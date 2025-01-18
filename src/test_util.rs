@@ -44,7 +44,6 @@ use crate::{
         },
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::{xml_strdup, XmlChar},
-        xmlwriter::{xml_free_text_writer, XmlTextWriterPtr},
     },
     parser::{
         xml_create_memory_parser_ctxt, xml_free_input_stream, xml_free_parser_ctxt,
@@ -343,28 +342,6 @@ pub(crate) fn gen_xml_xpath_context_ptr(_no: i32, _nr: i32) -> XmlXPathContextPt
 
 #[cfg(feature = "xpath")]
 pub(crate) fn des_xml_xpath_context_ptr(_no: i32, _val: XmlXPathContextPtr, _nr: i32) {}
-
-#[cfg(feature = "libxml_writer")]
-pub(crate) unsafe fn gen_xml_text_writer_ptr(no: i32, _nr: i32) -> XmlTextWriterPtr<'static> {
-    use crate::libxml::xmlwriter::xml_new_text_writer_filename;
-
-    if no == 0 {
-        return xml_new_text_writer_filename("test.out", 0);
-    }
-    null_mut()
-}
-
-#[cfg(feature = "libxml_writer")]
-pub(crate) unsafe fn des_xml_text_writer_ptr(_no: i32, val: XmlTextWriterPtr, _nr: i32) {
-    if !val.is_null() {
-        xml_free_text_writer(val);
-    }
-}
-
-#[cfg(feature = "libxml_writer")]
-pub(crate) unsafe fn desret_xml_text_writer_ptr(val: XmlTextWriterPtr) {
-    xml_free_text_writer(val);
-}
 
 #[cfg(feature = "schema")]
 pub(crate) fn gen_unsigned_long(no: i32, _nr: i32) -> u64 {

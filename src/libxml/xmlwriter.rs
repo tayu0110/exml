@@ -25,13 +25,13 @@
 // alfred@mickautsch.de
 
 use std::{
+    borrow::Cow,
     cell::{Cell, RefCell},
     collections::VecDeque,
     ffi::{c_char, CStr},
     io::{self, Write},
-    mem::size_of,
     os::raw::c_void,
-    ptr::{drop_in_place, null_mut},
+    ptr::null_mut,
     rc::Rc,
 };
 
@@ -42,14 +42,13 @@ use crate::{
     globals::GenericErrorContext,
     io::XmlOutputBuffer,
     libxml::{
-        globals::{xml_free, xml_malloc},
+        globals::xml_free,
         htmltree::html_new_doc_no_dtd,
         parser::{
             xml_create_push_parser_ctxt, xml_parse_chunk, XmlParserInputState, XmlSAXHandler,
             XML_DEFAULT_VERSION,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
-        xmlstring::{xml_strdup, XmlChar},
     },
     list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
@@ -95,23 +94,226 @@ struct XmlTextWriterNsStackEntry {
     elem: Option<Rc<XmlTextWriterStackEntry>>,
 }
 
-pub type XmlTextWriterPtr<'a> = *mut XmlTextWriter<'a>;
 #[repr(C)]
 pub struct XmlTextWriter<'a> {
     out: XmlOutputBuffer<'a>,                     /* output buffer */
     nodes: VecDeque<Rc<XmlTextWriterStackEntry>>, /* element name stack */
     nsstack: XmlList<XmlTextWriterNsStackEntry>,  /* name spaces stack */
     level: i32,
-    indent: i32,         /* enable indent */
-    doindent: i32,       /* internal indent flag */
-    ichar: *mut XmlChar, /* indent character */
-    qchar: u8,           /* character used for quoting attribute values */
+    indent: i32,              /* enable indent */
+    doindent: i32,            /* internal indent flag */
+    ichar: Cow<'static, str>, /* indent character */
+    qchar: u8,                /* character used for quoting attribute values */
     ctxt: XmlParserCtxtPtr,
     no_doc_free: i32,
     doc: XmlDocPtr,
 }
 
-impl XmlTextWriter<'_> {
+impl<'a> XmlTextWriter<'a> {
+    /// Create a new xmlNewTextWriter structure using an xmlOutputBufferPtr
+    ///
+    /// # Note
+    /// The @out parameter will be deallocated when the writer is closed
+    /// (if the call succeed.)
+    ///
+    /// Returns the new xmlTextWriterPtr or NULL in case of error
+    #[doc(alias = "xmlNewTextWriter")]
+    pub unsafe fn new(out: XmlOutputBuffer<'a>) -> XmlTextWriter {
+        Self {
+            nsstack: XmlList::new(
+                None,
+                Rc::new(|d1, d2| {
+                    if std::ptr::eq(d1, d2) {
+                        return std::cmp::Ordering::Equal;
+                    }
+
+                    let mut rc = d1.prefix.cmp(&d2.prefix);
+
+                    if !rc.is_eq() {
+                        rc = std::cmp::Ordering::Less;
+                    }
+                    match (d1.elem.as_ref(), d2.elem.as_ref()) {
+                        (Some(d1), Some(d2)) => {
+                            if !Rc::ptr_eq(d1, d2) {
+                                rc = std::cmp::Ordering::Less;
+                            }
+                        }
+                        (None, None) => {}
+                        _ => rc = std::cmp::Ordering::Less,
+                    }
+                    rc
+                }),
+            ),
+            out,
+            ichar: Cow::Borrowed(" "),
+            qchar: b'"',
+            doc: xml_new_doc(None),
+            no_doc_free: 0,
+            nodes: VecDeque::new(),
+            ..Default::default()
+        }
+    }
+
+    /// Create a new xmlNewTextWriter structure with @uri as output
+    ///
+    /// Returns the new xmlTextWriterPtr or NULL in case of error
+    #[doc(alias = "xmlNewTextWriterFilename")]
+    pub unsafe fn from_filename<'b: 'a>(uri: &'b str, compression: i32) -> Option<Self> {
+        let Some(out) = XmlOutputBuffer::from_uri(uri, None, compression) else {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlIOEIO,
+                "xmlNewTextWriterFilename : cannot open uri\n",
+            );
+            return None;
+        };
+
+        let mut ret = XmlTextWriter::new(out);
+        ret.indent = 0;
+        ret.doindent = 0;
+        Some(ret)
+    }
+
+    /// Create a new xmlNewTextWriter structure with @ctxt as output
+    /// NOTE: the @ctxt context will be freed with the resulting writer
+    ///       (if the call succeeds).
+    /// TODO: handle compression
+    ///
+    /// Returns the new xmlTextWriterPtr or NULL in case of error
+    #[doc(alias = "xmlNewTextWriterPushParser")]
+    pub unsafe fn from_push_parser(ctxt: XmlParserCtxtPtr, _compression: i32) -> Option<Self> {
+        if ctxt.is_null() {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterPushParser : invalid context!\n",
+            );
+            return None;
+        }
+
+        let Some(out) = XmlOutputBuffer::from_writer(TextWriterPushContext { context: ctxt }, None)
+        else {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterPushParser : error at xmlOutputBufferCreateIO!\n",
+            );
+            return None;
+        };
+
+        let mut ret = XmlTextWriter::new(out);
+        ret.ctxt = ctxt;
+        Some(ret)
+    }
+
+    /// Create a new xmlNewTextWriter structure with @*doc as output
+    ///
+    /// Returns the new xmlTextWriterPtr or NULL in case of error
+    #[doc(alias = "xmlNewTextWriterDoc")]
+    pub unsafe fn with_doc(doc: *mut XmlDocPtr, compression: i32) -> Option<Self> {
+        let mut sax_handler = XmlSAXHandler::default();
+        xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
+        sax_handler.start_document = Some(xml_text_writer_start_document_callback);
+        sax_handler.start_element = Some(xml_sax2_start_element);
+        sax_handler.end_element = Some(xml_sax2_end_element);
+
+        let ctxt: XmlParserCtxtPtr =
+            xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, None);
+        if ctxt.is_null() {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
+            );
+            return None;
+        }
+        // For some reason this seems to completely break if node names are interned.
+        (*ctxt).dict_names = 0;
+
+        (*ctxt).my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
+        if (*ctxt).my_doc.is_null() {
+            xml_free_parser_ctxt(ctxt);
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterDoc : error at xmlNewDoc!\n",
+            );
+            return None;
+        }
+
+        let Some(mut ret) = XmlTextWriter::from_push_parser(ctxt, compression) else {
+            xml_free_doc((*ctxt).my_doc);
+            xml_free_parser_ctxt(ctxt);
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n",
+            );
+            return None;
+        };
+
+        (*(*ctxt).my_doc).set_compress_mode(compression);
+
+        if !doc.is_null() {
+            *doc = (*ctxt).my_doc;
+            ret.no_doc_free = 1;
+        }
+
+        Some(ret)
+    }
+
+    /// Create a new xmlNewTextWriter structure with @doc as output starting at @node
+    ///
+    /// Returns the new xmlTextWriterPtr or NULL in case of error
+    #[doc(alias = "xmlNewTextWriterTree")]
+    pub unsafe fn with_tree(doc: XmlDocPtr, node: XmlNodePtr, compression: i32) -> Option<Self> {
+        if doc.is_null() {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterTree : invalid document tree!\n",
+            );
+            return None;
+        }
+
+        let mut sax_handler = XmlSAXHandler::default();
+        xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
+        sax_handler.start_document = Some(xml_text_writer_start_document_callback);
+        sax_handler.start_element = Some(xml_sax2_start_element);
+        sax_handler.end_element = Some(xml_sax2_end_element);
+
+        let ctxt: XmlParserCtxtPtr =
+            xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, None);
+        if ctxt.is_null() {
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
+            );
+            return None;
+        }
+        // For some reason this seems to completely break if node names are interned.
+        (*ctxt).dict_names = 0;
+
+        let Some(mut ret) = XmlTextWriter::from_push_parser(ctxt, compression) else {
+            xml_free_parser_ctxt(ctxt);
+            xml_writer_err_msg(
+                None,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n",
+            );
+            return None;
+        };
+
+        (*ctxt).my_doc = doc;
+        (*ctxt).node = node;
+        ret.no_doc_free = 1;
+
+        (*doc).set_compress_mode(compression);
+
+        Some(ret)
+    }
+
     /// Write state dependent strings.
     ///
     /// Returns -1 on error or the number of characters written.
@@ -173,21 +375,9 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns -1 on error or 0 otherwise.
     #[doc(alias = "xmlTextWriterSetIndentString")]
-    pub unsafe fn set_indent_string(&mut self, str: *const XmlChar) -> i32 {
-        if str.is_null() {
-            return -1;
-        }
-
-        if !self.ichar.is_null() {
-            xml_free(self.ichar as _);
-        }
-        self.ichar = xml_strdup(str);
-
-        if self.ichar.is_null() {
-            -1
-        } else {
-            0
-        }
+    pub unsafe fn set_indent_string(&mut self, indent: &str) -> i32 {
+        self.ichar = Cow::Owned(indent.to_owned());
+        0
     }
 
     /// Set the character used for quoting attributes.
@@ -335,8 +525,7 @@ impl XmlTextWriter<'_> {
             return Err(io::Error::other("List is empty"));
         }
         for _ in 0..lksize - 1 {
-            self.out
-                .write_str(CStr::from_ptr(self.ichar as _).to_string_lossy().as_ref())?;
+            self.out.write_str(&self.ichar)?;
         }
 
         Ok(lksize - 1)
@@ -354,7 +543,7 @@ impl XmlTextWriter<'_> {
     ) -> io::Result<usize> {
         if self.nodes.front().is_some() {
             xml_writer_err_msg(
-                self,
+                Some(self),
                 XmlParserErrors::XmlErrInternalError,
                 "xmlTextWriterStartDocument : not allowed in this context!\n",
             );
@@ -366,7 +555,7 @@ impl XmlTextWriter<'_> {
         let encoder = if let Some(encoding) = encoding {
             let Some(encoder) = find_encoding_handler(encoding) else {
                 xml_writer_err_msg(
-                    self,
+                    Some(self),
                     XmlParserErrors::XmlErrUnsupportedEncoding,
                     "xmlTextWriterStartDocument : unsupported encoding\n",
                 );
@@ -880,7 +1069,7 @@ impl XmlTextWriter<'_> {
         }
 
         if target.eq_ignore_ascii_case("xml") {
-            xml_writer_err_msg(self, XmlParserErrors::XmlErrInternalError,
+            xml_writer_err_msg(Some(self), XmlParserErrors::XmlErrInternalError,
                         "xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!\n");
             return Err(io::Error::other(
             "xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!",
@@ -905,7 +1094,7 @@ impl XmlTextWriter<'_> {
                 | XmlTextWriterState::XmlTextwriterDTD => {}
                 XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
                     xml_writer_err_msg(
-                        self,
+                        Some(self),
                         XmlParserErrors::XmlErrInternalError,
                         "xmlTextWriterStartPI : nested PI!\n",
                     );
@@ -993,7 +1182,7 @@ impl XmlTextWriter<'_> {
                 }
                 XmlTextWriterState::XmlTextwriterCDATA => {
                     xml_writer_err_msg(
-                        self,
+                        Some(self),
                         XmlParserErrors::XmlErrInternalError,
                         "xmlTextWriterStartCDATA : CDATA not allowed in this context!\n",
                     );
@@ -1113,7 +1302,7 @@ impl XmlTextWriter<'_> {
     pub unsafe fn end_comment(&mut self) -> io::Result<usize> {
         let Some(lk) = self.nodes.front() else {
             xml_writer_err_msg(
-                self,
+                Some(self),
                 XmlParserErrors::XmlErrInternalError,
                 "xmlTextWriterEndComment : not allowed in this context!\n",
             );
@@ -1156,7 +1345,7 @@ impl XmlTextWriter<'_> {
 
         if self.nodes.front().is_some() {
             xml_writer_err_msg(
-                self,
+                Some(self),
                 XmlParserErrors::XmlErrInternalError,
                 "xmlTextWriterStartDTD : DTD allowed only in prolog!\n",
             );
@@ -1177,7 +1366,7 @@ impl XmlTextWriter<'_> {
         if let Some(pubid) = pubid {
             if sysid.is_none() {
                 xml_writer_err_msg(
-                    self,
+                    Some(self),
                     XmlParserErrors::XmlErrInternalError,
                     "xmlTextWriterStartDTD : system identifier needed!\n",
                 );
@@ -1581,7 +1770,7 @@ impl XmlTextWriter<'_> {
         ndataid: Option<&str>,
     ) -> io::Result<usize> {
         let Some(lk) = self.nodes.front() else {
-            xml_writer_err_msg(self, XmlParserErrors::XmlErrInternalError,
+            xml_writer_err_msg(Some(self), XmlParserErrors::XmlErrInternalError,
                         "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!\n");
             return Err(io::Error::other(
             "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!",
@@ -1592,13 +1781,13 @@ impl XmlTextWriter<'_> {
             XmlTextWriterState::XmlTextwriterDTDEnty => {}
             XmlTextWriterState::XmlTextwriterDTDPEnt => {
                 if ndataid.is_some() {
-                    xml_writer_err_msg(self, XmlParserErrors::XmlErrInternalError,
+                    xml_writer_err_msg(Some(self), XmlParserErrors::XmlErrInternalError,
                                 "xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!\n");
                     return Err(io::Error::other("xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!"));
                 }
             }
             _ => {
-                xml_writer_err_msg(self, XmlParserErrors::XmlErrInternalError,
+                xml_writer_err_msg(Some(self), XmlParserErrors::XmlErrInternalError,
                             "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!\n");
                 return Err(io::Error::other("xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!"));
             }
@@ -1608,7 +1797,7 @@ impl XmlTextWriter<'_> {
         if let Some(pubid) = pubid {
             if sysid.is_none() {
                 xml_writer_err_msg(
-                    self,
+                    Some(self),
                     XmlParserErrors::XmlErrInternalError,
                     "xmlTextWriterWriteDTDExternalEntityContents: system identifier needed!\n",
                 );
@@ -1742,7 +1931,7 @@ impl Default for XmlTextWriter<'_> {
             level: 0,
             indent: 0,
             doindent: 0,
-            ichar: null_mut(),
+            ichar: Cow::Borrowed(" "),
             qchar: b'"',
             ctxt: null_mut(),
             no_doc_free: 0,
@@ -1751,15 +1940,37 @@ impl Default for XmlTextWriter<'_> {
     }
 }
 
+impl Drop for XmlTextWriter<'_> {
+    /// Deallocate all the resources associated to the writer
+    #[doc(alias = "xmlFreeTextWriter")]
+    fn drop(&mut self) {
+        self.out.flush();
+
+        unsafe {
+            if !self.ctxt.is_null() {
+                if !(*self.ctxt).my_doc.is_null() && self.no_doc_free == 0 {
+                    xml_free_doc((*self.ctxt).my_doc);
+                    (*self.ctxt).my_doc = null_mut();
+                }
+                xml_free_parser_ctxt(self.ctxt);
+            }
+
+            if !self.doc.is_null() {
+                xml_free_doc(self.doc);
+            }
+        }
+    }
+}
+
 /// Handle a writer error
 #[doc(alias = "xmlWriterErrMsg")]
-unsafe fn xml_writer_err_msg(ctxt: XmlTextWriterPtr, error: XmlParserErrors, msg: &str) {
-    if !ctxt.is_null() {
+unsafe fn xml_writer_err_msg(ctxt: Option<&XmlTextWriter>, error: XmlParserErrors, msg: &str) {
+    if let Some(ctxt) = ctxt {
         __xml_raise_error!(
             None,
             None,
             None,
-            (*ctxt).ctxt as _,
+            ctxt.ctxt as _,
             null_mut(),
             XmlErrorDomain::XmlFromWriter,
             error,
@@ -1793,102 +2004,6 @@ unsafe fn xml_writer_err_msg(ctxt: XmlTextWriterPtr, error: XmlParserErrors, msg
             msg,
         );
     }
-}
-
-/// Create a new xmlNewTextWriter structure using an xmlOutputBufferPtr
-///
-/// # Note
-/// The @out parameter will be deallocated when the writer is closed
-/// (if the call succeed.)
-///
-/// Returns the new xmlTextWriterPtr or NULL in case of error
-#[doc(alias = "xmlNewTextWriter")]
-pub unsafe fn xml_new_text_writer(out: XmlOutputBuffer) -> XmlTextWriterPtr {
-    let ret: XmlTextWriterPtr = xml_malloc(size_of::<XmlTextWriter>()) as XmlTextWriterPtr;
-    if ret.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlNewTextWriter : out of memory!\n",
-        );
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlTextWriter::default());
-
-    (*ret).nsstack = XmlList::new(
-        None,
-        Rc::new(|d1, d2| {
-            if std::ptr::eq(d1, d2) {
-                return std::cmp::Ordering::Equal;
-            }
-
-            let mut rc = d1.prefix.cmp(&d2.prefix);
-
-            if !rc.is_eq() {
-                rc = std::cmp::Ordering::Less;
-            }
-            match (d1.elem.as_ref(), d2.elem.as_ref()) {
-                (Some(d1), Some(d2)) => {
-                    if !Rc::ptr_eq(d1, d2) {
-                        rc = std::cmp::Ordering::Less;
-                    }
-                }
-                (None, None) => {}
-                _ => rc = std::cmp::Ordering::Less,
-            }
-            rc
-        }),
-    );
-
-    (*ret).out = out;
-    (*ret).ichar = xml_strdup(c" ".as_ptr() as _);
-    (*ret).qchar = b'"';
-
-    if (*ret).ichar.is_null() {
-        drop_in_place(ret);
-        xml_free(ret as _);
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlNewTextWriter : out of memory!\n",
-        );
-        return null_mut();
-    }
-
-    (*ret).doc = xml_new_doc(None);
-
-    (*ret).no_doc_free = 0;
-
-    ret
-}
-
-/// Create a new xmlNewTextWriter structure with @uri as output
-///
-/// Returns the new xmlTextWriterPtr or NULL in case of error
-#[doc(alias = "xmlNewTextWriterFilename")]
-pub unsafe fn xml_new_text_writer_filename(uri: &str, compression: i32) -> XmlTextWriterPtr {
-    let Some(out) = XmlOutputBuffer::from_uri(uri, None, compression) else {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlIOEIO,
-            "xmlNewTextWriterFilename : cannot open uri\n",
-        );
-        return null_mut();
-    };
-
-    let ret: XmlTextWriterPtr = xml_new_text_writer(out);
-    if ret.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlNewTextWriterFilename : out of memory!\n",
-        );
-        return null_mut();
-    }
-
-    (*ret).indent = 0;
-    (*ret).doindent = 0;
-    ret
 }
 
 /// Handle a writer error
@@ -1999,51 +2114,6 @@ impl Drop for TextWriterPushContext {
     }
 }
 
-/// Create a new xmlNewTextWriter structure with @ctxt as output
-/// NOTE: the @ctxt context will be freed with the resulting writer
-///       (if the call succeeds).
-/// TODO: handle compression
-///
-/// Returns the new xmlTextWriterPtr or NULL in case of error
-#[doc(alias = "xmlNewTextWriterPushParser")]
-pub unsafe fn xml_new_text_writer_push_parser(
-    ctxt: XmlParserCtxtPtr,
-    _compression: i32,
-) -> XmlTextWriterPtr<'static> {
-    if ctxt.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterPushParser : invalid context!\n",
-        );
-        return null_mut();
-    }
-
-    let Some(out) = XmlOutputBuffer::from_writer(TextWriterPushContext { context: ctxt }, None)
-    else {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterPushParser : error at xmlOutputBufferCreateIO!\n",
-        );
-        return null_mut();
-    };
-
-    let ret: XmlTextWriterPtr = xml_new_text_writer(out);
-    if ret.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterPushParser : error at xmlNewTextWriter!\n",
-        );
-        return null_mut();
-    }
-
-    (*ret).ctxt = ctxt;
-
-    ret
-}
-
 /// called at the start of document processing.
 #[doc(alias = "xmlTextWriterStartDocumentCallback")]
 unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContext>) {
@@ -2076,7 +2146,7 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
         #[cfg(not(feature = "html"))]
         {
             xml_writer_err_msg(
-                null_mut(),
+                None,
                 XmlParserErrors::XmlErrInternalError,
                 c"libxml2 built without HTML support\n".as_ptr() as _,
             );
@@ -2120,152 +2190,6 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
             (*(*ctxt).my_doc).url = (*(*ctxt).input).filename.clone()
         }
     }
-}
-
-/// Create a new xmlNewTextWriter structure with @*doc as output
-///
-/// Returns the new xmlTextWriterPtr or NULL in case of error
-#[doc(alias = "xmlNewTextWriterDoc")]
-pub unsafe fn xml_new_text_writer_doc(
-    doc: *mut XmlDocPtr,
-    compression: i32,
-) -> XmlTextWriterPtr<'static> {
-    let mut sax_handler = XmlSAXHandler::default();
-    xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
-    sax_handler.start_document = Some(xml_text_writer_start_document_callback);
-    sax_handler.start_element = Some(xml_sax2_start_element);
-    sax_handler.end_element = Some(xml_sax2_end_element);
-
-    let ctxt: XmlParserCtxtPtr =
-        xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, None);
-    if ctxt.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
-        );
-        return null_mut();
-    }
-    // For some reason this seems to completely break if node names are interned.
-    (*ctxt).dict_names = 0;
-
-    (*ctxt).my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
-    if (*ctxt).my_doc.is_null() {
-        xml_free_parser_ctxt(ctxt);
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterDoc : error at xmlNewDoc!\n",
-        );
-        return null_mut();
-    }
-
-    let ret: XmlTextWriterPtr = xml_new_text_writer_push_parser(ctxt, compression);
-    if ret.is_null() {
-        xml_free_doc((*ctxt).my_doc);
-        xml_free_parser_ctxt(ctxt);
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n",
-        );
-        return null_mut();
-    }
-
-    (*(*ctxt).my_doc).set_compress_mode(compression);
-
-    if !doc.is_null() {
-        *doc = (*ctxt).my_doc;
-        (*ret).no_doc_free = 1;
-    }
-
-    ret
-}
-
-/// Create a new xmlNewTextWriter structure with @doc as output starting at @node
-///
-/// Returns the new xmlTextWriterPtr or NULL in case of error
-#[doc(alias = "xmlNewTextWriterTree")]
-pub unsafe fn xml_new_text_writer_tree(
-    doc: XmlDocPtr,
-    node: XmlNodePtr,
-    compression: i32,
-) -> XmlTextWriterPtr<'static> {
-    if doc.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterTree : invalid document tree!\n",
-        );
-        return null_mut();
-    }
-
-    let mut sax_handler = XmlSAXHandler::default();
-    xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
-    sax_handler.start_document = Some(xml_text_writer_start_document_callback);
-    sax_handler.start_element = Some(xml_sax2_start_element);
-    sax_handler.end_element = Some(xml_sax2_end_element);
-
-    let ctxt: XmlParserCtxtPtr =
-        xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, None);
-    if ctxt.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
-        );
-        return null_mut();
-    }
-    // For some reason this seems to completely break if node names are interned.
-    (*ctxt).dict_names = 0;
-
-    let ret: XmlTextWriterPtr = xml_new_text_writer_push_parser(ctxt, compression);
-    if ret.is_null() {
-        xml_free_parser_ctxt(ctxt);
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n",
-        );
-        return null_mut();
-    }
-
-    (*ctxt).my_doc = doc;
-    (*ctxt).node = node;
-    (*ret).no_doc_free = 1;
-
-    (*doc).set_compress_mode(compression);
-
-    ret
-}
-
-/// Deallocate all the resources associated to the writer
-#[doc(alias = "xmlFreeTextWriter")]
-pub unsafe fn xml_free_text_writer(writer: XmlTextWriterPtr) {
-    if writer.is_null() {
-        return;
-    }
-
-    (*writer).out.flush();
-    (*writer).out = XmlOutputBuffer::default();
-
-    if !(*writer).ctxt.is_null() {
-        if !(*(*writer).ctxt).my_doc.is_null() && (*writer).no_doc_free == 0 {
-            xml_free_doc((*(*writer).ctxt).my_doc);
-            (*(*writer).ctxt).my_doc = null_mut();
-        }
-        xml_free_parser_ctxt((*writer).ctxt);
-    }
-
-    if !(*writer).doc.is_null() {
-        xml_free_doc((*writer).doc);
-    }
-
-    if !(*writer).ichar.is_null() {
-        xml_free((*writer).ichar as _);
-    }
-    drop_in_place(writer);
-    xml_free(writer as _);
 }
 
 const B64LINELEN: usize = 72;
@@ -2376,93 +2300,4 @@ unsafe fn xml_output_buffer_write_bin_hex(
     }
 
     Ok(sum)
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
-
-    use super::*;
-
-    #[test]
-    fn test_xml_new_text_writer_push_parser() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_compression in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let mut ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                    let compression = gen_int(n_compression, 1);
-
-                    let ret_val = xml_new_text_writer_push_parser(ctxt, compression);
-                    if !ctxt.is_null() {
-                        xml_free_doc((*ctxt).my_doc);
-                        (*ctxt).my_doc = null_mut();
-                    }
-                    if !ret_val.is_null() {
-                        ctxt = null_mut();
-                    }
-                    desret_xml_text_writer_ptr(ret_val);
-                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_int(n_compression, compression, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewTextWriterPushParser",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlNewTextWriterPushParser()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_compression);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_text_writer_tree() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    for n_compression in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let node = gen_xml_node_ptr(n_node, 1);
-                        let compression = gen_int(n_compression, 2);
-
-                        let ret_val = xml_new_text_writer_tree(doc, node, compression);
-                        desret_xml_text_writer_ptr(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_xml_node_ptr(n_node, node, 1);
-                        des_int(n_compression, compression, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNewTextWriterTree",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlNewTextWriterTree()"
-                            );
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_node);
-                            eprintln!(" {}", n_compression);
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
