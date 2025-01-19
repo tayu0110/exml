@@ -20,7 +20,7 @@
 
 use std::{
     borrow::Cow, collections::HashMap, ffi::CStr, os::raw::c_void, ptr::null_mut,
-    sync::atomic::Ordering,
+    slice::from_raw_parts, sync::atomic::Ordering,
 };
 
 use libc::memset;
@@ -437,12 +437,7 @@ impl XmlDoc {
         cur = value;
         let end: *const XmlChar = cur.add(len as usize);
 
-        let buf = xml_buf_create_size(0);
-        if buf.is_null() {
-            return null_mut();
-        }
-        xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-
+        let mut buf = vec![];
         q = cur;
         while cur < end && *cur != 0 {
             if *cur.add(0) == b'&' {
@@ -450,10 +445,8 @@ impl XmlDoc {
                 let mut tmp: XmlChar;
 
                 // Save the current text.
-                if cur != q && xml_buf_add(buf, q, cur.offset_from(q) as _) != 0 {
-                    // goto out;
-                    xml_buf_free(buf);
-                    return ret;
+                if cur != q {
+                    buf.extend(from_raw_parts(q, cur.offset_from(q) as usize));
                 }
                 // q = cur;
                 if cur.add(2) < end && *cur.add(1) == b'#' && *cur.add(2) == b'x' {
@@ -548,7 +541,6 @@ impl XmlDoc {
                             q.as_deref(),
                         );
                         // goto out;
-                        xml_buf_free(buf);
                         return ret;
                     }
                     if cur != q {
@@ -561,24 +553,23 @@ impl XmlDoc {
                         if !ent.is_null()
                             && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
                         {
-                            if xml_buf_cat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
-                                // goto out;
-                                xml_buf_free(buf);
-                                return ret;
-                            }
+                            buf.extend(
+                                CStr::from_ptr((*ent).content.load(Ordering::Relaxed) as *const i8)
+                                    .to_bytes(),
+                            );
                         } else {
                             // Flush buffer so far
-                            if xml_buf_is_empty(buf) == 0 {
+                            if !buf.is_empty() {
                                 node = xml_new_doc_text(self, null_mut());
                                 if node.is_null() {
                                     if !val.is_null() {
                                         xml_free(val as _);
                                     }
                                     // goto out;
-                                    xml_buf_free(buf);
                                     return ret;
                                 }
-                                (*node).content = xml_buf_detach(buf);
+                                (*node).content = xml_strndup(buf.as_ptr(), buf.len() as i32);
+                                buf.clear();
 
                                 if last.is_null() {
                                     last = node;
@@ -598,7 +589,6 @@ impl XmlDoc {
                                     xml_free(val as _);
                                 }
                                 // goto out;
-                                xml_buf_free(buf);
                                 return ret;
                             } else if !ent.is_null()
                                 && (*ent).flags & XML_ENT_PARSED as i32 == 0
@@ -638,12 +628,7 @@ impl XmlDoc {
 
                     let l: i32 = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
                     buffer[l as usize] = 0;
-
-                    if xml_buf_cat(buf, buffer.as_ptr() as _) != 0 {
-                        // goto out;
-                        xml_buf_free(buf);
-                        return ret;
-                    }
+                    buf.extend_from_slice(&buffer[..l as usize]);
                     // charval = 0;
                 }
             } else {
@@ -653,21 +638,17 @@ impl XmlDoc {
 
         if cur != q {
             // Handle the last piece of text.
-            if xml_buf_add(buf, q, cur.offset_from(q) as _) != 0 {
-                // goto out;
-                xml_buf_free(buf);
-                return ret;
-            }
+            buf.extend(from_raw_parts(q, cur.offset_from(q) as usize));
         }
 
-        if xml_buf_is_empty(buf) == 0 {
+        if !buf.is_empty() {
             node = xml_new_doc_text(self, null_mut());
             if node.is_null() {
                 // goto out;
-                xml_buf_free(buf);
                 return ret;
             }
-            (*node).content = xml_buf_detach(buf);
+            (*node).content = xml_strndup(buf.as_ptr(), buf.len() as i32);
+            buf.clear();
 
             if last.is_null() {
                 ret = node;
@@ -679,7 +660,6 @@ impl XmlDoc {
         }
 
         // out:
-        xml_buf_free(buf);
         ret
     }
 
