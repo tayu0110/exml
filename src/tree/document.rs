@@ -38,12 +38,11 @@ use crate::{
 };
 
 use super::{
-    xml_buf_add, xml_buf_cat, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_is_empty,
-    xml_buf_set_allocation_scheme, xml_free_node_list, xml_get_doc_entity, xml_new_doc_text,
-    xml_new_reference, xml_tree_err, xml_tree_err_memory, NodeCommon, NodePtr,
-    XmlBufferAllocationScheme, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlEntityPtr,
-    XmlEntityType, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XmlRef, XML_ENT_EXPANDING,
-    XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
+    xml_free_node_list, xml_get_doc_entity, xml_new_doc_text, xml_new_reference, xml_tree_err,
+    xml_tree_err_memory, NodeCommon, NodePtr, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType,
+    XmlEntityPtr, XmlEntityType, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XmlRef,
+    XML_ENT_EXPANDING, XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    __XML_REGISTER_CALLBACKS,
 };
 
 /// An XML document.
@@ -156,12 +155,7 @@ impl XmlDoc {
             return null_mut();
         }
 
-        let buf = xml_buf_create_size(0);
-        if buf.is_null() {
-            return null_mut();
-        }
-        xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-
+        let mut buf = vec![];
         q = cur;
         while *cur != 0 {
             if *cur.add(0) == b'&' {
@@ -169,16 +163,9 @@ impl XmlDoc {
                 let mut tmp: XmlChar;
 
                 // Save the current text.
-                if cur != q && xml_buf_add(buf, q, cur.offset_from(q) as _) != 0 {
+                if cur != q {
+                    buf.extend(from_raw_parts(q, cur.offset_from(q) as usize));
                     // goto out;
-                    xml_buf_free(buf);
-                    if !val.is_null() {
-                        xml_free(val as _);
-                    }
-                    if !head.is_null() {
-                        xml_free_node_list(head);
-                    }
-                    return ret;
                 }
                 // q = cur;
                 if *cur.add(1) == b'#' && *cur.add(2) == b'x' {
@@ -249,7 +236,6 @@ impl XmlDoc {
                             q.as_deref(),
                         );
                         // goto out;
-                        xml_buf_free(buf);
                         if !val.is_null() {
                             xml_free(val as _);
                         }
@@ -268,24 +254,16 @@ impl XmlDoc {
                         if ent.is_null()
                             && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
                         {
-                            if xml_buf_cat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
-                                // goto out;
-                                xml_buf_free(buf);
-                                if !val.is_null() {
-                                    xml_free(val as _);
-                                }
-                                if !head.is_null() {
-                                    xml_free_node_list(head);
-                                }
-                                return ret;
-                            }
+                            buf.extend(
+                                CStr::from_ptr((*ent).content.load(Ordering::Relaxed) as *const i8)
+                                    .to_bytes(),
+                            );
                         } else {
                             // Flush buffer so far
-                            if xml_buf_is_empty(buf) == 0 {
+                            if !buf.is_empty() {
                                 node = xml_new_doc_text(self, null_mut());
                                 if node.is_null() {
                                     // goto out;
-                                    xml_buf_free(buf);
                                     if !val.is_null() {
                                         xml_free(val as _);
                                     }
@@ -294,7 +272,8 @@ impl XmlDoc {
                                     }
                                     return ret;
                                 }
-                                (*node).content = xml_buf_detach(buf);
+                                (*node).content = xml_strndup(buf.as_ptr(), buf.len() as i32);
+                                buf.clear();
 
                                 if last.is_null() {
                                     last = node;
@@ -311,7 +290,6 @@ impl XmlDoc {
                             );
                             if node.is_null() {
                                 // goto out;
-                                xml_buf_free(buf);
                                 if !val.is_null() {
                                     xml_free(val as _);
                                 }
@@ -358,18 +336,7 @@ impl XmlDoc {
 
                     let len: i32 = xml_copy_char_multi_byte(buffer.as_mut_ptr() as _, charval);
                     buffer[len as usize] = 0;
-
-                    if xml_buf_cat(buf, buffer.as_ptr() as _) != 0 {
-                        // goto out;
-                        xml_buf_free(buf);
-                        if !val.is_null() {
-                            xml_free(val as _);
-                        }
-                        if !head.is_null() {
-                            xml_free_node_list(head);
-                        }
-                        return ret;
-                    }
+                    buf.extend_from_slice(&buffer[..len as usize]);
                     // charval = 0;
                 }
             } else {
@@ -378,14 +345,13 @@ impl XmlDoc {
         }
         if cur != q || head.is_null() {
             // Handle the last piece of text.
-            xml_buf_add(buf, q, cur.offset_from(q) as _);
+            buf.extend(from_raw_parts(q, cur.offset_from(q) as usize));
         }
 
-        if xml_buf_is_empty(buf) == 0 {
+        if !buf.is_empty() {
             node = xml_new_doc_text(self, null_mut());
             if node.is_null() {
                 // goto out;
-                xml_buf_free(buf);
                 if !val.is_null() {
                     xml_free(val as _);
                 }
@@ -394,7 +360,8 @@ impl XmlDoc {
                 }
                 return ret;
             }
-            (*node).content = xml_buf_detach(buf);
+            (*node).content = xml_strndup(buf.as_ptr(), buf.len() as i32);
+            buf.clear();
 
             if last.is_null() {
                 head = node;
@@ -407,7 +374,6 @@ impl XmlDoc {
         head = null_mut();
 
         // out:
-        xml_buf_free(buf);
         if !val.is_null() {
             xml_free(val as _);
         }
