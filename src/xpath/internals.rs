@@ -67,8 +67,8 @@ use crate::{
         },
     },
     tree::{
-        xml_build_qname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr,
-        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlDoc, XmlElementType, XmlNodePtr, XmlNs,
+        XML_XML_NAMESPACE,
     },
     xpath::{
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
@@ -675,7 +675,7 @@ pub(crate) unsafe extern "C" fn xml_xpath_release_object(
                         if !node.is_null()
                             && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
                         {
-                            xml_xpath_node_set_free_ns(node as XmlNsPtr);
+                            xml_xpath_node_set_free_ns(node as *mut XmlNs);
                         }
                     }
                 } else if nodeset.node_tab.len() == 1
@@ -685,7 +685,7 @@ pub(crate) unsafe extern "C" fn xml_xpath_release_object(
                             XmlElementType::XmlNamespaceDecl
                         ))
                 {
-                    xml_xpath_node_set_free_ns(nodeset.node_tab[0] as XmlNsPtr);
+                    xml_xpath_node_set_free_ns(nodeset.node_tab[0] as *mut XmlNs);
                 }
                 nodeset.node_tab.clear();
                 *obj = XmlXPathObject {
@@ -1788,7 +1788,7 @@ pub const XML_NODESET_DEFAULT: usize = 10;
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNodeSetDupNs")]
-pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: XmlNsPtr) -> XmlNodePtr {
+pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: *mut XmlNs) -> XmlNodePtr {
     if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
@@ -1797,7 +1797,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: XmlNsPt
     }
 
     // Allocate a new Namespace and fill the fields.
-    let cur: XmlNsPtr = xml_malloc(size_of::<XmlNs>()) as XmlNsPtr;
+    let cur: *mut XmlNs = xml_malloc(size_of::<XmlNs>()) as *mut XmlNs;
     if cur.is_null() {
         xml_xpath_err_memory(null_mut(), Some("duplicating namespace\n"));
         return null_mut();
@@ -1810,7 +1810,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: XmlNsPt
     if (*ns).prefix().is_some() {
         (*cur).prefix = xml_strdup((*ns).prefix);
     }
-    (*cur).next = node as XmlNsPtr;
+    (*cur).next = node as *mut XmlNs;
     cur as XmlNodePtr
 }
 
@@ -4293,7 +4293,7 @@ unsafe fn xml_xpath_next_preceding_internal(
         if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
             cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
         } else if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-            let ns: XmlNsPtr = cur as XmlNsPtr;
+            let ns: *mut XmlNs = cur as *mut XmlNs;
 
             if (*ns).next.is_null() || matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
             {
@@ -4415,7 +4415,7 @@ unsafe fn xml_xpath_node_set_filter(
 
     let xpctxt: XmlXPathContextPtr = (*ctxt).context;
     let oldnode: XmlNodePtr = (*xpctxt).node;
-    let olddoc: XmlDocPtr = (*xpctxt).doc;
+    let olddoc: *mut XmlDoc = (*xpctxt).doc;
     let oldcs: i32 = (*xpctxt).context_size;
     let oldpp: i32 = (*xpctxt).proximity_position;
     let filter_op: XmlXPathStepOpPtr = (*(*ctxt).comp).steps.add(filter_op_index as usize);
@@ -4463,7 +4463,7 @@ unsafe fn xml_xpath_node_set_filter(
             // Remove the entry from the initial node set.
             set.node_tab[i] = null_mut();
             if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-                xml_xpath_node_set_free_ns(node as XmlNsPtr);
+                xml_xpath_node_set_free_ns(node as *mut XmlNs);
             }
         }
 
@@ -4485,7 +4485,7 @@ unsafe fn xml_xpath_node_set_filter(
             let node: XmlNodePtr = set.node_tab[i];
             if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
             {
-                xml_xpath_node_set_free_ns(node as XmlNsPtr);
+                xml_xpath_node_set_free_ns(node as *mut XmlNs);
             }
             i += 1;
         }
@@ -4635,7 +4635,7 @@ macro_rules! xp_test_hit_ns {
                 $has_ns_nodes = true;
                 if $seq
                     .as_deref_mut()
-                    .map_or(-1, |seq| seq.add_ns((*$xpctxt).node, $cur as XmlNsPtr))
+                    .map_or(-1, |seq| seq.add_ns((*$xpctxt).node, $cur as *mut XmlNs))
                     < 0
                 {
                     (*$ctxt).error = XmlXPathError::XPathMemoryError as i32;
@@ -4646,7 +4646,7 @@ macro_rules! xp_test_hit_ns {
             $has_ns_nodes = true;
             if $seq
                 .as_deref_mut()
-                .map_or(-1, |seq| seq.add_ns((*$xpctxt).node, $cur as XmlNsPtr))
+                .map_or(-1, |seq| seq.add_ns((*$xpctxt).node, $cur as *mut XmlNs))
                 < 0
             {
                 (*$ctxt).error = XmlXPathError::XPathMemoryError as i32;
@@ -4992,7 +4992,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                             }
                         }
                         XmlElementType::XmlAttributeNode => {
-                            let attr: XmlAttrPtr = (*cur).as_attribute_node().unwrap().as_ptr();
+                            let attr: *mut XmlAttr = (*cur).as_attribute_node().unwrap().as_ptr();
 
                             if xml_str_equal(name, (*attr).name) {
                                 if prefix.is_null() {
@@ -5008,7 +5008,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                         }
                         XmlElementType::XmlNamespaceDecl => {
                             if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-                                let ns: XmlNsPtr = cur as XmlNsPtr;
+                                let ns: *mut XmlNs = cur as *mut XmlNs;
 
                                 if (*ns).prefix().is_some()
                                     && !name.is_null()
@@ -5307,7 +5307,7 @@ unsafe fn xml_xpath_node_set_keep_last(set: Option<&mut XmlNodeSet>) {
     let len = set.node_tab.len();
     for node in set.node_tab.drain(..len - 1) {
         if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-            xml_xpath_node_set_free_ns(node as XmlNsPtr);
+            xml_xpath_node_set_free_ns(node as *mut XmlNs);
         }
     }
 }
@@ -5333,7 +5333,7 @@ unsafe extern "C" fn xml_xpath_location_set_filter(
 
     let xpctxt: XmlXPathContextPtr = (*ctxt).context;
     let oldnode: XmlNodePtr = (*xpctxt).node;
-    let olddoc: XmlDocPtr = (*xpctxt).doc;
+    let olddoc: *mut XmlDoc = (*xpctxt).doc;
     let oldcs: i32 = (*xpctxt).context_size;
     let oldpp: i32 = (*xpctxt).proximity_position;
     let filter_op: XmlXPathStepOpPtr = (*(*ctxt).comp).steps.add(filter_op_index as usize);
@@ -7278,7 +7278,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
             return *string.add(0) as u32 + ((*string.add(1) as u32) << 8);
         }
         XmlElementType::XmlNamespaceDecl => {
-            string = (*(node as XmlNsPtr)).href;
+            string = (*(node as *mut XmlNs)).href;
             if string.is_null() {
                 return 0;
             }
@@ -8716,7 +8716,7 @@ pub unsafe fn xml_xpath_next_parent(ctxt: XmlXPathParserContextPtr, cur: XmlNode
                 return parent.as_ptr();
             }
             XmlElementType::XmlAttributeNode => {
-                let att: XmlAttrPtr = (*(*(*ctxt).context).node)
+                let att: *mut XmlAttr = (*(*(*ctxt).context).node)
                     .as_attribute_node()
                     .unwrap()
                     .as_ptr();
@@ -8730,7 +8730,7 @@ pub unsafe fn xml_xpath_next_parent(ctxt: XmlXPathParserContextPtr, cur: XmlNode
                 return null_mut();
             }
             XmlElementType::XmlNamespaceDecl => {
-                let ns: XmlNsPtr = (*(*ctxt).context).node as XmlNsPtr;
+                let ns: *mut XmlNs = (*(*ctxt).context).node as *mut XmlNs;
 
                 if !(*ns).next.is_null()
                     && !matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
@@ -8826,7 +8826,7 @@ pub unsafe fn xml_xpath_next_following(
         if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
             cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
         } else if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-            let ns: XmlNsPtr = cur as XmlNsPtr;
+            let ns: *mut XmlNs = cur as *mut XmlNs;
 
             if (*ns).next.is_null() || matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
             {
@@ -8997,7 +8997,7 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
         if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
             cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
         } else if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-            let ns: XmlNsPtr = cur as XmlNsPtr;
+            let ns: *mut XmlNs = cur as *mut XmlNs;
 
             if (*ns).next.is_null() || matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
             {
@@ -9087,7 +9087,7 @@ pub unsafe fn xml_xpath_next_ancestor(
                 return parent.as_ptr();
             }
             XmlElementType::XmlAttributeNode => {
-                let tmp: XmlAttrPtr = (*(*(*ctxt).context).node)
+                let tmp: *mut XmlAttr = (*(*(*ctxt).context).node)
                     .as_attribute_node()
                     .unwrap()
                     .as_ptr();
@@ -9101,7 +9101,7 @@ pub unsafe fn xml_xpath_next_ancestor(
                 return null_mut();
             }
             XmlElementType::XmlNamespaceDecl => {
-                let ns: XmlNsPtr = (*(*ctxt).context).node as XmlNsPtr;
+                let ns: *mut XmlNs = (*(*ctxt).context).node as *mut XmlNs;
 
                 if !(*ns).next.is_null()
                     && !matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
@@ -9147,12 +9147,12 @@ pub unsafe fn xml_xpath_next_ancestor(
             parent.as_ptr()
         }
         XmlElementType::XmlAttributeNode => {
-            let att: XmlAttrPtr = (*cur).as_attribute_node().unwrap().as_ptr();
+            let att: *mut XmlAttr = (*cur).as_attribute_node().unwrap().as_ptr();
 
             (*att).parent.map_or(null_mut(), |p| p.as_ptr())
         }
         XmlElementType::XmlNamespaceDecl => {
-            let ns: XmlNsPtr = cur as XmlNsPtr;
+            let ns: *mut XmlNs = cur as *mut XmlNs;
 
             if !(*ns).next.is_null()
                 && !matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
@@ -9282,7 +9282,7 @@ pub unsafe fn xml_xpath_count_function(ctxt: XmlXPathParserContextPtr, nargs: i3
 /// Returns a node-set of selected elements.
 #[doc(alias = "xmlXPathGetElementsByIds")]
 unsafe fn xml_xpath_get_elements_by_ids(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     mut ids: *const XmlChar,
 ) -> Option<Box<XmlNodeSet>> {
     let mut cur: *const XmlChar = ids;
@@ -9496,7 +9496,7 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: XmlXPathParserContextPtr, mut 
                     }
                 }
                 XmlElementType::XmlNamespaceDecl => {
-                    let prefix = (*(table[i] as XmlNsPtr)).prefix();
+                    let prefix = (*(table[i] as *mut XmlNs)).prefix();
                     value_push(
                         ctxt,
                         xml_xpath_cache_new_string((*ctxt).context, prefix.as_deref()),
@@ -10321,7 +10321,7 @@ pub unsafe fn xml_xpath_boolean_function(ctxt: XmlXPathParserContextPtr, nargs: 
 /// parent node in the XPath semantic. Check if such a node needs to be freed
 #[doc(alias = "xmlXPathNodeSetFreeNs")]
 #[cfg(feature = "xpath")]
-pub(crate) unsafe fn xml_xpath_node_set_free_ns(ns: XmlNsPtr) {
+pub(crate) unsafe fn xml_xpath_node_set_free_ns(ns: *mut XmlNs) {
     if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
         return;
     }

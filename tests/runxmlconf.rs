@@ -30,7 +30,7 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_input_from_file, xml_new_parser_ctxt,
         xml_read_file, XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
+    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlDocProperties, XmlElementType, XmlNodePtr},
     xpath::{
         xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
     },
@@ -182,7 +182,7 @@ unsafe fn xmlconf_test_invalid(
         test_log!(logfile, "test {id} : {filename} out of memory\n",);
         return 0;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
+    let doc: *mut XmlDoc = xml_ctxt_read_file(ctxt, filename, None, options);
     if doc.is_null() {
         test_log!(
             logfile,
@@ -217,7 +217,7 @@ unsafe fn xmlconf_test_valid(
         test_log!(logfile, "test {id} : {filename} out of memory\n",);
         return 0;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
+    let doc: *mut XmlDoc = xml_ctxt_read_file(ctxt, filename, None, options);
     if doc.is_null() {
         test_log!(
             logfile,
@@ -251,7 +251,7 @@ unsafe fn xmlconf_test_not_nswf(
 
     // In case of Namespace errors, libxml2 will still parse the document
     // but log a Namespace error.
-    let doc: XmlDocPtr = xml_read_file(filename, None, options);
+    let doc: *mut XmlDoc = xml_read_file(filename, None, options);
     if doc.is_null() {
         test_log!(logfile, "test {id} : {filename} failed to parse the XML\n",);
         NB_ERRORS += 1;
@@ -281,7 +281,7 @@ unsafe fn xmlconf_test_not_wf(
 ) -> i32 {
     let mut ret: i32 = 1;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, options);
+    let doc: *mut XmlDoc = xml_read_file(filename, None, options);
     if !doc.is_null() {
         test_log!(
             logfile,
@@ -296,7 +296,7 @@ unsafe fn xmlconf_test_not_wf(
 
 unsafe extern "C" fn xmlconf_test_item(
     logfile: &mut Option<File>,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     cur: XmlNodePtr,
 ) -> c_int {
     let mut ret: c_int = -1;
@@ -427,7 +427,7 @@ unsafe extern "C" fn xmlconf_test_item(
 
 unsafe extern "C" fn xmlconf_test_cases(
     logfile: &mut Option<File>,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     mut cur: XmlNodePtr,
     mut level: c_int,
 ) -> c_int {
@@ -470,7 +470,7 @@ unsafe extern "C" fn xmlconf_test_cases(
 
 unsafe extern "C" fn xmlconf_test_suite(
     logfile: &mut Option<File>,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     mut cur: XmlNodePtr,
 ) -> c_int {
     let mut ret: c_int = 0;
@@ -513,7 +513,7 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         xmlconf_info();
         return -1;
     }
-    let doc: XmlDocPtr = xml_read_file(confxml, None, XmlParserOption::XmlParseNoEnt as i32);
+    let doc: *mut XmlDoc = xml_read_file(confxml, None, XmlParserOption::XmlParseNoEnt as i32);
     if doc.is_null() {
         eprintln!("{} is corrupted ", confxml);
         xmlconf_info();

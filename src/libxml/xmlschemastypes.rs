@@ -62,8 +62,8 @@ use crate::{
     },
     tree::{
         xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
-        xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType,
-        XmlElementType, XmlEntityPtr, XmlEntityType, XmlNodePtr, XmlNsPtr,
+        xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttr, XmlAttributeType,
+        XmlElementType, XmlEntity, XmlEntityType, XmlNodePtr, XmlNs,
     },
     xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };
@@ -2716,7 +2716,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     let mut prefix: *mut XmlChar = null_mut();
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
-                                    let ns: XmlNsPtr = (*node).search_ns(
+                                    let ns: *mut XmlNs = (*node).search_ns(
                                         (*node).doc,
                                         (!prefix.is_null())
                                             .then(|| {
@@ -2789,7 +2789,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: XmlAttrPtr =
+                                    let attr: *mut XmlAttr =
                                         (*node).as_attribute_node().unwrap().as_ptr();
 
                                     // NOTE: the IDness might have already be declared in the DTD
@@ -2842,7 +2842,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: XmlAttrPtr =
+                                    let attr: *mut XmlAttr =
                                         (*node).as_attribute_node().unwrap().as_ptr();
 
                                     let strip: *mut XmlChar = xml_schema_strip(value);
@@ -2886,7 +2886,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: XmlAttrPtr =
+                                    let attr: *mut XmlAttr =
                                         (*node).as_attribute_node().unwrap().as_ptr();
 
                                     (*attr).atype = Some(XmlAttributeType::XmlAttributeIDREFS);
@@ -2901,7 +2901,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     ret = 3;
                                 }
                                 if ret == 0 {
-                                    let ent: XmlEntityPtr;
+                                    let ent: *mut XmlEntity;
 
                                     strip = xml_schema_strip(value);
                                     if !strip.is_null() {
@@ -2933,7 +2933,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: XmlAttrPtr =
+                                    let attr: *mut XmlAttr =
                                         (*node).as_attribute_node().unwrap().as_ptr();
 
                                     (*attr).atype = Some(XmlAttributeType::XmlAttributeEntity);
@@ -2959,7 +2959,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: XmlAttrPtr =
+                                    let attr: *mut XmlAttr =
                                         (*node).as_attribute_node().unwrap().as_ptr();
 
                                     (*attr).atype = Some(XmlAttributeType::XmlAttributeEntities);
@@ -2976,7 +2976,7 @@ unsafe fn xml_schema_val_atomic_type(
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
                                     if !prefix.is_null() {
-                                        let ns: XmlNsPtr = (*node).search_ns(
+                                        let ns: *mut XmlNs = (*node).search_ns(
                                             (*node).doc,
                                             Some(
                                                 CStr::from_ptr(prefix as *const i8)

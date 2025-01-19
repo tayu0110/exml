@@ -43,8 +43,8 @@ use crate::{
     io::{write_quoted, XmlOutputBuffer},
     list::XmlList,
     tree::{
-        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc,
-        XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlDoc, XmlElementType, XmlNode,
+        XmlNodePtr, XmlNs, XML_XML_NAMESPACE,
     },
     uri::build_uri,
     xpath::XmlNodeSet,
@@ -97,7 +97,7 @@ pub struct XmlC14NVisibleNsStack {
     ns_cur_end: usize,         /* number of nodes in the set */
     ns_prev_start: usize,      /* the beginning of the stack for previous visible node */
     ns_prev_end: usize,        /* the end of the stack for previous visible node */
-    ns_tab: Vec<XmlNsPtr>,     /* array of ns in no particular order */
+    ns_tab: Vec<*mut XmlNs>,   /* array of ns in no particular order */
     node_tab: Vec<XmlNodePtr>, /* array of nodes in no particular order */
 }
 
@@ -155,7 +155,7 @@ impl XmlC14NVisibleNsStack {
     }
 
     #[doc(alias = "xmlC14NVisibleNsStackAdd")]
-    fn add(&mut self, ns: XmlNsPtr, node: XmlNodePtr) {
+    fn add(&mut self, ns: *mut XmlNs, node: XmlNodePtr) {
         if self.ns_cur_end == self.ns_tab.len() {
             self.ns_tab.push(ns);
             self.node_tab.push(node);
@@ -400,7 +400,7 @@ impl<T> XmlC14NCtx<'_, T> {
     /// Returns 0 on success or -1 on fail.
     #[doc(alias = "xmlC14NProcessAttrsAxis")]
     unsafe fn process_attrs_axis(&mut self, cur: &XmlNode, parent_visible: bool) -> i32 {
-        let mut attrs_to_delete: XmlAttrPtr = null_mut();
+        let mut attrs_to_delete: *mut XmlAttr = null_mut();
 
         if !matches!(cur.element_type(), XmlElementType::XmlElementNode) {
             xml_c14n_err_param("processing attributes axis");
@@ -505,9 +505,9 @@ impl<T> XmlC14NCtx<'_, T> {
                 // as ordinary attributes.
 
                 // special processing for 1.1 spec
-                let mut xml_base_attr: XmlAttrPtr = null_mut();
-                let mut xml_lang_attr: XmlAttrPtr = null_mut();
-                let mut xml_space_attr: XmlAttrPtr = null_mut();
+                let mut xml_base_attr: *mut XmlAttr = null_mut();
+                let mut xml_lang_attr: *mut XmlAttr = null_mut();
+                let mut xml_space_attr: *mut XmlAttr = null_mut();
 
                 // Add all visible attributes from current node.
                 let mut attr = cur.properties;
@@ -946,7 +946,7 @@ impl<T> XmlC14NCtx<'_, T> {
     /// Returns 0 on success or -1 on fail.
     #[doc(alias = "xmlExcC14NProcessNamespacesAxis")]
     unsafe fn exc_c14n_process_namespaces_axis(&mut self, cur: &mut XmlNode, visible: bool) -> i32 {
-        let mut ns: XmlNsPtr;
+        let mut ns: *mut XmlNs;
         let mut has_empty_ns = false;
         let mut has_visibly_utilized_empty_ns = false;
         let mut has_empty_ns_in_inclusive_list = false;
@@ -1143,8 +1143,8 @@ impl<T> XmlC14NCtx<'_, T> {
         mut cur: Option<&XmlNode>,
         name: &str,
         ns: &str,
-    ) -> XmlAttrPtr {
-        let mut res: XmlAttrPtr;
+    ) -> *mut XmlAttr {
+        let mut res: *mut XmlAttr;
         while let Some(now) =
             cur.filter(|&now| !self.is_visible(Some(now), now.parent().map(|p| &*p.as_ptr() as _)))
         {
@@ -1163,9 +1163,9 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns the newly created attribute or NULL
     #[doc(alias = "xmlC14NFixupBaseAttr")]
-    unsafe fn fixup_base_attr(&mut self, xml_base_attr: &XmlAttr) -> XmlAttrPtr {
+    unsafe fn fixup_base_attr(&mut self, xml_base_attr: &XmlAttr) -> *mut XmlAttr {
         let mut cur: XmlNodePtr;
-        let mut attr: XmlAttrPtr;
+        let mut attr: *mut XmlAttr;
 
         let Some(parent) = xml_base_attr.parent() else {
             xml_c14n_err_param("processing xml:base attribute");
@@ -1247,7 +1247,7 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns 1 on success or 0 on fail.
     #[doc(alias = "xmlC14NPrintAttrs")]
-    unsafe fn print_attrs(&mut self, attr: XmlAttrPtr) -> bool {
+    unsafe fn print_attrs(&mut self, attr: *mut XmlAttr) -> bool {
         let buffer: *mut XmlChar;
 
         if attr.is_null() {
@@ -1658,7 +1658,7 @@ unsafe fn xml_c14n_err_relative_namespace(ns_uri: &str) {
 ///
 /// Returns -1 if ns1 < ns2, 0 if ns1 == ns2 or 1 if ns1 > ns2.
 #[doc(alias = "xmlC14NNsCompare")]
-unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> i32 {
+unsafe fn xml_c14n_ns_compare(ns1: *mut XmlNs, ns2: *mut XmlNs) -> i32 {
     if ns1 == ns2 {
         return 0;
     }
@@ -1678,7 +1678,7 @@ unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> i32 {
 /// Please refer to the document of `xmlC14NIsXmlNs` for original libxml2.
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlNs")]
-unsafe fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
+unsafe fn xml_c14n_is_xml_ns(ns: *mut XmlNs) -> bool {
     !ns.is_null()
         && xml_str_equal((*ns).prefix as _, c"xml".as_ptr() as _)
         && xml_str_equal((*ns).href as _, XML_XML_NAMESPACE.as_ptr() as _)
@@ -1712,7 +1712,7 @@ const XML_NAMESPACES_DEFAULT: usize = 16;
 ///
 /// Returns -1 if attr1 < attr2, 0 if attr1 == attr2 or 1 if attr1 > attr2.
 #[doc(alias = "xmlC14NAttrsCompare")]
-unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> i32 {
+unsafe fn xml_c14n_attrs_compare(attr1: *mut XmlAttr, attr2: *mut XmlAttr) -> i32 {
     // Simple cases
     if attr1 == attr2 {
         return 0;
@@ -1755,7 +1755,7 @@ unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> i32 {
 /// Return `true` if so, otherwise return false.
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlAttr")]
-unsafe fn xml_c14n_is_xml_attr(attr: XmlAttrPtr) -> bool {
+unsafe fn xml_c14n_is_xml_attr(attr: *mut XmlAttr) -> bool {
     !(*attr).ns.is_null() && xml_c14n_is_xml_ns((*attr).ns)
 }
 

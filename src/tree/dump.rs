@@ -41,7 +41,7 @@ use crate::{
     tree::is_xhtml,
 };
 
-use super::{XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr};
+use super::{XmlDoc, XmlElementType, XmlNode, XmlNodePtr};
 
 impl XmlDoc {
     /// Dump the current DOM tree into memory using the character encoding specified by the caller.  
@@ -410,7 +410,7 @@ impl XmlNode {
     pub unsafe fn dump_output(
         &mut self,
         buf: Rc<RefCell<XmlOutputBuffer>>,
-        doc: XmlDocPtr,
+        doc: *mut XmlDoc,
         level: i32,
         format: i32,
         mut encoding: Option<&str>,
@@ -460,7 +460,7 @@ impl XmlNode {
 
     /// Dump an XML/HTML node, recursive behaviour, children are printed too.
     #[doc(alias = "xmlElemDump")]
-    pub unsafe fn dump_file<'a>(&mut self, f: &mut (impl Write + 'a), doc: XmlDocPtr) {
+    pub unsafe fn dump_file<'a>(&mut self, f: &mut (impl Write + 'a), doc: *mut XmlDoc) {
         xml_init_parser();
 
         let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
@@ -496,7 +496,7 @@ impl XmlNode {
     pub unsafe fn dump_memory(
         &mut self,
         buf: &mut Vec<u8>,
-        doc: XmlDocPtr,
+        doc: *mut XmlDoc,
         level: i32,
         format: i32,
     ) -> usize {

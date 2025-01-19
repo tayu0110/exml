@@ -28,10 +28,8 @@ use crate::{
     },
 };
 
-use super::XmlAttributePtr;
+use super::XmlAttribute;
 
-/// An XML Element declaration from a DTD.
-pub type XmlElementPtr = *mut XmlElement;
 #[repr(C)]
 pub struct XmlElement {
     pub(crate) _private: *mut c_void, /* application data */
@@ -51,7 +49,7 @@ pub struct XmlElement {
 
     pub(crate) etype: XmlElementTypeVal,      /* The type */
     pub(crate) content: XmlElementContentPtr, /* the allowed element content */
-    pub(crate) attributes: XmlAttributePtr,   /* List of the declared attributes */
+    pub(crate) attributes: *mut XmlAttribute, /* List of the declared attributes */
     pub(crate) prefix: Option<String>,        /* the namespace prefix if any */
     #[cfg(feature = "libxml_regexp")]
     pub(crate) cont_model: XmlRegexpPtr, /* the validating regexp */

@@ -32,12 +32,6 @@ use super::{
     XmlNsType, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
-/// An XML namespace.
-/// Note that prefix == NULL is valid, it defines the default namespace
-/// within the subtree (until overridden).
-///
-/// xmlNsType is unified with xmlElementType.
-pub type XmlNsPtr = *mut XmlNs;
 #[repr(C)]
 pub struct XmlNs {
     pub next: *mut XmlNs,             /* next Ns link for this node  */
@@ -119,7 +113,11 @@ impl NodeCommon for XmlNs {
 ///
 /// Returns a new namespace pointer or NULL
 #[doc(alias = "xmlNewNs")]
-pub unsafe fn xml_new_ns(node: XmlNodePtr, href: *const XmlChar, prefix: Option<&str>) -> XmlNsPtr {
+pub unsafe fn xml_new_ns(
+    node: XmlNodePtr,
+    href: *const XmlChar,
+    prefix: Option<&str>,
+) -> *mut XmlNs {
     if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
         return null_mut();
     }
@@ -138,7 +136,7 @@ pub unsafe fn xml_new_ns(node: XmlNodePtr, href: *const XmlChar, prefix: Option<
     }
 
     // Allocate a new Namespace and fill the fields.
-    let cur: XmlNsPtr = xml_malloc(size_of::<XmlNs>()) as _;
+    let cur: *mut XmlNs = xml_malloc(size_of::<XmlNs>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building namespace");
         return null_mut();
@@ -159,7 +157,7 @@ pub unsafe fn xml_new_ns(node: XmlNodePtr, href: *const XmlChar, prefix: Option<
         if (*node).ns_def.is_null() {
             (*node).ns_def = cur;
         } else {
-            let mut prev: XmlNsPtr = (*node).ns_def;
+            let mut prev: *mut XmlNs = (*node).ns_def;
 
             if ((*prev).prefix.is_null() && (*cur).prefix.is_null())
                 || xml_str_equal((*prev).prefix, (*cur).prefix)
@@ -184,7 +182,7 @@ pub unsafe fn xml_new_ns(node: XmlNodePtr, href: *const XmlChar, prefix: Option<
 
 /// Free up the structures associated to a namespace
 #[doc(alias = "xmlFreeNs")]
-pub unsafe extern "C" fn xml_free_ns(cur: XmlNsPtr) {
+pub unsafe extern "C" fn xml_free_ns(cur: *mut XmlNs) {
     if cur.is_null() {
         return;
     }
@@ -199,8 +197,8 @@ pub unsafe extern "C" fn xml_free_ns(cur: XmlNsPtr) {
 
 /// Free up all the structures associated to the chained namespaces.
 #[doc(alias = "xmlFreeNsList")]
-pub unsafe fn xml_free_ns_list(mut cur: XmlNsPtr) {
-    let mut next: XmlNsPtr;
+pub unsafe fn xml_free_ns_list(mut cur: *mut XmlNs) {
+    let mut next: *mut XmlNs;
     if cur.is_null() {
         return;
     }

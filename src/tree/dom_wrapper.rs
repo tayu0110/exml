@@ -32,8 +32,8 @@ use crate::libxml::{
 use super::{
     xml_free_ns, xml_get_doc_entity, xml_new_ns, xml_search_ns_by_namespace_strict,
     xml_search_ns_by_prefix_strict, xml_tree_err_memory, xml_tree_nslist_lookup_by_prefix,
-    NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType,
-    XmlEntityPtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE,
+    NodeCommon, NodePtr, XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlEntity, XmlNode,
+    XmlNodePtr, XmlNs, XML_LOCAL_NAMESPACE,
 };
 
 /// A function called to acquire namespaces (xmlNs) from the wrapper.
@@ -45,7 +45,7 @@ pub type XmlDOMWrapAcquireNsFunction = unsafe fn(
     node: XmlNodePtr,
     ns_name: *const XmlChar,
     ns_prefix: *const XmlChar,
-) -> XmlNsPtr;
+) -> *mut XmlNs;
 
 /// Context for DOM wrapper-operations.
 pub type XmlDOMWrapCtxtPtr = *mut XmlDOMWrapCtxt;
@@ -78,9 +78,9 @@ pub type XmlNsMapItemPtr = *mut XmlNsMapItem;
 pub struct XmlNsMapItem {
     next: XmlNsMapItemPtr,
     prev: XmlNsMapItemPtr,
-    old_ns: XmlNsPtr,  /* old ns decl reference */
-    new_ns: XmlNsPtr,  /* new ns decl reference */
-    shadow_depth: i32, /* Shadowed at this depth */
+    old_ns: *mut XmlNs, /* old ns decl reference */
+    new_ns: *mut XmlNs, /* new ns decl reference */
+    shadow_depth: i32,  /* Shadowed at this depth */
     /// depth:
     /// `>= 0` == @node's ns-decls
     /// `-1`   == @parent's ns-decls
@@ -224,8 +224,8 @@ const XML_TREE_NSMAP_CUSTOM: i32 = -4;
 unsafe fn xml_dom_wrap_ns_map_add_item(
     nsmap: *mut XmlNsMapPtr,
     position: i32,
-    old_ns: XmlNsPtr,
-    new_ns: XmlNsPtr,
+    old_ns: *mut XmlNs,
+    new_ns: *mut XmlNs,
     depth: i32,
 ) -> XmlNsMapItemPtr {
     let ret: XmlNsMapItemPtr;
@@ -294,7 +294,7 @@ unsafe fn xml_dom_wrap_ns_map_add_item(
 #[doc(alias = "xmlDOMWrapNSNormGatherInScopeNs")]
 unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(map: *mut XmlNsMapPtr, node: XmlNodePtr) -> i32 {
     let mut cur: XmlNodePtr;
-    let mut ns: XmlNsPtr;
+    let mut ns: *mut XmlNs;
     let mut mi: XmlNsMapItemPtr;
     let mut shadowed: i32;
 
@@ -347,14 +347,14 @@ unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(map: *mut XmlNsMapPtr, node: X
 /// Returns 0 on success, -1 on internal errors.
 #[doc(alias = "xmlDOMWrapNSNormAddNsMapItem2")]
 unsafe fn xml_dom_wrap_ns_norm_add_ns_map_item2(
-    list: *mut *mut XmlNsPtr,
+    list: *mut *mut *mut XmlNs,
     size: *mut i32,
     number: *mut i32,
-    old_ns: XmlNsPtr,
-    new_ns: XmlNsPtr,
+    old_ns: *mut XmlNs,
+    new_ns: *mut XmlNs,
 ) -> i32 {
     if !(*list).is_null() {
-        *list = xml_malloc(6 * size_of::<XmlNsPtr>()) as _;
+        *list = xml_malloc(6 * size_of::<*mut XmlNs>()) as _;
         if !(*list).is_null() {
             xml_tree_err_memory("alloc ns map item");
             return -1;
@@ -363,7 +363,7 @@ unsafe fn xml_dom_wrap_ns_norm_add_ns_map_item2(
         *number = 0;
     } else if *number >= *size {
         *size *= 2;
-        *list = xml_realloc(*list as _, (*size) as usize * 2 * size_of::<XmlNsPtr>()) as _;
+        *list = xml_realloc(*list as _, (*size) as usize * 2 * size_of::<*mut XmlNs>()) as _;
         if !(*list).is_null() {
             xml_tree_err_memory("realloc ns map item");
             return -1;
@@ -381,11 +381,11 @@ unsafe fn xml_dom_wrap_ns_norm_add_ns_map_item2(
 /// Returns the acquired ns struct or null_mut() in case of an API or internal error.
 #[doc(alias = "xmlDOMWrapStoreNs")]
 unsafe fn xml_dom_wrap_store_ns(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     ns_name: *const XmlChar,
     prefix: Option<&str>,
-) -> XmlNsPtr {
-    let mut ns: XmlNsPtr;
+) -> *mut XmlNs {
+    let mut ns: *mut XmlNs;
 
     if doc.is_null() {
         return null_mut();
@@ -422,13 +422,13 @@ unsafe fn xml_dom_wrap_store_ns(
 /// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
 #[doc(alias = "xmlDOMWrapNSNormDeclareNsForced")]
 unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     elem: XmlNodePtr,
     ns_name: *const XmlChar,
     prefix: *const XmlChar,
     check_shadow: i32,
-) -> XmlNsPtr {
-    let ret: XmlNsPtr;
+) -> *mut XmlNs {
+    let ret: *mut XmlNs;
     let mut buf: [i8; 50] = [0; 50];
     let mut pref: *const XmlChar;
     let mut counter: i32 = 0;
@@ -474,7 +474,7 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
                 if (*elem).ns_def.is_null() {
                     (*elem).ns_def = ret;
                 } else {
-                    let mut ns2: XmlNsPtr = (*elem).ns_def;
+                    let mut ns2: *mut XmlNs = (*elem).ns_def;
                     while !(*ns2).next.is_null() {
                         ns2 = (*ns2).next;
                     }
@@ -518,10 +518,10 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
 #[allow(clippy::too_many_arguments)]
 #[doc(alias = "xmlDOMWrapNSNormAcquireNormalizedNs")]
 unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     elem: XmlNodePtr,
-    ns: XmlNsPtr,
-    ret_ns: *mut XmlNsPtr,
+    ns: *mut XmlNs,
+    ret_ns: *mut *mut XmlNs,
     ns_map: *mut XmlNsMapPtr,
     depth: i32,
     ancestors_only: i32,
@@ -575,7 +575,7 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
     // No luck, the namespace is out of scope or shadowed.
     if elem.is_null() {
         // Store ns-decls in "oldNs" of the document-node.
-        let tmpns: XmlNsPtr = xml_dom_wrap_store_ns(doc, (*ns).href, (*ns).prefix().as_deref());
+        let tmpns: *mut XmlNs = xml_dom_wrap_store_ns(doc, (*ns).href, (*ns).prefix().as_deref());
         if tmpns.is_null() {
             return -1;
         }
@@ -586,7 +586,7 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
         }
         *ret_ns = tmpns;
     } else {
-        let tmpns: XmlNsPtr =
+        let tmpns: *mut XmlNs =
             xml_dom_wrap_nsnorm_declare_ns_forced(doc, elem, (*ns).href, (*ns).prefix, 0);
         if tmpns.is_null() {
             return -1;
@@ -632,8 +632,8 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
     let mut depth: i32 = -1;
     let mut adoptns: i32;
     let mut parnsdone: i32 = 0;
-    let mut ns: XmlNsPtr = null_mut();
-    let mut prevns: XmlNsPtr;
+    let mut ns: *mut XmlNs = null_mut();
+    let mut prevns: *mut XmlNs;
     let mut cur: XmlNodePtr;
     let mut cur_elem: XmlNodePtr = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
@@ -646,7 +646,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
         } else {
             0
         };
-    let mut list_redund: *mut XmlNsPtr = null_mut();
+    let mut list_redund: *mut *mut XmlNs = null_mut();
     let mut size_redund: i32 = 0;
     let mut nb_redund: i32 = 0;
 
@@ -658,7 +658,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
     }
 
     let ret;
-    let doc: XmlDocPtr = (*elem).doc;
+    let doc: *mut XmlDoc = (*elem).doc;
     cur = elem;
     'exit: {
         'internal_error: {
@@ -1063,9 +1063,9 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
 #[doc(alias = "xmlDOMWrapAdoptBranch")]
 unsafe fn xml_dom_wrap_adopt_branch(
     ctxt: XmlDOMWrapCtxtPtr,
-    source_doc: XmlDocPtr,
+    source_doc: *mut XmlDoc,
     node: XmlNodePtr,
-    dest_doc: XmlDocPtr,
+    dest_doc: *mut XmlDoc,
     dest_parent: XmlNodePtr,
     _options: i32,
 ) -> i32 {
@@ -1074,7 +1074,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
     let mut cur_elem: XmlNodePtr = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
-    let mut ns: XmlNsPtr = null_mut();
+    let mut ns: *mut XmlNs = null_mut();
     let mut depth: i32 = -1;
     // gather @parent's ns-decls.
     let mut parnsdone: i32;
@@ -1392,7 +1392,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                 || !(*dest_doc).ext_subset.is_null()
                             {
                                 // Assign new entity-node if available.
-                                let ent: XmlEntityPtr =
+                                let ent: *mut XmlEntity =
                                     xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
                                 if !ent.is_null() {
                                     (*cur).content = (*ent).content.load(Ordering::Relaxed);
@@ -1496,9 +1496,9 @@ unsafe fn xml_dom_wrap_adopt_branch(
 #[doc(alias = "xmlDOMWrapAdoptAttr")]
 unsafe fn xml_dom_wrap_adopt_attr(
     ctxt: XmlDOMWrapCtxtPtr,
-    _source_doc: XmlDocPtr,
-    attr: XmlAttrPtr,
-    dest_doc: XmlDocPtr,
+    _source_doc: *mut XmlDoc,
+    attr: *mut XmlAttr,
+    dest_doc: *mut XmlDoc,
     dest_parent: XmlNodePtr,
     _options: i32,
 ) -> i32 {
@@ -1510,7 +1510,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
 
     (*attr).doc = dest_doc;
     if !(*attr).ns.is_null() {
-        let mut ns: XmlNsPtr = null_mut();
+        let mut ns: *mut XmlNs = null_mut();
 
         if !ctxt.is_null() { /* TODO: User defined. */ }
         // XML Namespace.
@@ -1575,7 +1575,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
                 (*cur).set_last(None);
                 if !(*dest_doc).int_subset.is_null() || !(*dest_doc).ext_subset.is_null() {
                     // Assign new entity-node if available.
-                    let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
+                    let ent: *mut XmlEntity = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
                     if !ent.is_null() {
                         (*cur).content = (*ent).content.load(Ordering::Relaxed);
                         (*cur).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
@@ -1630,9 +1630,9 @@ unsafe fn xml_dom_wrap_adopt_attr(
 #[doc(alias = "xmlDOMWrapAdoptNode")]
 pub unsafe fn xml_dom_wrap_adopt_node(
     ctxt: XmlDOMWrapCtxtPtr,
-    mut source_doc: XmlDocPtr,
+    mut source_doc: *mut XmlDoc,
     node: XmlNodePtr,
-    dest_doc: XmlDocPtr,
+    dest_doc: *mut XmlDoc,
     dest_parent: XmlNodePtr,
     options: i32,
 ) -> i32 {
@@ -1707,7 +1707,8 @@ pub unsafe fn xml_dom_wrap_adopt_node(
                 (*node).set_last(None);
                 if !(*dest_doc).int_subset.is_null() || !(*dest_doc).ext_subset.is_null() {
                     // Assign new entity-node if available.
-                    let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, &(*node).name().unwrap());
+                    let ent: *mut XmlEntity =
+                        xml_get_doc_entity(dest_doc, &(*node).name().unwrap());
                     if !ent.is_null() {
                         (*node).content = (*ent).content.load(Ordering::Relaxed);
                         (*node).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
@@ -1734,14 +1735,14 @@ pub unsafe fn xml_dom_wrap_adopt_node(
 #[doc(alias = "xmlDOMWrapRemoveNode")]
 pub unsafe fn xml_dom_wrap_remove_node(
     ctxt: XmlDOMWrapCtxtPtr,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     mut node: XmlNodePtr,
     _options: i32,
 ) -> i32 {
-    let mut list: *mut XmlNsPtr = null_mut();
+    let mut list: *mut *mut XmlNs = null_mut();
     let mut size_list: i32 = 0;
     let mut nb_list: i32 = 0;
-    let mut ns: XmlNsPtr;
+    let mut ns: *mut XmlNs;
 
     if node.is_null() || doc.is_null() || (*node).doc != doc {
         return -1;
@@ -2033,10 +2034,10 @@ pub unsafe fn xml_dom_wrap_remove_node(
 #[allow(clippy::too_many_arguments)]
 pub unsafe fn xml_dom_wrap_clone_node(
     ctxt: XmlDOMWrapCtxtPtr,
-    mut source_doc: XmlDocPtr,
+    mut source_doc: *mut XmlDoc,
     node: XmlNodePtr,
     res_node: *mut XmlNodePtr,
-    dest_doc: XmlDocPtr,
+    dest_doc: *mut XmlDoc,
     dest_parent: XmlNodePtr,
     deep: i32,
     _options: i32,
@@ -2046,7 +2047,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
     let mut cur_elem: XmlNodePtr = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
-    let mut ns: XmlNsPtr = null_mut();
+    let mut ns: *mut XmlNs = null_mut();
     let mut depth: i32 = -1;
     // let adoptStr: i32 = 1;
     // gather @parent's ns-decls.
@@ -2059,8 +2060,8 @@ pub unsafe fn xml_dom_wrap_clone_node(
     let mut clone: XmlNodePtr;
     let mut parent_clone: XmlNodePtr = null_mut();
     let mut prev_clone: XmlNodePtr = null_mut();
-    let mut clone_ns: XmlNsPtr;
-    let mut clone_ns_def_slot: *mut XmlNsPtr;
+    let mut clone_ns: *mut XmlNs;
+    let mut clone_ns_def_slot: *mut *mut XmlNs;
     // The destination dict
 
     if node.is_null() || res_node.is_null() || dest_doc.is_null() {
@@ -2288,7 +2289,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 || !(*dest_doc).ext_subset.is_null()
                             {
                                 // Different doc: Assign new entity-node if available.
-                                let ent: XmlEntityPtr =
+                                let ent: *mut XmlEntity =
                                     xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
                                 if !ent.is_null() {
                                     (*clone).content = (*ent).content.load(Ordering::Relaxed);

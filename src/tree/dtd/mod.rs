@@ -47,13 +47,10 @@ use crate::{
 };
 
 use super::{
-    xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType, XmlEntityPtr,
-    XmlNode, __XML_REGISTER_CALLBACKS,
+    xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlEntity, XmlNode,
+    __XML_REGISTER_CALLBACKS,
 };
 
-/// An XML DTD, as defined by <!DOCTYPE ... There is actually one for
-/// the internal subset and for the external subset.
-pub type XmlDtdPtr = *mut XmlDtd;
 #[repr(C)]
 pub struct XmlDtd {
     pub(crate) _private: *mut c_void,     /* application data */
@@ -68,12 +65,12 @@ pub struct XmlDtd {
 
     // End of common part
     pub(crate) notations: Option<Box<XmlHashTable<'static, XmlNotation>>>, /* Hash table for notations if any */
-    pub(crate) elements: Option<XmlHashTable<'static, XmlElementPtr>>, /* Hash table for elements if any */
-    pub(crate) attributes: Option<XmlHashTableRef<'static, XmlAttributePtr>>, /* Hash table for attributes if any */
-    pub(crate) entities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for entities if any */
+    pub(crate) elements: Option<XmlHashTable<'static, *mut XmlElement>>, /* Hash table for elements if any */
+    pub(crate) attributes: Option<XmlHashTableRef<'static, *mut XmlAttribute>>, /* Hash table for attributes if any */
+    pub(crate) entities: Option<XmlHashTableRef<'static, *mut XmlEntity>>, /* Hash table for entities if any */
     pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
     pub(crate) system_id: Option<String>,   /* URI for a SYSTEM or PUBLIC DTD */
-    pub(crate) pentities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for param entities if any */
+    pub(crate) pentities: Option<XmlHashTableRef<'static, *mut XmlEntity>>, /* Hash table for param entities if any */
 }
 
 impl XmlDtd {
@@ -83,7 +80,7 @@ impl XmlDtd {
     /// Returns A pointer to the entity structure or null_mut() if not found.
     #[doc(alias = "xmlGetEntityFromDtd")]
     #[cfg(feature = "libxml_tree")]
-    pub(super) fn get_entity(&self, name: &str) -> XmlEntityPtr {
+    pub(super) fn get_entity(&self, name: &str) -> *mut XmlEntity {
         if let Some(table) = self.entities {
             return table.lookup(name).map_or(null_mut(), |p| *p);
         }
@@ -96,7 +93,7 @@ impl XmlDtd {
     /// Returns A pointer to the entity structure or NULL if not found.
     #[doc(alias = "xmlGetParameterEntityFromDtd")]
     #[cfg(feature = "libxml_tree")]
-    pub(super) fn get_parameter_entity(&self, name: &str) -> XmlEntityPtr {
+    pub(super) fn get_parameter_entity(&self, name: &str) -> *mut XmlEntity {
         if let Some(table) = self.pentities {
             return table.lookup(name).map_or(null_mut(), |p| *p);
         }
@@ -107,7 +104,7 @@ impl XmlDtd {
     ///
     /// returns the xmlAttributePtr if found or null_mut()
     #[doc(alias = "xmlGetDtdAttrDesc")]
-    pub fn get_attr_desc(&self, elem: &str, name: &str) -> XmlAttributePtr {
+    pub fn get_attr_desc(&self, elem: &str, name: &str) -> *mut XmlAttribute {
         let Some(table) = self.attributes else {
             return null_mut();
         };
@@ -129,7 +126,12 @@ impl XmlDtd {
     ///
     /// returns the xmlAttributePtr if found or null_mut()
     #[doc(alias = "xmlGetDtdQAttrDesc")]
-    pub fn get_qattr_desc(&self, elem: &str, name: &str, prefix: Option<&str>) -> XmlAttributePtr {
+    pub fn get_qattr_desc(
+        &self,
+        elem: &str,
+        name: &str,
+        prefix: Option<&str>,
+    ) -> *mut XmlAttribute {
         let Some(table) = self.attributes else {
             return null_mut();
         };
@@ -214,17 +216,17 @@ impl NodeCommon for XmlDtd {
 /// Returns a pointer to the new DTD structure
 #[doc(alias = "xmlCreateIntSubset")]
 pub unsafe fn xml_create_int_subset(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
-) -> XmlDtdPtr {
+) -> *mut XmlDtd {
     if !doc.is_null() && !(*doc).get_int_subset().is_null() {
         return null_mut();
     }
 
     // Allocate a new DTD and fill the fields.
-    let cur: XmlDtdPtr = xml_malloc(size_of::<XmlDtd>()) as _;
+    let cur: *mut XmlDtd = xml_malloc(size_of::<XmlDtd>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building internal subset");
         return null_mut();
@@ -297,17 +299,17 @@ pub unsafe fn xml_create_int_subset(
 /// Returns a pointer to the new DTD structure
 #[doc(alias = "xmlNewDtd")]
 pub unsafe fn xml_new_dtd(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
-) -> XmlDtdPtr {
+) -> *mut XmlDtd {
     if !doc.is_null() && !(*doc).ext_subset.is_null() {
         return null_mut();
     }
 
     // Allocate a new DTD and fill the fields.
-    let cur: XmlDtdPtr = xml_malloc(size_of::<XmlDtd>()) as _;
+    let cur: *mut XmlDtd = xml_malloc(size_of::<XmlDtd>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building DTD");
         return null_mut();

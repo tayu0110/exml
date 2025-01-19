@@ -48,9 +48,8 @@ use crate::{
         valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
     },
     tree::{
-        is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributePtr,
-        XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlEntityPtr, XmlNodePtr, XmlNotation,
-        XmlNsPtr, XML_LOCAL_NAMESPACE,
+        is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttribute, XmlDoc, XmlDtd,
+        XmlElement, XmlElementType, XmlEntity, XmlNodePtr, XmlNotation, XmlNs, XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -266,7 +265,7 @@ impl<'a> XmlSaveCtxt<'a> {
     ///
     /// Returns the number of byte written or -1 in case of error
     #[doc(alias = "xmlSaveDoc")]
-    pub unsafe fn save_doc(&mut self, doc: XmlDocPtr) -> i64 {
+    pub unsafe fn save_doc(&mut self, doc: *mut XmlDoc) -> i64 {
         let ret: i64 = 0;
 
         if doc.is_null() {
@@ -329,9 +328,9 @@ impl<'a> XmlSaveCtxt<'a> {
 
     /// Dump an XML document.
     #[doc(alias = "xmlDocContentDumpOutput")]
-    pub(crate) unsafe fn doc_content_dump_output(&mut self, cur: XmlDocPtr) -> i32 {
+    pub(crate) unsafe fn doc_content_dump_output(&mut self, cur: *mut XmlDoc) -> i32 {
         #[cfg(feature = "html")]
-        let dtd: XmlDtdPtr;
+        let dtd: *mut XmlDtd;
         #[cfg(feature = "html")]
         let mut is_html = false;
         let oldenc = (*cur).encoding.clone();
@@ -634,7 +633,7 @@ fn escape_entities(src: &str, dst: &mut String) -> i32 {
 #[doc(alias = "xmlNsDumpOutput")]
 unsafe fn xml_ns_dump_output(
     mut buf: Option<&mut XmlOutputBuffer>,
-    cur: XmlNsPtr,
+    cur: *mut XmlNs,
     mut ctxt: Option<&mut XmlSaveCtxt>,
 ) {
     if cur.is_null() {
@@ -690,26 +689,26 @@ unsafe fn xml_buf_dump_notation_table<'a>(
 
 /// This will dump the content of the element declaration as an XML DTD definition
 #[doc(alias = "xmlBufDumpElementDecl")]
-unsafe fn xml_buf_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlElementPtr) {
+unsafe fn xml_buf_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: *mut XmlElement) {
     xml_dump_element_decl(buf, elem);
 }
 
 /// This will dump the content of the attribute declaration as an XML DTD definition
 #[doc(alias = "xmlBufDumpAttributeDecl")]
-unsafe fn xml_buf_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: XmlAttributePtr) {
+unsafe fn xml_buf_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: *mut XmlAttribute) {
     xml_dump_attribute_decl(buf, attr);
 }
 
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlBufDumpEntityDecl")]
-unsafe fn xml_buf_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
+unsafe fn xml_buf_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut XmlEntity) {
     xml_dump_entity_decl(buf, ent);
 }
 
 /// Dump a list of local namespace definitions to a save context.
 /// Should be called in the context of attribute dumps.
 #[doc(alias = "xmlNsListDumpOutputCtxt")]
-unsafe fn xml_ns_list_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, mut cur: XmlNsPtr) {
+unsafe fn xml_ns_list_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, mut cur: *mut XmlNs) {
     while !cur.is_null() {
         xml_ns_dump_output(None, cur, Some(ctxt));
         cur = (*cur).next;
@@ -777,7 +776,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
 
     let mut unformatted_node: XmlNodePtr = null_mut();
     let mut parent: XmlNodePtr;
-    let mut attr: XmlAttrPtr;
+    let mut attr: *mut XmlAttr;
     let mut start: *mut u8;
     let mut end: *mut u8;
 
@@ -1098,7 +1097,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
 
 /// Dump the XML document DTD, if any.
 #[doc(alias = "xmlDtdDumpOutput")]
-unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
+unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: *mut XmlDtd) {
     let mut cur: XmlNodePtr;
 
     if dtd.is_null() {
@@ -1161,23 +1160,23 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
 /// Dump a local Namespace definition to a save context.
 /// Should be called in the context of attribute dumps.
 #[doc(alias = "xmlNsDumpOutputCtxt")]
-unsafe fn xml_ns_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, cur: XmlNsPtr) {
+unsafe fn xml_ns_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, cur: *mut XmlNs) {
     xml_ns_dump_output(None, cur, Some(ctxt));
 }
 
 /// Dump a list of XML attributes
 #[doc(alias = "xhtmlAttrListDumpOutput")]
 #[cfg(feature = "html")]
-unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: XmlAttrPtr) {
+unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mut XmlAttr) {
     use crate::{
         libxml::htmltree::html_is_boolean_attr,
         tree::{xml_free_node, xml_new_doc_text, XmlNode},
     };
 
-    let mut xml_lang: XmlAttrPtr = null_mut();
-    let mut lang: XmlAttrPtr = null_mut();
-    let mut name: XmlAttrPtr = null_mut();
-    let mut id: XmlAttrPtr = null_mut();
+    let mut xml_lang: *mut XmlAttr = null_mut();
+    let mut lang: *mut XmlAttr = null_mut();
+    let mut name: *mut XmlAttr = null_mut();
+    let mut id: *mut XmlAttr = null_mut();
 
     if cur.is_null() {
         return;
@@ -1681,7 +1680,7 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlNodePtr
 
     xml_init_parser();
 
-    let doc: XmlDocPtr = (*cur).doc;
+    let doc: *mut XmlDoc = (*cur).doc;
     if !doc.is_null() {
         oldenc = (*doc).encoding.clone();
         if let Some(encoding) = ctxt.encoding.as_deref() {
@@ -1732,7 +1731,7 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlNodePtr
 #[doc(alias = "xmlBufAttrSerializeTxtContent")]
 pub(crate) unsafe fn attr_serialize_text_content<'a>(
     buf: &mut (impl Write + 'a),
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     attr: Option<&XmlAttr>,
     string: &str,
 ) {
@@ -1809,7 +1808,7 @@ pub(crate) unsafe fn attr_serialize_text_content<'a>(
 /// Dump a list of local Namespace definitions.
 /// Should be called in the context of attributes dumps.
 #[doc(alias = "xmlNsListDumpOutput")]
-pub(crate) unsafe fn xml_ns_list_dump_output(buf: &mut XmlOutputBuffer, mut cur: XmlNsPtr) {
+pub(crate) unsafe fn xml_ns_list_dump_output(buf: &mut XmlOutputBuffer, mut cur: *mut XmlNs) {
     while !cur.is_null() {
         xml_ns_dump_output(Some(buf), cur, None);
         cur = (*cur).next;

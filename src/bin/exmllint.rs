@@ -96,8 +96,8 @@ use exml::{
     save::{XmlSaveCtxt, XmlSaveOption},
     tree::{
         xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc,
-        xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
-        XmlElementContentPtr, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration,
+        xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd,
+        XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration,
         XmlNodePtr,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
@@ -1396,7 +1396,7 @@ fn resolve_entity_debug(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityDebug")]
-fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
+fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return null_mut();
@@ -1409,7 +1409,7 @@ fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityP
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityDebug")]
-fn get_parameter_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
+fn get_parameter_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return null_mut();
@@ -2272,7 +2272,7 @@ unsafe fn stream_file(filename: *mut c_char) {
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe fn walk_doc(doc: XmlDocPtr) {
+unsafe fn walk_doc(doc: *mut XmlDoc) {
     use std::{ptr::null, sync::atomic::Ordering};
 
     use exml::{
@@ -2451,7 +2451,7 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
 }
 
 #[cfg(feature = "xpath")]
-unsafe fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
+unsafe fn do_xpath_query(doc: *mut XmlDoc, query: *const c_char) {
     use exml::{
         tree::XmlNodePtr,
         xpath::{
@@ -2482,9 +2482,9 @@ unsafe fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
 // Tree Test processing
 
 unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr) {
-    let mut doc: XmlDocPtr = null_mut();
+    let mut doc: *mut XmlDoc = null_mut();
     #[cfg(feature = "libxml_tree")]
-    let tmp: XmlDocPtr;
+    let tmp: *mut XmlDoc;
 
     if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
         start_timer();
@@ -2778,7 +2778,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
     // Remove DOCTYPE nodes
     if CMD_ARGS.dropdtd {
-        let dtd: XmlDtdPtr = (*doc).get_int_subset();
+        let dtd: *mut XmlDtd = (*doc).get_int_subset();
         if !dtd.is_null() {
             (*dtd).unlink();
             (*doc).int_subset = null_mut();
@@ -3079,7 +3079,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     // A posteriori validation test
     #[cfg(feature = "libxml_valid")]
     if CMD_ARGS.dtdvalid.is_some() || CMD_ARGS.dtdvalidfpi.is_some() {
-        let dtd: XmlDtdPtr;
+        let dtd: *mut XmlDtd;
 
         if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();

@@ -51,10 +51,10 @@ use crate::{
         xml_get_predefined_entity, xml_new_cdata_block, xml_new_char_ref, xml_new_doc,
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
-        NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
-        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
-        XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        NodeCommon, NodePtr, XmlAttr, XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc,
+        XmlDocProperties, XmlDtd, XmlElement, XmlElementContentPtr, XmlElementType,
+        XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNodePtr, XmlNs,
+        __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -271,7 +271,7 @@ pub unsafe fn xml_sax2_internal_subset(
     if (*ctxt).my_doc.is_null() {
         return;
     }
-    let dtd: XmlDtdPtr = (*(*ctxt).my_doc).get_int_subset();
+    let dtd: *mut XmlDtd = (*(*ctxt).my_doc).get_int_subset();
     if !dtd.is_null() {
         if (*ctxt).html != 0 {
             return;
@@ -455,8 +455,8 @@ macro_rules! xml_fatal_err_msg {
 ///
 /// Returns the xmlEntityPtr if found.
 #[doc(alias = "xmlSAX2GetEntity")]
-pub unsafe fn xml_sax2_get_entity(ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
-    let mut ret: XmlEntityPtr;
+pub unsafe fn xml_sax2_get_entity(ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity {
+    let mut ret: *mut XmlEntity;
 
     if ctx.is_none() {
         return null_mut();
@@ -507,7 +507,7 @@ pub unsafe fn xml_sax2_get_entity(ctx: Option<GenericErrorContext>, name: &str) 
 pub unsafe fn xml_sax2_get_parameter_entity(
     ctx: Option<GenericErrorContext>,
     name: &str,
-) -> XmlEntityPtr {
+) -> *mut XmlEntity {
     if ctx.is_none() {
         return null_mut();
     }
@@ -599,7 +599,7 @@ pub unsafe fn xml_sax2_entity_decl(
     system_id: Option<&str>,
     content: Option<&str>,
 ) {
-    let ent: XmlEntityPtr;
+    let ent: *mut XmlEntity;
 
     if ctx.is_none() {
         return;
@@ -764,7 +764,7 @@ pub unsafe fn xml_sax2_attribute_decl(
     default_value: Option<&str>,
     tree: Option<Box<XmlEnumeration>>,
 ) {
-    let attr: XmlAttributePtr;
+    let attr: *mut XmlAttribute;
 
     if ctx.is_none() {
         return;
@@ -848,7 +848,7 @@ pub unsafe fn xml_sax2_element_decl(
     typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
 ) {
-    let elem: XmlElementPtr;
+    let elem: *mut XmlElement;
 
     if ctx.is_none() {
         return;
@@ -980,7 +980,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
     system_id: Option<&str>,
     notation_name: Option<&str>,
 ) {
-    let ent: XmlEntityPtr;
+    let ent: *mut XmlEntity;
     if ctx.is_none() {
         return;
     }
@@ -1082,7 +1082,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
 /// called when the document start being processed.
 #[doc(alias = "xmlSAX2StartDocument")]
 pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
-    let doc: XmlDocPtr;
+    let doc: *mut XmlDoc;
 
     if ctx.is_none() {
         return;
@@ -1334,10 +1334,12 @@ unsafe fn xml_sax2_attribute_internal(
     value: Option<&str>,
     prefix: Option<&str>,
 ) {
+    use crate::tree::XmlNs;
+
     use super::htmltree::html_is_boolean_attr;
 
     let nval: *mut XmlChar;
-    let namespace: XmlNsPtr;
+    let namespace: *mut XmlNs;
     let value = value.map(|v| CString::new(v).unwrap());
     let mut value = value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8);
 
@@ -1462,7 +1464,7 @@ unsafe fn xml_sax2_attribute_internal(
         }
 
         // a default namespace definition
-        let nsret: XmlNsPtr = xml_new_ns((*ctxt).node, val, None);
+        let nsret: *mut XmlNs = xml_new_ns((*ctxt).node, val, None);
 
         #[cfg(feature = "libxml_valid")]
         {
@@ -1544,7 +1546,7 @@ unsafe fn xml_sax2_attribute_internal(
         }
 
         // a standard namespace definition
-        let nsret: XmlNsPtr = xml_new_ns((*ctxt).node, val, Some(name));
+        let nsret: *mut XmlNs = xml_new_ns((*ctxt).node, val, Some(name));
         #[cfg(feature = "libxml_valid")]
         {
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
@@ -1585,7 +1587,7 @@ unsafe fn xml_sax2_attribute_internal(
                 name
             );
         } else {
-            let mut prop: XmlAttrPtr;
+            let mut prop: *mut XmlAttr;
 
             prop = (*(*ctxt).node).properties;
             while !prop.is_null() {
@@ -1617,7 +1619,7 @@ unsafe fn xml_sax2_attribute_internal(
     }
 
     // !!!!!! <a toto:arg="" xmlns:toto="http://toto.com">
-    let ret: XmlAttrPtr = xml_new_ns_prop((*ctxt).node, namespace, name, null());
+    let ret: *mut XmlAttr = xml_new_ns_prop((*ctxt).node, namespace, name, null());
     if ret.is_null() {
         // goto error;
         if !nval.is_null() {
@@ -1777,7 +1779,7 @@ unsafe fn xml_check_defaulted_attributes(
 ) {
     use crate::parser::build_qname;
 
-    let mut elem_decl: XmlElementPtr;
+    let mut elem_decl: *mut XmlElement;
     let mut internal: i32 = 1;
 
     elem_decl = xml_get_dtd_qelement_desc((*(*ctxt).my_doc).int_subset, name, prefix);
@@ -1789,7 +1791,7 @@ unsafe fn xml_check_defaulted_attributes(
     // process_external_subset:
     'process_external_subset: loop {
         if !elem_decl.is_null() {
-            let mut attr: XmlAttributePtr = (*elem_decl).attributes;
+            let mut attr: *mut XmlAttribute = (*elem_decl).attributes;
             // Check against defaulted attributes from the external subset
             // if the document is stamped as standalone
             if (*(*ctxt).my_doc).standalone == 1
@@ -1865,11 +1867,12 @@ unsafe fn xml_check_defaulted_attributes(
                         || ((*attr).prefix.is_none() && (*attr).name().as_deref() == Some("xmlns"))
                         || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
                     {
-                        let tst: XmlAttributePtr = (*(*(*ctxt).my_doc).int_subset).get_qattr_desc(
-                            (*attr).elem.as_deref().unwrap(),
-                            (*attr).name().as_deref().unwrap(),
-                            (*attr).prefix.as_deref(),
-                        );
+                        let tst: *mut XmlAttribute = (*(*(*ctxt).my_doc).int_subset)
+                            .get_qattr_desc(
+                                (*attr).elem.as_deref().unwrap(),
+                                (*attr).name().as_deref().unwrap(),
+                                (*attr).prefix.as_deref(),
+                            );
                         if tst == attr || tst.is_null() {
                             let name = (*attr).name().unwrap();
                             let fulln = build_qname(&name, (*attr).prefix.as_deref());
@@ -1913,10 +1916,10 @@ pub unsafe fn xml_sax2_start_element(
     fullname: &str,
     atts: &[(String, Option<String>)],
 ) {
-    use crate::libxml::parser_internals::XML_VCTXT_DTD_VALIDATED;
+    use crate::{libxml::parser_internals::XML_VCTXT_DTD_VALIDATED, tree::XmlNs};
 
     let mut parent: XmlNodePtr;
-    let mut ns: XmlNsPtr;
+    let mut ns: *mut XmlNs;
 
     if ctx.is_none() {
         return;
@@ -2114,8 +2117,8 @@ pub unsafe fn xml_sax2_start_element_ns(
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ret: XmlNodePtr;
-    let mut last: XmlNsPtr = null_mut();
-    let mut ns: XmlNsPtr;
+    let mut last: *mut XmlNs = null_mut();
+    let mut ns: *mut XmlNs;
 
     if ctx.is_none() {
         return;
@@ -2447,8 +2450,8 @@ unsafe fn xml_sax2_attribute_ns(
     prefix: *const XmlChar,
     value: *const XmlChar,
 ) {
-    let ret: XmlAttrPtr;
-    let mut namespace: XmlNsPtr = null_mut();
+    let ret: *mut XmlAttr;
+    let mut namespace: *mut XmlNs = null_mut();
     let mut dup: *mut XmlChar = null_mut();
 
     // Note: if prefix.is_null(), the attribute is not in the default namespace
@@ -2480,7 +2483,7 @@ unsafe fn xml_sax2_attribute_ns(
         if (*(*ctxt).node).properties.is_null() {
             (*(*ctxt).node).properties = ret;
         } else {
-            let mut prev: XmlAttrPtr = (*(*ctxt).node).properties;
+            let mut prev: *mut XmlAttr = (*(*ctxt).node).properties;
 
             while !(*prev).next.is_null() {
                 prev = (*prev).next;

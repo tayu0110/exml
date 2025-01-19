@@ -36,6 +36,8 @@ use libc::memset;
 
 #[cfg(feature = "schema")]
 use crate::relaxng::{xml_relaxng_new_parser_ctxt, XmlRelaxNGValidCtxtPtr};
+#[cfg(feature = "libxml_reader")]
+use crate::tree::{XmlAttr, XmlNs};
 use crate::{
     error::{
         parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
@@ -76,8 +78,8 @@ use crate::{
     parser::XmlParserCtxtPtr,
     tree::{
         xml_copy_dtd, xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
-        xml_free_ns_list, xml_new_doc_text, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
-        XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        xml_free_ns_list, xml_new_doc_text, XmlDoc, XmlElementType, XmlNodePtr,
+        __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -210,7 +212,7 @@ pub struct XmlTextReader {
     // the parsing mode
     mode: XmlTextReaderMode,
     // when walking an existing doc
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     // is there any validation
     validate: XmlTextReaderValidate,
     // what structure were deallocated
@@ -753,7 +755,7 @@ impl XmlTextReader {
         if self.expand().is_null() {
             return null_mut();
         }
-        let doc: XmlDocPtr = (*self.node).doc;
+        let doc: *mut XmlDoc = (*self.node).doc;
         let mut buff = vec![];
         cur_node = (*self.node).children().map_or(null_mut(), |c| c.as_ptr());
         while !cur_node.is_null() {
@@ -787,7 +789,7 @@ impl XmlTextReader {
             return null_mut();
         }
         node = self.node;
-        let doc: XmlDocPtr = (*node).doc;
+        let doc: *mut XmlDoc = (*node).doc;
         // XXX: Why is the node copied?
         if (*node).element_type() == XmlElementType::XmlDTDNode {
             node = xml_copy_dtd((*node).as_dtd_node().unwrap().as_ptr()) as XmlNodePtr;
@@ -950,7 +952,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadAttributeValue")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read_attribute_value(&mut self) -> i32 {
-        use crate::tree::NodeCommon;
+        use crate::tree::{NodeCommon, XmlNs};
 
         if self.node.is_null() {
             return -1;
@@ -964,7 +966,7 @@ impl XmlTextReader {
             };
             self.curnode = children.as_ptr();
         } else if (*self.curnode).element_type() == XmlElementType::XmlNamespaceDecl {
-            let ns: XmlNsPtr = self.curnode as XmlNsPtr;
+            let ns: *mut XmlNs = self.curnode as *mut XmlNs;
 
             if self.faketext.is_null() {
                 self.faketext = xml_new_doc_text((*self.node).doc, (*ns).href);
@@ -1610,9 +1612,12 @@ impl XmlTextReader {
     pub unsafe fn get_attribute(&mut self, name: &str) -> Option<String> {
         use std::ffi::CStr;
 
-        use crate::{parser::split_qname2, tree::NodeCommon};
+        use crate::{
+            parser::split_qname2,
+            tree::{NodeCommon, XmlNs},
+        };
 
-        let mut ns: XmlNsPtr;
+        let mut ns: *mut XmlNs;
 
         if self.node.is_null() {
             return None;
@@ -1732,10 +1737,10 @@ impl XmlTextReader {
     pub unsafe fn get_attribute_no(&mut self, no: i32) -> Option<String> {
         use std::ffi::CStr;
 
-        use crate::tree::NodeCommon;
+        use crate::tree::{NodeCommon, XmlNs};
 
-        let mut cur: XmlAttrPtr;
-        let mut ns: XmlNsPtr;
+        let mut cur: *mut XmlAttr;
+        let mut ns: *mut XmlNs;
 
         if self.node.is_null() {
             return None;
@@ -1917,8 +1922,8 @@ impl XmlTextReader {
     pub unsafe fn move_to_attribute(&mut self, name: &str) -> i32 {
         use crate::{parser::split_qname2, tree::NodeCommon};
 
-        let mut ns: XmlNsPtr;
-        let mut prop: XmlAttrPtr;
+        let mut ns: *mut XmlNs;
+        let mut prop: *mut XmlAttr;
 
         if self.node.is_null() {
             return -1;
@@ -1998,7 +2003,7 @@ impl XmlTextReader {
     pub unsafe fn move_to_attribute_ns(&mut self, local_name: &str, namespace_uri: &str) -> i32 {
         use crate::tree::NodeCommon;
 
-        let mut ns: XmlNsPtr;
+        let mut ns: *mut XmlNs;
 
         if self.node.is_null() {
             return -1;
@@ -2048,8 +2053,8 @@ impl XmlTextReader {
     pub unsafe fn move_to_attribute_no(&mut self, no: i32) -> i32 {
         use crate::tree::NodeCommon;
 
-        let mut cur: XmlAttrPtr;
-        let mut ns: XmlNsPtr;
+        let mut cur: *mut XmlAttr;
+        let mut ns: *mut XmlNs;
 
         if self.node.is_null() {
             return -1;
@@ -2137,7 +2142,7 @@ impl XmlTextReader {
         }
 
         if (*self.curnode).element_type() == XmlElementType::XmlNamespaceDecl {
-            let ns: XmlNsPtr = self.curnode as XmlNsPtr;
+            let ns: *mut XmlNs = self.curnode as *mut XmlNs;
             if !(*ns).next.is_null() {
                 self.curnode = (*ns).next as XmlNodePtr;
                 return 1;
@@ -2204,7 +2209,7 @@ impl XmlTextReader {
     /// Returns the xmlDocPtr or NULL in case of error.
     #[doc(alias = "xmlTextReaderCurrentDoc")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn current_doc(&mut self) -> XmlDocPtr {
+    pub unsafe fn current_doc(&mut self) -> *mut XmlDoc {
         if !self.doc.is_null() {
             return self.doc;
         }
@@ -2495,7 +2500,7 @@ impl XmlTextReader {
             self.node
         };
         if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
-            let ns: XmlNsPtr = node as XmlNsPtr;
+            let ns: *mut XmlNs = node as *mut XmlNs;
             if let Some(prefix) = (*ns).prefix() {
                 return Some(prefix.into_owned());
             } else {
@@ -2580,7 +2585,7 @@ impl XmlTextReader {
                 })
             }
             XmlElementType::XmlNamespaceDecl => {
-                let ns: XmlNsPtr = node as XmlNsPtr;
+                let ns: *mut XmlNs = node as *mut XmlNs;
 
                 let mut ret = "xmlns".to_owned();
                 let Some(prefix) = (*ns).prefix() else {
@@ -2654,7 +2659,7 @@ impl XmlTextReader {
             self.node
         };
         if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
-            let ns: XmlNsPtr = node as XmlNsPtr;
+            let ns: *mut XmlNs = node as *mut XmlNs;
             (*ns).prefix()?;
             return Some("xmlns".to_owned());
         }
@@ -2680,7 +2685,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderStandalone")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn standalone(&self) -> Option<bool> {
-        let mut doc: XmlDocPtr = null_mut();
+        let mut doc: *mut XmlDoc = null_mut();
         if !self.doc.is_null() {
             doc = self.doc;
         } else if !self.ctxt.is_null() {
@@ -2822,13 +2827,13 @@ impl XmlTextReader {
         match (*node).element_type() {
             XmlElementType::XmlNamespaceDecl => {
                 return Some(
-                    CStr::from_ptr((*(node as XmlNsPtr)).href as *const i8)
+                    CStr::from_ptr((*(node as *mut XmlNs)).href as *const i8)
                         .to_string_lossy()
                         .into_owned(),
                 )
             }
             XmlElementType::XmlAttributeNode => {
-                let attr: XmlAttrPtr = (*node).as_attribute_node().unwrap().as_ptr();
+                let attr: *mut XmlAttr = (*node).as_attribute_node().unwrap().as_ptr();
 
                 return if let Some(parent) = (*attr).parent {
                     (*attr).children.and_then(|c| c.get_string(parent.doc, 1))
@@ -3567,8 +3572,8 @@ macro_rules! DICT_FREE {
 /// Free a property and all its siblings, all the children are freed too.
 #[doc(alias = "xmlTextReaderFreePropList")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: XmlAttrPtr) {
-    let mut next: XmlAttrPtr;
+unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: *mut XmlAttr) {
+    let mut next: *mut XmlAttr;
 
     while !cur.is_null() {
         next = (*cur).next;
@@ -3596,7 +3601,7 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlN
         return;
     }
     if (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
-        xml_free_ns_list(cur as XmlNsPtr);
+        xml_free_ns_list(cur as *mut XmlNs);
         return;
     }
     if matches!(
@@ -3698,7 +3703,7 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlN
 /// Free a node.
 #[doc(alias = "xmlTextReaderFreeProp")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: XmlAttrPtr) {
+unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: *mut XmlAttr) {
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
         (*(*reader).ctxt).dict
     } else {
@@ -3749,7 +3754,7 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: XmlNodePtr) {
         return;
     }
     if (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
-        xml_free_ns(cur as XmlNsPtr);
+        xml_free_ns(cur as *mut XmlNs);
         return;
     }
     if (*cur).element_type() == XmlElementType::XmlAttributeNode {
@@ -3898,11 +3903,11 @@ unsafe fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *mut XmlChar
 #[doc(alias = "xmlTextReaderAttributeCount")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32 {
-    use crate::tree::NodeCommon;
+    use crate::tree::{NodeCommon, XmlAttr};
 
     let mut ret: i32;
-    let mut attr: XmlAttrPtr;
-    let mut ns: XmlNsPtr;
+    let mut attr: *mut XmlAttr;
+    let mut ns: *mut XmlNs;
 
     if reader.node.is_null() {
         return 0;
@@ -3975,7 +3980,7 @@ pub unsafe fn xml_text_reader_const_local_name(reader: &mut XmlTextReader) -> *c
         reader.node
     };
     if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
-        let ns: XmlNsPtr = node as XmlNsPtr;
+        let ns: *mut XmlNs = node as *mut XmlNs;
         if (*ns).prefix.is_null() {
             return CONSTSTR!(reader, c"xmlns".as_ptr() as _);
         } else {
@@ -4034,7 +4039,7 @@ pub unsafe fn xml_text_reader_const_name(reader: &mut XmlTextReader) -> *const X
             CONSTSTR!(reader, (*node).name)
         }
         XmlElementType::XmlNamespaceDecl => {
-            let ns: XmlNsPtr = node as XmlNsPtr;
+            let ns: *mut XmlNs = node as *mut XmlNs;
 
             if (*ns).prefix.is_null() {
                 return CONSTSTR!(reader, c"xmlns".as_ptr() as _);
@@ -4100,7 +4105,7 @@ pub unsafe fn xml_text_reader_const_prefix(reader: &mut XmlTextReader) -> *const
         reader.node
     };
     if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
-        let ns: XmlNsPtr = node as XmlNsPtr;
+        let ns: *mut XmlNs = node as *mut XmlNs;
         if (*ns).prefix().is_none() {
             return null_mut();
         }
@@ -4158,7 +4163,7 @@ pub unsafe fn xml_text_reader_const_string(
 #[doc(alias = "xmlTextReaderConstValue")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const XmlChar {
-    use crate::tree::NodeCommon;
+    use crate::tree::{NodeCommon, XmlAttr};
 
     if reader.node.is_null() {
         return null_mut();
@@ -4170,9 +4175,9 @@ pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const 
     };
 
     match (*node).element_type() {
-        XmlElementType::XmlNamespaceDecl => return (*(node as XmlNsPtr)).href,
+        XmlElementType::XmlNamespaceDecl => return (*(node as *mut XmlNs)).href,
         XmlElementType::XmlAttributeNode => {
-            let attr: XmlAttrPtr = (*node).as_attribute_node().unwrap().as_ptr();
+            let attr: *mut XmlAttr = (*node).as_attribute_node().unwrap().as_ptr();
 
             if let Some(children) = (*attr)
                 .children
@@ -4199,10 +4204,10 @@ pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const 
 /// Free up all the structures used by a document, tree included.
 #[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
-    use crate::tree::NodeCommon;
+unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: *mut XmlDoc) {
+    use crate::tree::{NodeCommon, XmlDtd};
 
-    let mut ext_subset: XmlDtdPtr;
+    let mut ext_subset: *mut XmlDtd;
 
     if cur.is_null() {
         return;
@@ -4219,7 +4224,7 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
     (*cur).ids.take();
     (*cur).refs.take();
     ext_subset = (*cur).ext_subset;
-    let int_subset: XmlDtdPtr = (*cur).int_subset;
+    let int_subset: *mut XmlDtd = (*cur).int_subset;
     if int_subset == ext_subset {
         ext_subset = null_mut();
     }
@@ -4313,7 +4318,7 @@ pub unsafe fn xml_text_reader_lookup_namespace(
         return null_mut();
     }
 
-    let ns: XmlNsPtr = (*reader.node).search_ns(
+    let ns: *mut XmlNs = (*reader.node).search_ns(
         (*reader.node).doc,
         (!prefix.is_null())
             .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
@@ -4334,7 +4339,7 @@ pub unsafe fn xml_text_reader_lookup_namespace(
 pub unsafe fn xml_text_reader_const_encoding(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
-    let mut doc: XmlDocPtr = null_mut();
+    let mut doc: *mut XmlDoc = null_mut();
     if !reader.doc.is_null() {
         doc = reader.doc;
     } else if !reader.ctxt.is_null() {
@@ -4919,7 +4924,7 @@ unsafe fn xml_text_reader_locator(
             }
         }
         if !file.is_null() {
-            let doc: XmlDocPtr = (*(*reader).node).doc;
+            let doc: *mut XmlDoc = (*(*reader).node).doc;
             if !doc.is_null() && (*doc).url.is_some() {
                 *file = (*doc).url.clone();
             } else {
@@ -5189,7 +5194,7 @@ pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSc
 pub unsafe fn xml_text_reader_const_xml_version(reader: XmlTextReaderPtr) -> *const XmlChar {
     use std::ffi::CString;
 
-    let mut doc: XmlDocPtr = null_mut();
+    let mut doc: *mut XmlDoc = null_mut();
     if reader.is_null() {
         return null_mut();
     }
@@ -5215,7 +5220,7 @@ pub unsafe fn xml_text_reader_const_xml_version(reader: XmlTextReaderPtr) -> *co
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderWalker")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
+pub unsafe fn xml_reader_walker(doc: *mut XmlDoc) -> XmlTextReaderPtr {
     use crate::generic_error;
 
     if doc.is_null() {
@@ -5344,7 +5349,7 @@ pub unsafe fn xml_reader_for_io(
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewWalker")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) -> i32 {
+pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: *mut XmlDoc) -> i32 {
     if doc.is_null() {
         return -1;
     }

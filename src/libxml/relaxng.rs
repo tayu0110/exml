@@ -68,8 +68,8 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node, xml_new_doc_text,
-        xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode,
-        XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_validate_ncname, NodeCommon, NodePtr, XmlAttr, XmlDoc, XmlElementType, XmlNode,
+        XmlNodePtr, XmlNs,
     },
     uri::{build_uri, escape_url_except, XmlURI},
 };
@@ -239,7 +239,7 @@ pub type XmlRelaxNGPtr = *mut XmlRelaxNG;
 pub struct XmlRelaxNG {
     _private: *mut c_void, // unused by the library for users or bindings
     pub(crate) topgrammar: XmlRelaxNGGrammarPtr,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
 
     pub(crate) idref: i32, // requires idref checking
 
@@ -328,7 +328,7 @@ pub type XmlRelaxNGIncludePtr = *mut XmlRelaxNGInclude;
 pub struct XmlRelaxNGInclude {
     next: XmlRelaxNGIncludePtr,   // keep a chain of includes
     href: *mut XmlChar,           // the normalized href value
-    doc: XmlDocPtr,               // the associated XML document
+    doc: *mut XmlDoc,             // the associated XML document
     content: XmlRelaxNGDefinePtr, // the definitions
     schema: XmlRelaxNGPtr,        // the schema
 }
@@ -340,7 +340,7 @@ pub type XmlRelaxNGDocumentPtr = *mut XmlRelaxNGDocument;
 pub struct XmlRelaxNGDocument {
     next: XmlRelaxNGDocumentPtr,  // keep a chain of documents
     href: *mut XmlChar,           // the normalized href value
-    doc: XmlDocPtr,               // the associated XML document
+    doc: *mut XmlDoc,             // the associated XML document
     content: XmlRelaxNGDefinePtr, // the definitions
     schema: XmlRelaxNGPtr,        // the schema
     external_ref: i32,            // 1 if an external ref
@@ -1085,8 +1085,8 @@ unsafe fn xml_relaxng_is_blank(mut str: *mut XmlChar) -> i32 {
 /// Check all the attributes on the given node
 #[doc(alias = "xmlRelaxNGCleanupAttributes")]
 unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNodePtr) {
-    let mut cur: XmlAttrPtr;
-    let mut next: XmlAttrPtr;
+    let mut cur: *mut XmlAttr;
+    let mut next: *mut XmlAttr;
 
     cur = (*node).properties;
     while !cur.is_null() {
@@ -1210,7 +1210,7 @@ unsafe fn xml_relaxng_load_external_ref(
     url: &str,
     ns: Option<&str>,
 ) -> XmlRelaxNGDocumentPtr {
-    let mut doc: XmlDocPtr;
+    let mut doc: *mut XmlDoc;
     let root: XmlNodePtr;
 
     // check against recursion in the stack
@@ -1364,7 +1364,7 @@ unsafe fn xml_relaxng_load_include(
     node: XmlNodePtr,
     ns: Option<&str>,
 ) -> XmlRelaxNGIncludePtr {
-    let mut doc: XmlDocPtr;
+    let mut doc: *mut XmlDoc;
     let mut root: XmlNodePtr;
     let mut cur: XmlNodePtr;
 
@@ -1774,7 +1774,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             // Simplification: 4.10. QNames
                             if let Some(name) = (*cur).get_content() {
                                 if let Some((prefix, local)) = split_qname2(&name) {
-                                    let ns: XmlNsPtr = (*cur).search_ns((*cur).doc, Some(prefix));
+                                    let ns: *mut XmlNs = (*cur).search_ns((*cur).doc, Some(prefix));
                                     if ns.is_null() {
                                         xml_rng_perr!(
                                             ctxt,
@@ -1869,8 +1869,8 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                         // of (*cur).parent's list, since it's never going to be re-serialized
                         // (bug 143738).
                         if !(*cur).ns_def.is_null() && (*cur).parent().is_some() {
-                            let mut par_def: XmlNsPtr =
-                                addr_of_mut!((*cur).parent().unwrap().ns_def) as XmlNsPtr;
+                            let mut par_def: *mut XmlNs =
+                                addr_of_mut!((*cur).parent().unwrap().ns_def) as *mut XmlNs;
                             while !(*par_def).next.is_null() {
                                 par_def = (*par_def).next;
                             }
@@ -1957,7 +1957,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
 ///
 /// Returns the cleaned up document or NULL in case of error
 #[doc(alias = "xmlRelaxNGCleanupDoc")]
-unsafe fn xml_relaxng_cleanup_doc(ctxt: XmlRelaxNGParserCtxtPtr, doc: XmlDocPtr) -> XmlDocPtr {
+unsafe fn xml_relaxng_cleanup_doc(ctxt: XmlRelaxNGParserCtxtPtr, doc: *mut XmlDoc) -> *mut XmlDoc {
     // Extract the root
     let root: XmlNodePtr = if doc.is_null() {
         null_mut()
@@ -5861,7 +5861,7 @@ unsafe fn xml_relaxng_try_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNG
 /// Returns the internal XML RelaxNG structure built from the resource or NULL in case of error
 #[doc(alias = "xmlRelaxNGParse")]
 pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr {
-    let mut doc: XmlDocPtr;
+    let mut doc: *mut XmlDoc;
 
     xml_relaxng_init_types();
 
@@ -6802,7 +6802,7 @@ unsafe fn xml_relaxng_validate_value_content(
 unsafe fn xml_relaxng_attribute_match(
     _ctxt: XmlRelaxNGValidCtxtPtr,
     mut define: XmlRelaxNGDefinePtr,
-    prop: XmlAttrPtr,
+    prop: *mut XmlAttr,
 ) -> i32 {
     let mut ret: i32;
 
@@ -6867,8 +6867,8 @@ unsafe fn xml_relaxng_validate_attribute(
 ) -> i32 {
     let ret: i32;
     let oldvalue: *mut XmlChar;
-    let mut prop: XmlAttrPtr = null_mut();
-    let mut tmp: XmlAttrPtr;
+    let mut prop: *mut XmlAttr = null_mut();
+    let mut tmp: *mut XmlAttr;
     let oldseq: XmlNodePtr;
 
     if (*(*ctxt).state).nb_attr_left <= 0 {
@@ -7298,7 +7298,7 @@ unsafe fn xml_relaxng_copy_valid_state(
         }
         std::ptr::write(&mut *ret, XmlRelaxNGValidState::default());
     }
-    let attrs: *mut XmlAttrPtr = (*ret).attrs;
+    let attrs: *mut *mut XmlAttr = (*ret).attrs;
     let max_attrs: u32 = (*ret).max_attrs as _;
     memcpy(ret as _, state as _, size_of::<XmlRelaxNGValidState>());
     (*ret).attrs = attrs;
@@ -7306,16 +7306,16 @@ unsafe fn xml_relaxng_copy_valid_state(
     if (*state).nb_attrs > 0 {
         if (*ret).attrs.is_null() {
             (*ret).max_attrs = (*state).max_attrs;
-            (*ret).attrs = xml_malloc((*ret).max_attrs as usize * size_of::<XmlAttrPtr>()) as _;
+            (*ret).attrs = xml_malloc((*ret).max_attrs as usize * size_of::<*mut XmlAttr>()) as _;
             if (*ret).attrs.is_null() {
                 xml_rng_verr_memory(ctxt, "allocating states\n");
                 (*ret).nb_attrs = 0;
                 return ret;
             }
         } else if (*ret).max_attrs < (*state).nb_attrs {
-            let tmp: *mut XmlAttrPtr = xml_realloc(
+            let tmp: *mut *mut XmlAttr = xml_realloc(
                 (*ret).attrs as _,
-                (*state).max_attrs as usize * size_of::<XmlAttrPtr>(),
+                (*state).max_attrs as usize * size_of::<*mut XmlAttr>(),
             ) as _;
             if tmp.is_null() {
                 xml_rng_verr_memory(ctxt, "allocating states\n");
@@ -7328,7 +7328,7 @@ unsafe fn xml_relaxng_copy_valid_state(
         memcpy(
             (*ret).attrs as _,
             (*state).attrs as _,
-            (*state).nb_attrs as usize * size_of::<XmlAttrPtr>(),
+            (*state).nb_attrs as usize * size_of::<*mut XmlAttr>(),
         );
     }
     ret
@@ -8663,7 +8663,7 @@ unsafe fn xml_relaxng_validate_definition(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateDocument")]
-unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDocPtr) -> i32 {
+unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: *mut XmlDoc) -> i32 {
     let mut ret: i32;
     let mut state: XmlRelaxNGValidStatePtr;
     let mut node: XmlNodePtr;
@@ -8804,7 +8804,7 @@ unsafe fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
 /// Returns 0 if the document is valid, a positive error code
 /// number otherwise and -1 in case of internal or API error.
 #[doc(alias = "xmlRelaxNGValidateDoc")]
-pub unsafe fn xml_relaxng_validate_doc(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDocPtr) -> i32 {
+pub unsafe fn xml_relaxng_validate_doc(ctxt: XmlRelaxNGValidCtxtPtr, doc: *mut XmlDoc) -> i32 {
     if ctxt.is_null() || doc.is_null() {
         return -1;
     }
@@ -8999,7 +8999,7 @@ pub unsafe fn xml_relaxng_validate_push_cdata(
 #[doc(alias = "xmlRelaxNGValidateFullElement")]
 pub unsafe fn xml_relaxng_validate_full_element(
     ctxt: XmlRelaxNGValidCtxtPtr,
-    _doc: XmlDocPtr,
+    _doc: *mut XmlDoc,
     elem: XmlNodePtr,
 ) -> i32 {
     let mut ret: i32;

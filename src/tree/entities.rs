@@ -45,10 +45,7 @@ use crate::{
         hash::{xml_hash_create, XmlHashTable},
         xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
     },
-    tree::{
-        xml_free_node_list, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
-        XmlElementType, XmlNode,
-    },
+    tree::{xml_free_node_list, NodeCommon, NodePtr, XmlDoc, XmlDtd, XmlElementType, XmlNode},
 };
 
 /// The different valid entity types.
@@ -88,9 +85,6 @@ impl TryFrom<i32> for XmlEntityType {
     }
 }
 
-/// An unit of storage for an entity, contains the string,
-/// the value and the linkind data needed for the linking in the hash table.
-pub type XmlEntityPtr = *mut XmlEntity;
 #[repr(C)]
 #[derive(Default)]
 pub struct XmlEntity {
@@ -212,8 +206,8 @@ unsafe fn xml_create_entity(
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
-) -> XmlEntityPtr {
-    let ret: XmlEntityPtr = xml_malloc(size_of::<XmlEntity>()) as XmlEntityPtr;
+) -> *mut XmlEntity {
+    let ret: *mut XmlEntity = xml_malloc(size_of::<XmlEntity>()) as *mut XmlEntity;
     if ret.is_null() {
         xml_entities_err_memory("xmlCreateEntity: malloc failed");
         return null_mut();
@@ -258,17 +252,17 @@ unsafe fn xml_create_entity(
 /// Returns a pointer to the entity or NULL in case of error
 #[doc(alias = "xmlNewEntity")]
 pub unsafe fn xml_new_entity(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     name: &str,
     typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
-) -> XmlEntityPtr {
+) -> *mut XmlEntity {
     if !doc.is_null() && !(*doc).int_subset.is_null() {
         return xml_add_doc_entity(doc, name, typ, external_id, system_id, content);
     }
-    let ret: XmlEntityPtr = xml_create_entity(name, typ, external_id, system_id, content);
+    let ret: *mut XmlEntity = xml_create_entity(name, typ, external_id, system_id, content);
     if ret.is_null() {
         return null_mut();
     }
@@ -316,7 +310,7 @@ macro_rules! xml_entities_warn {
 
 /// clean-up an entity record.
 #[doc(alias = "xmlFreeEntity")]
-unsafe fn xml_free_entity(entity: XmlEntityPtr) {
+unsafe fn xml_free_entity(entity: *mut XmlEntity) {
     if entity.is_null() {
         return;
     }
@@ -359,15 +353,15 @@ unsafe fn xml_free_entity(entity: XmlEntityPtr) {
 /// Register a new entity for an entities table.
 #[doc(alias = "xmlAddEntity")]
 unsafe fn xml_add_entity(
-    dtd: XmlDtdPtr,
+    dtd: *mut XmlDtd,
     name: &str,
     typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
-) -> XmlEntityPtr {
+) -> *mut XmlEntity {
     let mut table = None;
-    let predef: XmlEntityPtr;
+    let predef: *mut XmlEntity;
 
     if dtd.is_null() {
         return null_mut();
@@ -397,8 +391,7 @@ unsafe fn xml_add_entity(
                                     valid = 1;
                                 }
                             } else {
-                                let refe =
-                                    [b'0' + (c / 10 % 10) as u8, b'0' + (c % 10) as u8, b';'];
+                                let refe = [b'0' + (c / 10 % 10), b'0' + (c % 10), b';'];
                                 if content.as_bytes() == refe {
                                     valid = 1;
                                 }
@@ -436,7 +429,7 @@ unsafe fn xml_add_entity(
     let Some(mut table) = table else {
         return null_mut();
     };
-    let ret: XmlEntityPtr = xml_create_entity(name, typ, external_id, system_id, content);
+    let ret: *mut XmlEntity = xml_create_entity(name, typ, external_id, system_id, content);
     if ret.is_null() {
         return null_mut();
     }
@@ -455,13 +448,13 @@ unsafe fn xml_add_entity(
 /// Returns a pointer to the entity or NULL in case of error
 #[doc(alias = "xmlAddDocEntity")]
 pub unsafe fn xml_add_doc_entity(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     name: &str,
     typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
-) -> XmlEntityPtr {
+) -> *mut XmlEntity {
     if doc.is_null() {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDoc,
@@ -476,8 +469,8 @@ pub unsafe fn xml_add_doc_entity(
         );
         return null_mut();
     }
-    let dtd: XmlDtdPtr = (*doc).int_subset;
-    let ret: XmlEntityPtr = xml_add_entity(dtd, name, typ, external_id, system_id, content);
+    let dtd: *mut XmlDtd = (*doc).int_subset;
+    let ret: *mut XmlEntity = xml_add_entity(dtd, name, typ, external_id, system_id, content);
     if ret.is_null() {
         return null_mut();
     }
@@ -501,13 +494,13 @@ pub unsafe fn xml_add_doc_entity(
 /// Returns a pointer to the entity or NULL in case of error
 #[doc(alias = "xmlAddDtdEntity")]
 pub unsafe fn xml_add_dtd_entity(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     name: &str,
     typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
-) -> XmlEntityPtr {
+) -> *mut XmlEntity {
     if doc.is_null() {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDoc,
@@ -522,8 +515,8 @@ pub unsafe fn xml_add_dtd_entity(
         );
         return null_mut();
     }
-    let dtd: XmlDtdPtr = (*doc).ext_subset;
-    let ret: XmlEntityPtr = xml_add_entity(dtd, name, typ, external_id, system_id, content);
+    let dtd: *mut XmlDtd = (*doc).ext_subset;
+    let ret: *mut XmlEntity = xml_add_entity(dtd, name, typ, external_id, system_id, content);
     if ret.is_null() {
         return null_mut();
     }
@@ -659,7 +652,7 @@ static mut XML_ENTITY_APOS: XmlEntity = XmlEntity {
 ///
 /// Returns NULL if not, otherwise the entity
 #[doc(alias = "xmlGetPredefinedEntity")]
-pub unsafe fn xml_get_predefined_entity(name: &str) -> XmlEntityPtr {
+pub unsafe fn xml_get_predefined_entity(name: &str) -> *mut XmlEntity {
     match name {
         "lt" => addr_of_mut!(XML_ENTITY_LT),
         "gt" => addr_of_mut!(XML_ENTITY_GT),
@@ -676,9 +669,9 @@ pub unsafe fn xml_get_predefined_entity(name: &str) -> XmlEntityPtr {
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetEntityFromTable")]
 unsafe fn xml_get_entity_from_table(
-    table: XmlHashTableRef<'static, XmlEntityPtr>,
+    table: XmlHashTableRef<'static, *mut XmlEntity>,
     name: &str,
-) -> XmlEntityPtr {
+) -> *mut XmlEntity {
     table.lookup(name).map_or(null_mut(), |p| *p)
 }
 
@@ -688,7 +681,7 @@ unsafe fn xml_get_entity_from_table(
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDocEntity")]
-pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> XmlEntityPtr {
+pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> *mut XmlEntity {
     if !doc.is_null() {
         if !(*doc).int_subset.is_null() {
             if let Some(table) = (*(*doc).int_subset).entities {
@@ -716,7 +709,7 @@ pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> XmlEntityPtr
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDtdEntity")]
-pub unsafe fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> XmlEntityPtr {
+pub unsafe fn xml_get_dtd_entity(doc: *mut XmlDoc, name: &str) -> *mut XmlEntity {
     if doc.is_null() {
         return null_mut();
     }
@@ -733,7 +726,7 @@ pub unsafe fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> XmlEntityPtr {
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetParameterEntity")]
-pub unsafe fn xml_get_parameter_entity(doc: XmlDocPtr, name: &str) -> XmlEntityPtr {
+pub unsafe fn xml_get_parameter_entity(doc: *mut XmlDoc, name: &str) -> *mut XmlEntity {
     if doc.is_null() {
         return null_mut();
     }
@@ -778,7 +771,7 @@ macro_rules! grow_buffer_reentrant {
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeEntitiesInternal")]
 pub(crate) unsafe fn xml_encode_entities_internal(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     input: *const XmlChar,
     attr: i32,
 ) -> *mut XmlChar {
@@ -1062,7 +1055,10 @@ pub(crate) unsafe fn xml_encode_entities_internal(
 ///
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeEntitiesReentrant")]
-pub unsafe fn xml_encode_entities_reentrant(doc: XmlDocPtr, input: *const XmlChar) -> *mut XmlChar {
+pub unsafe fn xml_encode_entities_reentrant(
+    doc: *mut XmlDoc,
+    input: *const XmlChar,
+) -> *mut XmlChar {
     xml_encode_entities_internal(doc, input, 0)
 }
 
@@ -1183,9 +1179,9 @@ pub unsafe fn xml_create_entities_table() -> XmlEntitiesTablePtr {
 /// Returns the new xmlEntitiesPtr or NULL in case of error.
 #[doc(alias = "xmlCopyEntity")]
 #[cfg(feature = "libxml_tree")]
-extern "C" fn xml_copy_entity(ent: XmlEntityPtr) -> XmlEntityPtr {
+extern "C" fn xml_copy_entity(ent: *mut XmlEntity) -> *mut XmlEntity {
     unsafe {
-        let cur: XmlEntityPtr = xml_malloc(size_of::<XmlEntity>()) as XmlEntityPtr;
+        let cur: *mut XmlEntity = xml_malloc(size_of::<XmlEntity>()) as *mut XmlEntity;
         if cur.is_null() {
             xml_entities_err_memory("xmlCopyEntity:: malloc failed");
             return null_mut();
@@ -1225,8 +1221,8 @@ extern "C" fn xml_copy_entity(ent: XmlEntityPtr) -> XmlEntityPtr {
 #[doc(alias = "xmlCopyEntitiesTable")]
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_copy_entities_table(
-    table: XmlHashTableRef<'static, XmlEntityPtr>,
-) -> Option<XmlHashTableRef<'static, XmlEntityPtr>> {
+    table: XmlHashTableRef<'static, *mut XmlEntity>,
+) -> Option<XmlHashTableRef<'static, *mut XmlEntity>> {
     let new = table.clone_with(|payload, _| xml_copy_entity(*payload));
     XmlHashTableRef::from_table(new)
 }
@@ -1236,14 +1232,14 @@ pub unsafe fn xml_copy_entities_table(
 extern "C" fn xml_free_entity_wrapper(entity: *mut c_void, _name: *const XmlChar) {
     unsafe {
         if !entity.is_null() {
-            xml_free_entity(entity as XmlEntityPtr);
+            xml_free_entity(entity as *mut XmlEntity);
         }
     }
 }
 
 /// Deallocate the memory used by an entities hash table.
 #[doc(alias = "xmlFreeEntitiesTable")]
-pub unsafe fn xml_free_entities_table(table: XmlHashTableRef<'static, XmlEntityPtr>) {
+pub unsafe fn xml_free_entities_table(table: XmlHashTableRef<'static, *mut XmlEntity>) {
     let mut table = table.into_inner();
     table.clear_with(|payload, _| {
         xml_free_entity(payload);
@@ -1257,7 +1253,7 @@ pub unsafe fn xml_dump_entities_table<'a>(buf: &mut (impl Write + 'a), table: Xm
     let Some(table) = XmlHashTableRef::from_raw(table) else {
         return;
     };
-    table.scan(|data, _, _, _| xml_dump_entity_decl(buf, data.0 as XmlEntityPtr));
+    table.scan(|data, _, _, _| xml_dump_entity_decl(buf, data.0 as *mut XmlEntity));
 }
 
 /// This will dump the quoted string value, taking care of the special
@@ -1324,7 +1320,7 @@ unsafe fn xml_dump_entity_content<'a>(buf: &mut (impl Write + 'a), content: *con
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlDumpEntityDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
+pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut XmlEntity) {
     use crate::io::write_quoted;
 
     if ent.is_null() {
@@ -1490,7 +1486,7 @@ pub(crate) const XML_ENT_CONTAINS_LT: usize = 1 << 4;
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeAttributeEntities")]
 pub(crate) unsafe fn xml_encode_attribute_entities(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     input: *const XmlChar,
 ) -> *mut XmlChar {
     xml_encode_entities_internal(doc, input, 1)

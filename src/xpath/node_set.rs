@@ -2,7 +2,7 @@ use std::ptr::null_mut;
 
 use crate::{
     hash::XmlHashTable,
-    tree::{xml_free_node_list, NodeCommon, NodePtr, XmlElementType, XmlNode, XmlNsPtr},
+    tree::{xml_free_node_list, NodeCommon, NodePtr, XmlElementType, XmlNode, XmlNs},
     xpath::xml_xpath_node_set_free_ns,
 };
 
@@ -34,7 +34,7 @@ impl XmlNodeSet {
         if !val.is_null() {
             ret.node_tab = vec![];
             if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
-                let ns = val as XmlNsPtr;
+                let ns = val as *mut XmlNs;
                 let ns_node = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
 
                 if ns_node.is_null() {
@@ -85,7 +85,7 @@ impl XmlNodeSet {
         if let Some(ns1) = val.as_namespace_decl_node() {
             for &node in table {
                 if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-                    let ns2: XmlNsPtr = node as XmlNsPtr;
+                    let ns2: *mut XmlNs = node as *mut XmlNs;
                     if ns1.as_ptr() == ns2 {
                         return true;
                     }
@@ -155,7 +155,7 @@ impl XmlNodeSet {
         while let Some(node) = table.pop() {
             if !node.is_null() {
                 if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-                    xml_xpath_node_set_free_ns(node as XmlNsPtr);
+                    xml_xpath_node_set_free_ns(node as *mut XmlNs);
                 } else if free_actual_tree {
                     xml_free_node_list(node);
                 }
@@ -206,7 +206,7 @@ impl XmlNodeSet {
                 XmlElementType::XmlNamespaceDecl
             )
         {
-            xml_xpath_node_set_free_ns(self.node_tab[val as usize] as XmlNsPtr);
+            xml_xpath_node_set_free_ns(self.node_tab[val as usize] as *mut XmlNs);
         }
         self.node_tab.remove(val as usize);
     }
@@ -228,7 +228,7 @@ impl XmlNodeSet {
                 XmlElementType::XmlNamespaceDecl
             )
         {
-            xml_xpath_node_set_free_ns(self.node_tab[pos] as XmlNsPtr);
+            xml_xpath_node_set_free_ns(self.node_tab[pos] as *mut XmlNs);
         }
         self.node_tab.remove(pos);
     }
@@ -246,7 +246,7 @@ impl XmlNodeSet {
                 if !node.is_null()
                     && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
                 {
-                    xml_xpath_node_set_free_ns(node as XmlNsPtr);
+                    xml_xpath_node_set_free_ns(node as *mut XmlNs);
                 }
             }
         }
@@ -283,7 +283,7 @@ impl XmlNodeSet {
             return -1;
         }
         if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
-            let ns: XmlNsPtr = val as XmlNsPtr;
+            let ns: *mut XmlNs = val as *mut XmlNs;
             let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
 
             if ns_node.is_null() {
@@ -313,7 +313,7 @@ impl XmlNodeSet {
             return -1;
         }
         if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
-            let ns: XmlNsPtr = val as XmlNsPtr;
+            let ns: *mut XmlNs = val as *mut XmlNs;
             let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
 
             if ns_node.is_null() {
@@ -330,7 +330,7 @@ impl XmlNodeSet {
     ///
     /// Returns 0 in case of success and -1 in case of error
     #[doc(alias = "xmlXPathNodeSetAddNs")]
-    pub unsafe fn add_ns(&mut self, node: *mut XmlNode, ns: XmlNsPtr) -> i32 {
+    pub unsafe fn add_ns(&mut self, node: *mut XmlNode, ns: *mut XmlNs) -> i32 {
         if ns.is_null()
             || node.is_null()
             || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl)
@@ -345,7 +345,7 @@ impl XmlNodeSet {
             if node.is_null()
                 && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
                 && (*node).next == NodePtr::from_ptr(node)
-                && (*ns).prefix() == (*(node as XmlNsPtr)).prefix()
+                && (*ns).prefix() == (*(node as *mut XmlNs)).prefix()
             {
                 return 0;
             }
@@ -731,11 +731,11 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear(
                 continue 'b;
             } else if matches!((*n1).element_type(), XmlElementType::XmlNamespaceDecl)
                 && matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl)
-                && (*(n1 as XmlNsPtr)).next == (*(n2 as XmlNsPtr)).next
-                && (*(n1 as XmlNsPtr)).prefix() == (*(n2 as XmlNsPtr)).prefix()
+                && (*(n1 as *mut XmlNs)).next == (*(n2 as *mut XmlNs)).next
+                && (*(n1 as *mut XmlNs)).prefix() == (*(n2 as *mut XmlNs)).prefix()
             {
                 // Free the namespace node.
-                xml_xpath_node_set_free_ns(n2 as XmlNsPtr);
+                xml_xpath_node_set_free_ns(n2 as *mut XmlNs);
                 // goto skip_node;
                 continue 'b;
             }
@@ -818,8 +818,8 @@ pub unsafe fn xml_xpath_node_set_merge(
             if n1 == n2
                 || ((matches!((*n1).element_type(), XmlElementType::XmlNamespaceDecl)
                     && matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl))
-                    && ((*(n1 as XmlNsPtr)).next == (*(n2 as XmlNsPtr)).next
-                        && (*(n1 as XmlNsPtr)).prefix() == (*(n2 as XmlNsPtr)).prefix()))
+                    && ((*(n1 as *mut XmlNs)).next == (*(n2 as *mut XmlNs)).next
+                        && (*(n1 as *mut XmlNs)).prefix() == (*(n2 as *mut XmlNs)).prefix()))
             {
                 skip = 1;
                 break;
@@ -837,7 +837,7 @@ pub unsafe fn xml_xpath_node_set_merge(
             return None;
         }
         if matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl) {
-            let ns: XmlNsPtr = n2 as XmlNsPtr;
+            let ns: *mut XmlNs = n2 as *mut XmlNs;
             let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
 
             if ns_node.is_null() {

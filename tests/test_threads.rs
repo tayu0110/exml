@@ -19,7 +19,7 @@ use exml::{
         parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
         xmlmemory::xml_memory_dump,
     },
-    tree::{xml_free_doc, XmlDocPtr},
+    tree::{xml_free_doc, XmlDoc},
 };
 use libc::{memset, pthread_create, pthread_join, pthread_t};
 
@@ -67,7 +67,7 @@ static NUM_THREADS: usize = unsafe { THREAD_PARAMS.len() };
 
 extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     unsafe {
-        let my_doc: XmlDocPtr;
+        let my_doc: *mut XmlDoc;
         let params: *mut XmlThreadParams = private_data as *mut XmlThreadParams;
         let filename = (*params).filename;
         let mut okay: c_int = 1;

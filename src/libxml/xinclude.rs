@@ -55,8 +55,8 @@ use crate::{
     tree::{
         xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
-        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDocPtr, XmlDtdPtr,
-        XmlElementType, XmlEntityPtr, XmlEntityType, XmlNodePtr, XML_XML_NAMESPACE,
+        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc, XmlDtd,
+        XmlElementType, XmlEntity, XmlEntityType, XmlNodePtr, XML_XML_NAMESPACE,
     },
     uri::{build_uri, escape_url, XmlURI},
     xpath::{
@@ -107,7 +107,7 @@ pub struct XmlXincludeRef {
 pub type XmlXincludeDocPtr = *mut XmlXincludeDoc;
 #[repr(C)]
 pub struct XmlXincludeDoc {
-    doc: XmlDocPtr,    /* the parsed document */
+    doc: *mut XmlDoc,  /* the parsed document */
     url: *mut XmlChar, /* the URL */
     expanding: i32,    /* flag to detect inclusion loops */
 }
@@ -123,7 +123,7 @@ pub type XmlXincludeCtxtPtr = *mut XmlXincludeCtxt;
 /// An XInclude context
 #[repr(C)]
 pub struct XmlXincludeCtxt {
-    doc: XmlDocPtr,                  /* the source document */
+    doc: *mut XmlDoc,                /* the source document */
     inc_nr: i32,                     /* number of includes */
     inc_max: i32,                    /* size of includes tab */
     inc_tab: *mut XmlXincludeRefPtr, /* array of included references */
@@ -156,7 +156,7 @@ pub struct XmlXincludeCtxt {
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcess")]
-pub unsafe fn xml_xinclude_process(doc: XmlDocPtr) -> i32 {
+pub unsafe fn xml_xinclude_process(doc: *mut XmlDoc) -> i32 {
     xml_xinclude_process_flags(doc, 0)
 }
 
@@ -165,7 +165,7 @@ pub unsafe fn xml_xinclude_process(doc: XmlDocPtr) -> i32 {
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessFlags")]
-pub unsafe fn xml_xinclude_process_flags(doc: XmlDocPtr, flags: i32) -> i32 {
+pub unsafe fn xml_xinclude_process_flags(doc: *mut XmlDoc, flags: i32) -> i32 {
     xml_xinclude_process_flags_data(doc, flags, null_mut())
 }
 
@@ -175,7 +175,7 @@ pub unsafe fn xml_xinclude_process_flags(doc: XmlDocPtr, flags: i32) -> i32 {
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessFlagsData")]
 pub unsafe fn xml_xinclude_process_flags_data(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     flags: i32,
     data: *mut c_void,
 ) -> i32 {
@@ -579,8 +579,8 @@ unsafe fn xml_xinclude_add_node(ctxt: XmlXincludeCtxtPtr, cur: XmlNodePtr) -> Xm
 
 /// Parse a document for XInclude
 #[doc(alias = "xmlXIncludeParseFile")]
-unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> XmlDocPtr {
-    let ret: XmlDocPtr;
+unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> *mut XmlDoc {
+    let ret: *mut XmlDoc;
 
     xml_init_parser();
 
@@ -647,22 +647,22 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> Xm
 
 pub type XmlXIncludeMergeDataPtr = *mut XmlXIncludeMergeData;
 pub struct XmlXIncludeMergeData {
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     ctxt: XmlXincludeCtxtPtr,
 }
 
 /// Implements the merge of one entity
 #[doc(alias = "xmlXIncludeMergeOneEntity")]
-extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
+extern "C" fn xml_xinclude_merge_entity(ent: *mut XmlEntity, vdata: *mut c_void) {
     let data: XmlXIncludeMergeDataPtr = vdata as XmlXIncludeMergeDataPtr;
-    let prev: XmlEntityPtr;
+    let prev: *mut XmlEntity;
 
     if ent.is_null() || data.is_null() {
         return;
     }
     unsafe {
         let ctxt: XmlXincludeCtxtPtr = (*data).ctxt;
-        let doc: XmlDocPtr = (*data).doc;
+        let doc: *mut XmlDoc = (*data).doc;
         if ctxt.is_null() || doc.is_null() {
             return;
         }
@@ -678,7 +678,7 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
         let external_id = (*ent).external_id.load(Ordering::Relaxed);
         let system_id = (*ent).system_id.load(Ordering::Relaxed);
         let content = (*ent).content.load(Ordering::Relaxed);
-        let ret: XmlEntityPtr = xml_add_doc_entity(
+        let ret: *mut XmlEntity = xml_add_doc_entity(
             doc,
             &(*ent).name().unwrap(),
             (*ent).etype,
@@ -782,12 +782,12 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
 #[doc(alias = "xmlXIncludeMergeEntities")]
 unsafe fn xml_xinclude_merge_entities(
     ctxt: XmlXincludeCtxtPtr,
-    doc: XmlDocPtr,
-    from: XmlDocPtr,
+    doc: *mut XmlDoc,
+    from: *mut XmlDoc,
 ) -> i32 {
     let cur: XmlNodePtr;
-    let mut target: XmlDtdPtr;
-    let mut source: XmlDtdPtr;
+    let mut target: *mut XmlDtd;
+    let mut source: *mut XmlDtd;
 
     if ctxt.is_null() {
         return -1;
@@ -847,8 +847,8 @@ unsafe fn xml_xinclude_merge_entities(
 
 /// The XInclude recursive nature is handled at this point.
 #[doc(alias = "xmlXIncludeRecurseDoc")]
-unsafe fn xml_xinclude_recurse_doc(ctxt: XmlXincludeCtxtPtr, doc: XmlDocPtr, _url: XmlURL) {
-    let old_doc: XmlDocPtr = (*ctxt).doc;
+unsafe fn xml_xinclude_recurse_doc(ctxt: XmlXincludeCtxtPtr, doc: *mut XmlDoc, _url: XmlURL) {
+    let old_doc: *mut XmlDoc = (*ctxt).doc;
     let old_inc_max: i32 = (*ctxt).inc_max;
     let old_inc_nr: i32 = (*ctxt).inc_nr;
     let old_inc_tab: *mut XmlXincludeRefPtr = (*ctxt).inc_tab;
@@ -1362,7 +1362,7 @@ unsafe fn xml_xinclude_load_doc(
     refe: XmlXincludeRefPtr,
 ) -> i32 {
     let mut cache: XmlXincludeDocPtr;
-    let doc: XmlDocPtr;
+    let doc: *mut XmlDoc;
     let mut fragment: *mut XmlChar = null_mut();
     let mut ret: i32 = -1;
     let cache_nr: i32;
@@ -2529,7 +2529,7 @@ pub unsafe fn xml_xinclude_process_tree_flags(tree: XmlNodePtr, flags: i32) -> i
 ///
 /// Returns the new set
 #[doc(alias = "xmlXIncludeNewContext")]
-pub unsafe fn xml_xinclude_new_context(doc: XmlDocPtr) -> XmlXincludeCtxtPtr {
+pub unsafe fn xml_xinclude_new_context(doc: *mut XmlDoc) -> XmlXincludeCtxtPtr {
     if doc.is_null() {
         return null_mut();
     }

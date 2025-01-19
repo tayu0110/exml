@@ -29,12 +29,9 @@ use crate::libxml::{
 
 use super::{
     xml_free_prop, xml_new_prop_internal, xml_tree_err_memory, NodeCommon, NodePtr,
-    XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
-    __XML_REGISTER_CALLBACKS,
+    XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNodePtr, XmlNs, __XML_REGISTER_CALLBACKS,
 };
 
-/// An attribute on an XML node.
-pub type XmlAttrPtr = *mut XmlAttr;
 #[repr(C)]
 pub struct XmlAttr {
     pub(crate) _private: *mut c_void,           /* application data */
@@ -59,7 +56,7 @@ impl XmlAttr {
     /// Returns 0 if success and -1 in case of error.
     #[doc(alias = "xmlRemoveProp")]
     pub unsafe fn remove_prop(&mut self) -> i32 {
-        let mut tmp: XmlAttrPtr;
+        let mut tmp: *mut XmlAttr;
         let Some(mut parent) = self.parent else {
             return -1;
         };
@@ -161,16 +158,16 @@ impl NodeCommon for XmlAttr {
 /// xmlEncodeEntitiesReentrant(). Use xmlNewProp() if you don't need entities support.
 #[doc(alias = "xmlNewDocProp")]
 pub unsafe fn xml_new_doc_prop(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     name: *const XmlChar,
     value: *const XmlChar,
-) -> XmlAttrPtr {
+) -> *mut XmlAttr {
     if name.is_null() {
         return null_mut();
     }
 
     // Allocate a new property and fill the fields.
-    let cur: XmlAttrPtr = xml_malloc(size_of::<XmlAttr>()) as _;
+    let cur: *mut XmlAttr = xml_malloc(size_of::<XmlAttr>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building attribute");
         return null_mut();
@@ -211,7 +208,7 @@ pub unsafe fn xml_new_prop(
     node: XmlNodePtr,
     name: *const XmlChar,
     value: *const XmlChar,
-) -> XmlAttrPtr {
+) -> *mut XmlAttr {
     if name.is_null() {
         return null_mut();
     }
@@ -225,10 +222,10 @@ pub unsafe fn xml_new_prop(
 #[doc(alias = "xmlNewNsProp")]
 pub unsafe fn xml_new_ns_prop(
     node: XmlNodePtr,
-    ns: XmlNsPtr,
+    ns: *mut XmlNs,
     name: &str,
     value: *const XmlChar,
-) -> XmlAttrPtr {
+) -> *mut XmlAttr {
     xml_new_prop_internal(node, ns, name, value)
 }
 
@@ -237,10 +234,10 @@ pub unsafe fn xml_new_ns_prop(
 #[doc(alias = "xmlNewNsPropEatName")]
 pub unsafe fn xml_new_ns_prop_eat_name(
     node: XmlNodePtr,
-    ns: XmlNsPtr,
+    ns: *mut XmlNs,
     name: *mut XmlChar,
     value: *const XmlChar,
-) -> XmlAttrPtr {
+) -> *mut XmlAttr {
     if name.is_null() {
         return null_mut();
     }

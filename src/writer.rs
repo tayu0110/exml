@@ -54,7 +54,7 @@ use crate::{
     list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
     save::attr_serialize_text_content,
-    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
+    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDoc, XmlNodePtr},
     uri::canonic_path,
 };
 
@@ -113,7 +113,7 @@ pub struct XmlTextWriter<'a> {
     qchar: u8,
     ctxt: XmlParserCtxtPtr,
     no_doc_free: i32,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
 }
 
 impl<'a> XmlTextWriter<'a> {
@@ -217,7 +217,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterDoc")]
-    pub unsafe fn with_doc(doc: *mut XmlDocPtr, compression: i32) -> Option<Self> {
+    pub unsafe fn with_doc(doc: *mut *mut XmlDoc, compression: i32) -> Option<Self> {
         let mut sax_handler = XmlSAXHandler::default();
         xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
         sax_handler.start_document = Some(xml_text_writer_start_document_callback);
@@ -273,7 +273,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterTree")]
-    pub unsafe fn with_tree(doc: XmlDocPtr, node: XmlNodePtr, compression: i32) -> Option<Self> {
+    pub unsafe fn with_tree(doc: *mut XmlDoc, node: XmlNodePtr, compression: i32) -> Option<Self> {
         if doc.is_null() {
             xml_writer_err_msg(
                 None,
@@ -2104,7 +2104,7 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
-    let mut doc: XmlDocPtr;
+    let mut doc: *mut XmlDoc;
 
     if (*ctxt).html != 0 {
         #[cfg(feature = "html")]

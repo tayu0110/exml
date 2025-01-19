@@ -39,14 +39,11 @@ use crate::{
 
 use super::{
     xml_free_node_list, xml_get_doc_entity, xml_new_doc_text, xml_new_reference, xml_tree_err,
-    xml_tree_err_memory, NodeCommon, NodePtr, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType,
-    XmlEntityPtr, XmlEntityType, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XmlRef,
-    XML_ENT_EXPANDING, XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
-    __XML_REGISTER_CALLBACKS,
+    xml_tree_err_memory, NodeCommon, NodePtr, XmlDocProperties, XmlDtd, XmlElementType, XmlEntity,
+    XmlEntityType, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
+    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
-/// An XML document.
-pub type XmlDocPtr = *mut XmlDoc;
 #[repr(C)]
 pub struct XmlDoc {
     pub(crate) _private: *mut c_void,   /* application data */
@@ -101,7 +98,7 @@ impl XmlDoc {
     /// Get the internal subset of a document
     /// Returns a pointer to the DTD structure or null_mut() if not found
     #[doc(alias = "xmlGetIntSubset")]
-    pub unsafe fn get_int_subset(&self) -> XmlDtdPtr {
+    pub unsafe fn get_int_subset(&self) -> *mut XmlDtd {
         let mut cur = self.children();
         while let Some(now) = cur {
             if matches!(now.element_type(), XmlElementType::XmlDTDNode) {
@@ -149,7 +146,7 @@ impl XmlDoc {
         let mut val: *mut XmlChar = null_mut();
         let mut cur: *const XmlChar = value;
         let mut q: *const XmlChar;
-        let mut ent: XmlEntityPtr;
+        let mut ent: *mut XmlEntity;
 
         if value.is_null() {
             return null_mut();
@@ -395,7 +392,7 @@ impl XmlDoc {
         let mut val: *mut XmlChar;
         let mut cur: *const XmlChar;
         let mut q: *const XmlChar;
-        let mut ent: XmlEntityPtr;
+        let mut ent: *mut XmlEntity;
 
         if value.is_null() {
             return null_mut();
@@ -680,12 +677,12 @@ impl XmlDoc {
     ///
     /// Returns the XML ns-struct or null_mut() on API and internal errors.
     #[doc(alias = "xmlTreeEnsureXMLDecl")]
-    pub(super) unsafe fn ensure_xmldecl(&mut self) -> XmlNsPtr {
+    pub(super) unsafe fn ensure_xmldecl(&mut self) -> *mut XmlNs {
         if !self.old_ns.is_null() {
             return self.old_ns;
         }
         {
-            let ns = xml_malloc(size_of::<XmlNs>()) as XmlNsPtr;
+            let ns = xml_malloc(size_of::<XmlNs>()) as *mut XmlNs;
             if ns.is_null() {
                 xml_tree_err_memory("allocating the XML namespace");
                 return null_mut();
@@ -780,11 +777,11 @@ impl Default for XmlDoc {
 ///
 /// Returns a new document
 #[doc(alias = "xmlNewDoc")]
-pub unsafe fn xml_new_doc(version: Option<&str>) -> XmlDocPtr {
+pub unsafe fn xml_new_doc(version: Option<&str>) -> *mut XmlDoc {
     let version = version.unwrap_or("1.0");
 
     // Allocate a new document and fill the fields.
-    let cur: XmlDocPtr = xml_malloc(size_of::<XmlDoc>()) as _;
+    let cur: *mut XmlDoc = xml_malloc(size_of::<XmlDoc>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building doc");
         return null_mut();

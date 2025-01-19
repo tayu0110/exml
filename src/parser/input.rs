@@ -64,7 +64,7 @@ use crate::{
         xmlstring::xml_strlen,
     },
     parser::xml_err_internal,
-    tree::{XmlEntityPtr, XmlEntityType},
+    tree::{XmlEntity, XmlEntityType},
     uri::canonic_path,
 };
 
@@ -114,7 +114,7 @@ pub struct XmlParserInput {
     // consumed bytes from parents
     pub(crate) parent_consumed: u64,
     // entity, if any
-    pub(crate) entity: XmlEntityPtr,
+    pub(crate) entity: *mut XmlEntity,
 }
 
 impl XmlParserInput {
@@ -458,7 +458,7 @@ pub unsafe fn xml_new_input_from_file(
 #[doc(alias = "xmlNewEntityInputStream")]
 pub(crate) unsafe fn xml_new_entity_input_stream(
     ctxt: XmlParserCtxtPtr,
-    entity: XmlEntityPtr,
+    entity: *mut XmlEntity,
 ) -> XmlParserInputPtr {
     let input: XmlParserInputPtr;
 

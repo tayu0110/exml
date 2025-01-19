@@ -33,9 +33,8 @@ use libc::memset;
 use crate::{
     encoding::XmlCharEncoding,
     tree::{
-        xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop, NodeCommon,
-        XmlAttrPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
-        __XML_REGISTER_CALLBACKS,
+        xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop, NodeCommon, XmlAttr,
+        XmlDoc, XmlDocProperties, XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
     },
 };
 #[cfg(feature = "libxml_output")]
@@ -84,7 +83,7 @@ pub unsafe fn html_new_doc(uri: *const XmlChar, external_id: *const XmlChar) -> 
 #[doc(alias = "htmlNewDocNoDtD")]
 pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlChar) -> HtmlDocPtr {
     // Allocate a new document and fill the fields.
-    let cur: XmlDocPtr = xml_malloc(size_of::<XmlDoc>()) as XmlDocPtr;
+    let cur: *mut XmlDoc = xml_malloc(size_of::<XmlDoc>()) as *mut XmlDoc;
     if cur.is_null() {
         html_err_memory(null_mut(), Some("HTML document creation failed\n"));
         return null_mut();
@@ -196,7 +195,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             && !(*cur).name.is_null())
             && xml_str_equal((*cur).name, c"meta".as_ptr() as _)
         {
-            let mut attr: XmlAttrPtr = (*cur).properties;
+            let mut attr: *mut XmlAttr = (*cur).properties;
             let mut http: i32;
             let mut value: *const XmlChar;
 
@@ -400,7 +399,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
             && !(*cur).name.is_null())
             && (xml_strcasecmp((*cur).name, c"meta".as_ptr() as _) == 0)
         {
-            let mut attr: XmlAttrPtr = (*cur).properties;
+            let mut attr: *mut XmlAttr = (*cur).properties;
             let mut http: i32;
             let mut value: *const XmlChar;
 
@@ -445,7 +444,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
 /// It's up to the caller to free the memory.
 #[doc(alias = "htmlDocDumpMemory")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_doc_dump_memory(cur: XmlDocPtr, mem: *mut *mut XmlChar, size: *mut i32) {
+pub unsafe fn html_doc_dump_memory(cur: *mut XmlDoc, mem: *mut *mut XmlChar, size: *mut i32) {
     html_doc_dump_memory_format(cur, mem, size, 1);
 }
 
@@ -474,7 +473,7 @@ unsafe fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&
 #[doc(alias = "htmlDocDumpMemoryFormat")]
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_doc_dump_memory_format(
-    cur: XmlDocPtr,
+    cur: *mut XmlDoc,
     mem: *mut *mut XmlChar,
     size: *mut i32,
     format: i32,
@@ -560,7 +559,7 @@ pub unsafe fn html_doc_dump_memory_format(
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlDocDump")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i32 {
+pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: *mut XmlDoc) -> i32 {
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         libxml::parser::xml_init_parser,
@@ -611,7 +610,7 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i3
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlSaveFile")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
+pub unsafe fn html_save_file(filename: *const c_char, cur: *mut XmlDoc) -> i32 {
     use std::{cell::RefCell, rc::Rc};
 
     use crate::{
@@ -682,7 +681,7 @@ unsafe fn html_save_err_memory(extra: &str) {
 #[cfg(feature = "libxml_output")]
 unsafe fn html_buf_node_dump_format<'a>(
     buf: &mut (impl Write + 'a),
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     cur: XmlNodePtr,
     format: i32,
 ) -> usize {
@@ -707,7 +706,7 @@ unsafe fn html_buf_node_dump_format<'a>(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump<'a>(
     buf: &mut (impl Write + 'a),
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     cur: XmlNodePtr,
 ) -> i32 {
     use crate::libxml::parser::xml_init_parser;
@@ -726,7 +725,7 @@ pub unsafe fn html_node_dump<'a>(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump_file<'a>(
     out: &mut (impl Write + 'a),
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     cur: XmlNodePtr,
 ) {
     html_node_dump_file_format(out, doc, cur, null_mut(), 1);
@@ -741,7 +740,7 @@ pub unsafe fn html_node_dump_file<'a>(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump_file_format<'a>(
     out: &mut (impl Write + 'a),
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     cur: XmlNodePtr,
     encoding: *const c_char,
     format: i32,
@@ -797,7 +796,7 @@ pub unsafe fn html_node_dump_file_format<'a>(
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlSaveFileEnc")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_save_file_enc(filename: &str, cur: XmlDocPtr, encoding: Option<&str>) -> i32 {
+pub unsafe fn html_save_file_enc(filename: &str, cur: *mut XmlDoc, encoding: Option<&str>) -> i32 {
     html_save_file_format(filename, cur, encoding, 1)
 }
 
@@ -808,7 +807,7 @@ pub unsafe fn html_save_file_enc(filename: &str, cur: XmlDocPtr, encoding: Optio
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_save_file_format(
     filename: &str,
-    cur: XmlDocPtr,
+    cur: *mut XmlDoc,
     encoding: Option<&str>,
     format: i32,
 ) -> i32 {
@@ -875,14 +874,14 @@ pub unsafe fn html_save_file_format(
 #[cfg(feature = "libxml_output")]
 unsafe fn html_dtd_dump_output(
     buf: &mut XmlOutputBuffer,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     _encoding: *const c_char,
 ) {
     use std::ffi::CStr;
 
-    use crate::tree::XmlDtdPtr;
+    use crate::tree::XmlDtd;
 
-    let cur: XmlDtdPtr = (*doc).int_subset;
+    let cur: *mut XmlDtd = (*doc).int_subset;
 
     if cur.is_null() {
         html_save_err(XmlParserErrors::XmlSaveNoDoctype, doc as _, None);
@@ -921,7 +920,7 @@ unsafe fn html_dtd_dump_output(
 /// Dump an HTML attribute
 #[doc(alias = "htmlAttrDumpOutput")]
 #[cfg(feature = "libxml_output")]
-unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, cur: XmlAttrPtr) {
+unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur: *mut XmlAttr) {
     use std::ffi::CStr;
 
     use crate::{libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
@@ -990,7 +989,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, cur: 
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump_format_output(
     buf: &mut XmlOutputBuffer,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     mut cur: XmlNodePtr,
     _encoding: Option<&str>,
     format: i32,
@@ -1009,7 +1008,7 @@ pub unsafe fn html_node_dump_format_output(
     };
 
     let mut parent: XmlNodePtr;
-    let mut attr: XmlAttrPtr;
+    let mut attr: *mut XmlAttr;
 
     xml_init_parser();
 
@@ -1274,7 +1273,7 @@ pub unsafe fn html_node_dump_format_output(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_doc_content_dump_output(
     buf: &mut XmlOutputBuffer,
-    cur: XmlDocPtr,
+    cur: *mut XmlDoc,
     _encoding: *const c_char,
 ) {
     html_node_dump_format_output(buf, cur, cur as _, None, 1);
@@ -1285,7 +1284,7 @@ pub unsafe fn html_doc_content_dump_output(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_doc_content_dump_format_output(
     buf: &mut XmlOutputBuffer,
-    cur: XmlDocPtr,
+    cur: *mut XmlDoc,
     _encoding: Option<&str>,
     format: i32,
 ) {
@@ -1306,7 +1305,7 @@ pub unsafe fn html_doc_content_dump_format_output(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump_output(
     buf: &mut XmlOutputBuffer,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     cur: XmlNodePtr,
     _encoding: *const c_char,
 ) {

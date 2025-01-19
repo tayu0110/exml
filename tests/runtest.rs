@@ -66,8 +66,8 @@ use exml::{
     },
     relaxng::xml_relaxng_init_types,
     tree::{
-        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
+        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType,
         XmlEnumeration, XmlNodePtr,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
@@ -717,7 +717,7 @@ unsafe fn resolve_entity_debug(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityDebug")]
-unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
+unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity {
     increment_callbacks_counter();
     sax_debugln!("SAX.getEntity({name})");
     null_mut()
@@ -730,7 +730,7 @@ unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> Xml
 unsafe fn get_parameter_entity_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-) -> XmlEntityPtr {
+) -> *mut XmlEntity {
     increment_callbacks_counter();
     sax_debugln!("SAX.getParameterEntity({name})");
     null_mut()
@@ -1691,7 +1691,7 @@ unsafe fn push_parse_test(
         }
         cur < size
     } {}
-    let doc: XmlDocPtr = (*ctxt).my_doc;
+    let doc: *mut XmlDoc = (*ctxt).my_doc;
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
         res = 1;
@@ -2079,7 +2079,7 @@ unsafe fn push_boundary_test(
             }
         }
     }
-    let doc: XmlDocPtr = (*ctxt).my_doc;
+    let doc: *mut XmlDoc = (*ctxt).my_doc;
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
         res = 1;
@@ -2178,7 +2178,7 @@ unsafe fn mem_parse_test(
     }
 
     let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
-    let doc: XmlDocPtr = xml_read_memory(buffer, Some(filename), None, 0);
+    let doc: *mut XmlDoc = xml_read_memory(buffer, Some(filename), None, 0);
     unload_mem(base);
     if doc.is_null() {
         return 1;
@@ -2212,7 +2212,7 @@ unsafe fn noent_parse_test(
     _err: Option<String>,
     options: i32,
 ) -> i32 {
-    let mut doc: XmlDocPtr;
+    let mut doc: *mut XmlDoc;
     let mut res: i32 = 0;
 
     NB_TESTS.set(NB_TESTS.get() + 1);
@@ -2257,7 +2257,7 @@ unsafe fn err_parse_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    let mut doc: XmlDocPtr;
+    let mut doc: *mut XmlDoc;
     let mut base: *const c_char = null_mut();
     let mut size: i32 = 0;
     let mut res: i32 = 0;
@@ -2499,7 +2499,7 @@ unsafe fn walker_parse_test(
 ) -> i32 {
     use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_walker};
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, options);
+    let doc: *mut XmlDoc = xml_read_file(filename, None, options);
     if doc.is_null() {
         eprintln!("Failed to parse {filename}",);
         return -1;
@@ -3219,7 +3219,7 @@ unsafe fn urip_read(context: *mut c_void, buffer: *mut c_char, mut len: i32) -> 
 }
 
 unsafe fn urip_check_url(url: &str) -> i32 {
-    let doc: XmlDocPtr = xml_read_file(url, None, 0);
+    let doc: *mut XmlDoc = xml_read_file(url, None, 0);
     if doc.is_null() {
         return -1;
     }
@@ -3321,7 +3321,7 @@ unsafe fn schemas_one_test(
 
     let mut ret: i32 = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, options);
+    let doc: *mut XmlDoc = xml_read_file(filename, None, options);
     if doc.is_null() {
         eprintln!(
             "failed to parse instance {filename} for {}",
@@ -3551,7 +3551,7 @@ unsafe fn rng_one_test(
 
     let mut ret: i32;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, options);
+    let doc: *mut XmlDoc = xml_read_file(filename, None, options);
     if doc.is_null() {
         eprintln!(
             "failed to parse instance {filename} for {}",
@@ -4002,7 +4002,7 @@ unsafe fn pattern_test(
             },
             xmlreader::{xml_free_text_reader, xml_reader_walker},
         },
-        tree::XmlNsPtr,
+        tree::XmlNs,
     };
 
     let mut patternc: XmlPatternPtr;
@@ -4015,7 +4015,7 @@ unsafe fn pattern_test(
     let cfilename = CString::new(filename).unwrap();
 
     let mut reader: XmlTextReaderPtr;
-    let mut doc: XmlDocPtr;
+    let mut doc: *mut XmlDoc;
 
     len = filename.len();
     len -= 4;
@@ -4085,7 +4085,7 @@ unsafe fn pattern_test(
                     // ret = 1;
                 } else {
                     let mut namespaces: [(*const u8, *const u8); 20] = [(null(), null()); 20];
-                    let mut ns: XmlNsPtr;
+                    let mut ns: *mut XmlNs;
 
                     let root: XmlNodePtr = (*doc).get_root_element();
                     ns = (*root).ns_def;
@@ -4152,14 +4152,14 @@ unsafe fn pattern_test(
 }
 
 #[cfg(feature = "c14n")]
-unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObjectPtr {
+unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathObjectPtr {
     use exml::{
         globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
         libxml::{
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             xmlstring::xml_str_equal,
         },
-        tree::XmlNsPtr,
+        tree::XmlNs,
         xpath::{
             internals::xml_xpath_register_ns, xml_xpath_eval_expression, xml_xpath_free_context,
             xml_xpath_new_context, XmlXPathContextPtr,
@@ -4167,13 +4167,13 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
     };
 
     let mut node: XmlNodePtr;
-    let mut ns: XmlNsPtr;
+    let mut ns: *mut XmlNs;
 
     // load XPath expr as a file
     set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
     set_substitute_entities_default_value(1);
 
-    let doc: XmlDocPtr = xml_read_file(
+    let doc: *mut XmlDoc = xml_read_file(
         filename,
         None,
         XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
@@ -4290,7 +4290,7 @@ unsafe fn c14n_run_test(
     set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
     set_substitute_entities_default_value(1);
 
-    let doc: XmlDocPtr = xml_read_file(
+    let doc: *mut XmlDoc = xml_read_file(
         xml_filename,
         None,
         XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
@@ -4593,7 +4593,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     };
 
     unsafe {
-        let my_doc: XmlDocPtr;
+        let my_doc: *mut XmlDoc;
         let params: *mut XmlThreadParams = private_data as *mut XmlThreadParams;
         let filename = (*params).filename;
         let mut okay: i32 = 1;

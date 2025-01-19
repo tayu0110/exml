@@ -72,9 +72,9 @@ use crate::{
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon,
-        NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
+        NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNodePtr,
+        XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNodePtr,
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
@@ -1684,8 +1684,8 @@ pub(crate) unsafe fn xml_parse_element_content_decl(
 ///
 /// Returns the xmlEntityPtr if found, or NULL otherwise.
 #[doc(alias = "xmlParseEntityRef")]
-pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> XmlEntityPtr {
-    let mut ent: XmlEntityPtr = null_mut();
+pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> *mut XmlEntity {
+    let mut ent: *mut XmlEntity = null_mut();
 
     (*ctxt).grow();
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -1881,7 +1881,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     user_data: Option<GenericErrorContext>,
     lst: *mut XmlNodePtr,
 ) -> XmlParserErrors {
-    let mut new_doc: XmlDocPtr = null_mut();
+    let mut new_doc: *mut XmlDoc = null_mut();
     let mut content: XmlNodePtr = null_mut();
     let mut last: XmlNodePtr = null_mut();
     let ret: XmlParserErrors;
@@ -2141,7 +2141,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     }
 
     // We are seeing an entity reference
-    let ent: XmlEntityPtr = xml_parse_entity_ref(ctxt);
+    let ent: *mut XmlEntity = xml_parse_entity_ref(ctxt);
     if ent.is_null() {
         return;
     }
@@ -2571,7 +2571,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 /// NOTE: misleading but this is handled.
 #[doc(alias = "xmlParsePEReference")]
 pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
-    let mut entity: XmlEntityPtr = null_mut();
+    let mut entity: *mut XmlEntity = null_mut();
     let input: XmlParserInputPtr;
 
     if (*ctxt).current_byte() != b'%' {
@@ -2680,7 +2680,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
 
             // Must be computed from old input before pushing new input.
             parent_consumed = (*(*ctxt).input).parent_consumed;
-            let old_ent: XmlEntityPtr = (*(*ctxt).input).entity;
+            let old_ent: *mut XmlEntity = (*(*ctxt).input).entity;
             if old_ent.is_null()
                 || (matches!((*old_ent).etype, XmlEntityType::XmlExternalParameterEntity)
                     && (*old_ent).flags & XML_ENT_PARSED as i32 == 0)

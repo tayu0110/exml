@@ -17,7 +17,7 @@ use crate::{
         },
     },
     relaxng::{VALID_ERR, VALID_ERR2},
-    tree::{NodeCommon, XmlAttrPtr, XmlDocPtr, XmlNodePtr},
+    tree::{NodeCommon, XmlAttr, XmlDoc, XmlNodePtr},
 };
 
 use super::{xml_rng_verr_memory, XmlRelaxNGDefinePtr};
@@ -40,14 +40,14 @@ pub type XmlRelaxNGValidStatePtr = *mut XmlRelaxNGValidState;
 #[doc(alias = "xmlRelaxNGValidState")]
 #[repr(C)]
 pub struct XmlRelaxNGValidState {
-    pub(crate) node: XmlNodePtr,       // the current node
-    pub(crate) seq: XmlNodePtr,        // the sequence of children left to validate
-    pub(crate) nb_attrs: i32,          // the number of attributes
-    pub(crate) max_attrs: i32,         // the size of attrs
-    pub(crate) nb_attr_left: i32,      // the number of attributes left to validate
-    pub(crate) value: *mut u8,         // the value when operating on string
-    pub(crate) endvalue: *mut u8,      // the end value when operating on string
-    pub(crate) attrs: *mut XmlAttrPtr, // the array of attributes
+    pub(crate) node: XmlNodePtr,         // the current node
+    pub(crate) seq: XmlNodePtr,          // the sequence of children left to validate
+    pub(crate) nb_attrs: i32,            // the number of attributes
+    pub(crate) max_attrs: i32,           // the size of attrs
+    pub(crate) nb_attr_left: i32,        // the number of attributes left to validate
+    pub(crate) value: *mut u8,           // the value when operating on string
+    pub(crate) endvalue: *mut u8,        // the end value when operating on string
+    pub(crate) attrs: *mut *mut XmlAttr, // the array of attributes
 }
 
 impl Default for XmlRelaxNGValidState {
@@ -78,7 +78,7 @@ pub struct XmlRelaxNGValidCtxt {
     pub(crate) nb_errors: i32, // number of errors in validation
 
     pub(crate) schema: XmlRelaxNGPtr, // The schema in use
-    pub(crate) doc: XmlDocPtr,        // the document being validated
+    pub(crate) doc: *mut XmlDoc,      // the document being validated
     pub(crate) flags: i32,            // validation flags
     pub(crate) depth: i32,            // validation depth
     pub(crate) idref: i32,            // requires idref checking
@@ -166,7 +166,7 @@ impl XmlRelaxNGValidCtxt {
     /// returns 1 if no validation problem was found or 0 if validating the
     /// element requires a full node, and -1 in case of error.
     #[doc(alias = "xmlRelaxNGValidatePushElement")]
-    pub unsafe fn push_element(&mut self, _doc: XmlDocPtr, elem: XmlNodePtr) -> i32 {
+    pub unsafe fn push_element(&mut self, _doc: *mut XmlDoc, elem: XmlNodePtr) -> i32 {
         let mut ret: i32;
 
         if elem.is_null() {
@@ -231,7 +231,7 @@ impl XmlRelaxNGValidCtxt {
     ///
     /// returns 1 if no validation problem was found or 0 otherwise
     #[doc(alias = "xmlRelaxNGValidatePopElement")]
-    pub unsafe fn pop_element(&mut self, _doc: XmlDocPtr, elem: XmlNodePtr) -> i32 {
+    pub unsafe fn pop_element(&mut self, _doc: *mut XmlDoc, elem: XmlNodePtr) -> i32 {
         let mut ret: i32;
 
         if self.elem.is_null() || elem.is_null() {
@@ -455,8 +455,8 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     node: XmlNodePtr,
 ) -> XmlRelaxNGValidStatePtr {
     let ret: XmlRelaxNGValidStatePtr;
-    let mut attr: XmlAttrPtr;
-    let mut attrs: [XmlAttrPtr; MAX_ATTR] = [null_mut(); MAX_ATTR];
+    let mut attr: *mut XmlAttr;
+    let mut attrs: [*mut XmlAttr; MAX_ATTR] = [null_mut(); MAX_ATTR];
     let mut nb_attrs: usize = 0;
     let mut root: XmlNodePtr = null_mut();
 
@@ -511,14 +511,14 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
             } else {
                 (*ret).max_attrs = nb_attrs as _;
             }
-            (*ret).attrs = xml_malloc((*ret).max_attrs as usize * size_of::<XmlAttrPtr>()) as _;
+            (*ret).attrs = xml_malloc((*ret).max_attrs as usize * size_of::<*mut XmlAttr>()) as _;
             if (*ret).attrs.is_null() {
                 xml_rng_verr_memory(ctxt, "allocating states\n");
                 return ret;
             }
         } else if (*ret).max_attrs < nb_attrs as i32 {
-            let tmp: *mut XmlAttrPtr =
-                xml_realloc((*ret).attrs as _, nb_attrs * size_of::<XmlAttrPtr>()) as _;
+            let tmp: *mut *mut XmlAttr =
+                xml_realloc((*ret).attrs as _, nb_attrs * size_of::<*mut XmlAttr>()) as _;
             if tmp.is_null() {
                 xml_rng_verr_memory(ctxt, "allocating states\n");
                 return ret;
@@ -531,7 +531,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
             memcpy(
                 (*ret).attrs as _,
                 attrs.as_ptr() as _,
-                size_of::<XmlAttrPtr>() * nb_attrs,
+                size_of::<*mut XmlAttr>() * nb_attrs,
             );
         } else {
             attr = (*node).properties;

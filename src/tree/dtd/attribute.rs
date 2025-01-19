@@ -35,8 +35,6 @@ use crate::{
 
 use super::XmlEnumeration;
 
-/// An Attribute declaration in a DTD.
-pub type XmlAttributePtr = *mut XmlAttribute;
 #[repr(C)]
 #[derive(Clone)]
 pub struct XmlAttribute {
@@ -130,7 +128,7 @@ impl NodeCommon for XmlAttribute {
 
 /// Deallocate the memory used by an attribute definition
 #[doc(alias = "xmlFreeAttribute")]
-pub(crate) unsafe fn xml_free_attribute(attr: XmlAttributePtr) {
+pub(crate) unsafe fn xml_free_attribute(attr: *mut XmlAttribute) {
     if attr.is_null() {
         return;
     }

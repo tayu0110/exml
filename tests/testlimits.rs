@@ -35,8 +35,8 @@ use exml::{
         XmlParserInputPtr,
     },
     tree::{
-        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
+        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType,
         XmlEnumeration,
     },
 };
@@ -716,7 +716,7 @@ fn resolve_entity_callback(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityCallback")]
-fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> XmlEntityPtr {
+fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> *mut XmlEntity {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()
 }
@@ -725,7 +725,7 @@ fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> XmlEnt
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityCallback")]
-fn get_parameter_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> XmlEntityPtr {
+fn get_parameter_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> *mut XmlEntity {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()
 }
@@ -949,7 +949,7 @@ unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -
     };
     let filename = CStr::from_ptr(filename).to_string_lossy();
     let filename = filename.as_ref();
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
+    let doc: *mut XmlDoc = xml_ctxt_read_file(ctxt, filename, None, options);
 
     if !doc.is_null() {
         eprintln!("SAX parsing generated a document !");

@@ -35,7 +35,7 @@ use crate::{
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     libxml::xmlstring::xml_str_equal,
     parser::{xml_read_file, xml_read_memory},
-    tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlNodePtr},
+    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlElementType, XmlNodePtr},
     xpath::{
         internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
         xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_comp_expr,
@@ -138,7 +138,7 @@ pub type XmlSchematronPtr = *mut XmlSchematron;
 pub struct XmlSchematron {
     name: *const XmlChar, /* schema name */
     preserve: i32,        /* was the document passed by the user */
-    doc: XmlDocPtr,       /* pointer to the parsed document */
+    doc: *mut XmlDoc,     /* pointer to the parsed document */
     flags: i32,           /* specific to this schematron */
 
     _private: *mut c_void, /* unused by the library */
@@ -232,7 +232,7 @@ pub type XmlSchematronParserCtxtPtr = *mut XmlSchematronParserCtxt;
 pub struct XmlSchematronParserCtxt {
     typ: i32,
     url: *const XmlChar,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     preserve: i32, /* Whether the doc should be freed  */
     buffer: *const c_char,
     size: i32,
@@ -383,7 +383,7 @@ pub unsafe fn xml_schematron_new_mem_parser_ctxt(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchematronNewDocParserCtxt")]
-pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchematronParserCtxtPtr {
+pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: *mut XmlDoc) -> XmlSchematronParserCtxtPtr {
     if doc.is_null() {
         return null_mut();
     }
@@ -1041,7 +1041,7 @@ unsafe fn xml_schematron_parse_pattern(ctxt: XmlSchematronParserCtxtPtr, pat: Xm
 /// Returns the internal XML Schematron structure built from the resource or NULL in case of error
 #[doc(alias = "xmlSchematronParse")]
 pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchematronPtr {
-    let doc: XmlDocPtr;
+    let doc: *mut XmlDoc;
     let mut ret: XmlSchematronPtr = null_mut();
     let mut cur: XmlNodePtr;
     let mut preserve: i32 = 0;
@@ -1423,7 +1423,7 @@ pub unsafe fn xml_schematron_free_valid_ctxt(ctxt: XmlSchematronValidCtxtPtr) {
 unsafe fn xml_schematron_register_variables(
     ctxt: XmlXPathContextPtr,
     mut letr: XmlSchematronLetPtr,
-    instance: XmlDocPtr,
+    instance: *mut XmlDoc,
     cur: XmlNodePtr,
 ) -> i32 {
     let mut let_eval: XmlXPathObjectPtr;
@@ -1730,7 +1730,7 @@ unsafe fn xml_schematron_report_success(
 unsafe fn xml_schematron_run_test(
     ctxt: XmlSchematronValidCtxtPtr,
     test: XmlSchematronTestPtr,
-    instance: XmlDocPtr,
+    instance: *mut XmlDoc,
     cur: XmlNodePtr,
     pattern: XmlSchematronPatternPtr,
 ) -> i32 {
@@ -1883,7 +1883,7 @@ unsafe fn xml_schematron_report_pattern(
 #[doc(alias = "xmlSchematronValidateDoc")]
 pub unsafe fn xml_schematron_validate_doc(
     ctxt: XmlSchematronValidCtxtPtr,
-    instance: XmlDocPtr,
+    instance: *mut XmlDoc,
 ) -> i32 {
     let mut cur: XmlNodePtr;
     let mut pattern: XmlSchematronPatternPtr;

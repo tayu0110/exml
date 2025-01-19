@@ -13,8 +13,8 @@ use crate::{
 
 use super::{
     xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge, NodePtr, XmlAttr,
-    XmlAttribute, XmlDoc, XmlDtd, XmlElement, XmlElementType, XmlEntity, XmlEntityPtr, XmlNode,
-    XmlNodePtr, XmlNs, XML_XML_NAMESPACE,
+    XmlAttribute, XmlDoc, XmlDtd, XmlElement, XmlElementType, XmlEntity, XmlNode, XmlNodePtr,
+    XmlNs, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -617,14 +617,16 @@ pub trait NodeCommon {
                     if let (Some(mut table), Some(name)) =
                         ((*(*doc).int_subset).entities, name.as_deref())
                     {
-                        if table.lookup(name).copied() == Some(self as *mut Self as XmlEntityPtr) {
+                        if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
+                        {
                             table.remove_entry(name, |_, _| {});
                         }
                     }
                     if let (Some(mut table), Some(name)) =
                         ((*(*doc).int_subset).pentities, name.as_deref())
                     {
-                        if table.lookup(name).copied() == Some(self as *mut Self as XmlEntityPtr) {
+                        if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
+                        {
                             table.remove_entry(name, |_, _| {});
                         }
                     }
@@ -633,14 +635,16 @@ pub trait NodeCommon {
                     if let (Some(mut table), Some(name)) =
                         ((*(*doc).ext_subset).entities, name.as_deref())
                     {
-                        if table.lookup(name).copied() == Some(self as *mut Self as XmlEntityPtr) {
+                        if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
+                        {
                             table.remove_entry(name, |_, _| {});
                         }
                     }
                     if let (Some(mut table), Some(name)) =
                         ((*(*doc).ext_subset).pentities, name.as_deref())
                     {
-                        if table.lookup(name).copied() == Some(self as *mut Self as XmlEntityPtr) {
+                        if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
+                        {
                             table.remove_entry(name, |_, _| {});
                         }
                     }

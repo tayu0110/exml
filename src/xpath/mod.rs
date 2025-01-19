@@ -63,7 +63,7 @@ use crate::{
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, XmlChar},
     },
-    tree::{NodeCommon, NodePtr, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNsPtr},
+    tree::{NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlNode, XmlNodePtr, XmlNs},
 };
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
@@ -236,7 +236,7 @@ pub type XmlXPathContextPtr = *mut XmlXPathContext;
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlXPathContext {
-    pub doc: XmlDocPtr,   /* The current document */
+    pub doc: *mut XmlDoc, /* The current document */
     pub node: XmlNodePtr, /* The current node */
 
     pub(crate) nb_variables_unused: i32, /* unused (hash table) */
@@ -256,8 +256,8 @@ pub struct XmlXPathContext {
     pub(crate) axis: XmlXPathAxisPtr, /* Array of defined axis */
 
     // the namespace nodes of the context node
-    pub(crate) namespaces: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
-    pub(crate) user: *mut c_void,                 /* function to free */
+    pub(crate) namespaces: Option<Vec<*mut XmlNs>>, /* Array of namespaces */
+    pub(crate) user: *mut c_void,                   /* function to free */
 
     // extra variables
     pub(crate) context_size: i32,       /* the context size */
@@ -285,8 +285,8 @@ pub struct XmlXPathContext {
     pub(crate) func_lookup_data: *mut c_void,                    /* function lookup data */
 
     // temporary namespace lists kept for walking the namespace axis
-    pub(crate) tmp_ns_list: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
-    pub(crate) tmp_ns_nr: i32,                     /* number of namespaces in scope */
+    pub(crate) tmp_ns_list: Option<Vec<*mut XmlNs>>, /* Array of namespaces */
+    pub(crate) tmp_ns_nr: i32,                       /* number of namespaces in scope */
 
     // error reporting mechanism
     pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
@@ -849,7 +849,7 @@ pub unsafe fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> 
 /// Returns the xmlXPathContext just allocated. The caller will need to free it.
 #[doc(alias = "xmlXPathNewContext")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_new_context(doc: XmlDocPtr) -> XmlXPathContextPtr {
+pub unsafe extern "C" fn xml_xpath_new_context(doc: *mut XmlDoc) -> XmlXPathContextPtr {
     let ret: XmlXPathContextPtr = xml_malloc(size_of::<XmlXPathContext>()) as XmlXPathContextPtr;
     if ret.is_null() {
         xml_xpath_err_memory(null_mut(), Some("creating context\n"));
@@ -1033,7 +1033,7 @@ pub unsafe extern "C" fn xml_xpath_context_set_cache(
 /// Returns the number of elements found in the document or -1 in case of error.
 #[doc(alias = "xmlXPathOrderDocElems")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
+pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: *mut XmlDoc) -> i64 {
     use crate::tree::NodeCommon;
 
     let mut count: isize = 0;

@@ -62,8 +62,7 @@ use crate::{
         XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
     },
     tree::{
-        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType,
-        XmlNodePtr,
+        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDoc, XmlDtd, XmlElementType, XmlNodePtr,
     },
     uri::canonic_path,
 };
@@ -84,7 +83,7 @@ pub type HtmlSAXHandler = XmlSAXHandler;
 pub type HtmlSAXHandlerPtr = XmlSAXHandlerPtr;
 pub type HtmlParserInput = XmlParserInput;
 pub type HtmlParserInputPtr = XmlParserInputPtr;
-pub type HtmlDocPtr = XmlDocPtr;
+pub type HtmlDocPtr = *mut XmlDoc;
 pub type HtmlNodePtr = XmlNodePtr;
 
 pub type HtmlElemDescPtr = *mut HtmlElemDesc;
@@ -8282,7 +8281,7 @@ const ALLOW_PCDATA: &[&str] = &[
 #[doc(alias = "areBlanks")]
 unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> i32 {
     let mut last_child: XmlNodePtr;
-    let dtd: XmlDtdPtr;
+    let dtd: *mut XmlDtd;
 
     for j in 0..len {
         if !xml_is_blank_char(*str.add(j as usize) as u32) {
@@ -9117,7 +9116,7 @@ unsafe fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
 #[doc(alias = "htmlParseDocument")]
 pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut start: [XmlChar; 4] = [0; 4];
-    let dtd: XmlDtdPtr;
+    let dtd: *mut XmlDtd;
 
     xml_init_parser();
 
@@ -10606,7 +10605,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                 XmlParserInputState::XmlParserEOF | XmlParserInputState::XmlParserEpilog
             ))
     {
-        let dtd: XmlDtdPtr = (*(*ctxt).my_doc).get_int_subset();
+        let dtd: *mut XmlDtd = (*(*ctxt).my_doc).get_int_subset();
         if dtd.is_null() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
                 (*ctxt).my_doc,

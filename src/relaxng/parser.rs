@@ -12,7 +12,7 @@ use crate::{
         },
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
     },
-    tree::{xml_copy_doc, xml_free_doc, XmlDocPtr},
+    tree::{xml_copy_doc, xml_free_doc, XmlDoc},
 };
 
 use super::{xml_relaxng_free_define, xml_rng_perr_memory, XmlRelaxNGDefinePtr};
@@ -42,7 +42,7 @@ pub struct XmlRelaxNGParserCtxt {
     pub(crate) documents: XmlRelaxNGDocumentPtr, // all the documents loaded
     pub(crate) includes: XmlRelaxNGIncludePtr,   // all the includes loaded
     pub(crate) url: Option<String>,
-    pub(crate) document: XmlDocPtr,
+    pub(crate) document: *mut XmlDoc,
 
     pub(crate) def_tab: Vec<XmlRelaxNGDefinePtr>, // pointer to the allocated definitions
 
@@ -268,11 +268,11 @@ pub unsafe fn xml_relaxng_new_mem_parser_ctxt(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlRelaxNGNewDocParserCtxt")]
-pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlRelaxNGParserCtxtPtr {
+pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: *mut XmlDoc) -> XmlRelaxNGParserCtxtPtr {
     if doc.is_null() {
         return null_mut();
     }
-    let copy: XmlDocPtr = xml_copy_doc(doc, 1);
+    let copy: *mut XmlDoc = xml_copy_doc(doc, 1);
     if copy.is_null() {
         return null_mut();
     }

@@ -53,6 +53,8 @@ use std::{
 
 use const_format::concatcp;
 
+#[cfg(feature = "libxml_output")]
+use crate::tree::XmlNs;
 use crate::{
     encoding::XmlCharEncoding,
     error::__xml_raise_error,
@@ -69,7 +71,7 @@ use crate::{
     parser::{xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt, XmlParserInputPtr},
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
-        NodeCommon, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        NodeCommon, XmlDoc, XmlNodePtr, XML_XML_NAMESPACE,
     },
     uri::{build_uri, canonic_path},
     SYSCONFDIR,
@@ -1519,8 +1521,8 @@ impl CatalogEntryListNode {
     unsafe fn dump_xml_catalog_node(
         entry: &Arc<RwLock<Self>>,
         catalog: XmlNodePtr,
-        doc: XmlDocPtr,
-        ns: XmlNsPtr,
+        doc: *mut XmlDoc,
+        ns: *mut XmlNs,
         cgroup: Option<&Arc<RwLock<Self>>>,
     ) {
         use crate::tree::NodeCommon;
@@ -1555,7 +1557,7 @@ impl CatalogEntryListNode {
                         node = xml_new_doc_node(doc, ns, "group", null_mut());
                         (*node).set_prop("id", n.name.as_deref());
                         if let Some(value) = n.value.as_deref() {
-                            let xns: XmlNsPtr =
+                            let xns: *mut XmlNs =
                                 (*node).search_ns_by_href(doc, XML_XML_NAMESPACE.to_str().unwrap());
                             if !xns.is_null() {
                                 (*node).set_ns_prop(xns, "base", Some(value));
@@ -1917,8 +1919,8 @@ impl XmlCatalogEntry {
     unsafe fn dump_xml_catalog_node(
         &self,
         catalog: XmlNodePtr,
-        doc: XmlDocPtr,
-        ns: XmlNsPtr,
+        doc: *mut XmlDoc,
+        ns: *mut XmlNs,
         cgroup: Option<&Self>,
     ) {
         CatalogEntryListNode::dump_xml_catalog_node(
@@ -1933,14 +1935,17 @@ impl XmlCatalogEntry {
     #[doc(alias = "xmlDumpXMLCatalog")]
     #[cfg(feature = "libxml_output")]
     unsafe fn dump_xml_catalog<'a>(&self, out: impl Write + 'a) -> i32 {
-        use crate::{io::XmlOutputBuffer, tree::NodeCommon};
+        use crate::{
+            io::XmlOutputBuffer,
+            tree::{NodeCommon, XmlDtd, XmlNs},
+        };
 
         // Rebuild a catalog
-        let doc: XmlDocPtr = xml_new_doc(None);
+        let doc: *mut XmlDoc = xml_new_doc(None);
         if doc.is_null() {
             return -1;
         }
-        let dtd: XmlDtdPtr = xml_new_dtd(
+        let dtd: *mut XmlDtd = xml_new_dtd(
             doc,
             Some("catalog"),
             Some("-//OASIS//DTD Entity Resolution XML Catalog V1.0//EN"),
@@ -1949,7 +1954,7 @@ impl XmlCatalogEntry {
 
         (*doc).add_child(dtd as _);
 
-        let ns: XmlNsPtr = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, None);
+        let ns: *mut XmlNs = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, None);
         if ns.is_null() {
             xml_free_doc(doc);
             return -1;
@@ -2581,7 +2586,7 @@ unsafe fn xml_parse_xml_catalog_file(
 ) -> Option<Arc<RwLock<CatalogEntryListNode>>> {
     let mut cur: XmlNodePtr;
 
-    let doc: XmlDocPtr = xml_parse_catalog_file(filename);
+    let doc: *mut XmlDoc = xml_parse_catalog_file(filename);
     if doc.is_null() {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             generic_error!("Failed to parse catalog {filename}\n");
@@ -3083,8 +3088,8 @@ pub unsafe fn xml_catalog_remove(value: &str) -> i32 {
 ///
 /// Returns the resulting document tree or null_mut() in case of error
 #[doc(alias = "xmlParseCatalogFile")]
-pub unsafe fn xml_parse_catalog_file(filename: &str) -> XmlDocPtr {
-    let ret: XmlDocPtr;
+pub unsafe fn xml_parse_catalog_file(filename: &str) -> *mut XmlDoc {
+    let ret: *mut XmlDoc;
 
     let ctxt = xml_new_parser_ctxt();
     if ctxt.is_null() {

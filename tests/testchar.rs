@@ -26,7 +26,7 @@ use exml::{
         xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt, xml_read_memory,
         XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{xml_free_doc, NodeCommon, XmlDocPtr},
+    tree::{xml_free_doc, NodeCommon, XmlDoc},
 };
 use libc::{memset, strlen};
 
@@ -677,7 +677,7 @@ unsafe fn test_user_encoding() -> c_int {
     }
 
     let buffer = from_raw_parts(buf, 2 * total_size as usize).to_vec();
-    let doc: XmlDocPtr = xml_read_memory(buffer, None, Some("UTF-16LE"), 0);
+    let doc: *mut XmlDoc = xml_read_memory(buffer, None, Some("UTF-16LE"), 0);
     if doc.is_null() {
         let error = get_last_error();
         eprintln!("error: {error:?}");

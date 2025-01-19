@@ -37,9 +37,8 @@ use crate::{
     libxml::chvalid::xml_is_blank_char,
     tree::{
         xml_free_node_list, xml_get_doc_entity, xml_validate_name, NodeCommon, NodePtr, XmlAttr,
-        XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
-        XmlElement, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType,
-        XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElement,
+        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlNode, XmlNodePtr, XmlNs,
     },
 };
 
@@ -84,7 +83,7 @@ pub struct XmlDebugCtxt<'a> {
     output: Box<dyn Write + 'a>, /* the output file */
     shift: String,               /* used for indenting */
     depth: i32,                  /* current depth */
-    doc: XmlDocPtr,              /* current document */
+    doc: *mut XmlDoc,            /* current document */
     node: XmlNodePtr,            /* current node */
     dict: XmlDictPtr,            /* the doc dictionary */
     check: i32,                  /* do just checkings */
@@ -135,7 +134,7 @@ impl XmlDebugCtxt<'_> {
 
     /// Report if a given namespace is is not in scope.
     #[doc(alias = "xmlCtxtNsCheckScope")]
-    unsafe fn ns_check_scope(&mut self, node: &impl NodeCommon, ns: XmlNsPtr) {
+    unsafe fn ns_check_scope(&mut self, node: &impl NodeCommon, ns: *mut XmlNs) {
         let ret: i32 = xml_ns_check_scope(node, ns);
         if ret == -2 {
             if let Some(prefix) = (*ns).prefix() {
@@ -220,7 +219,7 @@ impl XmlDebugCtxt<'_> {
 
     #[doc(alias = "xmlCtxtGenericNodeCheck")]
     unsafe fn generic_node_check(&mut self, node: &impl NodeCommon) {
-        let doc: XmlDocPtr = node.document();
+        let doc: *mut XmlDoc = node.document();
 
         if node.parent().is_none() {
             xml_debug_err!(
@@ -316,7 +315,7 @@ impl XmlDebugCtxt<'_> {
             );
         }
         if node.element_type() == XmlElementType::XmlElementNode {
-            let mut ns: XmlNsPtr;
+            let mut ns: *mut XmlNs;
 
             ns = node.as_node().unwrap().as_ref().ns_def;
             while !ns.is_null() {
@@ -1096,7 +1095,7 @@ impl XmlDebugCtxt<'_> {
             }
         } else {
             let name = node.name().unwrap();
-            let ent: XmlEntityPtr = xml_get_doc_entity(node.document(), &name);
+            let ent: *mut XmlEntity = xml_get_doc_entity(node.document(), &name);
             if !ent.is_null() {
                 self.dump_entity(Some(&*ent));
             }
@@ -1451,7 +1450,7 @@ const DUMP_TEXT_TYPE: i32 = 1;
 /// -2 if the namespace is not in scope,
 /// and -3 if not on an ancestor node.
 #[doc(alias = "xmlNsCheckScope")]
-unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
+unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: *mut XmlNs) -> i32 {
     if ns.is_null() {
         return -1;
     }
@@ -1502,7 +1501,7 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
         )
     }) {
-        let old_ns: XmlNsPtr = node.as_document_node().unwrap().as_ref().old_ns;
+        let old_ns: *mut XmlNs = node.as_document_node().unwrap().as_ref().old_ns;
         if old_ns == ns {
             return 1;
         }
@@ -1765,7 +1764,7 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: XmlNodeP
         XmlElementType::XmlDocumentFragNode => {}
         XmlElementType::XmlNotationNode => {}
         XmlElementType::XmlNamespaceDecl => {
-            let ns: XmlNsPtr = node as XmlNsPtr;
+            let ns: *mut XmlNs = node as *mut XmlNs;
 
             let href = CStr::from_ptr((*ns).href as *const i8).to_string_lossy();
             if let Some(prefix) = (*ns).prefix() {
@@ -1863,7 +1862,7 @@ pub type XmlShellCtxtPtr<'a> = *mut XmlShellCtxt<'a>;
 #[repr(C)]
 pub struct XmlShellCtxt<'a> {
     filename: *mut c_char,
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     node: XmlNodePtr,
     pctxt: XmlXPathContextPtr,
     loaded: i32,
@@ -2136,7 +2135,7 @@ pub unsafe fn xml_shell_load(
 
     use crate::tree::xml_free_doc;
 
-    let doc: XmlDocPtr;
+    let doc: *mut XmlDoc;
     let mut html: i32 = 0;
 
     if ctxt.is_null() {
@@ -2409,7 +2408,7 @@ pub unsafe fn xml_shell_validate(
     if dtd.is_null() || *dtd.add(0) == 0 {
         res = xml_validate_document(addr_of_mut!(vctxt), (*ctxt).doc);
     } else {
-        let subset: XmlDtdPtr = xml_parse_dtd(
+        let subset: *mut XmlDtd = xml_parse_dtd(
             None,
             (!dtd.is_null())
                 .then(|| CStr::from_ptr(dtd as *const i8).to_string_lossy())
@@ -2822,7 +2821,7 @@ unsafe fn xml_shell_register_root_namespaces(
 ) -> i32 {
     use crate::xpath::internals::xml_xpath_register_ns;
 
-    let mut ns: XmlNsPtr;
+    let mut ns: *mut XmlNs;
 
     if root.is_null()
         || (*root).element_type() != XmlElementType::XmlElementNode
@@ -2876,7 +2875,7 @@ unsafe fn xml_shell_set_base(
 #[doc(alias = "xmlShell")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_shell<'a>(
-    doc: XmlDocPtr,
+    doc: *mut XmlDoc,
     filename: *mut c_char,
     input: Option<XmlShellReadlineFunc>,
     output: Option<impl Write + 'a>,

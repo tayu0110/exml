@@ -65,7 +65,7 @@ use crate::{
         },
         parser_internals::xml_is_letter,
     },
-    tree::XmlDocPtr,
+    tree::XmlDoc,
 };
 
 pub use context::*;
@@ -304,7 +304,7 @@ pub unsafe fn xml_read_doc(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> *mut XmlDoc {
     if cur.is_null() {
         return null_mut();
     }
@@ -323,7 +323,7 @@ pub unsafe fn xml_read_doc(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadFile")]
-pub unsafe fn xml_read_file(filename: &str, encoding: Option<&str>, options: i32) -> XmlDocPtr {
+pub unsafe fn xml_read_file(filename: &str, encoding: Option<&str>, options: i32) -> *mut XmlDoc {
     xml_init_parser();
     let ctxt: XmlParserCtxtPtr = xml_create_url_parser_ctxt(Some(filename), options);
     if ctxt.is_null() {
@@ -343,7 +343,7 @@ pub unsafe fn xml_read_memory(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> *mut XmlDoc {
     xml_init_parser();
     let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(buffer);
 
@@ -364,7 +364,7 @@ pub unsafe fn xml_read_io(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> *mut XmlDoc {
     xml_init_parser();
 
     let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
@@ -395,7 +395,7 @@ pub unsafe fn xml_ctxt_read_doc(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> *mut XmlDoc {
     if cur.is_null() {
         return null_mut();
     }
@@ -418,7 +418,7 @@ pub unsafe fn xml_ctxt_read_file(
     filename: &str,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> *mut XmlDoc {
     if ctxt.is_null() {
         return null_mut();
     }
@@ -445,7 +445,7 @@ pub unsafe fn xml_ctxt_read_memory(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> *mut XmlDoc {
     if ctxt.is_null() {
         return null_mut();
     }
@@ -476,7 +476,7 @@ pub unsafe fn xml_ctxt_read_io(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> *mut XmlDoc {
     if ctxt.is_null() {
         return null_mut();
     }

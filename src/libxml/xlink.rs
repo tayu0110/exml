@@ -26,7 +26,7 @@ use std::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use crate::tree::{XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr};
+use crate::tree::{XmlDoc, XmlElementType, XmlNodePtr, XmlNs};
 
 use super::xmlstring::{xml_str_equal, XmlChar};
 
@@ -169,7 +169,7 @@ const XHTML_NAMESPACE: &CStr = c"http://www.w3.org/1999/xhtml/";
 ///
 /// Returns the xlinkType of the node (XLINK_TYPE_NONE if there is no link detected.
 #[doc(alias = "xlinkIsLink")]
-pub unsafe fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> XlinkType {
+pub unsafe fn xlink_is_link(mut doc: *mut XmlDoc, node: XmlNodePtr) -> XlinkType {
     let mut ret: XlinkType = XlinkType::XlinkTypeNone;
 
     if node.is_null() {
@@ -195,7 +195,7 @@ pub unsafe fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> XlinkType {
             ret = XlinkType::XlinkTypeSimple;
         } else if typ == "extended" {
             if let Some(role) = (*node).get_ns_prop("role", Some(XLINK_NAMESPACE)) {
-                let xlink: XmlNsPtr = (*node).search_ns(doc, Some(XLINK_NAMESPACE));
+                let xlink: *mut XmlNs = (*node).search_ns(doc, Some(XLINK_NAMESPACE));
                 if xlink.is_null() {
                     /* Humm, fallback method */
                     if role == "xlink:external-linkset" {

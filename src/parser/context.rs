@@ -49,7 +49,7 @@ use crate::{
     },
     parser::{__xml_err_encoding, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int},
     tree::{
-        xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlEntityType, XmlNodePtr,
+        xml_free_doc, XmlAttr, XmlAttributeType, XmlDoc, XmlEntityType, XmlNodePtr,
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::build_uri,
@@ -79,7 +79,7 @@ pub struct XmlParserCtxt {
     // For SAX interface only, used by DOM build
     pub(crate) user_data: Option<GenericErrorContext>,
     // the document being built
-    pub my_doc: XmlDocPtr,
+    pub my_doc: *mut XmlDoc,
     // is the document well formed
     pub well_formed: i32,
     // shall we replace entities ?
@@ -234,7 +234,7 @@ pub struct XmlParserCtxt {
     // number of freed attributes nodes
     pub(crate) free_attrs_nr: i32,
     // List of freed attributes nodes
-    pub(crate) free_attrs: XmlAttrPtr,
+    pub(crate) free_attrs: *mut XmlAttr,
 
     // the complete error information for the last error.
     pub last_error: XmlError,
@@ -1337,8 +1337,8 @@ impl XmlParserCtxt {
         url: Option<&str>,
         encoding: Option<&str>,
         options: i32,
-    ) -> XmlDocPtr {
-        let ret: XmlDocPtr;
+    ) -> *mut XmlDoc {
+        let ret: *mut XmlDoc;
 
         self.ctxt_use_options_internal(options, encoding);
         if let Some(encoding) = encoding {
@@ -1900,8 +1900,8 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         }
     }
     if !(*ctxt).free_attrs.is_null() {
-        let mut cur: XmlAttrPtr;
-        let mut next: XmlAttrPtr;
+        let mut cur: *mut XmlAttr;
+        let mut next: *mut XmlAttr;
 
         cur = (*ctxt).free_attrs;
         while !cur.is_null() {

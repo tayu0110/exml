@@ -36,7 +36,7 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_parser_ctxt, XmlParserCtxtPtr,
         XmlParserInputPtr,
     },
-    tree::{xml_free_doc, xml_get_doc_entity, NodeCommon, XmlDocPtr, XmlElementType, XmlEntityPtr},
+    tree::{xml_free_doc, xml_get_doc_entity, NodeCommon, XmlDoc, XmlElementType, XmlEntity},
 };
 use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};
 
@@ -500,7 +500,7 @@ unsafe fn recursive_detect_test(
         parser_options |= XmlParserOption::XmlParseNoEnt as i32;
     }
     // base of the test, parse with the old API
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, parser_options);
+    let doc: *mut XmlDoc = xml_ctxt_read_file(ctxt, filename, None, parser_options);
     if !doc.is_null() || (*ctxt).last_error.code() != XmlParserErrors::XmlErrEntityLoop {
         eprintln!("Failed to detect recursion in {filename}");
         xml_free_parser_ctxt(ctxt);
@@ -536,7 +536,7 @@ unsafe fn not_recursive_detect_test(
         parser_options |= XmlParserOption::XmlParseNoEnt as i32;
     }
     // base of the test, parse with the old API
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, parser_options);
+    let doc: *mut XmlDoc = xml_ctxt_read_file(ctxt, filename, None, parser_options);
     if doc.is_null() {
         eprintln!("Failed to parse correct file {filename}");
         xml_free_parser_ctxt(ctxt);
@@ -570,12 +570,12 @@ unsafe fn not_recursive_huge_test(
     if options & OPT_NO_SUBST == 0 {
         parser_options |= XmlParserOption::XmlParseNoEnt as i32;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, "test/recurse/huge.xml", None, parser_options);
+    let doc: *mut XmlDoc = xml_ctxt_read_file(ctxt, "test/recurse/huge.xml", None, parser_options);
     if doc.is_null() {
         eprintln!("Failed to parse huge.xml");
         res = 1;
     } else {
-        let mut ent: XmlEntityPtr;
+        let mut ent: *mut XmlEntity;
         let fixed_cost: c_ulong = 20;
         let allowed_expansion: c_ulong = 1000000;
         let f_size: c_ulong = xml_strlen(c"some internal data".as_ptr() as _) as u64;
@@ -678,7 +678,7 @@ unsafe fn huge_dtd_test(
     if options & OPT_NO_SUBST == 0 {
         parser_options |= XmlParserOption::XmlParseNoEnt as i32;
     }
-    let doc: XmlDocPtr =
+    let doc: *mut XmlDoc =
         xml_ctxt_read_file(ctxt, "test/recurse/huge_dtd.xml", None, parser_options);
     if doc.is_null() {
         eprintln!("Failed to parse huge_dtd.xml");

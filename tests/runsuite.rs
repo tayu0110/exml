@@ -45,7 +45,7 @@ use exml::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_init_types,
         xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
     },
-    tree::{xml_free_doc, XmlDocPtr, XmlNodePtr},
+    tree::{xml_free_doc, XmlDoc, XmlNodePtr},
     uri::build_uri,
     xpath::{
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,
@@ -427,7 +427,7 @@ unsafe fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
 unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
     let mut test: XmlNodePtr;
     let mut tmp: XmlNodePtr;
-    let mut doc: XmlDocPtr;
+    let mut doc: *mut XmlDoc;
     let mut ctxt: XmlRelaxNGValidCtxtPtr;
     let mut ret: c_int = 0;
     let mut mem: c_int;
@@ -686,7 +686,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
     let filename = "test/xsdtest/xsdtestsuite.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
+    let doc: *mut XmlDoc = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
     if doc.is_null() {
         eprintln!("Failed to parse {}", filename);
         return -1;
@@ -753,7 +753,7 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
     let filename = "test/relaxng/OASIS/spectest.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
+    let doc: *mut XmlDoc = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
     if doc.is_null() {
         eprintln!("Failed to parse {}", filename);
         return -1;
@@ -796,7 +796,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
     let filename = "test/relaxng/testsuite.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
+    let doc: *mut XmlDoc = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
     if doc.is_null() {
         eprintln!("Failed to parse {}", filename);
         return -1;
@@ -843,7 +843,7 @@ unsafe fn xstc_test_instance(
 ) -> c_int {
     let mut validity: *mut XmlChar = null_mut();
     let mut ctxt: XmlSchemaValidCtxtPtr = null_mut();
-    let mut doc: XmlDocPtr = null_mut();
+    let mut doc: *mut XmlDoc = null_mut();
     let mut ret: c_int;
 
     reset_last_error();
@@ -1168,7 +1168,7 @@ unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const
     let mut cur: XmlNodePtr;
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(metadata, None, XmlParserOption::XmlParseNoEnt as _);
+    let doc: *mut XmlDoc = xml_read_file(metadata, None, XmlParserOption::XmlParseNoEnt as _);
     if doc.is_null() {
         eprintln!("Failed to parse {metadata}");
         return -1;
