@@ -68,7 +68,7 @@ use exml::{
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType,
-        XmlEnumeration, XmlNodePtr,
+        XmlEnumeration, XmlNode,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
     xpath::XmlXPathObjectPtr,
@@ -4087,7 +4087,7 @@ unsafe fn pattern_test(
                     let mut namespaces: [(*const u8, *const u8); 20] = [(null(), null()); 20];
                     let mut ns: *mut XmlNs;
 
-                    let root: XmlNodePtr = (*doc).get_root_element();
+                    let root: *mut XmlNode = (*doc).get_root_element();
                     ns = (*root).ns_def;
                     let mut j = 0;
                     while j < 10 && !ns.is_null() {
@@ -4166,7 +4166,7 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
         },
     };
 
-    let mut node: XmlNodePtr;
+    let mut node: *mut XmlNode;
     let mut ns: *mut XmlNs;
 
     // load XPath expr as a file

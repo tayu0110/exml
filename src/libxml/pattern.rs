@@ -39,7 +39,7 @@ use crate::{
         parser_internals::{xml_is_letter, xml_string_current_char},
         xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
     },
-    tree::{NodeCommon, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE},
+    tree::{NodeCommon, XmlElementType, XmlNode, XML_XML_NAMESPACE},
 };
 
 const XML_STREAM_STEP_DESC: usize = 1;
@@ -194,7 +194,7 @@ pub struct XmlPatParserContext {
     base: *const XmlChar, /* the full expression */
     error: i32,           /* error code */
     comp: XmlPatternPtr,  /* the result */
-    elem: XmlNodePtr,     /* the current node if any */
+    elem: *mut XmlNode,   /* the current node if any */
     namespaces: Option<Vec<(*const u8, *const u8)>>, /* the namespaces definitions */
 }
 
@@ -1324,7 +1324,7 @@ pub type XmlStepStatePtr = *mut XmlStepState;
 #[repr(C)]
 pub struct XmlStepState {
     step: i32,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 }
 
 pub type XmlStepStatesPtr = *mut XmlStepStates;
@@ -1335,7 +1335,7 @@ pub struct XmlStepStates {
     states: XmlStepStatePtr,
 }
 
-unsafe fn xml_pat_push_state(states: *mut XmlStepStates, step: i32, node: XmlNodePtr) -> i32 {
+unsafe fn xml_pat_push_state(states: *mut XmlStepStates, step: i32, node: *mut XmlNode) -> i32 {
     if (*states).states.is_null() || (*states).maxstates <= 0 {
         (*states).maxstates = 4;
         (*states).nbstates = 0;
@@ -1361,7 +1361,7 @@ unsafe fn xml_pat_push_state(states: *mut XmlStepStates, step: i32, node: XmlNod
 ///
 /// Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
 #[doc(alias = "xmlPatMatch")]
-unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) -> i32 {
+unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
     let mut i: i32;
     let mut step: XmlStepOpPtr;
     let mut states: XmlStepStates = XmlStepStates {
@@ -1434,7 +1434,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) -> i32 {
                                 break 'to_continue;
                             }
                             XmlPatOp::XmlOpChild => {
-                                let mut lst: XmlNodePtr;
+                                let mut lst: *mut XmlNode;
 
                                 if !matches!(
                                     (*node).element_type(),
@@ -1648,7 +1648,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) -> i32 {
 ///
 /// Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
 #[doc(alias = "xmlPatternMatch")]
-pub unsafe fn xml_pattern_match(mut comp: XmlPatternPtr, node: XmlNodePtr) -> i32 {
+pub unsafe fn xml_pattern_match(mut comp: XmlPatternPtr, node: *mut XmlNode) -> i32 {
     let mut ret: i32 = 0;
 
     if comp.is_null() || node.is_null() {

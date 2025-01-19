@@ -45,7 +45,7 @@ use exml::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_init_types,
         xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
     },
-    tree::{xml_free_doc, XmlDoc, XmlNodePtr},
+    tree::{xml_free_doc, XmlDoc, XmlNode},
     uri::build_uri,
     xpath::{
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,
@@ -245,8 +245,8 @@ unsafe fn initialize_libxml2() {
     }
 }
 
-unsafe fn get_next(cur: XmlNodePtr, xpath: *const c_char) -> XmlNodePtr {
-    let mut ret: XmlNodePtr = null_mut();
+unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
+    let mut ret: *mut XmlNode = null_mut();
 
     if cur.is_null() || (*cur).doc.is_null() || xpath.is_null() {
         return null_mut();
@@ -277,7 +277,7 @@ unsafe fn get_next(cur: XmlNodePtr, xpath: *const c_char) -> XmlNodePtr {
     ret
 }
 
-unsafe fn get_string(cur: XmlNodePtr, xpath: *const c_char) -> *mut XmlChar {
+unsafe fn get_string(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlChar {
     let mut ret: *mut XmlChar = null_mut();
 
     if cur.is_null() || (*cur).doc.is_null() || xpath.is_null() {
@@ -308,7 +308,7 @@ unsafe fn get_string(cur: XmlNodePtr, xpath: *const c_char) -> *mut XmlChar {
     ret
 }
 
-unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
+unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
     let mut ret: c_int = 0;
 
     cur = get_next(cur, c"./incorrect[1]".as_ptr() as _);
@@ -316,7 +316,7 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: XmlNodePt
         return 0;
     }
 
-    let test: XmlNodePtr = get_next(cur, c"./*".as_ptr() as _);
+    let test: *mut XmlNode = get_next(cur, c"./*".as_ptr() as _);
     if test.is_null() {
         test_log!(
             logfile,
@@ -366,8 +366,8 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: XmlNodePt
     ret
 }
 
-unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
-    let mut test: XmlNodePtr;
+unsafe fn install_resources(mut tst: *mut XmlNode, base: *const XmlChar) {
+    let mut test: *mut XmlNode;
     let mut name: *mut XmlChar;
     let mut content: *mut XmlChar;
     let mut res: *mut XmlChar;
@@ -399,8 +399,8 @@ unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
     }
 }
 
-unsafe fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
-    let mut test: XmlNodePtr;
+unsafe fn install_dirs(tst: *mut XmlNode, base: *const XmlChar) {
+    let mut test: *mut XmlNode;
 
     let name: *mut XmlChar = get_string(tst, c"string(@name)".as_ptr() as _);
     if name.is_null() {
@@ -424,9 +424,9 @@ unsafe fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
     xml_free(res as _);
 }
 
-unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
-    let mut test: XmlNodePtr;
-    let mut tmp: XmlNodePtr;
+unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int {
+    let mut test: *mut XmlNode;
+    let mut tmp: *mut XmlNode;
     let mut doc: *mut XmlDoc;
     let mut ctxt: XmlRelaxNGValidCtxtPtr;
     let mut ret: c_int = 0;
@@ -446,7 +446,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
         install_resources(tmp, null_mut());
     }
 
-    let cur: XmlNodePtr = get_next(tst, c"./correct[1]".as_ptr() as _);
+    let cur: *mut XmlNode = get_next(tst, c"./correct[1]".as_ptr() as _);
     if cur.is_null() {
         return xsd_incorrect_test_case(logfile, tst);
     }
@@ -663,7 +663,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
     ret
 }
 
-unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
+unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
     if VERBOSE != 0 {
         let doc: *mut XmlChar = get_string(cur, c"string(documentation)".as_ptr() as _);
 
@@ -682,7 +682,7 @@ unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_i
 }
 
 unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
     let filename = "test/xsdtest/xsdtestsuite.xml";
     let mut ret: c_int = 0;
 
@@ -724,7 +724,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
     ret
 }
 
-unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
+unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
     if VERBOSE != 0 {
         let mut doc: *mut XmlChar = get_string(cur, c"string(documentation)".as_ptr() as _);
 
@@ -749,7 +749,7 @@ unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_i
 }
 
 unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
     let filename = "test/relaxng/OASIS/spectest.xml";
     let mut ret: c_int = 0;
 
@@ -792,7 +792,7 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
 }
 
 unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
     let filename = "test/relaxng/testsuite.xml";
     let mut ret: c_int = 0;
 
@@ -836,7 +836,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
 
 unsafe fn xstc_test_instance(
     logfile: &mut Option<File>,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
     schemas: XmlSchemaPtr,
     spath: *const XmlChar,
     base: *const c_char,
@@ -985,14 +985,14 @@ unsafe fn xstc_test_instance(
 
 unsafe fn xstc_test_group(
     logfile: &mut Option<File>,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
     base: *const c_char,
 ) -> c_int {
     let mut p = None::<String>;
     let mut validity: *mut XmlChar = null_mut();
     let mut schemas: XmlSchemaPtr = null_mut();
     let ctxt: XmlSchemaParserCtxtPtr;
-    let mut instance: XmlNodePtr;
+    let mut instance: *mut XmlNode;
     let mut ret: c_int = 0;
 
     reset_last_error();
@@ -1165,7 +1165,7 @@ unsafe fn xstc_test_group(
 }
 
 unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const c_char) -> c_int {
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
     let mut ret: c_int = 0;
 
     let doc: *mut XmlDoc = xml_read_file(metadata, None, XmlParserOption::XmlParseNoEnt as _);

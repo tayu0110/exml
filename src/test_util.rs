@@ -52,7 +52,7 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, NodeCommon, XmlAttr,
         XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDOMWrapCtxtPtr, XmlDoc, XmlDtd,
         XmlElement, XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
-        XmlEntitiesTablePtr, XmlEntity, XmlNode, XmlNodePtr, XmlNs,
+        XmlEntitiesTablePtr, XmlEntity, XmlNode, XmlNs,
     },
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
@@ -758,7 +758,7 @@ pub(crate) unsafe fn des_xml_dtd_ptr(no: i32, val: *mut XmlDtd, _nr: i32) {
         free_api_doc();
     } else if !val.is_null() {
         (*val).unlink();
-        xml_free_node(val as XmlNodePtr);
+        xml_free_node(val as *mut XmlNode);
     }
 }
 
@@ -930,8 +930,8 @@ pub(crate) fn gen_xml_char(no: i32, _nr: i32) -> XmlChar {
 
 pub(crate) fn des_xml_char(_no: i32, _val: XmlChar, _nr: i32) {}
 
-pub(crate) unsafe fn desret_xml_node_ptr(val: XmlNodePtr) {
-    if !val.is_null() && val != API_ROOT.get() && val != API_DOC.get() as XmlNodePtr {
+pub(crate) unsafe fn desret_xml_node_ptr(val: *mut XmlNode) {
+    if !val.is_null() && val != API_ROOT.get() && val != API_DOC.get() as *mut XmlNode {
         (*val).unlink();
         xml_free_node(val);
     }
@@ -939,7 +939,7 @@ pub(crate) unsafe fn desret_xml_node_ptr(val: XmlNodePtr) {
 pub(crate) unsafe fn desret_xml_attr_ptr(val: *mut XmlAttr) {
     if !val.is_null() {
         (*val).unlink();
-        xml_free_node(val as XmlNodePtr);
+        xml_free_node(val as *mut XmlNode);
     }
 }
 
@@ -958,7 +958,7 @@ pub(crate) unsafe fn desret_xml_attribute_ptr(val: *mut XmlAttribute) {
 pub(crate) fn desret_xml_ns_ptr(_val: *mut XmlNs) {}
 
 pub(crate) unsafe fn desret_xml_dtd_ptr(val: *mut XmlDtd) {
-    desret_xml_node_ptr(val as XmlNodePtr);
+    desret_xml_node_ptr(val as *mut XmlNode);
 }
 
 pub(crate) fn gen_xml_feature(no: i32, _nr: i32) -> Option<XmlFeature> {
@@ -1063,11 +1063,11 @@ pub(crate) fn des_const_xml_parser_node_info_ptr(
 ) {
 }
 
-pub(crate) fn gen_xml_node_ptr_ptr(_no: i32, _nr: i32) -> *mut XmlNodePtr {
+pub(crate) fn gen_xml_node_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlNode {
     null_mut()
 }
 
-pub(crate) fn des_xml_node_ptr_ptr(_no: i32, _val: *mut XmlNodePtr, _nr: i32) {}
+pub(crate) fn des_xml_node_ptr_ptr(_no: i32, _val: *mut *mut XmlNode, _nr: i32) {}
 
 pub(crate) fn gen_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut c_char {
     null_mut()
@@ -1176,7 +1176,7 @@ pub(crate) unsafe fn desret_xml_parser_input_ptr(val: XmlParserInputPtr) {
 pub(crate) unsafe fn desret_xml_entity_ptr(val: *mut XmlEntity) {
     if !val.is_null() {
         (*val).unlink();
-        xml_free_node(val as XmlNodePtr);
+        xml_free_node(val as *mut XmlNode);
     }
 }
 
@@ -1204,7 +1204,7 @@ pub(crate) unsafe fn desret_xml_element_content_ptr(val: XmlElementContentPtr) {
     }
 }
 
-unsafe fn get_api_root() -> XmlNodePtr {
+unsafe fn get_api_root() -> *mut XmlNode {
     if (API_ROOT.get().is_null())
         || (*API_ROOT.get()).element_type() != XmlElementType::XmlElementNode
     {
@@ -1244,7 +1244,7 @@ unsafe fn free_api_doc() {
     API_NS.set(null_mut());
 }
 
-pub(crate) unsafe fn gen_xml_node_ptr(no: i32, _nr: i32) -> XmlNodePtr {
+pub(crate) unsafe fn gen_xml_node_ptr(no: i32, _nr: i32) -> *mut XmlNode {
     if no == 0 {
         return xml_new_pi("test", None);
     }
@@ -1255,7 +1255,7 @@ pub(crate) unsafe fn gen_xml_node_ptr(no: i32, _nr: i32) -> XmlNodePtr {
     /*     if no == 2 {
     // return((xmlNodePtr) get_api_doc()); */
 }
-pub(crate) unsafe fn des_xml_node_ptr(no: i32, val: XmlNodePtr, _nr: i32) {
+pub(crate) unsafe fn des_xml_node_ptr(no: i32, val: *mut XmlNode, _nr: i32) {
     if no == 1 {
         free_api_doc();
     } else if !val.is_null() {

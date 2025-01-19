@@ -45,8 +45,6 @@ use super::{
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
-/// A node in an XML tree.
-pub type XmlNodePtr = *mut XmlNode;
 #[repr(C)]
 pub struct XmlNode {
     pub _private: *mut c_void,        /* application data */
@@ -1657,7 +1655,7 @@ impl XmlNode {
     ///
     /// Returns the new element or NULL in case of error.
     #[doc(alias = "xmlAddSibling")]
-    pub unsafe fn add_sibling(&mut self, elem: XmlNodePtr) -> XmlNodePtr {
+    pub unsafe fn add_sibling(&mut self, elem: *mut XmlNode) -> *mut XmlNode {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return null_mut();
         }
@@ -1730,7 +1728,7 @@ impl XmlNode {
         feature = "schema",
         feature = "xinclude"
     ))]
-    pub unsafe fn add_prev_sibling(&mut self, elem: XmlNodePtr) -> XmlNodePtr {
+    pub unsafe fn add_prev_sibling(&mut self, elem: *mut XmlNode) -> *mut XmlNode {
         use crate::libxml::{
             globals::xml_free,
             xmlstring::{xml_strcat, xml_strdup},
@@ -1798,7 +1796,7 @@ impl XmlNode {
     ///
     /// Returns the new node or NULL in case of error.
     #[doc(alias = "xmlAddNextSibling")]
-    pub unsafe extern "C" fn add_next_sibling(&mut self, elem: XmlNodePtr) -> XmlNodePtr {
+    pub unsafe extern "C" fn add_next_sibling(&mut self, elem: *mut XmlNode) -> *mut XmlNode {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return null_mut();
         }
@@ -1858,8 +1856,8 @@ impl XmlNode {
     ///
     /// Returns the last child or NULL in case of error.
     #[doc(alias = "xmlAddChildList")]
-    pub unsafe fn add_child_list(&mut self, mut cur: XmlNodePtr) -> XmlNodePtr {
-        let mut prev: XmlNodePtr;
+    pub unsafe fn add_child_list(&mut self, mut cur: *mut XmlNode) -> *mut XmlNode {
+        let mut prev: *mut XmlNode;
 
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return null_mut();
@@ -2017,7 +2015,7 @@ impl XmlNode {
     #[doc(alias = "xmlSearchNsByHref")]
     pub unsafe fn search_ns_by_href(&mut self, mut doc: *mut XmlDoc, href: &str) -> *mut XmlNs {
         let mut cur: *mut XmlNs;
-        let orig: XmlNodePtr = self;
+        let orig: *mut XmlNode = self;
 
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return null_mut();
@@ -2115,7 +2113,7 @@ impl XmlNode {
         let mut size_cache: i32 = 0;
         let mut nb_cache: i32 = 0;
         let mut n: *mut XmlNs;
-        let mut node: XmlNodePtr = self;
+        let mut node: *mut XmlNode = self;
         let mut attr: *mut XmlAttr;
         let ret: i32 = 0;
 
@@ -2441,7 +2439,11 @@ impl From<&mut XmlNode> for NodePtr {
 ///
 /// Returns the attribute being inserted or NULL in case of error.
 #[doc(alias = "xmlAddPropSibling")]
-unsafe fn add_prop_sibling(prev: XmlNodePtr, cur: XmlNodePtr, prop: XmlNodePtr) -> XmlNodePtr {
+unsafe fn add_prop_sibling(
+    prev: *mut XmlNode,
+    cur: *mut XmlNode,
+    prop: *mut XmlNode,
+) -> *mut XmlNode {
     if cur.is_null()
         || !matches!((*cur).typ, XmlElementType::XmlAttributeNode)
         || prop.is_null()

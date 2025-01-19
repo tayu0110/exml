@@ -33,7 +33,7 @@ use super::{
     xml_free_ns, xml_get_doc_entity, xml_new_ns, xml_search_ns_by_namespace_strict,
     xml_search_ns_by_prefix_strict, xml_tree_err_memory, xml_tree_nslist_lookup_by_prefix,
     NodeCommon, NodePtr, XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlEntity, XmlNode,
-    XmlNodePtr, XmlNs, XML_LOCAL_NAMESPACE,
+    XmlNs, XML_LOCAL_NAMESPACE,
 };
 
 /// A function called to acquire namespaces (xmlNs) from the wrapper.
@@ -42,7 +42,7 @@ use super::{
 #[doc(alias = "xmlDOMWrapAcquireNsFunction")]
 pub type XmlDOMWrapAcquireNsFunction = unsafe fn(
     ctxt: XmlDOMWrapCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     ns_name: *const XmlChar,
     ns_prefix: *const XmlChar,
 ) -> *mut XmlNs;
@@ -292,8 +292,11 @@ unsafe fn xml_dom_wrap_ns_map_add_item(
 ///
 /// Returns 0 on success, -1 on API or internal errors.
 #[doc(alias = "xmlDOMWrapNSNormGatherInScopeNs")]
-unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(map: *mut XmlNsMapPtr, node: XmlNodePtr) -> i32 {
-    let mut cur: XmlNodePtr;
+unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
+    map: *mut XmlNsMapPtr,
+    node: *mut XmlNode,
+) -> i32 {
+    let mut cur: *mut XmlNode;
     let mut ns: *mut XmlNs;
     let mut mi: XmlNsMapItemPtr;
     let mut shadowed: i32;
@@ -423,7 +426,7 @@ unsafe fn xml_dom_wrap_store_ns(
 #[doc(alias = "xmlDOMWrapNSNormDeclareNsForced")]
 unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
     doc: *mut XmlDoc,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
     ns_name: *const XmlChar,
     prefix: *const XmlChar,
     check_shadow: i32,
@@ -519,7 +522,7 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
 #[doc(alias = "xmlDOMWrapNSNormAcquireNormalizedNs")]
 unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
     doc: *mut XmlDoc,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
     ns: *mut XmlNs,
     ret_ns: *mut *mut XmlNs,
     ns_map: *mut XmlNsMapPtr,
@@ -626,7 +629,7 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
 #[doc(alias = "xmlDOMWrapReconcileNamespaces")]
 pub unsafe fn xml_dom_wrap_reconcile_namespaces(
     _ctxt: XmlDOMWrapCtxtPtr,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
     options: i32,
 ) -> i32 {
     let mut depth: i32 = -1;
@@ -634,8 +637,8 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
     let mut parnsdone: i32 = 0;
     let mut ns: *mut XmlNs = null_mut();
     let mut prevns: *mut XmlNs;
-    let mut cur: XmlNodePtr;
-    let mut cur_elem: XmlNodePtr = null_mut();
+    let mut cur: *mut XmlNode;
+    let mut cur_elem: *mut XmlNode = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
     // @ancestorsOnly should be set by an option flag.
@@ -1064,14 +1067,14 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
 unsafe fn xml_dom_wrap_adopt_branch(
     ctxt: XmlDOMWrapCtxtPtr,
     source_doc: *mut XmlDoc,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     dest_doc: *mut XmlDoc,
-    dest_parent: XmlNodePtr,
+    dest_parent: *mut XmlNode,
     _options: i32,
 ) -> i32 {
     let mut ret: i32 = 0;
-    let mut cur: XmlNodePtr;
-    let mut cur_elem: XmlNodePtr = null_mut();
+    let mut cur: *mut XmlNode;
+    let mut cur_elem: *mut XmlNode = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
     let mut ns: *mut XmlNs = null_mut();
@@ -1499,10 +1502,10 @@ unsafe fn xml_dom_wrap_adopt_attr(
     _source_doc: *mut XmlDoc,
     attr: *mut XmlAttr,
     dest_doc: *mut XmlDoc,
-    dest_parent: XmlNodePtr,
+    dest_parent: *mut XmlNode,
     _options: i32,
 ) -> i32 {
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
 
     if !attr.is_null() || dest_doc.is_null() {
         return -1;
@@ -1631,9 +1634,9 @@ unsafe fn xml_dom_wrap_adopt_attr(
 pub unsafe fn xml_dom_wrap_adopt_node(
     ctxt: XmlDOMWrapCtxtPtr,
     mut source_doc: *mut XmlDoc,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     dest_doc: *mut XmlDoc,
-    dest_parent: XmlNodePtr,
+    dest_parent: *mut XmlNode,
     options: i32,
 ) -> i32 {
     if node.is_null()
@@ -1691,7 +1694,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
             options,
         );
     } else {
-        let cur: XmlNodePtr = node;
+        let cur: *mut XmlNode = node;
 
         (*cur).doc = dest_doc;
         // Optimize string adoption.
@@ -1736,7 +1739,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
 pub unsafe fn xml_dom_wrap_remove_node(
     ctxt: XmlDOMWrapCtxtPtr,
     doc: *mut XmlDoc,
-    mut node: XmlNodePtr,
+    mut node: *mut XmlNode,
     _options: i32,
 ) -> i32 {
     let mut list: *mut *mut XmlNs = null_mut();
@@ -2035,16 +2038,16 @@ pub unsafe fn xml_dom_wrap_remove_node(
 pub unsafe fn xml_dom_wrap_clone_node(
     ctxt: XmlDOMWrapCtxtPtr,
     mut source_doc: *mut XmlDoc,
-    node: XmlNodePtr,
-    res_node: *mut XmlNodePtr,
+    node: *mut XmlNode,
+    res_node: *mut *mut XmlNode,
     dest_doc: *mut XmlDoc,
-    dest_parent: XmlNodePtr,
+    dest_parent: *mut XmlNode,
     deep: i32,
     _options: i32,
 ) -> i32 {
     let mut ret: i32 = 0;
-    let mut cur: XmlNodePtr;
-    let mut cur_elem: XmlNodePtr = null_mut();
+    let mut cur: *mut XmlNode;
+    let mut cur_elem: *mut XmlNode = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
     let mut ns: *mut XmlNs = null_mut();
@@ -2056,10 +2059,10 @@ pub unsafe fn xml_dom_wrap_clone_node(
     // TODO: @ancestorsOnly should be set per option.
     //
     let ancestors_only: i32 = 0;
-    let mut result_clone: XmlNodePtr = null_mut();
-    let mut clone: XmlNodePtr;
-    let mut parent_clone: XmlNodePtr = null_mut();
-    let mut prev_clone: XmlNodePtr = null_mut();
+    let mut result_clone: *mut XmlNode = null_mut();
+    let mut clone: *mut XmlNode;
+    let mut parent_clone: *mut XmlNode = null_mut();
+    let mut prev_clone: *mut XmlNode = null_mut();
     let mut clone_ns: *mut XmlNs;
     let mut clone_ns_def_slot: *mut *mut XmlNs;
     // The destination dict

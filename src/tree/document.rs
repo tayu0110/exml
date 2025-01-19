@@ -40,7 +40,7 @@ use crate::{
 use super::{
     xml_free_node_list, xml_get_doc_entity, xml_new_doc_text, xml_new_reference, xml_tree_err,
     xml_tree_err_memory, NodeCommon, NodePtr, XmlDocProperties, XmlDtd, XmlElementType, XmlEntity,
-    XmlEntityType, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
+    XmlEntityType, XmlID, XmlNode, XmlNs, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
@@ -114,7 +114,7 @@ impl XmlDoc {
     ///
     /// Returns the `XmlNodePtr` for the root or NULL
     #[doc(alias = "xmlDocGetRootElement")]
-    pub unsafe fn get_root_element(&self) -> XmlNodePtr {
+    pub unsafe fn get_root_element(&self) -> *mut XmlNode {
         let mut ret = self.children();
         while let Some(now) = ret {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
@@ -138,11 +138,11 @@ impl XmlDoc {
     ///
     /// Returns a pointer to the first child.
     #[doc(alias = "xmlStringGetNodeList")]
-    pub unsafe fn get_node_list(&self, value: *const XmlChar) -> XmlNodePtr {
-        let mut ret: XmlNodePtr = null_mut();
-        let mut head: XmlNodePtr = null_mut();
-        let mut last: XmlNodePtr = null_mut();
-        let mut node: XmlNodePtr;
+    pub unsafe fn get_node_list(&self, value: *const XmlChar) -> *mut XmlNode {
+        let mut ret: *mut XmlNode = null_mut();
+        let mut head: *mut XmlNode = null_mut();
+        let mut last: *mut XmlNode = null_mut();
+        let mut node: *mut XmlNode;
         let mut val: *mut XmlChar = null_mut();
         let mut cur: *const XmlChar = value;
         let mut q: *const XmlChar;
@@ -385,10 +385,14 @@ impl XmlDoc {
     ///
     /// Returns a pointer to the first child.
     #[doc(alias = "xmlStringLenGetNodeList")]
-    pub unsafe fn get_node_list_with_strlen(&self, value: *const XmlChar, len: i32) -> XmlNodePtr {
-        let mut ret: XmlNodePtr = null_mut();
-        let mut last: XmlNodePtr = null_mut();
-        let mut node: XmlNodePtr;
+    pub unsafe fn get_node_list_with_strlen(
+        &self,
+        value: *const XmlChar,
+        len: i32,
+    ) -> *mut XmlNode {
+        let mut ret: *mut XmlNode = null_mut();
+        let mut last: *mut XmlNode = null_mut();
+        let mut node: *mut XmlNode;
         let mut val: *mut XmlChar;
         let mut cur: *const XmlChar;
         let mut q: *const XmlChar;
@@ -632,7 +636,7 @@ impl XmlDoc {
     /// Returns the old root element if any was found, NULL if root was NULL
     #[doc(alias = "xmlDocSetRootElement")]
     #[cfg(any(feature = "libxml_tree", feature = "libxml_writer"))]
-    pub unsafe fn set_root_element(&mut self, root: XmlNodePtr) -> XmlNodePtr {
+    pub unsafe fn set_root_element(&mut self, root: *mut XmlNode) -> *mut XmlNode {
         use crate::tree::{xml_replace_node, NodeCommon};
 
         if root.is_null() || matches!((*root).element_type(), XmlElementType::XmlNamespaceDecl) {

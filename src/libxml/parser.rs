@@ -122,7 +122,7 @@ use crate::{
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
         NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNodePtr, XmlNs,
+        XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNs,
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
@@ -1992,7 +1992,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory(
     user_data: Option<GenericErrorContext>,
     depth: i32,
     string: *const XmlChar,
-    lst: *mut XmlNodePtr,
+    lst: *mut *mut XmlNode,
 ) -> i32 {
     xml_parse_balanced_chunk_memory_recover(doc, sax, user_data, depth, string, lst, 0)
 }
@@ -2029,13 +2029,13 @@ unsafe fn xml_get_namespace(ctxt: XmlParserCtxtPtr, prefix: Option<&str>) -> Opt
 /// error code otherwise
 #[doc(alias = "xmlParseInNodeContext")]
 pub unsafe fn xml_parse_in_node_context(
-    mut node: XmlNodePtr,
+    mut node: *mut XmlNode,
     data: Vec<u8>,
     mut options: i32,
-    lst: *mut XmlNodePtr,
+    lst: *mut *mut XmlNode,
 ) -> XmlParserErrors {
     let ctxt: XmlParserCtxtPtr;
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
     let mut nsnr = 0;
     let ret: XmlParserErrors;
 
@@ -2121,7 +2121,7 @@ pub unsafe fn xml_parse_in_node_context(
     (*ctxt).input_id = 2;
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
 
-    let fake: XmlNodePtr = xml_new_doc_comment((*node).doc, "");
+    let fake: *mut XmlNode = xml_new_doc_comment((*node).doc, "");
     if fake.is_null() {
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrNoMemory;
@@ -2236,12 +2236,12 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     user_data: Option<GenericErrorContext>,
     depth: i32,
     string: *const XmlChar,
-    lst: *mut XmlNodePtr,
+    lst: *mut *mut XmlNode,
     recover: i32,
 ) -> i32 {
     let replaced = sax.is_some();
     let mut oldsax = None;
-    let content: XmlNodePtr;
+    let content: *mut XmlNode;
     let ret: i32;
 
     if depth > 40 {
@@ -2280,7 +2280,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         (*new_doc).int_subset = (*doc).int_subset;
         (*new_doc).ext_subset = (*doc).ext_subset;
     }
-    let new_root: XmlNodePtr = xml_new_doc_node(new_doc, null_mut(), "pseudoroot", null());
+    let new_root: *mut XmlNode = xml_new_doc_node(new_doc, null_mut(), "pseudoroot", null());
     if new_root.is_null() {
         if replaced {
             (*ctxt).sax = oldsax;
@@ -2382,7 +2382,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     depth: i32,
     url: Option<&str>,
     id: Option<&str>,
-    list: *mut XmlNodePtr,
+    list: *mut *mut XmlNode,
 ) -> (Option<Box<XmlSAXHandler>>, XmlParserErrors) {
     let ret: XmlParserErrors;
     let mut start: [XmlChar; 4] = [0; 4];
@@ -2435,7 +2435,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
             (*new_doc).url = (*doc).url.clone();
         }
     }
-    let new_root: XmlNodePtr = xml_new_doc_node(new_doc, null_mut(), "pseudoroot", null());
+    let new_root: *mut XmlNode = xml_new_doc_node(new_doc, null_mut(), "pseudoroot", null());
     if new_root.is_null() {
         let sax = (*ctxt).sax.take();
         (*new_doc).int_subset = null_mut();
@@ -2605,7 +2605,7 @@ pub(crate) unsafe fn xml_parse_external_entity(
     depth: i32,
     url: Option<&str>,
     id: Option<&str>,
-    lst: *mut XmlNodePtr,
+    lst: *mut *mut XmlNode,
 ) -> i32 {
     xml_parse_external_entity_private(doc, null_mut(), sax, user_data, depth, url, id, lst).1 as i32
 }
@@ -2623,7 +2623,7 @@ pub unsafe fn xml_parse_ctxt_external_entity(
     ctx: XmlParserCtxtPtr,
     url: Option<&str>,
     id: Option<&str>,
-    lst: *mut XmlNodePtr,
+    lst: *mut *mut XmlNode,
 ) -> i32 {
     if ctx.is_null() {
         return -1;
@@ -5495,7 +5495,7 @@ unsafe fn are_blanks(
         return 0;
     }
 
-    let last_child: XmlNodePtr = (*(*ctxt).node).get_last_child();
+    let last_child: *mut XmlNode = (*(*ctxt).node).get_last_child();
     if last_child.is_null() {
         if (*(*ctxt).node).element_type() != XmlElementType::XmlElementNode
             && !(*(*ctxt).node).content.is_null()
@@ -7193,7 +7193,7 @@ pub unsafe fn xml_new_io_input_stream(
 #[doc(alias = "xmlParserFindNodeInfo")]
 pub(crate) unsafe fn xml_parser_find_node_info(
     ctxt: XmlParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> Option<Rc<RefCell<XmlParserNodeInfo>>> {
     if ctxt.is_null() {
         return None;

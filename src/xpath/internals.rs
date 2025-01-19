@@ -67,7 +67,7 @@ use crate::{
         },
     },
     tree::{
-        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlDoc, XmlElementType, XmlNodePtr, XmlNs,
+        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlDoc, XmlElementType, XmlNode, XmlNs,
         XML_XML_NAMESPACE,
     },
     xpath::{
@@ -1788,12 +1788,15 @@ pub const XML_NODESET_DEFAULT: usize = 10;
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNodeSetDupNs")]
-pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: *mut XmlNs) -> XmlNodePtr {
+pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(
+    node: *mut XmlNode,
+    ns: *mut XmlNs,
+) -> *mut XmlNode {
     if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
     if node.is_null() || matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-        return ns as XmlNodePtr;
+        return ns as *mut XmlNode;
     }
 
     // Allocate a new Namespace and fill the fields.
@@ -1811,7 +1814,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: *mut Xm
         (*cur).prefix = xml_strdup((*ns).prefix);
     }
     (*cur).next = node as *mut XmlNs;
-    cur as XmlNodePtr
+    cur as *mut XmlNode
 }
 
 /// This is the cached version of xmlXPathNewNodeSet().
@@ -1822,7 +1825,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: *mut Xm
 #[doc(alias = "xmlXPathCacheNewNodeSet")]
 unsafe fn xml_xpath_cache_new_node_set(
     ctxt: XmlXPathContextPtr,
-    val: XmlNodePtr,
+    val: *mut XmlNode,
 ) -> XmlXPathObjectPtr {
     if !ctxt.is_null() && !(*ctxt).cache.is_null() {
         let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
@@ -1884,7 +1887,7 @@ pub unsafe extern "C" fn xml_xpath_root(ctxt: XmlXPathParserContextPtr) {
     }
     value_push(
         ctxt,
-        xml_xpath_cache_new_node_set((*ctxt).context, (*(*ctxt).context).doc as XmlNodePtr),
+        xml_xpath_cache_new_node_set((*ctxt).context, (*(*ctxt).context).doc as *mut XmlNode),
     );
 }
 
@@ -3874,8 +3877,8 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
     let mut max_depth: i32;
     let mut ret: i32;
     let mut depth: i32;
-    let mut cur: XmlNodePtr = null_mut();
-    let mut limit: XmlNodePtr = null_mut();
+    let mut cur: *mut XmlNode = null_mut();
+    let mut limit: *mut XmlNode = null_mut();
 
     if ctxt.is_null() || comp.is_null() {
         return -1;
@@ -3915,7 +3918,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
             }
             // TODO: Check memory error.
             if let Some(nodeset) = (*(*result_seq)).nodesetval.as_deref_mut() {
-                nodeset.add_unique((*ctxt).doc as XmlNodePtr);
+                nodeset.add_unique((*ctxt).doc as *mut XmlNode);
             }
         } else {
             // Select "self::node()"
@@ -3933,7 +3936,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
     }
 
     if from_root != 0 {
-        cur = (*ctxt).doc as XmlNodePtr;
+        cur = (*ctxt).doc as *mut XmlNode;
     } else if !(*ctxt).node.is_null() {
         match (*(*ctxt).node).element_type() {
             XmlElementType::XmlElementNode
@@ -4192,7 +4195,7 @@ pub type XmlXPathNodeSetMergeFunction =
 // Initially it must be called with NULL, and it indicates
 // termination on the axis by returning NULL.
 pub type XmlXPathTraversalFunction =
-    unsafe fn(ctxt: XmlXPathParserContextPtr, cur: XmlNodePtr) -> XmlNodePtr;
+    unsafe fn(ctxt: XmlXPathParserContextPtr, cur: *mut XmlNode) -> *mut XmlNode;
 
 /// Traversal function for the "child" direction and nodes of type element.
 /// The child axis contains the children of the context node in document order.
@@ -4201,8 +4204,8 @@ pub type XmlXPathTraversalFunction =
 #[doc(alias = "xmlXPathNextChildElement")]
 unsafe fn xml_xpath_next_child_element(
     ctxt: XmlXPathParserContextPtr,
-    mut cur: XmlNodePtr,
-) -> XmlNodePtr {
+    mut cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -4280,8 +4283,8 @@ unsafe fn xml_xpath_next_child_element(
 #[doc(alias = "xmlXPathNextPrecedingInternal")]
 unsafe fn xml_xpath_next_preceding_internal(
     ctxt: XmlXPathParserContextPtr,
-    mut cur: XmlNodePtr,
-) -> XmlNodePtr {
+    mut cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -4299,7 +4302,7 @@ unsafe fn xml_xpath_next_preceding_internal(
             {
                 return null_mut();
             }
-            cur = (*ns).next as XmlNodePtr;
+            cur = (*ns).next as *mut XmlNode;
         }
         (*ctxt).ancestor = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
     }
@@ -4414,7 +4417,7 @@ unsafe fn xml_xpath_node_set_filter(
     }
 
     let xpctxt: XmlXPathContextPtr = (*ctxt).context;
-    let oldnode: XmlNodePtr = (*xpctxt).node;
+    let oldnode: *mut XmlNode = (*xpctxt).node;
     let olddoc: *mut XmlDoc = (*xpctxt).doc;
     let oldcs: i32 = (*xpctxt).context_size;
     let oldpp: i32 = (*xpctxt).proximity_position;
@@ -4426,7 +4429,7 @@ unsafe fn xml_xpath_node_set_filter(
     let mut j = 0;
     let mut pos = 1;
     while i < set.node_tab.len() {
-        let node: XmlNodePtr = set.node_tab[i];
+        let node: *mut XmlNode = set.node_tab[i];
 
         (*xpctxt).node = node;
         (*xpctxt).proximity_position = i as i32 + 1;
@@ -4482,7 +4485,7 @@ unsafe fn xml_xpath_node_set_filter(
     // Free remaining nodes.
     if has_ns_nodes {
         while i < set.node_tab.len() {
-            let node: XmlNodePtr = set.node_tab[i];
+            let node: *mut XmlNode = set.node_tab[i];
             if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
             {
                 xml_xpath_node_set_free_ns(node as *mut XmlNs);
@@ -4661,8 +4664,8 @@ macro_rules! xp_test_hit_ns {
 unsafe extern "C" fn xml_xpath_node_collect_and_test(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    mut first: *mut XmlNodePtr,
-    mut last: *mut XmlNodePtr,
+    mut first: *mut *mut XmlNode,
+    mut last: *mut *mut XmlNode,
     to_bool: i32,
 ) -> i32 {
     let axis: XmlXPathAxisVal = (*op).value.try_into().unwrap();
@@ -4674,7 +4677,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
     let mut total: i32 = 0;
     let mut has_ns_nodes: bool;
 
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
     // First predicate operator
     let mut pred_op: XmlXPathStepOpPtr;
     let mut max_pos: i32; /* The requested position() (when a "[n]" predicate) */
@@ -4834,12 +4837,12 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
     // A node test * is true for any node of the
     // principal node type. For example, child::* will
     // select all element children of the context node
-    let old_context_node: XmlNodePtr = (*xpctxt).node;
+    let old_context_node: *mut XmlNode = (*xpctxt).node;
     // The final resulting node set wrt to all context nodes
     let mut out_seq = None;
     // Used to feed predicate evaluation.
     let mut seq = None;
-    let context_node: XmlNodePtr = null_mut();
+    let context_node: *mut XmlNode = null_mut();
     let mut context_idx = 0;
 
     'main: while (context_idx < context_seq.node_tab.len() || !context_node.is_null())
@@ -5152,7 +5155,7 @@ unsafe extern "C" fn xml_xpath_comp_swap(op: XmlXPathStepOpPtr) {
 unsafe extern "C" fn xml_xpath_comp_op_eval_last(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    last: *mut XmlNodePtr,
+    last: *mut *mut XmlNode,
 ) -> i32 {
     let mut total: i32 = 0;
     let cur: i32;
@@ -5332,7 +5335,7 @@ unsafe extern "C" fn xml_xpath_location_set_filter(
     }
 
     let xpctxt: XmlXPathContextPtr = (*ctxt).context;
-    let oldnode: XmlNodePtr = (*xpctxt).node;
+    let oldnode: *mut XmlNode = (*xpctxt).node;
     let olddoc: *mut XmlDoc = (*xpctxt).doc;
     let oldcs: i32 = (*xpctxt).context_size;
     let oldpp: i32 = (*xpctxt).proximity_position;
@@ -5344,7 +5347,7 @@ unsafe extern "C" fn xml_xpath_location_set_filter(
     j = 0;
     pos = 1;
     while i < (*locset).loc_nr {
-        let context_node: XmlNodePtr = (*(*(*locset).loc_tab.add(i as usize))).user as _;
+        let context_node: *mut XmlNode = (*(*(*locset).loc_tab.add(i as usize))).user as _;
 
         (*xpctxt).node = context_node;
         (*xpctxt).proximity_position = i + 1;
@@ -5433,7 +5436,7 @@ unsafe extern "C" fn xml_xpath_location_set_filter(
 unsafe extern "C" fn xml_xpath_comp_op_eval_filter_first(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    first: *mut XmlNodePtr,
+    first: *mut *mut XmlNode,
 ) -> i32 {
     let mut total: i32 = 0;
 
@@ -5468,7 +5471,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_filter_first(
                 c"last".as_ptr() as _,
             )
         {
-            let mut last: XmlNodePtr = null_mut();
+            let mut last: *mut XmlNode = null_mut();
 
             total += xml_xpath_comp_op_eval_last(
                 ctxt,
@@ -5513,7 +5516,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_filter_first(
             if !locset.is_null() {
                 xml_xpath_location_set_filter(ctxt, locset, (*op).ch2, 1, 1);
                 if (*locset).loc_nr > 0 {
-                    *first = (*(*(*locset).loc_tab.add(0))).user as XmlNodePtr;
+                    *first = (*(*(*locset).loc_tab.add(0))).user as *mut XmlNode;
                 }
             }
 
@@ -5544,7 +5547,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_filter_first(
 unsafe extern "C" fn xml_xpath_comp_op_eval_first(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    first: *mut XmlNodePtr,
+    first: *mut *mut XmlNode,
 ) -> i32 {
     let mut total: i32 = 0;
     let cur: i32;
@@ -6023,7 +6026,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                     && (*val).typ == XmlXPathObjectType::XPathNumber
                     && (*val).floatval == 1.0
                 {
-                    let mut first: XmlNodePtr = null_mut();
+                    let mut first: *mut XmlNode = null_mut();
 
                     total += xml_xpath_comp_op_eval_first(
                         ctxt,
@@ -6073,7 +6076,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                         c"last".as_ptr() as _,
                     )
                 {
-                    let mut last: XmlNodePtr = null_mut();
+                    let mut last: *mut XmlNode = null_mut();
 
                     total += xml_xpath_comp_op_eval_last(
                         ctxt,
@@ -6159,7 +6162,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
             let obj: XmlXPathObjectPtr;
             let mut tmp: XmlXPathObjectPtr;
             let newlocset: XmlLocationSetPtr;
-            let oldnode: XmlNodePtr = (*(*ctxt).context).node;
+            let oldnode: *mut XmlNode = (*(*ctxt).context).node;
             let oldcs: i32 = (*(*ctxt).context).context_size;
             let oldpp: i32 = (*(*ctxt).context).proximity_position;
 
@@ -6227,7 +6230,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                             }
                         } else {
                             range = xml_xptr_new_range_node_object(
-                                (*(*(*oldlocset).loc_tab.add(i as usize))).user as XmlNodePtr,
+                                (*(*(*oldlocset).loc_tab.add(i as usize))).user as *mut XmlNode,
                                 res,
                             );
                             if !range.is_null() {
@@ -7236,10 +7239,10 @@ pub unsafe extern "C" fn xml_xpath_register_all_functions(ctxt: XmlXPathContextP
 ///
 /// Returns an int usable as a hash
 #[doc(alias = "xmlXPathNodeValHash")]
-unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
+unsafe extern "C" fn xml_xpath_node_val_hash(mut node: *mut XmlNode) -> u32 {
     let mut len: i32 = 2;
     let mut string: *const XmlChar;
-    let mut tmp: XmlNodePtr;
+    let mut tmp: *mut XmlNode;
     let mut ret: u32 = 0;
 
     if node.is_null() {
@@ -8489,7 +8492,10 @@ pub unsafe extern "C" fn xml_xpath_is_node_type(name: *const XmlChar) -> i32 {
 ///
 /// Returns the next element following that axis
 #[doc(alias = "xmlXPathNextSelf")]
-pub unsafe fn xml_xpath_next_self(ctxt: XmlXPathParserContextPtr, cur: XmlNodePtr) -> XmlNodePtr {
+pub unsafe fn xml_xpath_next_self(
+    ctxt: XmlXPathParserContextPtr,
+    cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -8504,7 +8510,10 @@ pub unsafe fn xml_xpath_next_self(ctxt: XmlXPathParserContextPtr, cur: XmlNodePt
 ///
 /// Returns the next element following that axis
 #[doc(alias = "xmlXPathNextChild")]
-pub unsafe fn xml_xpath_next_child(ctxt: XmlXPathParserContextPtr, cur: XmlNodePtr) -> XmlNodePtr {
+pub unsafe fn xml_xpath_next_child(
+    ctxt: XmlXPathParserContextPtr,
+    cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -8566,8 +8575,8 @@ pub unsafe fn xml_xpath_next_child(ctxt: XmlXPathParserContextPtr, cur: XmlNodeP
 #[doc(alias = "xmlXPathNextDescendant")]
 pub unsafe fn xml_xpath_next_descendant(
     ctxt: XmlXPathParserContextPtr,
-    mut cur: XmlNodePtr,
-) -> XmlNodePtr {
+    mut cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -8582,7 +8591,7 @@ pub unsafe fn xml_xpath_next_descendant(
             return null_mut();
         }
 
-        if (*(*ctxt).context).node == (*(*ctxt).context).doc as XmlNodePtr {
+        if (*(*ctxt).context).node == (*(*ctxt).context).doc as *mut XmlNode {
             return (*(*(*ctxt).context).doc)
                 .children
                 .map_or(null_mut(), |c| c.as_ptr());
@@ -8649,8 +8658,8 @@ pub unsafe fn xml_xpath_next_descendant(
 #[doc(alias = "xmlXPathNextDescendantOrSelf")]
 pub unsafe fn xml_xpath_next_descendant_or_self(
     ctxt: XmlXPathParserContextPtr,
-    cur: XmlNodePtr,
-) -> XmlNodePtr {
+    cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -8676,7 +8685,10 @@ pub unsafe fn xml_xpath_next_descendant_or_self(
 ///
 /// Returns the next element following that axis
 #[doc(alias = "xmlXPathNextParent")]
-pub unsafe fn xml_xpath_next_parent(ctxt: XmlXPathParserContextPtr, cur: XmlNodePtr) -> XmlNodePtr {
+pub unsafe fn xml_xpath_next_parent(
+    ctxt: XmlXPathParserContextPtr,
+    cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -8705,7 +8717,7 @@ pub unsafe fn xml_xpath_next_parent(ctxt: XmlXPathParserContextPtr, cur: XmlNode
             | XmlElementType::XmlXIncludeEnd
             | XmlElementType::XmlEntityDecl => {
                 let Some(parent) = (*(*(*ctxt).context).node).parent() else {
-                    return (*(*ctxt).context).doc as XmlNodePtr;
+                    return (*(*ctxt).context).doc as *mut XmlNode;
                 };
                 if matches!(parent.element_type(), XmlElementType::XmlElementNode)
                     && (*parent.name.add(0) == b' '
@@ -8735,7 +8747,7 @@ pub unsafe fn xml_xpath_next_parent(ctxt: XmlXPathParserContextPtr, cur: XmlNode
                 if !(*ns).next.is_null()
                     && !matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
                 {
-                    return (*ns).next as XmlNodePtr;
+                    return (*ns).next as *mut XmlNode;
                 }
                 return null_mut();
             }
@@ -8755,8 +8767,8 @@ pub unsafe fn xml_xpath_next_parent(ctxt: XmlXPathParserContextPtr, cur: XmlNode
 #[doc(alias = "xmlXPathNextAncestorOrSelf")]
 pub unsafe fn xml_xpath_next_ancestor_or_self(
     ctxt: XmlXPathParserContextPtr,
-    cur: XmlNodePtr,
-) -> XmlNodePtr {
+    cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -8774,8 +8786,8 @@ pub unsafe fn xml_xpath_next_ancestor_or_self(
 #[doc(alias = "xmlXPathNextFollowingSibling")]
 pub unsafe fn xml_xpath_next_following_sibling(
     ctxt: XmlXPathParserContextPtr,
-    cur: XmlNodePtr,
-) -> XmlNodePtr {
+    cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -8785,7 +8797,7 @@ pub unsafe fn xml_xpath_next_following_sibling(
     ) {
         return null_mut();
     }
-    if cur == (*(*ctxt).context).doc as XmlNodePtr {
+    if cur == (*(*ctxt).context).doc as *mut XmlNode {
         return null_mut();
     }
     if cur.is_null() {
@@ -8806,8 +8818,8 @@ pub unsafe fn xml_xpath_next_following_sibling(
 #[doc(alias = "xmlXPathNextFollowing")]
 pub unsafe fn xml_xpath_next_following(
     ctxt: XmlXPathParserContextPtr,
-    mut cur: XmlNodePtr,
-) -> XmlNodePtr {
+    mut cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -8832,7 +8844,7 @@ pub unsafe fn xml_xpath_next_following(
             {
                 return null_mut();
             }
-            cur = (*ns).next as XmlNodePtr;
+            cur = (*ns).next as *mut XmlNode;
         }
     }
     if cur.is_null() {
@@ -8846,7 +8858,7 @@ pub unsafe fn xml_xpath_next_following(
         if cur.is_null() {
             break;
         }
-        if cur == (*(*ctxt).context).doc as XmlNodePtr {
+        if cur == (*(*ctxt).context).doc as *mut XmlNode {
             return null_mut();
         }
         if let Some(next) = (*cur).next {
@@ -8881,8 +8893,8 @@ thread_local! {
 #[doc(alias = "xmlXPathNextNamespace")]
 pub unsafe fn xml_xpath_next_namespace(
     ctxt: XmlXPathParserContextPtr,
-    cur: XmlNodePtr,
-) -> XmlNodePtr {
+    cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -8901,12 +8913,12 @@ pub unsafe fn xml_xpath_next_namespace(
         }
         // Does it work ???
         let reference = XML_XPATH_XMLNAMESPACE_STRUCT.with(|s| s as *const XmlNs);
-        return reference as XmlNodePtr;
+        return reference as *mut XmlNode;
     }
     if (*(*ctxt).context).tmp_ns_nr > 0 {
         (*(*ctxt).context).tmp_ns_nr -= 1;
         (*(*ctxt).context).tmp_ns_list.as_deref().unwrap()[(*(*ctxt).context).tmp_ns_nr as usize]
-            as XmlNodePtr
+            as *mut XmlNode
     } else {
         (*(*ctxt).context).tmp_ns_list = None;
         null_mut()
@@ -8920,8 +8932,8 @@ pub unsafe fn xml_xpath_next_namespace(
 #[doc(alias = "xmlXPathNextAttribute")]
 pub unsafe fn xml_xpath_next_attribute(
     ctxt: XmlXPathParserContextPtr,
-    cur: XmlNodePtr,
-) -> XmlNodePtr {
+    cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -8935,10 +8947,10 @@ pub unsafe fn xml_xpath_next_attribute(
         return null_mut();
     }
     if cur.is_null() {
-        if (*(*ctxt).context).node == (*(*ctxt).context).doc as XmlNodePtr {
+        if (*(*ctxt).context).node == (*(*ctxt).context).doc as *mut XmlNode {
             return null_mut();
         }
-        return (*(*(*ctxt).context).node).properties as XmlNodePtr;
+        return (*(*(*ctxt).context).node).properties as *mut XmlNode;
     }
     (*cur).next.map_or(null_mut(), |n| n.as_ptr())
 }
@@ -8947,7 +8959,7 @@ pub unsafe fn xml_xpath_next_attribute(
 ///
 /// returns 1 if @ancestor is a @node's ancestor, 0 otherwise.
 #[doc(alias = "xmlXPathIsAncestor")]
-unsafe extern "C" fn xml_xpath_is_ancestor(ancestor: XmlNodePtr, mut node: XmlNodePtr) -> i32 {
+unsafe extern "C" fn xml_xpath_is_ancestor(ancestor: *mut XmlNode, mut node: *mut XmlNode) -> i32 {
     if ancestor.is_null() || node.is_null() {
         return 0;
     }
@@ -8962,10 +8974,10 @@ unsafe extern "C" fn xml_xpath_is_ancestor(ancestor: XmlNodePtr, mut node: XmlNo
         return 0;
     }
     /* avoid searching if ancestor or node is the root node */
-    if ancestor == (*node).doc as XmlNodePtr {
+    if ancestor == (*node).doc as *mut XmlNode {
         return 1;
     }
-    if node == (*ancestor).doc as XmlNodePtr {
+    if node == (*ancestor).doc as *mut XmlNode {
         return 0;
     }
     while let Some(parent) = (*node).parent() {
@@ -8987,8 +8999,8 @@ unsafe extern "C" fn xml_xpath_is_ancestor(ancestor: XmlNodePtr, mut node: XmlNo
 #[doc(alias = "xmlXPathNextPreceding")]
 pub unsafe extern "C" fn xml_xpath_next_preceding(
     ctxt: XmlXPathParserContextPtr,
-    mut cur: XmlNodePtr,
-) -> XmlNodePtr {
+    mut cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -9003,7 +9015,7 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
             {
                 return null_mut();
             }
-            cur = (*ns).next as XmlNodePtr;
+            cur = (*ns).next as *mut XmlNode;
         }
     }
     if cur.is_null() || matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -9049,8 +9061,8 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
 #[doc(alias = "xmlXPathNextAncestor")]
 pub unsafe fn xml_xpath_next_ancestor(
     ctxt: XmlXPathParserContextPtr,
-    cur: XmlNodePtr,
-) -> XmlNodePtr {
+    cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -9076,7 +9088,7 @@ pub unsafe fn xml_xpath_next_ancestor(
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd => {
                 let Some(parent) = (*(*(*ctxt).context).node).parent() else {
-                    return (*(*ctxt).context).doc as XmlNodePtr;
+                    return (*(*ctxt).context).doc as *mut XmlNode;
                 };
                 if matches!(parent.element_type(), XmlElementType::XmlElementNode)
                     && (*parent.name.add(0) == b' '
@@ -9106,7 +9118,7 @@ pub unsafe fn xml_xpath_next_ancestor(
                 if !(*ns).next.is_null()
                     && !matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
                 {
-                    return (*ns).next as XmlNodePtr;
+                    return (*ns).next as *mut XmlNode;
                 }
                 /* Bad, how did that namespace end up here ? */
                 return null_mut();
@@ -9115,9 +9127,9 @@ pub unsafe fn xml_xpath_next_ancestor(
         }
     }
     if NodePtr::from_ptr(cur) == (*(*(*ctxt).context).doc).children {
-        return (*(*ctxt).context).doc as XmlNodePtr;
+        return (*(*ctxt).context).doc as *mut XmlNode;
     }
-    if cur == (*(*ctxt).context).doc as XmlNodePtr {
+    if cur == (*(*ctxt).context).doc as *mut XmlNode {
         return null_mut();
     }
     match (*cur).element_type() {
@@ -9157,7 +9169,7 @@ pub unsafe fn xml_xpath_next_ancestor(
             if !(*ns).next.is_null()
                 && !matches!((*(*ns).next).typ, XmlElementType::XmlNamespaceDecl)
             {
-                return (*ns).next as XmlNodePtr;
+                return (*ns).next as *mut XmlNode;
             }
             /* Bad, how did that namespace end up here ? */
             null_mut()
@@ -9179,8 +9191,8 @@ pub unsafe fn xml_xpath_next_ancestor(
 #[doc(alias = "xmlXPathNextPrecedingSibling")]
 pub unsafe fn xml_xpath_next_preceding_sibling(
     ctxt: XmlXPathParserContextPtr,
-    mut cur: XmlNodePtr,
-) -> XmlNodePtr {
+    mut cur: *mut XmlNode,
+) -> *mut XmlNode {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return null_mut();
     }
@@ -9190,7 +9202,7 @@ pub unsafe fn xml_xpath_next_preceding_sibling(
     ) {
         return null_mut();
     }
-    if cur == (*(*ctxt).context).doc as XmlNodePtr {
+    if cur == (*(*ctxt).context).doc as *mut XmlNode {
         return null_mut();
     }
     if cur.is_null() {
@@ -9287,7 +9299,7 @@ unsafe fn xml_xpath_get_elements_by_ids(
 ) -> Option<Box<XmlNodeSet>> {
     let mut cur: *const XmlChar = ids;
     let mut id: *mut XmlChar;
-    let mut elem: XmlNodePtr;
+    let mut elem: *mut XmlNode;
 
     if ids.is_null() {
         return None;

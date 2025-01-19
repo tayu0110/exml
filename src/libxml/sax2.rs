@@ -53,7 +53,7 @@ use crate::{
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlDtd, XmlElement, XmlElementContentPtr, XmlElementType,
-        XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNodePtr, XmlNs,
+        XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNs,
         __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
@@ -1918,7 +1918,7 @@ pub unsafe fn xml_sax2_start_element(
 ) {
     use crate::{libxml::parser_internals::XML_VCTXT_DTD_VALIDATED, tree::XmlNs};
 
-    let mut parent: XmlNodePtr;
+    let mut parent: *mut XmlNode;
     let mut ns: *mut XmlNs;
 
     if ctx.is_none() {
@@ -1961,7 +1961,7 @@ pub unsafe fn xml_sax2_start_element(
     // Note : the namespace resolution is deferred until the end of the
     //        attributes parsing, since local namespace can be defined as
     //        an attribute at this level.
-    let ret: XmlNodePtr = xml_new_doc_node((*ctxt).my_doc, null_mut(), name, null_mut());
+    let ret: *mut XmlNode = xml_new_doc_node((*ctxt).my_doc, null_mut(), name, null_mut());
     if ret.is_null() {
         xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
         return;
@@ -1971,7 +1971,7 @@ pub unsafe fn xml_sax2_start_element(
             parent = children.as_ptr();
         }
     } else {
-        (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
+        (*(*ctxt).my_doc).add_child(ret);
     }
     (*ctxt).nodemem = -1;
     if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
@@ -2082,7 +2082,7 @@ pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: &str
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
-    let cur: XmlNodePtr = (*ctxt).node;
+    let cur: *mut XmlNode = (*ctxt).node;
 
     (*ctxt).nodemem = -1;
 
@@ -2116,7 +2116,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
-    let ret: XmlNodePtr;
+    let ret: *mut XmlNode;
     let mut last: *mut XmlNs = null_mut();
     let mut ns: *mut XmlNs;
 
@@ -2128,7 +2128,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
-    let parent: XmlNodePtr = (*ctxt).node;
+    let parent: *mut XmlNode = (*ctxt).node;
     // First check on validity:
     if (*ctxt).validate != 0
         && (*(*ctxt).my_doc).ext_subset.is_null()
@@ -2197,7 +2197,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     }
 
     if parent.is_null() {
-        (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
+        (*(*ctxt).my_doc).add_child(ret);
     }
     // Build the namespace list
     for (pref, uri) in namespaces {
@@ -2359,15 +2359,15 @@ pub unsafe fn xml_sax2_start_element_ns(
 
 /// Returns the newly allocated string or NULL if not needed or error
 #[doc(alias = "xmlSAX2TextNode")]
-unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> XmlNodePtr {
+unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> *mut XmlNode {
     // Allocate
-    let ret: XmlNodePtr = if !(*ctxt).free_elems.is_null() {
+    let ret: *mut XmlNode = if !(*ctxt).free_elems.is_null() {
         let ret = (*ctxt).free_elems;
         (*ctxt).free_elems = (*ret).next.map_or(null_mut(), |n| n.as_ptr());
         (*ctxt).free_elems_nr -= 1;
         ret
     } else {
-        xml_malloc(size_of::<XmlNode>()) as XmlNodePtr
+        xml_malloc(size_of::<XmlNode>()) as *mut XmlNode
     };
     if ret.is_null() {
         xml_err_memory(ctxt, Some("xmlSAX2Characters"));
@@ -2495,7 +2495,7 @@ unsafe fn xml_sax2_attribute_ns(
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xml_register_node_default_value(ret as XmlNodePtr);
+            xml_register_node_default_value(ret as *mut XmlNode);
         }
     } else {
         ret = xml_new_ns_prop(
@@ -2533,7 +2533,7 @@ unsafe fn xml_sax2_attribute_ns(
         let value = CStr::from_ptr(value as *const i8)
             .to_string_lossy()
             .into_owned();
-        let tmp: XmlNodePtr = xml_sax2_text_node(ctxt, &value);
+        let tmp: *mut XmlNode = xml_sax2_text_node(ctxt, &value);
         (*ret).children = NodePtr::from_ptr(tmp);
         (*ret).last = NodePtr::from_ptr(tmp);
         if !tmp.is_null() {
@@ -2902,9 +2902,9 @@ pub unsafe fn xml_sax2_processing_instruction(
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
 
-    let parent: XmlNodePtr = (*ctxt).node;
+    let parent: *mut XmlNode = (*ctxt).node;
 
-    let ret: XmlNodePtr = xml_new_doc_pi((*ctxt).my_doc, target, data);
+    let ret: *mut XmlNode = xml_new_doc_pi((*ctxt).my_doc, target, data);
     if ret.is_null() {
         return;
     }
@@ -2924,7 +2924,7 @@ pub unsafe fn xml_sax2_processing_instruction(
         return;
     }
     if parent.is_null() {
-        (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
+        (*(*ctxt).my_doc).add_child(ret);
         return;
     }
     if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
@@ -2945,8 +2945,8 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: &str) {
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
-    let parent: XmlNodePtr = (*ctxt).node;
-    let ret: XmlNodePtr = xml_new_doc_comment((*ctxt).my_doc, value);
+    let parent: *mut XmlNode = (*ctxt).node;
+    let ret: *mut XmlNode = xml_new_doc_comment((*ctxt).my_doc, value);
     if ret.is_null() {
         return;
     }
@@ -2966,7 +2966,7 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: &str) {
         return;
     }
     if parent.is_null() {
-        (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
+        (*(*ctxt).my_doc).add_child(ret);
         return;
     }
     if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {

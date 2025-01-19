@@ -26,7 +26,7 @@ use std::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use crate::tree::{XmlDoc, XmlElementType, XmlNodePtr, XmlNs};
+use crate::tree::{XmlDoc, XmlElementType, XmlNode, XmlNs};
 
 use super::xmlstring::{xml_str_equal, XmlChar};
 
@@ -72,13 +72,13 @@ pub enum XlinkActuate {
 /// This is the prototype for the link detection routine.
 /// It calls the default link detection callbacks upon link detection.
 #[doc(alias = "xlinkNodeDetectFunc")]
-pub type XlinkNodeDetectFunc = unsafe fn(ctx: *mut c_void, node: XmlNodePtr);
+pub type XlinkNodeDetectFunc = unsafe fn(ctx: *mut c_void, node: *mut XmlNode);
 
 /// This is the prototype for a simple link detection callback.
 #[doc(alias = "xlinkSimpleLinkFunk")]
 pub type XlinkSimpleLinkFunk = unsafe fn(
     ctx: *mut c_void,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     href: *const XmlChar,
     role: *const XmlChar,
     title: *const XmlChar,
@@ -88,7 +88,7 @@ pub type XlinkSimpleLinkFunk = unsafe fn(
 #[doc(alias = "xlinkExtendedLinkFunk")]
 pub type XlinkExtendedLinkFunk = unsafe fn(
     ctx: *mut c_void,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     nbLocators: i32,
     hrefs: *mut *const XmlChar,
     roles: *mut *const XmlChar,
@@ -106,7 +106,7 @@ pub type XlinkExtendedLinkFunk = unsafe fn(
 #[doc(alias = "xlinkExtendedLinkSetFunk")]
 pub type XlinkExtendedLinkSetFunk = unsafe fn(
     ctx: *mut c_void,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     nbLocators: i32,
     hrefs: *mut *const XmlChar,
     roles: *mut *const XmlChar,
@@ -169,7 +169,7 @@ const XHTML_NAMESPACE: &CStr = c"http://www.w3.org/1999/xhtml/";
 ///
 /// Returns the xlinkType of the node (XLINK_TYPE_NONE if there is no link detected.
 #[doc(alias = "xlinkIsLink")]
-pub unsafe fn xlink_is_link(mut doc: *mut XmlDoc, node: XmlNodePtr) -> XlinkType {
+pub unsafe fn xlink_is_link(mut doc: *mut XmlDoc, node: *mut XmlNode) -> XlinkType {
     let mut ret: XlinkType = XlinkType::XlinkTypeNone;
 
     if node.is_null() {

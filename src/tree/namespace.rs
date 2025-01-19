@@ -28,8 +28,8 @@ use crate::libxml::{
 };
 
 use super::{
-    xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlNode, XmlNodePtr,
-    XmlNsType, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlNode, XmlNsType,
+    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
@@ -114,7 +114,7 @@ impl NodeCommon for XmlNs {
 /// Returns a new namespace pointer or NULL
 #[doc(alias = "xmlNewNs")]
 pub unsafe fn xml_new_ns(
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     href: *const XmlChar,
     prefix: Option<&str>,
 ) -> *mut XmlNs {

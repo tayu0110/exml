@@ -42,7 +42,7 @@ use crate::{
         parser::XmlSAXLocator,
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
-    tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
+    tree::{XmlBufferAllocationScheme, XmlNode, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
 };
 
 use super::{
@@ -74,10 +74,10 @@ pub unsafe extern "C" fn xml_cleanup_globals() {}
 
 /// Signature for the registration callback of a created node
 #[doc(alias = "xmlRegisterNodeFunc")]
-pub type XmlRegisterNodeFunc = unsafe extern "C" fn(node: XmlNodePtr);
+pub type XmlRegisterNodeFunc = unsafe extern "C" fn(node: *mut XmlNode);
 /// Signature for the deregistration callback of a discarded node
 #[doc(alias = "xmlDeregisterNodeFunc")]
-pub type XmlDeregisterNodeFunc = unsafe extern "C" fn(node: XmlNodePtr);
+pub type XmlDeregisterNodeFunc = unsafe extern "C" fn(node: *mut XmlNode);
 
 pub type XmlGlobalStatePtr = *mut XmlGlobalState;
 pub struct XmlGlobalState {
@@ -538,7 +538,7 @@ pub unsafe extern "C" fn __xml_register_node_default_value() -> XmlRegisterNodeF
     }
 }
 
-pub unsafe extern "C" fn xml_register_node_default_value(node: XmlNodePtr) {
+pub unsafe extern "C" fn xml_register_node_default_value(node: *mut XmlNode) {
     __xml_register_node_default_value()(node)
 }
 
@@ -553,7 +553,7 @@ pub unsafe extern "C" fn __xml_deregister_node_default_value() -> XmlDeregisterN
     }
 }
 
-pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
+pub unsafe extern "C" fn xml_deregister_node_default_value(node: *mut XmlNode) {
     __xml_deregister_node_default_value()(node)
 }
 

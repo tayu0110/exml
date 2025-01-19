@@ -1047,7 +1047,7 @@ pub unsafe fn xml_free_doc(cur: *mut XmlDoc) {
 }
 
 unsafe fn xml_new_prop_internal(
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     ns: *mut XmlNs,
     name: &str,
     value: *const XmlChar,
@@ -1170,7 +1170,11 @@ pub unsafe fn xml_free_prop(cur: *mut XmlAttr) {
 /// @tree or on one of its ancestors then a new prefix is generated.
 /// Returns the (new) namespace definition or null_mut() in case of error
 #[doc(alias = "xmlNewReconciledNs")]
-unsafe fn xml_new_reconciled_ns(doc: *mut XmlDoc, tree: XmlNodePtr, ns: *mut XmlNs) -> *mut XmlNs {
+unsafe fn xml_new_reconciled_ns(
+    doc: *mut XmlDoc,
+    tree: *mut XmlNode,
+    ns: *mut XmlNs,
+) -> *mut XmlNs {
     let mut def: *mut XmlNs;
     let mut counter: i32 = 1;
 
@@ -1226,11 +1230,11 @@ unsafe fn xml_new_reconciled_ns(doc: *mut XmlDoc, tree: XmlNodePtr, ns: *mut Xml
 // however, we allow a value of 2 to indicate copy properties and
 // namespace info, but don't recurse on children.
 pub(crate) unsafe fn xml_static_copy_node(
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     doc: *mut XmlDoc,
-    parent: XmlNodePtr,
+    parent: *mut XmlNode,
     extended: i32,
-) -> XmlNodePtr {
+) -> *mut XmlNode {
     if node.is_null() {
         return null_mut();
     }
@@ -1270,7 +1274,7 @@ pub(crate) unsafe fn xml_static_copy_node(
     }
 
     // Allocate a new node and fill the fields.
-    let ret: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let ret: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if ret.is_null() {
         xml_tree_err_memory("copying node");
         return null_mut();
@@ -1315,7 +1319,7 @@ pub(crate) unsafe fn xml_static_copy_node(
         // Assuming that the subtree to be copied always has its text
         // nodes coalesced, the somewhat confusing call to xmlAddChild
         // could be removed.
-        let tmp: XmlNodePtr = (*parent).add_child(ret);
+        let tmp: *mut XmlNode = (*parent).add_child(ret);
         /* node could have coalesced */
         if tmp != ret {
             return tmp;
@@ -1350,7 +1354,7 @@ pub(crate) unsafe fn xml_static_copy_node(
             // and add it at the top of the new tree
             ns = (*node).search_ns((*node).doc, prefix.as_deref());
             if !ns.is_null() {
-                let mut root: XmlNodePtr = ret;
+                let mut root: *mut XmlNode = ret;
 
                 while let Some(parent) = (*root).parent() {
                     root = parent.as_ptr();
@@ -1387,7 +1391,7 @@ pub(crate) unsafe fn xml_static_copy_node(
         let mut cur = children.as_ptr();
         let mut insert = ret;
         while !cur.is_null() {
-            let copy: XmlNodePtr = xml_static_copy_node(cur, doc, insert, 2);
+            let copy: *mut XmlNode = xml_static_copy_node(cur, doc, insert, 2);
             if copy.is_null() {
                 xml_free_node(ret);
                 return null_mut();
@@ -1441,13 +1445,13 @@ pub(crate) unsafe fn xml_static_copy_node(
 }
 
 pub(crate) unsafe fn xml_static_copy_node_list(
-    mut node: XmlNodePtr,
+    mut node: *mut XmlNode,
     doc: *mut XmlDoc,
-    parent: XmlNodePtr,
-) -> XmlNodePtr {
-    let mut ret: XmlNodePtr = null_mut();
-    let mut p: XmlNodePtr = null_mut();
-    let mut q: XmlNodePtr;
+    parent: *mut XmlNode,
+) -> *mut XmlNode {
+    let mut ret: *mut XmlNode = null_mut();
+    let mut p: *mut XmlNode = null_mut();
+    let mut q: *mut XmlNode;
 
     while !node.is_null() {
         #[cfg(feature = "libxml_tree")]
@@ -1505,7 +1509,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
 
 unsafe fn xml_copy_prop_internal(
     doc: *mut XmlDoc,
-    target: XmlNodePtr,
+    target: *mut XmlNode,
     cur: *mut XmlAttr,
 ) -> *mut XmlAttr {
     let ret: *mut XmlAttr;
@@ -1544,8 +1548,8 @@ unsafe fn xml_copy_prop_internal(
                 .unwrap()
                 .search_ns((*cur).doc, prefix.as_deref());
             if !ns.is_null() {
-                let mut root: XmlNodePtr = target;
-                let mut pred: XmlNodePtr = null_mut();
+                let mut root: *mut XmlNode = target;
+                let mut pred: *mut XmlNode = null_mut();
 
                 while let Some(parent) = (*root).parent() {
                     pred = root;
@@ -1613,7 +1617,7 @@ unsafe fn xml_copy_prop_internal(
 ///
 /// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyProp")]
-pub unsafe fn xml_copy_prop(target: XmlNodePtr, cur: *mut XmlAttr) -> *mut XmlAttr {
+pub unsafe fn xml_copy_prop(target: *mut XmlNode, cur: *mut XmlAttr) -> *mut XmlAttr {
     xml_copy_prop_internal(null_mut(), target, cur)
 }
 
@@ -1621,7 +1625,7 @@ pub unsafe fn xml_copy_prop(target: XmlNodePtr, cur: *mut XmlAttr) -> *mut XmlAt
 ///
 /// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyPropList")]
-pub unsafe fn xml_copy_prop_list(target: XmlNodePtr, mut cur: *mut XmlAttr) -> *mut XmlAttr {
+pub unsafe fn xml_copy_prop_list(target: *mut XmlNode, mut cur: *mut XmlAttr) -> *mut XmlAttr {
     let mut ret: *mut XmlAttr = null_mut();
     let mut p: *mut XmlAttr = null_mut();
     let mut q: *mut XmlAttr;
@@ -1659,8 +1663,8 @@ pub unsafe fn xml_copy_dtd(dtd: *mut XmlDtd) -> *mut XmlDtd {
         xml_get_dtd_qelement_desc,
     };
 
-    let mut p: XmlNodePtr = null_mut();
-    let mut q: XmlNodePtr;
+    let mut p: *mut XmlNode = null_mut();
+    let mut q: *mut XmlNode;
 
     if dtd.is_null() {
         return null_mut();
@@ -1844,7 +1848,7 @@ pub unsafe fn xml_new_doc_node(
     ns: *mut XmlNs,
     name: &str,
     content: *const XmlChar,
-) -> XmlNodePtr {
+) -> *mut XmlNode {
     let name = CString::new(name).unwrap();
     let cur = xml_new_node(ns, name.as_ptr() as *const u8);
     if !cur.is_null() {
@@ -1876,8 +1880,8 @@ pub unsafe fn xml_new_doc_node_eat_name(
     ns: *mut XmlNs,
     name: *mut XmlChar,
     content: *const XmlChar,
-) -> XmlNodePtr {
-    let cur: XmlNodePtr = xml_new_node_eat_name(ns, name);
+) -> *mut XmlNode {
+    let cur: *mut XmlNode = xml_new_node_eat_name(ns, name);
     if !cur.is_null() {
         (*cur).doc = doc;
         if !content.is_null() {
@@ -1905,13 +1909,13 @@ pub unsafe fn xml_new_doc_node_eat_name(
 ///
 /// Returns a pointer to the new node object. Uses xml_strdup() to make copy of @name.
 #[doc(alias = "xmlNewNode")]
-pub unsafe fn xml_new_node(ns: *mut XmlNs, name: *const XmlChar) -> XmlNodePtr {
+pub unsafe fn xml_new_node(ns: *mut XmlNs, name: *const XmlChar) -> *mut XmlNode {
     if name.is_null() {
         return null_mut();
     }
 
     // Allocate a new node and fill the fields.
-    let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building node");
         return null_mut();
@@ -1938,13 +1942,13 @@ pub unsafe fn xml_new_node(ns: *mut XmlNs, name: *const XmlChar) -> XmlNodePtr {
 /// new node's name. Use xmlNewNode() if a copy of @name string is
 /// is needed as new node's name.
 #[doc(alias = "xmlNewNodeEatName")]
-pub unsafe fn xml_new_node_eat_name(ns: *mut XmlNs, name: *mut XmlChar) -> XmlNodePtr {
+pub unsafe fn xml_new_node_eat_name(ns: *mut XmlNs, name: *mut XmlChar) -> *mut XmlNode {
     if name.is_null() {
         return null_mut();
     }
 
     // Allocate a new node and fill the fields.
-    let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building node");
         // we can't check here that name comes from the doc dictionary
@@ -1976,13 +1980,13 @@ pub unsafe fn xml_new_node_eat_name(ns: *mut XmlNs, name: *mut XmlChar) -> XmlNo
 #[doc(alias = "xmlNewChild")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub unsafe fn xml_new_child(
-    parent: XmlNodePtr,
+    parent: *mut XmlNode,
     ns: *mut XmlNs,
     name: &str,
     content: *const XmlChar,
-) -> XmlNodePtr {
-    let cur: XmlNodePtr;
-    let prev: XmlNodePtr;
+) -> *mut XmlNode {
+    let cur: *mut XmlNode;
+    let prev: *mut XmlNode;
 
     if parent.is_null() {
         return null_mut();
@@ -2038,8 +2042,8 @@ pub unsafe fn xml_new_child(
 /// Creation of a new text node within a document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocText")]
-pub unsafe fn xml_new_doc_text(doc: *const XmlDoc, content: *const XmlChar) -> XmlNodePtr {
-    let cur: XmlNodePtr = xml_new_text(content);
+pub unsafe fn xml_new_doc_text(doc: *const XmlDoc, content: *const XmlChar) -> *mut XmlNode {
+    let cur: *mut XmlNode = xml_new_text(content);
     if !cur.is_null() {
         (*cur).doc = doc as _;
     }
@@ -2052,9 +2056,9 @@ pub unsafe fn xml_new_doc_text(doc: *const XmlDoc, content: *const XmlChar) -> X
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewText")]
-pub unsafe fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
+pub unsafe fn xml_new_text(content: *const XmlChar) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building text");
         return null_mut();
@@ -2078,9 +2082,9 @@ pub unsafe fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
 /// Creation of a processing instruction element.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocPI")]
-pub unsafe fn xml_new_doc_pi(doc: *mut XmlDoc, name: &str, content: Option<&str>) -> XmlNodePtr {
+pub unsafe fn xml_new_doc_pi(doc: *mut XmlDoc, name: &str, content: Option<&str>) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building PI");
         return null_mut();
@@ -2110,7 +2114,7 @@ pub unsafe fn xml_new_doc_pi(doc: *mut XmlDoc, name: &str, content: Option<&str>
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewPI")]
-pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> XmlNodePtr {
+pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> *mut XmlNode {
     xml_new_doc_pi(null_mut(), name, content)
 }
 
@@ -2122,8 +2126,8 @@ pub unsafe fn xml_new_doc_text_len(
     doc: *mut XmlDoc,
     content: *const XmlChar,
     len: i32,
-) -> XmlNodePtr {
-    let cur: XmlNodePtr = xml_new_text_len(content, len);
+) -> *mut XmlNode {
+    let cur: *mut XmlNode = xml_new_text_len(content, len);
     if !cur.is_null() {
         (*cur).doc = doc;
     }
@@ -2135,9 +2139,9 @@ pub unsafe fn xml_new_doc_text_len(
 /// Creation of a new text node with an extra parameter for the content's length
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewTextLen")]
-pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> XmlNodePtr {
+pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building text");
         return null_mut();
@@ -2161,8 +2165,8 @@ pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> XmlNodePtr 
 /// Creation of a new node containing a comment within a document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocComment")]
-pub unsafe fn xml_new_doc_comment(doc: *mut XmlDoc, content: &str) -> XmlNodePtr {
-    let cur: XmlNodePtr = xml_new_comment(content);
+pub unsafe fn xml_new_doc_comment(doc: *mut XmlDoc, content: &str) -> *mut XmlNode {
+    let cur: *mut XmlNode = xml_new_comment(content);
     if !cur.is_null() {
         (*cur).doc = doc;
     }
@@ -2174,9 +2178,9 @@ pub unsafe fn xml_new_doc_comment(doc: *mut XmlDoc, content: &str) -> XmlNodePtr
 /// Creation of a new node containing a comment.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewComment")]
-pub unsafe fn xml_new_comment(content: &str) -> XmlNodePtr {
+pub unsafe fn xml_new_comment(content: &str) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building comment");
         return null_mut();
@@ -2199,9 +2203,9 @@ pub unsafe fn xml_new_comment(content: &str) -> XmlNodePtr {
 /// Creation of a new node containing a CDATA block.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCDataBlock")]
-pub unsafe fn xml_new_cdata_block(doc: *mut XmlDoc, content: &str) -> XmlNodePtr {
+pub unsafe fn xml_new_cdata_block(doc: *mut XmlDoc, content: &str) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building CDATA");
         return null_mut();
@@ -2222,9 +2226,9 @@ pub unsafe fn xml_new_cdata_block(doc: *mut XmlDoc, content: &str) -> XmlNodePtr
 /// Creation of a new character reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCharRef")]
-pub unsafe fn xml_new_char_ref(doc: *mut XmlDoc, name: &str) -> XmlNodePtr {
+pub unsafe fn xml_new_char_ref(doc: *mut XmlDoc, name: &str) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building character reference");
         return null_mut();
@@ -2256,9 +2260,9 @@ pub unsafe fn xml_new_char_ref(doc: *mut XmlDoc, name: &str) -> XmlNodePtr {
 /// Creation of a new reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewReference")]
-pub unsafe fn xml_new_reference(doc: *const XmlDoc, name: &str) -> XmlNodePtr {
+pub unsafe fn xml_new_reference(doc: *const XmlDoc, name: &str) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building reference");
         return null_mut();
@@ -2301,8 +2305,8 @@ pub unsafe fn xml_new_reference(doc: *const XmlDoc, name: &str) -> XmlNodePtr {
 ///
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNode")]
-pub unsafe fn xml_copy_node(node: XmlNodePtr, extended: i32) -> XmlNodePtr {
-    let ret: XmlNodePtr = xml_static_copy_node(node, null_mut(), null_mut(), extended);
+pub unsafe fn xml_copy_node(node: *mut XmlNode, extended: i32) -> *mut XmlNode {
+    let ret: *mut XmlNode = xml_static_copy_node(node, null_mut(), null_mut(), extended);
     ret
 }
 
@@ -2310,8 +2314,12 @@ pub unsafe fn xml_copy_node(node: XmlNodePtr, extended: i32) -> XmlNodePtr {
 ///
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlDocCopyNode")]
-pub unsafe fn xml_doc_copy_node(node: XmlNodePtr, doc: *mut XmlDoc, extended: i32) -> XmlNodePtr {
-    let ret: XmlNodePtr = xml_static_copy_node(node, doc, null_mut(), extended);
+pub unsafe fn xml_doc_copy_node(
+    node: *mut XmlNode,
+    doc: *mut XmlDoc,
+    extended: i32,
+) -> *mut XmlNode {
+    let ret: *mut XmlNode = xml_static_copy_node(node, doc, null_mut(), extended);
     ret
 }
 
@@ -2319,8 +2327,8 @@ pub unsafe fn xml_doc_copy_node(node: XmlNodePtr, doc: *mut XmlDoc, extended: i3
 ///
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlDocCopyNodeList")]
-pub unsafe fn xml_doc_copy_node_list(doc: *mut XmlDoc, node: XmlNodePtr) -> XmlNodePtr {
-    let ret: XmlNodePtr = xml_static_copy_node_list(node, doc, null_mut());
+pub unsafe fn xml_doc_copy_node_list(doc: *mut XmlDoc, node: *mut XmlNode) -> *mut XmlNode {
+    let ret: *mut XmlNode = xml_static_copy_node_list(node, doc, null_mut());
     ret
 }
 
@@ -2329,8 +2337,8 @@ pub unsafe fn xml_doc_copy_node_list(doc: *mut XmlDoc, node: XmlNodePtr) -> XmlN
 ///
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNodeList")]
-pub unsafe fn xml_copy_node_list(node: XmlNodePtr) -> XmlNodePtr {
-    let ret: XmlNodePtr = xml_static_copy_node_list(node, null_mut(), null_mut());
+pub unsafe fn xml_copy_node_list(node: *mut XmlNode) -> *mut XmlNode {
+    let ret: *mut XmlNode = xml_static_copy_node_list(node, null_mut(), null_mut());
     ret
 }
 
@@ -2348,13 +2356,13 @@ pub unsafe fn xml_copy_node_list(node: XmlNodePtr) -> XmlNodePtr {
 #[doc(alias = "xmlNewTextChild")]
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_new_text_child(
-    parent: XmlNodePtr,
+    parent: *mut XmlNode,
     ns: *mut XmlNs,
     name: &str,
     content: *const XmlChar,
-) -> XmlNodePtr {
-    let cur: XmlNodePtr;
-    let prev: XmlNodePtr;
+) -> *mut XmlNode {
+    let cur: *mut XmlNode;
+    let prev: *mut XmlNode;
 
     if parent.is_null() {
         return null_mut();
@@ -2418,8 +2426,8 @@ pub unsafe fn xml_new_doc_raw_node(
     ns: *mut XmlNs,
     name: &str,
     content: *const XmlChar,
-) -> XmlNodePtr {
-    let cur: XmlNodePtr = xml_new_doc_node(doc, ns, name, null_mut());
+) -> *mut XmlNode {
+    let cur: *mut XmlNode = xml_new_doc_node(doc, ns, name, null_mut());
     if !cur.is_null() {
         (*cur).doc = doc;
         if !content.is_null() {
@@ -2434,9 +2442,9 @@ pub unsafe fn xml_new_doc_raw_node(
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocFragment")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_new_doc_fragment(doc: *mut XmlDoc) -> XmlNodePtr {
+pub unsafe fn xml_new_doc_fragment(doc: *mut XmlDoc) -> *mut XmlNode {
     // Allocate a new DocumentFragment node and fill the fields.
-    let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
+    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building fragment");
         return null_mut();
@@ -2463,7 +2471,7 @@ pub unsafe fn xml_new_doc_fragment(doc: *mut XmlDoc) -> XmlNodePtr {
 /// Returns the @old node
 #[doc(alias = "xmlReplaceNode")]
 #[cfg(any(feature = "libxml_tree", feature = "libxml_writer"))]
-pub unsafe fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> XmlNodePtr {
+pub unsafe fn xml_replace_node(old: *mut XmlNode, cur: *mut XmlNode) -> *mut XmlNode {
     if old == cur {
         return null_mut();
     }
@@ -2524,7 +2532,7 @@ pub unsafe fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> XmlNodePtr {
 /// Merge two text nodes into one
 /// Returns the first text node augmented
 #[doc(alias = "xmlTextMerge")]
-pub unsafe fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -> XmlNodePtr {
+pub unsafe fn xml_text_merge(first: *mut XmlNode, second: *mut XmlNode) -> *mut XmlNode {
     if first.is_null() {
         return second;
     }
@@ -2550,7 +2558,7 @@ pub unsafe fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -> XmlNodePt
 ///
 /// Returns -1 in case of error, 0 otherwise
 #[doc(alias = "xmlTextConcat")]
-pub unsafe fn xml_text_concat(node: XmlNodePtr, content: &str) -> i32 {
+pub unsafe fn xml_text_concat(node: *mut XmlNode, content: &str) -> i32 {
     if node.is_null() {
         return -1;
     }
@@ -2574,8 +2582,8 @@ pub unsafe fn xml_text_concat(node: XmlNodePtr, content: &str) -> i32 {
 /// Free a node and all its siblings, this is a recursive behaviour, all
 /// the children are freed too.
 #[doc(alias = "xmlFreeNodeList")]
-pub unsafe fn xml_free_node_list(mut cur: XmlNodePtr) {
-    let mut parent: XmlNodePtr;
+pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
+    let mut parent: *mut XmlNode;
     let mut depth: usize = 0;
 
     if cur.is_null() {
@@ -2664,7 +2672,7 @@ pub unsafe fn xml_free_node_list(mut cur: XmlNodePtr) {
 /// Free a node, this is a recursive behaviour, all the children are freed too.
 /// This doesn't unlink the child from the list, use xmlUnlinkNode() first.
 #[doc(alias = "xmlFreeNode")]
-pub unsafe fn xml_free_node(cur: XmlNodePtr) {
+pub unsafe fn xml_free_node(cur: *mut XmlNode) {
     if cur.is_null() {
         return;
     }
@@ -2747,8 +2755,8 @@ pub unsafe fn xml_free_node(cur: XmlNodePtr) {
 #[doc(alias = "xmlNsInScope")]
 unsafe fn xml_ns_in_scope(
     _doc: *mut XmlDoc,
-    mut node: XmlNodePtr,
-    ancestor: XmlNodePtr,
+    mut node: *mut XmlNode,
+    ancestor: *mut XmlNode,
     prefix: *const XmlChar,
 ) -> i32 {
     let mut tst: *mut XmlNs;
@@ -2832,7 +2840,7 @@ static XML_CHECK_DTD: AtomicBool = AtomicBool::new(true);
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlTreeErr")]
-unsafe fn xml_tree_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&str>) {
+unsafe fn xml_tree_err(code: XmlParserErrors, node: *mut XmlNode, extra: Option<&str>) {
     let msg: Cow<'static, str> = match code {
         XmlParserErrors::XmlTreeInvalidHex => "invalid hexadecimal character value\n".into(),
         XmlParserErrors::XmlTreeInvalidDec => "invalid decimal character value\n".into(),
@@ -2933,11 +2941,11 @@ unsafe fn xml_tree_nslist_lookup_by_prefix(
 #[doc(alias = "xmlSearchNsByPrefixStrict")]
 unsafe fn xml_search_ns_by_prefix_strict(
     doc: *mut XmlDoc,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     prefix: *const XmlChar,
     ret_ns: *mut *mut XmlNs,
 ) -> i32 {
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
     let mut ns: *mut XmlNs;
 
     if doc.is_null()
@@ -3003,14 +3011,14 @@ unsafe fn xml_search_ns_by_prefix_strict(
 #[doc(alias = "xmlSearchNsByNamespaceStrict")]
 unsafe fn xml_search_ns_by_namespace_strict(
     doc: *mut XmlDoc,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     ns_name: *const XmlChar,
     ret_ns: *mut *mut XmlNs,
     prefixed: i32,
 ) -> i32 {
-    let mut cur: XmlNodePtr;
-    let mut prev: XmlNodePtr = null_mut();
-    let mut out: XmlNodePtr = null_mut();
+    let mut cur: *mut XmlNode;
+    let mut prev: *mut XmlNode = null_mut();
+    let mut out: *mut XmlNode = null_mut();
     let mut ns: *mut XmlNs;
     let mut prevns: *mut XmlNs;
 

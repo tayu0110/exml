@@ -71,7 +71,7 @@ use crate::{
         XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties, XmlDtd, XmlElement,
         XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
         XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlID,
-        XmlNode, XmlNodePtr, XmlNotation, XmlRef,
+        XmlNode, XmlNotation, XmlRef,
     },
 };
 
@@ -88,14 +88,14 @@ pub type XmlValidStatePtr = *mut XmlValidState;
 #[repr(C)]
 pub struct XmlValidState {
     elem_decl: *mut XmlElement, /* pointer to the content model */
-    node: XmlNodePtr,           /* pointer to the current node */
+    node: *mut XmlNode,         /* pointer to the current node */
     exec: XmlRegExecCtxtPtr,    /* regexp runtime */
 }
 #[cfg(not(feature = "libxml_regexp"))]
 #[repr(C)]
 pub struct XmlValidState {
     cont: XmlElementContentPtr, /* pointer to the content model subtree */
-    node: XmlNodePtr,           /* pointer to the current node in the list */
+    node: *mut XmlNode,         /* pointer to the current node in the list */
     occurs: c_long,             /* bitfield for multiple occurrences */
     depth: c_uchar,             /* current depth in the overall tree */
     state: c_uchar,             /* ROLLBACK_XXX */
@@ -121,10 +121,10 @@ pub struct XmlValidCtxt {
     pub warning: Option<GenericError>,                 /* the callback in case of warning */
 
     /* Node analysis stack used when validating within entities */
-    pub(crate) node: XmlNodePtr,          /* Current parsed Node */
-    pub(crate) node_nr: i32,              /* Depth of the parsing stack */
-    pub(crate) node_max: i32,             /* Max depth of the parsing stack */
-    pub(crate) node_tab: *mut XmlNodePtr, /* array of nodes */
+    pub(crate) node: *mut XmlNode,          /* Current parsed Node */
+    pub(crate) node_nr: i32,                /* Depth of the parsing stack */
+    pub(crate) node_max: i32,               /* Max depth of the parsing stack */
+    pub(crate) node_tab: *mut *mut XmlNode, /* array of nodes */
 
     pub(crate) flags: u32,       /* internal flags */
     pub(crate) doc: *mut XmlDoc, /* the document */
@@ -739,7 +739,7 @@ pub(crate) unsafe fn xml_free_element(elem: *mut XmlElement) {
 #[cfg(any(feature = "libxml_valid", feature = "schema"))]
 unsafe fn xml_err_valid_node(
     ctxt: XmlValidCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     error: XmlParserErrors,
     msg: &str,
     str1: Option<&str>,
@@ -897,7 +897,7 @@ pub unsafe fn xml_add_element_decl(
                 // The element is already defined in this DTD.
                 xml_err_valid_node(
                     ctxt,
-                    dtd as XmlNodePtr,
+                    dtd as *mut XmlNode,
                     XmlParserErrors::XmlDTDElemRedefined,
                     format!("Redefinition of element {name}\n").as_str(),
                     Some(name),
@@ -929,7 +929,7 @@ pub unsafe fn xml_add_element_decl(
                 // The element is already defined in this DTD.
                 xml_err_valid_node(
                     ctxt,
-                    dtd as XmlNodePtr,
+                    dtd as *mut XmlNode,
                     XmlParserErrors::XmlDTDElemRedefined,
                     format!("Redefinition of element {name}\n").as_str(),
                     Some(name),
@@ -1685,7 +1685,7 @@ unsafe fn xml_scan_id_attribute_decl(
                 let cur_name = (*cur).name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem as XmlNodePtr,
+                    elem as *mut XmlNode,
                     XmlParserErrors::XmlDTDMultipleID,
                     format!(
                         "Element {elem_name} has too many ID attributes defined : {cur_name}\n"
@@ -1759,7 +1759,7 @@ pub unsafe fn xml_add_attribute_decl(
         }) {
             xml_err_valid_node(
                 ctxt,
-                dtd as XmlNodePtr,
+                dtd as *mut XmlNode,
                 XmlParserErrors::XmlDTDAttributeDefault,
                 format!("Attribute {elem} of {name}: invalid default value\n").as_str(),
                 Some(elem),
@@ -1845,7 +1845,7 @@ pub unsafe fn xml_add_attribute_decl(
             // The attribute is already defined in this DTD.
             xml_err_valid_warning!(
                 ctxt,
-                dtd as XmlNodePtr,
+                dtd as *mut XmlNode,
                 XmlParserErrors::XmlDTDAttributeRedefined,
                 "Attribute {} of element {}: already defined\n",
                 name,
@@ -1869,7 +1869,7 @@ pub unsafe fn xml_add_attribute_decl(
             {
                 xml_err_valid_node(
                     ctxt,
-                    dtd as XmlNodePtr,
+                    dtd as *mut XmlNode,
                     XmlParserErrors::XmlDTDMultipleID,
                     format!("Element {elem} has too may ID attributes defined : {name}\n").as_str(),
                     Some(elem),
@@ -2147,7 +2147,7 @@ pub unsafe fn xml_get_id(doc: *mut XmlDoc, id: *const XmlChar) -> Option<NonNull
 ///
 /// Returns 0 or 1 depending on the lookup result
 #[doc(alias = "xmlIsID")]
-pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: XmlNodePtr, attr: *mut XmlAttr) -> i32 {
+pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: *mut XmlAttr) -> i32 {
     if attr.is_null() || (*attr).name.is_null() {
         return 0;
     }
@@ -2361,7 +2361,11 @@ pub(crate) unsafe fn xml_add_ref(
 ///
 /// Returns 0 or 1 depending on the lookup result
 #[doc(alias = "xmlIsRef")]
-pub(crate) unsafe fn xml_is_ref(mut doc: *mut XmlDoc, elem: XmlNodePtr, attr: *mut XmlAttr) -> i32 {
+pub(crate) unsafe fn xml_is_ref(
+    mut doc: *mut XmlDoc,
+    elem: *mut XmlNode,
+    attr: *mut XmlAttr,
+) -> i32 {
     if attr.is_null() {
         return 0;
     }
@@ -2514,7 +2518,7 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> i32 
         return 0;
     }
 
-    let root: XmlNodePtr = (*doc).get_root_element();
+    let root: *mut XmlNode = (*doc).get_root_element();
     if root.is_null() || (*root).name.is_null() {
         xml_err_valid!(ctxt, XmlParserErrors::XmlDTDNoRoot, "no root element\n");
         return 0;
@@ -2644,7 +2648,7 @@ pub unsafe fn xml_validate_element_decl(
                             if (*(*cur).c1).prefix.is_null() {
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem as XmlNodePtr,
+                                    elem as *mut XmlNode,
                                     XmlParserErrors::XmlDTDContentError,
                                     format!("Definition of {elem_name} has duplicate references of {name}\n")
                                         .as_str(),
@@ -2657,7 +2661,7 @@ pub unsafe fn xml_validate_element_decl(
                                     .to_string_lossy();
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem as XmlNodePtr,
+                                    elem as *mut XmlNode,
                                     XmlParserErrors::XmlDTDContentError,
                                     format!("Definition of {elem_name} has duplicate references of {prefix}:{name}\n").as_str(),
                                     Some(elem_name.as_str()),
@@ -2686,7 +2690,7 @@ pub unsafe fn xml_validate_element_decl(
                         if (*(*cur).c1).prefix.is_null() {
                             xml_err_valid_node(
                                 ctxt,
-                                elem as XmlNodePtr,
+                                elem as *mut XmlNode,
                                 XmlParserErrors::XmlDTDContentError,
                                 format!(
                                     "Definition of {elem_name} has duplicate references to {name}\n"
@@ -2701,7 +2705,7 @@ pub unsafe fn xml_validate_element_decl(
                                 CStr::from_ptr((*(*cur).c1).prefix as *const i8).to_string_lossy();
                             xml_err_valid_node(
                                 ctxt,
-                                elem as XmlNodePtr,
+                                elem as *mut XmlNode,
                                 XmlParserErrors::XmlDTDContentError,
                                 format!(
                                     "Definition of {elem_name} has duplicate references to {prefix}:{name}\n"
@@ -2740,7 +2744,7 @@ pub unsafe fn xml_validate_element_decl(
         let elem_name = elem_name.as_deref().unwrap().to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem as XmlNodePtr,
+            elem as *mut XmlNode,
             XmlParserErrors::XmlDTDElemRedefined,
             format!("Redefinition of element {elem_name}\n").as_str(),
             Some(&elem_name),
@@ -2763,7 +2767,7 @@ pub unsafe fn xml_validate_element_decl(
         let elem_name = elem_name.as_deref().unwrap().to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem as XmlNodePtr,
+            elem as *mut XmlNode,
             XmlParserErrors::XmlDTDElemRedefined,
             format!("Redefinition of element {elem_name}\n").as_str(),
             Some(&elem_name),
@@ -2793,7 +2797,7 @@ pub unsafe fn xml_validate_element_decl(
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_valid_normalize_attribute_value(
     doc: *mut XmlDoc,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
     name: &str,
     value: *const XmlChar,
 ) -> *mut XmlChar {
@@ -2862,7 +2866,7 @@ pub unsafe fn xml_valid_normalize_attribute_value(
 pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
     name: &str,
     value: *const XmlChar,
 ) -> *mut XmlChar {
@@ -3038,7 +3042,7 @@ pub unsafe fn xml_validate_attribute_decl(
             let attr_elem = attr_elem.as_deref().unwrap().to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                attr as XmlNodePtr,
+                attr as *mut XmlNode,
                 XmlParserErrors::XmlDTDAttributeDefault,
                 format!("Syntax of default value for attribute {attr_name} of {attr_elem} is not valid\n")
                     .as_str(),
@@ -3061,7 +3065,7 @@ pub unsafe fn xml_validate_attribute_decl(
         let attr_elem = attr_elem.as_deref().unwrap().to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            attr as XmlNodePtr,
+            attr as *mut XmlNode,
             XmlParserErrors::XmlDTDIDFixed,
             format!("ID attribute {attr_name} of {attr_elem} is not valid must be #IMPLIED or #REQUIRED\n").as_str(),
             Some(&attr_name),
@@ -3104,7 +3108,7 @@ pub unsafe fn xml_validate_attribute_decl(
         if nb_id > 1 {
             xml_err_valid_node_nr!(
                 ctxt,
-                attr as XmlNodePtr,
+                attr as *mut XmlNode,
                 XmlParserErrors::XmlDTDIDSubset,
                 "Element {} has {} ID attribute defined in the internal subset : {}\n",
                 attr_elem.as_deref().unwrap().to_string_lossy().into_owned(),
@@ -3125,7 +3129,7 @@ pub unsafe fn xml_validate_attribute_decl(
             if ext_id > 1 {
                 xml_err_valid_node_nr!(
                     ctxt,
-                    attr as XmlNodePtr,
+                    attr as *mut XmlNode,
                     XmlParserErrors::XmlDTDIDSubset,
                     "Element {} has {} ID attribute defined in the external subset : {}\n",
                     attr_elem.as_deref().unwrap().to_string_lossy().into_owned(),
@@ -3137,7 +3141,7 @@ pub unsafe fn xml_validate_attribute_decl(
                 let attr_name = (*attr).name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    attr as XmlNodePtr,
+                    attr as *mut XmlNode,
                     XmlParserErrors::XmlDTDIDSubset,
                     format!("Element {attr_elem} has ID attributes defined in the internal and external subset : {attr_name}\n").as_str(),
                     Some(&attr_elem),
@@ -3163,7 +3167,7 @@ pub unsafe fn xml_validate_attribute_decl(
             let attr_def = CStr::from_ptr((*attr).default_value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                attr as XmlNodePtr,
+                attr as *mut XmlNode,
                 XmlParserErrors::XmlDTDAttributeValue,
                 format!(
                     "Default value \"{attr_def}\" for attribute {attr_name} of {attr_elem} is not among the enumerated set\n"
@@ -3253,7 +3257,7 @@ pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc, dtd: *mu
     }
     (*doc).ids.take();
     (*doc).refs.take();
-    let root: XmlNodePtr = (*doc).get_root_element();
+    let root: *mut XmlNode = (*doc).get_root_element();
     ret = xml_validate_element(ctxt, doc, root);
     ret &= xml_validate_document_final(ctxt, doc);
     (*doc).ext_subset = old_ext;
@@ -3306,7 +3310,7 @@ unsafe fn xml_validate_attribute_value2(
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
-                    doc as XmlNodePtr,
+                    doc as *mut XmlNode,
                     XmlParserErrors::XmlDTDUnknownEntity,
                     format!("ENTITY attribute {name} reference an unknown entity \"{value}\"\n")
                         .as_str(),
@@ -3322,7 +3326,7 @@ unsafe fn xml_validate_attribute_value2(
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
-                    doc as XmlNodePtr,
+                    doc as *mut XmlNode,
                     XmlParserErrors::XmlDTDEntityType,
                     format!(
                         "ENTITY attribute {name} reference an entity \"{value}\" of wrong type\n"
@@ -3360,7 +3364,7 @@ unsafe fn xml_validate_attribute_value2(
                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
-                        doc as XmlNodePtr,
+                        doc as *mut XmlNode,
                         XmlParserErrors::XmlDTDUnknownEntity,
                         format!(
                             "ENTITIES attribute {name} reference an unknown entity \"{nam}\"\n"
@@ -3378,7 +3382,7 @@ unsafe fn xml_validate_attribute_value2(
                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
-                        doc as XmlNodePtr,
+                        doc as *mut XmlNode,
                         XmlParserErrors::XmlDTDEntityType,
                         format!("ENTITIES attribute {name} reference an entity \"{nam}\" of wrong type\n")
                             .as_str(),
@@ -3409,7 +3413,7 @@ unsafe fn xml_validate_attribute_value2(
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
-                    doc as XmlNodePtr,
+                    doc as *mut XmlNode,
                     XmlParserErrors::XmlDTDUnknownNotation,
                     format!(
                         "NOTATION attribute {name} reference an unknown notation \"{value}\"\n"
@@ -3691,7 +3695,7 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> 
         return 0;
     }
 
-    let root: XmlNodePtr = (*doc).get_root_element();
+    let root: *mut XmlNode = (*doc).get_root_element();
     ret &= xml_validate_element(ctxt, doc, root);
     ret &= xml_validate_document_final(ctxt, doc);
     ret
@@ -3705,9 +3709,9 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> 
 pub unsafe fn xml_validate_element(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
-    root: XmlNodePtr,
+    root: *mut XmlNode,
 ) -> i32 {
-    let mut elem: XmlNodePtr;
+    let mut elem: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut ns: *mut XmlNs;
     let mut ret: i32 = 1;
@@ -3788,7 +3792,7 @@ pub unsafe fn xml_validate_element(
 unsafe fn xml_valid_get_elem_decl(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
     extsubset: *mut i32,
 ) -> *mut XmlElement {
     let mut elem_decl: *mut XmlElement = null_mut();
@@ -3848,12 +3852,12 @@ unsafe fn xml_valid_get_elem_decl(
     elem_decl
 }
 
-unsafe fn node_vpush(ctxt: XmlValidCtxtPtr, value: XmlNodePtr) -> i32 {
+unsafe fn node_vpush(ctxt: XmlValidCtxtPtr, value: *mut XmlNode) -> i32 {
     if (*ctxt).node_max <= 0 {
         (*ctxt).node_max = 4;
         (*ctxt).node_tab =
             xml_malloc((*ctxt).node_max as usize * size_of_val(&*(*ctxt).node_tab.add(0)))
-                as *mut XmlNodePtr;
+                as *mut *mut XmlNode;
         if (*ctxt).node_tab.is_null() {
             xml_verr_memory(ctxt as _, Some("malloc failed"));
             (*ctxt).node_max = 0;
@@ -3861,10 +3865,10 @@ unsafe fn node_vpush(ctxt: XmlValidCtxtPtr, value: XmlNodePtr) -> i32 {
         }
     }
     if (*ctxt).node_nr >= (*ctxt).node_max {
-        let tmp: *mut XmlNodePtr = xml_realloc(
+        let tmp: *mut *mut XmlNode = xml_realloc(
             (*ctxt).node_tab as _,
             (*ctxt).node_max as usize * 2 * size_of_val(&*(*ctxt).node_tab.add(0)),
-        ) as *mut XmlNodePtr;
+        ) as *mut *mut XmlNode;
         if tmp.is_null() {
             xml_verr_memory(ctxt as _, Some("realloc failed"));
             return 0;
@@ -3879,7 +3883,7 @@ unsafe fn node_vpush(ctxt: XmlValidCtxtPtr, value: XmlNodePtr) -> i32 {
     res
 }
 
-unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> XmlNodePtr {
+unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> *mut XmlNode {
     if (*ctxt).node_nr <= 0 {
         return null_mut();
     }
@@ -3889,7 +3893,7 @@ unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> XmlNodePtr {
     } else {
         (*ctxt).node = null_mut();
     }
-    let ret: XmlNodePtr = *(*ctxt).node_tab.add((*ctxt).node_nr as usize);
+    let ret: *mut XmlNode = *(*ctxt).node_tab.add((*ctxt).node_nr as usize);
     *(*ctxt).node_tab.add((*ctxt).node_nr as usize) = null_mut();
     ret
 }
@@ -3901,7 +3905,7 @@ unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> XmlNodePtr {
 unsafe fn xml_validate_one_cdata_element(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
 ) -> i32 {
     let mut ret: i32 = 1;
 
@@ -3970,8 +3974,8 @@ macro_rules! DEBUG_VALID_MSG {
 /// This will dump the list of elements to the buffer
 /// Intended just for the debug routine
 #[doc(alias = "xmlSnprintfElements")]
-unsafe fn xml_snprintf_elements(buf: *mut c_char, size: i32, node: XmlNodePtr, glob: i32) {
-    let mut cur: XmlNodePtr;
+unsafe fn xml_snprintf_elements(buf: *mut c_char, size: i32, node: *mut XmlNode, glob: i32) {
+    let mut cur: *mut XmlNode;
     let mut len: i32;
 
     if node.is_null() {
@@ -4383,7 +4387,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
         while !(*(*ctxt).vstate).cont.is_null() {
             // First do the analysis depending on the occurrence model at this level.
             if ret == 0 {
-                let cur: XmlNodePtr;
+                let cur: *mut XmlNode;
                 match (*(*(*ctxt).vstate).cont).ocur {
                     XmlElementContentOccur::XmlElementContentOnce => {
                         cur = (*(*ctxt).vstate).node;
@@ -4520,7 +4524,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
             }
         }
         if !(*(*ctxt).vstate).node.is_null() {
-            let cur: XmlNodePtr;
+            let cur: *mut XmlNode;
 
             cur = (*(*ctxt).vstate).node;
             DEBUG_VALID_MSG!(c"Failed, remaining input, rollback".as_ptr());
@@ -4535,7 +4539,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
             continue 'cont;
         }
         if ret == 0 {
-            let cur: XmlNodePtr;
+            let cur: *mut XmlNode;
 
             cur = (*(*ctxt).vstate).node;
             DEBUG_VALID_MSG!(c"Failure, rollback".as_ptr());
@@ -4558,19 +4562,19 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
 #[doc(alias = "xmlValidateElementContent")]
 unsafe fn xml_validate_element_content(
     ctxt: XmlValidCtxtPtr,
-    child: XmlNodePtr,
+    child: *mut XmlNode,
     elem_decl: *mut XmlElement,
     warn: i32,
-    parent: XmlNodePtr,
+    parent: *mut XmlNode,
 ) -> i32 {
     let mut ret: i32 = 1;
     #[cfg(not(feature = "libxml_regexp"))]
-    let mut repl: XmlNodePtr = null_mut();
+    let mut repl: *mut XmlNode = null_mut();
     #[cfg(not(feature = "libxml_regexp"))]
-    let mut last: XmlNodePtr = null_mut();
+    let mut last: *mut XmlNode = null_mut();
     #[cfg(not(feature = "libxml_regexp"))]
-    let mut tmp: XmlNodePtr;
-    let mut cur: XmlNodePtr;
+    let mut tmp: *mut XmlNode;
+    let mut cur: *mut XmlNode;
 
     if elem_decl.is_null() || parent.is_null() || ctxt.is_null() {
         return -1;
@@ -4707,7 +4711,7 @@ unsafe fn xml_validate_element_content(
                 xml_snprintf_element_content(expr.as_mut_ptr() as _, 5000, (*elem_decl).content, 1);
                 xml_err_valid_node(
                     ctxt,
-                    elem_decl as XmlNodePtr,
+                    elem_decl as *mut XmlNode,
                     XmlParserErrors::XmlDTDContentNotDeterminist,
                     c"Content model of %s is not deterministic: %s\n".as_ptr() as _,
                     name,
@@ -4742,7 +4746,7 @@ unsafe fn xml_validate_element_content(
                             } else {
                                 // Allocate a new node and minimally fills in
                                 // what's required
-                                tmp = xml_malloc(size_of::<XmlNode>()) as XmlNodePtr;
+                                tmp = xml_malloc(size_of::<XmlNode>()) as *mut XmlNode;
                                 if tmp.is_null() {
                                     xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
                                     xmlFreeNodeList(repl);
@@ -4911,13 +4915,13 @@ unsafe fn xml_validate_element_content(
 pub unsafe fn xml_validate_one_element(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
 ) -> i32 {
     use crate::tree::XmlNs;
 
     let mut cont: XmlElementContentPtr;
     let mut attr: *mut XmlAttribute;
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut ret: i32 = 1;
     let tmp: i32;
     let mut name: *const XmlChar;
@@ -5483,7 +5487,7 @@ pub unsafe fn xml_validate_one_element(
 pub unsafe fn xml_validate_one_attribute(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
     attr: *mut XmlAttr,
     value: *const XmlChar,
 ) -> i32 {
@@ -5791,7 +5795,7 @@ pub unsafe fn xml_validate_one_attribute(
 pub unsafe fn xml_validate_one_namespace(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
     prefix: Option<&str>,
     ns: *mut XmlNs,
     value: *const XmlChar,
@@ -6349,7 +6353,7 @@ pub unsafe fn xml_validate_notation_use(
     if nota_decl.is_none() && !ctxt.is_null() {
         xml_err_valid_node(
             ctxt,
-            doc as XmlNodePtr,
+            doc as *mut XmlNode,
             XmlParserErrors::XmlDTDUnknownNotation,
             format!("NOTATION {notation_name} is not declared\n").as_str(),
             Some(notation_name),
@@ -6940,7 +6944,7 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, elem: *mut Xm
         let name = (*elem).name.as_deref().unwrap();
         xml_err_valid_node(
             ctxt,
-            elem as XmlNodePtr,
+            elem as *mut XmlNode,
             XmlParserErrors::XmlErrInternalError,
             format!("Cannot create automata for element {name}\n").as_str(),
             Some(name.as_str()),
@@ -6965,7 +6969,7 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, elem: *mut Xm
         let expr = CStr::from_ptr(expr.as_ptr()).to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem as XmlNodePtr,
+            elem as *mut XmlNode,
             XmlParserErrors::XmlDTDContentNotDeterminist,
             format!("Content model of {name} is not deterministic: {expr}\n").as_str(),
             Some(name.as_str()),
@@ -7072,7 +7076,11 @@ unsafe fn xml_validate_check_mixed(
 }
 
 #[cfg(feature = "libxml_regexp")]
-unsafe fn vstate_vpush(ctxt: XmlValidCtxtPtr, elem_decl: *mut XmlElement, node: XmlNodePtr) -> i32 {
+unsafe fn vstate_vpush(
+    ctxt: XmlValidCtxtPtr,
+    elem_decl: *mut XmlElement,
+    node: *mut XmlNode,
+) -> i32 {
     if (*ctxt).vstate_max == 0 || (*ctxt).vstate_tab.is_null() {
         (*ctxt).vstate_max = 10;
         (*ctxt).vstate_tab =
@@ -7113,7 +7121,7 @@ unsafe fn vstate_vpush(ctxt: XmlValidCtxtPtr, elem_decl: *mut XmlElement, node: 
             let node_name = (*node).name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem_decl as XmlNodePtr,
+                elem_decl as *mut XmlNode,
                 XmlParserErrors::XmlErrInternalError,
                 format!("Failed to build content model regexp for {node_name}\n").as_str(),
                 Some(&node_name),
@@ -7135,7 +7143,7 @@ const MAX_RECURSE: usize = 25000;
 unsafe fn vstate_vpush(
     ctxt: XmlValidCtxtPtr,
     cont: XmlElementContentPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     depth: c_uchar,
     occurs: c_long,
     state: c_uchar,
@@ -7199,7 +7207,7 @@ unsafe fn vstate_vpush(
 pub unsafe fn xml_validate_push_element(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
     qname: *const XmlChar,
 ) -> i32 {
     let mut ret: i32 = 1;
@@ -7432,7 +7440,7 @@ unsafe fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
 pub unsafe fn xml_validate_pop_element(
     ctxt: XmlValidCtxtPtr,
     _doc: *mut XmlDoc,
-    _elem: XmlNodePtr,
+    _elem: *mut XmlNode,
     _qname: *const XmlChar,
 ) -> i32 {
     let mut ret: i32 = 1;
@@ -7484,7 +7492,7 @@ pub unsafe fn xml_validate_pop_element(
 /// Returns the first element to consider for validation of the content model
 #[doc(alias = "xmlValidateSkipIgnorable")]
 #[cfg(not(feature = "libxml_regexp"))]
-unsafe fn xmlValidateSkipIgnorable(mut child: XmlNodePtr) -> XmlNodePtr {
+unsafe fn xmlValidateSkipIgnorable(mut child: *mut XmlNode) -> *mut XmlNode {
     while !child.is_null() {
         match (*child).typ {
             // These things are ignored (skipped) during validation.

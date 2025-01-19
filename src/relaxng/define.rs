@@ -7,7 +7,7 @@ use crate::{
         relaxng::{xml_relaxng_free_partition, XmlRelaxNGPartitionPtr, XmlRelaxNGType},
         xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr},
     },
-    tree::XmlNodePtr,
+    tree::XmlNode,
 };
 
 use super::{xml_rng_perr_memory, XmlRelaxNGParserCtxtPtr, XmlRelaxNGTypeLibraryPtr};
@@ -18,7 +18,7 @@ pub type XmlRelaxNGDefinePtr = *mut XmlRelaxNGDefine;
 #[repr(C)]
 pub struct XmlRelaxNGDefine {
     pub(crate) typ: XmlRelaxNGType,             // the type of definition
-    pub(crate) node: XmlNodePtr,                // the node in the source
+    pub(crate) node: *mut XmlNode,              // the node in the source
     pub(crate) name: *mut u8,                   // the element local name if present
     pub(crate) ns: *mut u8,                     // the namespace local name if present
     pub(crate) value: *mut u8,                  // value when available
@@ -92,7 +92,7 @@ impl Default for XmlRelaxNGDefine {
 #[doc(alias = "xmlRelaxNGNewDefine")]
 pub(crate) unsafe fn xml_relaxng_new_define(
     ctxt: XmlRelaxNGParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlRelaxNGDefinePtr {
     let ret: XmlRelaxNGDefinePtr = xml_malloc(size_of::<XmlRelaxNGDefine>()) as _;
     if ret.is_null() {

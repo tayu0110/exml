@@ -1,7 +1,7 @@
 use std::{ffi::CStr, io::Write};
 
 #[cfg(feature = "libxml_xptr_locs")]
-use crate::{libxml::xpointer::XmlLocationSetPtr, tree::XmlNodePtr};
+use crate::{libxml::xpointer::XmlLocationSetPtr, tree::XmlNode};
 use crate::{
     libxml::{
         debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node},
@@ -190,7 +190,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathPoint => {
             write!(output, "Object is a point : index {} in node", (*cur).index,);
-            let node = (*cur).user as XmlNodePtr;
+            let node = (*cur).user as *mut XmlNode;
             xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
             writeln!(output);
         }
@@ -205,7 +205,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
                     write!(output, "index {} in ", (*cur).index);
                 }
                 writeln!(output, "node");
-                let node = (*cur).user as XmlNodePtr;
+                let node = (*cur).user as *mut XmlNode;
                 xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
             } else {
                 writeln!(output, "Object is a range :");
@@ -215,7 +215,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
                     write!(output, "index {} in ", (*cur).index);
                 }
                 writeln!(output, "node");
-                let node = (*cur).user as XmlNodePtr;
+                let node = (*cur).user as *mut XmlNode;
                 xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
                 write!(output, "{}", shift);
                 write!(output, "To ");
@@ -223,7 +223,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
                     write!(output, "index {} in ", (*cur).index2);
                 }
                 writeln!(output, "node");
-                let node = (*cur).user2 as XmlNodePtr;
+                let node = (*cur).user2 as *mut XmlNode;
                 xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
                 writeln!(output);
             }

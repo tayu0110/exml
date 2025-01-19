@@ -49,7 +49,7 @@ use crate::{
     },
     tree::{
         is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttribute, XmlDoc, XmlDtd,
-        XmlElement, XmlElementType, XmlEntity, XmlNodePtr, XmlNotation, XmlNs, XML_LOCAL_NAMESPACE,
+        XmlElement, XmlElementType, XmlEntity, XmlNotation, XmlNs, XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -283,7 +283,7 @@ impl<'a> XmlSaveCtxt<'a> {
     ///
     /// Returns the number of byte written or -1 in case of error
     #[doc(alias = "xmlSaveTree")]
-    pub unsafe fn save_tree(&mut self, node: XmlNodePtr) -> i64 {
+    pub unsafe fn save_tree(&mut self, node: *mut XmlNode) -> i64 {
         let ret: i64 = 0;
 
         if node.is_null() {
@@ -554,7 +554,7 @@ impl Drop for XmlSaveCtxt<'_> {
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErr")]
-pub(crate) unsafe fn xml_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&str>) {
+pub(crate) unsafe fn xml_save_err(code: XmlParserErrors, node: *mut XmlNode, extra: Option<&str>) {
     let msg: Cow<'static, str> = match code {
         XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n".into(),
         XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n".into(),
@@ -770,12 +770,12 @@ unsafe fn xml_attr_dump_output(ctxt: &mut XmlSaveCtxt, cur: &XmlAttr) {
 
 /// Dump an XML node, recursive behaviour, children are printed too.
 #[doc(alias = "xmlNodeDumpOutputInternal")]
-pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut cur: XmlNodePtr) {
+pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut cur: *mut XmlNode) {
     let format: i32 = ctxt.format;
-    let mut tmp: XmlNodePtr;
+    let mut tmp: *mut XmlNode;
 
-    let mut unformatted_node: XmlNodePtr = null_mut();
-    let mut parent: XmlNodePtr;
+    let mut unformatted_node: *mut XmlNode = null_mut();
+    let mut parent: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut start: *mut u8;
     let mut end: *mut u8;
@@ -784,7 +784,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
         return;
     }
 
-    let root: XmlNodePtr = cur;
+    let root: *mut XmlNode = cur;
     parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
     loop {
         match (*cur).element_type() {
@@ -1098,7 +1098,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
 /// Dump the XML document DTD, if any.
 #[doc(alias = "xmlDtdDumpOutput")]
 unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: *mut XmlDtd) {
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
 
     if dtd.is_null() {
         return;
@@ -1288,14 +1288,14 @@ unsafe fn xhtml_is_empty(node: &XmlNode) -> bool {
 /// Dump an XHTML node, recursive behaviour, children are printed too.
 #[doc(alias = "xhtmlNodeDumpOutput")]
 #[cfg(feature = "html")]
-pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: XmlNodePtr) {
+pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mut XmlNode) {
     use crate::{libxml::parser_internals::XML_STRING_TEXT, tree::XmlNode};
 
     let format: i32 = ctxt.format;
     let mut addmeta: i32;
-    let mut tmp: XmlNodePtr;
-    let mut unformatted_node: XmlNodePtr = null_mut();
-    let mut parent: XmlNodePtr;
+    let mut tmp: *mut XmlNode;
+    let mut unformatted_node: *mut XmlNode = null_mut();
+    let mut parent: *mut XmlNode;
     let mut start: *mut u8;
     let mut end: *mut u8;
 
@@ -1303,7 +1303,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
         return;
     }
 
-    let root: XmlNodePtr = cur;
+    let root: *mut XmlNode = cur;
     parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
     loop {
         match (*cur).element_type() {
@@ -1669,7 +1669,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
 /// Dump an HTML node, recursive behaviour, children are printed too.
 #[doc(alias = "htmlNodeDumpOutputInternal")]
 #[cfg(feature = "html")]
-unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlNodePtr) -> i32 {
+unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: *mut XmlNode) -> i32 {
     use crate::libxml::htmltree::html_node_dump_format_output;
 
     let mut oldenc = None;

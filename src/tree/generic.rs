@@ -13,8 +13,8 @@ use crate::{
 
 use super::{
     xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge, NodePtr, XmlAttr,
-    XmlAttribute, XmlDoc, XmlDtd, XmlElement, XmlElementType, XmlEntity, XmlNode, XmlNodePtr,
-    XmlNs, XML_XML_NAMESPACE,
+    XmlAttribute, XmlDoc, XmlDtd, XmlElement, XmlElementType, XmlEntity, XmlNode, XmlNs,
+    XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -232,7 +232,7 @@ pub trait NodeCommon {
     /// Search the last child of a node.
     /// Returns the last child or null_mut() if none.
     #[doc(alias = "xmlGetLastChild")]
-    fn get_last_child(&self) -> XmlNodePtr {
+    fn get_last_child(&self) -> *mut XmlNode {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return null_mut();
         }
@@ -266,7 +266,7 @@ pub trait NodeCommon {
         match self.element_type() {
             XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
                 let last = self.last();
-                let new_node: XmlNodePtr = xml_new_doc_text_len(self.document(), content, len);
+                let new_node: *mut XmlNode = xml_new_doc_text_len(self.document(), content, len);
                 if !new_node.is_null() {
                     let tmp = self.add_child(new_node);
                     if tmp != new_node {
@@ -316,8 +316,8 @@ pub trait NodeCommon {
     ///
     /// Returns the child or NULL in case of error.
     #[doc(alias = "xmlAddChild")]
-    unsafe fn add_child(&mut self, cur: XmlNodePtr) -> XmlNodePtr {
-        let mut prev: XmlNodePtr;
+    unsafe fn add_child(&mut self, cur: *mut XmlNode) -> *mut XmlNode {
+        let mut prev: *mut XmlNode;
 
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return null_mut();
@@ -441,7 +441,7 @@ pub trait NodeCommon {
     /// Returns the first element child or NULL if not available.
     #[doc(alias = "xmlFirstElementChild")]
     #[cfg(feature = "libxml_tree")]
-    fn first_element_child(&self) -> XmlNodePtr {
+    fn first_element_child(&self) -> *mut XmlNode {
         let mut next = match self.element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlEntityNode
@@ -470,7 +470,7 @@ pub trait NodeCommon {
     /// Returns the last element child or NULL if not available.
     #[doc(alias = "xmlLastElementChild")]
     #[cfg(feature = "libxml_tree")]
-    fn last_element_child(&self) -> XmlNodePtr {
+    fn last_element_child(&self) -> *mut XmlNode {
         let mut cur = match self.element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlEntityNode
@@ -530,7 +530,7 @@ pub trait NodeCommon {
     /// Returns the next element sibling or NULL if not available
     #[doc(alias = "xmlNextElementSibling")]
     #[cfg(feature = "libxml_tree")]
-    fn next_element_sibling(&self) -> XmlNodePtr {
+    fn next_element_sibling(&self) -> *mut XmlNode {
         let mut cur = match self.element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlTextNode
@@ -564,7 +564,7 @@ pub trait NodeCommon {
     /// Returns the previous element sibling or null_mut() if not available
     #[doc(alias = "xmlPreviousElementSibling")]
     #[cfg(feature = "libxml_tree")]
-    fn previous_element_sibling(&self) -> XmlNodePtr {
+    fn previous_element_sibling(&self) -> *mut XmlNode {
         let mut node = match self.element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlTextNode

@@ -44,7 +44,7 @@ use crate::{
     list::XmlList,
     tree::{
         xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlDoc, XmlElementType, XmlNode,
-        XmlNodePtr, XmlNs, XML_XML_NAMESPACE,
+        XmlNs, XML_XML_NAMESPACE,
     },
     uri::build_uri,
     xpath::XmlNodeSet,
@@ -94,11 +94,11 @@ pub type XmlC14NVisibleNsStackPtr = *mut XmlC14NVisibleNsStack;
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct XmlC14NVisibleNsStack {
-    ns_cur_end: usize,         /* number of nodes in the set */
-    ns_prev_start: usize,      /* the beginning of the stack for previous visible node */
-    ns_prev_end: usize,        /* the end of the stack for previous visible node */
-    ns_tab: Vec<*mut XmlNs>,   /* array of ns in no particular order */
-    node_tab: Vec<XmlNodePtr>, /* array of nodes in no particular order */
+    ns_cur_end: usize,           /* number of nodes in the set */
+    ns_prev_start: usize,        /* the beginning of the stack for previous visible node */
+    ns_prev_end: usize,          /* the end of the stack for previous visible node */
+    ns_tab: Vec<*mut XmlNs>,     /* array of ns in no particular order */
+    node_tab: Vec<*mut XmlNode>, /* array of nodes in no particular order */
 }
 
 impl XmlC14NVisibleNsStack {
@@ -155,7 +155,7 @@ impl XmlC14NVisibleNsStack {
     }
 
     #[doc(alias = "xmlC14NVisibleNsStackAdd")]
-    fn add(&mut self, ns: *mut XmlNs, node: XmlNodePtr) {
+    fn add(&mut self, ns: *mut XmlNs, node: *mut XmlNode) {
         if self.ns_cur_end == self.ns_tab.len() {
             self.ns_tab.push(ns);
             self.node_tab.push(node);
@@ -1164,7 +1164,7 @@ impl<T> XmlC14NCtx<'_, T> {
     /// Returns the newly created attribute or NULL
     #[doc(alias = "xmlC14NFixupBaseAttr")]
     unsafe fn fixup_base_attr(&mut self, xml_base_attr: &XmlAttr) -> *mut XmlAttr {
-        let mut cur: XmlNodePtr;
+        let mut cur: *mut XmlNode;
         let mut attr: *mut XmlAttr;
 
         let Some(parent) = xml_base_attr.parent() else {
@@ -1535,7 +1535,7 @@ pub unsafe fn xml_c14n_doc_save(
 #[doc(alias = "xmlC14NErr")]
 unsafe fn xml_c14n_err<T>(
     ctxt: XmlC14NCtxPtr<'_, T>,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     error: XmlParserErrors,
     msg: &str,
 ) {
@@ -2002,7 +2002,7 @@ pub unsafe fn xml_c14n_execute<'a, T>(
     if buf.borrow().encoder.is_some() {
         xml_c14n_err::<T>(
             null_mut(),
-            doc as *mut XmlDoc as XmlNodePtr,
+            doc as *mut XmlDoc as *mut XmlNode,
             XmlParserErrors::XmlC14NRequiresUtf8,
             "xmlC14NExecute: output buffer encoder != NULL but C14N requires UTF8 output\n",
         );

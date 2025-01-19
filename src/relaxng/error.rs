@@ -13,7 +13,7 @@ use crate::{
         },
         xmlstring::{xml_char_strdup, xml_escape_format_string, xml_str_equal, xml_strdup},
     },
-    tree::{XmlNode, XmlNodePtr},
+    tree::XmlNode,
 };
 
 const ERROR_IS_DUP: i32 = 1;
@@ -294,7 +294,7 @@ unsafe fn xml_relaxng_get_error_string(
 #[doc(alias = "xmlRngVErr")]
 unsafe fn xml_rng_verr(
     ctxt: XmlRelaxNGValidCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     error: i32,
     msg: &str,
     str1: Option<&str>,
@@ -339,8 +339,8 @@ unsafe fn xml_rng_verr(
 unsafe fn xml_relaxng_show_valid_error(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: XmlRelaxNGValidErr,
-    node: XmlNodePtr,
-    child: XmlNodePtr,
+    node: *mut XmlNode,
+    child: *mut XmlNode,
     arg1: *const u8,
     arg2: *const u8,
 ) {
@@ -557,8 +557,8 @@ pub(crate) unsafe fn xml_relaxng_add_valid_error(
 
     // generate the error directly
     if (*ctxt).flags & FLAGS_IGNORABLE == 0 || (*ctxt).flags & FLAGS_NEGATIVE != 0 {
-        let mut node: XmlNodePtr;
-        let seq: XmlNodePtr;
+        let mut node: *mut XmlNode;
+        let seq: *mut XmlNode;
 
         // Flush first any stacked error which might be the
         // real cause of the problem.

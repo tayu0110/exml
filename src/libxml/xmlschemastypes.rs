@@ -63,7 +63,7 @@ use crate::{
     tree::{
         xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
         xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttr, XmlAttributeType,
-        XmlElementType, XmlEntity, XmlEntityType, XmlNodePtr, XmlNs,
+        XmlElementType, XmlEntity, XmlEntityType, XmlNode, XmlNs,
     },
     xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };
@@ -419,7 +419,7 @@ unsafe fn xml_schema_cleanup_types_internal() {
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchemaTypeErrMemory")]
-unsafe fn xml_schema_type_err_memory(node: XmlNodePtr, extra: Option<&str>) {
+unsafe fn xml_schema_type_err_memory(node: *mut XmlNode, extra: Option<&str>) {
     __xml_simple_oom_error(XmlErrorDomain::XmlFromDatatype, node, extra);
 }
 
@@ -1877,7 +1877,7 @@ unsafe fn xml_schema_val_atomic_list_node(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
     ret: *mut XmlSchemaValPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
     let mut cur: *mut XmlChar;
     let mut nb_values: i32 = 0;
@@ -2011,7 +2011,7 @@ unsafe fn xml_schema_val_atomic_type(
     typ: XmlSchemaTypePtr,
     mut value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     flags: i32,
     ws: XmlSchemaWhitespaceValueType,
     norm_on_the_fly: i32,
@@ -3652,7 +3652,7 @@ pub unsafe fn xml_schema_val_predef_type_node(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
     xml_schema_val_atomic_type(
         typ,
@@ -6452,7 +6452,7 @@ pub unsafe fn xml_schema_val_predef_type_node_no_norm(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
     xml_schema_val_atomic_type(
         typ,

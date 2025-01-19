@@ -29,7 +29,7 @@ use crate::libxml::{
 
 use super::{
     xml_free_prop, xml_new_prop_internal, xml_tree_err_memory, NodeCommon, NodePtr,
-    XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNodePtr, XmlNs, __XML_REGISTER_CALLBACKS,
+    XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -205,7 +205,7 @@ pub unsafe fn xml_new_doc_prop(
 #[doc(alias = "xmlNewProp")]
 #[cfg(any(feature = "libxml_tree", feature = "html", feature = "schema"))]
 pub unsafe fn xml_new_prop(
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     name: *const XmlChar,
     value: *const XmlChar,
 ) -> *mut XmlAttr {
@@ -221,7 +221,7 @@ pub unsafe fn xml_new_prop(
 /// Returns a pointer to the attribute
 #[doc(alias = "xmlNewNsProp")]
 pub unsafe fn xml_new_ns_prop(
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     ns: *mut XmlNs,
     name: &str,
     value: *const XmlChar,
@@ -233,7 +233,7 @@ pub unsafe fn xml_new_ns_prop(
 /// Returns a pointer to the attribute
 #[doc(alias = "xmlNewNsPropEatName")]
 pub unsafe fn xml_new_ns_prop_eat_name(
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     ns: *mut XmlNs,
     name: *mut XmlChar,
     value: *const XmlChar,

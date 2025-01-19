@@ -25,7 +25,7 @@ use std::{
 use crate::{
     globals::{GenericError, GenericErrorContext, GLOBAL_STATE},
     parser::{XmlParserCtxtPtr, XmlParserInputPtr},
-    tree::{NodeCommon, XmlElementType, XmlNode, XmlNodePtr},
+    tree::{NodeCommon, XmlElementType, XmlNode},
 };
 
 macro_rules! impl_xml_parser_errors {
@@ -1091,7 +1091,7 @@ pub unsafe fn report_error(
     let code = err.code;
     let domain = err.domain;
     let level = err.level;
-    let node: XmlNodePtr = err.node.map_or(null_mut(), |n| n.as_ptr()) as _;
+    let node: *mut XmlNode = err.node.map_or(null_mut(), |n| n.as_ptr()) as _;
 
     if code.is_ok() {
         return;
@@ -1433,7 +1433,7 @@ macro_rules! __xml_raise_error {
             },
             libxml::parser::XML_SAX2_MAGIC,
             parser::{XmlParserCtxtPtr, XmlParserInputPtr},
-            tree::{NodeCommon, XmlElementType, XmlNodePtr},
+            tree::{NodeCommon, XmlElementType, XmlNode},
         };
         (|mut schannel: Option<StructuredError>,
             mut channel: Option<GenericError>,
@@ -1453,10 +1453,10 @@ macro_rules! __xml_raise_error {
             msg: &str| {
                 let mut ctxt: XmlParserCtxtPtr = null_mut();
                 let Some((channel, error, s, data)) = GLOBAL_STATE.with_borrow_mut(|state| {
-                    let mut node: XmlNodePtr = nod as XmlNodePtr;
+                    let mut node: *mut XmlNode = nod as *mut XmlNode;
                     let mut input: XmlParserInputPtr;
                     let mut to = &mut state.last_error;
-                    let mut baseptr: XmlNodePtr = null_mut();
+                    let mut baseptr: *mut XmlNode = null_mut();
 
                     if code == XmlParserErrors::XmlErrOK {
                         return None;
@@ -1553,7 +1553,7 @@ macro_rules! __xml_raise_error {
                             // We check if the error is within an XInclude section and,
                             // if so, attempt to print out the href of the XInclude instead
                             // of the usual "base" (doc->URL) for the node (bug 152623).
-                            let mut prev: XmlNodePtr = baseptr;
+                            let mut prev: *mut XmlNode = baseptr;
                             let mut href = None;
                             let mut inclcount = 0;
                             while !prev.is_null() {
@@ -1653,7 +1653,7 @@ pub(crate) use __xml_raise_error;
 #[doc(hidden)]
 pub(crate) unsafe fn __xml_simple_oom_error(
     domain: XmlErrorDomain,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     msg: Option<&str>,
 ) {
     if let Some(msg) = msg {

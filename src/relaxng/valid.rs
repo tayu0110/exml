@@ -17,7 +17,7 @@ use crate::{
         },
     },
     relaxng::{VALID_ERR, VALID_ERR2},
-    tree::{NodeCommon, XmlAttr, XmlDoc, XmlNodePtr},
+    tree::{NodeCommon, XmlAttr, XmlDoc, XmlNode},
 };
 
 use super::{xml_rng_verr_memory, XmlRelaxNGDefinePtr};
@@ -40,8 +40,8 @@ pub type XmlRelaxNGValidStatePtr = *mut XmlRelaxNGValidState;
 #[doc(alias = "xmlRelaxNGValidState")]
 #[repr(C)]
 pub struct XmlRelaxNGValidState {
-    pub(crate) node: XmlNodePtr,         // the current node
-    pub(crate) seq: XmlNodePtr,          // the sequence of children left to validate
+    pub(crate) node: *mut XmlNode,       // the current node
+    pub(crate) seq: *mut XmlNode,        // the sequence of children left to validate
     pub(crate) nb_attrs: i32,            // the number of attributes
     pub(crate) max_attrs: i32,           // the size of attrs
     pub(crate) nb_attr_left: i32,        // the number of attributes left to validate
@@ -105,7 +105,7 @@ pub struct XmlRelaxNGValidCtxt {
     pub(crate) elem_max: i32,           // the max depth of elements
     pub(crate) elem_tab: *mut XmlRegExecCtxtPtr, // the stack of regexp runtime
     pub(crate) pstate: i32,             // progressive state
-    pub(crate) pnode: XmlNodePtr,       // the current node
+    pub(crate) pnode: *mut XmlNode,     // the current node
     pub(crate) pdef: XmlRelaxNGDefinePtr, // the non-streamable definition
     pub(crate) perr: i32,               // signal error in content model outside the regexp
 }
@@ -166,7 +166,7 @@ impl XmlRelaxNGValidCtxt {
     /// returns 1 if no validation problem was found or 0 if validating the
     /// element requires a full node, and -1 in case of error.
     #[doc(alias = "xmlRelaxNGValidatePushElement")]
-    pub unsafe fn push_element(&mut self, _doc: *mut XmlDoc, elem: XmlNodePtr) -> i32 {
+    pub unsafe fn push_element(&mut self, _doc: *mut XmlDoc, elem: *mut XmlNode) -> i32 {
         let mut ret: i32;
 
         if elem.is_null() {
@@ -231,7 +231,7 @@ impl XmlRelaxNGValidCtxt {
     ///
     /// returns 1 if no validation problem was found or 0 otherwise
     #[doc(alias = "xmlRelaxNGValidatePopElement")]
-    pub unsafe fn pop_element(&mut self, _doc: *mut XmlDoc, elem: XmlNodePtr) -> i32 {
+    pub unsafe fn pop_element(&mut self, _doc: *mut XmlDoc, elem: *mut XmlNode) -> i32 {
         let mut ret: i32;
 
         if self.elem.is_null() || elem.is_null() {
@@ -452,13 +452,13 @@ pub(crate) unsafe fn xml_relaxng_free_states(
 #[doc(alias = "xmlRelaxNGNewValidState")]
 pub(crate) unsafe fn xml_relaxng_new_valid_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlRelaxNGValidStatePtr {
     let ret: XmlRelaxNGValidStatePtr;
     let mut attr: *mut XmlAttr;
     let mut attrs: [*mut XmlAttr; MAX_ATTR] = [null_mut(); MAX_ATTR];
     let mut nb_attrs: usize = 0;
-    let mut root: XmlNodePtr = null_mut();
+    let mut root: *mut XmlNode = null_mut();
 
     if node.is_null() {
         root = if (*ctxt).doc.is_null() {

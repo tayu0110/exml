@@ -145,7 +145,7 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNodePtr,
+        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode,
         XmlNs, XML_XML_NAMESPACE,
     },
     uri::build_uri,
@@ -828,7 +828,7 @@ pub struct XmlSchemaAttributeUse {
     attr_decl: XmlSchemaAttributePtr,
 
     flags: i32,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     occurs: i32, /* required, optional */
     def_value: *const XmlChar,
     def_val: XmlSchemaValPtr,
@@ -841,7 +841,7 @@ pub type XmlSchemaAttributeUseProhibPtr = *mut XmlSchemaAttributeUseProhib;
 #[repr(C)]
 pub struct XmlSchemaAttributeUseProhib {
     typ: XmlSchemaTypeType, /* == XML_SCHEMA_EXTRA_ATTR_USE_PROHIB */
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     name: *const XmlChar,
     target_namespace: *const XmlChar,
     is_ref: i32,
@@ -941,7 +941,7 @@ pub struct XmlSchemaQnameRef {
     item_type: XmlSchemaTypeType,
     name: *const XmlChar,
     target_namespace: *const XmlChar,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 }
 
 pub type XmlSchemaParticlePtr = *mut XmlSchemaParticle;
@@ -958,7 +958,7 @@ pub struct XmlSchemaParticle {
     pub(crate) children: XmlSchemaTreeItemPtr,
     pub(crate) min_occurs: i32,
     pub(crate) max_occurs: i32,
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: *mut XmlNode,
 }
 
 pub type XmlSchemaModelGroupPtr = *mut XmlSchemaModelGroup;
@@ -971,7 +971,7 @@ pub struct XmlSchemaModelGroup {
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) next: XmlSchemaTreeItemPtr,     /* not used */
     pub(crate) children: XmlSchemaTreeItemPtr, /* first particle (OR "element decl" OR "wildcard") */
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: *mut XmlNode,
 }
 
 const XML_SCHEMA_MODEL_GROUP_DEF_MARKED: i32 = 1 << 0;
@@ -988,7 +988,7 @@ pub struct XmlSchemaModelGroupDef {
     children: XmlSchemaTreeItemPtr, /* the "model group" */
     name: *const XmlChar,
     target_namespace: *const XmlChar,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     flags: i32,
 }
 
@@ -1013,7 +1013,7 @@ pub struct XmlSchemaIDC {
     typ: XmlSchemaTypeType,
     annot: XmlSchemaAnnotPtr,
     next: XmlSchemaIDCPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     name: *const XmlChar,
     target_namespace: *const XmlChar,
     selector: XmlSchemaIdcselectPtr,
@@ -1047,7 +1047,7 @@ pub type XmlSchemaPSVIIDCNodePtr = *mut XmlSchemaPSVIIDCNode;
 #[doc(alias = "xmlSchemaPSVIIDCNode")]
 #[repr(C)]
 pub struct XmlSchemaPSVIIDCNode {
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     keys: *mut XmlSchemaPSVIIDCKeyPtr,
     node_line: i32,
     node_qname_id: i32,
@@ -1131,7 +1131,7 @@ pub type XmlSchemaNodeInfoPtr = *mut XmlSchemaNodeInfo;
 #[repr(C)]
 pub struct XmlSchemaNodeInfo {
     node_type: i32,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     node_line: i32,
     local_name: *const XmlChar,
     ns_name: *const XmlChar,
@@ -1188,7 +1188,7 @@ pub type XmlSchemaAttrInfoPtr = *mut XmlSchemaAttrInfo;
 #[repr(C)]
 pub struct XmlSchemaAttrInfo {
     node_type: i32,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     node_line: i32,
     local_name: *const XmlChar,
     ns_name: *const XmlChar,
@@ -1229,15 +1229,15 @@ pub struct XmlSchemaValidCtxt {
     err: i32,
     nberrors: i32,
 
-    node: XmlNodePtr,
-    cur: XmlNodePtr,
+    node: *mut XmlNode,
+    cur: *mut XmlNode,
     /* typ: XmlSchemaTypePtr, */
     regexp: XmlRegExecCtxtPtr,
     value: XmlSchemaValPtr,
 
     value_ws: i32,
     options: i32,
-    validation_root: XmlNodePtr,
+    validation_root: *mut XmlNode,
     pctxt: XmlSchemaParserCtxtPtr,
     xsi_assemble: i32,
 
@@ -1309,7 +1309,7 @@ unsafe fn xml_schema_err4_line(
     ctxt: XmlSchemaAbstractCtxtPtr,
     error_level: XmlErrorLevel,
     error: XmlParserErrors,
-    mut node: XmlNodePtr,
+    mut node: *mut XmlNode,
     mut line: i32,
     msg: &str,
     str1: Option<&str>,
@@ -1458,7 +1458,7 @@ unsafe fn xml_schema_err4_line(
 unsafe fn xml_schema_err3(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     msg: &str,
     str1: Option<&str>,
     str2: Option<&str>,
@@ -1774,7 +1774,7 @@ unsafe fn xml_schema_format_item_for_report(
     buf: *mut *mut XmlChar,
     item_des: *const XmlChar,
     item: XmlSchemaBasicItemPtr,
-    item_node: XmlNodePtr,
+    item_node: *mut XmlNode,
 ) -> *mut XmlChar {
     let mut str: *mut XmlChar = null_mut();
     let mut named: i32 = 1;
@@ -2004,7 +2004,7 @@ unsafe fn xml_schema_format_item_for_report(
 unsafe fn xml_schema_format_node_for_error(
     msg: *mut *mut XmlChar,
     actxt: XmlSchemaAbstractCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> *mut XmlChar {
     let mut str: *mut XmlChar = null_mut();
 
@@ -2024,7 +2024,7 @@ unsafe fn xml_schema_format_node_for_error(
     if !node.is_null() {
         // Work on tree nodes.
         if (*node).element_type() == XmlElementType::XmlAttributeNode {
-            let elem: XmlNodePtr = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+            let elem: *mut XmlNode = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
 
             *msg = xml_strdup(c"Element '".as_ptr() as _);
             if !(*elem).ns.is_null() {
@@ -2115,7 +2115,7 @@ unsafe fn xml_schema_format_node_for_error(
 unsafe fn xml_schema_err4(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     msg: &str,
     str1: Option<&str>,
     str2: Option<&str>,
@@ -2142,7 +2142,7 @@ unsafe fn xml_schema_err4(
 pub(crate) unsafe fn xml_schema_custom_err4(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
-    mut node: XmlNodePtr,
+    mut node: *mut XmlNode,
     item: XmlSchemaBasicItemPtr,
     message: &str,
     str1: Option<&str>,
@@ -2178,7 +2178,7 @@ pub(crate) unsafe fn xml_schema_custom_err4(
 pub(crate) unsafe fn xml_schema_custom_err(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     item: XmlSchemaBasicItemPtr,
     message: &str,
     str1: Option<&str>,
@@ -2300,7 +2300,7 @@ unsafe fn xml_schema_normalize_value(typ: XmlSchemaTypePtr, value: *const XmlCha
 /// node need not to reflect the component directly, since there is no
 /// one-to-one relationship between the XML Schema representation and
 /// the component representation.
-unsafe fn xml_schema_get_component_node(item: XmlSchemaBasicItemPtr) -> XmlNodePtr {
+unsafe fn xml_schema_get_component_node(item: XmlSchemaBasicItemPtr) -> *mut XmlNode {
     match (*item).typ {
         XmlSchemaTypeType::XmlSchemaTypeElement => (*(item as XmlSchemaElementPtr)).node,
         XmlSchemaTypeType::XmlSchemaTypeAttribute => (*(item as XmlSchemaAttributePtr)).node,
@@ -2444,7 +2444,7 @@ unsafe fn xml_schema_get_notation(
 unsafe fn xml_schema_validate_notation(
     vctxt: XmlSchemaValidCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
     val_needed: i32,
@@ -2611,7 +2611,7 @@ unsafe fn xml_schema_get_primitive_type(mut typ: XmlSchemaTypePtr) -> XmlSchemaT
 
 unsafe fn xml_schema_eval_error_node_type(
     actxt: XmlSchemaAbstractCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
     if !node.is_null() {
         return (*node).element_type() as i32;
@@ -2629,7 +2629,7 @@ unsafe fn xml_schema_eval_error_node_type(
 unsafe fn xml_schema_err(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     msg: &str,
     str1: Option<&str>,
     str2: Option<&str>,
@@ -2829,7 +2829,7 @@ unsafe fn xml_schema_format_facet_enum_set(
 unsafe fn xml_schema_facet_err(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     value: &str,
     length: u64,
     typ: XmlSchemaTypePtr,
@@ -3114,7 +3114,7 @@ macro_rules! ACTIVATE_PARENT_ELEM {
 #[allow(clippy::too_many_arguments)]
 unsafe fn xml_schema_validate_facets(
     actxt: XmlSchemaAbstractCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     typ: XmlSchemaTypePtr,
     mut val_type: XmlSchemaValType,
     value: *const XmlChar,
@@ -3469,7 +3469,7 @@ unsafe fn xml_schema_is_global_item(item: XmlSchemaTypePtr) -> i32 {
 unsafe fn xml_schema_simple_type_err(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     value: &str,
     typ: XmlSchemaTypePtr,
     display_value: i32,
@@ -3580,7 +3580,7 @@ macro_rules! NORMALIZE {
 #[allow(clippy::too_many_arguments)]
 pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
     actxt: XmlSchemaAbstractCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     typ: XmlSchemaTypePtr,
     mut value: *const XmlChar,
     ret_val: *mut XmlSchemaValPtr,
@@ -4090,7 +4090,7 @@ pub(crate) unsafe fn xml_schema_facet_type_to_string(typ: XmlSchemaTypeType) -> 
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchemaPErrMemory")]
-unsafe fn xml_schema_perr_memory(ctxt: XmlSchemaParserCtxtPtr, extra: &str, node: XmlNodePtr) {
+unsafe fn xml_schema_perr_memory(ctxt: XmlSchemaParserCtxtPtr, extra: &str, node: *mut XmlNode) {
     if !ctxt.is_null() {
         (*ctxt).nberrors += 1;
     }
@@ -4469,7 +4469,7 @@ unsafe fn xml_schema_get_schema_bucket_by_tns(
 unsafe fn xml_schema_custom_warning(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     _typ: XmlSchemaTypePtr,
     message: &str,
     str1: Option<&str>,
@@ -4539,7 +4539,7 @@ unsafe fn xml_schema_get_chameleon_schema_bucket(
 #[doc(alias = "xmlSchemaPErr")]
 unsafe fn xml_schema_perr(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     error: XmlParserErrors,
     msg: &str,
     str1: Option<&str>,
@@ -4612,9 +4612,9 @@ unsafe fn xml_schema_is_blank(mut str: *mut XmlChar, mut len: i32) -> i32 {
 
 /// Removes unwanted nodes in a schemas document tree
 #[doc(alias = "xmlSchemaCleanupDoc")]
-unsafe fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: XmlNodePtr) {
-    let mut delete: XmlNodePtr;
-    let mut cur: XmlNodePtr;
+unsafe fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: *mut XmlNode) {
+    let mut delete: *mut XmlNode;
+    let mut cur: *mut XmlNode;
 
     if ctxt.is_null() || root.is_null() {
         return;
@@ -4829,7 +4829,7 @@ unsafe fn xml_schema_free_qname_ref(item: XmlSchemaQnameRefPtr) {
     xml_free(item as _);
 }
 
-unsafe fn xml_schema_psimple_internal_err(node: XmlNodePtr, msg: &str) {
+unsafe fn xml_schema_psimple_internal_err(node: *mut XmlNode, msg: &str) {
     __xml_simple_error!(
         XmlErrorDomain::XmlFromSchemasp,
         XmlParserErrors::XmlSchemapInternal,
@@ -4953,7 +4953,7 @@ unsafe fn xml_schema_bucket_free(bucket: XmlSchemaBucketPtr) {
 #[doc(alias = "xmlSchemaGetProp")]
 unsafe fn xml_schema_get_prop(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     name: *const c_char,
 ) -> *const XmlChar {
     let Some(val) = (*node).get_no_ns_prop(CStr::from_ptr(name).to_string_lossy().as_ref()) else {
@@ -5135,7 +5135,7 @@ unsafe fn xml_schema_add_schema_doc(
     schema_doc: *mut XmlDoc,
     schema_buffer: *const c_char,
     schema_buffer_len: i32,
-    invoking_node: XmlNodePtr,
+    invoking_node: *mut XmlNode,
     source_target_namespace: *const XmlChar,
     import_namespace: *const XmlChar,
     bucket: *mut XmlSchemaBucketPtr,
@@ -5492,7 +5492,7 @@ unsafe fn xml_schema_add_schema_doc(
                 // Preprocess the document.
                 if !doc.is_null() {
                     located = 1;
-                    let doc_elem: XmlNodePtr = (*doc).get_root_element();
+                    let doc_elem: *mut XmlNode = (*doc).get_root_element();
                     if doc_elem.is_null() {
                         let schema_location =
                             CStr::from_ptr(schema_location as *const i8).to_string_lossy();
@@ -5627,7 +5627,7 @@ unsafe fn xml_schema_clear_schema_defaults(schema: XmlSchemaPtr) {
 ///
 /// Returns the attribute or NULL if not present.
 #[doc(alias = "xmlSchemaGetPropNode")]
-unsafe fn xml_schema_get_prop_node(node: XmlNodePtr, name: *const c_char) -> *mut XmlAttr {
+unsafe fn xml_schema_get_prop_node(node: *mut XmlNode, name: *const c_char) -> *mut XmlAttr {
     let mut prop: *mut XmlAttr;
 
     if node.is_null() || name.is_null() {
@@ -5643,7 +5643,7 @@ unsafe fn xml_schema_get_prop_node(node: XmlNodePtr, name: *const c_char) -> *mu
     null_mut()
 }
 
-unsafe fn xml_schema_get_node_content_no_dict(node: XmlNodePtr) -> Option<String> {
+unsafe fn xml_schema_get_node_content_no_dict(node: *mut XmlNode) -> Option<String> {
     (*node).get_content()
 }
 
@@ -5655,7 +5655,7 @@ unsafe fn xml_schema_get_node_content_no_dict(node: XmlNodePtr) -> Option<String
 #[doc(alias = "xmlSchemaPErrExt")]
 unsafe fn xml_schema_perr_ext(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     error: XmlParserErrors,
     str_data1: Option<&str>,
     str_data2: Option<&str>,
@@ -5706,7 +5706,7 @@ unsafe fn xml_schema_psimple_type_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
     _owner_item: XmlSchemaBasicItemPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     typ: XmlSchemaTypePtr,
     expected: *const c_char,
     value: Option<&str>,
@@ -5820,7 +5820,7 @@ unsafe fn xml_schema_pval_attr_node_id(ctxt: XmlSchemaParserCtxtPtr, attr: *mut 
         return 0;
     }
     let value =
-        xml_schema_get_node_content_no_dict(attr as XmlNodePtr).map(|c| CString::new(c).unwrap());
+        xml_schema_get_node_content_no_dict(attr as *mut XmlNode).map(|c| CString::new(c).unwrap());
     let mut value = value
         .as_ref()
         .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *mut u8));
@@ -5850,7 +5850,7 @@ unsafe fn xml_schema_pval_attr_node_id(ctxt: XmlSchemaParserCtxtPtr, attr: *mut 
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr as XmlNodePtr,
+                        attr as *mut XmlNode,
                         xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasID),
                         null_mut(),
                         None,
@@ -5870,7 +5870,7 @@ unsafe fn xml_schema_pval_attr_node_id(ctxt: XmlSchemaParserCtxtPtr, attr: *mut 
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                 null_mut(),
-                attr as XmlNodePtr,
+                attr as *mut XmlNode,
                 xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasID),
                 null_mut(),
                 None,
@@ -5895,7 +5895,7 @@ unsafe fn xml_schema_pval_attr_node_id(ctxt: XmlSchemaParserCtxtPtr, attr: *mut 
 
 unsafe fn xml_schema_pval_attr_id(
     ctxt: XmlSchemaParserCtxtPtr,
-    owner_elem: XmlNodePtr,
+    owner_elem: *mut XmlNode,
     name: *const XmlChar,
 ) -> i32 {
     let attr: *mut XmlAttr = xml_schema_get_prop_node(owner_elem, name as _);
@@ -5907,7 +5907,7 @@ unsafe fn xml_schema_pval_attr_id(
 
 unsafe fn xml_schema_get_node_content(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> *const XmlChar {
     let val = if node.is_null() {
         "".to_owned()
@@ -5957,7 +5957,7 @@ unsafe fn xml_schema_pval_attr_node_value(
         | Ok(XmlSchemaValType::XmlSchemasAnyURI)
         | Ok(XmlSchemaValType::XmlSchemasToken)
         | Ok(XmlSchemaValType::XmlSchemasLanguage) => {
-            ret = xml_schema_val_predef_type_node(typ, value, null_mut(), attr as XmlNodePtr);
+            ret = xml_schema_val_predef_type_node(typ, value, null_mut(), attr as *mut XmlNode);
         }
         _ => {
             PERROR_INT!(
@@ -5989,7 +5989,7 @@ unsafe fn xml_schema_pval_attr_node_value(
                 pctxt,
                 ret.try_into().unwrap(),
                 owner_item,
-                attr as XmlNodePtr,
+                attr as *mut XmlNode,
                 typ,
                 null_mut(),
                 Some(&value),
@@ -6021,7 +6021,7 @@ unsafe fn xml_schema_pval_attr_node(
         return -1;
     }
 
-    let val: *const XmlChar = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+    let val: *const XmlChar = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
     if !value.is_null() {
         *value = val;
     }
@@ -6169,7 +6169,7 @@ unsafe fn xml_schema_pval_attr_block_final(
 unsafe fn xml_schema_parse_schema_element(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
     let mut attr: *mut XmlAttr;
     let mut val: *const XmlChar;
@@ -6210,7 +6210,7 @@ unsafe fn xml_schema_parse_schema_element(
             }
             attr = xml_schema_get_prop_node(node, c"elementFormDefault".as_ptr() as _);
             if !attr.is_null() {
-                val = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+                val = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
                 res = xml_schema_pval_attr_form_default(
                     val,
                     addr_of_mut!((*schema).flags),
@@ -6223,7 +6223,7 @@ unsafe fn xml_schema_parse_schema_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapElemFormDefaultValue,
                         null_mut(),
-                        attr as XmlNodePtr,
+                        attr as *mut XmlNode,
                         null_mut(),
                         c"(qualified | unqualified)".as_ptr() as _,
                         Some(&val),
@@ -6235,7 +6235,7 @@ unsafe fn xml_schema_parse_schema_element(
             }
             attr = xml_schema_get_prop_node(node, c"attributeFormDefault".as_ptr() as _);
             if !attr.is_null() {
-                val = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+                val = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
                 res = xml_schema_pval_attr_form_default(
                     val,
                     addr_of_mut!((*schema).flags),
@@ -6248,7 +6248,7 @@ unsafe fn xml_schema_parse_schema_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapAttrFormDefaultValue,
                         null_mut(),
-                        attr as XmlNodePtr,
+                        attr as *mut XmlNode,
                         null_mut(),
                         c"(qualified | unqualified)".as_ptr() as _,
                         Some(&val),
@@ -6260,7 +6260,7 @@ unsafe fn xml_schema_parse_schema_element(
             }
             attr = xml_schema_get_prop_node(node, c"finalDefault".as_ptr() as _);
             if !attr.is_null() {
-                val = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+                val = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
                 res = xml_schema_pval_attr_block_final(
                     val,
                     addr_of_mut!((*schema).flags),
@@ -6278,7 +6278,7 @@ unsafe fn xml_schema_parse_schema_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr as XmlNodePtr,
+                        attr as *mut XmlNode,
                         null_mut(),
                         c"(#all | List of (extension | restriction | list | union))".as_ptr() as _,
                         Some(&val),
@@ -6290,7 +6290,7 @@ unsafe fn xml_schema_parse_schema_element(
             }
             attr = xml_schema_get_prop_node(node, c"blockDefault".as_ptr() as _);
             if !attr.is_null() {
-                val = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+                val = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
                 res = xml_schema_pval_attr_block_final(
                     val,
                     addr_of_mut!((*schema).flags),
@@ -6308,7 +6308,7 @@ unsafe fn xml_schema_parse_schema_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr as XmlNodePtr,
+                        attr as *mut XmlNode,
                         null_mut(),
                         c"(#all | List of (extension | restriction | substitution))".as_ptr() as _,
                         Some(&val),
@@ -6336,7 +6336,7 @@ unsafe fn xml_schema_parse_schema_element(
 #[doc(alias = "xmlSchemaNewAnnot")]
 unsafe fn xml_schema_new_annot(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaAnnotPtr {
     let ret: XmlSchemaAnnotPtr = xml_malloc(size_of::<XmlSchemaAnnot>()) as _;
     if ret.is_null() {
@@ -6382,7 +6382,7 @@ unsafe fn xml_schema_pillegal_attr_err(
     xml_schema_err4(
         ctxt as XmlSchemaAbstractCtxtPtr,
         error,
-        attr as XmlNodePtr,
+        attr as *mut XmlNode,
         format!("{str1}The attribute '{str2}' is not allowed.\n").as_str(),
         Some(&str1),
         Some(&str2),
@@ -6403,7 +6403,7 @@ unsafe fn xml_schema_pillegal_attr_err(
 unsafe fn xml_schema_pval_attr(
     ctxt: XmlSchemaParserCtxtPtr,
     owner_item: XmlSchemaBasicItemPtr,
-    owner_elem: XmlNodePtr,
+    owner_elem: *mut XmlNode,
     name: *const c_char,
     typ: XmlSchemaTypePtr,
     value: *mut *const XmlChar,
@@ -6444,7 +6444,7 @@ unsafe fn xml_schema_pval_attr(
 /// Returns the attribute or NULL if not present.
 #[doc(alias = "xmlSchemaGetPropNodeNs")]
 unsafe fn xml_schema_get_prop_node_ns(
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     uri: *const c_char,
     name: *const c_char,
 ) -> *mut XmlAttr {
@@ -6473,8 +6473,8 @@ unsafe fn xml_schema_get_prop_node_ns(
 #[doc(alias = "xmlSchemaPErr2")]
 unsafe fn xml_schema_perr2(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
-    child: XmlNodePtr,
+    node: *mut XmlNode,
+    child: *mut XmlNode,
     error: XmlParserErrors,
     msg: &str,
     str1: Option<&str>,
@@ -6493,8 +6493,8 @@ unsafe fn xml_schema_pcontent_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
     owner_item: XmlSchemaBasicItemPtr,
-    owner_elem: XmlNodePtr,
-    child: XmlNodePtr,
+    owner_elem: *mut XmlNode,
+    child: *mut XmlNode,
     message: *const c_char,
     content: *const c_char,
 ) {
@@ -6547,10 +6547,10 @@ unsafe fn xml_schema_pcontent_err(
 #[doc(alias = "xmlSchemaParseAnnotation")]
 unsafe fn xml_schema_parse_annotation(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     needed: i32,
 ) -> XmlSchemaAnnotPtr {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut barked: i32 = 0;
 
@@ -6691,7 +6691,7 @@ unsafe fn xml_schema_pcustom_err_ext(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
     item: XmlSchemaBasicItemPtr,
-    mut item_elem: XmlNodePtr,
+    mut item_elem: *mut XmlNode,
     message: &str,
     str1: Option<&str>,
     str2: Option<&str>,
@@ -6727,7 +6727,7 @@ unsafe fn xml_schema_pcustom_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
     item: XmlSchemaBasicItemPtr,
-    item_elem: XmlNodePtr,
+    item_elem: *mut XmlNode,
     message: &str,
     str1: Option<&str>,
 ) {
@@ -6737,7 +6737,7 @@ unsafe fn xml_schema_pcustom_err(
 unsafe fn xml_schema_build_absolute_uri(
     dict: XmlDictPtr,
     location: *const XmlChar,
-    ctxt_node: XmlNodePtr,
+    ctxt_node: *mut XmlNode,
 ) -> *const XmlChar {
     // Build an absolute location URI.
     if !location.is_null() {
@@ -6847,7 +6847,7 @@ unsafe fn xml_schema_pmissing_attr_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
     owner_item: XmlSchemaBasicItemPtr,
-    owner_elem: XmlNodePtr,
+    owner_elem: *mut XmlNode,
     name: Option<&str>,
     message: Option<&str>,
 ) {
@@ -6884,7 +6884,7 @@ unsafe fn xml_schema_pmissing_attr_err(
 unsafe fn xml_schema_parse_include_or_redefine_attrs(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     schema_location: *mut *mut XmlChar,
     typ: i32,
 ) -> i32 {
@@ -7053,7 +7053,7 @@ unsafe fn xml_schema_add_type(
     typ: XmlSchemaTypeType,
     name: *const XmlChar,
     ns_name: *const XmlChar,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     top_level: i32,
 ) -> XmlSchemaTypePtr {
     let mut ret: XmlSchemaTypePtr;
@@ -7118,7 +7118,7 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                 owner_item,
-                attr as XmlNodePtr,
+                attr as *mut XmlNode,
                 xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname),
                 null_mut(),
                 Some(&v),
@@ -7162,7 +7162,7 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             owner_item,
-            attr as XmlNodePtr,
+            attr as *mut XmlNode,
             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname),
             null_mut(),
             Some(&value),
@@ -7192,7 +7192,7 @@ unsafe fn xml_schema_pval_attr_node_qname(
     uri: *mut *const XmlChar,
     local: *mut *const XmlChar,
 ) -> i32 {
-    let value: *const XmlChar = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+    let value: *const XmlChar = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
     xml_schema_pval_attr_node_qname_value(ctxt, schema, owner_item, attr, value, uri, local)
 }
 
@@ -7205,7 +7205,7 @@ unsafe fn xml_schema_pval_attr_qname(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     owner_item: XmlSchemaBasicItemPtr,
-    owner_elem: XmlNodePtr,
+    owner_elem: *mut XmlNode,
     name: *const c_char,
     uri: *mut *const XmlChar,
     local: *mut *const XmlChar,
@@ -7325,7 +7325,7 @@ unsafe fn xml_schema_add_model_group(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     typ: XmlSchemaTypeType,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaModelGroupPtr {
     let mut ret: XmlSchemaModelGroupPtr;
 
@@ -7357,7 +7357,7 @@ unsafe fn xml_schema_add_model_group(
 #[doc(alias = "xmlGetMinOccurs")]
 unsafe fn xml_get_min_occurs(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     min: i32,
     max: i32,
     def: i32,
@@ -7370,7 +7370,7 @@ unsafe fn xml_get_min_occurs(
     if attr.is_null() {
         return def;
     }
-    let val: *const XmlChar = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+    let val: *const XmlChar = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
     if val.is_null() {
         return def;
     }
@@ -7385,7 +7385,7 @@ unsafe fn xml_get_min_occurs(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
-            attr as XmlNodePtr,
+            attr as *mut XmlNode,
             null_mut(),
             expected,
             Some(&val),
@@ -7420,7 +7420,7 @@ unsafe fn xml_get_min_occurs(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
-            attr as XmlNodePtr,
+            attr as *mut XmlNode,
             null_mut(),
             expected,
             Some(&val),
@@ -7439,7 +7439,7 @@ unsafe fn xml_get_min_occurs(
 #[doc(alias = "xmlGetMaxOccurs")]
 unsafe fn xml_get_max_occurs(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     min: i32,
     max: i32,
     def: i32,
@@ -7452,7 +7452,7 @@ unsafe fn xml_get_max_occurs(
     if attr.is_null() {
         return def;
     }
-    let val: *const XmlChar = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+    let val: *const XmlChar = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
     if val.is_null() {
         return def;
     }
@@ -7465,7 +7465,7 @@ unsafe fn xml_get_max_occurs(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                 null_mut(),
-                attr as XmlNodePtr,
+                attr as *mut XmlNode,
                 null_mut(),
                 expected,
                 Some(&val),
@@ -7491,7 +7491,7 @@ unsafe fn xml_get_max_occurs(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
-            attr as XmlNodePtr,
+            attr as *mut XmlNode,
             null_mut(),
             expected,
             Some(&val),
@@ -7526,7 +7526,7 @@ unsafe fn xml_get_max_occurs(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
-            attr as XmlNodePtr,
+            attr as *mut XmlNode,
             null_mut(),
             expected,
             Some(&val),
@@ -7592,7 +7592,7 @@ unsafe fn xml_schema_pcustom_attr_err(
         let msg = CStr::from_ptr(msg).to_string_lossy();
         xml_schema_perr_ext(
             ctxt,
-            attr as XmlNodePtr,
+            attr as *mut XmlNode,
             error,
             None,
             None,
@@ -7613,7 +7613,7 @@ unsafe fn xml_schema_pcustom_attr_err(
 unsafe fn xml_schema_pcheck_particle_correct_2(
     ctxt: XmlSchemaParserCtxtPtr,
     _item: XmlSchemaParticlePtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     min_occurs: i32,
     max_occurs: i32,
 ) -> i32 {
@@ -7660,7 +7660,7 @@ unsafe fn xml_schema_pcheck_particle_correct_2(
 #[doc(alias = "xmlSchemaAddParticle")]
 unsafe fn xml_schema_add_particle(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     min: i32,
     max: i32,
 ) -> XmlSchemaParticlePtr {
@@ -7693,7 +7693,7 @@ unsafe fn xml_schema_add_particle(
 unsafe fn xml_schema_check_reference(
     pctxt: XmlSchemaParserCtxtPtr,
     _schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     attr: *mut XmlAttr,
     namespace_name: *const XmlChar,
 ) -> i32 {
@@ -7721,8 +7721,8 @@ unsafe fn xml_schema_check_reference(
     }
     // No matching <import>ed namespace found.
     {
-        let n: XmlNodePtr = if !attr.is_null() {
-            attr as XmlNodePtr
+        let n: *mut XmlNode = if !attr.is_null() {
+            attr as *mut XmlNode
         } else {
             node
         };
@@ -7776,7 +7776,7 @@ unsafe fn xml_schema_pmutual_excl_attr_err(
     let name2 = CStr::from_ptr(name2).to_string_lossy();
     xml_schema_perr_ext(
         ctxt,
-        attr as XmlNodePtr,
+        attr as *mut XmlNode,
         error,
         None,
         None,
@@ -7824,7 +7824,7 @@ unsafe fn xml_schema_add_element(
     ctxt: XmlSchemaParserCtxtPtr,
     name: *const XmlChar,
     ns_name: *const XmlChar,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     top_level: i32,
 ) -> XmlSchemaElementPtr {
     let mut ret: XmlSchemaElementPtr;
@@ -7860,7 +7860,7 @@ unsafe fn xml_schema_add_element(
 unsafe fn xml_schema_pget_bool_node_value(
     ctxt: XmlSchemaParserCtxtPtr,
     owner_item: XmlSchemaBasicItemPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
     let mut res: i32 = 0;
 
@@ -7900,9 +7900,9 @@ unsafe fn xml_schema_pget_bool_node_value(
 unsafe fn xml_schema_parse_model_group_def_ref(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaTreeItemPtr {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut refe: *const XmlChar = null();
     let mut ref_ns: *const XmlChar = null();
@@ -8014,7 +8014,7 @@ unsafe fn xml_schema_parse_model_group_def_ref(
 #[doc(alias = "xmlSchemaAddAttributeUse")]
 unsafe fn xml_schema_add_attribute_use(
     pctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaAttributeUsePtr {
     let mut ret: XmlSchemaAttributeUsePtr;
 
@@ -8045,7 +8045,7 @@ unsafe fn xml_schema_add_attribute(
     schema: XmlSchemaPtr,
     name: *const XmlChar,
     ns_name: *const XmlChar,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     top_level: i32,
 ) -> XmlSchemaAttributePtr {
     let mut ret: XmlSchemaAttributePtr;
@@ -8098,7 +8098,7 @@ unsafe fn xml_schema_add_attribute_use_prohib(
 unsafe fn xml_schema_parse_local_attribute(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     uses: XmlSchemaItemListPtr,
     parent_type: i32,
 ) -> XmlSchemaBasicItemPtr {
@@ -8106,7 +8106,7 @@ unsafe fn xml_schema_parse_local_attribute(
     let mut name: *const XmlChar = null();
     let mut ns: *const XmlChar = null();
     let mut using: XmlSchemaAttributeUsePtr = null_mut();
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut tmp_ns: *const XmlChar = null();
     let mut tmp_name: *const XmlChar = null();
@@ -8174,7 +8174,7 @@ unsafe fn xml_schema_parse_local_attribute(
                 } else if xml_str_equal((*attr).name, c"form".as_ptr() as _) {
                     // Evaluate the target namespace
                     has_form = 1;
-                    attr_value = xml_schema_get_node_content(pctxt, attr as XmlNodePtr);
+                    attr_value = xml_schema_get_node_content(pctxt, attr as *mut XmlNode);
                     if xml_str_equal(attr_value, c"qualified".as_ptr() as _) {
                         ns = (*pctxt).target_namespace;
                     } else if !xml_str_equal(attr_value, c"unqualified".as_ptr() as _) {
@@ -8183,7 +8183,7 @@ unsafe fn xml_schema_parse_local_attribute(
                             pctxt,
                             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                             null_mut(),
-                            attr as XmlNodePtr,
+                            attr as *mut XmlNode,
                             null_mut(),
                             c"(qualified | unqualified)".as_ptr() as _,
                             Some(&attr_value),
@@ -8195,7 +8195,7 @@ unsafe fn xml_schema_parse_local_attribute(
                     break 'attr_next;
                 }
                 if xml_str_equal((*attr).name, c"use".as_ptr() as _) {
-                    attr_value = xml_schema_get_node_content(pctxt, attr as XmlNodePtr);
+                    attr_value = xml_schema_get_node_content(pctxt, attr as *mut XmlNode);
                     // TODO: Maybe we need to normalize the value beforehand.
                     if xml_str_equal(attr_value, c"optional".as_ptr() as _) {
                         occurs = XML_SCHEMAS_ATTR_USE_OPTIONAL;
@@ -8209,7 +8209,7 @@ unsafe fn xml_schema_parse_local_attribute(
                             pctxt,
                             XmlParserErrors::XmlSchemapInvalidAttrUse,
                             null_mut(),
-                            attr as XmlNodePtr,
+                            attr as *mut XmlNode,
                             null_mut(),
                             c"(optional | prohibited | required)".as_ptr() as _,
                             Some(&attr_value),
@@ -8232,7 +8232,7 @@ unsafe fn xml_schema_parse_local_attribute(
                             c"fixed".as_ptr() as _,
                         );
                     } else {
-                        def_value = xml_schema_get_node_content(pctxt, attr as XmlNodePtr);
+                        def_value = xml_schema_get_node_content(pctxt, attr as *mut XmlNode);
                         def_value_type = WXS_ATTR_DEF_VAL_DEFAULT;
                     }
                     break 'attr_next;
@@ -8249,7 +8249,7 @@ unsafe fn xml_schema_parse_local_attribute(
                             c"fixed".as_ptr() as _,
                         );
                     } else {
-                        def_value = xml_schema_get_node_content(pctxt, attr as XmlNodePtr);
+                        def_value = xml_schema_get_node_content(pctxt, attr as *mut XmlNode);
                         def_value_type = WXS_ATTR_DEF_VAL_FIXED;
                     }
                     break 'attr_next;
@@ -8340,7 +8340,7 @@ unsafe fn xml_schema_parse_local_attribute(
                 pctxt,
                 XmlParserErrors::XmlSchemapNoXmlns,
                 null_mut(),
-                attr as XmlNodePtr,
+                attr as *mut XmlNode,
                 xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
                 null_mut(),
                 None,
@@ -8581,10 +8581,10 @@ unsafe fn xml_schema_parse_local_attribute(
 unsafe fn xml_schema_parse_attribute_group_ref(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaQnameRefPtr {
     let ret: XmlSchemaQnameRefPtr;
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut ref_ns: *const XmlChar = null();
     let mut refe: *const XmlChar = null();
@@ -8734,7 +8734,7 @@ unsafe fn xml_schema_parse_attribute_group_ref(
 unsafe fn xml_schema_parse_local_attributes(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    child: *mut XmlNodePtr,
+    child: *mut *mut XmlNode,
     list: *mut XmlSchemaItemListPtr,
     parent_type: i32,
     has_refs: *mut i32,
@@ -8778,7 +8778,7 @@ unsafe fn xml_schema_add_wildcard(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     typ: XmlSchemaTypeType,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaWildcardPtr {
     let mut ret: XmlSchemaWildcardPtr;
 
@@ -8827,7 +8827,7 @@ unsafe fn xml_schema_parse_wildcard_ns(
     ctxt: XmlSchemaParserCtxtPtr,
     _schema: XmlSchemaPtr,
     wildc: XmlSchemaWildcardPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
     let mut dictns_item: *const XmlChar;
     let mut ret: i32 = 0;
@@ -8861,7 +8861,7 @@ unsafe fn xml_schema_parse_wildcard_ns(
     }
     // Build the namespace constraints.
     let attr: *mut XmlAttr = xml_schema_get_prop_node(node, c"namespace".as_ptr() as _);
-    let ns: *const XmlChar = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+    let ns: *const XmlChar = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
     if ns.is_null() {
         return -1;
     }
@@ -8898,7 +8898,7 @@ unsafe fn xml_schema_parse_wildcard_ns(
                     ctxt,
                     XmlParserErrors::XmlSchemapWildcardInvalidNsMember,
                     null_mut(),
-                    attr as XmlNodePtr,
+                    attr as *mut XmlNode,
                     null_mut(),
                     c"((##any | ##other) | List of (xs:anyURI | (##targetNamespace | ##local)))"
                         .as_ptr() as _,
@@ -8967,9 +8967,9 @@ unsafe fn xml_schema_parse_wildcard_ns(
 unsafe fn xml_schema_parse_any_attribute(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaWildcardPtr {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
@@ -9045,10 +9045,10 @@ unsafe fn xml_schema_parse_any_attribute(
 unsafe fn xml_schema_parse_extension(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     parent_type: XmlSchemaTypeType,
 ) -> XmlSchemaTypePtr {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
@@ -9203,10 +9203,10 @@ unsafe fn xml_schema_parse_extension(
 unsafe fn xml_schema_parse_simple_content(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     has_restriction_or_extension: *mut i32,
 ) -> i32 {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
 
     if ctxt.is_null()
@@ -9318,10 +9318,10 @@ unsafe fn xml_schema_parse_simple_content(
 unsafe fn xml_schema_parse_complex_content(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     has_restriction_or_extension: *mut i32,
 ) -> i32 {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
 
     if ctxt.is_null()
@@ -9439,11 +9439,11 @@ unsafe fn xml_schema_parse_complex_content(
 unsafe fn xml_schema_parse_complex_type(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     top_level: i32,
 ) -> XmlSchemaTypePtr {
     let typ: XmlSchemaTypePtr;
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut name: *const XmlChar = null();
     let mut attr: *mut XmlAttr;
     let mut attr_value: *const XmlChar;
@@ -9535,7 +9535,7 @@ unsafe fn xml_schema_parse_complex_type(
                 xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
             } else if xml_str_equal((*attr).name, c"mixed".as_ptr() as _) {
                 // Attribute "mixed".
-                if xml_schema_pget_bool_node_value(ctxt, null_mut(), attr as XmlNodePtr) != 0 {
+                if xml_schema_pget_bool_node_value(ctxt, null_mut(), attr as *mut XmlNode) != 0 {
                     (*typ).flags |= XML_SCHEMAS_TYPE_MIXED;
                 }
             } else if top_level != 0 {
@@ -9544,12 +9544,13 @@ unsafe fn xml_schema_parse_complex_type(
                     // Pass.
                 } else if xml_str_equal((*attr).name, c"abstract".as_ptr() as _) {
                     // Attribute "abstract".
-                    if xml_schema_pget_bool_node_value(ctxt, null_mut(), attr as XmlNodePtr) != 0 {
+                    if xml_schema_pget_bool_node_value(ctxt, null_mut(), attr as *mut XmlNode) != 0
+                    {
                         (*typ).flags |= XML_SCHEMAS_TYPE_ABSTRACT;
                     }
                 } else if xml_str_equal((*attr).name, c"final".as_ptr() as _) {
                     // Attribute "final".
-                    attr_value = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+                    attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
                     if xml_schema_pval_attr_block_final(
                         attr_value,
                         addr_of_mut!((*typ).flags),
@@ -9566,7 +9567,7 @@ unsafe fn xml_schema_parse_complex_type(
                             ctxt,
                             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                             null_mut(),
-                            attr as XmlNodePtr,
+                            attr as *mut XmlNode,
                             null_mut(),
                             c"(#all | List of (extension | restriction))".as_ptr() as _,
                             Some(&attr_value),
@@ -9579,7 +9580,7 @@ unsafe fn xml_schema_parse_complex_type(
                     }
                 } else if xml_str_equal((*attr).name, c"block".as_ptr() as _) {
                     // Attribute "block".
-                    attr_value = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+                    attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
                     if xml_schema_pval_attr_block_final(
                         attr_value,
                         addr_of_mut!((*typ).flags),
@@ -9596,7 +9597,7 @@ unsafe fn xml_schema_parse_complex_type(
                             ctxt,
                             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                             null_mut(),
-                            attr as XmlNodePtr,
+                            attr as *mut XmlNode,
                             null_mut(),
                             c"(#all | List of (extension | restriction)) ".as_ptr() as _,
                             Some(&attr_value),
@@ -9778,7 +9779,7 @@ unsafe fn xml_schema_parse_complex_type(
 #[doc(alias = "xmlGetBooleanProp")]
 unsafe fn xml_get_boolean_prop(
     ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     name: *const c_char,
     mut def: i32,
 ) -> i32 {
@@ -9821,7 +9822,7 @@ unsafe fn xml_schema_add_idc(
     name: *const XmlChar,
     ns_name: *const XmlChar,
     category: XmlSchemaTypeType,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaIDCPtr {
     let mut ret: XmlSchemaIDCPtr;
 
@@ -9879,7 +9880,7 @@ unsafe fn xml_schema_check_cselector_xpath(
     let node = if attr.is_null() {
         (*idc).node
     } else {
-        attr as XmlNodePtr
+        attr as *mut XmlNode
     };
     if (*selector).xpath.is_null() {
         // TODO: Adjust error code.
@@ -9950,10 +9951,10 @@ unsafe fn xml_schema_check_cselector_xpath(
 unsafe fn xml_schema_parse_idcselector_and_field(
     ctxt: XmlSchemaParserCtxtPtr,
     idc: XmlSchemaIDCPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     is_field: i32,
 ) -> XmlSchemaIdcselectPtr {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
 
     // Check for illegal attributes.
@@ -10004,13 +10005,13 @@ unsafe fn xml_schema_parse_idcselector_and_field(
             None,
         );
     } else {
-        (*item).xpath = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+        (*item).xpath = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
         // URGENT TODO: "field"s have an other syntax than "selector"s.
 
         if xml_schema_check_cselector_xpath(ctxt, idc, item, attr, is_field) == -1 {
             xml_schema_perr(
                 ctxt,
-                attr as XmlNodePtr,
+                attr as *mut XmlNode,
                 XmlParserErrors::XmlSchemapInternal,
                 "Internal error: xmlSchemaParseIDCSelectorAndField, validating the XPath expression of a IDC selector.\n",
                 None,
@@ -10051,11 +10052,11 @@ unsafe fn xml_schema_parse_idcselector_and_field(
 unsafe fn xml_schema_parse_idc(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     idc_category: XmlSchemaTypeType,
     target_namespace: *const XmlChar,
 ) -> XmlSchemaIDCPtr {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut name: *const XmlChar = null();
     let mut field: XmlSchemaIdcselectPtr;
@@ -10226,14 +10227,14 @@ unsafe fn xml_schema_parse_idc(
 unsafe fn xml_schema_parse_element(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     is_elem_ref: *mut i32,
     top_level: i32,
 ) -> XmlSchemaBasicItemPtr {
     let mut decl: XmlSchemaElementPtr = null_mut();
     let mut particle: XmlSchemaParticlePtr = null_mut();
     let mut annot: XmlSchemaAnnotPtr = null_mut();
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let min: i32;
     let max: i32;
@@ -10415,7 +10416,7 @@ unsafe fn xml_schema_parse_element(
         } else {
             attr = xml_schema_get_prop_node(node, c"form".as_ptr() as _);
             if !attr.is_null() {
-                attr_value = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+                attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
                 if xml_str_equal(attr_value, c"qualified".as_ptr() as _) {
                     ns = (*ctxt).target_namespace;
                 } else if !xml_str_equal(attr_value, c"unqualified".as_ptr() as _) {
@@ -10424,7 +10425,7 @@ unsafe fn xml_schema_parse_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr as XmlNodePtr,
+                        attr as *mut XmlNode,
                         null_mut(),
                         c"(qualified | unqualified)".as_ptr() as _,
                         Some(&attr_value),
@@ -10515,7 +10516,7 @@ unsafe fn xml_schema_parse_element(
                     (*decl).flags |= XML_SCHEMAS_ELEM_FINAL_RESTRICTION;
                 }
             } else {
-                attr_value = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+                attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
                 if xml_schema_pval_attr_block_final(
                     attr_value,
                     addr_of_mut!((*decl).flags),
@@ -10532,7 +10533,7 @@ unsafe fn xml_schema_parse_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr as XmlNodePtr,
+                        attr as *mut XmlNode,
                         null_mut(),
                         c"(#all | List of (extension | restriction))".as_ptr() as _,
                         Some(&attr_value),
@@ -10557,7 +10558,7 @@ unsafe fn xml_schema_parse_element(
                 (*decl).flags |= XML_SCHEMAS_ELEM_BLOCK_SUBSTITUTION;
             }
         } else {
-            attr_value = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+            attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
             if xml_schema_pval_attr_block_final(
                 attr_value,
                 addr_of_mut!((*decl).flags),
@@ -10574,7 +10575,7 @@ unsafe fn xml_schema_parse_element(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                     null_mut(),
-                    attr as XmlNodePtr,
+                    attr as *mut XmlNode,
                     null_mut(),
                     c"(#all | List of (extension | restriction | substitution))".as_ptr() as _,
                     Some(&attr_value),
@@ -10603,7 +10604,7 @@ unsafe fn xml_schema_parse_element(
         (*decl).value = xml_schema_get_prop(ctxt, node, c"default".as_ptr() as _);
         attr = xml_schema_get_prop_node(node, c"fixed".as_ptr() as _);
         if !attr.is_null() {
-            fixed = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+            fixed = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
             if !(*decl).value.is_null() {
                 // 3.3.3 : 1
                 // default and fixed must not both be present.
@@ -10752,9 +10753,9 @@ unsafe fn xml_schema_get_qname_ref_target_ns(refe: *mut c_void) -> *const XmlCha
 unsafe fn xml_schema_parse_any(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaParticlePtr {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
 
     let mut attr: *mut XmlAttr;
     let mut annot: XmlSchemaAnnotPtr = null_mut();
@@ -10861,12 +10862,12 @@ unsafe fn xml_schema_parse_any(
 unsafe fn xml_schema_parse_model_group(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     typ: XmlSchemaTypeType,
     with_particle: i32,
 ) -> XmlSchemaTreeItemPtr {
     let mut particle: XmlSchemaParticlePtr = null_mut();
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut min: i32 = 1;
     let mut max: i32 = 1;
@@ -11174,9 +11175,9 @@ unsafe fn xml_schema_parse_model_group(
 unsafe fn xml_schema_parse_facet(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaFacetPtr {
-    let mut child: XmlNodePtr = null_mut();
+    let mut child: *mut XmlNode = null_mut();
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
@@ -11280,10 +11281,10 @@ unsafe fn xml_schema_parse_facet(
 unsafe fn xml_schema_parse_restriction(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     parent_type: XmlSchemaTypeType,
 ) -> XmlSchemaTypePtr {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
@@ -11605,9 +11606,9 @@ unsafe fn xml_schema_parse_restriction(
 unsafe fn xml_schema_parse_list(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaTypePtr {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
@@ -11733,9 +11734,9 @@ unsafe fn xml_schema_parse_list(
 unsafe fn xml_schema_parse_union(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut cur: *const XmlChar;
 
@@ -11786,7 +11787,7 @@ unsafe fn xml_schema_parse_union(
         let mut last_link: XmlSchemaTypeLinkPtr = null_mut();
         let mut refe: XmlSchemaQnameRefPtr;
 
-        cur = xml_schema_get_node_content(ctxt, attr as XmlNodePtr);
+        cur = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
         if cur.is_null() {
             return -1;
         }
@@ -11929,11 +11930,11 @@ unsafe fn xml_schema_parse_union(
 unsafe fn xml_schema_parse_simple_type(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     top_level: i32,
 ) -> XmlSchemaTypePtr {
     let typ: XmlSchemaTypePtr;
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr_value: *const XmlChar = null();
     let mut attr: *mut XmlAttr;
     let mut has_restriction: i32 = 0;
@@ -12117,7 +12118,7 @@ unsafe fn xml_schema_parse_simple_type(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                     typ as XmlSchemaBasicItemPtr,
-                    attr as XmlNodePtr,
+                    attr as *mut XmlNode,
                     null_mut(),
                     c"(#all | List of (list | union | restriction)".as_ptr() as _,
                     Some(&attr_value),
@@ -12201,7 +12202,7 @@ unsafe fn xml_schema_add_model_group_definition(
     schema: XmlSchemaPtr,
     name: *const XmlChar,
     ns_name: *const XmlChar,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaModelGroupDefPtr {
     let mut ret: XmlSchemaModelGroupDefPtr;
 
@@ -12246,9 +12247,9 @@ unsafe fn xml_schema_add_model_group_definition(
 unsafe fn xml_schema_parse_model_group_definition(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaModelGroupDefPtr {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut name: *const XmlChar = null();
 
@@ -12365,7 +12366,7 @@ unsafe fn xml_schema_add_attribute_group_definition(
     _schema: XmlSchemaPtr,
     name: *const XmlChar,
     ns_name: *const XmlChar,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaAttributeGroupPtr {
     let mut ret: XmlSchemaAttributeGroupPtr;
 
@@ -12407,11 +12408,11 @@ unsafe fn xml_schema_add_attribute_group_definition(
 unsafe fn xml_schema_parse_attribute_group_definition(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaAttributeGroupPtr {
     let mut name: *const XmlChar = null();
 
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
     let mut has_refs: i32 = 0;
 
@@ -12521,10 +12522,10 @@ unsafe fn xml_schema_parse_attribute_group_definition(
 unsafe fn xml_schema_parse_include_or_redefine(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     typ: i32,
 ) -> i32 {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut schema_location: *const XmlChar = null();
     let mut res: i32; /* hasRedefinitions = 0 */
     let mut is_chameleon: i32 = 0;
@@ -12753,9 +12754,9 @@ unsafe fn xml_schema_parse_include_or_redefine(
 unsafe fn xml_schema_parse_import(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut namespace_name: *const XmlChar = null();
     let mut schema_location: *const XmlChar = null();
     let mut attr: *mut XmlAttr;
@@ -12951,7 +12952,7 @@ unsafe fn xml_schema_parse_import(
 unsafe fn xml_schema_parse_include(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
     let res: i32 =
         xml_schema_parse_include_or_redefine(pctxt, schema, node, XML_SCHEMA_SCHEMA_INCLUDE);
@@ -12964,7 +12965,7 @@ unsafe fn xml_schema_parse_include(
 unsafe fn xml_schema_parse_redefine(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> i32 {
     let res: i32 =
         xml_schema_parse_include_or_redefine(pctxt, schema, node, XML_SCHEMA_SCHEMA_REDEFINE);
@@ -12977,10 +12978,10 @@ unsafe fn xml_schema_parse_redefine(
 unsafe fn xml_schema_parse_global_attribute(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaAttributePtr {
     let mut attr_value: *const XmlChar = null();
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut attr: *mut XmlAttr;
 
     // Note that the w3c spec assumes the schema to be validated with schema
@@ -13021,7 +13022,7 @@ unsafe fn xml_schema_parse_global_attribute(
             pctxt,
             XmlParserErrors::XmlSchemapNoXmlns,
             null_mut(),
-            attr as XmlNodePtr,
+            attr as *mut XmlNode,
             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
             null_mut(),
             None,
@@ -13122,7 +13123,7 @@ unsafe fn xml_schema_parse_global_attribute(
                 c"fixed".as_ptr() as _,
             );
         } else {
-            (*ret).def_value = xml_schema_get_node_content(pctxt, attr as XmlNodePtr);
+            (*ret).def_value = xml_schema_get_node_content(pctxt, attr as *mut XmlNode);
         }
     }
     // And now for the children...
@@ -13175,7 +13176,7 @@ unsafe fn xml_schema_add_notation(
     schema: XmlSchemaPtr,
     name: *const XmlChar,
     ns_name: *const XmlChar,
-    _node: XmlNodePtr,
+    _node: *mut XmlNode,
 ) -> XmlSchemaNotationPtr {
     let mut ret: XmlSchemaNotationPtr;
 
@@ -13205,9 +13206,9 @@ unsafe fn xml_schema_add_notation(
 unsafe fn xml_schema_parse_notation(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlSchemaNotationPtr {
-    let mut child: XmlNodePtr = null_mut();
+    let mut child: *mut XmlNode = null_mut();
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
@@ -13257,9 +13258,9 @@ unsafe fn xml_schema_parse_notation(
 unsafe fn xml_schema_parse_schema_top_level(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    nodes: XmlNodePtr,
+    nodes: *mut XmlNode,
 ) -> i32 {
-    let mut child: XmlNodePtr;
+    let mut child: *mut XmlNode;
     let mut annot: XmlSchemaAnnotPtr;
     let mut res: i32 = 0;
     let mut tmp_old_errs: i32;
@@ -13409,7 +13410,7 @@ unsafe fn xml_schema_parse_new_doc_with_context(
     // Mark it as parsed, even if parsing fails.
     (*bucket).parsed += 1;
     // Compile the schema doc.
-    let node: XmlNodePtr = if (*bucket).doc.is_null() {
+    let node: *mut XmlNode = if (*bucket).doc.is_null() {
         null_mut()
     } else {
         (*(*bucket).doc).get_root_element()
@@ -13912,7 +13913,7 @@ unsafe fn xml_schema_pres_comp_attr_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
     owner_item: XmlSchemaBasicItemPtr,
-    owner_elem: XmlNodePtr,
+    owner_elem: *mut XmlNode,
     name: *const c_char,
     ref_name: *const XmlChar,
     ref_uri: *const XmlChar,
@@ -16546,7 +16547,7 @@ macro_rules! WXS_ACTION_STR {
 unsafe fn xml_schema_pattr_use_err4(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     owner_item: XmlSchemaBasicItemPtr,
     attruse: XmlSchemaAttributeUsePtr,
     message: &str,
@@ -20113,7 +20114,7 @@ unsafe fn xml_schema_check_cos_derived_ok(
 #[doc(alias = "xmlSchemaParseCheckCOSValidDefault")]
 unsafe fn xml_schema_parse_check_cos_valid_default(
     pctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
@@ -20355,7 +20356,7 @@ unsafe fn xml_schema_check_elem_props_correct(
             None
         );
     } else if !(*elem_decl).value.is_null() {
-        let mut node: XmlNodePtr = null_mut();
+        let mut node: *mut XmlNode = null_mut();
 
         // SPEC (2) "If there is a {value constraint}, the canonical lexical
         // representation of its value must be `valid` with respect to the
@@ -20373,9 +20374,9 @@ unsafe fn xml_schema_check_elem_props_correct(
         }
         if !(*elem_decl).node.is_null() {
             if (*elem_decl).flags & XML_SCHEMAS_ELEM_FIXED != 0 {
-                node = (*(*elem_decl).node).has_prop("fixed") as XmlNodePtr;
+                node = (*(*elem_decl).node).has_prop("fixed") as *mut XmlNode;
             } else {
-                node = (*(*elem_decl).node).has_prop("default") as XmlNodePtr;
+                node = (*(*elem_decl).node).has_prop("default") as *mut XmlNode;
             }
         }
         let vcret: i32 = xml_schema_parse_check_cos_valid_default(
@@ -22597,7 +22598,7 @@ pub unsafe fn xml_schema_valid_ctxt_get_options(ctxt: XmlSchemaValidCtxtPtr) -> 
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchemaVTypeErrMemory")]
-unsafe fn xml_schema_verr_memory(ctxt: XmlSchemaValidCtxtPtr, extra: &str, node: XmlNodePtr) {
+unsafe fn xml_schema_verr_memory(ctxt: XmlSchemaValidCtxtPtr, extra: &str, node: *mut XmlNode) {
     if !ctxt.is_null() {
         (*ctxt).nberrors += 1;
         (*ctxt).err = XmlParserErrors::XmlSchemavInternal as i32;
@@ -23172,7 +23173,7 @@ unsafe fn xml_schema_get_fresh_attr_info(vctxt: XmlSchemaValidCtxtPtr) -> XmlSch
 #[allow(clippy::too_many_arguments)]
 unsafe fn xml_schema_validator_push_attribute(
     vctxt: XmlSchemaValidCtxtPtr,
-    attr_node: XmlNodePtr,
+    attr_node: *mut XmlNode,
     node_line: i32,
     local_name: *const XmlChar,
     ns_name: *const XmlChar,
@@ -23257,7 +23258,7 @@ unsafe fn xml_schema_get_meta_attr_info(
 unsafe fn xml_schema_assemble_by_location(
     vctxt: XmlSchemaValidCtxtPtr,
     schema: XmlSchemaPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     ns_name: *const XmlChar,
     mut location: *const XmlChar,
 ) -> i32 {
@@ -23693,7 +23694,7 @@ unsafe fn xml_schema_vcontent_model_callback(
 unsafe fn xml_schema_complex_type_err(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     _typ: XmlSchemaTypePtr,
     message: &str,
     nbval: usize,
@@ -25295,7 +25296,7 @@ unsafe fn xml_schema_xpath_pop(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
 unsafe fn xml_schema_format_error_node_qname(
     str: *mut *mut XmlChar,
     ni: XmlSchemaNodeInfoPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> *const XmlChar {
     if !node.is_null() {
         if !(*node).ns.is_null() {
@@ -25313,7 +25314,7 @@ unsafe fn xml_schema_illegal_attr_err(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
     ni: XmlSchemaAttrInfoPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) {
     let mut msg: *mut XmlChar = null_mut();
     let mut str: *mut XmlChar = null_mut();
@@ -25359,7 +25360,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut res: i32;
     let mut wild_ids = 0;
     let mut fixed: i32;
-    let mut def_attr_owner_elem: XmlNodePtr = null_mut();
+    let mut def_attr_owner_elem: *mut XmlNode = null_mut();
 
     // SPEC (cvc-attribute)
     // (1) "The declaration must not be `absent` (see Missing
@@ -27492,7 +27493,7 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 if (*vctxt).options & XmlSchemaValidOption::XmlSchemaValVcICreate as i32 != 0
                     && !(*inode).node.is_null()
                 {
-                    let text_child: XmlNodePtr;
+                    let text_child: *mut XmlNode;
 
                     // VAL TODO: Normalize the value.
                     let norm_value =
@@ -27728,7 +27729,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut attr: *mut XmlAttr;
     let mut ret: i32 = 0;
     let mut ielem: XmlSchemaNodeInfoPtr = null_mut();
-    let mut node: XmlNodePtr;
+    let mut node: *mut XmlNode;
     let mut ns_name: *const XmlChar;
 
     // DOC VAL TODO: Move this to the start function.
@@ -27802,7 +27803,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         );
                         ret = xml_schema_validator_push_attribute(
                             vctxt,
-                            attr as XmlNodePtr,
+                            attr as *mut XmlNode,
                             (*ielem).node_line,
                             (*attr).name,
                             ns_name,
@@ -28136,7 +28137,7 @@ pub unsafe fn xml_schema_validate_doc(ctxt: XmlSchemaValidCtxtPtr, doc: *mut Xml
         xml_schema_custom_err(
             ctxt as XmlSchemaAbstractCtxtPtr,
             XmlParserErrors::XmlSchemavDocumentElementMissing,
-            doc as XmlNodePtr,
+            doc as *mut XmlNode,
             null_mut(),
             "The document has no document element",
             None,
@@ -28155,7 +28156,7 @@ pub unsafe fn xml_schema_validate_doc(ctxt: XmlSchemaValidCtxtPtr, doc: *mut Xml
 #[doc(alias = "xmlSchemaValidateOneElement")]
 pub unsafe fn xml_schema_validate_one_element(
     ctxt: XmlSchemaValidCtxtPtr,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
 ) -> i32 {
     if ctxt.is_null() || elem.is_null() || (*elem).element_type() != XmlElementType::XmlElementNode
     {

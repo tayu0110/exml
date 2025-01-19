@@ -34,7 +34,7 @@ use crate::{
     encoding::XmlCharEncoding,
     tree::{
         xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop, NodeCommon, XmlAttr,
-        XmlDoc, XmlDocProperties, XmlElementType, XmlNodePtr, __XML_REGISTER_CALLBACKS,
+        XmlDoc, XmlDocProperties, XmlElementType, XmlNode, __XML_REGISTER_CALLBACKS,
     },
 };
 #[cfg(feature = "libxml_output")]
@@ -123,7 +123,7 @@ pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlCh
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     /* && xmlRegisterNodeDefaultValue() */
     {
-        xml_register_node_default_value(cur as XmlNodePtr);
+        xml_register_node_default_value(cur as *mut XmlNode);
     }
     cur
 }
@@ -451,7 +451,7 @@ pub unsafe fn html_doc_dump_memory(cur: *mut XmlDoc, mem: *mut *mut XmlChar, siz
 /// Handle an out of memory condition
 #[doc(alias = "htmlSaveErr")]
 #[cfg(feature = "libxml_output")]
-unsafe fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&str>) {
+unsafe fn html_save_err(code: XmlParserErrors, node: *mut XmlNode, extra: Option<&str>) {
     use std::borrow::Cow;
 
     use crate::error::__xml_simple_error;
@@ -682,7 +682,7 @@ unsafe fn html_save_err_memory(extra: &str) {
 unsafe fn html_buf_node_dump_format<'a>(
     buf: &mut (impl Write + 'a),
     doc: *mut XmlDoc,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
     format: i32,
 ) -> usize {
     use crate::io::XmlOutputBuffer;
@@ -707,7 +707,7 @@ unsafe fn html_buf_node_dump_format<'a>(
 pub unsafe fn html_node_dump<'a>(
     buf: &mut (impl Write + 'a),
     doc: *mut XmlDoc,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
 ) -> i32 {
     use crate::libxml::parser::xml_init_parser;
 
@@ -726,7 +726,7 @@ pub unsafe fn html_node_dump<'a>(
 pub unsafe fn html_node_dump_file<'a>(
     out: &mut (impl Write + 'a),
     doc: *mut XmlDoc,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
 ) {
     html_node_dump_file_format(out, doc, cur, null_mut(), 1);
 }
@@ -741,7 +741,7 @@ pub unsafe fn html_node_dump_file<'a>(
 pub unsafe fn html_node_dump_file_format<'a>(
     out: &mut (impl Write + 'a),
     doc: *mut XmlDoc,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
     encoding: *const c_char,
     format: i32,
 ) -> i32 {
@@ -990,7 +990,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur
 pub unsafe fn html_node_dump_format_output(
     buf: &mut XmlOutputBuffer,
     doc: *mut XmlDoc,
-    mut cur: XmlNodePtr,
+    mut cur: *mut XmlNode,
     _encoding: Option<&str>,
     format: i32,
 ) {
@@ -1007,7 +1007,7 @@ pub unsafe fn html_node_dump_format_output(
         tree::{xml_encode_entities_reentrant, NodePtr},
     };
 
-    let mut parent: XmlNodePtr;
+    let mut parent: *mut XmlNode;
     let mut attr: *mut XmlAttr;
 
     xml_init_parser();
@@ -1016,7 +1016,7 @@ pub unsafe fn html_node_dump_format_output(
         return;
     }
 
-    let root: XmlNodePtr = cur;
+    let root: *mut XmlNode = cur;
     parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
     'main: loop {
         match (*cur).element_type() {
@@ -1306,7 +1306,7 @@ pub unsafe fn html_doc_content_dump_format_output(
 pub unsafe fn html_node_dump_output(
     buf: &mut XmlOutputBuffer,
     doc: *mut XmlDoc,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
     _encoding: *const c_char,
 ) {
     html_node_dump_format_output(buf, doc, cur, None, 1);

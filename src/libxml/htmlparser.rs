@@ -62,7 +62,7 @@ use crate::{
         XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
     },
     tree::{
-        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDoc, XmlDtd, XmlElementType, XmlNodePtr,
+        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDoc, XmlDtd, XmlElementType, XmlNode,
     },
     uri::canonic_path,
 };
@@ -84,7 +84,7 @@ pub type HtmlSAXHandlerPtr = XmlSAXHandlerPtr;
 pub type HtmlParserInput = XmlParserInput;
 pub type HtmlParserInputPtr = XmlParserInputPtr;
 pub type HtmlDocPtr = *mut XmlDoc;
-pub type HtmlNodePtr = XmlNodePtr;
+pub type HtmlNodePtr = *mut XmlNode;
 
 pub type HtmlElemDescPtr = *mut HtmlElemDesc;
 // Internal description of an HTML element, representing HTML 4.01
@@ -8280,7 +8280,7 @@ const ALLOW_PCDATA: &[&str] = &[
 /// Returns 1 if ignorable 0 otherwise.
 #[doc(alias = "areBlanks")]
 unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> i32 {
-    let mut last_child: XmlNodePtr;
+    let mut last_child: *mut XmlNode;
     let dtd: *mut XmlDtd;
 
     for j in 0..len {

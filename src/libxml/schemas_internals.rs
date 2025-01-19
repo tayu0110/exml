@@ -22,7 +22,7 @@
 
 use std::{any::type_name, os::raw::c_void};
 
-use crate::tree::XmlNodePtr;
+use crate::tree::XmlNode;
 
 use super::{
     globals::xml_free,
@@ -260,7 +260,7 @@ pub type XmlSchemaAnnotPtr = *mut XmlSchemaAnnot;
 #[repr(C)]
 pub struct XmlSchemaAnnot {
     pub(crate) next: *mut XmlSchemaAnnot,
-    pub(crate) content: XmlNodePtr, /* the annotation */
+    pub(crate) content: *mut XmlNode, /* the annotation */
 }
 
 /// Skip unknown attribute from validation Obsolete, not used anymore.
@@ -312,7 +312,7 @@ pub struct XmlSchemaAttribute {
     pub(crate) occurs: i32,               /* Deprecated; not used */
     pub(crate) def_value: *const XmlChar, /* The initial value of the value constraint */
     pub(crate) subtypes: XmlSchemaTypePtr, /* the type definition */
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: *mut XmlNode,
     pub(crate) target_namespace: *const XmlChar,
     pub(crate) flags: i32,
     pub(crate) ref_prefix: *const XmlChar, /* Deprecated; not used */
@@ -350,7 +350,7 @@ pub struct XmlSchemaWildcard {
     pub(crate) typ: XmlSchemaTypeType, /* The kind of type */
     pub(crate) id: *const XmlChar,     /* Deprecated; not used */
     pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: *mut XmlNode,
     pub(crate) min_occurs: i32, /* Deprecated; not used */
     pub(crate) max_occurs: i32, /* Deprecated; not used */
     pub(crate) process_contents: i32,
@@ -385,7 +385,7 @@ pub struct XmlSchemaAttributeGroup {
     pub(crate) annot: XmlSchemaAnnotPtr,
 
     pub(crate) attributes: XmlSchemaAttributePtr, /* Deprecated; not used */
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: *mut XmlNode,
     pub(crate) flags: i32,
     pub(crate) attribute_wildcard: XmlSchemaWildcardPtr,
     pub(crate) ref_prefix: *const XmlChar, /* Deprecated; not used */
@@ -496,7 +496,7 @@ pub struct XmlSchemaType {
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) subtypes: XmlSchemaTypePtr,
     pub(crate) attributes: XmlSchemaAttributePtr, /* Deprecated; not used */
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: *mut XmlNode,
     pub(crate) min_occurs: i32, /* Deprecated; not used */
     pub(crate) max_occurs: i32, /* Deprecated; not used */
 
@@ -580,7 +580,7 @@ pub struct XmlSchemaElement {
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) subtypes: XmlSchemaTypePtr, /* the type definition */
     pub(crate) attributes: XmlSchemaAttributePtr,
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: *mut XmlNode,
     pub(crate) min_occurs: i32, /* Deprecated; not used */
     pub(crate) max_occurs: i32, /* Deprecated; not used */
 
@@ -618,7 +618,7 @@ pub struct XmlSchemaFacet {
     pub(crate) value: *const XmlChar,     /* The original value */
     pub(crate) id: *const XmlChar,        /* Obsolete */
     pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: *mut XmlNode,
     pub(crate) fixed: i32, /* XML_SCHEMAS_FACET_PRESERVE, etc. */
     pub(crate) whitespace: i32,
     pub(crate) val: XmlSchemaValPtr, /* The compiled value */

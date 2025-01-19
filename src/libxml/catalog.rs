@@ -71,7 +71,7 @@ use crate::{
     parser::{xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt, XmlParserInputPtr},
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
-        NodeCommon, XmlDoc, XmlNodePtr, XML_XML_NAMESPACE,
+        NodeCommon, XmlDoc, XmlNode, XML_XML_NAMESPACE,
     },
     uri::{build_uri, canonic_path},
     SYSCONFDIR,
@@ -1520,14 +1520,14 @@ impl CatalogEntryListNode {
     #[cfg(feature = "libxml_output")]
     unsafe fn dump_xml_catalog_node(
         entry: &Arc<RwLock<Self>>,
-        catalog: XmlNodePtr,
+        catalog: *mut XmlNode,
         doc: *mut XmlDoc,
         ns: *mut XmlNs,
         cgroup: Option<&Arc<RwLock<Self>>>,
     ) {
         use crate::tree::NodeCommon;
 
-        let mut node: XmlNodePtr;
+        let mut node: *mut XmlNode;
         // add all the catalog entries
         let mut cur = Some(entry.clone());
         while let Some(now) = cur {
@@ -1918,7 +1918,7 @@ impl XmlCatalogEntry {
     #[cfg(feature = "libxml_output")]
     unsafe fn dump_xml_catalog_node(
         &self,
-        catalog: XmlNodePtr,
+        catalog: *mut XmlNode,
         doc: *mut XmlDoc,
         ns: *mut XmlNs,
         cgroup: Option<&Self>,
@@ -1959,7 +1959,7 @@ impl XmlCatalogEntry {
             xml_free_doc(doc);
             return -1;
         }
-        let catalog: XmlNodePtr = xml_new_doc_node(doc, ns, "catalog", null_mut());
+        let catalog: *mut XmlNode = xml_new_doc_node(doc, ns, "catalog", null_mut());
         if catalog.is_null() {
             xml_free_ns(ns);
             xml_free_doc(doc);
@@ -2318,7 +2318,7 @@ pub unsafe fn xml_load_sgml_super_catalog(filename: impl AsRef<Path>) -> Option<
 /// Returns the new Catalog entry node or null_mut() in case of error.
 #[doc(alias = "xmlParseXMLCatalogOneNode")]
 unsafe fn xml_parse_xml_catalog_one_node(
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
     typ: XmlCatalogEntryType,
     name: &str,
     attr_name: Option<&str>,
@@ -2395,7 +2395,7 @@ unsafe fn xml_parse_xml_catalog_one_node(
 /// The examination can be recursive.
 #[doc(alias = "xmlParseXMLCatalogNode")]
 unsafe fn xml_parse_xml_catalog_node(
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
     mut prefer: XmlCatalogPrefer,
     parent: Option<XmlCatalogEntry>,
     cgroup: Option<XmlCatalogEntry>,
@@ -2558,7 +2558,7 @@ unsafe fn xml_parse_xml_catalog_node(
 /// The examination will recurse to examine node subtrees.
 #[doc(alias = "xmlParseXMLCatalogNodeList")]
 unsafe fn xml_parse_xml_catalog_node_list(
-    mut cur: XmlNodePtr,
+    mut cur: *mut XmlNode,
     prefer: XmlCatalogPrefer,
     parent: Option<XmlCatalogEntry>,
     cgroup: Option<XmlCatalogEntry>,
@@ -2584,7 +2584,7 @@ unsafe fn xml_parse_xml_catalog_file(
     mut prefer: XmlCatalogPrefer,
     filename: &str,
 ) -> Option<Arc<RwLock<CatalogEntryListNode>>> {
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
 
     let doc: *mut XmlDoc = xml_parse_catalog_file(filename);
     if doc.is_null() {

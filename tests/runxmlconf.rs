@@ -30,7 +30,7 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_input_from_file, xml_new_parser_ctxt,
         xml_read_file, XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlDocProperties, XmlElementType, XmlNodePtr},
+    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlDocProperties, XmlElementType, XmlNode},
     xpath::{
         xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
     },
@@ -297,7 +297,7 @@ unsafe fn xmlconf_test_not_wf(
 unsafe extern "C" fn xmlconf_test_item(
     logfile: &mut Option<File>,
     doc: *mut XmlDoc,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
 ) -> c_int {
     let mut ret: c_int = -1;
     let mut options: c_int = 0;
@@ -428,7 +428,7 @@ unsafe extern "C" fn xmlconf_test_item(
 unsafe extern "C" fn xmlconf_test_cases(
     logfile: &mut Option<File>,
     doc: *mut XmlDoc,
-    mut cur: XmlNodePtr,
+    mut cur: *mut XmlNode,
     mut level: c_int,
 ) -> c_int {
     let mut ret: c_int = 0;
@@ -471,7 +471,7 @@ unsafe extern "C" fn xmlconf_test_cases(
 unsafe extern "C" fn xmlconf_test_suite(
     logfile: &mut Option<File>,
     doc: *mut XmlDoc,
-    mut cur: XmlNodePtr,
+    mut cur: *mut XmlNode,
 ) -> c_int {
     let mut ret: c_int = 0;
 
@@ -520,7 +520,7 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         return -1;
     }
 
-    let cur: XmlNodePtr = (*doc).get_root_element();
+    let cur: *mut XmlNode = (*doc).get_root_element();
     let ret = if cur.is_null() || !xml_str_equal((*cur).name, c"TESTSUITE".as_ptr() as _) {
         eprintln!("Unexpected format {}", confxml);
         xmlconf_info();

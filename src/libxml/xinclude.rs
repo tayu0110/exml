@@ -56,7 +56,7 @@ use crate::{
         xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
         xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc, XmlDtd,
-        XmlElementType, XmlEntity, XmlEntityType, XmlNodePtr, XML_XML_NAMESPACE,
+        XmlElementType, XmlEntity, XmlEntityType, XmlNode, XML_XML_NAMESPACE,
     },
     uri::{build_uri, escape_url, XmlURI},
     xpath::{
@@ -95,8 +95,8 @@ pub type XmlXincludeRefPtr = *mut XmlXincludeRef;
 pub struct XmlXincludeRef {
     uri: *mut XmlChar,      /* the fully resolved resource URL */
     fragment: *mut XmlChar, /* the fragment in the URI */
-    elem: XmlNodePtr,       /* the xi:include element */
-    inc: XmlNodePtr,        /* the included copy */
+    elem: *mut XmlNode,     /* the xi:include element */
+    inc: *mut XmlNode,      /* the included copy */
     xml: i32,               /* xml or txt */
     fallback: i32,          /* fallback was loaded */
     empty_fb: i32,          /* flag to show fallback empty */
@@ -182,7 +182,7 @@ pub unsafe fn xml_xinclude_process_flags_data(
     if doc.is_null() {
         return -1;
     }
-    let tree: XmlNodePtr = (*doc).get_root_element();
+    let tree: *mut XmlNode = (*doc).get_root_element();
     if tree.is_null() {
         return -1;
     }
@@ -229,7 +229,7 @@ macro_rules! xml_xinclude_err {
 ///
 /// Returns 1 true, 0 otherwise
 #[doc(alias = "xmlXIncludeTestNode")]
-unsafe fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlNodePtr) -> i32 {
+unsafe fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: *mut XmlNode) -> i32 {
     if node.is_null() {
         return 0;
     }
@@ -246,7 +246,7 @@ unsafe fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlNodePtr) -> 
             (*ctxt).legacy = 1;
         }
         if (*node).name().as_deref() == Some(XINCLUDE_NODE) {
-            let mut child: XmlNodePtr = (*node).children().map_or(null_mut(), |c| c.as_ptr());
+            let mut child: *mut XmlNode = (*node).children().map_or(null_mut(), |c| c.as_ptr());
             let mut nb_fallback: i32 = 0;
 
             while !child.is_null() {
@@ -316,7 +316,7 @@ const XINCLUDE_MAX_DEPTH: i32 = 40;
 #[doc(alias = "xmlXIncludeGetProp")]
 unsafe fn xml_xinclude_get_prop(
     ctxt: XmlXincludeCtxtPtr,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
     name: &str,
 ) -> Option<String> {
     if let Some(ret) = (*cur).get_ns_prop(XINCLUDE_NS.to_string_lossy().as_ref(), Some(name)) {
@@ -334,7 +334,11 @@ unsafe fn xml_xinclude_get_prop(
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlXIncludeErrMemory")]
-unsafe fn xml_xinclude_err_memory(ctxt: XmlXincludeCtxtPtr, node: XmlNodePtr, extra: Option<&str>) {
+unsafe fn xml_xinclude_err_memory(
+    ctxt: XmlXincludeCtxtPtr,
+    node: *mut XmlNode,
+    extra: Option<&str>,
+) {
     if !ctxt.is_null() {
         (*ctxt).nb_errors += 1;
     }
@@ -402,7 +406,7 @@ unsafe fn xml_xinclude_free_ref(refe: XmlXincludeRefPtr) {
 unsafe fn xml_xinclude_new_ref(
     ctxt: XmlXincludeCtxtPtr,
     uri: *const XmlChar,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
 ) -> XmlXincludeRefPtr {
     let ret: XmlXincludeRefPtr = xml_malloc(size_of::<XmlXincludeRef>()) as XmlXincludeRefPtr;
     if ret.is_null() {
@@ -452,7 +456,7 @@ unsafe fn xml_xinclude_new_ref(
 
 /// Add a new node to process to an XInclude context
 #[doc(alias = "xmlXIncludeAddNode")]
-unsafe fn xml_xinclude_add_node(ctxt: XmlXincludeCtxtPtr, cur: XmlNodePtr) -> XmlXincludeRefPtr {
+unsafe fn xml_xinclude_add_node(ctxt: XmlXincludeCtxtPtr, cur: *mut XmlNode) -> XmlXincludeRefPtr {
     let mut xml: i32 = 1;
     let mut local: i32 = 0;
 
@@ -714,7 +718,7 @@ extern "C" fn xml_xinclude_merge_entity(ent: *mut XmlEntity, vdata: *mut c_void)
                     }
                     xml_xinclude_err!(
                         ctxt,
-                        ent as XmlNodePtr,
+                        ent as *mut XmlNode,
                         XmlParserErrors::XmlXIncludeEntityDefMismatch,
                         "mismatch in redefinition of entity {}\n",
                         (*ent).name().unwrap()
@@ -785,7 +789,7 @@ unsafe fn xml_xinclude_merge_entities(
     doc: *mut XmlDoc,
     from: *mut XmlDoc,
 ) -> i32 {
-    let cur: XmlNodePtr;
+    let cur: *mut XmlNode;
     let mut target: *mut XmlDtd;
     let mut source: *mut XmlDtd;
 
@@ -888,13 +892,13 @@ unsafe fn xml_xinclude_recurse_doc(ctxt: XmlXincludeCtxtPtr, doc: *mut XmlDoc, _
 #[doc(alias = "xmlXIncludeCopyNode")]
 unsafe fn xml_xinclude_copy_node(
     ctxt: XmlXincludeCtxtPtr,
-    elem: XmlNodePtr,
+    elem: *mut XmlNode,
     copy_children: i32,
-) -> XmlNodePtr {
-    let mut result: XmlNodePtr = null_mut();
-    let mut insert_parent: XmlNodePtr = null_mut();
-    let mut insert_last: XmlNodePtr = null_mut();
-    let mut cur: XmlNodePtr;
+) -> *mut XmlNode {
+    let mut result: *mut XmlNode = null_mut();
+    let mut insert_parent: *mut XmlNode = null_mut();
+    let mut insert_last: *mut XmlNode = null_mut();
+    let mut cur: *mut XmlNode;
 
     if copy_children != 0 {
         cur = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
@@ -906,7 +910,7 @@ unsafe fn xml_xinclude_copy_node(
     }
 
     loop {
-        let mut copy: XmlNodePtr = null_mut();
+        let mut copy: *mut XmlNode = null_mut();
         let mut recurse: i32 = 0;
 
         if matches!(
@@ -999,7 +1003,7 @@ unsafe fn xml_xinclude_copy_node(
 /// Returns the @n'th element child of @cur or NULL
 #[doc(alias = "xmlXIncludeGetNthChild")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xinclude_get_nth_child(cur: XmlNodePtr, no: i32) -> XmlNodePtr {
+unsafe fn xml_xinclude_get_nth_child(cur: *mut XmlNode, no: i32) -> *mut XmlNode {
     let mut i: i32;
     if cur.is_null() || (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
         return null_mut();
@@ -1036,21 +1040,21 @@ unsafe fn xml_xinclude_get_nth_child(cur: XmlNodePtr, no: i32) -> XmlNodePtr {
 unsafe fn xml_xinclude_copy_range(
     ctxt: XmlXincludeCtxtPtr,
     range: XmlXPathObjectPtr,
-) -> XmlNodePtr {
+) -> *mut XmlNode {
     use crate::{
         libxml::xpointer::xml_xptr_advance_node,
         tree::{xml_new_doc_text, xml_new_doc_text_len},
     };
 
     /* pointers to generated nodes */
-    let mut list: XmlNodePtr = null_mut();
-    let mut last: XmlNodePtr = null_mut();
-    let mut list_parent: XmlNodePtr = null_mut();
-    let mut tmp: XmlNodePtr;
-    let mut tmp2: XmlNodePtr;
+    let mut list: *mut XmlNode = null_mut();
+    let mut last: *mut XmlNode = null_mut();
+    let mut list_parent: *mut XmlNode = null_mut();
+    let mut tmp: *mut XmlNode;
+    let mut tmp2: *mut XmlNode;
     /* pointers to traversal nodes */
-    let mut cur: XmlNodePtr;
-    let mut end: XmlNodePtr;
+    let mut cur: *mut XmlNode;
+    let mut end: *mut XmlNode;
     let mut index1: i32;
     let mut index2: i32;
     let mut level: i32 = 0;
@@ -1064,7 +1068,7 @@ unsafe fn xml_xinclude_copy_range(
     if (*range).typ != XmlXPathObjectType::XPathRange {
         return null_mut();
     }
-    let start: XmlNodePtr = (*range).user as XmlNodePtr;
+    let start: *mut XmlNode = (*range).user as *mut XmlNode;
 
     if start.is_null() || (*start).typ == XmlElementType::XmlNamespaceDecl {
         return null_mut();
@@ -1250,10 +1254,10 @@ unsafe fn xml_xinclude_copy_range(
 unsafe fn xml_xinclude_copy_xpointer(
     ctxt: XmlXincludeCtxtPtr,
     obj: XmlXPathObjectPtr,
-) -> XmlNodePtr {
-    let mut list: XmlNodePtr = null_mut();
-    let mut last: XmlNodePtr = null_mut();
-    let mut copy: XmlNodePtr;
+) -> *mut XmlNode {
+    let mut list: *mut XmlNode = null_mut();
+    let mut last: *mut XmlNode = null_mut();
+    let mut copy: *mut XmlNode;
 
     if ctxt.is_null() || obj.is_null() {
         return null_mut();
@@ -1695,7 +1699,7 @@ unsafe fn xml_xinclude_load_doc(
             && (*ctxt).parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
             && (*doc).parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
         {
-            let mut node: XmlNodePtr;
+            let mut node: *mut XmlNode;
 
             // The base is only adjusted if "necessary", i.e. if the xinclude node
             // has a base specified, or the URL is relative
@@ -1795,7 +1799,7 @@ unsafe fn xml_xinclude_load_txt(
     mut url: *const XmlChar,
     refe: XmlXincludeRefPtr,
 ) -> i32 {
-    let mut node: XmlNodePtr = null_mut();
+    let mut node: *mut XmlNode = null_mut();
     let mut i: i32;
     let mut ret: i32 = -1;
     let mut enc = XmlCharEncoding::None;
@@ -2051,7 +2055,7 @@ unsafe fn xml_xinclude_load_txt(
 #[doc(alias = "xmlXIncludeLoadFallback")]
 unsafe fn xml_xinclude_load_fallback(
     ctxt: XmlXincludeCtxtPtr,
-    fallback: XmlNodePtr,
+    fallback: *mut XmlNode,
     refe: XmlXincludeRefPtr,
 ) -> i32 {
     let mut ret: i32 = 0;
@@ -2094,7 +2098,7 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeRefP
     if ctxt.is_null() || refe.is_null() {
         return -1;
     }
-    let cur: XmlNodePtr = (*refe).elem;
+    let cur: *mut XmlNode = (*refe).elem;
     if cur.is_null() {
         return -1;
     }
@@ -2200,7 +2204,7 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeRefP
 #[doc(alias = "xmlXIncludeExpandNode")]
 unsafe fn xml_xinclude_expand_node(
     ctxt: XmlXincludeCtxtPtr,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
 ) -> XmlXincludeRefPtr {
     if (*ctxt).fatal_err != 0 {
         return null_mut();
@@ -2249,10 +2253,10 @@ unsafe fn xml_xinclude_expand_node(
 /// Returns 0 if substitution succeeded, -1 if some processing failed
 #[doc(alias = "xmlXIncludeIncludeNode")]
 unsafe fn xml_xinclude_include_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeRefPtr) -> i32 {
-    let mut cur: XmlNodePtr;
-    let mut end: XmlNodePtr;
-    let mut list: XmlNodePtr;
-    let mut tmp: XmlNodePtr;
+    let mut cur: *mut XmlNode;
+    let mut end: *mut XmlNode;
+    let mut list: *mut XmlNode;
+    let mut tmp: *mut XmlNode;
 
     if ctxt.is_null() || refe.is_null() {
         return -1;
@@ -2349,9 +2353,9 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeR
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeDoProcess")]
-unsafe fn xml_xinclude_do_process(ctxt: XmlXincludeCtxtPtr, tree: XmlNodePtr) -> i32 {
+unsafe fn xml_xinclude_do_process(ctxt: XmlXincludeCtxtPtr, tree: *mut XmlNode) -> i32 {
     let mut refe: XmlXincludeRefPtr;
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
     let mut ret: i32 = 0;
 
     if tree.is_null() || (*tree).element_type() == XmlElementType::XmlNamespaceDecl {
@@ -2449,7 +2453,7 @@ unsafe fn xml_xinclude_do_process(ctxt: XmlXincludeCtxtPtr, tree: XmlNodePtr) ->
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessTreeFlagsData")]
 pub unsafe fn xml_xinclude_process_tree_flags_data(
-    tree: XmlNodePtr,
+    tree: *mut XmlNode,
     flags: i32,
     data: *mut c_void,
 ) -> i32 {
@@ -2487,7 +2491,7 @@ pub unsafe fn xml_xinclude_process_tree_flags_data(
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessTree")]
-pub unsafe fn xml_xinclude_process_tree(tree: XmlNodePtr) -> i32 {
+pub unsafe fn xml_xinclude_process_tree(tree: *mut XmlNode) -> i32 {
     xml_xinclude_process_tree_flags(tree, 0)
 }
 
@@ -2496,7 +2500,7 @@ pub unsafe fn xml_xinclude_process_tree(tree: XmlNodePtr) -> i32 {
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessTreeFlags")]
-pub unsafe fn xml_xinclude_process_tree_flags(tree: XmlNodePtr, flags: i32) -> i32 {
+pub unsafe fn xml_xinclude_process_tree_flags(tree: *mut XmlNode, flags: i32) -> i32 {
     let mut ret: i32;
 
     if tree.is_null()
@@ -2537,7 +2541,7 @@ pub unsafe fn xml_xinclude_new_context(doc: *mut XmlDoc) -> XmlXincludeCtxtPtr {
     if ret.is_null() {
         xml_xinclude_err_memory(
             null_mut(),
-            doc as XmlNodePtr,
+            doc as *mut XmlNode,
             Some("creating XInclude context"),
         );
         return null_mut();
@@ -2603,7 +2607,7 @@ pub unsafe fn xml_xinclude_free_context(ctxt: XmlXincludeCtxtPtr) {
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessNode")]
-pub unsafe fn xml_xinclude_process_node(ctxt: XmlXincludeCtxtPtr, node: XmlNodePtr) -> i32 {
+pub unsafe fn xml_xinclude_process_node(ctxt: XmlXincludeCtxtPtr, node: *mut XmlNode) -> i32 {
     let mut ret: i32;
 
     if node.is_null()

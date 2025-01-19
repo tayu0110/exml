@@ -97,8 +97,7 @@ use exml::{
     tree::{
         xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc,
         xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd,
-        XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration,
-        XmlNodePtr,
+        XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
 };
@@ -2275,15 +2274,11 @@ unsafe fn stream_file(filename: *mut c_char) {
 unsafe fn walk_doc(doc: *mut XmlDoc) {
     use std::{ptr::null, sync::atomic::Ordering};
 
-    use exml::{
-        libxml::{
-            pattern::{
-                xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile,
-                xml_stream_push,
-            },
-            xmlreader::{xml_free_text_reader, xml_reader_walker},
+    use exml::libxml::{
+        pattern::{
+            xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile, xml_stream_push,
         },
-        tree::XmlNodePtr,
+        xmlreader::{xml_free_text_reader, xml_reader_walker},
     };
 
     let mut ret: i32;
@@ -2292,7 +2287,7 @@ unsafe fn walk_doc(doc: *mut XmlDoc) {
     {
         let mut namespaces: [(*const u8, *const u8); 22] = [(null(), null()); 22];
 
-        let root: XmlNodePtr = if doc.is_null() {
+        let root: *mut XmlNode = if doc.is_null() {
             null_mut()
         } else {
             (*doc).get_root_element()
@@ -2452,12 +2447,9 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
 
 #[cfg(feature = "xpath")]
 unsafe fn do_xpath_query(doc: *mut XmlDoc, query: *const c_char) {
-    use exml::{
-        tree::XmlNodePtr,
-        xpath::{
-            xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object, xml_xpath_new_context,
-            XmlXPathContextPtr,
-        },
+    use exml::xpath::{
+        xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object, xml_xpath_new_context,
+        XmlXPathContextPtr,
     };
 
     let ctxt: XmlXPathContextPtr = xml_xpath_new_context(doc);
@@ -2466,7 +2458,7 @@ unsafe fn do_xpath_query(doc: *mut XmlDoc, query: *const c_char) {
         PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
         return;
     }
-    (*ctxt).node = doc as XmlNodePtr;
+    (*ctxt).node = doc as *mut XmlNode;
     let res: XmlXPathObjectPtr = xml_xpath_eval(query as _, ctxt);
     xml_xpath_free_context(ctxt);
 
@@ -3304,7 +3296,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
 // Usage and Main
 
-unsafe extern "C" fn register_node(node: XmlNodePtr) {
+unsafe extern "C" fn register_node(node: *mut XmlNode) {
     (*node)._private = malloc(size_of::<c_long>());
     if (*node)._private.is_null() {
         eprintln!("Out of memory in xmllint:registerNode()");
@@ -3314,7 +3306,7 @@ unsafe extern "C" fn register_node(node: XmlNodePtr) {
     NBREGISTER.fetch_add(1, Ordering::Relaxed);
 }
 
-unsafe extern "C" fn deregister_node(node: XmlNodePtr) {
+unsafe extern "C" fn deregister_node(node: *mut XmlNode) {
     assert!(!(*node)._private.is_null());
     assert!(*((*node)._private as *mut c_long) == 0x81726354);
     free((*node)._private);

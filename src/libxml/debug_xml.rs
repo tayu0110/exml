@@ -38,7 +38,7 @@ use crate::{
     tree::{
         xml_free_node_list, xml_get_doc_entity, xml_validate_name, NodeCommon, NodePtr, XmlAttr,
         XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElement,
-        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlNode, XmlNodePtr, XmlNs,
+        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlNode, XmlNs,
     },
 };
 
@@ -84,7 +84,7 @@ pub struct XmlDebugCtxt<'a> {
     shift: String,               /* used for indenting */
     depth: i32,                  /* current depth */
     doc: *mut XmlDoc,            /* current document */
-    node: XmlNodePtr,            /* current node */
+    node: *mut XmlNode,          /* current node */
     dict: XmlDictPtr,            /* the doc dictionary */
     check: i32,                  /* do just checkings */
     errors: i32,                 /* number of errors found */
@@ -1142,7 +1142,7 @@ impl XmlDebugCtxt<'_> {
 
     #[doc(alias = "xmlCtxtDumpDocHead")]
     unsafe fn dump_doc_head(&mut self, doc: &XmlDoc) {
-        self.node = doc as *const XmlDoc as XmlNodePtr;
+        self.node = doc as *const XmlDoc as *mut XmlNode;
 
         match doc.typ {
             XmlElementType::XmlElementNode => {
@@ -1647,7 +1647,7 @@ pub unsafe fn xml_debug_check_document<'a>(
 
 /// Dump to `output` the type and name of @node.
 #[doc(alias = "xmlLsOneNode")]
-pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: XmlNodePtr) {
+pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: *mut XmlNode) {
     if node.is_null() {
         writeln!(output, "NULL");
         return;
@@ -1863,7 +1863,7 @@ pub type XmlShellCtxtPtr<'a> = *mut XmlShellCtxt<'a>;
 pub struct XmlShellCtxt<'a> {
     filename: *mut c_char,
     doc: *mut XmlDoc,
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     pctxt: XmlXPathContextPtr,
     loaded: i32,
     output: Box<dyn Write + 'a>,
@@ -1875,8 +1875,12 @@ pub struct XmlShellCtxt<'a> {
 /// Returns an int, negative returns indicating errors.
 #[doc(alias = "xmlShellCmd")]
 #[cfg(feature = "xpath")]
-pub type XmlShellCmd =
-    unsafe fn(ctxt: XmlShellCtxtPtr, arg: *mut c_char, node: XmlNodePtr, node2: XmlNodePtr) -> i32;
+pub type XmlShellCmd = unsafe fn(
+    ctxt: XmlShellCtxtPtr,
+    arg: *mut c_char,
+    node: *mut XmlNode,
+    node2: *mut XmlNode,
+) -> i32;
 
 /// Print the xpath error to libxml default error channel
 #[doc(alias = "xmlShellPrintXPathError")]
@@ -1924,7 +1928,7 @@ pub fn xml_shell_print_xpath_error(error_type: XmlXPathObjectType, arg: Option<&
 /// Print node to the output FILE
 #[doc(alias = "xmlShellPrintNodeCtxt")]
 #[cfg(feature = "libxml_output")]
-unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlNodePtr) {
+unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: *mut XmlNode) {
     if node.is_null() {
         return;
     }
@@ -2010,10 +2014,10 @@ pub unsafe fn xml_shell_print_xpath_result(list: XmlXPathObjectPtr) {
 pub unsafe fn xml_shell_list(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
-    node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
-    let mut cur: XmlNodePtr;
+    let mut cur: *mut XmlNode;
     if ctxt.is_null() {
         return 0;
     }
@@ -2055,8 +2059,8 @@ pub unsafe fn xml_shell_list(
 pub unsafe fn xml_shell_base(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
-    node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     use crate::tree::NodeCommon;
 
@@ -2085,8 +2089,8 @@ pub unsafe fn xml_shell_base(
 pub unsafe fn xml_shell_dir(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
-    node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     if ctxt.is_null() {
         return 0;
@@ -2123,8 +2127,8 @@ pub unsafe fn xml_shell_dir(
 pub unsafe fn xml_shell_load(
     ctxt: XmlShellCtxtPtr,
     filename: &str,
-    _node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    _node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     use crate::{
         libxml::{globals::xml_free, htmlparser::html_parse_file, xmlstring::xml_strdup},
@@ -2169,7 +2173,7 @@ pub unsafe fn xml_shell_load(
         }
         xml_free((*ctxt).filename as _);
         (*ctxt).doc = doc;
-        (*ctxt).node = doc as XmlNodePtr;
+        (*ctxt).node = doc as *mut XmlNode;
         #[cfg(feature = "xpath")]
         {
             (*ctxt).pctxt = xml_xpath_new_context(doc);
@@ -2186,7 +2190,7 @@ pub unsafe fn xml_shell_load(
 /// Print node to the output FILE
 #[doc(alias = "xmlShellPrintNode")]
 #[cfg(all(feature = "xpath", feature = "libxml_output"))]
-pub unsafe fn xml_shell_print_node(node: XmlNodePtr) {
+pub unsafe fn xml_shell_print_node(node: *mut XmlNode) {
     xml_shell_print_node_ctxt(null_mut(), node);
 }
 
@@ -2199,8 +2203,8 @@ pub unsafe fn xml_shell_print_node(node: XmlNodePtr) {
 pub unsafe fn xml_shell_cat(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
-    node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     use crate::libxml::htmltree::{html_doc_dump, html_node_dump_file};
 
@@ -2253,8 +2257,8 @@ pub unsafe fn xml_shell_cat(
 pub unsafe fn xml_shell_write(
     ctxt: XmlShellCtxtPtr,
     filename: &str,
-    node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     use std::fs::File;
 
@@ -2318,8 +2322,8 @@ pub unsafe fn xml_shell_write(
 pub unsafe fn xml_shell_save(
     ctxt: XmlShellCtxtPtr,
     mut filename: *mut c_char,
-    _node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    _node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     use crate::libxml::htmltree::html_save_file;
 
@@ -2377,8 +2381,8 @@ pub unsafe fn xml_shell_save(
 pub unsafe fn xml_shell_validate(
     ctxt: XmlShellCtxtPtr,
     dtd: *mut c_char,
-    _node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    _node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     use std::mem::size_of_val;
 
@@ -2433,10 +2437,10 @@ pub unsafe fn xml_shell_validate(
 pub unsafe fn xml_shell_du(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
-    tree: XmlNodePtr,
-    _node2: XmlNodePtr,
+    tree: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
-    let mut node: XmlNodePtr;
+    let mut node: *mut XmlNode;
     let mut indent: i32 = 0;
 
     if ctxt.is_null() {
@@ -2527,8 +2531,8 @@ pub unsafe fn xml_shell_du(
 pub unsafe fn xml_shell_pwd(
     _ctxt: XmlShellCtxtPtr,
     buffer: *mut c_char,
-    node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     use libc::snprintf;
 
@@ -2561,8 +2565,8 @@ pub unsafe fn xml_shell_pwd(
 unsafe fn xml_shell_rng_validate(
     sctxt: XmlShellCtxtPtr,
     schemas: &str,
-    _node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    _node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     use crate::{
         globals::GLOBAL_STATE,
@@ -2620,8 +2624,8 @@ unsafe fn xml_shell_rng_validate(
 unsafe fn xml_shell_grep(
     ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
-    mut node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    mut node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     if ctxt.is_null() {
         return 0;
@@ -2706,10 +2710,10 @@ unsafe fn xml_shell_grep(
 unsafe fn xml_shell_set_content(
     ctxt: XmlShellCtxtPtr,
     value: *mut c_char,
-    node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
-    let mut results: XmlNodePtr = null_mut();
+    let mut results: *mut XmlNode = null_mut();
 
     if ctxt.is_null() {
         return 0;
@@ -2751,8 +2755,8 @@ unsafe fn xml_shell_set_content(
 unsafe fn xml_shell_register_namespace(
     ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
-    _node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    _node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     use crate::{libxml::xmlstring::xml_strdup, xpath::internals::xml_xpath_register_ns};
 
@@ -2816,8 +2820,8 @@ unsafe fn xml_shell_register_namespace(
 unsafe fn xml_shell_register_root_namespaces(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
-    root: XmlNodePtr,
-    _node2: XmlNodePtr,
+    root: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     use crate::xpath::internals::xml_xpath_register_ns;
 
@@ -2853,8 +2857,8 @@ unsafe fn xml_shell_register_root_namespaces(
 unsafe fn xml_shell_set_base(
     _ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
-    node: XmlNodePtr,
-    _node2: XmlNodePtr,
+    node: *mut XmlNode,
+    _node2: *mut XmlNode,
 ) -> i32 {
     if node.is_null() {
         return 0;
@@ -2925,7 +2929,7 @@ pub unsafe fn xml_shell<'a>(
     (*ctxt).input = input.unwrap();
     (*ctxt).output = output.map_or(Box::new(stdout()) as Box<dyn Write + 'a>, |o| Box::new(o));
     (*ctxt).filename = xml_strdup(filename as *mut XmlChar) as *mut c_char;
-    (*ctxt).node = (*ctxt).doc as XmlNodePtr;
+    (*ctxt).node = (*ctxt).doc as *mut XmlNode;
 
     #[cfg(feature = "xpath")]
     {
@@ -2936,7 +2940,7 @@ pub unsafe fn xml_shell<'a>(
         }
     }
     loop {
-        if (*ctxt).node == (*ctxt).doc as XmlNodePtr {
+        if (*ctxt).node == (*ctxt).doc as *mut XmlNode {
             snprintf(
                 prompt.as_mut_ptr() as _,
                 prompt.len(),
@@ -3329,7 +3333,7 @@ pub unsafe fn xml_shell<'a>(
         } {
             #[cfg(feature = "xpath")]
             {
-                let root: XmlNodePtr = (*(*ctxt).doc).get_root_element();
+                let root: *mut XmlNode = (*(*ctxt).doc).get_root_element();
                 xml_shell_register_root_namespaces(ctxt, null_mut(), root, null_mut());
             }
         } else if {
@@ -3575,7 +3579,7 @@ pub unsafe fn xml_shell<'a>(
             }
         } else if strcmp(command.as_ptr(), c"cd".as_ptr()) == 0 {
             if arg[0] == 0 {
-                (*ctxt).node = (*ctxt).doc as XmlNodePtr;
+                (*ctxt).node = (*ctxt).doc as *mut XmlNode;
             } else {
                 #[cfg(feature = "xpath")]
                 {

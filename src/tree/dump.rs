@@ -41,7 +41,7 @@ use crate::{
     tree::is_xhtml,
 };
 
-use super::{XmlDoc, XmlElementType, XmlNode, XmlNodePtr};
+use super::{XmlDoc, XmlElementType, XmlNode};
 
 impl XmlDoc {
     /// Dump the current DOM tree into memory using the character encoding specified by the caller.  
@@ -83,7 +83,7 @@ impl XmlDoc {
             let Some(handler) = find_encoding_handler(encoding) else {
                 xml_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding,
-                    self as *mut XmlDoc as XmlNodePtr,
+                    self as *mut XmlDoc as *mut XmlNode,
                     Some(encoding),
                 );
                 return;

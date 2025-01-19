@@ -54,7 +54,7 @@ use crate::{
     list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
     save::attr_serialize_text_content,
-    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDoc, XmlNodePtr},
+    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDoc, XmlNode},
     uri::canonic_path,
 };
 
@@ -273,7 +273,11 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterTree")]
-    pub unsafe fn with_tree(doc: *mut XmlDoc, node: XmlNodePtr, compression: i32) -> Option<Self> {
+    pub unsafe fn with_tree(
+        doc: *mut XmlDoc,
+        node: *mut XmlNode,
+        compression: i32,
+    ) -> Option<Self> {
         if doc.is_null() {
             xml_writer_err_msg(
                 None,

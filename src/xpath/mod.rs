@@ -63,7 +63,7 @@ use crate::{
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, XmlChar},
     },
-    tree::{NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlNode, XmlNodePtr, XmlNs},
+    tree::{NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlNode, XmlNs},
 };
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
@@ -236,8 +236,8 @@ pub type XmlXPathContextPtr = *mut XmlXPathContext;
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlXPathContext {
-    pub doc: *mut XmlDoc, /* The current document */
-    pub node: XmlNodePtr, /* The current node */
+    pub doc: *mut XmlDoc,   /* The current document */
+    pub node: *mut XmlNode, /* The current node */
 
     pub(crate) nb_variables_unused: i32, /* unused (hash table) */
     pub(crate) max_variables_unused: i32, /* unused (hash table) */
@@ -264,9 +264,9 @@ pub struct XmlXPathContext {
     pub(crate) proximity_position: i32, /* the proximity position */
 
     // extra stuff for XPointer
-    pub(crate) xptr: i32,          /* is this an XPointer context? */
-    pub(crate) here: XmlNodePtr,   /* for here() */
-    pub(crate) origin: XmlNodePtr, /* for origin() */
+    pub(crate) xptr: i32,            /* is this an XPointer context? */
+    pub(crate) here: *mut XmlNode,   /* for here() */
+    pub(crate) origin: *mut XmlNode, /* for origin() */
 
     // the set of namespace declarations in scope for the expression
     pub(crate) ns_hash: Option<XmlHashTableRef<'static, *mut XmlChar>>, /* The namespaces hash table */
@@ -292,7 +292,7 @@ pub struct XmlXPathContext {
     pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
     pub(crate) error: Option<StructuredError>,         /* the callback in case of errors */
     pub(crate) last_error: XmlError,                   /* the last error */
-    pub(crate) debug_node: XmlNodePtr,                 /* the source node XSLT */
+    pub(crate) debug_node: *mut XmlNode,               /* the source node XSLT */
 
     pub(crate) flags: i32, /* flags to control compilation */
 
@@ -431,7 +431,7 @@ pub struct XmlXPathParserContext {
 
     pub(crate) comp: XmlXPathCompExprPtr, /* the precompiled expression */
     pub(crate) xptr: i32,                 /* it this an XPointer expression */
-    pub(crate) ancestor: XmlNodePtr,      /* used for walking preceding axis */
+    pub(crate) ancestor: *mut XmlNode,    /* used for walking preceding axis */
 
     pub(crate) value_frame: i32, /* unused */
 }
@@ -449,16 +449,16 @@ pub const XML_XPATH_NINF: f64 = f64::NEG_INFINITY;
 /// it's the same node, -1 otherwise
 #[doc(alias = "xmlXPathCmpNodes")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: XmlNodePtr) -> i32 {
+pub unsafe fn xml_xpath_cmp_nodes(mut node1: *mut XmlNode, mut node2: *mut XmlNode) -> i32 {
     use crate::tree::{NodeCommon, NodePtr};
 
     let mut depth1: i32;
     let mut depth2: i32;
     let mut attr1: i32 = 0;
     let mut attr2: i32 = 0;
-    let mut attr_node1: XmlNodePtr = null_mut();
-    let mut attr_node2: XmlNodePtr = null_mut();
-    let mut cur: XmlNodePtr;
+    let mut attr_node1: *mut XmlNode = null_mut();
+    let mut attr_node2: *mut XmlNode = null_mut();
+    let mut cur: *mut XmlNode;
 
     if node1.is_null() || node2.is_null() {
         return -2;
@@ -537,7 +537,7 @@ pub unsafe fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: XmlNodePtr) 
         depth2 += 1;
         cur = parent.as_ptr();
     }
-    let root: XmlNodePtr = cur;
+    let root: *mut XmlNode = cur;
 
     depth1 = 0;
     cur = node1;
@@ -657,7 +657,7 @@ pub unsafe extern "C" fn xml_xpath_cast_string_to_number(val: *const XmlChar) ->
 /// Returns the number value
 #[doc(alias = "xmlXPathCastNodeToNumber")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_node_to_number(node: XmlNodePtr) -> f64 {
+pub unsafe extern "C" fn xml_xpath_cast_node_to_number(node: *mut XmlNode) -> f64 {
     use std::ffi::CString;
 
     if node.is_null() {
@@ -819,7 +819,7 @@ pub fn xml_xpath_cast_number_to_string(val: f64) -> Cow<'static, str> {
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastNodeToString")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> String {
+pub unsafe fn xml_xpath_cast_node_to_string(node: *mut XmlNode) -> String {
     if node.is_null() {
         "".to_owned()
     } else {
@@ -1060,7 +1060,7 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: *mut XmlDoc) -> i64 {
             if cur.is_null() {
                 break;
             }
-            if cur == doc as XmlNodePtr {
+            if cur == doc as *mut XmlNode {
                 cur = null_mut();
                 break;
             }
@@ -1084,7 +1084,7 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: *mut XmlDoc) -> i64 {
 #[doc(alias = "xmlXPathSetContextNode")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_set_context_node(
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     ctx: XmlXPathContextPtr,
 ) -> i32 {
     if node.is_null() || ctx.is_null() {
@@ -1106,7 +1106,7 @@ pub unsafe extern "C" fn xml_xpath_set_context_node(
 #[doc(alias = "xmlXPathNodeEval")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_node_eval(
-    node: XmlNodePtr,
+    node: *mut XmlNode,
     str: *const XmlChar,
     ctx: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {

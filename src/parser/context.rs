@@ -49,8 +49,8 @@ use crate::{
     },
     parser::{__xml_err_encoding, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int},
     tree::{
-        xml_free_doc, XmlAttr, XmlAttributeType, XmlDoc, XmlEntityType, XmlNodePtr,
-        XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
+        xml_free_doc, XmlAttr, XmlAttributeType, XmlDoc, XmlEntityType, XmlNode, XML_ENT_EXPANDING,
+        XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
@@ -103,9 +103,9 @@ pub struct XmlParserCtxt {
 
     // Node analysis stack only used for DOM building
     // Current parsed Node
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: *mut XmlNode,
     // array of nodes
-    pub(crate) node_tab: Vec<XmlNodePtr>,
+    pub(crate) node_tab: Vec<*mut XmlNode>,
 
     // Whether node info should be kept
     pub(crate) record_info: i32,
@@ -230,7 +230,7 @@ pub struct XmlParserCtxt {
     // number of freed element nodes
     pub(crate) free_elems_nr: i32,
     // List of freed element nodes
-    pub(crate) free_elems: XmlNodePtr,
+    pub(crate) free_elems: *mut XmlNode,
     // number of freed attributes nodes
     pub(crate) free_attrs_nr: i32,
     // List of freed attributes nodes
@@ -916,7 +916,7 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "nodePush")]
-    pub(crate) unsafe fn node_push(&mut self, value: XmlNodePtr) -> i32 {
+    pub(crate) unsafe fn node_push(&mut self, value: *mut XmlNode) -> i32 {
         if self.node_tab.len() as u32 > XML_PARSER_MAX_DEPTH
             && self.options & XmlParserOption::XmlParseHuge as i32 == 0
         {
@@ -938,7 +938,7 @@ impl XmlParserCtxt {
     ///
     /// Returns the node just removed
     #[doc(alias = "nodePop")]
-    pub(crate) fn node_pop(&mut self) -> XmlNodePtr {
+    pub(crate) fn node_pop(&mut self) -> *mut XmlNode {
         let res = self.node_tab.pop().unwrap_or(null_mut());
         self.node = *self.node_tab.last().unwrap_or(&null_mut());
         res
