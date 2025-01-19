@@ -39,9 +39,8 @@ use std::{
 };
 
 use crate::{
-    buf::libxml_api::xml_buf_write_quoted_string,
     error::{XmlParserErrors, __xml_raise_error},
-    io::XmlOutputBuffer,
+    io::{write_quoted, XmlOutputBuffer},
     list::XmlList,
     tree::{
         xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc,
@@ -271,13 +270,7 @@ impl<T> XmlC14NCtx<'_, T> {
             self.buf.borrow_mut().write_str(" xmlns=");
         }
         if !ns.href.is_null() {
-            xml_buf_write_quoted_string(
-                self.buf
-                    .borrow_mut()
-                    .buffer
-                    .map_or(null_mut(), |buf| buf.as_ptr()),
-                ns.href,
-            );
+            write_quoted(&mut *self.buf.borrow_mut(), &ns.href().unwrap());
         } else {
             self.buf.borrow_mut().write_str("\"\"");
         }
