@@ -63,9 +63,6 @@ use crate::libxml::catalog::xml_catalog_cleanup;
 #[cfg(feature = "schema")]
 use crate::relaxng::xml_relaxng_cleanup_types;
 use crate::{
-    buf::libxml_api::{
-        xml_buf_add, xml_buf_create, xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme,
-    },
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{XmlError, XmlParserErrors},
     generic_error,
@@ -119,13 +116,13 @@ use crate::{
         XmlParserNodeInfo,
     },
     tree::{
-        xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list,
+        xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
-        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme,
-        XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr,
-        XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
-        XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT,
-        XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
+        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
+        XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
+        XmlNodePtr, XmlNsPtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT,
+        XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::{canonic_path, XmlURI},
     xpath::xml_init_xpath_internal,
@@ -3696,17 +3693,6 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: XmlEntityPtr) 
         );
     }
 
-    let buf = xml_buf_create();
-    if buf.is_null() {
-        xml_fatal_err(
-            ctxt,
-            XmlParserErrors::XmlErrInternalError,
-            Some("xmlLoadEntityContent parameter error"),
-        );
-        return -1;
-    }
-    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-
     let input: XmlParserInputPtr = xml_new_entity_input_stream(ctxt, entity);
     if input.is_null() {
         xml_fatal_err(
@@ -3714,30 +3700,28 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: XmlEntityPtr) 
             XmlParserErrors::XmlErrInternalError,
             Some("xmlLoadEntityContent input error"),
         );
-        xml_buf_free(buf);
         return -1;
     }
 
     // Push the entity as the current input, read c_char by c_char
     // saving to the buffer until the end of the entity or an error
     if (*ctxt).push_input(input) < 0 {
-        xml_buf_free(buf);
         xml_free_input_stream(input);
         return -1;
     }
 
     (*ctxt).grow();
+    let mut buf = String::new();
     let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     while (*ctxt).input == input
         && (*(*ctxt).input).cur < (*(*ctxt).input).end
         && xml_is_char(c as u32)
     {
-        xml_buf_add(buf, (*(*ctxt).input).cur, l);
+        buf.push(c);
         (*ctxt).advance_with_line_handling(l as usize);
         c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        xml_buf_free(buf);
         return -1;
     }
 
@@ -3753,14 +3737,13 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: XmlEntityPtr) 
             format!("xmlLoadEntityContent: invalid char value {}\n", c as i32).as_str(),
             c as i32
         );
-        xml_buf_free(buf);
         return -1;
     }
-    (*entity).length = xml_buf_use(buf) as i32;
-    (*entity)
-        .content
-        .store(xml_buf_detach(buf), Ordering::Relaxed);
-    xml_buf_free(buf);
+    (*entity).length = buf.len() as i32;
+    (*entity).content.store(
+        xml_strndup(buf.as_ptr(), buf.len() as i32),
+        Ordering::Relaxed,
+    );
 
     0
 }
