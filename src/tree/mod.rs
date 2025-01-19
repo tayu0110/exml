@@ -55,10 +55,7 @@ use crate::{
             xml_register_node_default_value,
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-        valid::{
-            xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_is_id, xml_remove_id,
-            XmlElementTablePtr,
-        },
+        valid::{xml_add_id, xml_free_attribute_table, xml_free_element, xml_is_id, xml_remove_id},
         xmlstring::{xml_str_equal, xml_strdup, xml_strncat, xml_strndup, XmlChar},
     },
 };
@@ -982,8 +979,8 @@ pub unsafe fn xml_free_dtd(cur: XmlDtdPtr) {
     (*cur).external_id = None;
     // TODO !!!
 
-    if !(*cur).elements.is_null() {
-        xml_free_element_table((*cur).elements as XmlElementTablePtr);
+    if let Some(table) = (*cur).elements.take() {
+        table.scan(|data, _, _, _| xml_free_element(*data));
     }
     if let Some(table) = (*cur).attributes.take().map(|t| t.into_inner()) {
         xml_free_attribute_table(table);
@@ -1658,7 +1655,7 @@ pub unsafe fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttrPtr) -> Xml
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     use crate::libxml::valid::{
-        xml_copy_attribute_table, xml_copy_element_table, xml_copy_notation_table,
+        xml_copy_attribute_table, xml_copy_element, xml_copy_notation_table,
         xml_get_dtd_qelement_desc,
     };
 
@@ -1684,8 +1681,8 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         let new = xml_copy_notation_table(table);
         (*ret).notations = Some(Box::new(new));
     }
-    if !(*dtd).elements.is_null() {
-        (*ret).elements = xml_copy_element_table((*dtd).elements as XmlElementTablePtr) as _;
+    if let Some(table) = (*dtd).elements.as_ref() {
+        (*ret).elements = Some(table.clone_with(|data, _| xml_copy_element(*data)));
     }
     if let Some(table) = (*dtd).attributes {
         (*ret).attributes = xml_copy_attribute_table(table);

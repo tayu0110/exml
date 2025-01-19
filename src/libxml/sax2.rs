@@ -1936,7 +1936,7 @@ pub unsafe fn xml_sax2_start_element(
         && (*(*ctxt).my_doc).ext_subset.is_null()
         && ((*(*ctxt).my_doc).int_subset.is_null()
             || ((*(*(*ctxt).my_doc).int_subset).notations.is_none()
-                && (*(*(*ctxt).my_doc).int_subset).elements.is_null()
+                && (*(*(*ctxt).my_doc).int_subset).elements.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).attributes.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).entities.is_none()))
     {
@@ -2131,7 +2131,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         && (*(*ctxt).my_doc).ext_subset.is_null()
         && ((*(*ctxt).my_doc).int_subset.is_null()
             || ((*(*(*ctxt).my_doc).int_subset).notations.is_none()
-                && (*(*(*ctxt).my_doc).int_subset).elements.is_null()
+                && (*(*(*ctxt).my_doc).int_subset).elements.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).attributes.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).entities.is_none()))
     {

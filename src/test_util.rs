@@ -31,7 +31,7 @@ use crate::{
         uri::XmlURIPtr,
         valid::{
             xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt,
-            XmlAttributeTablePtr, XmlElementTablePtr, XmlValidCtxtPtr,
+            XmlAttributeTablePtr, XmlValidCtxtPtr,
         },
         xinclude::XmlXincludeCtxtPtr,
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
@@ -693,12 +693,6 @@ pub(crate) fn gen_xml_element_ptr(_no: i32, _nr: i32) -> XmlElementPtr {
 }
 
 pub(crate) fn des_xml_element_ptr(_no: i32, _val: XmlElementPtr, _nr: i32) {}
-
-pub(crate) fn gen_xml_element_table_ptr(_no: i32, _nr: i32) -> XmlElementTablePtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_element_table_ptr(_no: i32, _val: XmlElementTablePtr, _nr: i32) {}
 
 pub(crate) fn gen_char_ptr(_no: i32, _nr: i32) -> *mut c_char {
     null_mut()

@@ -52,10 +52,7 @@ use crate::{
     hash::XmlHashTableRef,
     libxml::{
         globals::{xml_free, xml_malloc, xml_realloc},
-        hash::{
-            xml_hash_add_entry2, xml_hash_copy, xml_hash_free, xml_hash_lookup2,
-            xml_hash_remove_entry2, XmlHashTable,
-        },
+        hash::XmlHashTable,
         parser::XmlParserMode,
         parser_internals::xml_string_current_char,
         xmlautomata::{
@@ -77,9 +74,7 @@ use crate::{
 };
 
 use super::{
-    chvalid::xml_is_blank_char,
-    hash::{xml_hash_create, CVoidWrapper},
-    parser_internals::XML_VCTXT_USE_PCTXT,
+    chvalid::xml_is_blank_char, hash::CVoidWrapper, parser_internals::XML_VCTXT_USE_PCTXT,
 };
 
 // Validation state added for non-determinist content model.
@@ -173,11 +168,6 @@ impl Default for XmlValidCtxt {
         }
     }
 }
-
-// ALL element declarations are stored in a table.
-// There is one table per DTD.
-pub type XmlElementTable = XmlHashTable<'static, CVoidWrapper>;
-pub type XmlElementTablePtr = *mut XmlElementTable;
 
 // ALL attribute declarations are stored in a table.
 // There is one table per DTD.
@@ -731,7 +721,7 @@ pub unsafe fn xml_sprintf_element_content(
 
 /// Deallocate the memory used by an element definition
 #[doc(alias = "xmlFreeElement")]
-unsafe fn xml_free_element(elem: XmlElementPtr) {
+pub(crate) unsafe fn xml_free_element(elem: XmlElementPtr) {
     if elem.is_null() {
         return;
     }
@@ -815,7 +805,6 @@ pub unsafe fn xml_add_element_decl(
     content: XmlElementContentPtr,
 ) -> XmlElementPtr {
     let mut ret: XmlElementPtr;
-    let mut table: XmlElementTablePtr;
     let mut old_attributes: XmlAttributePtr = null_mut();
 
     if dtd.is_null() {
@@ -881,50 +870,31 @@ pub unsafe fn xml_add_element_decl(
     }
 
     // Create the Element table if needed.
-    table = (*dtd).elements as XmlElementTablePtr;
-    if table.is_null() {
-        table = xml_hash_create(0);
-        (*dtd).elements = table as *mut c_void;
-    }
-    if table.is_null() {
-        xml_verr_memory(ctxt, Some("xmlAddElementDecl: Table creation failed!\n"));
-        return null_mut();
-    }
+    let table = (*dtd)
+        .elements
+        .get_or_insert_with(|| XmlHashTable::with_capacity(0));
 
     // lookup old attributes inserted on an undefined element in the internal subset.
     if !(*dtd).doc.is_null() && !(*(*dtd).doc).int_subset.is_null() {
-        let name = CString::new(name).unwrap();
-        let ns = ns.map(|ns| CString::new(ns).unwrap());
-        ret = xml_hash_lookup2(
-            (*(*(*dtd).doc).int_subset).elements as _,
-            name.as_ptr() as *const u8,
-            ns.as_deref()
-                .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
-        ) as _;
+        ret = *(*(*(*dtd).doc).int_subset)
+            .elements
+            .as_ref()
+            .and_then(|table| table.lookup2(name, ns))
+            .unwrap_or(&null_mut());
         if !ret.is_null() && matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
             old_attributes = (*ret).attributes;
             (*ret).attributes = null_mut();
-            xml_hash_remove_entry2(
-                (*(*(*dtd).doc).int_subset).elements as _,
-                name.as_ptr() as *const u8,
-                ns.as_deref()
-                    .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
-                None,
-            );
+            (*(*(*dtd).doc).int_subset)
+                .elements
+                .as_mut()
+                .unwrap()
+                .remove_entry2(name, ns, |_, _| {});
             xml_free_element(ret);
         }
     }
 
-    let cname = CString::new(name).unwrap();
-    let cns = ns.map(|ns| CString::new(ns).unwrap());
-
     // The element may already be present if one of its attribute was registered first
-    ret = xml_hash_lookup2(
-        table,
-        cname.as_ptr() as *const u8,
-        cns.as_deref()
-            .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
-    ) as _;
+    ret = *table.lookup2(name, ns).unwrap_or(&null_mut());
     if !ret.is_null() {
         if !matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
             #[cfg(feature = "libxml_valid")]
@@ -958,14 +928,7 @@ pub unsafe fn xml_add_element_decl(
 
         // Validity Check:
         // Insertion must not fail
-        if xml_hash_add_entry2(
-            table,
-            cname.as_ptr() as *const u8,
-            cns.as_deref()
-                .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
-            ret as _,
-        ) != 0
-        {
+        if table.add_entry2(name, ns, ret).is_err() {
             #[cfg(feature = "libxml_valid")]
             {
                 // The element is already defined in this DTD.
@@ -1020,60 +983,32 @@ pub unsafe fn xml_add_element_decl(
 /// Returns the new xmlElementPtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyElement")]
 #[cfg(feature = "libxml_tree")]
-extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
-    let elem: XmlElementPtr = payload as XmlElementPtr;
-
-    unsafe {
-        let cur: XmlElementPtr = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
-        if cur.is_null() {
-            xml_verr_memory(null_mut(), Some("malloc failed"));
-            return null_mut();
-        }
-        memset(cur as _, 0, size_of::<XmlElement>());
-        std::ptr::write(&mut *cur, XmlElement::default());
-        (*cur).typ = XmlElementType::XmlElementDecl;
-        (*cur).etype = (*elem).etype;
-        (*cur).name = (*elem).name.clone();
-        (*cur).prefix = (*elem).prefix.clone();
-        (*cur).content = xml_copy_element_content((*elem).content);
-        /* TODO : rebuild the attribute list on the copy */
-        (*cur).attributes = null_mut();
-        cur as _
+pub(crate) unsafe fn xml_copy_element(elem: XmlElementPtr) -> XmlElementPtr {
+    let cur: XmlElementPtr = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
+    if cur.is_null() {
+        xml_verr_memory(null_mut(), Some("malloc failed"));
+        return null_mut();
     }
-}
-
-/// Build a copy of an element table.
-///
-/// Returns the new xmlElementTablePtr or null_mut() in case of error.
-#[doc(alias = "xmlCopyElementTable")]
-#[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_copy_element_table(table: XmlElementTablePtr) -> XmlElementTablePtr {
-    xml_hash_copy(table, Some(xml_copy_element)) as XmlElementTablePtr
-}
-
-extern "C" fn xml_free_element_table_entry(elem: *mut c_void, _name: *const XmlChar) {
-    unsafe {
-        xml_free_element(elem as XmlElementPtr);
-    }
-}
-
-/// Deallocate the memory used by an element hash table.
-#[doc(alias = "xmlFreeElementTable")]
-pub unsafe fn xml_free_element_table(table: XmlElementTablePtr) {
-    xml_hash_free(table, Some(xml_free_element_table_entry));
+    memset(cur as _, 0, size_of::<XmlElement>());
+    std::ptr::write(&mut *cur, XmlElement::default());
+    (*cur).typ = XmlElementType::XmlElementDecl;
+    (*cur).etype = (*elem).etype;
+    (*cur).name = (*elem).name.clone();
+    (*cur).prefix = (*elem).prefix.clone();
+    (*cur).content = xml_copy_element_content((*elem).content);
+    /* TODO : rebuild the attribute list on the copy */
+    (*cur).attributes = null_mut();
+    cur as _
 }
 
 /// This will dump the content of the element table as an XML DTD definition
 #[doc(alias = "xmlDumpElementTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_element_table<'a>(buf: &mut (impl Write + 'a), table: XmlElementTablePtr) {
-    if table.is_null() {
-        return;
-    }
-    let Some(table) = XmlHashTableRef::from_raw(table) else {
-        return;
-    };
-    table.scan(|data, _, _, _| xml_dump_element_decl(buf, data.0 as XmlElementPtr));
+pub unsafe fn xml_dump_element_table<'a>(
+    buf: &mut (impl Write + 'a),
+    table: &XmlHashTable<'static, XmlElementPtr>,
+) {
+    table.scan(|data, _, _, _| xml_dump_element_decl(buf, *data));
 }
 
 /// Dump the occurrence operator of an element.
@@ -1655,37 +1590,30 @@ unsafe fn xml_get_dtd_element_desc2(
     mut name: *const XmlChar,
     create: i32,
 ) -> XmlElementPtr {
-    let mut table: XmlElementTablePtr;
-    let mut cur: XmlElementPtr;
-
     let mut prefix: *mut XmlChar = null_mut();
 
     if dtd.is_null() {
         return null_mut();
     }
-    if (*dtd).elements.is_null() {
-        if create == 0 {
-            return null_mut();
-        }
-        // Create the Element table if needed.
-        table = (*dtd).elements as XmlElementTablePtr;
-        if table.is_null() {
-            table = xml_hash_create(0);
-            (*dtd).elements = table as *mut c_void;
-        }
-        if table.is_null() {
-            xml_verr_memory(ctxt, Some("element table allocation failed"));
-            return null_mut();
-        }
+    if (*dtd).elements.is_none() && create == 0 {
+        return null_mut();
     }
-    table = (*dtd).elements as XmlElementTablePtr;
-
+    let table = (*dtd)
+        .elements
+        .get_or_insert_with(|| XmlHashTable::with_capacity(0));
     let uqname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix));
     if !uqname.is_null() {
         name = uqname;
     }
-    let name = CString::new(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()).unwrap();
-    cur = xml_hash_lookup2(table, name.as_ptr() as *const u8, prefix) as _;
+    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+    let mut cur = *table
+        .lookup2(
+            &name,
+            (!prefix.is_null())
+                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                .as_deref(),
+        )
+        .unwrap_or(&null_mut());
     if cur.is_null() && create != 0 {
         cur = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
         if cur.is_null() {
@@ -1703,7 +1631,7 @@ unsafe fn xml_get_dtd_element_desc2(
         (*cur).typ = XmlElementType::XmlElementDecl;
 
         // fill the structure.
-        (*cur).name = Some(Box::new(name.to_string_lossy().into_owned()));
+        (*cur).name = Some(Box::new(name.clone().into_owned()));
         (*cur).prefix = (!prefix.is_null()).then(|| {
             CStr::from_ptr(prefix as *const i8)
                 .to_string_lossy()
@@ -1711,7 +1639,16 @@ unsafe fn xml_get_dtd_element_desc2(
         });
         (*cur).etype = XmlElementTypeVal::XmlElementTypeUndefined;
 
-        if xml_hash_add_entry2(table, name.as_ptr() as *const u8, prefix, cur as _) < 0 {
+        if table
+            .add_entry2(
+                &name,
+                (!prefix.is_null())
+                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                    .as_deref(),
+                cur,
+            )
+            .is_err()
+        {
             xml_verr_memory(ctxt, Some("adding entry failed"));
             xml_free_element(cur);
             cur = null_mut();
@@ -6484,20 +6421,15 @@ pub unsafe fn xml_get_dtd_qelement_desc(
     if dtd.is_null() {
         return null_mut();
     }
-    if (*dtd).elements.is_null() {
+    if (*dtd).elements.is_none() {
         return null_mut();
     }
-    let table: XmlElementTablePtr = (*dtd).elements as XmlElementTablePtr;
-
-    let name = CString::new(name).unwrap();
-    let prefix = prefix.map(|p| CString::new(p).unwrap());
-    xml_hash_lookup2(
-        table,
-        name.as_ptr() as *const u8,
-        prefix
-            .as_deref()
-            .map_or(null(), |p| p.as_ptr() as *const u8),
-    ) as _
+    *(*dtd)
+        .elements
+        .as_ref()
+        .unwrap()
+        .lookup2(name, prefix)
+        .unwrap_or(&null_mut())
 }
 
 /// Search the DTD for the description of this element
@@ -6510,16 +6442,23 @@ pub unsafe fn xml_get_dtd_element_desc(dtd: XmlDtdPtr, mut name: *const XmlChar)
     if dtd.is_null() || name.is_null() {
         return null_mut();
     }
-    if (*dtd).elements.is_null() {
+    if (*dtd).elements.is_none() {
         return null_mut();
     }
-    let table: XmlElementTablePtr = (*dtd).elements as XmlElementTablePtr;
+    let table = (*dtd).elements.as_ref().unwrap();
 
     let uqname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix));
     if !uqname.is_null() {
         name = uqname;
     }
-    let cur: XmlElementPtr = xml_hash_lookup2(table, name, prefix) as _;
+    let cur = *table
+        .lookup2(
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            (!prefix.is_null())
+                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                .as_deref(),
+        )
+        .unwrap_or(&null_mut());
     if !prefix.is_null() {
         xml_free(prefix as _);
     }

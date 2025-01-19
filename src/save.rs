@@ -1128,7 +1128,7 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
         }
     }
     if (*dtd).entities.is_none()
-        && (*dtd).elements.is_null()
+        && (*dtd).elements.is_none()
         && (*dtd).attributes.is_none()
         && (*dtd).notations.is_none()
         && (*dtd).pentities.is_none()
