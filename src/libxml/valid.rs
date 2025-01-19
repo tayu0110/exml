@@ -174,11 +174,6 @@ impl Default for XmlValidCtxt {
     }
 }
 
-// ALL notation declarations are stored in a table.
-// There is one table per DTD.
-pub type XmlNotationTable = XmlHashTable<'static, CVoidWrapper>;
-pub type XmlNotationTablePtr = *mut XmlNotationTable;
-
 // ALL element declarations are stored in a table.
 // There is one table per DTD.
 pub type XmlElementTable = XmlHashTable<'static, CVoidWrapper>;
