@@ -141,7 +141,7 @@ pub(crate) const XML_DEFAULT_VERSION: &str = "1.0";
 
 /// Callback for freeing some parser input allocations.
 #[doc(alias = "xmlParserInputDeallocate")]
-pub type XmlParserInputDeallocate = unsafe extern "C" fn(*mut XmlChar) -> c_void;
+pub type XmlParserInputDeallocate = unsafe fn(*mut XmlChar) -> c_void;
 
 /// The parser is now working also as a state based parser.
 /// The recursive one use the state info for entities processing.
@@ -2692,7 +2692,7 @@ pub(crate) unsafe fn xml_setup_parser_for_buffer(
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "xmlCreateDocParserCtxt")]
-pub unsafe extern "C" fn xml_create_doc_parser_ctxt(cur: *const XmlChar) -> XmlParserCtxtPtr {
+pub unsafe fn xml_create_doc_parser_ctxt(cur: *const XmlChar) -> XmlParserCtxtPtr {
     if cur.is_null() {
         return null_mut();
     }

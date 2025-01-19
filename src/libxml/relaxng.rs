@@ -8960,7 +8960,7 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
 ///
 /// Returns 1 if no validation problem was found or -1 otherwise
 #[doc(alias = "xmlRelaxNGValidatePushCData")]
-pub unsafe extern "C" fn xml_relaxng_validate_push_cdata(
+pub unsafe fn xml_relaxng_validate_push_cdata(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut data: *const XmlChar,
     _len: i32,

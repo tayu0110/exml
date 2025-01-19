@@ -125,10 +125,7 @@ unsafe fn xml_xptr_err_memory(extra: &str) {
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewLocationSetNodes")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_new_location_set_nodes(
-    start: XmlNodePtr,
-    end: XmlNodePtr,
-) -> XmlXPathObjectPtr {
+unsafe fn xml_xptr_new_location_set_nodes(start: XmlNodePtr, end: XmlNodePtr) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
         xml_xptr_err_memory("allocating locationset");
@@ -149,9 +146,7 @@ unsafe extern "C" fn xml_xptr_new_location_set_nodes(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrLocationSetCreate")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_location_set_create(
-    val: XmlXPathObjectPtr,
-) -> XmlLocationSetPtr {
+pub(crate) unsafe fn xml_xptr_location_set_create(val: XmlXPathObjectPtr) -> XmlLocationSetPtr {
     let ret: XmlLocationSetPtr = xml_malloc(size_of::<XmlLocationSet>()) as XmlLocationSetPtr;
     if ret.is_null() {
         xml_xptr_err_memory("allocating locationset");
@@ -181,7 +176,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_create(
 /// Free the LocationSet compound (not the actual ranges !).
 #[doc(alias = "xmlXPtrFreeLocationSet")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_free_location_set(obj: XmlLocationSetPtr) {
+pub(crate) unsafe fn xml_xptr_free_location_set(obj: XmlLocationSetPtr) {
     if obj.is_null() {
         return;
     }
@@ -199,7 +194,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_free_location_set(obj: XmlLocationSetPt
 /// Returns val1 once extended or NULL in case of error.
 #[doc(alias = "xmlXPtrLocationSetMerge")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_location_set_merge(
+pub(crate) unsafe fn xml_xptr_location_set_merge(
     val1: XmlLocationSetPtr,
     val2: XmlLocationSetPtr,
 ) -> XmlLocationSetPtr {
@@ -348,7 +343,7 @@ pub(crate) unsafe fn xml_xptr_new_range(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewRangePoints")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_new_range_points(
+pub(crate) unsafe fn xml_xptr_new_range_points(
     start: XmlXPathObjectPtr,
     end: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
@@ -380,7 +375,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range_points(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewRangeNodePoint")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_new_range_node_point(
+pub(crate) unsafe fn xml_xptr_new_range_node_point(
     start: XmlNodePtr,
     end: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
@@ -405,7 +400,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range_node_point(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewRangePointNode")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_new_range_point_node(
+pub(crate) unsafe fn xml_xptr_new_range_point_node(
     start: XmlXPathObjectPtr,
     end: XmlNodePtr,
 ) -> XmlXPathObjectPtr {
@@ -430,7 +425,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range_point_node(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewRangeNodes")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_new_range_nodes(
+pub(crate) unsafe fn xml_xptr_new_range_nodes(
     start: XmlNodePtr,
     end: XmlNodePtr,
 ) -> XmlXPathObjectPtr {
@@ -482,7 +477,7 @@ pub(crate) unsafe fn xml_xptr_new_location_set_node_set(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewRangeNodeObject")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_new_range_node_object(
+pub(crate) unsafe fn xml_xptr_new_range_node_object(
     start: XmlNodePtr,
     end: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
@@ -528,9 +523,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range_node_object(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewCollapsedRange")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_new_collapsed_range(
-    start: XmlNodePtr,
-) -> XmlXPathObjectPtr {
+pub(crate) unsafe fn xml_xptr_new_collapsed_range(start: XmlNodePtr) -> XmlXPathObjectPtr {
     if start.is_null() {
         return null_mut();
     }
@@ -544,10 +537,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_collapsed_range(
 /// Returns 1 if equal, 0 otherwise
 #[doc(alias = "xmlXPtrRangesEqual")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_ranges_equal(
-    range1: XmlXPathObjectPtr,
-    range2: XmlXPathObjectPtr,
-) -> i32 {
+unsafe fn xml_xptr_ranges_equal(range1: XmlXPathObjectPtr, range2: XmlXPathObjectPtr) -> i32 {
     if range1 == range2 {
         return 1;
     }
@@ -579,10 +569,7 @@ unsafe extern "C" fn xml_xptr_ranges_equal(
 /// If the location already exist in the set @val is freed.
 #[doc(alias = "xmlXPtrLocationSetAdd")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_location_set_add(
-    cur: XmlLocationSetPtr,
-    val: XmlXPathObjectPtr,
-) {
+pub(crate) unsafe fn xml_xptr_location_set_add(cur: XmlLocationSetPtr, val: XmlXPathObjectPtr) {
     if cur.is_null() || val.is_null() {
         return;
     }
@@ -634,9 +621,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_add(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrWrapLocationSet")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_wrap_location_set(
-    val: XmlLocationSetPtr,
-) -> XmlXPathObjectPtr {
+pub(crate) unsafe fn xml_xptr_wrap_location_set(val: XmlLocationSetPtr) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
         xml_xptr_err_memory("allocating locationset");
@@ -651,10 +636,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_wrap_location_set(
 /// Removes an xmlXPathObjectPtr from an existing LocationSet
 #[doc(alias = "xmlXPtrLocationSetDel")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_location_set_del(
-    cur: XmlLocationSetPtr,
-    val: XmlXPathObjectPtr,
-) {
+pub(crate) unsafe fn xml_xptr_location_set_del(cur: XmlLocationSetPtr, val: XmlXPathObjectPtr) {
     let mut i: i32 = (*cur).loc_nr;
 
     if cur.is_null() {
@@ -687,7 +669,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_del(
 /// Removes an entry from an existing LocationSet list.
 #[doc(alias = "xmlXPtrLocationSetRemove")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_location_set_remove(cur: XmlLocationSetPtr, val: i32) {
+pub(crate) unsafe fn xml_xptr_location_set_remove(cur: XmlLocationSetPtr, val: i32) {
     if cur.is_null() {
         return;
     }
@@ -755,7 +737,7 @@ unsafe fn xml_xptr_get_index(mut cur: XmlNodePtr) -> i32 {
 /// Returns a new location or NULL in case of error
 #[doc(alias = "xmlXPtrCoveringRange")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_covering_range(
+unsafe fn xml_xptr_covering_range(
     ctxt: XmlXPathParserContextPtr,
     loc: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
@@ -878,7 +860,7 @@ unsafe fn xml_xptr_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
 /// Returns a new location or NULL in case of error
 #[doc(alias = "xmlXPtrInsideRange")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_inside_range(
+unsafe fn xml_xptr_inside_range(
     ctxt: XmlXPathParserContextPtr,
     loc: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
@@ -1122,10 +1104,7 @@ unsafe fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: usize) -> XmlNodePtr {
 /// Returns -1 in case of failure, 0 otherwise
 #[doc(alias = "xmlXPtrAdvanceNode")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_advance_node(
-    mut cur: XmlNodePtr,
-    level: *mut i32,
-) -> XmlNodePtr {
+pub(crate) unsafe fn xml_xptr_advance_node(mut cur: XmlNodePtr, level: *mut i32) -> XmlNodePtr {
     // next:
     'next: loop {
         if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
@@ -1684,7 +1663,7 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewPoint")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_new_point(node: XmlNodePtr, indx: i32) -> XmlXPathObjectPtr {
+unsafe fn xml_xptr_new_point(node: XmlNodePtr, indx: i32) -> XmlXPathObjectPtr {
     if node.is_null() {
         return null_mut();
     }
@@ -1965,7 +1944,7 @@ unsafe fn xml_xptr_origin_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
 /// # Safety
 /// - A valid pointer generated by the API for this crate must be given.
 /// - If the context generation fails, this method may return null.
-pub unsafe extern "C" fn xml_xptr_new_context(
+pub unsafe fn xml_xptr_new_context(
     doc: XmlDocPtr,
     _here: XmlNodePtr,
     _origin: XmlNodePtr,
@@ -2140,7 +2119,7 @@ macro_rules! xml_xptr_err {
 
 /// Move the current node of the nodeset on the stack to the given child if found
 #[doc(alias = "xmlXPtrGetChildNo")]
-unsafe extern "C" fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: i32) {
+unsafe fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: i32) {
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNodeset);
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
     let Some(oldset) = (*obj).nodesetval.as_deref_mut().filter(|_| indx > 0) else {
@@ -2241,10 +2220,7 @@ unsafe fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: Option<&
 ///
 /// TODO: there is no new scheme registration mechanism
 #[doc(alias = "xmlXPtrEvalXPtrPart")]
-unsafe extern "C" fn xml_xptr_eval_xptr_part(
-    ctxt: XmlXPathParserContextPtr,
-    mut name: *mut XmlChar,
-) {
+unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut XmlChar) {
     let mut cur: *mut XmlChar;
     let mut len: i32;
     let mut level: i32;
@@ -2416,10 +2392,7 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
 /// Parse and evaluate a Full XPtr i.e. possibly a cascade of XPath based
 /// expressions or other schemes.
 #[doc(alias = "xmlXPtrEvalFullXPtr")]
-unsafe extern "C" fn xml_xptr_eval_full_xptr(
-    ctxt: XmlXPathParserContextPtr,
-    mut name: *mut XmlChar,
-) {
+unsafe fn xml_xptr_eval_full_xptr(ctxt: XmlXPathParserContextPtr, mut name: *mut XmlChar) {
     if name.is_null() {
         name = xml_xpath_parse_name(ctxt);
     }
@@ -2480,7 +2453,7 @@ unsafe extern "C" fn xml_xptr_eval_full_xptr(
 ///
 /// Parse and evaluate an XPointer
 #[doc(alias = "xmlXPtrEvalXPointer")]
-unsafe extern "C" fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
+unsafe fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
     if (*ctxt).value_tab.is_null() {
         // Allocate the value stack
         (*ctxt).value_tab =
@@ -2528,10 +2501,7 @@ unsafe extern "C" fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
 /// # Safety
 /// - A valid pointer generated by the API for this crate must be given.
 /// - If the evaluation fails or arguments is invalid, this method may return null.
-pub unsafe extern "C" fn xml_xptr_eval(
-    str: *const XmlChar,
-    ctx: XmlXPathContextPtr,
-) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xptr_eval(str: *const XmlChar, ctx: XmlXPathContextPtr) -> XmlXPathObjectPtr {
     let mut res: XmlXPathObjectPtr = null_mut();
     let mut tmp: XmlXPathObjectPtr;
     let init: XmlXPathObjectPtr = null_mut();
@@ -2610,10 +2580,7 @@ pub unsafe extern "C" fn xml_xptr_eval(
 /// step which is handled in xpath.c.
 #[doc(alias = "xmlXPtrRangeToFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_range_to_function(
-    ctxt: XmlXPathParserContextPtr,
-    _nargs: i32,
-) {
+pub(crate) unsafe fn xml_xptr_range_to_function(ctxt: XmlXPathParserContextPtr, _nargs: i32) {
     XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
 }
 
@@ -2622,7 +2589,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_range_to_function(
 /// Returns an xmlNodePtr list or NULL. The caller has to free the node tree.
 #[doc(alias = "xmlXPtrBuildRangeNodeList")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> XmlNodePtr {
+unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> XmlNodePtr {
     /* pointers to generated nodes */
 
     use crate::tree::{xml_copy_node, xml_new_text, xml_new_text_len};
@@ -2796,7 +2763,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
 /// Returns an xmlNodePtr list or NULL. The caller has to free the node tree.
 #[doc(alias = "xmlXPtrBuildNodeList")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> XmlNodePtr {
+pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> XmlNodePtr {
     use crate::tree::xml_copy_node;
 
     let mut list: XmlNodePtr = null_mut();
@@ -2885,7 +2852,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr)
 /// a Location Set instead of a node set
 #[doc(alias = "xmlXPtrEvalRangePredicate")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe extern "C" fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
+pub(crate) unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
     let cur: *const XmlChar;
     let mut res: XmlXPathObjectPtr;
     let mut tmp: XmlXPathObjectPtr;

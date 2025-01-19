@@ -4211,7 +4211,7 @@ const HTML40_ENTITIES_TABLE: &[HtmlEntityDesc] = &[
 
 #[doc(alias = "htmlInitAutoClose")]
 #[deprecated = "This is a no-op"]
-pub unsafe extern "C" fn html_init_auto_close() {}
+pub unsafe fn html_init_auto_close() {}
 
 /// Lookup the HTML tag in the ElementTable
 ///
@@ -4231,7 +4231,7 @@ pub unsafe fn html_tag_lookup(tag: &str) -> Option<&'static HtmlElemDesc> {
 ///
 /// Returns the associated htmlEntityDescPtr if found, NULL otherwise.
 #[doc(alias = "htmlEntityLookup")]
-pub unsafe extern "C" fn html_entity_lookup(name: *const XmlChar) -> *const HtmlEntityDesc {
+pub unsafe fn html_entity_lookup(name: *const XmlChar) -> *const HtmlEntityDesc {
     for entry in HTML40_ENTITIES_TABLE {
         if xml_str_equal(name, entry.name as _) {
             return entry as *const HtmlEntityDesc;
@@ -4246,7 +4246,7 @@ pub unsafe extern "C" fn html_entity_lookup(name: *const XmlChar) -> *const Html
 ///
 /// Returns the associated htmlEntityDescPtr if found, NULL otherwise.
 #[doc(alias = "htmlEntityValueLookup")]
-pub unsafe extern "C" fn html_entity_value_lookup(value: u32) -> *const HtmlEntityDesc {
+pub unsafe fn html_entity_value_lookup(value: u32) -> *const HtmlEntityDesc {
     for entry in HTML40_ENTITIES_TABLE {
         if entry.value >= value {
             if entry.value > value {
@@ -4264,7 +4264,7 @@ pub unsafe extern "C" fn html_entity_value_lookup(value: u32) -> *const HtmlEnti
 ///
 /// Returns 1 if autoclosed, 0 otherwise
 #[doc(alias = "htmlIsAutoClosed")]
-pub unsafe extern "C" fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> i32 {
+pub unsafe fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> i32 {
     if elem.is_null() {
         return 1;
     }
@@ -5323,7 +5323,7 @@ unsafe fn html_check_auto_close(newtag: *const XmlChar, oldtag: Option<&str>) ->
 ///
 /// Returns 1 if autoclose, 0 otherwise
 #[doc(alias = "htmlAutoCloseTag")]
-pub unsafe extern "C" fn html_auto_close_tag(
+pub unsafe fn html_auto_close_tag(
     _doc: HtmlDocPtr,
     name: *const XmlChar,
     elem: HtmlNodePtr,

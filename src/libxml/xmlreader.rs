@@ -3567,10 +3567,7 @@ macro_rules! DICT_FREE {
 /// Free a property and all its siblings, all the children are freed too.
 #[doc(alias = "xmlTextReaderFreePropList")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_free_prop_list(
-    reader: &mut XmlTextReader,
-    mut cur: XmlAttrPtr,
-) {
+unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: XmlAttrPtr) {
     let mut next: XmlAttrPtr;
 
     while !cur.is_null() {
@@ -3583,7 +3580,7 @@ unsafe extern "C" fn xml_text_reader_free_prop_list(
 /// Free a node and all its siblings, this is a recursive behaviour, all the children are freed too.
 #[doc(alias = "xmlTextReaderFreeNodeList")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlNodePtr) {
+unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlNodePtr) {
     use crate::tree::{NodeCommon, NodePtr};
 
     let mut next: XmlNodePtr;
@@ -3701,7 +3698,7 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
 /// Free a node.
 #[doc(alias = "xmlTextReaderFreeProp")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: XmlAttrPtr) {
+unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: XmlAttrPtr) {
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
         (*(*reader).ctxt).dict
     } else {
@@ -3739,7 +3736,7 @@ unsafe extern "C" fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: Xm
 /// This doesn't unlink the child from the list, use xmlUnlinkNode() first.
 #[doc(alias = "xmlTextReaderFreeNode")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: XmlNodePtr) {
+unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: XmlNodePtr) {
     use crate::tree::{NodeCommon, NodePtr};
 
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
@@ -3835,7 +3832,7 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
 /// Returns the successor node or NULL
 #[doc(alias = "xmlTextReaderGetSuccessor")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_get_successor(mut cur: XmlNodePtr) -> XmlNodePtr {
+unsafe fn xml_text_reader_get_successor(mut cur: XmlNodePtr) -> XmlNodePtr {
     use crate::tree::NodeCommon;
 
     if cur.is_null() {
@@ -3900,7 +3897,7 @@ unsafe fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *mut XmlChar
 /// Returns 0 i no attributes, -1 in case of error or the attribute count
 #[doc(alias = "xmlTextReaderAttributeCount")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32 {
+pub unsafe fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32 {
     use crate::tree::NodeCommon;
 
     let mut ret: i32;
@@ -3945,9 +3942,7 @@ pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextRea
 /// Returns the base URI or NULL if not available, the string will be deallocated with the reader
 #[doc(alias = "xmlTextReaderConstBaseUri")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_base_uri(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_base_uri(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
     use crate::tree::NodeCommon;
@@ -4001,7 +3996,7 @@ pub unsafe fn xml_text_reader_const_local_name(reader: &mut XmlTextReader) -> *c
 /// Returns the local name or NULL if not available, the string is deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstName")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_name(reader: &mut XmlTextReader) -> *const XmlChar {
     use crate::tree::NodeCommon;
 
     if reader.node.is_null() {
@@ -4062,9 +4057,7 @@ pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) 
 /// Returns the namespace URI or NULL if not available, the string will be deallocated with the reader
 #[doc(alias = "xmlTextReaderConstNamespaceUri")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_namespace_uri(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_namespace_uri(reader: &mut XmlTextReader) -> *const XmlChar {
     use crate::tree::NodeCommon;
 
     if reader.node.is_null() {
@@ -4095,9 +4088,7 @@ pub unsafe extern "C" fn xml_text_reader_const_namespace_uri(
 /// Returns the prefix or NULL if not available, the string is deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstPrefix")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_prefix(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_prefix(reader: &mut XmlTextReader) -> *const XmlChar {
     use crate::tree::NodeCommon;
 
     if reader.node.is_null() {
@@ -4132,9 +4123,7 @@ pub unsafe extern "C" fn xml_text_reader_const_prefix(
 /// Returns the xml:lang value or NULL if none exists.
 #[doc(alias = "xmlTextReaderConstXmlLang")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_xml_lang(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_xml_lang(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
     if reader.node.is_null() {
@@ -4155,7 +4144,7 @@ pub unsafe extern "C" fn xml_text_reader_const_xml_lang(
 /// The string will be deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstString")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_string(
+pub unsafe fn xml_text_reader_const_string(
     reader: &mut XmlTextReader,
     str: *const XmlChar,
 ) -> *const XmlChar {
@@ -4268,7 +4257,7 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlTextReaderClose")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
+pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
     reader.node = null_mut();
     reader.curnode = null_mut();
     reader.mode = XmlTextReaderMode::XmlTextreaderModeClosed;
@@ -4314,7 +4303,7 @@ pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> i3
 /// The string must be deallocated by the caller.
 #[doc(alias = "xmlTextReaderLookupNamespace")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_lookup_namespace(
+pub unsafe fn xml_text_reader_lookup_namespace(
     reader: &mut XmlTextReader,
     prefix: *const XmlChar,
 ) -> *mut XmlChar {
@@ -4342,9 +4331,7 @@ pub unsafe extern "C" fn xml_text_reader_lookup_namespace(
 /// The string is deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstEncoding")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_encoding(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_encoding(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
     let mut doc: XmlDocPtr = null_mut();
@@ -4371,7 +4358,7 @@ pub unsafe extern "C" fn xml_text_reader_const_encoding(
 /// Returns 0 if the call was successful, or -1 in case of error
 #[doc(alias = "xmlTextReaderSetParserProp")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_set_parser_prop(
+pub unsafe fn xml_text_reader_set_parser_prop(
     reader: &mut XmlTextReader,
     prop: i32,
     value: i32,
@@ -5199,9 +5186,7 @@ pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSc
 /// The string is deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstXmlVersion")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_xml_version(
-    reader: XmlTextReaderPtr,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_xml_version(reader: XmlTextReaderPtr) -> *const XmlChar {
     use std::ffi::CString;
 
     let mut doc: XmlDocPtr = null_mut();
@@ -5230,7 +5215,7 @@ pub unsafe extern "C" fn xml_text_reader_const_xml_version(
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderWalker")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
+pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
     use crate::generic_error;
 
     if doc.is_null() {
