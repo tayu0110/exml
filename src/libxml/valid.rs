@@ -73,9 +73,7 @@ use crate::{
     },
 };
 
-use super::{
-    chvalid::xml_is_blank_char, hash::CVoidWrapper, parser_internals::XML_VCTXT_USE_PCTXT,
-};
+use super::{chvalid::xml_is_blank_char, parser_internals::XML_VCTXT_USE_PCTXT};
 
 // Validation state added for non-determinist content model.
 pub type XmlValidStatePtr = *mut XmlValidState;
@@ -168,11 +166,6 @@ impl Default for XmlValidCtxt {
         }
     }
 }
-
-// ALL attribute declarations are stored in a table.
-// There is one table per DTD.
-pub type XmlAttributeTable = XmlHashTable<'static, CVoidWrapper>;
-pub type XmlAttributeTablePtr = *mut XmlAttributeTable;
 
 /// Handle a validation error
 #[doc(alias = "xmlErrValid")]
@@ -1979,15 +1972,9 @@ pub unsafe fn xml_free_attribute_table(mut table: XmlHashTable<'static, *mut Xml
 #[cfg(feature = "libxml_output")]
 pub unsafe fn xml_dump_attribute_table<'a>(
     buf: &mut (impl Write + 'a),
-    table: XmlAttributeTablePtr,
+    table: XmlHashTableRef<'static, XmlAttributePtr>,
 ) {
-    if table.is_null() {
-        return;
-    }
-    let Some(table) = XmlHashTableRef::from_raw(table) else {
-        return;
-    };
-    table.scan(|data, _, _, _| xml_dump_attribute_decl(buf, data.0 as XmlAttributePtr));
+    table.scan(|data, _, _, _| xml_dump_attribute_decl(buf, *data));
 }
 
 /// This will dump the content of the attribute declaration as an XML DTD definition

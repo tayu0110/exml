@@ -30,8 +30,7 @@ use crate::{
         schematron::XmlSchematronValidCtxtPtr,
         uri::XmlURIPtr,
         valid::{
-            xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt,
-            XmlAttributeTablePtr, XmlValidCtxtPtr,
+            xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt, XmlValidCtxtPtr,
         },
         xinclude::XmlXincludeCtxtPtr,
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
@@ -681,12 +680,6 @@ pub(crate) fn gen_xml_attribute_ptr(_no: i32, _nr: i32) -> XmlAttributePtr {
 }
 
 pub(crate) fn des_xml_attribute_ptr(_no: i32, _val: XmlAttributePtr, _nr: i32) {}
-
-pub(crate) fn gen_xml_attribute_table_ptr(_no: i32, _nr: i32) -> XmlAttributeTablePtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_attribute_table_ptr(_no: i32, _val: XmlAttributeTablePtr, _nr: i32) {}
 
 pub(crate) fn gen_xml_element_ptr(_no: i32, _nr: i32) -> XmlElementPtr {
     null_mut()
