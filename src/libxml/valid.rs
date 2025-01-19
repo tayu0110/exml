@@ -189,11 +189,6 @@ pub type XmlElementTablePtr = *mut XmlElementTable;
 pub type XmlAttributeTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlAttributeTablePtr = *mut XmlAttributeTable;
 
-// ALL Refs attributes are stored in a table.
-// There is one table per document.
-pub type XmlRefTable = XmlHashTable<'static, CVoidWrapper>;
-pub type XmlRefTablePtr = *mut XmlRefTable;
-
 /// Handle a validation error
 #[doc(alias = "xmlErrValid")]
 macro_rules! xml_err_valid {
