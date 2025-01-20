@@ -63,7 +63,7 @@ use crate::libxml::catalog::xml_catalog_cleanup;
 #[cfg(feature = "schema")]
 use crate::relaxng::xml_relaxng_cleanup_types;
 #[cfg(feature = "libxml_valid")]
-use crate::tree::XmlDtd;
+use crate::tree::{XmlDtd, XmlDtdPtr};
 use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{XmlError, XmlParserErrors},
@@ -1770,20 +1770,19 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     sax: Option<Box<XmlSAXHandler>>,
     external_id: Option<&str>,
     system_id: Option<&str>,
-) -> *mut XmlDtd {
+) -> Option<XmlDtdPtr> {
     use std::slice::from_raw_parts;
 
     use crate::parser::{xml_free_parser_ctxt, xml_new_sax_parser_ctxt};
 
-    let mut ret: *mut XmlDtd = null_mut();
     let mut input: XmlParserInputPtr = null_mut();
 
     if external_id.is_none() && system_id.is_none() {
-        return null_mut();
+        return None;
     }
 
     let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, None) else {
-        return null_mut();
+        return None;
     };
 
     // We are loading a DTD
@@ -1806,13 +1805,13 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     }
     if input.is_null() {
         xml_free_parser_ctxt(ctxt);
-        return null_mut();
+        return None;
     }
 
     // plug some encoding conversion routines here.
     if (*ctxt).push_input(input) < 0 {
         xml_free_parser_ctxt(ctxt);
-        return null_mut();
+        return None;
     }
     if (*(*ctxt).input).remainder_len() >= 4 {
         let input = from_raw_parts((*(*ctxt).input).cur, 4);
@@ -1837,29 +1836,27 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     if (*ctxt).my_doc.is_null() {
         xml_err_memory(ctxt, Some("New Doc failed"));
         xml_free_parser_ctxt(ctxt);
-        return null_mut();
+        return None;
     }
     (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
     (*(*ctxt).my_doc).ext_subset =
         xml_new_dtd((*ctxt).my_doc, Some("none"), external_id, system_id);
     xml_parse_external_subset(ctxt, external_id, system_id);
 
+    let mut ret = None;
     if !(*ctxt).my_doc.is_null() {
         if (*ctxt).well_formed != 0 {
-            ret = (*(*ctxt).my_doc)
-                .ext_subset
-                .take()
-                .map_or(null_mut(), |p| p.as_ptr());
-            if !ret.is_null() {
-                (*ret).doc = null_mut();
-                let mut tmp = (*ret).children;
+            ret = (*(*ctxt).my_doc).ext_subset.take();
+            if let Some(mut ret) = ret {
+                ret.doc = null_mut();
+                let mut tmp = ret.children;
                 while let Some(mut now) = tmp {
                     now.doc = null_mut();
                     tmp = now.next;
                 }
             }
         } else {
-            ret = null_mut();
+            ret = None;
         }
         xml_free_doc((*ctxt).my_doc);
         (*ctxt).my_doc = null_mut();
@@ -1874,7 +1871,10 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
 /// Returns the resulting xmlDtdPtr or NULL in case of error.
 #[doc(alias = "xmlParseDTD")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_parse_dtd(external_id: Option<&str>, system_id: Option<&str>) -> *mut XmlDtd {
+pub unsafe fn xml_parse_dtd(
+    external_id: Option<&str>,
+    system_id: Option<&str>,
+) -> Option<XmlDtdPtr> {
     xml_sax_parse_dtd(None, external_id, system_id)
 }
 

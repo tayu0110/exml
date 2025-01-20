@@ -3535,8 +3535,7 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> 
             None
         };
         let external_id = int_subset.external_id.as_deref();
-        (*doc).ext_subset =
-            XmlDtdPtr::from_raw(xml_parse_dtd(external_id, sys_id.as_deref())).unwrap();
+        (*doc).ext_subset = xml_parse_dtd(external_id, sys_id.as_deref());
         if (*doc).ext_subset.is_none() {
             if let Some(system_id) = int_subset.system_id.as_deref() {
                 xml_err_valid!(

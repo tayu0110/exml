@@ -339,13 +339,11 @@ impl XmlDtdPtr {
     /// If `ptr` is a valid pointer of `XmlDtd`, return `Ok(Some(Self))`.  
     /// Otherwise, return `Err`.
     ///
-    /// # Note
-    /// `pub` is a temporary workaround for `exmllint`.  
-    /// It is removed in the future.
-    ///
     /// # Safety
     /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
-    pub unsafe fn from_raw(ptr: *mut XmlDtd) -> Result<Option<Self>, InvalidNodePointerCastError> {
+    pub(crate) unsafe fn from_raw(
+        ptr: *mut XmlDtd,
+    ) -> Result<Option<Self>, InvalidNodePointerCastError> {
         if ptr.is_null() {
             return Ok(None);
         }

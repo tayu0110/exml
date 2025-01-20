@@ -3077,30 +3077,20 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
-        if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
-            dtd = xml_parse_dtd(None, Some(dtd_valid));
+        let dtd = if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
+            xml_parse_dtd(None, Some(dtd_valid))
         } else {
-            dtd = xml_parse_dtd(CMD_ARGS.dtdvalidfpi.as_deref(), None);
-        }
+            xml_parse_dtd(CMD_ARGS.dtdvalidfpi.as_deref(), None)
+        };
         if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
             end_timer!("Parsing DTD");
         }
-        if dtd.is_null() {
-            if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
-                generic_error!("Could not parse DTD {}\n", dtd_valid);
-            } else {
-                generic_error!(
-                    "Could not parse DTD {}\n",
-                    CMD_ARGS.dtdvalidfpi.as_deref().unwrap()
-                );
-            }
-            PROGRESULT.store(ERR_DTD, Ordering::Relaxed);
-        } else {
+        if let Some(dtd) = dtd {
             let cvp = xml_new_valid_ctxt();
             if cvp.is_null() {
                 generic_error!("Couldn't allocate validation context\n");
                 PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                xml_free_dtd(XmlDtdPtr::from_raw(dtd).unwrap().unwrap());
+                xml_free_dtd(dtd);
                 return;
             }
             (*cvp).error = Some(generic_error_default);
@@ -3109,7 +3099,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
-            if xml_validate_dtd(cvp, doc, XmlDtdPtr::from_raw(dtd).unwrap().unwrap()) == 0 {
+            if xml_validate_dtd(cvp, doc, dtd) == 0 {
                 let filename = filename.unwrap();
                 if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
                     generic_error!("Document {filename} does not validate against {dtd_valid}\n");
@@ -3125,7 +3115,17 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 end_timer!("Validating against DTD");
             }
             xml_free_valid_ctxt(cvp);
-            xml_free_dtd(XmlDtdPtr::from_raw(dtd).unwrap().unwrap());
+            xml_free_dtd(dtd);
+        } else {
+            if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
+                generic_error!("Could not parse DTD {}\n", dtd_valid);
+            } else {
+                generic_error!(
+                    "Could not parse DTD {}\n",
+                    CMD_ARGS.dtdvalidfpi.as_deref().unwrap()
+                );
+            }
+            PROGRESULT.store(ERR_DTD, Ordering::Relaxed);
         }
     } else if CMD_ARGS.postvalid {
         let cvp = xml_new_valid_ctxt();
