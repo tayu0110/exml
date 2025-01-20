@@ -1729,20 +1729,24 @@ pub unsafe fn xml_copy_dtd(dtd: *mut XmlDtd) -> *mut XmlDtd {
                 _ => unreachable!(),
             }
         } else if matches!((*cur).element_type(), XmlElementType::XmlElementDecl) {
-            let tmp: *mut XmlElement = cur as _;
+            let tmp = XmlElementPtr::from_raw(cur as *mut XmlElement)
+                .unwrap()
+                .unwrap();
             q = xml_get_dtd_qelement_desc(
                 ret,
-                (*tmp).name().as_deref().unwrap(),
-                (*tmp).prefix.as_deref(),
+                tmp.name().as_deref().unwrap(),
+                tmp.prefix.as_deref(),
             )
             .map_or(null_mut(), |desc| desc.as_ptr()) as _;
         } else if matches!((*cur).element_type(), XmlElementType::XmlAttributeDecl) {
-            let tmp: *mut XmlAttribute = cur as _;
+            let tmp = XmlAttributePtr::from_raw(cur as *mut XmlAttribute)
+                .unwrap()
+                .unwrap();
             q = (*ret)
                 .get_qattr_desc(
-                    (*tmp).elem.as_deref().unwrap(),
-                    (*tmp).name().as_deref().unwrap(),
-                    (*tmp).prefix.as_deref(),
+                    tmp.elem.as_deref().unwrap(),
+                    tmp.name().as_deref().unwrap(),
+                    tmp.prefix.as_deref(),
                 )
                 .map_or(null_mut(), |desc| desc.as_ptr()) as _;
         } else if matches!((*cur).element_type(), XmlElementType::XmlCommentNode) {
