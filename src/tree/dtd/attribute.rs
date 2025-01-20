@@ -24,7 +24,7 @@ use std::{
     ffi::CStr,
     ops::{Deref, DerefMut},
     os::raw::c_void,
-    ptr::{drop_in_place, null_mut, NonNull},
+    ptr::{null_mut, NonNull},
 };
 
 use crate::{
@@ -247,19 +247,15 @@ impl From<XmlAttributePtr> for *mut XmlAttribute {
 
 /// Deallocate the memory used by an attribute definition
 #[doc(alias = "xmlFreeAttribute")]
-pub(crate) unsafe fn xml_free_attribute(attr: *mut XmlAttribute) {
-    if attr.is_null() {
-        return;
+pub(crate) unsafe fn xml_free_attribute(mut attr: XmlAttributePtr) {
+    attr.unlink();
+    attr.elem = None;
+    if !attr.name.is_null() {
+        xml_free(attr.name as _);
     }
-    (*attr).unlink();
-    (*attr).elem = None;
-    if !(*attr).name.is_null() {
-        xml_free((*attr).name as _);
+    if !attr.default_value.is_null() {
+        xml_free(attr.default_value as _);
     }
-    if !(*attr).default_value.is_null() {
-        xml_free((*attr).default_value as _);
-    }
-    (*attr).prefix = None;
-    drop_in_place(attr);
-    xml_free(attr as _);
+    attr.prefix = None;
+    attr.free();
 }

@@ -66,7 +66,7 @@ pub struct XmlDtd {
     // End of common part
     pub(crate) notations: Option<Box<XmlHashTable<'static, XmlNotation>>>, /* Hash table for notations if any */
     pub(crate) elements: Option<XmlHashTable<'static, XmlElementPtr>>, /* Hash table for elements if any */
-    pub(crate) attributes: Option<XmlHashTableRef<'static, *mut XmlAttribute>>, /* Hash table for attributes if any */
+    pub(crate) attributes: Option<XmlHashTableRef<'static, XmlAttributePtr>>, /* Hash table for attributes if any */
     pub(crate) entities: Option<XmlHashTableRef<'static, *mut XmlEntity>>, /* Hash table for entities if any */
     pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
     pub(crate) system_id: Option<String>,   /* URI for a SYSTEM or PUBLIC DTD */
@@ -104,21 +104,12 @@ impl XmlDtd {
     ///
     /// returns the xmlAttributePtr if found or null_mut()
     #[doc(alias = "xmlGetDtdAttrDesc")]
-    pub fn get_attr_desc(&self, elem: &str, name: &str) -> *mut XmlAttribute {
-        let Some(table) = self.attributes else {
-            return null_mut();
-        };
-
+    pub fn get_attr_desc(&self, elem: &str, name: &str) -> Option<XmlAttributePtr> {
+        let table = self.attributes?;
         if let Some((prefix, local)) = split_qname2(name) {
-            table
-                .lookup3(local, Some(prefix), Some(elem))
-                .copied()
-                .unwrap_or(null_mut())
+            table.lookup3(local, Some(prefix), Some(elem)).copied()
         } else {
-            table
-                .lookup3(name, None, Some(elem))
-                .copied()
-                .unwrap_or(null_mut())
+            table.lookup3(name, None, Some(elem)).copied()
         }
     }
 
@@ -131,15 +122,8 @@ impl XmlDtd {
         elem: &str,
         name: &str,
         prefix: Option<&str>,
-    ) -> *mut XmlAttribute {
-        let Some(table) = self.attributes else {
-            return null_mut();
-        };
-
-        table
-            .lookup3(name, prefix, Some(elem))
-            .copied()
-            .unwrap_or(null_mut())
+    ) -> Option<XmlAttributePtr> {
+        self.attributes?.lookup3(name, prefix, Some(elem)).copied()
     }
 }
 

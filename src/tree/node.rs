@@ -683,21 +683,25 @@ impl XmlNode {
                 if let Some(ns_name) = ns_name {
                     if ns_name == XML_XML_NAMESPACE.to_string_lossy() {
                         // The XML namespace must be bound to prefix 'xml'.
-                        attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                            CStr::from_ptr(elem_qname as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                            name,
-                            Some("xml"),
-                        );
-                        if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                            attr_decl = (*(*doc).ext_subset).get_qattr_desc(
+                        attr_decl = (*(*doc).int_subset)
+                            .get_qattr_desc(
                                 CStr::from_ptr(elem_qname as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
                                 name,
                                 Some("xml"),
-                            );
+                            )
+                            .map_or(null_mut(), |decl| decl.as_ptr());
+                        if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
+                            attr_decl = (*(*doc).ext_subset)
+                                .get_qattr_desc(
+                                    CStr::from_ptr(elem_qname as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                    name,
+                                    Some("xml"),
+                                )
+                                .map_or(null_mut(), |decl| decl.as_ptr());
                         }
                     } else {
                         // The ugly case: Search using the prefixes of in-scope
@@ -712,24 +716,28 @@ impl XmlNode {
                         for cur in ns_list {
                             if xml_str_equal((*cur).href, ns_name.as_ptr() as *const u8) {
                                 let prefix = (*cur).prefix();
-                                attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                                    CStr::from_ptr(elem_qname as *const i8)
-                                        .to_string_lossy()
-                                        .as_ref(),
-                                    name,
-                                    prefix.as_deref(),
-                                );
-                                if !attr_decl.is_null() {
-                                    break;
-                                }
-                                if !(*doc).ext_subset.is_null() {
-                                    attr_decl = (*(*doc).ext_subset).get_qattr_desc(
+                                attr_decl = (*(*doc).int_subset)
+                                    .get_qattr_desc(
                                         CStr::from_ptr(elem_qname as *const i8)
                                             .to_string_lossy()
                                             .as_ref(),
                                         name,
                                         prefix.as_deref(),
-                                    );
+                                    )
+                                    .map_or(null_mut(), |decl| decl.as_ptr());
+                                if !attr_decl.is_null() {
+                                    break;
+                                }
+                                if !(*doc).ext_subset.is_null() {
+                                    attr_decl = (*(*doc).ext_subset)
+                                        .get_qattr_desc(
+                                            CStr::from_ptr(elem_qname as *const i8)
+                                                .to_string_lossy()
+                                                .as_ref(),
+                                            name,
+                                            prefix.as_deref(),
+                                        )
+                                        .map_or(null_mut(), |decl| decl.as_ptr());
                                     if !attr_decl.is_null() {
                                         break;
                                     }
@@ -739,21 +747,25 @@ impl XmlNode {
                     }
                 } else {
                     // The common and nice case: Attr in no namespace.
-                    attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                        CStr::from_ptr(elem_qname as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        name,
-                        None,
-                    );
-                    if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                        attr_decl = (*(*doc).ext_subset).get_qattr_desc(
+                    attr_decl = (*(*doc).int_subset)
+                        .get_qattr_desc(
                             CStr::from_ptr(elem_qname as *const i8)
                                 .to_string_lossy()
                                 .as_ref(),
                             name,
                             None,
-                        );
+                        )
+                        .map_or(null_mut(), |decl| decl.as_ptr());
+                    if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
+                        attr_decl = (*(*doc).ext_subset)
+                            .get_qattr_desc(
+                                CStr::from_ptr(elem_qname as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                                name,
+                                None,
+                            )
+                            .map_or(null_mut(), |decl| decl.as_ptr());
                     }
                 }
                 if !tmpstr.is_null() {
@@ -1618,14 +1630,16 @@ impl XmlNode {
         if !doc.is_null() && !(*doc).int_subset.is_null() {
             let mut attr_decl =
                 (*(*doc).int_subset).get_attr_desc(self.name().as_deref().unwrap(), name);
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
+            if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
                 attr_decl =
                     (*(*doc).ext_subset).get_attr_desc(self.name().as_deref().unwrap(), name);
             }
-            if !attr_decl.is_null() && !(*attr_decl).default_value.is_null() {
+            if let Some(attr_decl) =
+                attr_decl.filter(|attr_decl| !attr_decl.default_value.is_null())
+            {
                 // return attribute declaration only if a default value is given
                 // (that includes #FIXED declarations)
-                return attr_decl as *mut XmlAttr;
+                return attr_decl.as_ptr() as *mut XmlAttr;
             }
         }
         null_mut()

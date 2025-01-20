@@ -51,7 +51,7 @@ use crate::{
         xml_get_predefined_entity, xml_new_cdata_block, xml_new_char_ref, xml_new_doc,
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
-        NodeCommon, NodePtr, XmlAttr, XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc,
+        NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlDtd, XmlElementContentPtr, XmlElementType, XmlElementTypeVal,
         XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
     },
@@ -763,8 +763,6 @@ pub unsafe fn xml_sax2_attribute_decl(
     default_value: Option<&str>,
     tree: Option<Box<XmlEnumeration>>,
 ) {
-    let attr: *mut XmlAttribute;
-
     if ctx.is_none() {
         return;
     }
@@ -790,8 +788,8 @@ pub unsafe fn xml_sax2_attribute_decl(
     // TODO: optimize name/prefix allocation
     let (prefix, name) = split_qname(&mut *ctxt, fullname);
     (*ctxt).vctxt.valid = 1;
-    if (*ctxt).in_subset == 1 {
-        attr = xml_add_attribute_decl(
+    let attr = if (*ctxt).in_subset == 1 {
+        xml_add_attribute_decl(
             &raw mut (*ctxt).vctxt as _,
             (*(*ctxt).my_doc).int_subset,
             elem,
@@ -801,9 +799,9 @@ pub unsafe fn xml_sax2_attribute_decl(
             def,
             default_value,
             tree,
-        );
+        )
     } else if (*ctxt).in_subset == 2 {
-        attr = xml_add_attribute_decl(
+        xml_add_attribute_decl(
             &raw mut (*ctxt).vctxt as _,
             (*(*ctxt).my_doc).ext_subset,
             elem,
@@ -813,7 +811,7 @@ pub unsafe fn xml_sax2_attribute_decl(
             def,
             default_value,
             tree,
-        );
+        )
     } else {
         xml_fatal_err_msg!(
             ctxt,
@@ -822,19 +820,23 @@ pub unsafe fn xml_sax2_attribute_decl(
             name
         );
         return;
-    }
+    };
     #[cfg(feature = "libxml_valid")]
     {
         if (*ctxt).vctxt.valid == 0 {
             (*ctxt).valid = 0;
         }
-        if !attr.is_null()
-            && (*ctxt).validate != 0
+        if (*ctxt).validate != 0
             && (*ctxt).well_formed != 0
             && !(*(*ctxt).my_doc).int_subset.is_null()
         {
-            (*ctxt).valid &=
-                xml_validate_attribute_decl(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, attr);
+            if let Some(attr) = attr {
+                (*ctxt).valid &= xml_validate_attribute_decl(
+                    addr_of_mut!((*ctxt).vctxt) as _,
+                    (*ctxt).my_doc,
+                    attr,
+                );
+            }
         }
     }
 }
@@ -1798,14 +1800,14 @@ unsafe fn xml_check_defaulted_attributes(
                         cur_attr.elem.as_deref().unwrap(),
                         cur_attr.name().as_deref().unwrap(),
                         cur_attr.prefix.as_deref(),
-                    ) == cur_attr.as_ptr()
+                    ) == Some(cur_attr)
                     && (*(*(*ctxt).my_doc).int_subset)
                         .get_qattr_desc(
                             cur_attr.elem.as_deref().unwrap(),
                             cur_attr.name().as_deref().unwrap(),
                             cur_attr.prefix.as_deref(),
                         )
-                        .is_null()
+                        .is_none()
                 {
                     let mut fulln: *mut XmlChar;
 
@@ -1860,12 +1862,12 @@ unsafe fn xml_check_defaulted_attributes(
                     || (cur_attr.prefix.is_none() && cur_attr.name().as_deref() == Some("xmlns"))
                     || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
                 {
-                    let tst: *mut XmlAttribute = (*(*(*ctxt).my_doc).int_subset).get_qattr_desc(
+                    let tst = (*(*(*ctxt).my_doc).int_subset).get_qattr_desc(
                         cur_attr.elem.as_deref().unwrap(),
                         cur_attr.name().as_deref().unwrap(),
                         cur_attr.prefix.as_deref(),
                     );
-                    if tst == cur_attr.as_ptr() || tst.is_null() {
+                    if tst == Some(cur_attr) || tst.is_none() {
                         let name = cur_attr.name().unwrap();
                         let fulln = build_qname(&name, cur_attr.prefix.as_deref());
 
