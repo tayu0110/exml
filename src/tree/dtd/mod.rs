@@ -65,7 +65,7 @@ pub struct XmlDtd {
 
     // End of common part
     pub(crate) notations: Option<Box<XmlHashTable<'static, XmlNotation>>>, /* Hash table for notations if any */
-    pub(crate) elements: Option<XmlHashTable<'static, *mut XmlElement>>, /* Hash table for elements if any */
+    pub(crate) elements: Option<XmlHashTable<'static, XmlElementPtr>>, /* Hash table for elements if any */
     pub(crate) attributes: Option<XmlHashTableRef<'static, *mut XmlAttribute>>, /* Hash table for attributes if any */
     pub(crate) entities: Option<XmlHashTableRef<'static, *mut XmlEntity>>, /* Hash table for entities if any */
     pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */

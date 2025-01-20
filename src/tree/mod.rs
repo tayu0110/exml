@@ -56,7 +56,7 @@ use crate::{
             xml_register_node_default_value,
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-        valid::{xml_add_id, xml_free_attribute_table, xml_free_element, xml_is_id, xml_remove_id},
+        valid::{xml_add_id, xml_free_attribute_table, xml_is_id, xml_remove_id},
         xmlstring::{xml_str_equal, xml_strdup, xml_strncat, xml_strndup, XmlChar},
     },
 };
@@ -993,7 +993,7 @@ pub unsafe fn xml_free_dtd(cur: *mut XmlDtd) {
     // TODO !!!
 
     if let Some(table) = (*cur).elements.take() {
-        table.scan(|data, _, _, _| xml_free_element(*data));
+        table.scan(|data, _, _, _| xml_free_element(Some(*data)));
     }
     if let Some(table) = (*cur).attributes.take().map(|t| t.into_inner()) {
         xml_free_attribute_table(table);
@@ -1672,8 +1672,7 @@ pub unsafe fn xml_copy_prop_list(target: *mut XmlNode, mut cur: *mut XmlAttr) ->
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_copy_dtd(dtd: *mut XmlDtd) -> *mut XmlDtd {
     use crate::libxml::valid::{
-        xml_copy_attribute_table, xml_copy_element, xml_copy_notation_table,
-        xml_get_dtd_qelement_desc,
+        xml_copy_attribute_table, xml_copy_notation_table, xml_get_dtd_qelement_desc,
     };
 
     let mut p: *mut XmlNode = null_mut();
@@ -1699,7 +1698,9 @@ pub unsafe fn xml_copy_dtd(dtd: *mut XmlDtd) -> *mut XmlDtd {
         (*ret).notations = Some(Box::new(new));
     }
     if let Some(table) = (*dtd).elements.as_ref() {
-        (*ret).elements = Some(table.clone_with(|data, _| xml_copy_element(*data)));
+        (*ret).elements = Some(
+            table.clone_with(|data, _| xml_copy_element(*data).expect("Failed to copy element")),
+        );
     }
     if let Some(table) = (*dtd).attributes {
         (*ret).attributes = xml_copy_attribute_table(table);

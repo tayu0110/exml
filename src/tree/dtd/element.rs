@@ -26,8 +26,10 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
+#[cfg(feature = "libxml_regexp")]
+use crate::libxml::xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr};
 use crate::{
-    libxml::xmlregexp::XmlRegexpPtr,
+    libxml::valid::xml_free_doc_element_content,
     tree::{
         InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDoc, XmlDtd, XmlElementContentPtr,
         XmlElementType, XmlElementTypeVal, XmlGenericNodePtr, XmlNode,
@@ -243,4 +245,45 @@ impl From<XmlElementPtr> for *mut XmlElement {
     fn from(value: XmlElementPtr) -> Self {
         value.0.as_ptr()
     }
+}
+
+/// Build a copy of an element.
+///
+/// Returns the new xmlElementPtr or null_mut() in case of error.
+#[doc(alias = "xmlCopyElement")]
+#[cfg(feature = "libxml_tree")]
+pub(crate) unsafe fn xml_copy_element(elem: XmlElementPtr) -> Option<XmlElementPtr> {
+    use crate::libxml::valid::{xml_copy_element_content, xml_verr_memory};
+
+    let res = XmlElementPtr::new(XmlElement {
+        typ: XmlElementType::XmlElementDecl,
+        etype: elem.etype,
+        name: elem.name.clone(),
+        prefix: elem.prefix.clone(),
+        content: xml_copy_element_content(elem.content),
+        // TODO : rebuild the attribute list on the copy
+        attributes: null_mut(),
+        ..Default::default()
+    });
+    if res.is_none() {
+        xml_verr_memory(null_mut(), Some("malloc failed"));
+    }
+    res
+}
+
+/// Deallocate the memory used by an element definition
+#[doc(alias = "xmlFreeElement")]
+pub(crate) unsafe fn xml_free_element(elem: Option<XmlElementPtr>) {
+    let Some(mut elem) = elem else {
+        return;
+    };
+    elem.unlink();
+    xml_free_doc_element_content(elem.doc, elem.content);
+    elem.name = None;
+    elem.prefix = None;
+    #[cfg(feature = "libxml_regexp")]
+    if !elem.cont_model.is_null() {
+        xml_reg_free_regexp(elem.cont_model);
+    }
+    elem.free();
 }
