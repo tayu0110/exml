@@ -96,20 +96,20 @@ pub struct XmlValidState {
 pub struct XmlValidState {
     cont: XmlElementContentPtr, /* pointer to the content model subtree */
     node: *mut XmlNode,         /* pointer to the current node in the list */
-    occurs: c_long,             /* bitfield for multiple occurrences */
-    depth: c_uchar,             /* current depth in the overall tree */
-    state: c_uchar,             /* ROLLBACK_XXX */
+    occurs: i64,                /* bitfield for multiple occurrences */
+    depth: u8,                  /* current depth in the overall tree */
+    state: u8,                  /* ROLLBACK_XXX */
 }
 
 /// Callback called when a validity error is found. This is a message
 /// oriented function similar to an *printf function.
 #[doc(alias = "xmlValidityErrorFunc")]
-pub type XmlValidityErrorFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
+pub type XmlValidityErrorFunc = unsafe fn(ctx: *mut c_void, msg: *const i8);
 
 /// Callback called when a validity warning is found. This is a message
 /// oriented function similar to an *printf function.
 #[doc(alias = "xmlValidityWarningFunc")]
-pub type XmlValidityWarningFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
+pub type XmlValidityWarningFunc = unsafe fn(ctx: *mut c_void, msg: *const i8);
 
 pub type XmlValidCtxtPtr = *mut XmlValidCtxt;
 /// An xmlValidCtxt is used for error reporting when validating.
@@ -953,7 +953,7 @@ pub unsafe fn xml_add_element_decl(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn xml_dump_element_table<'a>(
     buf: &mut (impl Write + 'a),
-    table: &XmlHashTable<'static, *mut XmlElement>,
+    table: &XmlHashTable<'static, XmlElementPtr>,
 ) {
     table.scan(|data, _, _, _| xml_dump_element_decl(buf, *data));
 }
@@ -1081,42 +1081,39 @@ unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: Xml
 /// This will dump the content of the element declaration as an XML DTD definition
 #[doc(alias = "xmlDumpElementDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: *mut XmlElement) {
-    if elem.is_null() {
-        return;
-    }
-    let name = (*elem).name.as_deref().unwrap();
-    match (*elem).etype {
+pub unsafe fn xml_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlElementPtr) {
+    let name = elem.name.as_deref().unwrap();
+    match elem.etype {
         XmlElementTypeVal::XmlElementTypeEmpty => {
             write!(buf, "<!ELEMENT ");
-            if let Some(prefix) = (*elem).prefix.as_deref() {
+            if let Some(prefix) = elem.prefix.as_deref() {
                 write!(buf, "{prefix}:");
             }
             writeln!(buf, "{} EMPTY>", name);
         }
         XmlElementTypeVal::XmlElementTypeAny => {
             write!(buf, "<!ELEMENT ");
-            if let Some(prefix) = (*elem).prefix.as_deref() {
+            if let Some(prefix) = elem.prefix.as_deref() {
                 write!(buf, "{prefix}:");
             }
             writeln!(buf, "{} ANY>", name);
         }
         XmlElementTypeVal::XmlElementTypeMixed => {
             write!(buf, "<!ELEMENT ");
-            if let Some(prefix) = (*elem).prefix.as_deref() {
+            if let Some(prefix) = elem.prefix.as_deref() {
                 write!(buf, "{prefix}:");
             }
             write!(buf, "{} ", name);
-            xml_dump_element_content(buf, (*elem).content);
+            xml_dump_element_content(buf, elem.content);
             writeln!(buf, ">",);
         }
         XmlElementTypeVal::XmlElementTypeElement => {
             write!(buf, "<!ELEMENT ");
-            if let Some(prefix) = (*elem).prefix.as_deref() {
+            if let Some(prefix) = elem.prefix.as_deref() {
                 write!(buf, "{prefix}:");
             }
             write!(buf, "{} ", name);
-            xml_dump_element_content(buf, (*elem).content);
+            xml_dump_element_content(buf, elem.content);
             writeln!(buf, ">",);
         }
         _ => {

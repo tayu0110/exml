@@ -49,7 +49,8 @@ use crate::{
     },
     tree::{
         is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttribute, XmlDoc, XmlDtd,
-        XmlElement, XmlElementType, XmlEntity, XmlNotation, XmlNs, XML_LOCAL_NAMESPACE,
+        XmlElement, XmlElementPtr, XmlElementType, XmlEntity, XmlNotation, XmlNs,
+        XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -689,7 +690,7 @@ unsafe fn xml_buf_dump_notation_table<'a>(
 
 /// This will dump the content of the element declaration as an XML DTD definition
 #[doc(alias = "xmlBufDumpElementDecl")]
-unsafe fn xml_buf_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: *mut XmlElement) {
+unsafe fn xml_buf_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlElementPtr) {
     xml_dump_element_decl(buf, elem);
 }
 
@@ -806,7 +807,12 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                 }
             }
             XmlElementType::XmlElementDecl => {
-                xml_buf_dump_element_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
+                xml_buf_dump_element_decl(
+                    &mut *ctxt.buf.borrow_mut(),
+                    XmlElementPtr::from_raw(cur as *mut XmlElement)
+                        .unwrap()
+                        .unwrap(),
+                );
             }
             XmlElementType::XmlAttributeDecl => {
                 xml_buf_dump_attribute_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
@@ -1328,7 +1334,12 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                 }
             }
             XmlElementType::XmlElementDecl => {
-                xml_buf_dump_element_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
+                xml_buf_dump_element_decl(
+                    &mut *ctxt.buf.borrow_mut(),
+                    XmlElementPtr::from_raw(cur as *mut XmlElement)
+                        .unwrap()
+                        .unwrap(),
+                );
             }
             XmlElementType::XmlAttributeDecl => {
                 xml_buf_dump_attribute_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
