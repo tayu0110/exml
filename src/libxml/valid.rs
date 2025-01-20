@@ -781,11 +781,11 @@ pub unsafe fn xml_add_element_decl(
     mut name: &str,
     typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
-) -> *mut XmlElement {
+) -> Option<XmlElementPtr> {
     let mut old_attributes: *mut XmlAttribute = null_mut();
 
     if dtd.is_null() {
-        return null_mut();
+        return None;
     }
 
     match typ {
@@ -796,7 +796,7 @@ pub unsafe fn xml_add_element_decl(
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content != NULL for EMPTY\n"
                 );
-                return null_mut();
+                return None;
             }
         }
         Some(XmlElementTypeVal::XmlElementTypeAny) => {
@@ -806,7 +806,7 @@ pub unsafe fn xml_add_element_decl(
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content != NULL for ANY\n"
                 );
-                return null_mut();
+                return None;
             }
         }
         Some(XmlElementTypeVal::XmlElementTypeMixed) => {
@@ -816,7 +816,7 @@ pub unsafe fn xml_add_element_decl(
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content == NULL for MIXED\n"
                 );
-                return null_mut();
+                return None;
             }
         }
         Some(XmlElementTypeVal::XmlElementTypeElement) => {
@@ -826,7 +826,7 @@ pub unsafe fn xml_add_element_decl(
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content == NULL for ELEMENT\n"
                 );
-                return null_mut();
+                return None;
             }
         }
         _ => {
@@ -835,7 +835,7 @@ pub unsafe fn xml_add_element_decl(
                 XmlParserErrors::XmlErrInternalError,
                 "Internal: ELEMENT decl corrupted invalid type\n"
             );
-            return null_mut();
+            return None;
         }
     }
 
@@ -888,7 +888,7 @@ pub unsafe fn xml_add_element_decl(
                     None,
                 );
             }
-            return null_mut();
+            return None;
         }
         ret
     } else {
@@ -899,7 +899,7 @@ pub unsafe fn xml_add_element_decl(
             ..Default::default()
         }) else {
             xml_verr_memory(ctxt as _, Some("malloc failed"));
-            return null_mut();
+            return None;
         };
 
         // Validity Check:
@@ -919,7 +919,7 @@ pub unsafe fn xml_add_element_decl(
                 );
             }
             ret.free();
-            return null_mut();
+            return None;
         }
         // For new element, may have attributes from earlier
         // definition in internal subset
@@ -952,7 +952,7 @@ pub unsafe fn xml_add_element_decl(
         (*dtd).children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
         (*dtd).last = (*dtd).children;
     }
-    ret.as_ptr()
+    Some(ret)
 }
 
 /// This will dump the content of the element table as an XML DTD definition
@@ -1543,14 +1543,14 @@ unsafe fn xml_get_dtd_element_desc2(
     dtd: *mut XmlDtd,
     mut name: *const XmlChar,
     create: i32,
-) -> *mut XmlElement {
+) -> Option<XmlElementPtr> {
     let mut prefix: *mut XmlChar = null_mut();
 
     if dtd.is_null() {
-        return null_mut();
+        return None;
     }
     if (*dtd).elements.is_none() && create == 0 {
-        return null_mut();
+        return None;
     }
     let table = (*dtd)
         .elements
@@ -1588,7 +1588,7 @@ unsafe fn xml_get_dtd_element_desc2(
             if !uqname.is_null() {
                 xml_free(uqname as _);
             }
-            return null_mut();
+            return None;
         };
         cur = Some(res);
         if table
@@ -1613,7 +1613,7 @@ unsafe fn xml_get_dtd_element_desc2(
     if !uqname.is_null() {
         xml_free(uqname as _);
     }
-    cur.map_or(null_mut(), |cur| cur.as_ptr())
+    cur
 }
 
 /// Verify that the element don't have too many ID attributes
@@ -1816,13 +1816,12 @@ pub unsafe fn xml_add_attribute_decl(
     let celem = CString::new(elem).unwrap();
     // Validity Check:
     // Multiple ID per element
-    let elem_def: *mut XmlElement =
-        xml_get_dtd_element_desc2(ctxt, dtd, celem.as_ptr() as *const u8, 1);
-    if !elem_def.is_null() {
+    let elem_def = xml_get_dtd_element_desc2(ctxt, dtd, celem.as_ptr() as *const u8, 1);
+    if let Some(mut elem_def) = elem_def {
         #[cfg(feature = "libxml_valid")]
         {
             if matches!(typ, XmlAttributeType::XmlAttributeID)
-                && xml_scan_id_attribute_decl(null_mut(), elem_def, 1) != 0
+                && xml_scan_id_attribute_decl(null_mut(), elem_def.as_ptr(), 1) != 0
             {
                 xml_err_valid_node(
                     ctxt,
@@ -1840,16 +1839,14 @@ pub unsafe fn xml_add_attribute_decl(
         }
 
         // Insert namespace default def first they need to be processed first.
-        if xml_str_equal((*ret).name, c"xmlns".as_ptr() as _)
-            || (*ret).prefix.as_deref() == Some("xmlns")
-        {
-            (*ret).nexth = (*elem_def).attributes;
-            (*elem_def).attributes = ret;
+        if (*ret).name().as_deref() == Some("xmlns") || (*ret).prefix.as_deref() == Some("xmlns") {
+            (*ret).nexth = elem_def.attributes;
+            elem_def.attributes = ret;
         } else {
-            let mut tmp: *mut XmlAttribute = (*elem_def).attributes;
+            let mut tmp: *mut XmlAttribute = elem_def.attributes;
 
             while !tmp.is_null()
-                && (xml_str_equal((*tmp).name, c"xmlns".as_ptr() as _)
+                && ((*tmp).name().as_deref() == Some("xmlns")
                     || (*ret).prefix.as_deref() == Some("xmlns"))
             {
                 if (*tmp).nexth.is_null() {
@@ -1861,8 +1858,8 @@ pub unsafe fn xml_add_attribute_decl(
                 (*ret).nexth = (*tmp).nexth;
                 (*tmp).nexth = ret;
             } else {
-                (*ret).nexth = (*elem_def).attributes;
-                (*elem_def).attributes = ret;
+                (*ret).nexth = elem_def.attributes;
+                elem_def.attributes = ret;
             }
         }
     }

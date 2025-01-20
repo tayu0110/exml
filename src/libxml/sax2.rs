@@ -861,23 +861,21 @@ pub unsafe fn xml_sax2_element_decl(
     }
 
     let elem = if (*ctxt).in_subset == 1 {
-        XmlElementPtr::from_raw(xml_add_element_decl(
+        xml_add_element_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
             (*(*ctxt).my_doc).int_subset,
             name,
             typ,
             content,
-        ))
-        .unwrap()
+        )
     } else if (*ctxt).in_subset == 2 {
-        XmlElementPtr::from_raw(xml_add_element_decl(
+        xml_add_element_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
             (*(*ctxt).my_doc).ext_subset,
             name,
             typ,
             content,
-        ))
-        .unwrap()
+        )
     } else {
         xml_fatal_err_msg!(
             ctxt,
