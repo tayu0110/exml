@@ -36,7 +36,7 @@ use crate::{
     },
 };
 
-use super::XmlAttribute;
+use super::XmlAttributePtr;
 
 #[repr(C)]
 pub struct XmlElement {
@@ -55,10 +55,10 @@ pub struct XmlElement {
     pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
     pub(crate) doc: *mut XmlDoc,          /* the containing document */
 
-    pub(crate) etype: XmlElementTypeVal,      /* The type */
-    pub(crate) content: XmlElementContentPtr, /* the allowed element content */
-    pub(crate) attributes: *mut XmlAttribute, /* List of the declared attributes */
-    pub(crate) prefix: Option<String>,        /* the namespace prefix if any */
+    pub(crate) etype: XmlElementTypeVal,            /* The type */
+    pub(crate) content: XmlElementContentPtr,       /* the allowed element content */
+    pub(crate) attributes: Option<XmlAttributePtr>, /* List of the declared attributes */
+    pub(crate) prefix: Option<String>,              /* the namespace prefix if any */
     #[cfg(feature = "libxml_regexp")]
     pub(crate) cont_model: XmlRegexpPtr, /* the validating regexp */
     #[cfg(not(feature = "libxml_regexp"))]
@@ -79,7 +79,7 @@ impl Default for XmlElement {
             doc: null_mut(),
             etype: XmlElementTypeVal::XmlElementTypeUndefined,
             content: null_mut(),
-            attributes: null_mut(),
+            attributes: None,
             prefix: None,
             cont_model: null_mut(),
         }
@@ -263,7 +263,7 @@ pub(crate) unsafe fn xml_copy_element(elem: XmlElementPtr) -> Option<XmlElementP
         prefix: elem.prefix.clone(),
         content: xml_copy_element_content(elem.content),
         // TODO : rebuild the attribute list on the copy
-        attributes: null_mut(),
+        attributes: None,
         ..Default::default()
     });
     if res.is_none() {

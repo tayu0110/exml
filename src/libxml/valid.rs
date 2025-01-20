@@ -68,10 +68,10 @@ use crate::{
     tree::{
         xml_build_qname, xml_free_attribute, xml_free_element, xml_free_node, xml_get_doc_entity,
         xml_new_doc_node, xml_split_qname2, xml_split_qname3, NodeCommon, NodePtr, XmlAttr,
-        XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties, XmlDtd,
-        XmlElement, XmlElementContent, XmlElementContentOccur, XmlElementContentPtr,
-        XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType,
-        XmlEnumeration, XmlID, XmlNode, XmlNotation, XmlRef,
+        XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
+        XmlDocProperties, XmlDtd, XmlElement, XmlElementContent, XmlElementContentOccur,
+        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEntity,
+        XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNotation, XmlRef,
     },
 };
 
@@ -775,8 +775,6 @@ pub unsafe fn xml_add_element_decl(
     typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
 ) -> Option<XmlElementPtr> {
-    let mut old_attributes: *mut XmlAttribute = null_mut();
-
     if dtd.is_null() {
         return None;
     }
@@ -844,6 +842,7 @@ pub unsafe fn xml_add_element_decl(
         .elements
         .get_or_insert_with(|| XmlHashTable::with_capacity(0));
 
+    let mut old_attributes = None;
     // lookup old attributes inserted on an undefined element in the internal subset.
     if !(*dtd).doc.is_null() && !(*(*dtd).doc).int_subset.is_null() {
         let ret = (*(*(*dtd).doc).int_subset)
@@ -854,8 +853,7 @@ pub unsafe fn xml_add_element_decl(
         if let Some(mut ret) =
             ret.filter(|ret| ret.etype == XmlElementTypeVal::XmlElementTypeUndefined)
         {
-            old_attributes = ret.attributes;
-            ret.attributes = null_mut();
+            old_attributes = ret.attributes.take();
             (*(*(*dtd).doc).int_subset)
                 .elements
                 .as_mut()
@@ -1613,16 +1611,15 @@ unsafe fn xml_get_dtd_element_desc2(
 #[doc(alias = "xmlScanIDAttributeDecl")]
 #[cfg(feature = "libxml_valid")]
 unsafe fn xml_scan_id_attribute_decl(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr, err: i32) -> i32 {
-    let mut cur: *mut XmlAttribute;
     let mut ret: i32 = 0;
 
-    cur = elem.attributes;
-    while !cur.is_null() {
-        if matches!((*cur).atype, XmlAttributeType::XmlAttributeID) {
+    let mut cur = elem.attributes;
+    while let Some(now) = cur {
+        if matches!(now.atype, XmlAttributeType::XmlAttributeID) {
             ret += 1;
             if ret > 1 && err != 0 {
                 let elem_name = elem.name.as_deref().unwrap();
-                let cur_name = (*cur).name().unwrap();
+                let cur_name = now.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
                     elem.as_ptr() as *mut XmlNode,
@@ -1637,7 +1634,7 @@ unsafe fn xml_scan_id_attribute_decl(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr,
                 );
             }
         }
-        cur = (*cur).nexth;
+        cur = now.nexth;
     }
     ret
 }
@@ -1678,16 +1675,7 @@ pub unsafe fn xml_add_attribute_decl(
             XmlAttributeType::XmlAttributeNmtoken => {}
             XmlAttributeType::XmlAttributeNmtokens => {}
             XmlAttributeType::XmlAttributeEnumeration => {}
-            XmlAttributeType::XmlAttributeNotation => {} // _ => {
-                                                         //     xml_err_valid!(
-                                                         //         ctxt,
-                                                         //         XmlParserErrors::XmlErrInternalError,
-                                                         //         c"Internal: ATTRIBUTE struct corrupted invalid type\n".as_ptr() as _,
-                                                         //         null_mut(),
-                                                         //     );
-                                                         //     xml_free_enumeration(tree);
-                                                         //     return null_mut();
-                                                         // }
+            XmlAttributeType::XmlAttributeNotation => {}
         }
         if let Some(def) = default_value.filter(|&default_value| {
             let default_value = CString::new(default_value).unwrap();
@@ -1824,25 +1812,24 @@ pub unsafe fn xml_add_attribute_decl(
         // Insert namespace default def first they need to be processed first.
         if (*ret).name().as_deref() == Some("xmlns") || (*ret).prefix.as_deref() == Some("xmlns") {
             (*ret).nexth = elem_def.attributes;
-            elem_def.attributes = ret;
+            elem_def.attributes = XmlAttributePtr::from_raw(ret).unwrap();
         } else {
-            let mut tmp: *mut XmlAttribute = elem_def.attributes;
+            let mut tmp = elem_def.attributes;
 
-            while !tmp.is_null()
-                && ((*tmp).name().as_deref() == Some("xmlns")
-                    || (*ret).prefix.as_deref() == Some("xmlns"))
-            {
-                if (*tmp).nexth.is_null() {
+            while let Some(now) = tmp.filter(|tmp| {
+                tmp.name().as_deref() == Some("xmlns") || (*ret).prefix.as_deref() == Some("xmlns")
+            }) {
+                if now.nexth.is_none() {
                     break;
                 }
-                tmp = (*tmp).nexth;
+                tmp = now.nexth;
             }
-            if !tmp.is_null() {
-                (*ret).nexth = (*tmp).nexth;
-                (*tmp).nexth = ret;
+            if let Some(mut tmp) = tmp {
+                (*ret).nexth = tmp.nexth;
+                tmp.nexth = XmlAttributePtr::from_raw(ret).unwrap();
             } else {
                 (*ret).nexth = elem_def.attributes;
-                elem_def.attributes = ret;
+                elem_def.attributes = XmlAttributePtr::from_raw(ret).unwrap();
             }
         }
     }
@@ -4852,7 +4839,6 @@ pub unsafe fn xml_validate_one_element(
     use crate::tree::XmlNs;
 
     let mut cont: XmlElementContentPtr;
-    let mut attr: *mut XmlAttribute;
     let mut child: *mut XmlNode;
     let mut ret: i32 = 1;
     let tmp: i32;
@@ -5221,13 +5207,14 @@ pub unsafe fn xml_validate_one_element(
     }
 
     // [ VC: Required Attribute ]
-    attr = elem_decl.attributes;
-    while !attr.is_null() {
+    let mut attr = elem_decl.attributes;
+    while let Some(cur_attr) = attr {
         'found: {
-            if matches!((*attr).def, XmlAttributeDefault::XmlAttributeRequired) {
+            if matches!(cur_attr.def, XmlAttributeDefault::XmlAttributeRequired) {
                 let mut qualified: i32 = -1;
 
-                if (*attr).prefix.is_none() && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) {
+                if cur_attr.prefix.is_none() && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
+                {
                     let mut ns: *mut XmlNs;
 
                     ns = (*elem).ns_def;
@@ -5237,12 +5224,12 @@ pub unsafe fn xml_validate_one_element(
                         }
                         ns = (*ns).next;
                     }
-                } else if (*attr).prefix.as_deref() == Some("xmlns") {
+                } else if cur_attr.prefix.as_deref() == Some("xmlns") {
                     let mut ns: *mut XmlNs;
 
                     ns = (*elem).ns_def;
                     while !ns.is_null() {
-                        if (*attr).name() == (*ns).prefix() {
+                        if cur_attr.name() == (*ns).prefix() {
                             break 'found;
                         }
                         ns = (*ns).next;
@@ -5252,8 +5239,8 @@ pub unsafe fn xml_validate_one_element(
 
                     attrib = (*elem).properties;
                     while !attrib.is_null() {
-                        if xml_str_equal((*attrib).name, (*attr).name) {
-                            if let Some(prefix) = (*attr).prefix.as_deref() {
+                        if xml_str_equal((*attrib).name, cur_attr.name) {
+                            if let Some(prefix) = cur_attr.prefix.as_deref() {
                                 let mut name_space: *mut XmlNs = (*attrib).ns;
 
                                 if name_space.is_null() {
@@ -5284,9 +5271,9 @@ pub unsafe fn xml_validate_one_element(
                     }
                 }
                 if qualified == -1 {
-                    if (*attr).prefix.is_none() {
+                    if cur_attr.prefix.is_none() {
                         let elem_name = (*elem).name().unwrap();
-                        let attr_name = (*attr).name().unwrap();
+                        let attr_name = cur_attr.name().unwrap();
                         xml_err_valid_node(
                             ctxt,
                             elem,
@@ -5300,8 +5287,8 @@ pub unsafe fn xml_validate_one_element(
                         ret = 0;
                     } else {
                         let elem_name = (*elem).name().unwrap();
-                        let prefix = (*attr).prefix.as_deref().unwrap();
-                        let attr_name = (*attr).name().unwrap();
+                        let prefix = cur_attr.prefix.as_deref().unwrap();
+                        let attr_name = cur_attr.name().unwrap();
                         xml_err_valid_node(
                             ctxt,
                             elem,
@@ -5320,8 +5307,8 @@ pub unsafe fn xml_validate_one_element(
                         XmlParserErrors::XmlDTDNoPrefix,
                         "Element {} required attribute {}:{} has no prefix\n",
                         (*elem).name().unwrap(),
-                        (*attr).prefix.as_deref().unwrap(),
-                        (*attr).name().unwrap()
+                        cur_attr.prefix.as_deref().unwrap(),
+                        cur_attr.name().unwrap().into_owned()
                     );
                 } else if qualified == 1 {
                     xml_err_valid_warning!(
@@ -5330,21 +5317,22 @@ pub unsafe fn xml_validate_one_element(
                         XmlParserErrors::XmlDTDDifferentPrefix,
                         "Element {} required attribute {}:{} has different prefix\n",
                         (*elem).name().unwrap(),
-                        (*attr).prefix.as_deref().unwrap(),
-                        (*attr).name().unwrap()
+                        cur_attr.prefix.as_deref().unwrap(),
+                        cur_attr.name().unwrap().into_owned()
                     );
                 }
-            } else if matches!((*attr).def, XmlAttributeDefault::XmlAttributeFixed) {
+            } else if matches!(cur_attr.def, XmlAttributeDefault::XmlAttributeFixed) {
                 // Special tests checking #FIXED namespace declarations
                 // have the right value since this is not done as an
                 // attribute checking
-                if (*attr).prefix.is_none() && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) {
+                if cur_attr.prefix.is_none() && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
+                {
                     let mut ns: *mut XmlNs;
 
                     ns = (*elem).ns_def;
                     while !ns.is_null() {
                         if (*ns).prefix().is_none() {
-                            if !xml_str_equal((*attr).default_value, (*ns).href) {
+                            if !xml_str_equal(cur_attr.default_value, (*ns).href) {
                                 let elem_name = (*elem).name().unwrap();
                                 xml_err_valid_node(
                                     ctxt,
@@ -5361,13 +5349,13 @@ pub unsafe fn xml_validate_one_element(
                         }
                         ns = (*ns).next;
                     }
-                } else if (*attr).prefix.as_deref() == Some("xmlns") {
+                } else if cur_attr.prefix.as_deref() == Some("xmlns") {
                     let mut ns: *mut XmlNs;
 
                     ns = (*elem).ns_def;
                     while !ns.is_null() {
-                        if (*attr).name() == (*ns).prefix() {
-                            if !xml_str_equal((*attr).default_value, (*ns).href) {
+                        if cur_attr.name() == (*ns).prefix() {
+                            if !xml_str_equal(cur_attr.default_value, (*ns).href) {
                                 let elem_name = (*elem).name().unwrap();
                                 let prefix = (*ns).prefix().unwrap();
                                 xml_err_valid_node(
@@ -5392,7 +5380,7 @@ pub unsafe fn xml_validate_one_element(
             }
         }
         // found:
-        attr = (*attr).nexth;
+        attr = cur_attr.nexth;
     }
     ret
 }
