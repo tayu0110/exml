@@ -1838,36 +1838,6 @@ pub unsafe fn xml_add_attribute_decl(
     Some(ret)
 }
 
-/// Build a copy of an attribute.
-///
-/// Returns the new xmlAttributePtr or null_mut() in case of error.
-#[doc(alias = "xmlCopyAttribute")]
-#[cfg(feature = "libxml_tree")]
-extern "C" fn xml_copy_attribute(attr: *mut XmlAttribute) -> *mut XmlAttribute {
-    unsafe {
-        let cur: *mut XmlAttribute = xml_malloc(size_of::<XmlAttribute>()) as *mut XmlAttribute;
-        if cur.is_null() {
-            xml_verr_memory(null_mut(), Some("malloc failed"));
-            return null_mut();
-        }
-        memset(cur as _, 0, size_of::<XmlAttribute>());
-        std::ptr::write(&mut *cur, XmlAttribute::default());
-        (*cur).typ = XmlElementType::XmlAttributeDecl;
-        (*cur).atype = (*attr).atype;
-        (*cur).def = (*attr).def;
-        (*cur).tree = (*attr).tree.clone();
-        (*cur).elem = (*attr).elem.clone();
-        if !(*attr).name.is_null() {
-            (*cur).name = xml_strdup((*attr).name);
-        }
-        (*cur).prefix = (*attr).prefix.clone();
-        if !(*attr).default_value.is_null() {
-            (*cur).default_value = xml_strdup((*attr).default_value);
-        }
-        cur
-    }
-}
-
 /// Build a copy of an attribute table.
 ///
 /// Returns the new xmlAttributeTablePtr or null_mut() in case of error.
@@ -1911,7 +1881,7 @@ pub unsafe fn xml_free_attribute_table(mut table: XmlHashTable<'static, XmlAttri
 #[cfg(feature = "libxml_output")]
 pub unsafe fn xml_dump_attribute_table<'a>(
     buf: &mut (impl Write + 'a),
-    table: XmlHashTableRef<'static, *mut XmlAttribute>,
+    table: XmlHashTableRef<'static, XmlAttributePtr>,
 ) {
     table.scan(|data, _, _, _| xml_dump_attribute_decl(buf, *data));
 }
@@ -1919,21 +1889,18 @@ pub unsafe fn xml_dump_attribute_table<'a>(
 /// This will dump the content of the attribute declaration as an XML DTD definition
 #[doc(alias = "xmlDumpAttributeDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: *mut XmlAttribute) {
+pub unsafe fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: XmlAttributePtr) {
     use crate::{io::write_quoted, tree::xml_dump_enumeration};
 
-    if attr.is_null() {
-        return;
-    }
     write!(buf, "<!ATTLIST ");
-    let elem = (*attr).elem.as_deref().unwrap();
+    let elem = attr.elem.as_deref().unwrap();
     write!(buf, "{elem}");
     write!(buf, " ");
-    if let Some(prefix) = (*attr).prefix.as_deref() {
+    if let Some(prefix) = attr.prefix.as_deref() {
         write!(buf, "{}:", prefix);
     }
     write!(buf, "{}", (*attr).name().unwrap());
-    match (*attr).atype {
+    match attr.atype {
         XmlAttributeType::XmlAttributeCDATA => write!(buf, " CDATA").ok(),
         XmlAttributeType::XmlAttributeID => write!(buf, " ID").ok(),
         XmlAttributeType::XmlAttributeIDREF => write!(buf, " IDREF").ok(),
@@ -1944,26 +1911,26 @@ pub unsafe fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: *mu
         XmlAttributeType::XmlAttributeNmtokens => write!(buf, " NMTOKENS").ok(),
         XmlAttributeType::XmlAttributeEnumeration => {
             write!(buf, " (");
-            xml_dump_enumeration(buf, (*attr).tree.as_deref().unwrap());
+            xml_dump_enumeration(buf, attr.tree.as_deref().unwrap());
             Some(())
         }
         XmlAttributeType::XmlAttributeNotation => {
             write!(buf, " NOTATION (");
-            xml_dump_enumeration(buf, (*attr).tree.as_deref().unwrap());
+            xml_dump_enumeration(buf, attr.tree.as_deref().unwrap());
             Some(())
         }
     };
-    match (*attr).def {
+    match attr.def {
         XmlAttributeDefault::XmlAttributeNone => None,
         XmlAttributeDefault::XmlAttributeRequired => write!(buf, " #REQUIRED").ok(),
         XmlAttributeDefault::XmlAttributeImplied => write!(buf, " #IMPLIED").ok(),
         XmlAttributeDefault::XmlAttributeFixed => write!(buf, " #FIXED").ok(),
     };
-    if !(*attr).default_value.is_null() {
+    if !attr.default_value.is_null() {
         write!(buf, " ");
         write_quoted(
             buf,
-            CStr::from_ptr((*attr).default_value as *const i8)
+            CStr::from_ptr(attr.default_value as *const i8)
                 .to_string_lossy()
                 .as_ref(),
         );
