@@ -69,7 +69,7 @@ use crate::{
         xml_build_qname, xml_free_attribute, xml_free_element, xml_free_node, xml_get_doc_entity,
         xml_new_doc_node, xml_split_qname2, xml_split_qname3, NodeCommon, NodePtr, XmlAttr,
         XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
-        XmlDocProperties, XmlDtd, XmlElement, XmlElementContent, XmlElementContentOccur,
+        XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur,
         XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEntity,
         XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNotation, XmlRef,
     },
@@ -285,20 +285,17 @@ pub(crate) unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>)
 #[doc(alias = "xmlAddNotationDecl")]
 pub unsafe fn xml_add_notation_decl<'a>(
     _ctxt: XmlValidCtxtPtr,
-    dtd: *mut XmlDtd,
+    dtd: Option<&'a mut XmlDtd>,
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<&'a XmlNotation> {
-    if dtd.is_null() {
-        return None;
-    }
     if public_id.is_none() && system_id.is_none() {
         return None;
     }
 
     // Create the Notation table if needed.
-    let table = (*dtd)
+    let table = dtd?
         .notations
         .get_or_insert_with(|| Box::new(XmlHashTable::with_capacity(0)));
 
@@ -770,15 +767,12 @@ unsafe fn xml_err_valid_node(
 #[doc(alias = "xmlAddElementDecl")]
 pub unsafe fn xml_add_element_decl(
     ctxt: XmlValidCtxtPtr,
-    dtd: *mut XmlDtd,
+    dtd: Option<XmlDtdPtr>,
     mut name: &str,
     typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
 ) -> Option<XmlElementPtr> {
-    if dtd.is_null() {
-        return None;
-    }
-
+    let mut dtd = dtd?;
     match typ {
         Some(XmlElementTypeVal::XmlElementTypeEmpty) => {
             if !content.is_null() {
@@ -837,32 +831,32 @@ pub unsafe fn xml_add_element_decl(
         name = localname;
     }
 
-    // Create the Element table if needed.
-    let table = (*dtd)
-        .elements
-        .get_or_insert_with(|| XmlHashTable::with_capacity(0));
-
     let mut old_attributes = None;
     // lookup old attributes inserted on an undefined element in the internal subset.
-    if !(*dtd).doc.is_null() && !(*(*dtd).doc).int_subset.is_null() {
-        let ret = (*(*(*dtd).doc).int_subset)
-            .elements
-            .as_ref()
-            .and_then(|table| table.lookup2(name, ns))
-            .cloned();
-        if let Some(mut ret) =
-            ret.filter(|ret| ret.etype == XmlElementTypeVal::XmlElementTypeUndefined)
-        {
-            old_attributes = ret.attributes.take();
-            (*(*(*dtd).doc).int_subset)
+    if !dtd.doc.is_null() {
+        if let Some(mut dtd) = (*dtd.doc).int_subset {
+            let ret = dtd
                 .elements
-                .as_mut()
-                .unwrap()
-                .remove_entry2(name, ns, |_, _| {});
-            xml_free_element(Some(ret));
+                .as_ref()
+                .and_then(|table| table.lookup2(name, ns))
+                .cloned();
+            if let Some(mut ret) =
+                ret.filter(|ret| ret.etype == XmlElementTypeVal::XmlElementTypeUndefined)
+            {
+                old_attributes = ret.attributes.take();
+                dtd.elements
+                    .as_mut()
+                    .unwrap()
+                    .remove_entry2(name, ns, |_, _| {});
+                xml_free_element(Some(ret));
+            }
         }
     }
 
+    // Create the Element table if needed.
+    let table = dtd
+        .elements
+        .get_or_insert_with(|| XmlHashTable::with_capacity(0));
     // The element may already be present if one of its attribute was registered first
     let mut ret = if let Some(ret) = table.lookup2(name, ns).cloned() {
         if !matches!(ret.etype, XmlElementTypeVal::XmlElementTypeUndefined) {
@@ -871,7 +865,7 @@ pub unsafe fn xml_add_element_decl(
                 // The element is already defined in this DTD.
                 xml_err_valid_node(
                     ctxt,
-                    dtd as *mut XmlNode,
+                    dtd.as_ptr() as *mut XmlNode,
                     XmlParserErrors::XmlDTDElemRedefined,
                     format!("Redefinition of element {name}\n").as_str(),
                     Some(name),
@@ -901,7 +895,7 @@ pub unsafe fn xml_add_element_decl(
                 // The element is already defined in this DTD.
                 xml_err_valid_node(
                     ctxt,
-                    dtd as *mut XmlNode,
+                    dtd.as_ptr() as *mut XmlNode,
                     XmlParserErrors::XmlDTDElemRedefined,
                     format!("Redefinition of element {name}\n").as_str(),
                     Some(name),
@@ -929,19 +923,19 @@ pub unsafe fn xml_add_element_decl(
             (*content).parent = 1 as XmlElementContentPtr;
         }
     } else {
-        ret.content = xml_copy_doc_element_content((*dtd).doc, content);
+        ret.content = xml_copy_doc_element_content(dtd.doc, content);
     }
 
     // Link it to the DTD
-    ret.parent = dtd;
-    ret.doc = (*dtd).doc;
-    if let Some(mut last) = (*dtd).last {
+    ret.parent = Some(dtd);
+    ret.doc = dtd.doc;
+    if let Some(mut last) = dtd.last {
         last.next = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
         ret.prev = Some(last);
-        (*dtd).last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
     } else {
-        (*dtd).children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
-        (*dtd).last = (*dtd).children;
+        dtd.children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        dtd.last = dtd.children;
     }
     Some(ret)
 }
@@ -1528,19 +1522,16 @@ macro_rules! xml_err_valid_warning {
 #[doc(alias = "xmlGetDtdElementDesc2")]
 unsafe fn xml_get_dtd_element_desc2(
     ctxt: XmlValidCtxtPtr,
-    dtd: *mut XmlDtd,
+    mut dtd: XmlDtdPtr,
     mut name: *const XmlChar,
     create: i32,
 ) -> Option<XmlElementPtr> {
     let mut prefix: *mut XmlChar = null_mut();
 
-    if dtd.is_null() {
+    if dtd.elements.is_none() && create == 0 {
         return None;
     }
-    if (*dtd).elements.is_none() && create == 0 {
-        return None;
-    }
-    let table = (*dtd)
+    let table = dtd
         .elements
         .get_or_insert_with(|| XmlHashTable::with_capacity(0));
     let uqname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix));
@@ -1647,7 +1638,7 @@ unsafe fn xml_scan_id_attribute_decl(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr,
 #[doc(alias = "xmlAddAttributeDecl")]
 pub unsafe fn xml_add_attribute_decl(
     ctxt: XmlValidCtxtPtr,
-    dtd: *mut XmlDtd,
+    dtd: Option<XmlDtdPtr>,
     elem: &str,
     name: &str,
     ns: Option<&str>,
@@ -1656,9 +1647,7 @@ pub unsafe fn xml_add_attribute_decl(
     mut default_value: Option<&str>,
     tree: Option<Box<XmlEnumeration>>,
 ) -> Option<XmlAttributePtr> {
-    if dtd.is_null() {
-        return None;
-    }
+    let mut dtd = dtd?;
 
     #[cfg(feature = "libxml_valid")]
     {
@@ -1677,15 +1666,12 @@ pub unsafe fn xml_add_attribute_decl(
         }
         if let Some(def) = default_value.filter(|&default_value| {
             let default_value = CString::new(default_value).unwrap();
-            xml_validate_attribute_value_internal(
-                (*dtd).doc,
-                typ,
-                default_value.as_ptr() as *const u8,
-            ) == 0
+            xml_validate_attribute_value_internal(dtd.doc, typ, default_value.as_ptr() as *const u8)
+                == 0
         }) {
             xml_err_valid_node(
                 ctxt,
-                dtd as *mut XmlNode,
+                dtd.as_ptr() as *mut XmlNode,
                 XmlParserErrors::XmlDTDAttributeDefault,
                 format!("Attribute {elem} of {name}: invalid default value\n").as_str(),
                 Some(elem),
@@ -1701,20 +1687,19 @@ pub unsafe fn xml_add_attribute_decl(
 
     // Check first that an attribute defined in the external subset wasn't
     // already defined in the internal subset
-    if !(*dtd).doc.is_null()
-        && (*(*dtd).doc).ext_subset == dtd
-        && !(*(*dtd).doc).int_subset.is_null()
-    {
-        if let Some(attributes) = (*(*(*dtd).doc).int_subset).attributes {
-            let ret = attributes.lookup3(name, ns, Some(elem)).copied();
-            if ret.is_some() {
-                return None;
+    if !dtd.doc.is_null() && (*dtd.doc).ext_subset == Some(dtd) {
+        if let Some(int_subset) = (*dtd.doc).int_subset {
+            if let Some(attributes) = int_subset.attributes {
+                let ret = attributes.lookup3(name, ns, Some(elem)).copied();
+                if ret.is_some() {
+                    return None;
+                }
             }
         }
     }
 
     // Create the Attribute table if needed.
-    let mut table = if let Some(table) = (*dtd).attributes {
+    let mut table = if let Some(table) = dtd.attributes {
         table
     } else {
         let table = XmlHashTable::with_capacity(0);
@@ -1722,7 +1707,7 @@ pub unsafe fn xml_add_attribute_decl(
             xml_verr_memory(ctxt, Some("xmlAddAttributeDecl: Table creation failed!\n"));
             return None;
         };
-        (*dtd).attributes = Some(table);
+        dtd.attributes = Some(table);
         table
     };
 
@@ -1731,7 +1716,7 @@ pub unsafe fn xml_add_attribute_decl(
         atype: typ,
         // doc must be set before possible error causes call
         // to xmlFreeAttribute (because it's used to check on dict use)
-        doc: (*dtd).doc,
+        doc: dtd.doc,
         name: xml_strndup(name.as_ptr(), name.len() as i32),
         prefix: ns.map(|ns| ns.to_owned()),
         elem: Some(elem.to_owned()),
@@ -1764,7 +1749,7 @@ pub unsafe fn xml_add_attribute_decl(
             // The attribute is already defined in this DTD.
             xml_err_valid_warning!(
                 ctxt,
-                dtd as *mut XmlNode,
+                dtd.as_ptr() as *mut XmlNode,
                 XmlParserErrors::XmlDTDAttributeRedefined,
                 "Attribute {} of element {}: already defined\n",
                 name,
@@ -1787,7 +1772,7 @@ pub unsafe fn xml_add_attribute_decl(
             {
                 xml_err_valid_node(
                     ctxt,
-                    dtd as *mut XmlNode,
+                    dtd.as_ptr() as *mut XmlNode,
                     XmlParserErrors::XmlDTDMultipleID,
                     format!("Element {elem} has too may ID attributes defined : {name}\n").as_str(),
                     Some(elem),
@@ -1826,14 +1811,14 @@ pub unsafe fn xml_add_attribute_decl(
     }
 
     // Link it to the DTD
-    ret.parent = dtd;
-    if let Some(mut last) = (*dtd).last {
+    ret.parent = Some(dtd);
+    if let Some(mut last) = dtd.last {
         last.next = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
         ret.prev = Some(last);
-        (*dtd).last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
     } else {
-        (*dtd).children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
-        (*dtd).last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        dtd.children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
     }
     Some(ret)
 }
@@ -2060,8 +2045,8 @@ pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: *mut XmlAttr
     if doc.is_null() {
         return 0;
     }
-    if (*doc).int_subset.is_null()
-        && (*doc).ext_subset.is_null()
+    if (*doc).int_subset.is_none()
+        && (*doc).ext_subset.is_none()
         && !matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode)
     {
         return 0;
@@ -2095,23 +2080,27 @@ pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: *mut XmlAttr
 
         let mut attr_decl = None;
         if !fullelemname.is_null() && !fullattrname.is_null() {
-            attr_decl = (*(*doc).int_subset).get_attr_desc(
-                CStr::from_ptr(fullelemname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                CStr::from_ptr(fullattrname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            );
-            if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_attr_desc(
+            attr_decl = (*doc).int_subset.and_then(|dtd| {
+                dtd.get_attr_desc(
                     CStr::from_ptr(fullelemname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
                     CStr::from_ptr(fullattrname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                );
+                )
+            });
+            if attr_decl.is_none() {
+                if let Some(ext_subset) = (*doc).ext_subset {
+                    attr_decl = ext_subset.get_attr_desc(
+                        CStr::from_ptr(fullelemname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        CStr::from_ptr(fullattrname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                }
             }
         }
 
@@ -2277,7 +2266,7 @@ pub(crate) unsafe fn xml_is_ref(
         }
     }
 
-    if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
+    if (*doc).int_subset.is_none() && (*doc).ext_subset.is_none() {
         return 0;
     } else if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
         // TODO @@@
@@ -2286,15 +2275,19 @@ pub(crate) unsafe fn xml_is_ref(
         if elem.is_null() {
             return 0;
         }
-        let mut attr_decl = (*(*doc).int_subset).get_attr_desc(
-            (*elem).name().as_deref().unwrap(),
-            (*attr).name().as_deref().unwrap(),
-        );
-        if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-            attr_decl = (*(*doc).ext_subset).get_attr_desc(
+        let mut attr_decl = (*doc).int_subset.and_then(|dtd| {
+            dtd.get_attr_desc(
                 (*elem).name().as_deref().unwrap(),
                 (*attr).name().as_deref().unwrap(),
-            );
+            )
+        });
+        if attr_decl.is_none() {
+            if let Some(ext_subset) = (*doc).ext_subset {
+                attr_decl = ext_subset.get_attr_desc(
+                    (*elem).name().as_deref().unwrap(),
+                    (*attr).name().as_deref().unwrap(),
+                );
+            }
         }
 
         if attr_decl.map_or(false, |attr_decl| {
@@ -2425,9 +2418,9 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> i32 
 
     // When doing post validation against a separate DTD, those may
     // no internal subset has been generated
-    if !(*doc).int_subset.is_null() && !(*(*doc).int_subset).name.is_null() {
+    if let Some(int_subset) = (*doc).int_subset.filter(|dtd| !dtd.name.is_null()) {
         // Check first the document root against the NQName
-        if !xml_str_equal((*(*doc).int_subset).name, (*root).name) {
+        if !xml_str_equal(int_subset.name, (*root).name) {
             if !(*root).ns.is_null() && (*(*root).ns).prefix().is_some() {
                 let mut fname: [XmlChar; 50] = [0; 50];
 
@@ -2441,7 +2434,7 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> i32 
                     xml_verr_memory(ctxt, None);
                     return 0;
                 }
-                ret = xml_str_equal((*(*doc).int_subset).name, fullname) as i32;
+                ret = xml_str_equal(int_subset.name, fullname) as i32;
                 if fullname != fname.as_ptr() as _ && fullname != (*root).name as _ {
                     xml_free(fullname as _);
                 }
@@ -2450,7 +2443,7 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> i32 
                     return 1;
                 }
             }
-            if xml_str_equal((*(*doc).int_subset).name, c"HTML".as_ptr() as _)
+            if xml_str_equal(int_subset.name, c"HTML".as_ptr() as _)
                 && xml_str_equal((*root).name, c"html".as_ptr() as _)
             {
                 // goto name_ok;
@@ -2458,7 +2451,7 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> i32 
             }
 
             let root_name = (*root).name().unwrap();
-            let subset_name = (*(*doc).int_subset).name().unwrap();
+            let subset_name = int_subset.name().unwrap();
             xml_err_valid_node(
                 ctxt,
                 root,
@@ -2480,7 +2473,7 @@ macro_rules! CHECK_DTD {
     ($doc:expr) => {
         if $doc.is_null() {
             return 0;
-        } else if (*$doc).int_subset.is_null() && (*$doc).ext_subset.is_null() {
+        } else if (*$doc).int_subset.is_none() && (*$doc).ext_subset.is_none() {
             return 0;
         }
     };
@@ -2725,10 +2718,13 @@ pub unsafe fn xml_valid_normalize_attribute_value(
             xml_free(fullname as _);
         }
     }
-    let mut attr_decl =
-        (*(*doc).int_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
-    if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-        attr_decl = (*(*doc).ext_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
+    let mut attr_decl = (*doc)
+        .int_subset
+        .and_then(|dtd| dtd.get_attr_desc((*elem).name().as_deref().unwrap(), name));
+    if attr_decl.is_none() {
+        if let Some(ext_subset) = (*doc).ext_subset {
+            attr_decl = ext_subset.get_attr_desc((*elem).name().as_deref().unwrap(), name);
+        }
     }
 
     let Some(attr_decl) = attr_decl else {
@@ -2792,34 +2788,42 @@ pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
         if fullname.is_null() {
             return null_mut();
         }
-        attr_decl = (*(*doc).int_subset).get_attr_desc(
-            CStr::from_ptr(fullname as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-            name,
-        );
-        if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-            attr_decl = (*(*doc).ext_subset).get_attr_desc(
+        attr_decl = (*doc).int_subset.and_then(|dtd| {
+            dtd.get_attr_desc(
                 CStr::from_ptr(fullname as *const i8)
                     .to_string_lossy()
                     .as_ref(),
                 name,
-            );
-            if attr_decl.is_some() {
-                extsubset = 1;
+            )
+        });
+        if attr_decl.is_none() {
+            if let Some(ext_subset) = (*doc).ext_subset {
+                attr_decl = ext_subset.get_attr_desc(
+                    CStr::from_ptr(fullname as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    name,
+                );
+                if attr_decl.is_some() {
+                    extsubset = 1;
+                }
             }
         }
         if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
             xml_free(fullname as _);
         }
     }
-    if attr_decl.is_none() && !(*doc).int_subset.is_null() {
-        attr_decl = (*(*doc).int_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
+    if attr_decl.is_none() {
+        if let Some(int_subset) = (*doc).int_subset {
+            attr_decl = int_subset.get_attr_desc((*elem).name().as_deref().unwrap(), name);
+        }
     }
-    if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-        attr_decl = (*(*doc).ext_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
-        if attr_decl.is_some() {
-            extsubset = 1;
+    if attr_decl.is_none() {
+        if let Some(ext_subset) = (*doc).ext_subset {
+            attr_decl = ext_subset.get_attr_desc((*elem).name().as_deref().unwrap(), name);
+            if attr_decl.is_some() {
+                extsubset = 1;
+            }
         }
     }
 
@@ -2978,8 +2982,8 @@ pub unsafe fn xml_validate_attribute_decl(
             // The attribute may be declared in the internal subset and the
             // element in the external subset.
             nb_id = 0;
-            if !(*doc).int_subset.is_null() {
-                if let Some(table) = (*(*doc).int_subset).attributes {
+            if let Some(int_subset) = (*doc).int_subset {
+                if let Some(table) = int_subset.attributes {
                     table.scan(|&payload, _, _, name3| {
                         if matches!(payload.atype, XmlAttributeType::XmlAttributeID)
                             && name3.map(|n| n.as_ref())
@@ -3001,7 +3005,7 @@ pub unsafe fn xml_validate_attribute_decl(
                 nb_id,
                 (*attr).name().unwrap().into_owned()
             );
-        } else if !(*doc).ext_subset.is_null() {
+        } else if (*doc).ext_subset.is_some() {
             let mut ext_id: i32 = 0;
             elem = xml_get_dtd_element_desc(
                 (*doc).ext_subset,
@@ -3122,20 +3126,15 @@ pub unsafe fn xml_validate_notation_decl(
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDtd")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc, dtd: *mut XmlDtd) -> i32 {
-    let mut ret: i32;
-
-    if dtd.is_null() {
-        return 0;
-    }
+pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc, dtd: XmlDtdPtr) -> i32 {
     if doc.is_null() {
         return 0;
     }
-    let old_ext: *mut XmlDtd = (*doc).ext_subset;
-    let old_int: *mut XmlDtd = (*doc).int_subset;
-    (*doc).ext_subset = dtd;
-    (*doc).int_subset = null_mut();
-    ret = xml_validate_root(ctxt, doc);
+    let old_ext = (*doc).ext_subset;
+    let old_int = (*doc).int_subset;
+    (*doc).ext_subset = Some(dtd);
+    (*doc).int_subset = None;
+    let mut ret = xml_validate_root(ctxt, doc);
     if ret == 0 {
         (*doc).ext_subset = old_ext;
         (*doc).int_subset = old_int;
@@ -3289,11 +3288,8 @@ unsafe fn xml_validate_attribute_value2(
             xml_free(dup as _);
         }
         XmlAttributeType::XmlAttributeNotation => {
-            let nota = xml_get_dtd_notation_desc((*doc).int_subset, value).or_else(|| {
-                (!(*doc).ext_subset.is_null())
-                    .then(|| xml_get_dtd_notation_desc((*doc).ext_subset, value))
-                    .flatten()
-            });
+            let nota = xml_get_dtd_notation_desc((*doc).int_subset.as_deref(), value)
+                .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset.as_deref(), value));
 
             if nota.is_none() {
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
@@ -3380,14 +3376,13 @@ unsafe fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCt
         if elem.is_none() && !doc.is_null() {
             elem = xml_get_dtd_element_desc((*doc).ext_subset, cur_elem.as_ptr() as *const u8);
         }
-        if elem.is_none()
-            && !cur.parent.is_null()
-            && matches!((*cur.parent).element_type(), XmlElementType::XmlDTDNode)
-        {
-            elem = xml_get_dtd_element_desc(
-                (*cur.parent).as_dtd_node().unwrap().as_ptr(),
-                cur_elem.as_ptr() as *const u8,
-            );
+        if elem.is_none() {
+            if let Some(dtd) = cur
+                .parent
+                .filter(|dtd| dtd.element_type() == XmlElementType::XmlDTDNode)
+            {
+                elem = xml_get_dtd_element_desc(Some(dtd), cur_elem.as_ptr() as *const u8);
+            }
         }
         let Some(elem) = elem else {
             let name = (*cur).name().unwrap();
@@ -3460,41 +3455,35 @@ extern "C" fn xml_validate_notation_callback(cur: *mut XmlEntity, ctxt: XmlValid
 #[doc(alias = "xmlValidateDtdFinal")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> i32 {
-    let mut dtd: *mut XmlDtd;
-
     if doc.is_null() || ctxt.is_null() {
         return 0;
     }
-    if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
+    if (*doc).int_subset.is_none() && (*doc).ext_subset.is_none() {
         return 0;
     }
     (*ctxt).doc = doc;
     (*ctxt).valid = 1;
-    dtd = (*doc).int_subset;
-    if !dtd.is_null() {
-        if let Some(table) = (*dtd).attributes {
+    let dtd = (*doc).int_subset;
+    if let Some(dtd) = dtd {
+        if let Some(table) = dtd.attributes {
             table.scan(|&payload, _, _, _| {
                 xml_validate_attribute_callback(payload, ctxt);
             });
         }
-    }
-    if !dtd.is_null() {
-        if let Some(entities) = (*dtd).entities {
+        if let Some(entities) = dtd.entities {
             entities.scan(|payload, _, _, _| {
                 xml_validate_notation_callback(*payload, ctxt);
             });
         }
     }
-    dtd = (*doc).ext_subset;
-    if !dtd.is_null() {
-        if let Some(table) = (*dtd).attributes {
+    let dtd = (*doc).ext_subset;
+    if let Some(dtd) = dtd {
+        if let Some(table) = dtd.attributes {
             table.scan(|payload, _, _, _| {
                 xml_validate_attribute_callback(*payload, ctxt);
             });
         }
-    }
-    if !dtd.is_null() {
-        if let Some(entities) = (*dtd).entities {
+        if let Some(entities) = dtd.entities {
             entities.scan(|entity, _, _, _| {
                 xml_validate_notation_callback(*entity, ctxt);
             });
@@ -3520,15 +3509,14 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> 
     if doc.is_null() {
         return 0;
     }
-    if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
+    if (*doc).int_subset.is_none() && (*doc).ext_subset.is_none() {
         xml_err_valid!(ctxt, XmlParserErrors::XmlDTDNoDTD, "no DTD found!\n");
         return 0;
     }
-    if !(*doc).int_subset.is_null()
-        && ((*(*doc).int_subset).system_id.is_some() || (*(*doc).int_subset).external_id.is_some())
-        && (*doc).ext_subset.is_null()
-    {
-        let sys_id = if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
+    if let Some(int_subset) = (*doc).int_subset.filter(|dtd| {
+        (dtd.system_id.is_some() || dtd.external_id.is_some()) && (*doc).ext_subset.is_none()
+    }) {
+        let sys_id = if let Some(system_id) = int_subset.system_id.as_deref() {
             let Some(sys_id) = (*doc)
                 .url
                 .as_deref()
@@ -3546,10 +3534,11 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> 
         } else {
             None
         };
-        let external_id = (*(*doc).int_subset).external_id.as_deref();
-        (*doc).ext_subset = xml_parse_dtd(external_id, sys_id.as_deref());
-        if (*doc).ext_subset.is_null() {
-            if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
+        let external_id = int_subset.external_id.as_deref();
+        (*doc).ext_subset =
+            XmlDtdPtr::from_raw(xml_parse_dtd(external_id, sys_id.as_deref())).unwrap();
+        if (*doc).ext_subset.is_none() {
+            if let Some(system_id) = int_subset.system_id.as_deref() {
                 xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
@@ -3692,7 +3681,7 @@ unsafe fn xml_valid_get_elem_decl(
     if let Some(prefix) = prefix {
         elem_decl =
             xml_get_dtd_qelement_desc((*doc).int_subset, &(*elem).name().unwrap(), Some(&prefix));
-        if elem_decl.is_none() && !(*doc).ext_subset.is_null() {
+        if elem_decl.is_none() && (*doc).ext_subset.is_some() {
             elem_decl = xml_get_dtd_qelement_desc(
                 (*doc).ext_subset,
                 &(*elem).name().unwrap(),
@@ -3709,7 +3698,7 @@ unsafe fn xml_valid_get_elem_decl(
     // full QName but in that case being flexible makes sense.
     if elem_decl.is_none() {
         elem_decl = xml_get_dtd_element_desc((*doc).int_subset, (*elem).name);
-        if elem_decl.is_none() && !(*doc).ext_subset.is_null() {
+        if elem_decl.is_none() && (*doc).ext_subset.is_some() {
             elem_decl = xml_get_dtd_element_desc((*doc).ext_subset, (*elem).name);
             if elem_decl.is_some() && !extsubset.is_null() {
                 *extsubset = 1;
@@ -5393,36 +5382,44 @@ pub unsafe fn xml_validate_one_attribute(
             return 0;
         }
         if !(*attr).ns.is_null() {
-            attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                CStr::from_ptr(fullname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                (*attr).name().as_deref().unwrap(),
-                (*(*attr).ns).prefix().as_deref(),
-            );
-            if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
+            attr_decl = (*doc).int_subset.and_then(|dtd| {
+                dtd.get_qattr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
                     (*attr).name().as_deref().unwrap(),
                     (*(*attr).ns).prefix().as_deref(),
-                );
+                )
+            });
+            if attr_decl.is_none() && (*doc).ext_subset.is_some() {
+                attr_decl = (*doc).ext_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc(
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        (*attr).name().as_deref().unwrap(),
+                        (*(*attr).ns).prefix().as_deref(),
+                    )
+                });
             }
         } else {
-            attr_decl = (*(*doc).int_subset).get_attr_desc(
-                CStr::from_ptr(fullname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                (*attr).name().as_deref().unwrap(),
-            );
-            if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_attr_desc(
+            attr_decl = (*doc).int_subset.and_then(|dtd| {
+                dtd.get_attr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
                     (*attr).name().as_deref().unwrap(),
-                );
+                )
+            });
+            if attr_decl.is_none() && (*doc).ext_subset.is_some() {
+                attr_decl = (*doc).ext_subset.and_then(|dtd| {
+                    dtd.get_attr_desc(
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        (*attr).name().as_deref().unwrap(),
+                    )
+                });
             }
         }
         if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
@@ -5431,28 +5428,36 @@ pub unsafe fn xml_validate_one_attribute(
     }
     if attr_decl.is_none() {
         if !(*attr).ns.is_null() {
-            attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                (*elem).name().unwrap().as_ref(),
-                (*attr).name().as_deref().unwrap(),
-                (*(*attr).ns).prefix().as_deref(),
-            );
-            if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
+            attr_decl = (*doc).int_subset.and_then(|dtd| {
+                dtd.get_qattr_desc(
                     (*elem).name().unwrap().as_ref(),
                     (*attr).name().as_deref().unwrap(),
                     (*(*attr).ns).prefix().as_deref(),
-                );
+                )
+            });
+            if attr_decl.is_none() && (*doc).ext_subset.is_some() {
+                attr_decl = (*doc).ext_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc(
+                        (*elem).name().unwrap().as_ref(),
+                        (*attr).name().as_deref().unwrap(),
+                        (*(*attr).ns).prefix().as_deref(),
+                    )
+                });
             }
         } else {
-            attr_decl = (*(*doc).int_subset).get_attr_desc(
-                (*elem).name().as_deref().unwrap(),
-                (*attr).name().as_deref().unwrap(),
-            );
-            if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_attr_desc(
+            attr_decl = (*doc).int_subset.and_then(|dtd| {
+                dtd.get_attr_desc(
                     (*elem).name().as_deref().unwrap(),
                     (*attr).name().as_deref().unwrap(),
-                );
+                )
+            });
+            if attr_decl.is_none() && (*doc).ext_subset.is_some() {
+                attr_decl = (*doc).ext_subset.and_then(|dtd| {
+                    dtd.get_attr_desc(
+                        (*elem).name().as_deref().unwrap(),
+                        (*attr).name().as_deref().unwrap(),
+                    )
+                });
             }
         }
     }
@@ -5550,8 +5555,8 @@ pub unsafe fn xml_validate_one_attribute(
         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
 
         // First check that the given NOTATION was declared
-        let nota = xml_get_dtd_notation_desc((*doc).int_subset, &value)
-            .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset, &value));
+        let nota = xml_get_dtd_notation_desc((*doc).int_subset.as_deref(), &value)
+            .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset.as_deref(), &value));
 
         if nota.is_none() {
             let attr_name = (*attr).name().unwrap();
@@ -5702,36 +5707,44 @@ pub unsafe fn xml_validate_one_namespace(
             return 0;
         }
         if let Some(prefix) = (*ns).prefix() {
-            attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                CStr::from_ptr(fullname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                &prefix,
-                Some("xmlns"),
-            );
-            if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
+            attr_decl = (*doc).int_subset.and_then(|dtd| {
+                dtd.get_qattr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
                     &prefix,
                     Some("xmlns"),
-                );
+                )
+            });
+            if attr_decl.is_none() && (*doc).ext_subset.is_some() {
+                attr_decl = (*doc).ext_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc(
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        &prefix,
+                        Some("xmlns"),
+                    )
+                });
             }
         } else {
-            attr_decl = (*(*doc).int_subset).get_attr_desc(
-                CStr::from_ptr(fullname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                "xmlns",
-            );
-            if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_attr_desc(
+            attr_decl = (*doc).int_subset.and_then(|dtd| {
+                dtd.get_attr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
                     "xmlns",
-                );
+                )
+            });
+            if attr_decl.is_none() && (*doc).ext_subset.is_some() {
+                attr_decl = (*doc).ext_subset.and_then(|dtd| {
+                    dtd.get_attr_desc(
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        "xmlns",
+                    )
+                });
             }
         }
         if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
@@ -5740,24 +5753,22 @@ pub unsafe fn xml_validate_one_namespace(
     }
     if attr_decl.is_none() {
         if let Some(prefix) = (*ns).prefix() {
-            attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                (*elem).name().unwrap().as_ref(),
-                &prefix,
-                Some("xmlns"),
-            );
-            if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
-                    (*elem).name().unwrap().as_ref(),
-                    &prefix,
-                    Some("xmlns"),
-                );
+            attr_decl = (*doc).int_subset.and_then(|dtd| {
+                dtd.get_qattr_desc((*elem).name().unwrap().as_ref(), &prefix, Some("xmlns"))
+            });
+            if attr_decl.is_none() && (*doc).ext_subset.is_some() {
+                attr_decl = (*doc).ext_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc((*elem).name().unwrap().as_ref(), &prefix, Some("xmlns"))
+                });
             }
         } else {
-            attr_decl =
-                (*(*doc).int_subset).get_attr_desc((*elem).name().as_deref().unwrap(), "xmlns");
-            if attr_decl.is_none() && !(*doc).ext_subset.is_null() {
-                attr_decl =
-                    (*(*doc).ext_subset).get_attr_desc((*elem).name().as_deref().unwrap(), "xmlns");
+            attr_decl = (*doc)
+                .int_subset
+                .and_then(|dtd| dtd.get_attr_desc((*elem).name().as_deref().unwrap(), "xmlns"));
+            if attr_decl.is_none() && (*doc).ext_subset.is_some() {
+                attr_decl = (*doc)
+                    .ext_subset
+                    .and_then(|dtd| dtd.get_attr_desc((*elem).name().as_deref().unwrap(), "xmlns"));
             }
         }
     }
@@ -5877,8 +5888,8 @@ pub unsafe fn xml_validate_one_namespace(
         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
 
         // First check that the given NOTATION was declared
-        let nota = xml_get_dtd_notation_desc((*doc).int_subset, &value)
-            .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset, &value));
+        let nota = xml_get_dtd_notation_desc((*doc).int_subset.as_deref(), &value)
+            .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset.as_deref(), &value));
 
         if nota.is_none() {
             if let Some(prefix) = (*ns).prefix() {
@@ -6208,15 +6219,12 @@ pub unsafe fn xml_validate_notation_use(
     doc: *mut XmlDoc,
     notation_name: &str,
 ) -> i32 {
-    if doc.is_null() || (*doc).int_subset.is_null() {
+    if doc.is_null() || (*doc).int_subset.is_none() {
         return -1;
     }
 
-    let nota_decl = xml_get_dtd_notation_desc((*doc).int_subset, notation_name).or_else(|| {
-        (!(*doc).ext_subset.is_null())
-            .then(|| xml_get_dtd_notation_desc((*doc).ext_subset, notation_name))
-            .flatten()
-    });
+    let nota_decl = xml_get_dtd_notation_desc((*doc).int_subset.as_deref(), notation_name)
+        .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset.as_deref(), notation_name));
 
     if nota_decl.is_none() && !ctxt.is_null() {
         xml_err_valid_node(
@@ -6239,12 +6247,12 @@ pub unsafe fn xml_validate_notation_use(
 /// returns 0 if no, 1 if yes, and -1 if no element description is available
 #[doc(alias = "xmlIsMixedElement")]
 pub unsafe fn xml_is_mixed_element(doc: *mut XmlDoc, name: *const XmlChar) -> i32 {
-    if doc.is_null() || (*doc).int_subset.is_null() {
+    if doc.is_null() || (*doc).int_subset.is_none() {
         return -1;
     }
 
     let mut elem_decl = xml_get_dtd_element_desc((*doc).int_subset, name);
-    if elem_decl.is_none() && !(*doc).ext_subset.is_null() {
+    if elem_decl.is_none() && (*doc).ext_subset.is_some() {
         elem_decl = xml_get_dtd_element_desc((*doc).ext_subset, name);
     }
     let Some(elem_decl) = elem_decl else {
@@ -6272,13 +6280,11 @@ pub unsafe fn xml_is_mixed_element(doc: *mut XmlDoc, name: *const XmlChar) -> i3
 /// returns the xmlNotationPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdNotationDesc")]
 pub unsafe fn xml_get_dtd_notation_desc<'a>(
-    dtd: *mut XmlDtd,
+    dtd: Option<&'a XmlDtd>,
     name: &str,
 ) -> Option<&'a XmlNotation> {
-    if dtd.is_null() {
-        return None;
-    }
-    (*dtd).notations.as_deref()?.lookup(name)
+    dtd.and_then(|dtd| dtd.notations.as_deref())
+        .and_then(|notations| notations.lookup(name))
 }
 
 /// Search the DTD for the description of this element
@@ -6286,14 +6292,11 @@ pub unsafe fn xml_get_dtd_notation_desc<'a>(
 /// returns the xmlElementPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdQElementDesc")]
 pub unsafe fn xml_get_dtd_qelement_desc(
-    dtd: *mut XmlDtd,
+    dtd: Option<XmlDtdPtr>,
     name: &str,
     prefix: Option<&str>,
 ) -> Option<XmlElementPtr> {
-    if dtd.is_null() {
-        return None;
-    }
-    (*dtd).elements.as_ref()?.lookup2(name, prefix).cloned()
+    dtd?.elements.as_ref()?.lookup2(name, prefix).cloned()
 }
 
 /// Search the DTD for the description of this element
@@ -6301,15 +6304,16 @@ pub unsafe fn xml_get_dtd_qelement_desc(
 /// returns the xmlElementPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdElementDesc")]
 pub unsafe fn xml_get_dtd_element_desc(
-    dtd: *mut XmlDtd,
+    dtd: Option<XmlDtdPtr>,
     mut name: *const XmlChar,
 ) -> Option<XmlElementPtr> {
     let mut prefix: *mut XmlChar = null_mut();
 
-    if dtd.is_null() || name.is_null() {
+    if name.is_null() {
         return None;
     }
-    let table = (*dtd).elements.as_ref()?;
+    let dtd = dtd?;
+    let table = dtd.elements.as_ref()?;
 
     let uqname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix));
     if !uqname.is_null() {
@@ -6436,7 +6440,7 @@ pub unsafe fn xml_valid_get_valid_elements(
 
     // Retrieves the parent element declaration
     let mut element_desc = xml_get_dtd_element_desc((*(*parent).doc).int_subset, (*parent).name);
-    if element_desc.is_none() && !(*(*parent).doc).ext_subset.is_null() {
+    if element_desc.is_none() && (*(*parent).doc).ext_subset.is_some() {
         element_desc = xml_get_dtd_element_desc((*(*parent).doc).ext_subset, (*parent).name);
     }
     let Some(element_desc) = element_desc else {
@@ -7870,43 +7874,6 @@ mod tests {
                         );
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_doc);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_dtd() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_dtd in 0..GEN_NB_XML_DTD_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let dtd = gen_xml_dtd_ptr(n_dtd, 2);
-
-                        let ret_val = xml_validate_dtd(ctxt, doc, dtd);
-                        desret_int(ret_val);
-                        des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_dtd_ptr(n_dtd, dtd, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidateDtd",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlValidateDtd()");
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_dtd);
-                        }
                     }
                 }
             }

@@ -97,7 +97,8 @@ use exml::{
     tree::{
         xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc,
         xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd,
-        XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode,
+        XmlDtdPtr, XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityType,
+        XmlEnumeration, XmlNode,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
 };
@@ -2770,10 +2771,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
     // Remove DOCTYPE nodes
     if CMD_ARGS.dropdtd {
-        let dtd: *mut XmlDtd = (*doc).get_int_subset();
-        if !dtd.is_null() {
+        let dtd = (*doc).get_int_subset();
+        if let Some(mut dtd) = dtd {
             (*dtd).unlink();
-            (*doc).int_subset = null_mut();
+            (*doc).int_subset = None;
             xml_free_dtd(dtd);
         }
     }
@@ -3099,7 +3100,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if cvp.is_null() {
                 generic_error!("Couldn't allocate validation context\n");
                 PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                xml_free_dtd(dtd);
+                xml_free_dtd(XmlDtdPtr::from_raw(dtd).unwrap().unwrap());
                 return;
             }
             (*cvp).error = Some(generic_error_default);
@@ -3108,7 +3109,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
-            if xml_validate_dtd(cvp, doc, dtd) == 0 {
+            if xml_validate_dtd(cvp, doc, XmlDtdPtr::from_raw(dtd).unwrap().unwrap()) == 0 {
                 let filename = filename.unwrap();
                 if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
                     generic_error!("Document {filename} does not validate against {dtd_valid}\n");
@@ -3124,7 +3125,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 end_timer!("Validating against DTD");
             }
             xml_free_valid_ctxt(cvp);
-            xml_free_dtd(dtd);
+            xml_free_dtd(XmlDtdPtr::from_raw(dtd).unwrap().unwrap());
         }
     } else if CMD_ARGS.postvalid {
         let cvp = xml_new_valid_ctxt();

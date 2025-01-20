@@ -13,7 +13,7 @@ use crate::{
 
 use super::{
     xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge, NodePtr, XmlAttr,
-    XmlAttribute, XmlDoc, XmlDtd, XmlElement, XmlElementType, XmlEntity, XmlNode, XmlNs,
+    XmlAttribute, XmlDoc, XmlDtd, XmlDtdPtr, XmlElement, XmlElementType, XmlEntity, XmlNode, XmlNs,
     XML_XML_NAMESPACE,
 };
 
@@ -599,13 +599,14 @@ pub trait NodeCommon {
         }
 
         if matches!(self.element_type(), XmlElementType::XmlDTDNode) {
+            let dtd = XmlDtdPtr::from_raw(self as *mut Self as *mut XmlDtd).unwrap();
             let doc = self.document();
             if !doc.is_null() {
-                if (*doc).int_subset == self as *mut Self as *mut XmlDtd {
-                    (*doc).int_subset = null_mut();
+                if (*doc).int_subset == dtd {
+                    (*doc).int_subset = None;
                 }
-                if (*doc).ext_subset == self as *mut Self as *mut XmlDtd {
-                    (*doc).ext_subset = null_mut();
+                if (*doc).ext_subset == dtd {
+                    (*doc).ext_subset = None;
                 }
             }
         }
@@ -613,36 +614,28 @@ pub trait NodeCommon {
             let doc = self.document();
             let name = self.name().map(|n| n.into_owned());
             if !doc.is_null() {
-                if !(*doc).int_subset.is_null() {
-                    if let (Some(mut table), Some(name)) =
-                        ((*(*doc).int_subset).entities, name.as_deref())
-                    {
+                if let Some(int_subset) = (*doc).int_subset {
+                    if let (Some(mut table), Some(name)) = (int_subset.entities, name.as_deref()) {
                         if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
                         {
                             table.remove_entry(name, |_, _| {});
                         }
                     }
-                    if let (Some(mut table), Some(name)) =
-                        ((*(*doc).int_subset).pentities, name.as_deref())
-                    {
+                    if let (Some(mut table), Some(name)) = (int_subset.pentities, name.as_deref()) {
                         if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
                         {
                             table.remove_entry(name, |_, _| {});
                         }
                     }
                 }
-                if !(*doc).ext_subset.is_null() {
-                    if let (Some(mut table), Some(name)) =
-                        ((*(*doc).ext_subset).entities, name.as_deref())
-                    {
+                if let Some(ext_subset) = (*doc).ext_subset {
+                    if let (Some(mut table), Some(name)) = (ext_subset.entities, name.as_deref()) {
                         if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
                         {
                             table.remove_entry(name, |_, _| {});
                         }
                     }
-                    if let (Some(mut table), Some(name)) =
-                        ((*(*doc).ext_subset).pentities, name.as_deref())
-                    {
+                    if let (Some(mut table), Some(name)) = (ext_subset.pentities, name.as_deref()) {
                         if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
                         {
                             table.remove_entry(name, |_, _| {});

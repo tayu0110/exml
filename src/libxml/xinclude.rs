@@ -55,7 +55,7 @@ use crate::{
     tree::{
         xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
-        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc, XmlDtd,
+        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc,
         XmlElementType, XmlEntity, XmlEntityType, XmlNode, XML_XML_NAMESPACE,
     },
     uri::{build_uri, escape_url, XmlURI},
@@ -789,37 +789,31 @@ unsafe fn xml_xinclude_merge_entities(
     doc: *mut XmlDoc,
     from: *mut XmlDoc,
 ) -> i32 {
-    let cur: *mut XmlNode;
-    let mut target: *mut XmlDtd;
-    let mut source: *mut XmlDtd;
-
     if ctxt.is_null() {
         return -1;
     }
 
-    if from.is_null() || (*from).int_subset.is_null() {
+    if from.is_null() || (*from).int_subset.is_none() {
         return 0;
     }
 
-    target = (*doc).int_subset;
-    if target.is_null() {
-        cur = if doc.is_null() {
+    let Some(target) = (*doc).int_subset.or_else(|| {
+        let cur = if doc.is_null() {
             null_mut()
         } else {
             (*doc).get_root_element()
         };
         if cur.is_null() {
-            return -1;
+            return None;
         }
-        target = xml_create_int_subset(doc, (*cur).name().as_deref(), None, None);
-        if target.is_null() {
-            return -1;
-        }
-    }
+        xml_create_int_subset(doc, (*cur).name().as_deref(), None, None)
+    }) else {
+        return -1;
+    };
 
-    source = (*from).int_subset;
-    if !source.is_null() {
-        if let Some(entities) = (*source).entities {
+    let source = (*from).int_subset;
+    if let Some(source) = source {
+        if let Some(entities) = source.entities {
             let mut data: XmlXIncludeMergeData = unsafe { zeroed() };
             data.ctxt = ctxt;
             data.doc = doc;
@@ -829,17 +823,15 @@ unsafe fn xml_xinclude_merge_entities(
             });
         }
     }
-    source = (*from).ext_subset;
-    if !source.is_null() {
-        if let Some(entities) = (*source).entities {
+    let source = (*from).ext_subset;
+    if let Some(source) = source {
+        if let Some(entities) = source.entities {
             let mut data: XmlXIncludeMergeData = unsafe { zeroed() };
             data.ctxt = ctxt;
             data.doc = doc;
 
             // don't duplicate existing stuff when external subsets are the same
-            if (*target).external_id != (*source).external_id
-                && (*target).system_id != (*source).system_id
-            {
+            if target.external_id != source.external_id && target.system_id != source.system_id {
                 entities.scan(|payload, _, _, _| {
                     xml_xinclude_merge_entity(*payload, &raw mut data as _);
                 });

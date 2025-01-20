@@ -746,7 +746,8 @@ unsafe fn get_api_dtd() -> *mut XmlDtd {
 
 pub(crate) unsafe fn gen_xml_dtd_ptr(no: i32, _nr: i32) -> *mut XmlDtd {
     if no == 0 {
-        return xml_new_dtd(null_mut(), Some("dtd"), Some("foo"), Some("bar"));
+        return xml_new_dtd(null_mut(), Some("dtd"), Some("foo"), Some("bar"))
+            .map_or(null_mut(), |dtd| dtd.as_ptr());
     }
     if no == 1 {
         return get_api_dtd();

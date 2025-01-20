@@ -52,8 +52,8 @@ use crate::{
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
-        XmlDocProperties, XmlDtd, XmlElementContentPtr, XmlElementType, XmlElementTypeVal,
-        XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
+        XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntity,
+        XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -171,7 +171,7 @@ pub unsafe fn xml_sax2_has_internal_subset(ctx: Option<GenericErrorContext>) -> 
     if (*ctxt).my_doc.is_null() {
         return 0;
     }
-    (!(*(*ctxt).my_doc).int_subset.is_null()) as i32
+    (*(*ctxt).my_doc).int_subset.is_some() as i32
 }
 
 /// Does this document has an external subset
@@ -190,7 +190,7 @@ pub unsafe fn xml_sax2_has_external_subset(ctx: Option<GenericErrorContext>) -> 
     if (*ctxt).my_doc.is_null() {
         return 0;
     }
-    (!(*(*ctxt).my_doc).ext_subset.is_null()) as i32
+    (*(*ctxt).my_doc).ext_subset.is_some() as i32
 }
 
 #[doc(alias = "xmlSAX2ErrMemory")]
@@ -270,18 +270,18 @@ pub unsafe fn xml_sax2_internal_subset(
     if (*ctxt).my_doc.is_null() {
         return;
     }
-    let dtd: *mut XmlDtd = (*(*ctxt).my_doc).get_int_subset();
-    if !dtd.is_null() {
+    let dtd = (*(*ctxt).my_doc).get_int_subset();
+    if let Some(mut dtd) = dtd {
         if (*ctxt).html != 0 {
             return;
         }
         (*dtd).unlink();
         xml_free_dtd(dtd);
-        (*(*ctxt).my_doc).int_subset = null_mut();
+        (*(*ctxt).my_doc).int_subset = None;
     }
     (*(*ctxt).my_doc).int_subset =
         xml_create_int_subset((*ctxt).my_doc, name, external_id, system_id);
-    if (*(*ctxt).my_doc).int_subset.is_null() {
+    if (*(*ctxt).my_doc).int_subset.is_none() {
         xml_sax2_err_memory(ctxt, "xmlSAX2InternalSubset");
     }
 }
@@ -828,7 +828,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         }
         if (*ctxt).validate != 0
             && (*ctxt).well_formed != 0
-            && !(*(*ctxt).my_doc).int_subset.is_null()
+            && (*(*ctxt).my_doc).int_subset.is_some()
         {
             if let Some(attr) = attr {
                 (*ctxt).valid &= xml_validate_attribute_decl(
@@ -894,7 +894,7 @@ pub unsafe fn xml_sax2_element_decl(
         if (*ctxt).validate != 0
             && (*ctxt).well_formed != 0
             && !(*ctxt).my_doc.is_null()
-            && !(*(*ctxt).my_doc).int_subset.is_null()
+            && (*(*ctxt).my_doc).int_subset.is_some()
         {
             (*ctxt).valid &=
                 xml_validate_element_decl(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, elem);
@@ -933,7 +933,7 @@ pub unsafe fn xml_sax2_notation_decl(
     } else if (*ctxt).in_subset == 1 {
         xml_add_notation_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
-            (*(*ctxt).my_doc).int_subset,
+            (*(*ctxt).my_doc).int_subset.as_deref_mut(),
             name,
             public_id,
             system_id,
@@ -941,7 +941,7 @@ pub unsafe fn xml_sax2_notation_decl(
     } else if (*ctxt).in_subset == 2 {
         xml_add_notation_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
-            (*(*ctxt).my_doc).ext_subset,
+            (*(*ctxt).my_doc).ext_subset.as_deref_mut(),
             name,
             public_id,
             system_id,
@@ -962,7 +962,7 @@ pub unsafe fn xml_sax2_notation_decl(
         }
         if (*ctxt).validate != 0
             && (*ctxt).well_formed != 0
-            && !(*(*ctxt).my_doc).int_subset.is_null()
+            && (*(*ctxt).my_doc).int_subset.is_some()
         {
             (*ctxt).valid &=
                 xml_validate_notation_decl(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, nota);
@@ -1156,7 +1156,7 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
         if (*ctxt).validate != 0
             && (*ctxt).well_formed != 0
             && !(*ctxt).my_doc.is_null()
-            && !(*(*ctxt).my_doc).int_subset.is_null()
+            && (*(*ctxt).my_doc).int_subset.is_some()
         {
             (*ctxt).valid &=
                 xml_validate_document_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
@@ -1472,7 +1472,7 @@ unsafe fn xml_sax2_attribute_internal(
                 && (*ctxt).validate != 0
                 && (*ctxt).well_formed != 0
                 && !(*ctxt).my_doc.is_null()
-                && !(*(*ctxt).my_doc).int_subset.is_null()
+                && (*(*ctxt).my_doc).int_subset.is_some()
             {
                 (*ctxt).valid &= xml_validate_one_namespace(
                     addr_of_mut!((*ctxt).vctxt) as _,
@@ -1553,7 +1553,7 @@ unsafe fn xml_sax2_attribute_internal(
                 && (*ctxt).validate != 0
                 && (*ctxt).well_formed != 0
                 && !(*ctxt).my_doc.is_null()
-                && !(*(*ctxt).my_doc).int_subset.is_null()
+                && (*(*ctxt).my_doc).int_subset.is_some()
             {
                 (*ctxt).valid &= xml_validate_one_namespace(
                     addr_of_mut!((*ctxt).vctxt) as _,
@@ -1655,7 +1655,7 @@ unsafe fn xml_sax2_attribute_internal(
         && (*ctxt).validate != 0
         && (*ctxt).well_formed != 0
         && !(*ctxt).my_doc.is_null()
-        && !(*(*ctxt).my_doc).int_subset.is_null();
+        && (*(*ctxt).my_doc).int_subset.is_some();
     if f {
         // If we don't substitute entities, the validation should be
         // done on a value with replaced entities anyway.
@@ -1790,23 +1790,28 @@ unsafe fn xml_check_defaulted_attributes(
         // Check against defaulted attributes from the external subset
         // if the document is stamped as standalone
         if (*(*ctxt).my_doc).standalone == 1
-            && !(*(*ctxt).my_doc).ext_subset.is_null()
+            && (*(*ctxt).my_doc).ext_subset.is_some()
             && (*ctxt).validate != 0
         {
             while let Some(cur_attr) = attr {
                 let elem = cur_attr.elem.as_deref().map(|p| CString::new(p).unwrap());
                 if !cur_attr.default_value.is_null()
-                    && (*(*(*ctxt).my_doc).ext_subset).get_qattr_desc(
-                        cur_attr.elem.as_deref().unwrap(),
-                        cur_attr.name().as_deref().unwrap(),
-                        cur_attr.prefix.as_deref(),
-                    ) == Some(cur_attr)
-                    && (*(*(*ctxt).my_doc).int_subset)
-                        .get_qattr_desc(
+                    && (*(*ctxt).my_doc).ext_subset.and_then(|dtd| {
+                        dtd.get_qattr_desc(
                             cur_attr.elem.as_deref().unwrap(),
                             cur_attr.name().as_deref().unwrap(),
                             cur_attr.prefix.as_deref(),
                         )
+                    }) == Some(cur_attr)
+                    && (*(*ctxt).my_doc)
+                        .int_subset
+                        .and_then(|dtd| {
+                            dtd.get_qattr_desc(
+                                cur_attr.elem.as_deref().unwrap(),
+                                cur_attr.name().as_deref().unwrap(),
+                                cur_attr.prefix.as_deref(),
+                            )
+                        })
                         .is_none()
                 {
                     let mut fulln: *mut XmlChar;
@@ -1862,11 +1867,13 @@ unsafe fn xml_check_defaulted_attributes(
                     || (cur_attr.prefix.is_none() && cur_attr.name().as_deref() == Some("xmlns"))
                     || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
                 {
-                    let tst = (*(*(*ctxt).my_doc).int_subset).get_qattr_desc(
-                        cur_attr.elem.as_deref().unwrap(),
-                        cur_attr.name().as_deref().unwrap(),
-                        cur_attr.prefix.as_deref(),
-                    );
+                    let tst = (*(*ctxt).my_doc).int_subset.and_then(|dtd| {
+                        dtd.get_qattr_desc(
+                            cur_attr.elem.as_deref().unwrap(),
+                            cur_attr.name().as_deref().unwrap(),
+                            cur_attr.prefix.as_deref(),
+                        )
+                    });
                     if tst == Some(cur_attr) || tst.is_none() {
                         let name = cur_attr.name().unwrap();
                         let fulln = build_qname(&name, cur_attr.prefix.as_deref());
@@ -1919,12 +1926,13 @@ pub unsafe fn xml_sax2_start_element(
 
     // First check on validity:
     if (*ctxt).validate != 0
-        && (*(*ctxt).my_doc).ext_subset.is_null()
-        && ((*(*ctxt).my_doc).int_subset.is_null()
-            || ((*(*(*ctxt).my_doc).int_subset).notations.is_none()
-                && (*(*(*ctxt).my_doc).int_subset).elements.is_none()
-                && (*(*(*ctxt).my_doc).int_subset).attributes.is_none()
-                && (*(*(*ctxt).my_doc).int_subset).entities.is_none()))
+        && (*(*ctxt).my_doc).ext_subset.is_none()
+        && (*(*ctxt).my_doc).int_subset.map_or(true, |int_subset| {
+            int_subset.notations.is_none()
+                && int_subset.elements.is_none()
+                && int_subset.attributes.is_none()
+                && int_subset.entities.is_none()
+        })
     {
         xml_err_valid!(
             ctxt,
@@ -1983,7 +1991,7 @@ pub unsafe fn xml_sax2_start_element(
 
     if (*ctxt).html == 0 {
         // Insert all the defaulted attributes from the DTD especially namespaces
-        if !(*(*ctxt).my_doc).int_subset.is_null() || !(*(*ctxt).my_doc).ext_subset.is_null() {
+        if (*(*ctxt).my_doc).int_subset.is_some() || (*(*ctxt).my_doc).ext_subset.is_some() {
             xml_check_defaulted_attributes(ctxt, name, prefix, atts);
         }
 
@@ -2074,7 +2082,7 @@ pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: &str
         if (*ctxt).validate != 0
             && (*ctxt).well_formed != 0
             && !(*ctxt).my_doc.is_null()
-            && !(*(*ctxt).my_doc).int_subset.is_null()
+            && (*(*ctxt).my_doc).int_subset.is_some()
         {
             (*ctxt).valid &=
                 xml_validate_one_element(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, cur);
@@ -2114,12 +2122,13 @@ pub unsafe fn xml_sax2_start_element_ns(
     let parent: *mut XmlNode = (*ctxt).node;
     // First check on validity:
     if (*ctxt).validate != 0
-        && (*(*ctxt).my_doc).ext_subset.is_null()
-        && ((*(*ctxt).my_doc).int_subset.is_null()
-            || ((*(*(*ctxt).my_doc).int_subset).notations.is_none()
-                && (*(*(*ctxt).my_doc).int_subset).elements.is_none()
-                && (*(*(*ctxt).my_doc).int_subset).attributes.is_none()
-                && (*(*(*ctxt).my_doc).int_subset).entities.is_none()))
+        && (*(*ctxt).my_doc).ext_subset.is_none()
+        && (*(*ctxt).my_doc).int_subset.map_or(true, |int_subset| {
+            int_subset.notations.is_none()
+                && int_subset.elements.is_none()
+                && int_subset.attributes.is_none()
+                && int_subset.entities.is_none()
+        })
     {
         xml_err_valid!(
             ctxt,
@@ -2209,7 +2218,7 @@ pub unsafe fn xml_sax2_start_element_ns(
                 && (*ctxt).validate != 0
                 && (*ctxt).well_formed != 0
                 && !(*ctxt).my_doc.is_null()
-                && !(*(*ctxt).my_doc).int_subset.is_null()
+                && (*(*ctxt).my_doc).int_subset.is_some()
             {
                 (*ctxt).valid &= xml_validate_one_namespace(
                     addr_of_mut!((*ctxt).vctxt) as _,
@@ -2532,7 +2541,7 @@ unsafe fn xml_sax2_attribute_ns(
         && (*ctxt).validate != 0
         && (*ctxt).well_formed != 0
         && !(*ctxt).my_doc.is_null()
-        && !(*(*ctxt).my_doc).int_subset.is_null();
+        && (*(*ctxt).my_doc).int_subset.is_some();
     if f {
         #[cfg(feature = "libxml_valid")]
         {
@@ -2701,7 +2710,7 @@ pub unsafe fn xml_sax2_end_element_ns(
         if (*ctxt).validate != 0
             && (*ctxt).well_formed != 0
             && !(*ctxt).my_doc.is_null()
-            && !(*(*ctxt).my_doc).int_subset.is_null()
+            && (*(*ctxt).my_doc).int_subset.is_some()
         {
             (*ctxt).valid &= xml_validate_one_element(
                 addr_of_mut!((*ctxt).vctxt) as _,
@@ -2900,10 +2909,10 @@ pub unsafe fn xml_sax2_processing_instruction(
         }
     }
     if (*ctxt).in_subset == 1 {
-        (*(*(*ctxt).my_doc).int_subset).add_child(ret);
+        (*(*ctxt).my_doc).int_subset.unwrap().add_child(ret);
         return;
     } else if (*ctxt).in_subset == 2 {
-        (*(*(*ctxt).my_doc).ext_subset).add_child(ret);
+        (*(*ctxt).my_doc).ext_subset.unwrap().add_child(ret);
         return;
     }
     if parent.is_null() {
@@ -2942,10 +2951,10 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: &str) {
     }
 
     if (*ctxt).in_subset == 1 {
-        (*(*(*ctxt).my_doc).int_subset).add_child(ret);
+        (*(*ctxt).my_doc).int_subset.unwrap().add_child(ret);
         return;
     } else if (*ctxt).in_subset == 2 {
-        (*(*(*ctxt).my_doc).ext_subset).add_child(ret);
+        (*(*ctxt).my_doc).ext_subset.unwrap().add_child(ret);
         return;
     }
     if parent.is_null() {

@@ -48,6 +48,8 @@ use crate::{
     tree::{xml_free_node_list, NodeCommon, NodePtr, XmlDoc, XmlDtd, XmlElementType, XmlNode},
 };
 
+use super::XmlDtdPtr;
+
 /// The different valid entity types.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -259,7 +261,7 @@ pub unsafe fn xml_new_entity(
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> *mut XmlEntity {
-    if !doc.is_null() && !(*doc).int_subset.is_null() {
+    if !doc.is_null() && (*doc).int_subset.is_some() {
         return xml_add_doc_entity(doc, name, typ, external_id, system_id, content);
     }
     let ret: *mut XmlEntity = xml_create_entity(name, typ, external_id, system_id, content);
@@ -353,7 +355,7 @@ unsafe fn xml_free_entity(entity: *mut XmlEntity) {
 /// Register a new entity for an entities table.
 #[doc(alias = "xmlAddEntity")]
 unsafe fn xml_add_entity(
-    dtd: *mut XmlDtd,
+    mut dtd: XmlDtdPtr,
     name: &str,
     typ: XmlEntityType,
     external_id: Option<&str>,
@@ -362,10 +364,6 @@ unsafe fn xml_add_entity(
 ) -> *mut XmlEntity {
     let mut table = None;
     let predef: *mut XmlEntity;
-
-    if dtd.is_null() {
-        return null_mut();
-    }
 
     match typ {
         XmlEntityType::XmlInternalGeneralEntity
@@ -408,18 +406,18 @@ unsafe fn xml_add_entity(
                     return null_mut();
                 }
             }
-            if (*dtd).entities.is_none() {
+            if dtd.entities.is_none() {
                 let table = XmlHashTable::with_capacity(0);
-                (*dtd).entities = XmlHashTableRef::from_table(table);
+                dtd.entities = XmlHashTableRef::from_table(table);
             }
-            table = (*dtd).entities;
+            table = dtd.entities;
         }
         XmlEntityType::XmlInternalParameterEntity | XmlEntityType::XmlExternalParameterEntity => {
-            if (*dtd).pentities.is_none() {
+            if dtd.pentities.is_none() {
                 let table = XmlHashTable::with_capacity(0);
-                (*dtd).pentities = XmlHashTableRef::from_table(table);
+                dtd.pentities = XmlHashTableRef::from_table(table);
             }
-            table = (*dtd).pentities;
+            table = dtd.pentities;
         }
         XmlEntityType::XmlInternalPredefinedEntity => {
             return null_mut();
@@ -433,7 +431,7 @@ unsafe fn xml_add_entity(
     if ret.is_null() {
         return null_mut();
     }
-    (*ret).doc.store((*dtd).doc, Ordering::Relaxed);
+    (*ret).doc.store(dtd.doc, Ordering::Relaxed);
 
     if table.add_entry(name, ret).is_err() {
         // entity was already defined at another level.
@@ -462,29 +460,28 @@ pub unsafe fn xml_add_doc_entity(
         );
         return null_mut();
     }
-    if (*doc).int_subset.is_null() {
+    let Some(mut dtd) = (*doc).int_subset else {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDTD,
             "xmlAddDocEntity: document without internal subset",
         );
         return null_mut();
-    }
-    let dtd: *mut XmlDtd = (*doc).int_subset;
+    };
     let ret: *mut XmlEntity = xml_add_entity(dtd, name, typ, external_id, system_id, content);
     if ret.is_null() {
         return null_mut();
     }
 
     // Link it to the DTD
-    (*ret).parent.store(dtd as _, Ordering::Relaxed);
-    (*ret).doc.store((*dtd).doc, Ordering::Relaxed);
-    if let Some(mut last) = (*dtd).last {
+    (*ret).parent.store(dtd.as_ptr(), Ordering::Relaxed);
+    (*ret).doc.store(dtd.doc, Ordering::Relaxed);
+    if let Some(mut last) = dtd.last {
         last.next = NodePtr::from_ptr(ret as *mut XmlNode);
         (*ret).prev.store(last.as_ptr(), Ordering::Relaxed);
-        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
+        dtd.last = NodePtr::from_ptr(ret as *mut XmlNode);
     } else {
-        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
+        dtd.children = NodePtr::from_ptr(ret as *mut XmlNode);
+        dtd.last = NodePtr::from_ptr(ret as *mut XmlNode);
     }
     ret
 }
@@ -508,29 +505,28 @@ pub unsafe fn xml_add_dtd_entity(
         );
         return null_mut();
     }
-    if (*doc).ext_subset.is_null() {
+    let Some(mut dtd) = (*doc).ext_subset else {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDTD,
             "xmlAddDtdEntity: document without external subset",
         );
         return null_mut();
-    }
-    let dtd: *mut XmlDtd = (*doc).ext_subset;
+    };
     let ret: *mut XmlEntity = xml_add_entity(dtd, name, typ, external_id, system_id, content);
     if ret.is_null() {
         return null_mut();
     }
 
     // Link it to the DTD
-    (*ret).parent = dtd.into();
-    (*ret).doc = (*dtd).doc.into();
-    if let Some(mut last) = (*dtd).last {
+    (*ret).parent.store(dtd.as_ptr(), Ordering::Relaxed);
+    (*ret).doc = dtd.doc.into();
+    if let Some(mut last) = dtd.last {
         last.next = NodePtr::from_ptr(ret as *mut XmlNode);
         (*ret).prev.store(last.as_ptr(), Ordering::Relaxed);
-        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
+        dtd.last = NodePtr::from_ptr(ret as *mut XmlNode);
     } else {
-        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
+        dtd.children = NodePtr::from_ptr(ret as *mut XmlNode);
+        dtd.last = NodePtr::from_ptr(ret as *mut XmlNode);
     }
     ret
 }
@@ -683,19 +679,21 @@ unsafe fn xml_get_entity_from_table(
 #[doc(alias = "xmlGetDocEntity")]
 pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> *mut XmlEntity {
     if !doc.is_null() {
-        if !(*doc).int_subset.is_null() {
-            if let Some(table) = (*(*doc).int_subset).entities {
+        if let Some(int_subset) = (*doc).int_subset {
+            if let Some(table) = int_subset.entities {
                 let cur = xml_get_entity_from_table(table, name);
                 if !cur.is_null() {
                     return cur;
                 }
             }
         }
-        if (*doc).standalone != 1 && !(*doc).ext_subset.is_null() {
-            if let Some(table) = (*(*doc).ext_subset).entities {
-                let cur = xml_get_entity_from_table(table, name);
-                if !cur.is_null() {
-                    return cur;
+        if (*doc).standalone != 1 {
+            if let Some(ext_subset) = (*doc).ext_subset {
+                if let Some(table) = ext_subset.entities {
+                    let cur = xml_get_entity_from_table(table, name);
+                    if !cur.is_null() {
+                        return cur;
+                    }
                 }
             }
         }
@@ -713,8 +711,8 @@ pub unsafe fn xml_get_dtd_entity(doc: *mut XmlDoc, name: &str) -> *mut XmlEntity
     if doc.is_null() {
         return null_mut();
     }
-    if !(*doc).ext_subset.is_null() {
-        if let Some(table) = (*(*doc).ext_subset).entities {
+    if let Some(ext_subset) = (*doc).ext_subset {
+        if let Some(table) = ext_subset.entities {
             return xml_get_entity_from_table(table, name);
         }
     }
@@ -730,16 +728,16 @@ pub unsafe fn xml_get_parameter_entity(doc: *mut XmlDoc, name: &str) -> *mut Xml
     if doc.is_null() {
         return null_mut();
     }
-    if !(*doc).int_subset.is_null() {
-        if let Some(table) = (*(*doc).int_subset).pentities {
+    if let Some(int_subset) = (*doc).int_subset {
+        if let Some(table) = int_subset.pentities {
             let ret = xml_get_entity_from_table(table, name);
             if !ret.is_null() {
                 return ret;
             }
         }
     }
-    if !(*doc).ext_subset.is_null() {
-        if let Some(table) = (*(*doc).ext_subset).pentities {
+    if let Some(ext_subset) = (*doc).ext_subset {
+        if let Some(table) = ext_subset.pentities {
             return xml_get_entity_from_table(table, name);
         }
     }

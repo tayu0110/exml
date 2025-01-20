@@ -35,7 +35,7 @@ use crate::{
     },
 };
 
-use super::XmlEnumeration;
+use super::{XmlDtdPtr, XmlEnumeration};
 
 #[repr(C)]
 #[derive(Clone)]
@@ -45,7 +45,7 @@ pub struct XmlAttribute {
     pub(crate) name: *const XmlChar,      /* Attribute name */
     pub(crate) children: Option<NodePtr>, /* NULL */
     pub(crate) last: Option<NodePtr>,     /* NULL */
-    pub(crate) parent: *mut XmlDtd,       /* -> DTD */
+    pub(crate) parent: Option<XmlDtdPtr>, /* -> DTD */
     pub(crate) next: Option<NodePtr>,     /* next sibling link  */
     pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
     pub(crate) doc: *mut XmlDoc,          /* the containing document */
@@ -67,7 +67,7 @@ impl Default for XmlAttribute {
             name: null_mut(),
             children: None,
             last: None,
-            parent: null_mut(),
+            parent: None,
             next: None,
             prev: None,
             doc: null_mut(),
@@ -121,10 +121,12 @@ impl NodeCommon for XmlAttribute {
         self.prev = prev;
     }
     fn parent(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.parent as *mut XmlNode)
+        self.parent
+            .and_then(|p| NodePtr::from_ptr(p.as_ptr() as *mut XmlNode))
     }
     fn set_parent(&mut self, parent: Option<NodePtr>) {
-        self.parent = parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlDtd;
+        self.parent =
+            parent.and_then(|p| unsafe { XmlDtdPtr::from_raw(p.as_ptr() as *mut XmlDtd).unwrap() });
     }
 }
 

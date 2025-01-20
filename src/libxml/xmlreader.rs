@@ -781,7 +781,10 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadOuterXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_outer_xml(&mut self) -> *mut XmlChar {
-        use crate::{libxml::xmlstring::xml_strndup, tree::NodeCommon};
+        use crate::{
+            libxml::xmlstring::xml_strndup,
+            tree::{NodeCommon, XmlDtd, XmlDtdPtr},
+        };
 
         let mut node: *mut XmlNode;
 
@@ -792,7 +795,8 @@ impl XmlTextReader {
         let doc: *mut XmlDoc = (*node).doc;
         // XXX: Why is the node copied?
         if (*node).element_type() == XmlElementType::XmlDTDNode {
-            node = xml_copy_dtd((*node).as_dtd_node().unwrap().as_ptr()) as *mut XmlNode;
+            node = xml_copy_dtd(XmlDtdPtr::from_raw(node as *mut XmlDtd).unwrap().unwrap())
+                .map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNode;
         } else {
             node = xml_doc_copy_node(node, doc, 1);
         }
@@ -3742,7 +3746,7 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: *mut XmlAttr)
 #[doc(alias = "xmlTextReaderFreeNode")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: *mut XmlNode) {
-    use crate::tree::{NodeCommon, NodePtr};
+    use crate::tree::{NodeCommon, NodePtr, XmlDtd, XmlDtdPtr};
 
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
         (*(*reader).ctxt).dict
@@ -3750,7 +3754,7 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: *mut XmlNode)
         null_mut()
     };
     if (*cur).element_type() == XmlElementType::XmlDTDNode {
-        xml_free_dtd((*cur).as_dtd_node().unwrap().as_ptr());
+        xml_free_dtd(XmlDtdPtr::from_raw(cur as *mut XmlDtd).unwrap().unwrap());
         return;
     }
     if (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
@@ -4205,9 +4209,7 @@ pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const 
 #[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: *mut XmlDoc) {
-    use crate::tree::{NodeCommon, XmlDtd};
-
-    let mut ext_subset: *mut XmlDtd;
+    use crate::tree::NodeCommon;
 
     if cur.is_null() {
         return;
@@ -4223,19 +4225,17 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: *mut XmlDoc)
     // Do this before freeing the children list to avoid ID lookups
     (*cur).ids.take();
     (*cur).refs.take();
-    ext_subset = (*cur).ext_subset;
-    let int_subset: *mut XmlDtd = (*cur).int_subset;
+    let mut ext_subset = (*cur).ext_subset.take();
+    let int_subset = (*cur).int_subset.take();
     if int_subset == ext_subset {
-        ext_subset = null_mut();
+        ext_subset = None;
     }
-    if !ext_subset.is_null() {
-        (*(*cur).ext_subset).unlink();
-        (*cur).ext_subset = null_mut();
+    if let Some(mut ext_subset) = ext_subset {
+        ext_subset.unlink();
         xml_free_dtd(ext_subset);
     }
-    if !int_subset.is_null() {
-        (*(*cur).int_subset).unlink();
-        (*cur).int_subset = null_mut();
+    if let Some(mut int_subset) = int_subset {
+        int_subset.unlink();
         xml_free_dtd(int_subset);
     }
 

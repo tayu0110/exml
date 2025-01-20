@@ -1368,8 +1368,8 @@ impl XmlDebugCtxt<'_> {
     unsafe fn dump_entities(&mut self, doc: Option<&XmlDoc>) {
         if let Some(doc) = doc {
             self.dump_doc_head(doc);
-            if !doc.int_subset.is_null() {
-                if let Some(table) = (*doc.int_subset).entities {
+            if let Some(int_subset) = doc.int_subset {
+                if let Some(table) = int_subset.entities {
                     if self.check == 0 {
                         writeln!(self.output, "Entities in internal subset");
                     }
@@ -1381,8 +1381,8 @@ impl XmlDebugCtxt<'_> {
             } else {
                 writeln!(self.output, "No entities in internal subset");
             }
-            if !doc.ext_subset.is_null() {
-                if let Some(table) = (*doc.ext_subset).entities {
+            if let Some(ext_subset) = doc.ext_subset {
+                if let Some(table) = ext_subset.entities {
                     if self.check == 0 {
                         writeln!(self.output, "Entities in external subset");
                     }
@@ -2383,17 +2383,13 @@ pub unsafe fn xml_shell_validate(
     _node: *mut XmlNode,
     _node2: *mut XmlNode,
 ) -> i32 {
-    use std::mem::size_of_val;
-
-    use libc::memset;
-
     use crate::{
         globals::GLOBAL_STATE,
         libxml::{
             parser::xml_parse_dtd,
             valid::{xml_validate_document, xml_validate_dtd},
         },
-        tree::xml_free_dtd,
+        tree::{xml_free_dtd, XmlDtdPtr},
     };
 
     use super::valid::XmlValidCtxt;
@@ -2404,22 +2400,21 @@ pub unsafe fn xml_shell_validate(
     if ctxt.is_null() || (*ctxt).doc.is_null() {
         return -1;
     }
-    memset(addr_of_mut!(vctxt) as _, 0, size_of_val(&vctxt));
     vctxt.error = Some(GLOBAL_STATE.with_borrow(|state| state.generic_error));
     vctxt.warning = vctxt.error;
 
     if dtd.is_null() || *dtd.add(0) == 0 {
         res = xml_validate_document(addr_of_mut!(vctxt), (*ctxt).doc);
     } else {
-        let subset: *mut XmlDtd = xml_parse_dtd(
+        let subset = XmlDtdPtr::from_raw(xml_parse_dtd(
             None,
             (!dtd.is_null())
                 .then(|| CStr::from_ptr(dtd as *const i8).to_string_lossy())
                 .as_deref(),
-        );
-        if !subset.is_null() {
+        ))
+        .unwrap();
+        if let Some(subset) = subset {
             res = xml_validate_dtd(addr_of_mut!(vctxt), (*ctxt).doc, subset);
-
             xml_free_dtd(subset);
         }
     }

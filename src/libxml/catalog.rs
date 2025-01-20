@@ -1937,7 +1937,7 @@ impl XmlCatalogEntry {
     unsafe fn dump_xml_catalog<'a>(&self, out: impl Write + 'a) -> i32 {
         use crate::{
             io::XmlOutputBuffer,
-            tree::{NodeCommon, XmlDtd, XmlNs},
+            tree::{NodeCommon, XmlNs},
         };
 
         // Rebuild a catalog
@@ -1945,14 +1945,14 @@ impl XmlCatalogEntry {
         if doc.is_null() {
             return -1;
         }
-        let dtd: *mut XmlDtd = xml_new_dtd(
+        let dtd = xml_new_dtd(
             doc,
             Some("catalog"),
             Some("-//OASIS//DTD Entity Resolution XML Catalog V1.0//EN"),
             Some("http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd"),
         );
 
-        (*doc).add_child(dtd as _);
+        (*doc).add_child(dtd.map_or(null_mut(), |dtd| dtd.as_ptr()) as _);
 
         let ns: *mut XmlNs = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, None);
         if ns.is_null() {

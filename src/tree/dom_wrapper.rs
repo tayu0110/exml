@@ -1391,8 +1391,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             (*cur).content = null_mut();
                             (*cur).set_children(None);
                             (*cur).set_last(None);
-                            if !(*dest_doc).int_subset.is_null()
-                                || !(*dest_doc).ext_subset.is_null()
+                            if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some()
                             {
                                 // Assign new entity-node if available.
                                 let ent: *mut XmlEntity =
@@ -1576,7 +1575,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
                 (*cur).content = null_mut();
                 (*cur).set_children(None);
                 (*cur).set_last(None);
-                if !(*dest_doc).int_subset.is_null() || !(*dest_doc).ext_subset.is_null() {
+                if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some() {
                     // Assign new entity-node if available.
                     let ent: *mut XmlEntity = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
                     if !ent.is_null() {
@@ -1708,7 +1707,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
                 (*node).content = null_mut();
                 (*node).set_children(None);
                 (*node).set_last(None);
-                if !(*dest_doc).int_subset.is_null() || !(*dest_doc).ext_subset.is_null() {
+                if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some() {
                     // Assign new entity-node if available.
                     let ent: *mut XmlEntity =
                         xml_get_doc_entity(dest_doc, &(*node).name().unwrap());
@@ -2288,8 +2287,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     }
                     XmlElementType::XmlEntityRefNode => {
                         if source_doc != dest_doc {
-                            if !(*dest_doc).int_subset.is_null()
-                                || !(*dest_doc).ext_subset.is_null()
+                            if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some()
                             {
                                 // Different doc: Assign new entity-node if available.
                                 let ent: *mut XmlEntity =

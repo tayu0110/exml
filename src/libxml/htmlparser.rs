@@ -61,9 +61,7 @@ use crate::{
         xml_free_input_stream, xml_free_parser_ctxt, xml_new_input_stream, XmlParserCtxt,
         XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
     },
-    tree::{
-        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDoc, XmlDtd, XmlElementType, XmlNode,
-    },
+    tree::{xml_create_int_subset, xml_free_doc, NodeCommon, XmlDoc, XmlElementType, XmlNode},
     uri::canonic_path,
 };
 
@@ -8281,7 +8279,6 @@ const ALLOW_PCDATA: &[&str] = &[
 #[doc(alias = "areBlanks")]
 unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> i32 {
     let mut last_child: *mut XmlNode;
-    let dtd: *mut XmlDtd;
 
     for j in 0..len {
         if !xml_is_blank_char(*str.add(j as usize) as u32) {
@@ -8307,17 +8304,16 @@ unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> 
 
     // Only strip CDATA children of the body tag for strict HTML DTDs
     if name == "body" && !(*ctxt).my_doc.is_null() {
-        dtd = (*(*ctxt).my_doc).get_int_subset();
-        if !dtd.is_null()
-            && (*dtd)
-                .external_id
+        let dtd = (*(*ctxt).my_doc).get_int_subset();
+        if dtd.map_or(false, |dtd| {
+            dtd.external_id
                 .as_deref()
                 .filter(|e| {
                     let e = e.to_ascii_uppercase();
                     e == "-//W3C//DTD HTML 4.01//EN" || e == "-//W3C//DTD HTML 4//EN"
                 })
                 .is_some()
-        {
+        }) {
             return 1;
         }
     }
@@ -9116,7 +9112,6 @@ unsafe fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
 #[doc(alias = "htmlParseDocument")]
 pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut start: [XmlChar; 4] = [0; 4];
-    let dtd: *mut XmlDtd;
 
     xml_init_parser();
 
@@ -9231,8 +9226,8 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
     if (*ctxt).options & HtmlParserOption::HtmlParseNodefdtd as i32 == 0
         && !(*ctxt).my_doc.is_null()
     {
-        dtd = (*(*ctxt).my_doc).get_int_subset();
-        if dtd.is_null() {
+        let dtd = (*(*ctxt).my_doc).get_int_subset();
+        if dtd.is_none() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
                 (*ctxt).my_doc,
                 Some("html"),
@@ -10605,8 +10600,8 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                 XmlParserInputState::XmlParserEOF | XmlParserInputState::XmlParserEpilog
             ))
     {
-        let dtd: *mut XmlDtd = (*(*ctxt).my_doc).get_int_subset();
-        if dtd.is_null() {
+        let dtd = (*(*ctxt).my_doc).get_int_subset();
+        if dtd.is_none() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
                 (*ctxt).my_doc,
                 Some("html"),

@@ -93,11 +93,11 @@ pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlCh
 
     (*cur).typ = XmlElementType::XmlHTMLDocumentNode;
     (*cur).version = None;
-    (*cur).int_subset = null_mut();
+    (*cur).int_subset = None;
     (*cur).doc = cur;
     (*cur).name = null_mut();
     (*cur).children = None;
-    (*cur).ext_subset = null_mut();
+    (*cur).ext_subset = None;
     (*cur).old_ns = null_mut();
     (*cur).encoding = None;
     (*cur).standalone = 1;
@@ -879,31 +879,27 @@ unsafe fn html_dtd_dump_output(
 ) {
     use std::ffi::CStr;
 
-    use crate::tree::XmlDtd;
-
-    let cur: *mut XmlDtd = (*doc).int_subset;
-
-    if cur.is_null() {
+    let Some(cur) = (*doc).int_subset else {
         html_save_err(XmlParserErrors::XmlSaveNoDoctype, doc as _, None);
         return;
-    }
-    buf.write_str("<!DOCTYPE ");
+    };
 
-    buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-    if let Some(external_id) = (*cur).external_id.as_deref() {
+    buf.write_str("<!DOCTYPE ");
+    buf.write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
+    if let Some(external_id) = cur.external_id.as_deref() {
         buf.write_str(" PUBLIC ");
         if let Some(mut buf) = buf.buffer {
             let external_id = CString::new(external_id).unwrap();
             buf.push_quoted_cstr(&external_id);
         }
-        if let Some(system_id) = (*cur).system_id.as_deref() {
+        if let Some(system_id) = cur.system_id.as_deref() {
             buf.write_str(" ");
             if let Some(mut buf) = buf.buffer {
                 let system_id = CString::new(system_id).unwrap();
                 buf.push_quoted_cstr(&system_id);
             }
         }
-    } else if let Some(system_id) = (*cur)
+    } else if let Some(system_id) = cur
         .system_id
         .as_deref()
         .filter(|&s| s != "about:legacy-compat")
@@ -1021,12 +1017,12 @@ pub unsafe fn html_node_dump_format_output(
     'main: loop {
         match (*cur).element_type() {
             XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode => {
-                if !(*cur)
+                if (*cur)
                     .as_document_node()
                     .unwrap()
                     .as_ref()
                     .int_subset
-                    .is_null()
+                    .is_some()
                 {
                     html_dtd_dump_output(buf, cur as _, null_mut());
                 }

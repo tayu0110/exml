@@ -437,12 +437,12 @@ impl XmlNode {
         {
             let mut is_html = false;
             let dtd = if doc.is_null() {
-                null_mut()
+                None
             } else {
                 (*doc).get_int_subset()
             };
-            if !dtd.is_null() {
-                is_html = is_xhtml((*dtd).system_id.as_deref(), (*dtd).external_id.as_deref());
+            if let Some(dtd) = dtd {
+                is_html = is_xhtml(dtd.system_id.as_deref(), dtd.external_id.as_deref());
             }
 
             if is_html {

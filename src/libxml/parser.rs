@@ -1846,8 +1846,10 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
 
     if !(*ctxt).my_doc.is_null() {
         if (*ctxt).well_formed != 0 {
-            ret = (*(*ctxt).my_doc).ext_subset;
-            (*(*ctxt).my_doc).ext_subset = null_mut();
+            ret = (*(*ctxt).my_doc)
+                .ext_subset
+                .take()
+                .map_or(null_mut(), |p| p.as_ptr());
             if !ret.is_null() {
                 (*ret).doc = null_mut();
                 let mut tmp = (*ret).children;
@@ -1954,8 +1956,10 @@ pub unsafe fn xml_io_parse_dtd(
 
     if !(*ctxt).my_doc.is_null() {
         if (*ctxt).well_formed != 0 {
-            ret = (*(*ctxt).my_doc).ext_subset;
-            (*(*ctxt).my_doc).ext_subset = null_mut();
+            ret = (*(*ctxt).my_doc)
+                .ext_subset
+                .take()
+                .map_or(null_mut(), |p| p.as_ptr());
             if !ret.is_null() {
                 (*ret).doc = null_mut();
                 let mut tmp = (*ret).children;
@@ -2286,8 +2290,8 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             (*ctxt).sax = oldsax;
         }
         xml_free_parser_ctxt(ctxt);
-        (*new_doc).int_subset = null_mut();
-        (*new_doc).ext_subset = null_mut();
+        (*new_doc).int_subset = None;
+        (*new_doc).ext_subset = None;
         xml_free_doc(new_doc);
         return -1;
     }
@@ -2359,8 +2363,8 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         (*ctxt).sax = oldsax;
     }
     xml_free_parser_ctxt(ctxt);
-    (*new_doc).int_subset = null_mut();
-    (*new_doc).ext_subset = null_mut();
+    (*new_doc).int_subset = None;
+    (*new_doc).ext_subset = None;
     // This leaks the namespace list if doc.is_null()
     (*new_doc).old_ns = null_mut();
     xml_free_doc(new_doc);
@@ -2438,8 +2442,8 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     let new_root: *mut XmlNode = xml_new_doc_node(new_doc, null_mut(), "pseudoroot", null());
     if new_root.is_null() {
         let sax = (*ctxt).sax.take();
-        (*new_doc).int_subset = null_mut();
-        (*new_doc).ext_subset = null_mut();
+        (*new_doc).int_subset = None;
+        (*new_doc).ext_subset = None;
         xml_free_doc(new_doc);
         return (sax, XmlParserErrors::XmlErrInternalError);
     }
@@ -2580,8 +2584,8 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     }
     let sax = (*ctxt).sax.take();
     xml_free_parser_ctxt(ctxt);
-    (*new_doc).int_subset = null_mut();
-    (*new_doc).ext_subset = null_mut();
+    (*new_doc).int_subset = None;
+    (*new_doc).ext_subset = None;
     xml_free_doc(new_doc);
 
     (sax, ret)
@@ -7956,7 +7960,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     }
                     (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
                 }
-                if (*(*ctxt).my_doc).int_subset.is_null() {
+                if (*(*ctxt).my_doc).int_subset.is_none() {
                     (*(*ctxt).my_doc).int_subset =
                         xml_new_dtd((*ctxt).my_doc, Some("fake"), None, None);
                 }
@@ -8083,7 +8087,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
                     }
 
-                    if (*(*ctxt).my_doc).int_subset.is_null() {
+                    if (*(*ctxt).my_doc).int_subset.is_none() {
                         (*(*ctxt).my_doc).int_subset =
                             xml_new_dtd((*ctxt).my_doc, Some("fake"), None, None);
                     }

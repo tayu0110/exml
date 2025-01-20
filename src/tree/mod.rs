@@ -41,7 +41,7 @@ use std::{
     ffi::{CStr, CString},
     fmt::Display,
     mem::size_of,
-    ptr::{drop_in_place, null_mut},
+    ptr::null_mut,
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
@@ -56,7 +56,7 @@ use crate::{
             xml_register_node_default_value,
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-        valid::{xml_add_id, xml_free_attribute_table, xml_is_id, xml_remove_id},
+        valid::{xml_add_id, xml_is_id, xml_remove_id},
         xmlstring::{xml_str_equal, xml_strdup, xml_strncat, xml_strndup, XmlChar},
     },
 };
@@ -373,7 +373,7 @@ pub enum XmlDocProperties {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct InvalidNodePointerCastError {
+pub struct InvalidNodePointerCastError {
     from: XmlElementType,
     to: &'static str,
 }
@@ -953,67 +953,9 @@ pub unsafe fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -> *const Xm
     name.add(l as usize + 1)
 }
 
-/// Free a DTD structure.
-#[doc(alias = "xmlFreeDtd")]
-pub unsafe fn xml_free_dtd(cur: *mut XmlDtd) {
-    if cur.is_null() {
-        return;
-    }
-
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    // && xmlDeregisterNodeDefaultValue.is_some()
-    {
-        xml_deregister_node_default_value(cur as _);
-    }
-
-    if let Some(children) = (*cur).children() {
-        // Cleanup all nodes which are not part of the specific lists
-        // of notations, elements, attributes and entities.
-        let mut c = Some(children);
-        while let Some(mut now) = c {
-            let next = now.next;
-            if !matches!(
-                now.element_type(),
-                XmlElementType::XmlNotationNode
-                    | XmlElementType::XmlElementDecl
-                    | XmlElementType::XmlAttributeDecl
-                    | XmlElementType::XmlEntityDecl
-            ) {
-                now.unlink();
-                xml_free_node(now.as_ptr());
-            }
-            c = next;
-        }
-    }
-    if !(*cur).name.is_null() {
-        xml_free((*cur).name as _);
-    }
-    (*cur).system_id = None;
-    (*cur).external_id = None;
-    // TODO !!!
-
-    if let Some(table) = (*cur).elements.take() {
-        table.scan(|data, _, _, _| xml_free_element(Some(*data)));
-    }
-    if let Some(table) = (*cur).attributes.take().map(|t| t.into_inner()) {
-        xml_free_attribute_table(table);
-    }
-    if let Some(entities) = (*cur).entities.take() {
-        xml_free_entities_table(entities);
-    }
-    if let Some(pentities) = (*cur).pentities.take() {
-        xml_free_entities_table(pentities);
-    }
-
-    drop_in_place(cur);
-    xml_free(cur as _);
-}
-
 /// Free up all the structures used by a document, tree included.
 #[doc(alias = "xmlFreeDoc")]
 pub unsafe fn xml_free_doc(cur: *mut XmlDoc) {
-    let mut ext_subset: *mut XmlDtd;
-
     if cur.is_null() {
         return;
     }
@@ -1027,19 +969,17 @@ pub unsafe fn xml_free_doc(cur: *mut XmlDoc) {
     // Do this before freeing the children list to avoid ID lookups
     (*cur).ids.take();
     (*cur).refs.take();
-    ext_subset = (*cur).ext_subset;
-    let int_subset: *mut XmlDtd = (*cur).int_subset;
+    let mut ext_subset = (*cur).ext_subset.take();
+    let int_subset = (*cur).int_subset.take();
     if int_subset == ext_subset {
-        ext_subset = null_mut();
+        ext_subset = None;
     }
-    if !ext_subset.is_null() {
-        (*(*cur).ext_subset).unlink();
-        (*cur).ext_subset = null_mut();
+    if let Some(mut ext_subset) = ext_subset {
+        ext_subset.unlink();
         xml_free_dtd(ext_subset);
     }
-    if !int_subset.is_null() {
-        (*(*cur).int_subset).unlink();
-        (*cur).int_subset = null_mut();
+    if let Some(mut int_subset) = int_subset {
+        int_subset.unlink();
         xml_free_dtd(int_subset);
     }
 
@@ -1474,20 +1414,22 @@ pub(crate) unsafe fn xml_static_copy_node_list(
                     node = (*node).next.map_or(null_mut(), |c| c.as_ptr());
                     continue;
                 }
-                if (*doc).int_subset.is_null() {
-                    q = xml_copy_dtd(node as _) as _;
-                    if q.is_null() {
+                if let Some(int_subset) = (*doc).int_subset {
+                    q = int_subset.as_ptr() as *mut XmlNode;
+                    (*parent).add_child(q);
+                } else {
+                    let Some(mut new) =
+                        xml_copy_dtd(XmlDtdPtr::from_raw(node as *mut XmlDtd).unwrap().unwrap())
+                    else {
                         // goto error;
                         xml_free_node_list(ret);
                         return null_mut();
-                    }
-                    (*q).doc = doc;
-                    (*q).set_parent(NodePtr::from_ptr(parent));
-                    (*doc).int_subset = q as _;
-                    (*parent).add_child(q);
-                } else {
-                    q = (*doc).int_subset as _;
-                    (*parent).add_child(q);
+                    };
+                    new.doc = doc;
+                    new.set_parent(NodePtr::from_ptr(parent));
+                    (*doc).int_subset = Some(new);
+                    (*parent).add_child(new.as_ptr() as *mut XmlNode);
+                    q = new.as_ptr() as *mut XmlNode;
                 }
             } else {
                 q = xml_static_copy_node(node, doc, parent, 1);
@@ -1670,7 +1612,7 @@ pub unsafe fn xml_copy_prop_list(target: *mut XmlNode, mut cur: *mut XmlAttr) ->
 /// Returns: a new #xmlDtdPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyDtd")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_copy_dtd(dtd: *mut XmlDtd) -> *mut XmlDtd {
+pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
     use crate::libxml::valid::{
         xml_copy_attribute_table, xml_copy_notation_table, xml_get_dtd_qelement_desc,
     };
@@ -1678,38 +1620,32 @@ pub unsafe fn xml_copy_dtd(dtd: *mut XmlDtd) -> *mut XmlDtd {
     let mut p: *mut XmlNode = null_mut();
     let mut q: *mut XmlNode;
 
-    if dtd.is_null() {
-        return null_mut();
-    }
-    let ret: *mut XmlDtd = xml_new_dtd(
+    let mut ret = xml_new_dtd(
         null_mut(),
-        (*dtd).name().as_deref(),
-        (*dtd).external_id.as_deref(),
-        (*dtd).system_id.as_deref(),
-    );
-    if ret.is_null() {
-        return null_mut();
+        dtd.name().as_deref(),
+        dtd.external_id.as_deref(),
+        dtd.system_id.as_deref(),
+    )?;
+    if let Some(entities) = dtd.entities {
+        ret.entities = xml_copy_entities_table(entities);
     }
-    if let Some(entities) = (*dtd).entities {
-        (*ret).entities = xml_copy_entities_table(entities);
-    }
-    if let Some(table) = (*dtd).notations.as_deref() {
+    if let Some(table) = dtd.notations.as_deref() {
         let new = xml_copy_notation_table(table);
-        (*ret).notations = Some(Box::new(new));
+        ret.notations = Some(Box::new(new));
     }
-    if let Some(table) = (*dtd).elements.as_ref() {
-        (*ret).elements = Some(
+    if let Some(table) = dtd.elements.as_ref() {
+        ret.elements = Some(
             table.clone_with(|data, _| xml_copy_element(*data).expect("Failed to copy element")),
         );
     }
-    if let Some(table) = (*dtd).attributes {
-        (*ret).attributes = xml_copy_attribute_table(table);
+    if let Some(table) = dtd.attributes {
+        ret.attributes = xml_copy_attribute_table(table);
     }
-    if let Some(pentities) = (*dtd).pentities {
-        (*ret).pentities = xml_copy_entities_table(pentities);
+    if let Some(pentities) = dtd.pentities {
+        ret.pentities = xml_copy_entities_table(pentities);
     }
 
-    let mut cur = (*dtd).children.map_or(null_mut(), |c| c.as_ptr());
+    let mut cur = dtd.children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
         q = null_mut();
 
@@ -1733,7 +1669,7 @@ pub unsafe fn xml_copy_dtd(dtd: *mut XmlDtd) -> *mut XmlDtd {
                 .unwrap()
                 .unwrap();
             q = xml_get_dtd_qelement_desc(
-                ret,
+                Some(ret),
                 tmp.name().as_deref().unwrap(),
                 tmp.prefix.as_deref(),
             )
@@ -1759,20 +1695,20 @@ pub unsafe fn xml_copy_dtd(dtd: *mut XmlDtd) -> *mut XmlDtd {
         }
 
         if p.is_null() {
-            (*ret).children = NodePtr::from_ptr(q);
+            ret.children = NodePtr::from_ptr(q);
         } else {
             (*p).next = NodePtr::from_ptr(q);
         }
 
         (*q).prev = NodePtr::from_ptr(p);
-        (*q).set_parent(NodePtr::from_ptr(ret as *mut XmlNode));
+        (*q).set_parent(NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode));
         (*q).next = None;
-        (*ret).last = NodePtr::from_ptr(q);
+        ret.last = NodePtr::from_ptr(q);
         p = q;
         cur = (*cur).next.map_or(null_mut(), |c| c.as_ptr());
     }
 
-    ret
+    Some(ret)
 }
 
 /// Do a copy of the document info. If recursive, the content tree will
@@ -1810,14 +1746,14 @@ pub unsafe fn xml_copy_doc(doc: *mut XmlDoc, recursive: i32) -> *mut XmlDoc {
     (*ret).children = None;
     #[cfg(feature = "libxml_tree")]
     {
-        if !(*doc).int_subset.is_null() {
-            (*ret).int_subset = xml_copy_dtd((*doc).int_subset);
-            if (*ret).int_subset.is_null() {
+        if let Some(doc_int_subset) = (*doc).int_subset {
+            (*ret).int_subset = xml_copy_dtd(doc_int_subset);
+            let Some(mut ret_int_subset) = (*ret).int_subset else {
                 xml_free_doc(ret);
                 return null_mut();
-            }
-            (*((*ret).int_subset as *mut XmlNode)).set_doc(ret);
-            (*(*ret).int_subset).parent = ret;
+            };
+            (*(ret_int_subset.as_ptr() as *mut XmlNode)).set_doc(ret);
+            ret_int_subset.parent = ret;
         }
     }
     if !(*doc).old_ns.is_null() {
@@ -2700,7 +2636,7 @@ pub unsafe fn xml_free_node(cur: *mut XmlNode) {
 
     // use xmlFreeDtd for DTD nodes
     if matches!((*cur).element_type(), XmlElementType::XmlDTDNode) {
-        xml_free_dtd(cur as _);
+        xml_free_dtd(XmlDtdPtr::from_raw(cur as *mut XmlDtd).unwrap().unwrap());
         return;
     }
     if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -3221,33 +3157,6 @@ mod tests {
                         eprint!(" {}", n_doc);
                         eprintln!(" {}", n_recursive);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_copy_dtd() {
-        #[cfg(feature = "libxml_tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_dtd in 0..GEN_NB_XML_DTD_PTR {
-                let mem_base = xml_mem_blocks();
-                let dtd = gen_xml_dtd_ptr(n_dtd, 0);
-
-                let ret_val = xml_copy_dtd(dtd);
-                desret_xml_dtd_ptr(ret_val);
-                des_xml_dtd_ptr(n_dtd, dtd, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlCopyDtd",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlCopyDtd()");
-                    eprintln!(" {}", n_dtd);
                 }
             }
         }

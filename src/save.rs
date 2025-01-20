@@ -49,8 +49,8 @@ use crate::{
     },
     tree::{
         is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttribute,
-        XmlAttributePtr, XmlDoc, XmlDtd, XmlElement, XmlElementPtr, XmlElementType, XmlEntity,
-        XmlNotation, XmlNs, XML_LOCAL_NAMESPACE,
+        XmlAttributePtr, XmlDoc, XmlDtd, XmlDtdPtr, XmlElement, XmlElementPtr, XmlElementType,
+        XmlEntity, XmlNotation, XmlNs, XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -331,8 +331,6 @@ impl<'a> XmlSaveCtxt<'a> {
     #[doc(alias = "xmlDocContentDumpOutput")]
     pub(crate) unsafe fn doc_content_dump_output(&mut self, cur: *mut XmlDoc) -> i32 {
         #[cfg(feature = "html")]
-        let dtd: *mut XmlDtd;
-        #[cfg(feature = "html")]
         let mut is_html = false;
         let oldenc = (*cur).encoding.clone();
         let oldctxtenc = self.encoding.clone();
@@ -479,10 +477,9 @@ impl<'a> XmlSaveCtxt<'a> {
                     is_html = true;
                 }
                 if self.options & XmlSaveOption::XmlSaveNoXHTML as i32 == 0 {
-                    dtd = (*cur).get_int_subset();
-                    if !dtd.is_null() {
-                        is_html =
-                            is_xhtml((*dtd).system_id.as_deref(), (*dtd).external_id.as_deref());
+                    let dtd = (*cur).get_int_subset();
+                    if let Some(dtd) = dtd {
+                        is_html = is_xhtml(dtd.system_id.as_deref(), dtd.external_id.as_deref());
                     }
                 }
             }
@@ -793,7 +790,10 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                 ctxt.doc_content_dump_output(cur as _);
             }
             XmlElementType::XmlDTDNode => {
-                xml_dtd_dump_output(ctxt, cur as _);
+                xml_dtd_dump_output(
+                    ctxt,
+                    XmlDtdPtr::from_raw(cur as *mut XmlDtd).unwrap().unwrap(),
+                );
             }
             XmlElementType::XmlDocumentFragNode => {
                 // Always validate (*cur).parent when descending.
@@ -1108,18 +1108,14 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
 
 /// Dump the XML document DTD, if any.
 #[doc(alias = "xmlDtdDumpOutput")]
-unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: *mut XmlDtd) {
+unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
     let mut cur: *mut XmlNode;
 
-    if dtd.is_null() {
-        return;
-    }
     ctxt.buf.borrow_mut().write_bytes(b"<!DOCTYPE ");
-
     ctxt.buf
         .borrow_mut()
-        .write_str(CStr::from_ptr((*dtd).name as _).to_string_lossy().as_ref());
-    if let Some(external_id) = (*dtd).external_id.as_deref() {
+        .write_str(CStr::from_ptr(dtd.name as _).to_string_lossy().as_ref());
+    if let Some(external_id) = dtd.external_id.as_deref() {
         ctxt.buf.borrow_mut().write_bytes(b" PUBLIC ");
         if let Some(mut buf) = ctxt.buf.borrow().buffer {
             let external_id = CString::new(external_id).unwrap();
@@ -1127,21 +1123,21 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: *mut XmlDtd) {
         }
         ctxt.buf.borrow_mut().write_bytes(b" ");
         if let Some(mut buf) = ctxt.buf.borrow().buffer {
-            let system_id = CString::new((*dtd).system_id.as_deref().unwrap()).unwrap();
+            let system_id = CString::new(dtd.system_id.as_deref().unwrap()).unwrap();
             buf.push_quoted_cstr(&system_id);
         }
-    } else if let Some(system_id) = (*dtd).system_id.as_deref() {
+    } else if let Some(system_id) = dtd.system_id.as_deref() {
         ctxt.buf.borrow_mut().write_bytes(b" SYSTEM ");
         if let Some(mut buf) = ctxt.buf.borrow().buffer {
             let system_id = CString::new(system_id).unwrap();
             buf.push_quoted_cstr(&system_id);
         }
     }
-    if (*dtd).entities.is_none()
-        && (*dtd).elements.is_none()
-        && (*dtd).attributes.is_none()
-        && (*dtd).notations.is_none()
-        && (*dtd).pentities.is_none()
+    if dtd.entities.is_none()
+        && dtd.elements.is_none()
+        && dtd.attributes.is_none()
+        && dtd.notations.is_none()
+        && dtd.pentities.is_none()
     {
         ctxt.buf.borrow_mut().write_bytes(b">");
         return;
@@ -1149,8 +1145,8 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: *mut XmlDtd) {
     ctxt.buf.borrow_mut().write_bytes(b" [\n");
     // Dump the notations first they are not in the DTD children list
     // Do this only on a standalone DTD or on the internal subset though.
-    if (*dtd).doc.is_null() || (*(*dtd).doc).int_subset == dtd {
-        if let Some(table) = (*dtd).notations.as_deref() {
+    if dtd.doc.is_null() || (*dtd.doc).int_subset == Some(dtd) {
+        if let Some(table) = dtd.notations.as_deref() {
             xml_buf_dump_notation_table(&mut *ctxt.buf.borrow_mut(), table);
         }
     }
@@ -1158,7 +1154,7 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: *mut XmlDtd) {
     let level: i32 = ctxt.level;
     ctxt.format = 0;
     ctxt.level = -1;
-    cur = (*dtd).children.map_or(null_mut(), |c| c.as_ptr());
+    cur = dtd.children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
         xml_node_dump_output_internal(ctxt, cur);
         cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
@@ -1325,7 +1321,10 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                 xml_ns_dump_output_ctxt(ctxt, cur as _);
             }
             XmlElementType::XmlDTDNode => {
-                xml_dtd_dump_output(ctxt, cur as _);
+                xml_dtd_dump_output(
+                    ctxt,
+                    XmlDtdPtr::from_raw(cur as *mut XmlDtd).unwrap().unwrap(),
+                );
             }
             XmlElementType::XmlDocumentFragNode => {
                 // Always validate (*cur).parent when descending.

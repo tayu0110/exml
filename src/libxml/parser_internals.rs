@@ -2021,7 +2021,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             if (*oldctxt).validate != 0
                 && (*oldctxt).well_formed != 0
                 && !(*oldctxt).my_doc.is_null()
-                && !(*(*oldctxt).my_doc).int_subset.is_null()
+                && (*(*oldctxt).my_doc).int_subset.is_some()
                 && (*cur).element_type() == XmlElementType::XmlElementNode
             {
                 (*oldctxt).valid &=
@@ -3397,7 +3397,7 @@ pub unsafe fn xml_parse_external_subset(
         }
         (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
     }
-    if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).int_subset.is_null() {
+    if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).int_subset.is_none() {
         xml_create_int_subset((*ctxt).my_doc, None, external_id, system_id);
     }
 

@@ -39,8 +39,8 @@ use crate::{
 
 use super::{
     xml_free_node_list, xml_get_doc_entity, xml_new_doc_text, xml_new_reference, xml_tree_err,
-    xml_tree_err_memory, NodeCommon, NodePtr, XmlDocProperties, XmlDtd, XmlElementType, XmlEntity,
-    XmlEntityType, XmlID, XmlNode, XmlNs, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
+    xml_tree_err_memory, NodeCommon, NodePtr, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType,
+    XmlEntity, XmlEntityType, XmlID, XmlNode, XmlNs, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
@@ -66,9 +66,9 @@ pub struct XmlDoc {
     //  standalone attribute was specified
     pub(crate) standalone: i32,
     // the document internal subset
-    pub int_subset: *mut XmlDtd,
+    pub int_subset: Option<XmlDtdPtr>,
     // the document external subset
-    pub(crate) ext_subset: *mut XmlDtd,
+    pub(crate) ext_subset: Option<XmlDtdPtr>,
     // Global namespace, the old way
     pub(crate) old_ns: *mut XmlNs,
     // the XML version string
@@ -98,11 +98,11 @@ impl XmlDoc {
     /// Get the internal subset of a document
     /// Returns a pointer to the DTD structure or null_mut() if not found
     #[doc(alias = "xmlGetIntSubset")]
-    pub unsafe fn get_int_subset(&self) -> *mut XmlDtd {
-        let mut cur = self.children();
+    pub unsafe fn get_int_subset(&self) -> Option<XmlDtdPtr> {
+        let mut cur = self.children;
         while let Some(now) = cur {
             if matches!(now.element_type(), XmlElementType::XmlDTDNode) {
-                return now.as_ptr() as *mut XmlDtd;
+                return XmlDtdPtr::from_raw(now.as_ptr() as *mut XmlDtd).unwrap();
             }
             cur = now.next();
         }
@@ -761,8 +761,8 @@ impl Default for XmlDoc {
             doc: null_mut(),
             compression: 0,
             standalone: 0,
-            int_subset: null_mut(),
-            ext_subset: null_mut(),
+            int_subset: None,
+            ext_subset: None,
             old_ns: null_mut(),
             version: None,
             encoding: None,
