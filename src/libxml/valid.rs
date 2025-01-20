@@ -47,7 +47,7 @@ use crate::libxml::xmlstring::xml_strncmp;
 #[cfg(not(feature = "libxml_regexp"))]
 use crate::tree::xml_free_node_list;
 #[cfg(feature = "libxml_valid")]
-use crate::tree::XmlNs;
+use crate::tree::{XmlElementPtr, XmlNs};
 use crate::{
     error::{XmlParserErrors, __xml_raise_error},
     globals::{GenericError, GenericErrorContext, StructuredError},
@@ -2600,16 +2600,16 @@ macro_rules! CHECK_DTD {
 pub unsafe fn xml_validate_element_decl(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
-    elem: *mut XmlElement,
+    elem: Option<XmlElementPtr>,
 ) -> i32 {
     let mut ret: i32 = 1;
     let mut tst: *mut XmlElement;
 
     CHECK_DTD!(doc);
 
-    if elem.is_null() {
+    let Some(elem) = elem else {
         return 1;
-    }
+    };
 
     // #if 0
     // #ifdef LIBXML_REGEXP_ENABLED
@@ -2619,12 +2619,12 @@ pub unsafe fn xml_validate_element_decl(
     // #endif
 
     // No Duplicate Types
-    if matches!((*elem).etype, XmlElementTypeVal::XmlElementTypeMixed) {
+    if matches!(elem.etype, XmlElementTypeVal::XmlElementTypeMixed) {
         let mut cur: XmlElementContentPtr;
         let mut next: XmlElementContentPtr;
         let mut name: *const XmlChar;
 
-        cur = (*elem).content;
+        cur = elem.content;
         while !cur.is_null() {
             if !matches!((*cur).typ, XmlElementContentType::XmlElementContentOr) {
                 break;
@@ -2643,12 +2643,12 @@ pub unsafe fn xml_validate_element_decl(
                         if xml_str_equal((*next).name, name)
                             && xml_str_equal((*next).prefix, (*(*cur).c1).prefix)
                         {
-                            let elem_name = (*elem).name.as_deref().unwrap();
+                            let elem_name = elem.name.as_deref().unwrap();
                             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                             if (*(*cur).c1).prefix.is_null() {
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem as *mut XmlNode,
+                                    elem.as_ptr() as *mut XmlNode,
                                     XmlParserErrors::XmlDTDContentError,
                                     format!("Definition of {elem_name} has duplicate references of {name}\n")
                                         .as_str(),
@@ -2661,7 +2661,7 @@ pub unsafe fn xml_validate_element_decl(
                                     .to_string_lossy();
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem as *mut XmlNode,
+                                    elem.as_ptr() as *mut XmlNode,
                                     XmlParserErrors::XmlDTDContentError,
                                     format!("Definition of {elem_name} has duplicate references of {prefix}:{name}\n").as_str(),
                                     Some(elem_name.as_str()),
@@ -2685,12 +2685,12 @@ pub unsafe fn xml_validate_element_decl(
                     if xml_str_equal((*(*next).c1).name, name)
                         && xml_str_equal((*(*next).c1).prefix, (*(*cur).c1).prefix)
                     {
-                        let elem_name = (*elem).name.as_deref().unwrap();
+                        let elem_name = elem.name.as_deref().unwrap();
                         let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                         if (*(*cur).c1).prefix.is_null() {
                             xml_err_valid_node(
                                 ctxt,
-                                elem as *mut XmlNode,
+                                elem.as_ptr() as *mut XmlNode,
                                 XmlParserErrors::XmlDTDContentError,
                                 format!(
                                     "Definition of {elem_name} has duplicate references to {name}\n"
@@ -2705,7 +2705,7 @@ pub unsafe fn xml_validate_element_decl(
                                 CStr::from_ptr((*(*cur).c1).prefix as *const i8).to_string_lossy();
                             xml_err_valid_node(
                                 ctxt,
-                                elem as *mut XmlNode,
+                                elem.as_ptr() as *mut XmlNode,
                                 XmlParserErrors::XmlDTDContentError,
                                 format!(
                                     "Definition of {elem_name} has duplicate references to {prefix}:{name}\n"
@@ -2725,7 +2725,7 @@ pub unsafe fn xml_validate_element_decl(
         }
     }
 
-    let elem_name = (*elem)
+    let elem_name = elem
         .name
         .as_ref()
         .map(|n| CString::new(n.as_str()).unwrap());
@@ -2737,14 +2737,14 @@ pub unsafe fn xml_validate_element_decl(
             .map_or(null(), |n| n.as_ptr() as *const u8),
     );
     if !tst.is_null()
-        && tst != elem
-        && (*tst).prefix == (*elem).prefix
+        && tst != elem.into()
+        && (*tst).prefix == elem.prefix
         && !matches!((*tst).etype, XmlElementTypeVal::XmlElementTypeUndefined)
     {
         let elem_name = elem_name.as_deref().unwrap().to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem as *mut XmlNode,
+            elem.as_ptr() as *mut XmlNode,
             XmlParserErrors::XmlDTDElemRedefined,
             format!("Redefinition of element {elem_name}\n").as_str(),
             Some(&elem_name),
@@ -2760,14 +2760,14 @@ pub unsafe fn xml_validate_element_decl(
             .map_or(null(), |n| n.as_ptr() as *const u8),
     );
     if !tst.is_null()
-        && tst != elem
-        && (*tst).prefix == (*elem).prefix
+        && tst != elem.into()
+        && (*tst).prefix == elem.prefix
         && !matches!((*tst).etype, XmlElementTypeVal::XmlElementTypeUndefined)
     {
         let elem_name = elem_name.as_deref().unwrap().to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem as *mut XmlNode,
+            elem.as_ptr() as *mut XmlNode,
             XmlParserErrors::XmlDTDElemRedefined,
             format!("Redefinition of element {elem_name}\n").as_str(),
             Some(&elem_name),
@@ -8283,46 +8283,6 @@ mod tests {
                             eprint!(" {}", n_ctxt);
                             eprint!(" {}", n_doc);
                             eprintln!(" {}", n_root);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_element_decl() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_ELEMENT_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let elem = gen_xml_element_ptr(n_elem, 2);
-
-                        let ret_val = xml_validate_element_decl(ctxt, doc, elem);
-                        desret_int(ret_val);
-                        des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_element_ptr(n_elem, elem, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidateElementDecl",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlValidateElementDecl()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_elem);
                         }
                     }
                 }

@@ -18,13 +18,19 @@
 //
 // daniel@veillard.com
 
-use std::{borrow::Cow, os::raw::c_void, ptr::null_mut};
+use std::{
+    any::type_name,
+    borrow::Cow,
+    ops::{Deref, DerefMut},
+    os::raw::c_void,
+    ptr::{null_mut, NonNull},
+};
 
 use crate::{
     libxml::xmlregexp::XmlRegexpPtr,
     tree::{
-        NodeCommon, NodePtr, XmlDoc, XmlDtd, XmlElementContentPtr, XmlElementType,
-        XmlElementTypeVal, XmlNode,
+        InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDoc, XmlDtd, XmlElementContentPtr,
+        XmlElementType, XmlElementTypeVal, XmlGenericNodePtr, XmlNode,
     },
 };
 
@@ -120,5 +126,121 @@ impl NodeCommon for XmlElement {
     }
     fn set_parent(&mut self, parent: Option<NodePtr>) {
         self.parent = parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlDtd;
+    }
+}
+
+pub struct XmlElementPtr(NonNull<XmlElement>);
+
+impl XmlElementPtr {
+    /// Allocate new memory and create new `XmlElementPtr` from an owned xml node.
+    ///
+    /// This method leaks allocated memory.  
+    /// Users can use `free` method for deallocating memory.
+    pub(crate) fn new(node: XmlElement) -> Option<Self> {
+        let boxed = Box::new(node);
+        NonNull::new(Box::leak(boxed)).map(Self)
+    }
+
+    /// Create `XmlElementPtr` from a raw pointer.  
+    ///
+    /// If `ptr` is a NULL pointer, return `Ok(None)`.  
+    /// If `ptr` is a valid pointer of `XmlElement`, return `Ok(Some(Self))`.  
+    /// Otherwise, return `Err`.
+    ///
+    /// # Safety
+    /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
+    pub(crate) unsafe fn from_raw(
+        ptr: *mut XmlElement,
+    ) -> Result<Option<Self>, InvalidNodePointerCastError> {
+        if ptr.is_null() {
+            return Ok(None);
+        }
+        match (*ptr).element_type() {
+            XmlElementType::XmlElementDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+            _ => Err(InvalidNodePointerCastError {
+                from: (*ptr).element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+
+    pub(crate) fn as_ptr(self) -> *mut XmlElement {
+        self.0.as_ptr()
+    }
+
+    /// Deallocate memory.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn free(self) {
+        let _ = *Box::from_raw(self.0.as_ptr());
+    }
+
+    /// Acquire the ownership of the inner value.  
+    /// As a result, `self` will be invalid. `self` must not be used after performs this method.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn into_inner(self) -> Box<XmlElement> {
+        Box::from_raw(self.0.as_ptr())
+    }
+}
+
+impl Clone for XmlElementPtr {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl Copy for XmlElementPtr {}
+
+impl Deref for XmlElementPtr {
+    type Target = XmlElement;
+    fn deref(&self) -> &Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlElement`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl DerefMut for XmlElementPtr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlElement`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_mut() }
+    }
+}
+
+impl TryFrom<XmlGenericNodePtr> for XmlElementPtr {
+    type Error = InvalidNodePointerCastError;
+
+    fn try_from(value: XmlGenericNodePtr) -> Result<Self, Self::Error> {
+        match value.element_type() {
+            XmlElementType::XmlElementDecl => Ok(Self(value.0.cast())),
+            _ => Err(InvalidNodePointerCastError {
+                from: value.element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+}
+
+impl From<XmlElementPtr> for XmlGenericNodePtr {
+    fn from(value: XmlElementPtr) -> Self {
+        Self(value.0 as NonNull<dyn NodeCommon>)
+    }
+}
+
+impl From<XmlElementPtr> for *mut XmlElement {
+    fn from(value: XmlElementPtr) -> Self {
+        value.0.as_ptr()
     }
 }

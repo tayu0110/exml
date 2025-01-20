@@ -39,6 +39,7 @@ use std::{
     any::type_name,
     borrow::Cow,
     ffi::{CStr, CString},
+    fmt::Display,
     mem::size_of,
     ptr::{drop_in_place, null_mut},
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
@@ -369,6 +370,18 @@ pub enum XmlDocProperties {
                                and not by parsing an instance */
     XmlDocInternal = 1 << 6, /* built for internal processing */
     XmlDocHTML = 1 << 7,     /* parsed or built HTML document */
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct InvalidNodePointerCastError {
+    from: XmlElementType,
+    to: &'static str,
+}
+
+impl Display for InvalidNodePointerCastError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Invalid casting from {:?} to {}", self.from, self.to)
+    }
 }
 
 macro_rules! CUR_SCHAR {

@@ -52,7 +52,7 @@ use crate::{
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc,
-        XmlDocProperties, XmlDtd, XmlElement, XmlElementContentPtr, XmlElementType,
+        XmlDocProperties, XmlDtd, XmlElementContentPtr, XmlElementPtr, XmlElementType,
         XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNs,
         __XML_REGISTER_CALLBACKS,
     },
@@ -848,8 +848,6 @@ pub unsafe fn xml_sax2_element_decl(
     typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
 ) {
-    let elem: *mut XmlElement;
-
     if ctx.is_none() {
         return;
     }
@@ -862,22 +860,24 @@ pub unsafe fn xml_sax2_element_decl(
         return;
     }
 
-    if (*ctxt).in_subset == 1 {
-        elem = xml_add_element_decl(
+    let elem = if (*ctxt).in_subset == 1 {
+        XmlElementPtr::from_raw(xml_add_element_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
             (*(*ctxt).my_doc).int_subset,
             name,
             typ,
             content,
-        );
+        ))
+        .unwrap()
     } else if (*ctxt).in_subset == 2 {
-        elem = xml_add_element_decl(
+        XmlElementPtr::from_raw(xml_add_element_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
             (*(*ctxt).my_doc).ext_subset,
             name,
             typ,
             content,
-        );
+        ))
+        .unwrap()
     } else {
         xml_fatal_err_msg!(
             ctxt,
@@ -886,10 +886,10 @@ pub unsafe fn xml_sax2_element_decl(
             name
         );
         return;
-    }
+    };
     #[cfg(feature = "libxml_valid")]
     {
-        if elem.is_null() {
+        if elem.is_none() {
             (*ctxt).valid = 0;
         }
         if (*ctxt).validate != 0
@@ -1779,132 +1779,126 @@ unsafe fn xml_check_defaulted_attributes(
 ) {
     use crate::parser::build_qname;
 
-    let mut elem_decl: *mut XmlElement;
-    let mut internal: i32 = 1;
-
-    elem_decl = xml_get_dtd_qelement_desc((*(*ctxt).my_doc).int_subset, name, prefix);
-    if elem_decl.is_null() {
-        elem_decl = xml_get_dtd_qelement_desc((*(*ctxt).my_doc).ext_subset, name, prefix);
-        internal = 0;
-    }
-
-    // process_external_subset:
-    'process_external_subset: loop {
-        if !elem_decl.is_null() {
-            let mut attr: *mut XmlAttribute = (*elem_decl).attributes;
-            // Check against defaulted attributes from the external subset
-            // if the document is stamped as standalone
-            if (*(*ctxt).my_doc).standalone == 1
-                && !(*(*ctxt).my_doc).ext_subset.is_null()
-                && (*ctxt).validate != 0
-            {
-                while !attr.is_null() {
-                    let elem = (*attr).elem.as_deref().map(|p| CString::new(p).unwrap());
-                    if !(*attr).default_value.is_null()
-                        && (*(*(*ctxt).my_doc).ext_subset).get_qattr_desc(
+    let decls = [
+        XmlElementPtr::from_raw(xml_get_dtd_qelement_desc(
+            (*(*ctxt).my_doc).int_subset,
+            name,
+            prefix,
+        ))
+        .unwrap(),
+        XmlElementPtr::from_raw(xml_get_dtd_qelement_desc(
+            (*(*ctxt).my_doc).ext_subset,
+            name,
+            prefix,
+        ))
+        .unwrap(),
+    ];
+    for decl in decls {
+        let Some(elem_decl) = decl else {
+            continue;
+        };
+        let mut attr: *mut XmlAttribute = elem_decl.attributes;
+        // Check against defaulted attributes from the external subset
+        // if the document is stamped as standalone
+        if (*(*ctxt).my_doc).standalone == 1
+            && !(*(*ctxt).my_doc).ext_subset.is_null()
+            && (*ctxt).validate != 0
+        {
+            while !attr.is_null() {
+                let elem = (*attr).elem.as_deref().map(|p| CString::new(p).unwrap());
+                if !(*attr).default_value.is_null()
+                    && (*(*(*ctxt).my_doc).ext_subset).get_qattr_desc(
+                        (*attr).elem.as_deref().unwrap(),
+                        (*attr).name().as_deref().unwrap(),
+                        (*attr).prefix.as_deref(),
+                    ) == attr
+                    && (*(*(*ctxt).my_doc).int_subset)
+                        .get_qattr_desc(
                             (*attr).elem.as_deref().unwrap(),
                             (*attr).name().as_deref().unwrap(),
                             (*attr).prefix.as_deref(),
-                        ) == attr
-                        && (*(*(*ctxt).my_doc).int_subset)
-                            .get_qattr_desc(
-                                (*attr).elem.as_deref().unwrap(),
-                                (*attr).name().as_deref().unwrap(),
-                                (*attr).prefix.as_deref(),
-                            )
-                            .is_null()
-                    {
-                        let mut fulln: *mut XmlChar;
+                        )
+                        .is_null()
+                {
+                    let mut fulln: *mut XmlChar;
 
-                        if let Some(prefix) = (*attr).prefix.as_deref() {
-                            let prefix = CString::new(prefix).unwrap();
-                            fulln = xml_strdup(prefix.as_ptr() as *const u8);
-                            fulln = xml_strcat(fulln, c":".as_ptr() as _);
-                            fulln = xml_strcat(fulln, (*attr).name);
-                        } else {
-                            fulln = xml_strdup((*attr).name);
-                        }
-                        if fulln.is_null() {
-                            xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
-                            break;
-                        }
-
-                        // Check that the attribute is not declared in the serialization
-                        if !atts.iter().any(|(att, _)| {
-                            att.as_str()
-                                == CStr::from_ptr(fulln as *const i8)
-                                    .to_string_lossy()
-                                    .as_ref()
-                        }) {
-                            let fulln = CStr::from_ptr(fulln as *const i8).to_string_lossy();
-                            xml_err_valid!(
-                                ctxt,
-                                XmlParserErrors::XmlDTDStandaloneDefaulted,
-                                "standalone: attribute {} on {} defaulted from external subset\n",
-                                fulln,
-                                elem.as_deref().unwrap().to_string_lossy().into_owned()
-                            );
-                        }
-                        xml_free(fulln as _);
+                    if let Some(prefix) = (*attr).prefix.as_deref() {
+                        let prefix = CString::new(prefix).unwrap();
+                        fulln = xml_strdup(prefix.as_ptr() as *const u8);
+                        fulln = xml_strcat(fulln, c":".as_ptr() as _);
+                        fulln = xml_strcat(fulln, (*attr).name);
+                    } else {
+                        fulln = xml_strdup((*attr).name);
                     }
-                    attr = (*attr).nexth;
-                }
-            }
-
-            // Actually insert defaulted values when needed
-            attr = (*elem_decl).attributes;
-            while !attr.is_null() {
-                // Make sure that attributes redefinition occurring in the
-                // internal subset are not overridden by definitions in the external subset.
-                if !(*attr).default_value.is_null() {
-                    // the element should be instantiated in the tree if:
-                    //  - this is a namespace prefix
-                    //  - the user required for completion in the tree
-                    //    like XSLT
-                    //  - there isn't already an attribute definition
-                    //    in the internal subset overriding it.
-                    if (*attr).prefix.as_deref() == Some("xmlns")
-                        || ((*attr).prefix.is_none() && (*attr).name().as_deref() == Some("xmlns"))
-                        || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
-                    {
-                        let tst: *mut XmlAttribute = (*(*(*ctxt).my_doc).int_subset)
-                            .get_qattr_desc(
-                                (*attr).elem.as_deref().unwrap(),
-                                (*attr).name().as_deref().unwrap(),
-                                (*attr).prefix.as_deref(),
-                            );
-                        if tst == attr || tst.is_null() {
-                            let name = (*attr).name().unwrap();
-                            let fulln = build_qname(&name, (*attr).prefix.as_deref());
-
-                            // Check that the attribute is not declared in the serialization
-                            if !atts.iter().any(|(att, _)| att.as_str() == fulln) {
-                                let value = (*attr).default_value;
-                                xml_sax2_attribute_internal(
-                                    Some(GenericErrorContext::new(ctxt)),
-                                    &fulln,
-                                    (!value.is_null())
-                                        .then(|| {
-                                            CStr::from_ptr(value as *const i8).to_string_lossy()
-                                        })
-                                        .as_deref(),
-                                    prefix,
-                                );
-                            }
-                        }
+                    if fulln.is_null() {
+                        xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
+                        break;
                     }
+
+                    // Check that the attribute is not declared in the serialization
+                    if !atts.iter().any(|(att, _)| {
+                        att.as_str()
+                            == CStr::from_ptr(fulln as *const i8)
+                                .to_string_lossy()
+                                .as_ref()
+                    }) {
+                        let fulln = CStr::from_ptr(fulln as *const i8).to_string_lossy();
+                        xml_err_valid!(
+                            ctxt,
+                            XmlParserErrors::XmlDTDStandaloneDefaulted,
+                            "standalone: attribute {} on {} defaulted from external subset\n",
+                            fulln,
+                            elem.as_deref().unwrap().to_string_lossy().into_owned()
+                        );
+                    }
+                    xml_free(fulln as _);
                 }
                 attr = (*attr).nexth;
             }
-            if internal == 1 {
-                elem_decl = xml_get_dtd_qelement_desc((*(*ctxt).my_doc).ext_subset, name, prefix);
-                internal = 0;
-                // goto process_external_subset;
-                continue 'process_external_subset;
-            }
         }
 
-        break;
+        // Actually insert defaulted values when needed
+        attr = elem_decl.attributes;
+        while !attr.is_null() {
+            // Make sure that attributes redefinition occurring in the
+            // internal subset are not overridden by definitions in the external subset.
+            if !(*attr).default_value.is_null() {
+                // the element should be instantiated in the tree if:
+                //  - this is a namespace prefix
+                //  - the user required for completion in the tree
+                //    like XSLT
+                //  - there isn't already an attribute definition
+                //    in the internal subset overriding it.
+                if (*attr).prefix.as_deref() == Some("xmlns")
+                    || ((*attr).prefix.is_none() && (*attr).name().as_deref() == Some("xmlns"))
+                    || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
+                {
+                    let tst: *mut XmlAttribute = (*(*(*ctxt).my_doc).int_subset).get_qattr_desc(
+                        (*attr).elem.as_deref().unwrap(),
+                        (*attr).name().as_deref().unwrap(),
+                        (*attr).prefix.as_deref(),
+                    );
+                    if tst == attr || tst.is_null() {
+                        let name = (*attr).name().unwrap();
+                        let fulln = build_qname(&name, (*attr).prefix.as_deref());
+
+                        // Check that the attribute is not declared in the serialization
+                        if !atts.iter().any(|(att, _)| att.as_str() == fulln) {
+                            let value = (*attr).default_value;
+                            xml_sax2_attribute_internal(
+                                Some(GenericErrorContext::new(ctxt)),
+                                &fulln,
+                                (!value.is_null())
+                                    .then(|| CStr::from_ptr(value as *const i8).to_string_lossy())
+                                    .as_deref(),
+                                prefix,
+                            );
+                        }
+                    }
+                }
+            }
+            attr = (*attr).nexth;
+        }
     }
 }
 

@@ -677,7 +677,7 @@ pub trait NodeCommon {
     }
 }
 
-pub(crate) struct XmlGenericNodePtr(NonNull<dyn NodeCommon>);
+pub(crate) struct XmlGenericNodePtr(pub(super) NonNull<dyn NodeCommon>);
 
 impl XmlGenericNodePtr {
     /// Allocate new memory and create new `XmlGenericNodePtr` from an owned xml node.
