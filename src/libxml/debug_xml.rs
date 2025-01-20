@@ -22,7 +22,6 @@
 use std::{
     ffi::{c_char, CStr, CString},
     io::{stdout, Write},
-    mem::zeroed,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::Ordering,
 };
@@ -2399,7 +2398,7 @@ pub unsafe fn xml_shell_validate(
 
     use super::valid::XmlValidCtxt;
 
-    let mut vctxt: XmlValidCtxt = unsafe { zeroed() };
+    let mut vctxt = XmlValidCtxt::default();
     let mut res: i32 = -1;
 
     if ctxt.is_null() || (*ctxt).doc.is_null() {

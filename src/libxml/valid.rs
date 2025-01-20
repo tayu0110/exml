@@ -23,7 +23,7 @@ use std::io::Write;
 use std::{
     collections::HashMap,
     ffi::{c_char, CStr, CString},
-    mem::{size_of, size_of_val, zeroed},
+    mem::{size_of, size_of_val},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut, NonNull},
     rc::Rc,
@@ -130,11 +130,8 @@ pub struct XmlValidCtxt {
     pub(crate) doc: *mut XmlDoc, /* the document */
     pub(crate) valid: i32,       /* temporary validity check result */
 
-    /* state state used for non-determinist content validation */
-    pub(crate) vstate: *mut XmlValidState, /* current state */
-    pub(crate) vstate_nr: i32,             /* Depth of the validation stack */
-    pub(crate) vstate_max: i32,            /* Max depth of the validation stack */
-    pub(crate) vstate_tab: *mut XmlValidState, /* array of validation states */
+    // state state used for non-determinist content validation
+    pub(crate) vstate_tab: Vec<XmlValidState>, /* array of validation states */
 
     #[cfg(feature = "libxml_regexp")]
     pub(crate) am: XmlAutomataPtr, /* the automata */
@@ -159,10 +156,7 @@ impl Default for XmlValidCtxt {
             flags: 0,
             doc: null_mut(),
             valid: 0,
-            vstate: null_mut(),
-            vstate_nr: 0,
-            vstate_max: 0,
-            vstate_tab: null_mut(),
+            vstate_tab: vec![],
             am: null_mut(),
             state: null_mut(),
         }
@@ -188,8 +182,7 @@ macro_rules! xml_err_valid {
         if !ctxt.is_null() {
             channel = (*ctxt).error;
             data = (*ctxt).user_data.clone();
-            /* Look up flag to detect if it is part of a parsing
-            context */
+            // Look up flag to detect if it is part of a parsing context
             if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
                 pctxt = (*ctxt)
                     .user_data
@@ -2428,7 +2421,7 @@ pub unsafe fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
         return null_mut();
     }
 
-    memset(ret as _, 0, size_of::<XmlValidCtxt>());
+    std::ptr::write(&mut *ret, XmlValidCtxt::default());
 
     ret
 }
@@ -2437,15 +2430,15 @@ pub unsafe fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
 #[doc(alias = "xmlFreeValidCtxt")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
+    use std::ptr::drop_in_place;
+
     if cur.is_null() {
         return;
-    }
-    if !(*cur).vstate_tab.is_null() {
-        xml_free((*cur).vstate_tab as _);
     }
     if !(*cur).node_tab.is_null() {
         xml_free((*cur).node_tab as _);
     }
+    drop_in_place(cur);
     xml_free(cur as _);
 }
 
@@ -5007,7 +5000,7 @@ pub unsafe fn xml_validate_one_element(
 
     // If vstateNr is not zero that means continuous validation is
     // activated, do not try to check the content model at that level.
-    if (*ctxt).vstate_nr == 0 {
+    if (*ctxt).vstate_tab.is_empty() {
         // Check that the element content matches the definition
         match elem_decl.etype {
             XmlElementTypeVal::XmlElementTypeUndefined => {
@@ -6483,7 +6476,7 @@ pub unsafe fn xml_valid_get_valid_elements(
 ) -> i32 {
     use crate::tree::NodePtr;
 
-    let mut vctxt: XmlValidCtxt = unsafe { zeroed() };
+    let mut vctxt = XmlValidCtxt::default();
     let mut nb_valid_elements: i32;
     let mut elements: [*const XmlChar; 256] = [null(); 256];
     let mut nb_elements: i32 = 0;
@@ -6499,7 +6492,7 @@ pub unsafe fn xml_valid_get_valid_elements(
         return -1;
     }
 
-    memset(addr_of_mut!(vctxt) as _, 0, size_of::<XmlValidCtxt>());
+    std::ptr::write(&mut vctxt, XmlValidCtxt::default());
     vctxt.error = Some(xml_no_validity_err); /* this suppresses err/warn output */
 
     nb_valid_elements = 0;
@@ -7006,33 +6999,13 @@ unsafe fn vstate_vpush(
     ctxt: XmlValidCtxtPtr,
     elem_decl: *mut XmlElement,
     node: *mut XmlNode,
-) -> i32 {
-    if (*ctxt).vstate_max == 0 || (*ctxt).vstate_tab.is_null() {
-        (*ctxt).vstate_max = 10;
-        (*ctxt).vstate_tab =
-            xml_malloc((*ctxt).vstate_max as usize * size_of_val(&*(*ctxt).vstate_tab.add(0)))
-                as *mut XmlValidState;
-        if (*ctxt).vstate_tab.is_null() {
-            xml_verr_memory(ctxt as _, Some("malloc failed"));
-            return -1;
-        }
-    }
-
-    if (*ctxt).vstate_nr >= (*ctxt).vstate_max {
-        let tmp: *mut XmlValidState = xml_realloc(
-            (*ctxt).vstate_tab as _,
-            2 * (*ctxt).vstate_max as usize * size_of_val(&*(*ctxt).vstate_tab.add(0)),
-        ) as *mut XmlValidState;
-        if tmp.is_null() {
-            xml_verr_memory(ctxt as _, Some("realloc failed"));
-            return -1;
-        }
-        (*ctxt).vstate_max *= 2;
-        (*ctxt).vstate_tab = tmp;
-    }
-    (*ctxt).vstate = (*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize);
-    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).elem_decl = elem_decl;
-    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).node = node;
+) -> usize {
+    // (*ctxt).vstate = (*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize);
+    (*ctxt).vstate_tab.push(XmlValidState {
+        elem_decl,
+        node,
+        exec: null_mut(),
+    });
     if !elem_decl.is_null()
         && matches!((*elem_decl).etype, XmlElementTypeVal::XmlElementTypeElement)
     {
@@ -7040,10 +7013,10 @@ unsafe fn vstate_vpush(
             xml_valid_build_content_model(ctxt, elem_decl);
         }
         if !(*elem_decl).cont_model.is_null() {
-            (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).exec =
+            (*ctxt).vstate_tab.last_mut().unwrap().exec =
                 xml_reg_new_exec_ctxt((*elem_decl).cont_model, None, null_mut());
         } else {
-            (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).exec = null_mut();
+            (*ctxt).vstate_tab.last_mut().unwrap().exec = null_mut();
             let node_name = (*node).name().unwrap();
             xml_err_valid_node(
                 ctxt,
@@ -7056,10 +7029,7 @@ unsafe fn vstate_vpush(
             );
         }
     }
-
-    let res = (*ctxt).vstate_nr;
-    (*ctxt).vstate_nr += 1;
-    res
+    (*ctxt).vstate_tab.len() - 1
 }
 
 #[cfg(not(feature = "libxml_regexp"))]
@@ -7143,23 +7113,20 @@ pub unsafe fn xml_validate_push_element(
         return 0;
     }
 
-    if (*ctxt).vstate_nr > 0 && !(*ctxt).vstate.is_null() {
-        let state: XmlValidStatePtr = (*ctxt).vstate;
-        let elem_decl: *mut XmlElement;
-
+    if let Some(state) = (*ctxt).vstate_tab.last() {
         // Check the new element against the content model of the new elem.
-        if !(*state).elem_decl.is_null() {
-            elem_decl = (*state).elem_decl;
+        if !state.elem_decl.is_null() {
+            let elem_decl = state.elem_decl;
 
             match (*elem_decl).etype {
                 XmlElementTypeVal::XmlElementTypeUndefined => {
                     ret = 0;
                 }
                 XmlElementTypeVal::XmlElementTypeEmpty => {
-                    let name = (*(*state).node).name().unwrap();
+                    let name = (*state.node).name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        (*state).node,
+                        state.node,
                         XmlParserErrors::XmlDTDNotEmpty,
                         format!("Element {name} was declared EMPTY this one has content\n")
                             .as_str(),
@@ -7178,10 +7145,10 @@ pub unsafe fn xml_validate_push_element(
                         && (*(*elem_decl).content).typ
                             == XmlElementContentType::XmlElementContentPCDATA
                     {
-                        let name = (*(*state).node).name().unwrap();
+                        let name = (*state.node).name().unwrap();
                         xml_err_valid_node(
                             ctxt,
-                            (*state).node,
+                            state.node,
                             XmlParserErrors::XmlDTDNotPCDATA,
                             format!(
                                 "Element {name} was declared #PCDATA but contains non text nodes\n"
@@ -7196,10 +7163,10 @@ pub unsafe fn xml_validate_push_element(
                         ret = xml_validate_check_mixed(ctxt, (*elem_decl).content, qname);
                         if ret != 1 {
                             let qname = CStr::from_ptr(qname as *const i8).to_string_lossy();
-                            let name = (*(*state).node).name().unwrap();
+                            let name = (*state.node).name().unwrap();
                             xml_err_valid_node(
                                 ctxt,
-                                (*state).node,
+                                state.node,
                                 XmlParserErrors::XmlDTDInvalidChild,
                                 format!("Element {qname} is not declared in {name} list of possible children\n").as_str(),
                                 Some(&qname),
@@ -7214,14 +7181,14 @@ pub unsafe fn xml_validate_push_element(
                     // VC: Standalone Document Declaration
                     //     - element types with element content, if white space
                     //       occurs directly within any instance of those types.
-                    if !(*state).exec.is_null() {
-                        ret = xml_reg_exec_push_string((*state).exec, qname, null_mut());
+                    if !state.exec.is_null() {
+                        ret = xml_reg_exec_push_string(state.exec, qname, null_mut());
                         if ret < 0 {
-                            let name = (*(*state).node).name().unwrap();
+                            let name = (*state.node).name().unwrap();
                             let qname = CStr::from_ptr(qname as *const i8).to_string_lossy();
                             xml_err_valid_node(
                                 ctxt,
-                                (*state).node,
+                                state.node,
                                 XmlParserErrors::XmlDTDContentModel,
                                 format!("Element {name} content does not follow the DTD, Misplaced {qname}\n").as_str(),
                                 Some(&name),
@@ -7261,23 +7228,20 @@ pub unsafe fn xml_validate_push_cdata(
     if len <= 0 {
         return ret;
     }
-    if (*ctxt).vstate_nr > 0 && !(*ctxt).vstate.is_null() {
-        let state: XmlValidStatePtr = (*ctxt).vstate;
-        let elem_decl: *mut XmlElement;
-
+    if let Some(state) = (*ctxt).vstate_tab.last() {
         // Check the new element against the content model of the new elem.
-        if !(*state).elem_decl.is_null() {
-            elem_decl = (*state).elem_decl;
+        if !state.elem_decl.is_null() {
+            let elem_decl = state.elem_decl;
 
             match (*elem_decl).etype {
                 XmlElementTypeVal::XmlElementTypeUndefined => {
                     ret = 0;
                 }
                 XmlElementTypeVal::XmlElementTypeEmpty => {
-                    let name = (*(*state).node).name().unwrap();
+                    let name = (*state.node).name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        (*state).node,
+                        state.node,
                         XmlParserErrors::XmlDTDNotEmpty,
                         format!("Element {name} was declared EMPTY this one has content\n")
                             .as_str(),
@@ -7292,10 +7256,10 @@ pub unsafe fn xml_validate_push_cdata(
                 XmlElementTypeVal::XmlElementTypeElement => {
                     for i in 0..len {
                         if !xml_is_blank_char(*data.add(i as usize) as u32) {
-                            let name = (*(*state).node).name().unwrap();
+                            let name = (*state.node).name().unwrap();
                             xml_err_valid_node(
                                 ctxt,
-                                (*state).node,
+                                state.node,
                                 XmlParserErrors::XmlDTDContentModel,
                                 format!("Element {name} content does not follow the DTD, Text not allowed\n").as_str(),
                                 Some(&name),
@@ -7321,26 +7285,17 @@ pub unsafe fn xml_validate_push_cdata(
 
 #[cfg(feature = "libxml_regexp")]
 unsafe fn vstate_vpop(ctxt: XmlValidCtxtPtr) -> i32 {
-    if (*ctxt).vstate_nr < 1 {
+    if (*ctxt).vstate_tab.is_empty() {
         return -1;
     }
-    (*ctxt).vstate_nr -= 1;
-    let elem_decl: *mut XmlElement =
-        (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).elem_decl;
-    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).elem_decl = null_mut();
-    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).node = null_mut();
+    let state = (*ctxt).vstate_tab.pop().unwrap();
+    let elem_decl = state.elem_decl;
     if !elem_decl.is_null()
         && matches!((*elem_decl).etype, XmlElementTypeVal::XmlElementTypeElement)
     {
-        xml_reg_free_exec_ctxt((*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).exec);
+        xml_reg_free_exec_ctxt(state.exec);
     }
-    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).exec = null_mut();
-    if (*ctxt).vstate_nr >= 1 {
-        (*ctxt).vstate = (*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize - 1);
-    } else {
-        (*ctxt).vstate = null_mut();
-    }
-    (*ctxt).vstate_nr
+    (*ctxt).vstate_tab.len() as i32
 }
 
 #[cfg(not(feature = "libxml_regexp"))]
@@ -7375,23 +7330,20 @@ pub unsafe fn xml_validate_pop_element(
         return 0;
     }
     // printf("PopElem %s\n", qname);
-    if (*ctxt).vstate_nr > 0 && !(*ctxt).vstate.is_null() {
-        let state: XmlValidStatePtr = (*ctxt).vstate;
-        let elem_decl: *mut XmlElement;
-
+    if let Some(state) = (*ctxt).vstate_tab.last() {
         // Check the new element against the content model of the new elem.
-        if !(*state).elem_decl.is_null() {
-            elem_decl = (*state).elem_decl;
+        if !state.elem_decl.is_null() {
+            let elem_decl = state.elem_decl;
 
             if matches!((*elem_decl).etype, XmlElementTypeVal::XmlElementTypeElement)
-                && !(*state).exec.is_null()
+                && !state.exec.is_null()
             {
-                ret = xml_reg_exec_push_string((*state).exec, null_mut(), null_mut());
+                ret = xml_reg_exec_push_string(state.exec, null_mut(), null_mut());
                 if ret <= 0 {
-                    let name = (*(*state).node).name().unwrap();
+                    let name = (*state.node).name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        (*state).node,
+                        state.node,
                         XmlParserErrors::XmlDTDContentModel,
                         format!(
                             "Element {name} content does not follow the DTD, Expecting more children\n"

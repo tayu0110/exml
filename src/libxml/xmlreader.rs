@@ -4271,21 +4271,16 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
         reader.faketext = null_mut();
     }
     if !reader.ctxt.is_null() {
-        #[cfg(feature = "libxml_valid")]
-        if !(*reader.ctxt).vctxt.vstate_tab.is_null() && (*reader.ctxt).vctxt.vstate_max > 0 {
-            #[cfg(feature = "libxml_regexp")]
-            while (*reader.ctxt).vctxt.vstate_nr > 0 {
-                xml_validate_pop_element(
-                    addr_of_mut!((*reader.ctxt).vctxt),
-                    null_mut(),
-                    null_mut(),
-                    null_mut(),
-                );
-            }
-            xml_free((*reader.ctxt).vctxt.vstate_tab as _);
-            (*reader.ctxt).vctxt.vstate_tab = null_mut();
-            (*reader.ctxt).vctxt.vstate_max = 0;
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_valid"))]
+        while !(*reader.ctxt).vctxt.vstate_tab.is_empty() {
+            xml_validate_pop_element(
+                addr_of_mut!((*reader.ctxt).vctxt),
+                null_mut(),
+                null_mut(),
+                null_mut(),
+            );
         }
+        (*reader.ctxt).vctxt.vstate_tab.clear();
         (*reader.ctxt).stop();
         if !(*reader.ctxt).my_doc.is_null() {
             if reader.preserve == 0 {
