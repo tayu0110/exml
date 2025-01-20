@@ -131,6 +131,7 @@ impl NodeCommon for XmlElement {
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct XmlElementPtr(NonNull<XmlElement>);
 
 impl XmlElementPtr {

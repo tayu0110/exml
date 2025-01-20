@@ -52,9 +52,8 @@ use crate::{
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc,
-        XmlDocProperties, XmlDtd, XmlElementContentPtr, XmlElementPtr, XmlElementType,
-        XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNs,
-        __XML_REGISTER_CALLBACKS,
+        XmlDocProperties, XmlDtd, XmlElementContentPtr, XmlElementType, XmlElementTypeVal,
+        XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -1778,18 +1777,8 @@ unsafe fn xml_check_defaulted_attributes(
     use crate::parser::build_qname;
 
     let decls = [
-        XmlElementPtr::from_raw(xml_get_dtd_qelement_desc(
-            (*(*ctxt).my_doc).int_subset,
-            name,
-            prefix,
-        ))
-        .unwrap(),
-        XmlElementPtr::from_raw(xml_get_dtd_qelement_desc(
-            (*(*ctxt).my_doc).ext_subset,
-            name,
-            prefix,
-        ))
-        .unwrap(),
+        xml_get_dtd_qelement_desc((*(*ctxt).my_doc).int_subset, name, prefix),
+        xml_get_dtd_qelement_desc((*(*ctxt).my_doc).ext_subset, name, prefix),
     ];
     for decl in decls {
         let Some(elem_decl) = decl else {
