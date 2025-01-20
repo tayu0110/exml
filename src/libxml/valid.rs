@@ -87,9 +87,9 @@ pub type XmlValidStatePtr = *mut XmlValidState;
 #[cfg(feature = "libxml_regexp")]
 #[repr(C)]
 pub struct XmlValidState {
-    elem_decl: *mut XmlElement, /* pointer to the content model */
-    node: *mut XmlNode,         /* pointer to the current node */
-    exec: XmlRegExecCtxtPtr,    /* regexp runtime */
+    elem_decl: Option<XmlElementPtr>, /* pointer to the content model */
+    node: *mut XmlNode,               /* pointer to the current node */
+    exec: XmlRegExecCtxtPtr,          /* regexp runtime */
 }
 #[cfg(not(feature = "libxml_regexp"))]
 #[repr(C)]
@@ -4524,7 +4524,7 @@ unsafe fn xml_validate_element_content(
     {
         // Build the regexp associated to the content model
         if elem_decl.cont_model.is_null() {
-            ret = xml_valid_build_content_model(ctxt, elem_decl.as_ptr());
+            ret = xml_valid_build_content_model(ctxt, elem_decl);
         }
         if elem_decl.cont_model.is_null() {
             return -1;
@@ -6835,19 +6835,19 @@ unsafe fn xml_valid_build_acontent_model(
 /// Returns 1 in case of success, 0 in case of error
 #[doc(alias = "xmlValidBuildContentModel")]
 #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, elem: *mut XmlElement) -> i32 {
-    if ctxt.is_null() || elem.is_null() {
+pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: XmlElementPtr) -> i32 {
+    if ctxt.is_null() {
         return 0;
     }
-    if !matches!((*elem).element_type(), XmlElementType::XmlElementDecl) {
+    if !matches!(elem.element_type(), XmlElementType::XmlElementDecl) {
         return 0;
     }
-    if !matches!((*elem).etype, XmlElementTypeVal::XmlElementTypeElement) {
+    if !matches!(elem.etype, XmlElementTypeVal::XmlElementTypeElement) {
         return 1;
     }
     // TODO: should we rebuild in this case ?
-    if !(*elem).cont_model.is_null() {
-        if xml_regexp_is_determinist((*elem).cont_model) == 0 {
+    if !elem.cont_model.is_null() {
+        if xml_regexp_is_determinist(elem.cont_model) == 0 {
             (*ctxt).valid = 0;
             return 0;
         }
@@ -6855,15 +6855,15 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, elem: *mut Xm
     }
 
     (*ctxt).am = xml_new_automata();
-    let name = (*elem)
+    let name = elem
         .name
         .as_ref()
         .map(|n| CString::new(n.as_str()).unwrap());
     if (*ctxt).am.is_null() {
-        let name = (*elem).name.as_deref().unwrap();
+        let name = elem.name.as_deref().unwrap();
         xml_err_valid_node(
             ctxt,
-            elem as *mut XmlNode,
+            elem.as_ptr() as *mut XmlNode,
             XmlParserErrors::XmlErrInternalError,
             format!("Cannot create automata for element {name}\n").as_str(),
             Some(name.as_str()),
@@ -6874,21 +6874,21 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, elem: *mut Xm
     }
     (*ctxt).state = xml_automata_get_init_state((*ctxt).am);
     xml_valid_build_acontent_model(
-        (*elem).content,
+        elem.content,
         ctxt,
         name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
     );
     xml_automata_set_final_state((*ctxt).am, (*ctxt).state);
-    (*elem).cont_model = xml_automata_compile((*ctxt).am);
-    if xml_regexp_is_determinist((*elem).cont_model) != 1 {
+    elem.cont_model = xml_automata_compile((*ctxt).am);
+    if xml_regexp_is_determinist(elem.cont_model) != 1 {
         let mut expr: [c_char; 5000] = [0; 5000];
         expr[0] = 0;
-        xml_snprintf_element_content(expr.as_mut_ptr() as _, 5000, (*elem).content, 1);
-        let name = (*elem).name.as_deref().unwrap();
+        xml_snprintf_element_content(expr.as_mut_ptr() as _, 5000, elem.content, 1);
+        let name = elem.name.as_deref().unwrap();
         let expr = CStr::from_ptr(expr.as_ptr()).to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem as *mut XmlNode,
+            elem.as_ptr() as *mut XmlNode,
             XmlParserErrors::XmlDTDContentNotDeterminist,
             format!("Content model of {name} is not deterministic: {expr}\n").as_str(),
             Some(name.as_str()),
@@ -6997,7 +6997,7 @@ unsafe fn xml_validate_check_mixed(
 #[cfg(feature = "libxml_regexp")]
 unsafe fn vstate_vpush(
     ctxt: XmlValidCtxtPtr,
-    elem_decl: *mut XmlElement,
+    elem_decl: Option<XmlElementPtr>,
     node: *mut XmlNode,
 ) -> usize {
     // (*ctxt).vstate = (*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize);
@@ -7006,21 +7006,21 @@ unsafe fn vstate_vpush(
         node,
         exec: null_mut(),
     });
-    if !elem_decl.is_null()
-        && matches!((*elem_decl).etype, XmlElementTypeVal::XmlElementTypeElement)
+    if let Some(elem_decl) =
+        elem_decl.filter(|decl| matches!(decl.etype, XmlElementTypeVal::XmlElementTypeElement))
     {
-        if (*elem_decl).cont_model.is_null() {
+        if elem_decl.cont_model.is_null() {
             xml_valid_build_content_model(ctxt, elem_decl);
         }
-        if !(*elem_decl).cont_model.is_null() {
+        if !elem_decl.cont_model.is_null() {
             (*ctxt).vstate_tab.last_mut().unwrap().exec =
-                xml_reg_new_exec_ctxt((*elem_decl).cont_model, None, null_mut());
+                xml_reg_new_exec_ctxt(elem_decl.cont_model, None, null_mut());
         } else {
             (*ctxt).vstate_tab.last_mut().unwrap().exec = null_mut();
             let node_name = (*node).name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem_decl as *mut XmlNode,
+                elem_decl.as_ptr() as *mut XmlNode,
                 XmlParserErrors::XmlErrInternalError,
                 format!("Failed to build content model regexp for {node_name}\n").as_str(),
                 Some(&node_name),
@@ -7115,10 +7115,8 @@ pub unsafe fn xml_validate_push_element(
 
     if let Some(state) = (*ctxt).vstate_tab.last() {
         // Check the new element against the content model of the new elem.
-        if !state.elem_decl.is_null() {
-            let elem_decl = state.elem_decl;
-
-            match (*elem_decl).etype {
+        if let Some(elem_decl) = state.elem_decl {
+            match elem_decl.etype {
                 XmlElementTypeVal::XmlElementTypeUndefined => {
                     ret = 0;
                 }
@@ -7141,8 +7139,8 @@ pub unsafe fn xml_validate_push_element(
                 }
                 XmlElementTypeVal::XmlElementTypeMixed => {
                     // simple case of declared as #PCDATA
-                    if !(*elem_decl).content.is_null()
-                        && (*(*elem_decl).content).typ
+                    if !elem_decl.content.is_null()
+                        && (*elem_decl.content).typ
                             == XmlElementContentType::XmlElementContentPCDATA
                     {
                         let name = (*state.node).name().unwrap();
@@ -7160,7 +7158,7 @@ pub unsafe fn xml_validate_push_element(
                         );
                         ret = 0;
                     } else {
-                        ret = xml_validate_check_mixed(ctxt, (*elem_decl).content, qname);
+                        ret = xml_validate_check_mixed(ctxt, elem_decl.content, qname);
                         if ret != 1 {
                             let qname = CStr::from_ptr(qname as *const i8).to_string_lossy();
                             let name = (*state.node).name().unwrap();
@@ -7205,7 +7203,7 @@ pub unsafe fn xml_validate_push_element(
         }
     }
     let e_decl = xml_valid_get_elem_decl(ctxt, doc, elem, addr_of_mut!(extsubset));
-    vstate_vpush(ctxt, e_decl.map_or(null_mut(), |decl| decl.as_ptr()), elem);
+    vstate_vpush(ctxt, e_decl, elem);
     ret
 }
 
@@ -7230,10 +7228,8 @@ pub unsafe fn xml_validate_push_cdata(
     }
     if let Some(state) = (*ctxt).vstate_tab.last() {
         // Check the new element against the content model of the new elem.
-        if !state.elem_decl.is_null() {
-            let elem_decl = state.elem_decl;
-
-            match (*elem_decl).etype {
+        if let Some(elem_decl) = state.elem_decl {
+            match elem_decl.etype {
                 XmlElementTypeVal::XmlElementTypeUndefined => {
                     ret = 0;
                 }
@@ -7290,9 +7286,9 @@ unsafe fn vstate_vpop(ctxt: XmlValidCtxtPtr) -> i32 {
     }
     let state = (*ctxt).vstate_tab.pop().unwrap();
     let elem_decl = state.elem_decl;
-    if !elem_decl.is_null()
-        && matches!((*elem_decl).etype, XmlElementTypeVal::XmlElementTypeElement)
-    {
+    if elem_decl.map_or(false, |elem_decl| {
+        matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
+    }) {
         xml_reg_free_exec_ctxt(state.exec);
     }
     (*ctxt).vstate_tab.len() as i32
@@ -7332,10 +7328,8 @@ pub unsafe fn xml_validate_pop_element(
     // printf("PopElem %s\n", qname);
     if let Some(state) = (*ctxt).vstate_tab.last() {
         // Check the new element against the content model of the new elem.
-        if !state.elem_decl.is_null() {
-            let elem_decl = state.elem_decl;
-
-            if matches!((*elem_decl).etype, XmlElementTypeVal::XmlElementTypeElement)
+        if let Some(elem_decl) = state.elem_decl {
+            if matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
                 && !state.exec.is_null()
             {
                 ret = xml_reg_exec_push_string(state.exec, null_mut(), null_mut());
@@ -7736,41 +7730,6 @@ mod tests {
                             eprint!(" {}", n_content);
                             eprintln!(" {}", n_englob);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_valid_build_content_model() {
-        #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_elem in 0..GEN_NB_XML_ELEMENT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                    let elem = gen_xml_element_ptr(n_elem, 1);
-
-                    let ret_val = xml_valid_build_content_model(ctxt, elem);
-                    desret_int(ret_val);
-                    des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_element_ptr(n_elem, elem, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlValidBuildContentModel",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlValidBuildContentModel()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_elem);
                     }
                 }
             }
