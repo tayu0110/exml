@@ -37,7 +37,7 @@ use crate::{
     tree::{
         xml_free_node_list, xml_get_doc_entity, xml_validate_name, NodeCommon, NodePtr, XmlAttr,
         XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElement,
-        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlNode, XmlNs,
+        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType, XmlNode, XmlNs,
     },
 };
 
@@ -1094,8 +1094,9 @@ impl XmlDebugCtxt<'_> {
             }
         } else {
             let name = node.name().unwrap();
-            let ent: *mut XmlEntity = xml_get_doc_entity(node.document(), &name);
-            if !ent.is_null() {
+            if let Some(ent) =
+                XmlEntityPtr::from_raw(xml_get_doc_entity(node.document(), &name)).unwrap()
+            {
                 self.dump_entity(Some(&*ent));
             }
         }

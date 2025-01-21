@@ -74,9 +74,9 @@ use crate::{
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon,
         NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XML_ENT_CHECKED,
-        XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
-        XML_XML_NAMESPACE,
+        XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
+        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
+        XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
 };
 use crate::{
@@ -1684,16 +1684,14 @@ pub(crate) unsafe fn xml_parse_element_content_decl(
 ///
 /// Returns the xmlEntityPtr if found, or NULL otherwise.
 #[doc(alias = "xmlParseEntityRef")]
-pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> *mut XmlEntity {
-    let mut ent: *mut XmlEntity = null_mut();
-
+pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> Option<XmlEntityPtr> {
     (*ctxt).grow();
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        return null_mut();
+        return None;
     }
 
     if (*ctxt).current_byte() != b'&' {
-        return null_mut();
+        return None;
     }
     (*ctxt).skip_char();
     let Some(name) = parse_name(&mut *ctxt) else {
@@ -1702,47 +1700,51 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> *mut XmlEnt
             XmlParserErrors::XmlErrNameRequired,
             "xmlParseEntityRef: no name\n",
         );
-        return null_mut();
+        return None;
     };
     if (*ctxt).current_byte() != b';' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
-        return null_mut();
+        return None;
     }
     (*ctxt).skip_char();
 
     // Predefined entities override any extra definition
     if (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 == 0 {
-        ent = xml_get_predefined_entity(&name);
-        if !ent.is_null() {
-            return ent;
+        if let Some(ent) = XmlEntityPtr::from_raw(xml_get_predefined_entity(&name)).unwrap() {
+            return Some(ent);
         }
     }
 
+    let mut ent = None;
     // Ask first SAX for entity resolution, otherwise try the
     // entities which may have stored in the parser context.
     if let Some(sax) = (*ctxt).sax.as_deref_mut() {
         if let Some(f) = sax.get_entity {
-            ent = f((*ctxt).user_data.clone(), &name);
+            ent = XmlEntityPtr::from_raw(f((*ctxt).user_data.clone(), &name)).unwrap();
         }
         if (*ctxt).well_formed == 1
-            && ent.is_null()
+            && ent.is_none()
             && (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 != 0
         {
-            ent = xml_get_predefined_entity(&name);
+            ent = XmlEntityPtr::from_raw(xml_get_predefined_entity(&name)).unwrap();
         }
         if (*ctxt).well_formed == 1
-            && ent.is_null()
+            && ent.is_none()
             && (*ctxt)
                 .user_data
                 .as_ref()
                 .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
                 == Some(ctxt)
         {
-            ent = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)), &name);
+            ent = XmlEntityPtr::from_raw(xml_sax2_get_entity(
+                Some(GenericErrorContext::new(ctxt)),
+                &name,
+            ))
+            .unwrap();
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        return null_mut();
+        return None;
     }
     // [ WFC: Entity Declared ]
     // In a document without any DTD, a document with only an
@@ -1763,7 +1765,70 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> *mut XmlEnt
     // for such documents, the rule that an entity must be
     // declared is a well-formedness constraint only if
     // standalone='yes'.
-    if ent.is_null() {
+    if let Some(mut ent) = ent {
+        if matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
+            // [ WFC: Parsed Entity ]
+            // An entity reference must not contain the name of an unparsed entity
+            xml_fatal_err_msg_str!(
+                ctxt,
+                XmlParserErrors::XmlErrUnparsedEntity,
+                "Entity reference to unparsed entity {}\n",
+                name
+            );
+        } else if matches!(
+            (*ctxt).instate,
+            XmlParserInputState::XmlParserAttributeValue
+        ) && matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity)
+        {
+            // [ WFC: No External Entity References ]
+            // Attribute values cannot contain direct or indirect
+            // entity references to external entities.
+            xml_fatal_err_msg_str!(
+                ctxt,
+                XmlParserErrors::XmlErrEntityIsExternal,
+                "Attribute references external entity '{}'\n",
+                name
+            );
+        } else if matches!(
+            (*ctxt).instate,
+            XmlParserInputState::XmlParserAttributeValue
+        ) && !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
+        {
+            // [ WFC: No < in Attribute Values ]
+            // The replacement text of any entity referred to directly or
+            // indirectly in an attribute value (other than "&lt;") must not contain a <.
+            if ent.flags & XML_ENT_CHECKED_LT as i32 == 0 {
+                if !ent.content.load(Ordering::Relaxed).is_null()
+                    && !xml_strchr(ent.content.load(Ordering::Relaxed) as _, b'<').is_null()
+                {
+                    ent.flags |= XML_ENT_CONTAINS_LT as i32;
+                }
+                ent.flags |= XML_ENT_CHECKED_LT as i32;
+            }
+            if ent.flags & XML_ENT_CONTAINS_LT as i32 != 0 {
+                xml_fatal_err_msg_str!(
+                    ctxt,
+                    XmlParserErrors::XmlErrLtInAttribute,
+                    "'<' in entity '{}' is not allowed in attributes values\n",
+                    name
+                );
+            }
+        } else {
+            // Internal check, no parameter entities here ...
+            match ent.etype {
+                XmlEntityType::XmlInternalParameterEntity
+                | XmlEntityType::XmlExternalParameterEntity => {
+                    xml_fatal_err_msg_str!(
+                        ctxt,
+                        XmlParserErrors::XmlErrEntityIsParameter,
+                        "Attempt to reference the parameter entity '{}'\n",
+                        name
+                    );
+                }
+                _ => {}
+            }
+        }
+    } else {
         if (*ctxt).standalone == 1 || ((*ctxt).has_external_subset == 0 && (*ctxt).has_perefs == 0)
         {
             xml_fatal_err_msg_str!(
@@ -1786,74 +1851,6 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> *mut XmlEnt
             }
         }
         (*ctxt).valid = 0;
-    }
-    // [ WFC: Parsed Entity ]
-    // An entity reference must not contain the name of an unparsed entity
-    else if matches!(
-        (*ent).etype,
-        XmlEntityType::XmlExternalGeneralUnparsedEntity
-    ) {
-        xml_fatal_err_msg_str!(
-            ctxt,
-            XmlParserErrors::XmlErrUnparsedEntity,
-            "Entity reference to unparsed entity {}\n",
-            name
-        );
-    }
-    // [ WFC: No External Entity References ]
-    // Attribute values cannot contain direct or indirect
-    // entity references to external entities.
-    else if matches!(
-        (*ctxt).instate,
-        XmlParserInputState::XmlParserAttributeValue
-    ) && matches!((*ent).etype, XmlEntityType::XmlExternalGeneralParsedEntity)
-    {
-        xml_fatal_err_msg_str!(
-            ctxt,
-            XmlParserErrors::XmlErrEntityIsExternal,
-            "Attribute references external entity '{}'\n",
-            name
-        );
-    }
-    // [ WFC: No < in Attribute Values ]
-    // The replacement text of any entity referred to directly or
-    // indirectly in an attribute value (other than "&lt;") must not contain a <.
-    else if matches!(
-        (*ctxt).instate,
-        XmlParserInputState::XmlParserAttributeValue
-    ) && !matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
-    {
-        if (*ent).flags & XML_ENT_CHECKED_LT as i32 == 0 {
-            if !(*ent).content.load(Ordering::Relaxed).is_null()
-                && !xml_strchr((*ent).content.load(Ordering::Relaxed) as _, b'<').is_null()
-            {
-                (*ent).flags |= XML_ENT_CONTAINS_LT as i32;
-            }
-            (*ent).flags |= XML_ENT_CHECKED_LT as i32;
-        }
-        if (*ent).flags & XML_ENT_CONTAINS_LT as i32 != 0 {
-            xml_fatal_err_msg_str!(
-                ctxt,
-                XmlParserErrors::XmlErrLtInAttribute,
-                "'<' in entity '{}' is not allowed in attributes values\n",
-                name
-            );
-        }
-    }
-    // Internal check, no parameter entities here ...
-    else {
-        match (*ent).etype {
-            XmlEntityType::XmlInternalParameterEntity
-            | XmlEntityType::XmlExternalParameterEntity => {
-                xml_fatal_err_msg_str!(
-                    ctxt,
-                    XmlParserErrors::XmlErrEntityIsParameter,
-                    "Attempt to reference the parameter entity '{}'\n",
-                    name
-                );
-            }
-            _ => {}
-        }
     }
 
     // [ WFC: No Recursion ]
@@ -2141,20 +2138,19 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     }
 
     // We are seeing an entity reference
-    let ent: *mut XmlEntity = xml_parse_entity_ref(ctxt);
-    if ent.is_null() {
+    let Some(mut ent) = xml_parse_entity_ref(ctxt) else {
         return;
-    }
+    };
     if (*ctxt).well_formed == 0 {
         return;
     }
-    was_checked = (*ent).flags & XML_ENT_PARSED as i32;
+    was_checked = ent.flags & XML_ENT_PARSED as i32;
 
     // special case of predefined entities
-    if (*ent).name.load(Ordering::Relaxed).is_null()
-        || matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
+    if ent.name.load(Ordering::Relaxed).is_null()
+        || matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
     {
-        val = (*ent).content.load(Ordering::Relaxed) as _;
+        val = ent.content.load(Ordering::Relaxed) as _;
         if val.is_null() {
             return;
         }
@@ -2177,8 +2173,8 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     // of validating, or substituting entities were given. Doing so is
     // far more secure as the parser will only process data coming from
     // the document entity by default.
-    if (*ent).flags & XML_ENT_PARSED as i32 == 0
-        && (!matches!((*ent).etype, XmlEntityType::XmlExternalGeneralParsedEntity)
+    if ent.flags & XML_ENT_PARSED as i32 == 0
+        && (!matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity)
             || (*ctxt).options
                 & (XmlParserOption::XmlParseNoEnt as i32
                     | XmlParserOption::XmlParseDTDValid as i32)
@@ -2203,30 +2199,30 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         // Avoid overflow as much as possible
         (*ctxt).sizeentcopy = 0;
 
-        if (*ent).flags & XML_ENT_EXPANDING as i32 != 0 {
+        if ent.flags & XML_ENT_EXPANDING as i32 != 0 {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
             (*ctxt).halt();
             return;
         }
 
-        (*ent).flags |= XML_ENT_EXPANDING as i32;
+        ent.flags |= XML_ENT_EXPANDING as i32;
 
         // Check that this entity is well formed
         // 4.3.2: An internal general parsed entity is well-formed
         // if its replacement text matches the production labeled content.
-        if matches!((*ent).etype, XmlEntityType::XmlInternalGeneralEntity) {
+        if matches!(ent.etype, XmlEntityType::XmlInternalGeneralEntity) {
             (*ctxt).depth += 1;
             ret = xml_parse_balanced_chunk_memory_internal(
                 ctxt,
-                (*ent).content.load(Ordering::Relaxed),
+                ent.content.load(Ordering::Relaxed),
                 user_data,
                 addr_of_mut!(list),
             );
             (*ctxt).depth -= 1;
-        } else if matches!((*ent).etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
+        } else if matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
             (*ctxt).depth += 1;
-            let uri = (*ent).uri.load(Ordering::Relaxed);
-            let external_id = (*ent).external_id.load(Ordering::Relaxed);
+            let uri = ent.uri.load(Ordering::Relaxed);
+            let external_id = ent.external_id.load(Ordering::Relaxed);
             let has_sax = (*ctxt).sax.is_some();
             let (sax, error) = xml_parse_external_entity_private(
                 (*ctxt).my_doc,
@@ -2255,9 +2251,9 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             );
         }
 
-        (*ent).flags &= !XML_ENT_EXPANDING as i32;
-        (*ent).flags |= (XML_ENT_PARSED | XML_ENT_CHECKED) as i32;
-        (*ent).expanded_size = (*ctxt).sizeentcopy;
+        ent.flags &= !XML_ENT_EXPANDING as i32;
+        ent.flags |= (XML_ENT_PARSED | XML_ENT_CHECKED) as i32;
+        ent.expanded_size = (*ctxt).sizeentcopy;
         if matches!(ret, XmlParserErrors::XmlErrEntityLoop) {
             (*ctxt).halt();
             xml_free_node_list(list);
@@ -2269,7 +2265,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         }
 
         if matches!(ret, XmlParserErrors::XmlErrOK) && !list.is_null() {
-            (*ent).children.store(list, Ordering::Relaxed);
+            ent.children.store(list, Ordering::Relaxed);
             // Prune it directly in the generated document
             // except for single text nodes.
             if (*ctxt).replace_entities == 0
@@ -2277,44 +2273,44 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 || (matches!((*list).element_type(), XmlElementType::XmlTextNode)
                     && (*list).next.is_none())
             {
-                (*ent).owner = 1;
+                ent.owner = 1;
                 while !list.is_null() {
-                    (*list).set_parent(NodePtr::from_ptr(ent as *mut XmlNode));
-                    if (*list).doc != (*ent).doc.load(Ordering::Relaxed) as _ {
-                        (*list).set_doc((*ent).doc.load(Ordering::Relaxed));
+                    (*list).set_parent(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                    if (*list).doc != ent.doc.load(Ordering::Relaxed) as _ {
+                        (*list).set_doc(ent.doc.load(Ordering::Relaxed));
                     }
                     if (*list).next.is_none() {
-                        (*ent).last.store(list, Ordering::Relaxed);
+                        ent.last.store(list, Ordering::Relaxed);
                     }
                     list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
                 }
                 list = null_mut();
             } else {
-                (*ent).owner = 0;
+                ent.owner = 0;
                 while !list.is_null() {
                     (*list).set_parent(NodePtr::from_ptr((*ctxt).node));
                     (*list).doc = (*ctxt).my_doc;
                     if (*list).next.is_none() {
-                        (*ent).last.store(list, Ordering::Relaxed);
+                        ent.last.store(list, Ordering::Relaxed);
                     }
                     list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
                 }
-                list = (*ent).children.load(Ordering::Relaxed) as _;
+                list = ent.children.load(Ordering::Relaxed) as _;
             }
         } else if !matches!(
             ret,
             XmlParserErrors::XmlErrOK | XmlParserErrors::XmlWarUndeclaredEntity
         ) {
             let name =
-                CStr::from_ptr((*ent).name.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+                CStr::from_ptr(ent.name.load(Ordering::Relaxed) as *const i8).to_string_lossy();
             xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
                 "Entity '{}' failed to parse\n",
                 name
             );
-            if !(*ent).content.load(Ordering::Relaxed).is_null() {
-                *(*ent).content.load(Ordering::Relaxed).add(0) = 0;
+            if !ent.content.load(Ordering::Relaxed).is_null() {
+                *ent.content.load(Ordering::Relaxed).add(0) = 0;
             }
         } else if !list.is_null() {
             xml_free_node_list(list);
@@ -2328,7 +2324,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     // Now that the entity content has been gathered
     // provide it to the application, this can take different forms based
     // on the parsing modes.
-    if (*ent).children.load(Ordering::Relaxed).is_null() {
+    if ent.children.load(Ordering::Relaxed).is_null() {
         // Probably running in SAX mode and the callbacks don't
         // build the entity content. So unless we already went
         // though parsing for first checking go though the entity
@@ -2347,21 +2343,21 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 (*ctxt).user_data.clone()
             };
 
-            if matches!((*ent).etype, XmlEntityType::XmlInternalGeneralEntity) {
+            if matches!(ent.etype, XmlEntityType::XmlInternalGeneralEntity) {
                 (*ctxt).depth += 1;
                 ret = xml_parse_balanced_chunk_memory_internal(
                     ctxt,
-                    (*ent).content.load(Ordering::Relaxed),
+                    ent.content.load(Ordering::Relaxed),
                     user_data,
                     null_mut(),
                 );
                 (*ctxt).depth -= 1;
-            } else if matches!((*ent).etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
+            } else if matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
                 let oldsizeentities: u64 = (*ctxt).sizeentities;
 
                 (*ctxt).depth += 1;
-                let uri = (*ent).uri.load(Ordering::Relaxed);
-                let external_id = (*ent).external_id.load(Ordering::Relaxed);
+                let uri = ent.uri.load(Ordering::Relaxed);
+                let external_id = ent.external_id.load(Ordering::Relaxed);
                 let has_sax = (*ctxt).sax.is_some();
                 let (sax, error) = xml_parse_external_entity_private(
                     (*ctxt).my_doc,
@@ -2412,7 +2408,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
     // We also check for amplification if entities aren't substituted.
     // They might be expanded later.
-    if was_checked != 0 && xml_parser_entity_check(ctxt, (*ent).expanded_size) != 0 {
+    if was_checked != 0 && xml_parser_entity_check(ctxt, ent.expanded_size) != 0 {
         return;
     }
 
@@ -2420,7 +2416,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     if (*ctxt).replace_entities == 0 && (*ctxt).disable_sax == 0 {
         if let Some(reference) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.reference) {
             // Create a node.
-            reference((*ctxt).user_data.clone(), &(*ent).name().unwrap());
+            reference((*ctxt).user_data.clone(), &ent.name().unwrap());
             return;
         }
     }
@@ -2440,7 +2436,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             // Seems we are generating the DOM content, do
             // a simple tree copy for all references except the first
             // In the first occurrence list contains the replacement.
-            if (list.is_null() && (*ent).owner == 0)
+            if (list.is_null() && ent.owner == 0)
                 || matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader)
             {
                 let mut nw: *mut XmlNode;
@@ -2452,7 +2448,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 // if ((*ctxt).parseMode == XML_PARSE_READER)
                 //     (*ent).owner = 1;
 
-                cur = (*ent).children.load(Ordering::Relaxed) as _;
+                cur = ent.children.load(Ordering::Relaxed) as _;
                 while !cur.is_null() {
                     nw = xml_doc_copy_node(cur, (*ctxt).my_doc, 1);
                     if !nw.is_null() {
@@ -2464,7 +2460,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         }
                         nw = (*(*ctxt).node).add_child(nw);
                     }
-                    if cur == (*ent).last.load(Ordering::Relaxed) as _ {
+                    if cur == ent.last.load(Ordering::Relaxed) as _ {
                         // needed to detect some strange empty
                         // node cases in the reader tests
                         if matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader)
@@ -2489,10 +2485,10 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 // entity child list. The goal is to make sure any
                 // ID or REF referenced will be the one from the
                 // document content and not the entity copy.
-                cur = (*ent).children.load(Ordering::Relaxed) as _;
-                (*ent).children.store(null_mut(), Ordering::Relaxed);
-                let last: *mut XmlNode = (*ent).last.load(Ordering::Relaxed) as _;
-                (*ent).last.store(null_mut(), Ordering::Relaxed);
+                cur = ent.children.load(Ordering::Relaxed) as _;
+                ent.children.store(null_mut(), Ordering::Relaxed);
+                let last: *mut XmlNode = ent.last.load(Ordering::Relaxed) as _;
+                ent.last.store(null_mut(), Ordering::Relaxed);
                 while !cur.is_null() {
                     next = (*cur).next.take().map_or(null_mut(), |n| n.as_ptr());
                     (*cur).set_parent(None);
@@ -2512,8 +2508,8 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     }
                     cur = next;
                 }
-                if (*ent).owner == 0 {
-                    (*ent).owner = 1;
+                if ent.owner == 0 {
+                    ent.owner = 1;
                 }
             } else {
                 // the name change is to avoid coalescing of the
@@ -2522,20 +2518,20 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 let nbktext: *const XmlChar =
                     xml_dict_lookup((*ctxt).dict, c"nbktext".as_ptr() as _, -1);
                 if matches!(
-                    (*(*ent).children.load(Ordering::Relaxed)).element_type(),
+                    (*ent.children.load(Ordering::Relaxed)).element_type(),
                     XmlElementType::XmlTextNode
                 ) {
-                    (*(*ent).children.load(Ordering::Relaxed)).name = nbktext;
+                    (*ent.children.load(Ordering::Relaxed)).name = nbktext;
                 }
-                if (*ent).last.load(Ordering::Relaxed) != (*ent).children.load(Ordering::Relaxed)
+                if ent.last.load(Ordering::Relaxed) != ent.children.load(Ordering::Relaxed)
                     && matches!(
-                        (*(*ent).last.load(Ordering::Relaxed)).element_type(),
+                        (*ent.last.load(Ordering::Relaxed)).element_type(),
                         XmlElementType::XmlTextNode
                     )
                 {
-                    (*(*ent).last.load(Ordering::Relaxed)).name = nbktext;
+                    (*ent.last.load(Ordering::Relaxed)).name = nbktext;
                 }
-                (*(*ctxt).node).add_child_list((*ent).children.load(Ordering::Relaxed));
+                (*(*ctxt).node).add_child_list(ent.children.load(Ordering::Relaxed));
             }
 
             // This is to avoid a nasty side effect, see characters() in SAX.c
@@ -2571,7 +2567,6 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 /// NOTE: misleading but this is handled.
 #[doc(alias = "xmlParsePEReference")]
 pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
-    let mut entity: *mut XmlEntity = null_mut();
     let input: XmlParserInputPtr;
 
     if (*ctxt).current_byte() != b'%' {
@@ -2597,17 +2592,102 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
     (*ctxt).skip_char();
 
     // Request the entity from SAX
-    if let Some(get_parameter_entity) = (*ctxt)
+    let entity = (*ctxt)
         .sax
         .as_deref_mut()
         .and_then(|sax| sax.get_parameter_entity)
-    {
-        entity = get_parameter_entity((*ctxt).user_data.clone(), &name);
-    }
+        .and_then(|get_parameter_entity| {
+            XmlEntityPtr::from_raw(get_parameter_entity((*ctxt).user_data.clone(), &name)).unwrap()
+        });
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         return;
     }
-    if entity.is_null() {
+    if let Some(mut entity) = entity {
+        // Internal checking in case the entity quest barfed
+        if !matches!(
+            entity.etype,
+            XmlEntityType::XmlInternalParameterEntity | XmlEntityType::XmlExternalParameterEntity
+        ) {
+            xml_warning_msg!(
+                ctxt,
+                XmlParserErrors::XmlWarUndeclaredEntity,
+                "Internal: %{}; is not a parameter entity\n",
+                name
+            );
+        } else {
+            let mut start: [XmlChar; 4] = [0; 4];
+            let mut parent_consumed: u64;
+
+            if matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity)
+                && (*ctxt).options & XmlParserOption::XmlParseNoEnt as i32 == 0
+                && (*ctxt).options & XmlParserOption::XmlParseDTDValid as i32 == 0
+                && (*ctxt).options & XmlParserOption::XmlParseDTDLoad as i32 == 0
+                && (*ctxt).options & XmlParserOption::XmlParseDTDAttr as i32 == 0
+                && (*ctxt).replace_entities == 0
+                && (*ctxt).validate == 0
+            {
+                return;
+            }
+
+            if entity.flags & XML_ENT_EXPANDING as i32 != 0 {
+                xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
+                (*ctxt).halt();
+                return;
+            }
+
+            // Must be computed from old input before pushing new input.
+            parent_consumed = (*(*ctxt).input).parent_consumed;
+            let old_ent: *mut XmlEntity = (*(*ctxt).input).entity;
+            if old_ent.is_null()
+                || (matches!((*old_ent).etype, XmlEntityType::XmlExternalParameterEntity)
+                    && (*old_ent).flags & XML_ENT_PARSED as i32 == 0)
+            {
+                parent_consumed = parent_consumed.saturating_add((*(*ctxt).input).consumed);
+                parent_consumed =
+                    parent_consumed.saturating_add((*(*ctxt).input).offset_from_base() as u64);
+            }
+
+            input = xml_new_entity_input_stream(ctxt, entity.as_ptr());
+            if (*ctxt).push_input(input) < 0 {
+                xml_free_input_stream(input);
+                return;
+            }
+
+            entity.flags |= XML_ENT_EXPANDING as i32;
+
+            (*input).parent_consumed = parent_consumed;
+
+            if matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity) {
+                // Get the 4 first bytes and decode the charset
+                // if enc != XML_CHAR_ENCODING_NONE
+                // plug some encoding conversion routines.
+                // Note that, since we may have some non-UTF8
+                // encoding (like UTF16, bug 135229), the 'length'
+                // is not known, but we can calculate based upon
+                // the amount of data in the buffer.
+                (*ctxt).grow();
+                if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
+                    return;
+                }
+                if (*(*ctxt).input).remainder_len() >= 4 {
+                    start[0] = (*ctxt).current_byte();
+                    start[1] = NXT!(ctxt, 1);
+                    start[2] = NXT!(ctxt, 2);
+                    start[3] = NXT!(ctxt, 3);
+                    let enc = detect_encoding(&start);
+                    if !matches!(enc, XmlCharEncoding::None) {
+                        (*ctxt).switch_encoding(enc);
+                    }
+                }
+
+                if (*ctxt).content_bytes().starts_with(b"<?xml")
+                    && xml_is_blank_char(NXT!(ctxt, 5) as u32)
+                {
+                    parse_text_decl(&mut *ctxt);
+                }
+            }
+        }
+    } else {
         // [ WFC: Entity Declared ]
         // In a document without any DTD, a document with only an
         // internal DTD subset which contains no parameter entity
@@ -2644,91 +2724,6 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                 );
             }
             (*ctxt).valid = 0;
-        }
-    } else {
-        // Internal checking in case the entity quest barfed
-        if !matches!(
-            (*entity).etype,
-            XmlEntityType::XmlInternalParameterEntity | XmlEntityType::XmlExternalParameterEntity
-        ) {
-            xml_warning_msg!(
-                ctxt,
-                XmlParserErrors::XmlWarUndeclaredEntity,
-                "Internal: %{}; is not a parameter entity\n",
-                name
-            );
-        } else {
-            let mut start: [XmlChar; 4] = [0; 4];
-            let mut parent_consumed: u64;
-
-            if matches!((*entity).etype, XmlEntityType::XmlExternalParameterEntity)
-                && (*ctxt).options & XmlParserOption::XmlParseNoEnt as i32 == 0
-                && (*ctxt).options & XmlParserOption::XmlParseDTDValid as i32 == 0
-                && (*ctxt).options & XmlParserOption::XmlParseDTDLoad as i32 == 0
-                && (*ctxt).options & XmlParserOption::XmlParseDTDAttr as i32 == 0
-                && (*ctxt).replace_entities == 0
-                && (*ctxt).validate == 0
-            {
-                return;
-            }
-
-            if (*entity).flags & XML_ENT_EXPANDING as i32 != 0 {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
-                (*ctxt).halt();
-                return;
-            }
-
-            // Must be computed from old input before pushing new input.
-            parent_consumed = (*(*ctxt).input).parent_consumed;
-            let old_ent: *mut XmlEntity = (*(*ctxt).input).entity;
-            if old_ent.is_null()
-                || (matches!((*old_ent).etype, XmlEntityType::XmlExternalParameterEntity)
-                    && (*old_ent).flags & XML_ENT_PARSED as i32 == 0)
-            {
-                parent_consumed = parent_consumed.saturating_add((*(*ctxt).input).consumed);
-                parent_consumed =
-                    parent_consumed.saturating_add((*(*ctxt).input).offset_from_base() as u64);
-            }
-
-            input = xml_new_entity_input_stream(ctxt, entity);
-            if (*ctxt).push_input(input) < 0 {
-                xml_free_input_stream(input);
-                return;
-            }
-
-            (*entity).flags |= XML_ENT_EXPANDING as i32;
-
-            (*input).parent_consumed = parent_consumed;
-
-            if matches!((*entity).etype, XmlEntityType::XmlExternalParameterEntity) {
-                // Get the 4 first bytes and decode the charset
-                // if enc != XML_CHAR_ENCODING_NONE
-                // plug some encoding conversion routines.
-                // Note that, since we may have some non-UTF8
-                // encoding (like UTF16, bug 135229), the 'length'
-                // is not known, but we can calculate based upon
-                // the amount of data in the buffer.
-                (*ctxt).grow();
-                if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    return;
-                }
-                if (*(*ctxt).input).remainder_len() >= 4 {
-                    start[0] = (*ctxt).current_byte();
-                    start[1] = NXT!(ctxt, 1);
-                    start[2] = NXT!(ctxt, 2);
-                    start[3] = NXT!(ctxt, 3);
-                    let enc = detect_encoding(&start);
-                    if !matches!(enc, XmlCharEncoding::None) {
-                        (*ctxt).switch_encoding(enc);
-                    }
-                }
-
-                if (*ctxt).content_bytes().starts_with(b"<?xml")
-                    && xml_is_blank_char(NXT!(ctxt, 5) as u32)
-                {
-                    parse_text_decl(&mut *ctxt);
-                }
-            }
         }
     }
     (*ctxt).has_perefs = 1;

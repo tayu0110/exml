@@ -4102,7 +4102,6 @@ unsafe fn xml_parse_att_value_complex(
     let mut l: i32 = 0;
     let mut in_space: i32 = 0;
     let mut current: *mut XmlChar;
-    let mut ent: *mut XmlEntity;
 
     if (*ctxt).current_byte() == b'"' {
         (*ctxt).instate = XmlParserInputState::XmlParserAttributeValue;
@@ -4166,15 +4165,15 @@ unsafe fn xml_parse_att_value_complex(
                             len += xml_copy_char(0, buf.add(len as usize), val as i32) as usize;
                         }
                     } else {
-                        ent = xml_parse_entity_ref(ctxt);
-                        if !ent.is_null()
-                            && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
-                        {
+                        let ent = xml_parse_entity_ref(ctxt);
+                        if let Some(ent) = ent.filter(|ent| {
+                            matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
+                        }) {
                             if len + 10 > buf_size {
                                 grow_buffer!(ctxt, buf, 10, buf_size, rep, 'mem_error);
                             }
                             if (*ctxt).replace_entities == 0
-                                && *(*ent).content.load(Ordering::Relaxed).add(0) == b'&'
+                                && *ent.content.load(Ordering::Relaxed).add(0) == b'&'
                             {
                                 *buf.add(len as usize) = b'&';
                                 len += 1;
@@ -4188,20 +4187,20 @@ unsafe fn xml_parse_att_value_complex(
                                 len += 1;
                             } else {
                                 *buf.add(len as usize) =
-                                    *(*ent).content.load(Ordering::Relaxed).add(0);
+                                    *ent.content.load(Ordering::Relaxed).add(0);
                                 len += 1;
                             }
-                        } else if !ent.is_null() && (*ctxt).replace_entities != 0 {
-                            if !matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity) {
-                                if xml_parser_entity_check(ctxt, (*ent).length as _) != 0 {
+                        } else if let Some(ent) = ent.filter(|_| (*ctxt).replace_entities != 0) {
+                            if !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity) {
+                                if xml_parser_entity_check(ctxt, ent.length as _) != 0 {
                                     break 'error;
                                 }
 
                                 (*ctxt).depth += 1;
                                 rep = xml_string_decode_entities_int(
                                     ctxt,
-                                    (*ent).content.load(Ordering::Relaxed),
-                                    (*ent).length,
+                                    ent.content.load(Ordering::Relaxed),
+                                    ent.length,
                                     XML_SUBSTITUTE_REF as _,
                                     0,
                                     0,
@@ -4233,32 +4232,32 @@ unsafe fn xml_parse_att_value_complex(
                                 if len + 10 > buf_size {
                                     grow_buffer!(ctxt, buf, 10, buf_size, rep, 'mem_error);
                                 }
-                                if !(*ent).content.load(Ordering::Relaxed).is_null() {
+                                if !ent.content.load(Ordering::Relaxed).is_null() {
                                     *buf.add(len as usize) =
-                                        *(*ent).content.load(Ordering::Relaxed).add(0);
+                                        *ent.content.load(Ordering::Relaxed).add(0);
                                     len += 1;
                                 }
                             }
-                        } else if !ent.is_null() {
-                            let i: i32 = xml_strlen((*ent).name.load(Ordering::Relaxed));
-                            let mut cur: *const XmlChar = (*ent).name.load(Ordering::Relaxed);
+                        } else if let Some(mut ent) = ent {
+                            let i: i32 = xml_strlen(ent.name.load(Ordering::Relaxed));
+                            let mut cur: *const XmlChar = ent.name.load(Ordering::Relaxed);
 
                             // We also check for recursion and amplification
                             // when entities are not substituted. They're
                             // often expanded later.
-                            if !matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
-                                && !(*ent).content.load(Ordering::Relaxed).is_null()
+                            if !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
+                                && !ent.content.load(Ordering::Relaxed).is_null()
                             {
-                                if (*ent).flags & XML_ENT_CHECKED as i32 == 0 {
+                                if ent.flags & XML_ENT_CHECKED as i32 == 0 {
                                     let old_copy: u64 = (*ctxt).sizeentcopy;
 
-                                    (*ctxt).sizeentcopy = (*ent).length as _;
+                                    (*ctxt).sizeentcopy = ent.length as _;
 
                                     (*ctxt).depth += 1;
                                     rep = xml_string_decode_entities_int(
                                         ctxt,
-                                        (*ent).content.load(Ordering::Relaxed),
-                                        (*ent).length,
+                                        ent.content.load(Ordering::Relaxed),
+                                        ent.length,
                                         XML_SUBSTITUTE_REF as _,
                                         0,
                                         0,
@@ -4272,21 +4271,21 @@ unsafe fn xml_parse_att_value_complex(
                                     // weren't defined yet, so the check isn't
                                     // reliable.
                                     if (*ctxt).in_subset == 0 {
-                                        (*ent).flags |= XML_ENT_CHECKED as i32;
-                                        (*ent).expanded_size = (*ctxt).sizeentcopy;
+                                        ent.flags |= XML_ENT_CHECKED as i32;
+                                        ent.expanded_size = (*ctxt).sizeentcopy;
                                     }
 
                                     if !rep.is_null() {
                                         xml_free(rep as _);
                                         rep = null_mut();
                                     } else {
-                                        *(*ent).content.load(Ordering::Relaxed).add(0) = 0;
+                                        *ent.content.load(Ordering::Relaxed).add(0) = 0;
                                     }
 
                                     if xml_parser_entity_check(ctxt, old_copy) != 0 {
                                         break 'error;
                                     }
-                                } else if xml_parser_entity_check(ctxt, (*ent).expanded_size) != 0 {
+                                } else if xml_parser_entity_check(ctxt, ent.expanded_size) != 0 {
                                     break 'error;
                                 }
                             }
