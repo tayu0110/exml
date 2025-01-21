@@ -122,7 +122,7 @@ use crate::{
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
         NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode, XmlNs,
+        XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNs,
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
@@ -3103,16 +3103,15 @@ const XML_ENT_FIXED_COST: usize = 20;
 /// Returns 1 on error, 0 on success.
 #[doc(alias = "xmlParserEntityCheck")]
 pub(crate) unsafe fn xml_parser_entity_check(ctxt: XmlParserCtxtPtr, extra: u64) -> i32 {
-    let mut consumed: u64;
     let input: XmlParserInputPtr = (*ctxt).input;
-    let entity: *mut XmlEntity = (*input).entity;
+    let entity = (*input).entity;
 
     // Compute total consumed bytes so far, including input streams of external entities.
-    consumed = (*input).parent_consumed;
-    if entity.is_null()
-        || (matches!((*entity).etype, XmlEntityType::XmlExternalParameterEntity)
-            && (*entity).flags & XML_ENT_PARSED as i32 == 0)
-    {
+    let mut consumed = (*input).parent_consumed;
+    if entity.map_or(true, |entity| {
+        matches!(entity.etype, XmlEntityType::XmlExternalParameterEntity)
+            && entity.flags & XML_ENT_PARSED as i32 == 0
+    }) {
         consumed = consumed.saturating_add((*input).consumed);
         consumed = consumed.saturating_add((*input).offset_from_base() as u64);
     }
@@ -3673,17 +3672,16 @@ unsafe fn xml_parse_string_pereference(
 ///
 /// Returns 0 in case of success and -1 in case of failure
 #[doc(alias = "xmlLoadEntityContent")]
-unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: *mut XmlEntity) -> i32 {
+unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, mut entity: XmlEntityPtr) -> i32 {
     let mut l: i32 = 0;
 
     if ctxt.is_null()
-        || entity.is_null()
         || !matches!(
-            (*entity).etype,
+            entity.etype,
             XmlEntityType::XmlExternalParameterEntity
                 | XmlEntityType::XmlExternalGeneralParsedEntity
         )
-        || !(*entity).content.load(Ordering::Relaxed).is_null()
+        || !entity.content.load(Ordering::Relaxed).is_null()
     {
         xml_fatal_err(
             ctxt,
@@ -3696,7 +3694,7 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: *mut XmlEntity
     if get_parser_debug_entities() != 0 {
         generic_error!(
             "Reading {} entity content input\n",
-            CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8).to_string_lossy()
+            CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8).to_string_lossy()
         );
     }
 
@@ -3746,8 +3744,8 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: *mut XmlEntity
         );
         return -1;
     }
-    (*entity).length = buf.len() as i32;
-    (*entity).content.store(
+    entity.length = buf.len() as i32;
+    entity.content.store(
         xml_strndup(buf.as_ptr(), buf.len() as i32),
         Ordering::Relaxed,
     );
@@ -3980,7 +3978,10 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                                 || (*ctxt).options & XmlParserOption::XmlParseDTDValid as i32 != 0
                                 || (*ctxt).validate != 0
                             {
-                                xml_load_entity_content(ctxt, ent);
+                                xml_load_entity_content(
+                                    ctxt,
+                                    XmlEntityPtr::from_raw(ent).unwrap().unwrap(),
+                                );
                             } else {
                                 let name = CStr::from_ptr(
                                     (*ent).name.load(Ordering::Relaxed) as *const i8

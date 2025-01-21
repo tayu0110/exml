@@ -64,7 +64,7 @@ use crate::{
         xmlstring::xml_strlen,
     },
     parser::xml_err_internal,
-    tree::{XmlEntity, XmlEntityType},
+    tree::{XmlEntityPtr, XmlEntityType},
     uri::canonic_path,
 };
 
@@ -114,7 +114,7 @@ pub struct XmlParserInput {
     // consumed bytes from parents
     pub(crate) parent_consumed: u64,
     // entity, if any
-    pub(crate) entity: *mut XmlEntity,
+    pub(crate) entity: Option<XmlEntityPtr>,
 }
 
 impl XmlParserInput {
@@ -331,7 +331,7 @@ impl Default for XmlParserInput {
             standalone: 0,
             id: 0,
             parent_consumed: 0,
-            entity: null_mut(),
+            entity: None,
         }
     }
 }
@@ -458,31 +458,27 @@ pub unsafe fn xml_new_input_from_file(
 #[doc(alias = "xmlNewEntityInputStream")]
 pub(crate) unsafe fn xml_new_entity_input_stream(
     ctxt: XmlParserCtxtPtr,
-    entity: *mut XmlEntity,
+    mut entity: XmlEntityPtr,
 ) -> XmlParserInputPtr {
     let input: XmlParserInputPtr;
 
-    if entity.is_null() {
-        xml_err_internal!(ctxt, "xmlNewEntityInputStream entity = NULL\n");
-        return null_mut();
-    }
     if get_parser_debug_entities() != 0 {
         generic_error!(
             "new input from entity: {}\n",
-            CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8).to_string_lossy()
+            CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8).to_string_lossy()
         );
     }
-    if (*entity).content.load(Ordering::Relaxed).is_null() {
-        match (*entity).etype {
+    if entity.content.load(Ordering::Relaxed).is_null() {
+        match entity.etype {
             XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
+                let name = CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8)
                     .to_string_lossy();
                 xml_err_internal!(ctxt, "Cannot parse entity {}\n", name);
             }
             XmlEntityType::XmlExternalGeneralParsedEntity
             | XmlEntityType::XmlExternalParameterEntity => {
-                let uri = (*entity).uri.load(Ordering::Relaxed);
-                let external_id = (*entity).external_id.load(Ordering::Relaxed);
+                let uri = entity.uri.load(Ordering::Relaxed);
+                let external_id = entity.external_id.load(Ordering::Relaxed);
                 input = xml_load_external_entity(
                     (!uri.is_null())
                         .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
@@ -493,17 +489,17 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
                     ctxt,
                 );
                 if !input.is_null() {
-                    (*input).entity = entity;
+                    (*input).entity = Some(entity);
                 }
                 return input;
             }
             XmlEntityType::XmlInternalGeneralEntity => {
-                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
+                let name = CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8)
                     .to_string_lossy();
                 xml_err_internal!(ctxt, "Internal entity {} without content !\n", name);
             }
             XmlEntityType::XmlInternalParameterEntity => {
-                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
+                let name = CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8)
                     .to_string_lossy();
                 xml_err_internal!(
                     ctxt,
@@ -512,7 +508,7 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
                 );
             }
             XmlEntityType::XmlInternalPredefinedEntity => {
-                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
+                let name = CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8)
                     .to_string_lossy();
                 xml_err_internal!(ctxt, "Predefined entity {} without content !\n", name);
             }
@@ -526,24 +522,24 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
     if input.is_null() {
         return null_mut();
     }
-    if !(*entity).uri.load(Ordering::Relaxed).is_null() {
+    if !entity.uri.load(Ordering::Relaxed).is_null() {
         (*input).filename = Some(
-            CStr::from_ptr((*entity).uri.load(Ordering::Relaxed) as *const i8)
+            CStr::from_ptr(entity.uri.load(Ordering::Relaxed) as *const i8)
                 .to_string_lossy()
                 .into_owned(),
         );
     }
-    (*input).base = (*entity).content.load(Ordering::Relaxed) as _;
-    if (*entity).length == 0 {
-        (*entity).length = xml_strlen((*entity).content.load(Ordering::Relaxed) as _);
+    (*input).base = entity.content.load(Ordering::Relaxed) as _;
+    if entity.length == 0 {
+        entity.length = xml_strlen(entity.content.load(Ordering::Relaxed) as _);
     }
-    (*input).cur = (*entity).content.load(Ordering::Relaxed);
-    (*input).length = (*entity).length;
-    (*input).end = (*entity)
+    (*input).cur = entity.content.load(Ordering::Relaxed);
+    (*input).length = entity.length;
+    (*input).end = entity
         .content
         .load(Ordering::Relaxed)
         .add((*input).length as usize);
-    (*input).entity = entity;
+    (*input).entity = Some(entity);
     input
 }
 

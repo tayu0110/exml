@@ -74,9 +74,9 @@ use crate::{
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon,
         NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
-        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
-        XML_ENT_PARSED, XML_XML_NAMESPACE,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XML_ENT_CHECKED,
+        XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
+        XML_XML_NAMESPACE,
     },
 };
 use crate::{
@@ -2637,17 +2637,17 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
 
             // Must be computed from old input before pushing new input.
             parent_consumed = (*(*ctxt).input).parent_consumed;
-            let old_ent: *mut XmlEntity = (*(*ctxt).input).entity;
-            if old_ent.is_null()
-                || (matches!((*old_ent).etype, XmlEntityType::XmlExternalParameterEntity)
-                    && (*old_ent).flags & XML_ENT_PARSED as i32 == 0)
-            {
+            let old_ent = (*(*ctxt).input).entity;
+            if old_ent.map_or(true, |old_ent| {
+                matches!(old_ent.etype, XmlEntityType::XmlExternalParameterEntity)
+                    && old_ent.flags & XML_ENT_PARSED as i32 == 0
+            }) {
                 parent_consumed = parent_consumed.saturating_add((*(*ctxt).input).consumed);
                 parent_consumed =
                     parent_consumed.saturating_add((*(*ctxt).input).offset_from_base() as u64);
             }
 
-            input = xml_new_entity_input_stream(ctxt, entity.as_ptr());
+            input = xml_new_entity_input_stream(ctxt, entity);
             if (*ctxt).push_input(input) < 0 {
                 xml_free_input_stream(input);
                 return;
@@ -4113,40 +4113,6 @@ mod tests {
                         );
                         eprint!(" {}", n_out);
                         eprintln!(" {}", n_val);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_entity_input_stream() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_entity in 0..GEN_NB_XML_ENTITY_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                    let entity = gen_xml_entity_ptr(n_entity, 1);
-
-                    let ret_val = xml_new_entity_input_stream(ctxt, entity);
-                    desret_xml_parser_input_ptr(ret_val);
-                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_entity_ptr(n_entity, entity, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewEntityInputStream",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlNewEntityInputStream()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_entity);
                     }
                 }
             }

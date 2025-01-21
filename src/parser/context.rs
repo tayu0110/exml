@@ -722,11 +722,12 @@ impl XmlParserCtxt {
                     consumed = consumed.saturating_add((*self.input).offset_from_base() as u64);
 
                     // Add to sizeentities when parsing an external entity for the first time.
-                    let ent = (*self.input).entity;
-                    if matches!((*ent).etype, XmlEntityType::XmlExternalParameterEntity)
-                        && (*ent).flags & XML_ENT_PARSED as i32 == 0
+                    // Is this `unwrap` OK ????
+                    let mut ent = (*self.input).entity.unwrap();
+                    if matches!(ent.etype, XmlEntityType::XmlExternalParameterEntity)
+                        && ent.flags & XML_ENT_PARSED as i32 == 0
                     {
-                        (*ent).flags |= XML_ENT_PARSED as i32;
+                        ent.flags |= XML_ENT_PARSED as i32;
 
                         self.sizeentities = self.sizeentities.saturating_add(consumed);
                     }
@@ -1142,8 +1143,8 @@ impl XmlParserCtxt {
             );
         }
         let input: XmlParserInputPtr = self.input_pop();
-        if !(*input).entity.is_null() {
-            (*(*input).entity).flags &= !XML_ENT_EXPANDING as i32;
+        if let Some(mut entity) = (*input).entity {
+            entity.flags &= !XML_ENT_EXPANDING as i32;
         }
         xml_free_input_stream(input);
         if *(*self.input).cur == 0 {
