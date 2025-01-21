@@ -122,7 +122,7 @@ use crate::{
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
         NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNs,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNs,
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
@@ -304,14 +304,14 @@ pub type ExternalSubsetSAXFunc = unsafe fn(
 /// Returns the xmlEntityPtr if found.
 #[doc(alias = "getEntitySAXFunc")]
 pub type GetEntitySAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity;
+    unsafe fn(ctx: Option<GenericErrorContext>, name: &str) -> Option<XmlEntityPtr>;
 
 /// Get a parameter entity by name.
 ///
 /// Returns the xmlEntityPtr if found.
 #[doc(alias = "getParameterEntitySAXFunc")]
 pub type GetParameterEntitySAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity;
+    unsafe fn(ctx: Option<GenericErrorContext>, name: &str) -> Option<XmlEntityPtr>;
 
 /// An entity definition has been parsed.
 #[doc(alias = "entityDeclSAXFunc")]
@@ -3401,7 +3401,7 @@ unsafe fn xml_parse_string_entity_ref(
     // entities which may have stored in the parser context.
     if let Some(sax) = (*ctxt).sax.as_deref_mut() {
         if let Some(get_entity) = sax.get_entity {
-            ent = XmlEntityPtr::from_raw(get_entity((*ctxt).user_data.clone(), &name)).unwrap();
+            ent = get_entity((*ctxt).user_data.clone(), &name);
         }
         if ent.is_none() && (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 != 0 {
             ent = XmlEntityPtr::from_raw(xml_get_predefined_entity(&name)).unwrap();
@@ -3413,11 +3413,7 @@ unsafe fn xml_parse_string_entity_ref(
                 .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
                 == Some(ctxt)
         {
-            ent = XmlEntityPtr::from_raw(xml_sax2_get_entity(
-                Some(GenericErrorContext::new(ctxt)) as _,
-                &name,
-            ))
-            .unwrap();
+            ent = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)) as _, &name);
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -3607,9 +3603,7 @@ unsafe fn xml_parse_string_pereference(
         .sax
         .as_deref_mut()
         .and_then(|sax| sax.get_parameter_entity)
-        .and_then(|get_parameter_entity| {
-            XmlEntityPtr::from_raw(get_parameter_entity((*ctxt).user_data.clone(), &name)).unwrap()
-        });
+        .and_then(|get_parameter_entity| get_parameter_entity((*ctxt).user_data.clone(), &name));
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         *str = ptr;
         return None;
@@ -8144,17 +8138,12 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     .as_deref_mut()
                     .and_then(|sax| sax.get_parameter_entity)
                 {
-                    cur = XmlEntityPtr::from_raw(get_parameter_entity(
-                        (*ctxt).user_data.clone(),
-                        &name,
-                    ))
-                    .unwrap();
+                    cur = get_parameter_entity((*ctxt).user_data.clone(), &name);
                 }
             } else {
                 if let Some(get_entity) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.get_entity)
                 {
-                    cur = XmlEntityPtr::from_raw(get_entity((*ctxt).user_data.clone(), &name))
-                        .unwrap();
+                    cur = get_entity((*ctxt).user_data.clone(), &name);
                 }
                 if cur.is_none()
                     && (*ctxt)
@@ -8163,11 +8152,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
                         == Some(ctxt)
                 {
-                    cur = XmlEntityPtr::from_raw(xml_sax2_get_entity(
-                        Some(GenericErrorContext::new(ctxt)),
-                        &name,
-                    ))
-                    .unwrap();
+                    cur = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)), &name);
                 }
             }
             if let Some(cur) = cur.filter(|cur| cur.orig.load(Ordering::Relaxed).is_null()) {

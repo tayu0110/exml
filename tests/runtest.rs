@@ -67,7 +67,7 @@ use exml::{
     relaxng::xml_relaxng_init_types,
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlNode,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
@@ -717,10 +717,10 @@ unsafe fn resolve_entity_debug(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityDebug")]
-unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity {
+unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> Option<XmlEntityPtr> {
     increment_callbacks_counter();
     sax_debugln!("SAX.getEntity({name})");
-    null_mut()
+    None
 }
 
 /// Get a parameter entity by name
@@ -730,10 +730,10 @@ unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> *mu
 unsafe fn get_parameter_entity_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-) -> *mut XmlEntity {
+) -> Option<XmlEntityPtr> {
     increment_callbacks_counter();
     sax_debugln!("SAX.getParameterEntity({name})");
-    null_mut()
+    None
 }
 
 /// An entity definition has been parsed

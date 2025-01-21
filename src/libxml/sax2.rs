@@ -53,7 +53,7 @@ use crate::{
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntity,
-        XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
+        XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -454,35 +454,34 @@ macro_rules! xml_fatal_err_msg {
 ///
 /// Returns the xmlEntityPtr if found.
 #[doc(alias = "xmlSAX2GetEntity")]
-pub unsafe fn xml_sax2_get_entity(ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity {
-    let mut ret: *mut XmlEntity;
-
-    if ctx.is_none() {
-        return null_mut();
-    }
+pub unsafe fn xml_sax2_get_entity(
+    ctx: Option<GenericErrorContext>,
+    name: &str,
+) -> Option<XmlEntityPtr> {
     let ctxt = {
-        let ctx = ctx.unwrap();
+        let ctx = ctx?;
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
 
     if (*ctxt).in_subset == 0 {
-        ret = xml_get_predefined_entity(name);
-        if !ret.is_null() {
+        let ret = XmlEntityPtr::from_raw(xml_get_predefined_entity(name)).unwrap();
+        if ret.is_some() {
             return ret;
         }
     }
     if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).standalone == 1 {
         if (*ctxt).in_subset == 2 {
             (*(*ctxt).my_doc).standalone = 0;
-            ret = xml_get_doc_entity((*ctxt).my_doc, name);
+            let ret = XmlEntityPtr::from_raw(xml_get_doc_entity((*ctxt).my_doc, name)).unwrap();
             (*(*ctxt).my_doc).standalone = 1;
+            ret
         } else {
-            ret = xml_get_doc_entity((*ctxt).my_doc, name);
-            if ret.is_null() {
+            let mut ret = XmlEntityPtr::from_raw(xml_get_doc_entity((*ctxt).my_doc, name)).unwrap();
+            if ret.is_none() {
                 (*(*ctxt).my_doc).standalone = 0;
-                ret = xml_get_doc_entity((*ctxt).my_doc, name);
-                if !ret.is_null() {
+                ret = XmlEntityPtr::from_raw(xml_get_doc_entity((*ctxt).my_doc, name)).unwrap();
+                if ret.is_some() {
                     xml_fatal_err_msg!(
                         ctxt,
                         XmlParserErrors::XmlErrNotStandalone,
@@ -492,11 +491,11 @@ pub unsafe fn xml_sax2_get_entity(ctx: Option<GenericErrorContext>, name: &str) 
                 }
                 (*(*ctxt).my_doc).standalone = 1;
             }
+            ret
         }
     } else {
-        ret = xml_get_doc_entity((*ctxt).my_doc, name);
+        XmlEntityPtr::from_raw(xml_get_doc_entity((*ctxt).my_doc, name)).unwrap()
     }
-    ret
 }
 
 /// Get a parameter entity by name
@@ -506,17 +505,14 @@ pub unsafe fn xml_sax2_get_entity(ctx: Option<GenericErrorContext>, name: &str) 
 pub unsafe fn xml_sax2_get_parameter_entity(
     ctx: Option<GenericErrorContext>,
     name: &str,
-) -> *mut XmlEntity {
-    if ctx.is_none() {
-        return null_mut();
-    }
+) -> Option<XmlEntityPtr> {
     let ctxt = {
-        let ctx = ctx.unwrap();
+        let ctx = ctx?;
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
 
-    xml_get_parameter_entity((*ctxt).my_doc, name)
+    XmlEntityPtr::from_raw(xml_get_parameter_entity((*ctxt).my_doc, name)).unwrap()
 }
 
 /// The entity loader, to control the loading of external entities,

@@ -97,7 +97,7 @@ use exml::{
     tree::{
         xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc,
         xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd,
-        XmlDtdPtr, XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityType,
+        XmlDtdPtr, XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlNode,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
@@ -1396,26 +1396,29 @@ fn resolve_entity_debug(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityDebug")]
-fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity {
+fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> Option<XmlEntityPtr> {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
-        return null_mut();
+        return None;
     }
     println!("SAX.getEntity({name})");
-    null_mut()
+    None
 }
 
 /// Get a parameter entity by name
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityDebug")]
-fn get_parameter_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity {
+fn get_parameter_entity_debug(
+    _ctx: Option<GenericErrorContext>,
+    name: &str,
+) -> Option<XmlEntityPtr> {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
-        return null_mut();
+        return None;
     }
     println!("SAX.getParameterEntity({name})");
-    null_mut()
+    None
 }
 
 /// An entity definition has been parsed

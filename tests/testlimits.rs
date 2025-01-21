@@ -36,7 +36,7 @@ use exml::{
     },
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration,
     },
 };
@@ -716,18 +716,21 @@ fn resolve_entity_callback(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityCallback")]
-fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> *mut XmlEntity {
+fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> Option<XmlEntityPtr> {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
-    null_mut()
+    None
 }
 
 /// Get a parameter entity by name
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityCallback")]
-fn get_parameter_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> *mut XmlEntity {
+fn get_parameter_entity_callback(
+    _ctx: Option<GenericErrorContext>,
+    _name: &str,
+) -> Option<XmlEntityPtr> {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
-    null_mut()
+    None
 }
 
 /// An entity definition has been parsed

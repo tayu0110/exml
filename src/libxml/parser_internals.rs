@@ -1720,7 +1720,7 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> Option<XmlE
     // entities which may have stored in the parser context.
     if let Some(sax) = (*ctxt).sax.as_deref_mut() {
         if let Some(f) = sax.get_entity {
-            ent = XmlEntityPtr::from_raw(f((*ctxt).user_data.clone(), &name)).unwrap();
+            ent = f((*ctxt).user_data.clone(), &name);
         }
         if (*ctxt).well_formed == 1
             && ent.is_none()
@@ -1736,11 +1736,7 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> Option<XmlE
                 .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
                 == Some(ctxt)
         {
-            ent = XmlEntityPtr::from_raw(xml_sax2_get_entity(
-                Some(GenericErrorContext::new(ctxt)),
-                &name,
-            ))
-            .unwrap();
+            ent = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)), &name);
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2596,9 +2592,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
         .sax
         .as_deref_mut()
         .and_then(|sax| sax.get_parameter_entity)
-        .and_then(|get_parameter_entity| {
-            XmlEntityPtr::from_raw(get_parameter_entity((*ctxt).user_data.clone(), &name)).unwrap()
-        });
+        .and_then(|get_parameter_entity| get_parameter_entity((*ctxt).user_data.clone(), &name));
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         return;
     }

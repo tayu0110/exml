@@ -145,7 +145,7 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlEnumeration, XmlNode,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
         XmlNs, XML_XML_NAMESPACE,
     },
     uri::build_uri,
@@ -28765,7 +28765,7 @@ unsafe fn resolve_entity_split(
     null_mut()
 }
 
-unsafe fn get_entity_split(ctx: Option<GenericErrorContext>, name: &str) -> *mut XmlEntity {
+unsafe fn get_entity_split(ctx: Option<GenericErrorContext>, name: &str) -> Option<XmlEntityPtr> {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -28778,13 +28778,13 @@ unsafe fn get_entity_split(ctx: Option<GenericErrorContext>, name: &str) -> *mut
             return get_entity((*ctxt).user_data.clone(), name);
         }
     }
-    null_mut()
+    None
 }
 
 unsafe fn get_parameter_entity_split(
     ctx: Option<GenericErrorContext>,
     name: &str,
-) -> *mut XmlEntity {
+) -> Option<XmlEntityPtr> {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -28797,7 +28797,7 @@ unsafe fn get_parameter_entity_split(
             return get_parameter_entity((*ctxt).user_data.clone(), name);
         }
     }
-    null_mut()
+    None
 }
 
 unsafe fn entity_decl_split(
