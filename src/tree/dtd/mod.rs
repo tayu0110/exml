@@ -45,7 +45,7 @@ use crate::{
 
 use super::{
     xml_free_entities_table, xml_free_node, xml_tree_err_memory, InvalidNodePointerCastError,
-    NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlEntity, XmlGenericNodePtr, XmlNode,
+    NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlEntityPtr, XmlGenericNodePtr, XmlNode,
     __XML_REGISTER_CALLBACKS,
 };
 
@@ -70,10 +70,10 @@ pub struct XmlDtd {
     pub(crate) notations: Option<Box<XmlHashTable<'static, XmlNotation>>>, /* Hash table for notations if any */
     pub(crate) elements: Option<XmlHashTable<'static, XmlElementPtr>>, /* Hash table for elements if any */
     pub(crate) attributes: Option<XmlHashTableRef<'static, XmlAttributePtr>>, /* Hash table for attributes if any */
-    pub(crate) entities: Option<XmlHashTableRef<'static, *mut XmlEntity>>, /* Hash table for entities if any */
+    pub(crate) entities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for entities if any */
     pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
     pub(crate) system_id: Option<String>,   /* URI for a SYSTEM or PUBLIC DTD */
-    pub(crate) pentities: Option<XmlHashTableRef<'static, *mut XmlEntity>>, /* Hash table for param entities if any */
+    pub(crate) pentities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for param entities if any */
 }
 
 impl XmlDtd {
@@ -83,11 +83,8 @@ impl XmlDtd {
     /// Returns A pointer to the entity structure or null_mut() if not found.
     #[doc(alias = "xmlGetEntityFromDtd")]
     #[cfg(feature = "libxml_tree")]
-    pub(super) fn get_entity(&self, name: &str) -> *mut XmlEntity {
-        if let Some(table) = self.entities {
-            return table.lookup(name).map_or(null_mut(), |p| *p);
-        }
-        null_mut()
+    pub(super) fn get_entity(&self, name: &str) -> Option<XmlEntityPtr> {
+        self.entities.as_deref()?.lookup(name).copied()
     }
 
     /// Do an entity lookup in the DTD parameter entity hash table and
@@ -96,11 +93,8 @@ impl XmlDtd {
     /// Returns A pointer to the entity structure or NULL if not found.
     #[doc(alias = "xmlGetParameterEntityFromDtd")]
     #[cfg(feature = "libxml_tree")]
-    pub(super) fn get_parameter_entity(&self, name: &str) -> *mut XmlEntity {
-        if let Some(table) = self.pentities {
-            return table.lookup(name).map_or(null_mut(), |p| *p);
-        }
-        null_mut()
+    pub(super) fn get_parameter_entity(&self, name: &str) -> Option<XmlEntityPtr> {
+        self.pentities.as_deref()?.lookup(name).copied()
     }
 
     /// Search the DTD for the description of this attribute on this element.

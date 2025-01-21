@@ -1710,7 +1710,7 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> Option<XmlE
 
     // Predefined entities override any extra definition
     if (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 == 0 {
-        if let Some(ent) = XmlEntityPtr::from_raw(xml_get_predefined_entity(&name)).unwrap() {
+        if let Some(ent) = xml_get_predefined_entity(&name) {
             return Some(ent);
         }
     }
@@ -1726,7 +1726,7 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> Option<XmlE
             && ent.is_none()
             && (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 != 0
         {
-            ent = XmlEntityPtr::from_raw(xml_get_predefined_entity(&name)).unwrap();
+            ent = xml_get_predefined_entity(&name);
         }
         if (*ctxt).well_formed == 1
             && ent.is_none()

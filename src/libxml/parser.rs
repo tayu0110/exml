@@ -3390,7 +3390,7 @@ unsafe fn xml_parse_string_entity_ref(
     let mut ent = None;
     // Predefined entities override any extra definition
     if (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 == 0 {
-        ent = XmlEntityPtr::from_raw(xml_get_predefined_entity(&name)).unwrap();
+        ent = xml_get_predefined_entity(&name);
         if ent.is_some() {
             *str = ptr;
             return ent;
@@ -3404,7 +3404,7 @@ unsafe fn xml_parse_string_entity_ref(
             ent = get_entity((*ctxt).user_data.clone(), &name);
         }
         if ent.is_none() && (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 != 0 {
-            ent = XmlEntityPtr::from_raw(xml_get_predefined_entity(&name)).unwrap();
+            ent = xml_get_predefined_entity(&name);
         }
         if ent.is_none()
             && (*ctxt)

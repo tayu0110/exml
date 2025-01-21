@@ -32,8 +32,8 @@ use crate::libxml::{
 use super::{
     xml_free_ns, xml_get_doc_entity, xml_new_ns, xml_search_ns_by_namespace_strict,
     xml_search_ns_by_prefix_strict, xml_tree_err_memory, xml_tree_nslist_lookup_by_prefix,
-    NodeCommon, NodePtr, XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlEntity, XmlNode,
-    XmlNs, XML_LOCAL_NAMESPACE,
+    NodeCommon, NodePtr, XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNs,
+    XML_LOCAL_NAMESPACE,
 };
 
 /// A function called to acquire namespaces (xmlNs) from the wrapper.
@@ -1394,12 +1394,14 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some()
                             {
                                 // Assign new entity-node if available.
-                                let ent: *mut XmlEntity =
-                                    xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
-                                if !ent.is_null() {
-                                    (*cur).content = (*ent).content.load(Ordering::Relaxed);
-                                    (*cur).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
-                                    (*cur).set_last(NodePtr::from_ptr(ent as *mut XmlNode));
+                                let ent = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
+                                if let Some(ent) = ent {
+                                    (*cur).content = ent.content.load(Ordering::Relaxed);
+                                    (*cur).set_children(NodePtr::from_ptr(
+                                        ent.as_ptr() as *mut XmlNode
+                                    ));
+                                    (*cur)
+                                        .set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
                                 }
                             }
                             // goto leave_node;
@@ -1577,11 +1579,11 @@ unsafe fn xml_dom_wrap_adopt_attr(
                 (*cur).set_last(None);
                 if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some() {
                     // Assign new entity-node if available.
-                    let ent: *mut XmlEntity = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
-                    if !ent.is_null() {
-                        (*cur).content = (*ent).content.load(Ordering::Relaxed);
-                        (*cur).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
-                        (*cur).set_last(NodePtr::from_ptr(ent as *mut XmlNode));
+                    let ent = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
+                    if let Some(ent) = ent {
+                        (*cur).content = ent.content.load(Ordering::Relaxed);
+                        (*cur).set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                        (*cur).set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
                     }
                 }
             }
@@ -1709,12 +1711,11 @@ pub unsafe fn xml_dom_wrap_adopt_node(
                 (*node).set_last(None);
                 if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some() {
                     // Assign new entity-node if available.
-                    let ent: *mut XmlEntity =
-                        xml_get_doc_entity(dest_doc, &(*node).name().unwrap());
-                    if !ent.is_null() {
-                        (*node).content = (*ent).content.load(Ordering::Relaxed);
-                        (*node).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
-                        (*node).set_last(NodePtr::from_ptr(ent as *mut XmlNode));
+                    let ent = xml_get_doc_entity(dest_doc, &(*node).name().unwrap());
+                    if let Some(ent) = ent {
+                        (*node).content = ent.content.load(Ordering::Relaxed);
+                        (*node).set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                        (*node).set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
                     }
                 }
             }
@@ -2290,12 +2291,14 @@ pub unsafe fn xml_dom_wrap_clone_node(
                             if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some()
                             {
                                 // Different doc: Assign new entity-node if available.
-                                let ent: *mut XmlEntity =
-                                    xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
-                                if !ent.is_null() {
-                                    (*clone).content = (*ent).content.load(Ordering::Relaxed);
-                                    (*clone).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
-                                    (*clone).set_last(NodePtr::from_ptr(ent as *mut XmlNode));
+                                let ent = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
+                                if let Some(ent) = ent {
+                                    (*clone).content = ent.content.load(Ordering::Relaxed);
+                                    (*clone).set_children(NodePtr::from_ptr(
+                                        ent.as_ptr() as *mut XmlNode
+                                    ));
+                                    (*clone)
+                                        .set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
                                 }
                             }
                         } else {

@@ -36,7 +36,7 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_parser_ctxt, XmlParserCtxtPtr,
         XmlParserInputPtr,
     },
-    tree::{xml_free_doc, xml_get_doc_entity, NodeCommon, XmlDoc, XmlElementType, XmlEntity},
+    tree::{xml_free_doc, xml_get_doc_entity, NodeCommon, XmlDoc, XmlElementType},
 };
 use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};
 
@@ -575,51 +575,46 @@ unsafe fn not_recursive_huge_test(
         eprintln!("Failed to parse huge.xml");
         res = 1;
     } else {
-        let mut ent: *mut XmlEntity;
         let fixed_cost: c_ulong = 20;
         let allowed_expansion: c_ulong = 1000000;
         let f_size: c_ulong = xml_strlen(c"some internal data".as_ptr() as _) as u64;
 
-        ent = xml_get_doc_entity(doc, "e");
+        let ent = xml_get_doc_entity(doc, "e").unwrap();
         let e_size: c_ulong =
             f_size * 2 + xml_strlen(c"&f;".as_ptr() as _) as u64 * 2 + fixed_cost * 2;
-        if (*ent).expanded_size != e_size {
+        if ent.expanded_size != e_size {
             eprintln!(
                 "Wrong size for entity e: {} (expected {})",
-                (*ent).expanded_size,
-                e_size
+                ent.expanded_size, e_size
             );
             res = 1;
         }
 
-        ent = xml_get_doc_entity(doc, "b");
-        if (*ent).expanded_size != e_size {
+        let ent = xml_get_doc_entity(doc, "b").unwrap();
+        if ent.expanded_size != e_size {
             eprintln!(
                 "Wrong size for entity b: {} (expected {})",
-                (*ent).expanded_size,
-                e_size
+                ent.expanded_size, e_size
             );
             res = 1;
         }
 
-        ent = xml_get_doc_entity(doc, "d");
+        let ent = xml_get_doc_entity(doc, "d").unwrap();
         let d_size: c_ulong =
             e_size * 2 + xml_strlen(c"&e;".as_ptr() as _) as u64 * 2 + fixed_cost * 2;
-        if (*ent).expanded_size != d_size {
+        if ent.expanded_size != d_size {
             eprintln!(
                 "Wrong size for entity d: {} (expected {})",
-                (*ent).expanded_size,
-                d_size
+                ent.expanded_size, d_size
             );
             res = 1;
         }
 
-        ent = xml_get_doc_entity(doc, "c");
-        if (*ent).expanded_size != d_size {
+        let ent = xml_get_doc_entity(doc, "c").unwrap();
+        if ent.expanded_size != d_size {
             eprintln!(
                 "Wrong size for entity c: {} (expected {})",
-                (*ent).expanded_size,
-                d_size
+                ent.expanded_size, d_size
             );
             res = 1;
         }

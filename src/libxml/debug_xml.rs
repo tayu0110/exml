@@ -37,7 +37,7 @@ use crate::{
     tree::{
         xml_free_node_list, xml_get_doc_entity, xml_validate_name, NodeCommon, NodePtr, XmlAttr,
         XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElement,
-        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType, XmlNode, XmlNs,
+        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlNode, XmlNs,
     },
 };
 
@@ -1094,9 +1094,7 @@ impl XmlDebugCtxt<'_> {
             }
         } else {
             let name = node.name().unwrap();
-            if let Some(ent) =
-                XmlEntityPtr::from_raw(xml_get_doc_entity(node.document(), &name)).unwrap()
-            {
+            if let Some(ent) = xml_get_doc_entity(node.document(), &name) {
                 self.dump_entity(Some(&*ent));
             }
         }
@@ -1376,7 +1374,7 @@ impl XmlDebugCtxt<'_> {
                     }
                     table.scan(|payload, _, _, _| {
                         let entity = *payload;
-                        self.dump_entities_callback((!entity.is_null()).then(|| &*entity));
+                        self.dump_entities_callback(Some(&*entity));
                     });
                 }
             } else {
@@ -1389,7 +1387,7 @@ impl XmlDebugCtxt<'_> {
                     }
                     table.scan(|payload, _, _, _| {
                         let entity = *payload;
-                        self.dump_entities_callback((!entity.is_null()).then(|| &*entity));
+                        self.dump_entities_callback(Some(&*entity));
                     });
                 }
             } else if self.check == 0 {

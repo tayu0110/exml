@@ -465,7 +465,7 @@ pub unsafe fn xml_sax2_get_entity(
     };
 
     if (*ctxt).in_subset == 0 {
-        let ret = XmlEntityPtr::from_raw(xml_get_predefined_entity(name)).unwrap();
+        let ret = xml_get_predefined_entity(name);
         if ret.is_some() {
             return ret;
         }
@@ -473,14 +473,14 @@ pub unsafe fn xml_sax2_get_entity(
     if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).standalone == 1 {
         if (*ctxt).in_subset == 2 {
             (*(*ctxt).my_doc).standalone = 0;
-            let ret = XmlEntityPtr::from_raw(xml_get_doc_entity((*ctxt).my_doc, name)).unwrap();
+            let ret = xml_get_doc_entity((*ctxt).my_doc, name);
             (*(*ctxt).my_doc).standalone = 1;
             ret
         } else {
-            let mut ret = XmlEntityPtr::from_raw(xml_get_doc_entity((*ctxt).my_doc, name)).unwrap();
+            let mut ret = xml_get_doc_entity((*ctxt).my_doc, name);
             if ret.is_none() {
                 (*(*ctxt).my_doc).standalone = 0;
-                ret = XmlEntityPtr::from_raw(xml_get_doc_entity((*ctxt).my_doc, name)).unwrap();
+                ret = xml_get_doc_entity((*ctxt).my_doc, name);
                 if ret.is_some() {
                     xml_fatal_err_msg!(
                         ctxt,
@@ -494,7 +494,7 @@ pub unsafe fn xml_sax2_get_entity(
             ret
         }
     } else {
-        XmlEntityPtr::from_raw(xml_get_doc_entity((*ctxt).my_doc, name)).unwrap()
+        xml_get_doc_entity((*ctxt).my_doc, name)
     }
 }
 
@@ -512,7 +512,7 @@ pub unsafe fn xml_sax2_get_parameter_entity(
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
 
-    XmlEntityPtr::from_raw(xml_get_parameter_entity((*ctxt).my_doc, name)).unwrap()
+    xml_get_parameter_entity((*ctxt).my_doc, name)
 }
 
 /// The entity loader, to control the loading of external entities,
@@ -603,15 +603,7 @@ pub unsafe fn xml_sax2_entity_decl(
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
     if (*ctxt).in_subset == 1 {
-        let ent = XmlEntityPtr::from_raw(xml_add_doc_entity(
-            (*ctxt).my_doc,
-            name,
-            typ,
-            public_id,
-            system_id,
-            content,
-        ))
-        .unwrap();
+        let ent = xml_add_doc_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
         if ent.is_none() && (*ctxt).pedantic != 0 {
             xml_warn_msg!(
                 ctxt,
@@ -642,15 +634,7 @@ pub unsafe fn xml_sax2_entity_decl(
             }
         }
     } else if (*ctxt).in_subset == 2 {
-        let ent = XmlEntityPtr::from_raw(xml_add_dtd_entity(
-            (*ctxt).my_doc,
-            name,
-            typ,
-            public_id,
-            system_id,
-            content,
-        ))
-        .unwrap();
+        let ent = xml_add_dtd_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
         if ent.is_none() && (*ctxt).pedantic != 0 {
             if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
                 warning(
@@ -997,15 +981,14 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
     };
 
     if (*ctxt).in_subset == 1 {
-        let ent = XmlEntityPtr::from_raw(xml_add_doc_entity(
+        let ent = xml_add_doc_entity(
             (*ctxt).my_doc,
             name,
             XmlEntityType::XmlExternalGeneralUnparsedEntity,
             public_id,
             system_id,
             notation_name,
-        ))
-        .unwrap();
+        );
         if ent.is_none() && (*ctxt).pedantic != 0 {
             if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
                 warning(
@@ -1036,15 +1019,14 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
             }
         }
     } else if (*ctxt).in_subset == 2 {
-        let ent = XmlEntityPtr::from_raw(xml_add_dtd_entity(
+        let ent = xml_add_dtd_entity(
             (*ctxt).my_doc,
             name,
             XmlEntityType::XmlExternalGeneralUnparsedEntity,
             public_id,
             system_id,
             notation_name,
-        ))
-        .unwrap();
+        );
         if ent.is_none() && (*ctxt).pedantic != 0 {
             if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
                 warning(

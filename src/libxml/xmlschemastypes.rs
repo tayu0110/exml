@@ -63,7 +63,7 @@ use crate::{
     tree::{
         xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
         xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttr, XmlAttributeType,
-        XmlElementType, XmlEntity, XmlEntityType, XmlNode, XmlNs,
+        XmlElementType, XmlEntityType, XmlNode, XmlNs,
     },
     xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };
@@ -2901,27 +2901,26 @@ unsafe fn xml_schema_val_atomic_type(
                                     ret = 3;
                                 }
                                 if ret == 0 {
-                                    let ent: *mut XmlEntity;
-
                                     strip = xml_schema_strip(value);
-                                    if !strip.is_null() {
-                                        ent = xml_get_doc_entity(
+                                    let ent = if !strip.is_null() {
+                                        let e = xml_get_doc_entity(
                                             (*node).doc,
                                             &CStr::from_ptr(strip as *const i8).to_string_lossy(),
                                         );
                                         xml_free(strip as _);
+                                        e
                                     } else {
-                                        ent = xml_get_doc_entity(
+                                        xml_get_doc_entity(
                                             (*node).doc,
                                             &CStr::from_ptr(value as *const i8).to_string_lossy(),
-                                        );
-                                    }
-                                    if ent.is_null()
-                                        || !matches!(
-                                            (*ent).etype,
+                                        )
+                                    };
+                                    if ent.map_or(true, |ent| {
+                                        !matches!(
+                                            ent.etype,
                                             XmlEntityType::XmlExternalGeneralUnparsedEntity
                                         )
-                                    {
+                                    }) {
                                         ret = 4;
                                     }
                                 }

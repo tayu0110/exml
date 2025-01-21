@@ -40,7 +40,7 @@ use crate::{
 use super::{
     xml_free_node_list, xml_get_doc_entity, xml_new_doc_text, xml_new_reference, xml_tree_err,
     xml_tree_err_memory, NodeCommon, NodePtr, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType,
-    XmlEntity, XmlEntityType, XmlID, XmlNode, XmlNs, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
+    XmlEntityType, XmlID, XmlNode, XmlNs, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
@@ -146,7 +146,6 @@ impl XmlDoc {
         let mut val: *mut XmlChar = null_mut();
         let mut cur: *const XmlChar = value;
         let mut q: *const XmlChar;
-        let mut ent: *mut XmlEntity;
 
         if value.is_null() {
             return null_mut();
@@ -244,15 +243,15 @@ impl XmlDoc {
                     if cur != q {
                         // Predefined entities don't generate nodes
                         val = xml_strndup(q, cur.offset_from(q) as _);
-                        ent = xml_get_doc_entity(
+                        let ent = xml_get_doc_entity(
                             self,
                             CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
                         );
-                        if ent.is_null()
-                            && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
-                        {
+                        if let Some(ent) = ent.filter(|ent| {
+                            matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
+                        }) {
                             buf.extend(
-                                CStr::from_ptr((*ent).content.load(Ordering::Relaxed) as *const i8)
+                                CStr::from_ptr(ent.content.load(Ordering::Relaxed) as *const i8)
                                     .to_bytes(),
                             );
                         } else {
@@ -295,23 +294,23 @@ impl XmlDoc {
                                 }
                                 return ret;
                             }
-                            if !ent.is_null()
-                                && (((*ent).flags & XML_ENT_PARSED as i32) == 0)
-                                && (((*ent).flags & XML_ENT_EXPANDING as i32) == 0)
-                            {
+                            if let Some(mut ent) = ent.filter(|ent| {
+                                ent.flags & XML_ENT_PARSED as i32 == 0
+                                    && ent.flags & XML_ENT_EXPANDING as i32 == 0
+                            }) {
                                 // The entity should have been checked already,
                                 // but set the flag anyway to avoid recursion.
-                                (*ent).flags |= XML_ENT_EXPANDING as i32;
-                                (*ent).set_children(NodePtr::from_ptr(
+                                ent.flags |= XML_ENT_EXPANDING as i32;
+                                ent.set_children(NodePtr::from_ptr(
                                     self.get_node_list((*node).content),
                                 ));
-                                (*ent).owner = 1;
-                                (*ent).flags &= !XML_ENT_EXPANDING as i32;
-                                (*ent).flags |= XML_ENT_PARSED as i32;
-                                let mut temp = (*ent).children();
+                                ent.owner = 1;
+                                ent.flags &= !XML_ENT_EXPANDING as i32;
+                                ent.flags |= XML_ENT_PARSED as i32;
+                                let mut temp = ent.children();
                                 while let Some(mut now) = temp {
-                                    now.set_parent(NodePtr::from_ptr(ent as *mut XmlNode));
-                                    (*ent).set_last(Some(now));
+                                    now.set_parent(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                                    ent.set_last(Some(now));
                                     temp = now.next;
                                 }
                             }
@@ -396,7 +395,6 @@ impl XmlDoc {
         let mut val: *mut XmlChar;
         let mut cur: *const XmlChar;
         let mut q: *const XmlChar;
-        let mut ent: *mut XmlEntity;
 
         if value.is_null() {
             return null_mut();
@@ -513,15 +511,15 @@ impl XmlDoc {
                     if cur != q {
                         // Predefined entities don't generate nodes
                         val = xml_strndup(q, cur.offset_from(q) as _);
-                        ent = xml_get_doc_entity(
+                        let ent = xml_get_doc_entity(
                             self,
                             CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
                         );
-                        if !ent.is_null()
-                            && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
-                        {
+                        if let Some(ent) = ent.filter(|ent| {
+                            matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
+                        }) {
                             buf.extend(
-                                CStr::from_ptr((*ent).content.load(Ordering::Relaxed) as *const i8)
+                                CStr::from_ptr(ent.content.load(Ordering::Relaxed) as *const i8)
                                     .to_bytes(),
                             );
                         } else {
@@ -557,24 +555,24 @@ impl XmlDoc {
                                 }
                                 // goto out;
                                 return ret;
-                            } else if !ent.is_null()
-                                && (*ent).flags & XML_ENT_PARSED as i32 == 0
-                                && (*ent).flags & XML_ENT_EXPANDING as i32 == 0
-                            {
+                            } else if let Some(mut ent) = ent.filter(|ent| {
+                                ent.flags & XML_ENT_PARSED as i32 == 0
+                                    && ent.flags & XML_ENT_EXPANDING as i32 == 0
+                            }) {
                                 // The entity should have been checked already,
                                 // but set the flag anyway to avoid recursion.
-                                (*ent).flags |= XML_ENT_EXPANDING as i32;
-                                (*ent).children.store(
+                                ent.flags |= XML_ENT_EXPANDING as i32;
+                                ent.children.store(
                                     self.get_node_list((*node).content as _),
                                     Ordering::Relaxed,
                                 );
-                                (*ent).owner = 1;
-                                (*ent).flags &= !XML_ENT_EXPANDING as i32;
-                                (*ent).flags |= XML_ENT_PARSED as i32;
-                                let mut temp = (*ent).children();
+                                ent.owner = 1;
+                                ent.flags &= !XML_ENT_EXPANDING as i32;
+                                ent.flags |= XML_ENT_PARSED as i32;
+                                let mut temp = ent.children();
                                 while let Some(mut now) = temp {
-                                    now.set_parent(NodePtr::from_ptr(ent as *mut XmlNode));
-                                    (*ent).set_last(Some(now));
+                                    now.set_parent(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                                    ent.set_last(Some(now));
                                     temp = now.next();
                                 }
                             }

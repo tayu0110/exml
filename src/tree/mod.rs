@@ -1334,7 +1334,8 @@ pub(crate) unsafe fn xml_static_copy_node(
             // we cannot keep the reference. Try to find it in the
             // target document.
             (*ret).set_children(NodePtr::from_ptr(
-                xml_get_doc_entity(doc, &(*ret).name().unwrap()) as *mut XmlNode,
+                xml_get_doc_entity(doc, &(*ret).name().unwrap()).map_or(null_mut(), |e| e.as_ptr())
+                    as *mut XmlNode,
             ));
         } else {
             (*ret).set_children((*node).children());
@@ -1655,11 +1656,15 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
                 XmlEntityType::XmlInternalGeneralEntity
                 | XmlEntityType::XmlExternalGeneralParsedEntity
                 | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                    q = (*ret).get_entity((*tmp).name().as_deref().unwrap()) as _;
+                    q = (*ret)
+                        .get_entity((*tmp).name().as_deref().unwrap())
+                        .map_or(null_mut(), |e| e.as_ptr()) as _;
                 }
                 XmlEntityType::XmlInternalParameterEntity
                 | XmlEntityType::XmlExternalParameterEntity => {
-                    q = (*ret).get_parameter_entity((*tmp).name().as_deref().unwrap()) as _;
+                    q = (*ret)
+                        .get_parameter_entity((*tmp).name().as_deref().unwrap())
+                        .map_or(null_mut(), |e| e.as_ptr()) as _;
                 }
                 XmlEntityType::XmlInternalPredefinedEntity => {}
                 _ => unreachable!(),
@@ -2240,14 +2245,14 @@ pub unsafe fn xml_new_reference(doc: *const XmlDoc, name: &str) -> *mut XmlNode 
         (*cur).name = xml_strdup(name.as_ptr() as *const u8);
     }
 
-    let ent: *mut XmlEntity = xml_get_doc_entity(doc, &(*cur).name().unwrap());
-    if !ent.is_null() {
-        (*cur).content = (*ent).content.load(Ordering::Acquire);
+    let ent = xml_get_doc_entity(doc, &(*cur).name().unwrap());
+    if let Some(ent) = ent {
+        (*cur).content = ent.content.load(Ordering::Acquire);
         // The parent pointer in entity is a DTD pointer and thus is NOT
         // updated.  Not sure if this is 100% correct.
         //  -George
-        (*cur).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
-        (*cur).set_last(NodePtr::from_ptr(ent as *mut XmlNode));
+        (*cur).set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+        (*cur).set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0

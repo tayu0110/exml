@@ -56,7 +56,7 @@ use crate::{
         xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
         xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc,
-        XmlElementType, XmlEntity, XmlEntityType, XmlNode, XML_XML_NAMESPACE,
+        XmlElementType, XmlEntityPtr, XmlEntityType, XmlNode, XML_XML_NAMESPACE,
     },
     uri::{build_uri, escape_url, XmlURI},
     xpath::{
@@ -657,113 +657,110 @@ pub struct XmlXIncludeMergeData {
 
 /// Implements the merge of one entity
 #[doc(alias = "xmlXIncludeMergeOneEntity")]
-extern "C" fn xml_xinclude_merge_entity(ent: *mut XmlEntity, vdata: *mut c_void) {
+unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
     let data: XmlXIncludeMergeDataPtr = vdata as XmlXIncludeMergeDataPtr;
-    let prev: *mut XmlEntity;
 
-    if ent.is_null() || data.is_null() {
+    if data.is_null() {
         return;
     }
-    unsafe {
-        let ctxt: XmlXincludeCtxtPtr = (*data).ctxt;
-        let doc: *mut XmlDoc = (*data).doc;
-        if ctxt.is_null() || doc.is_null() {
-            return;
+    let ctxt: XmlXincludeCtxtPtr = (*data).ctxt;
+    let doc: *mut XmlDoc = (*data).doc;
+    if ctxt.is_null() || doc.is_null() {
+        return;
+    }
+    match ent.etype {
+        XmlEntityType::XmlInternalParameterEntity
+        | XmlEntityType::XmlExternalParameterEntity
+        | XmlEntityType::XmlInternalPredefinedEntity => return,
+        XmlEntityType::XmlInternalGeneralEntity
+        | XmlEntityType::XmlExternalGeneralParsedEntity
+        | XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
+        _ => unreachable!(),
+    }
+    let external_id = ent.external_id.load(Ordering::Relaxed);
+    let system_id = ent.system_id.load(Ordering::Relaxed);
+    let content = ent.content.load(Ordering::Relaxed);
+    let ret = xml_add_doc_entity(
+        doc,
+        &ent.name().unwrap(),
+        ent.etype,
+        (!external_id.is_null())
+            .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+            .as_deref(),
+        (!system_id.is_null())
+            .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
+            .as_deref(),
+        (!content.is_null())
+            .then(|| CStr::from_ptr(content as *const i8).to_string_lossy())
+            .as_deref(),
+    );
+    if let Some(ret) = ret {
+        if !ent.uri.load(Ordering::Relaxed).is_null() {
+            ret.uri.store(
+                xml_strdup(ent.uri.load(Ordering::Relaxed)),
+                Ordering::Relaxed,
+            );
         }
-        match (*ent).etype {
-            XmlEntityType::XmlInternalParameterEntity
-            | XmlEntityType::XmlExternalParameterEntity
-            | XmlEntityType::XmlInternalPredefinedEntity => return,
-            XmlEntityType::XmlInternalGeneralEntity
-            | XmlEntityType::XmlExternalGeneralParsedEntity
-            | XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
-            _ => unreachable!(),
-        }
-        let external_id = (*ent).external_id.load(Ordering::Relaxed);
-        let system_id = (*ent).system_id.load(Ordering::Relaxed);
-        let content = (*ent).content.load(Ordering::Relaxed);
-        let ret: *mut XmlEntity = xml_add_doc_entity(
-            doc,
-            &(*ent).name().unwrap(),
-            (*ent).etype,
-            (!external_id.is_null())
-                .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                .as_deref(),
-            (!system_id.is_null())
-                .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
-                .as_deref(),
-            (!content.is_null())
-                .then(|| CStr::from_ptr(content as *const i8).to_string_lossy())
-                .as_deref(),
-        );
-        if !ret.is_null() {
-            if !(*ent).uri.load(Ordering::Relaxed).is_null() {
-                (*ret).uri.store(
-                    xml_strdup((*ent).uri.load(Ordering::Relaxed)),
-                    Ordering::Relaxed,
+    } else {
+        let prev = xml_get_doc_entity(doc, &(*ent).name().unwrap());
+        if let Some(prev) = prev {
+            let error = || {
+                match ent.etype {
+                    XmlEntityType::XmlInternalParameterEntity
+                    | XmlEntityType::XmlExternalParameterEntity
+                    | XmlEntityType::XmlInternalPredefinedEntity
+                    | XmlEntityType::XmlInternalGeneralEntity
+                    | XmlEntityType::XmlExternalGeneralParsedEntity => return,
+                    XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
+                    _ => unreachable!(),
+                }
+                xml_xinclude_err!(
+                    ctxt,
+                    ent.as_ptr() as *mut XmlNode,
+                    XmlParserErrors::XmlXIncludeEntityDefMismatch,
+                    "mismatch in redefinition of entity {}\n",
+                    (*ent).name().unwrap().into_owned()
                 );
+            };
+
+            if ent.etype != prev.etype {
+                // goto error;
+                return error();
             }
-        } else {
-            prev = xml_get_doc_entity(doc, &(*ent).name().unwrap());
-            if !prev.is_null() {
-                let error = || {
-                    match (*ent).etype {
-                        XmlEntityType::XmlInternalParameterEntity
-                        | XmlEntityType::XmlExternalParameterEntity
-                        | XmlEntityType::XmlInternalPredefinedEntity
-                        | XmlEntityType::XmlInternalGeneralEntity
-                        | XmlEntityType::XmlExternalGeneralParsedEntity => return,
-                        XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
-                        _ => unreachable!(),
-                    }
-                    xml_xinclude_err!(
-                        ctxt,
-                        ent as *mut XmlNode,
-                        XmlParserErrors::XmlXIncludeEntityDefMismatch,
-                        "mismatch in redefinition of entity {}\n",
-                        (*ent).name().unwrap()
-                    );
-                };
 
-                if (*ent).etype != (*prev).etype {
+            if !ent.system_id.load(Ordering::Relaxed).is_null()
+                && !prev.system_id.load(Ordering::Relaxed).is_null()
+            {
+                if !xml_str_equal(
+                    ent.system_id.load(Ordering::Relaxed),
+                    prev.system_id.load(Ordering::Relaxed),
+                ) {
+                    // goto error;
+                    error()
+                }
+            } else if !ent.external_id.load(Ordering::Relaxed).is_null()
+                && !prev.external_id.load(Ordering::Relaxed).is_null()
+            {
+                if !xml_str_equal(
+                    ent.external_id.load(Ordering::Relaxed),
+                    prev.external_id.load(Ordering::Relaxed),
+                ) {
                     // goto error;
                     return error();
                 }
-
-                if !(*ent).system_id.load(Ordering::Relaxed).is_null()
-                    && !(*prev).system_id.load(Ordering::Relaxed).is_null()
-                {
-                    if !xml_str_equal(
-                        (*ent).system_id.load(Ordering::Relaxed),
-                        (*prev).system_id.load(Ordering::Relaxed),
-                    ) {
-                        // goto error;
-                        error()
-                    }
-                } else if !(*ent).external_id.load(Ordering::Relaxed).is_null()
-                    && !(*prev).external_id.load(Ordering::Relaxed).is_null()
-                {
-                    if !xml_str_equal(
-                        (*ent).external_id.load(Ordering::Relaxed),
-                        (*prev).external_id.load(Ordering::Relaxed),
-                    ) {
-                        // goto error;
-                        return error();
-                    }
-                } else if !(*ent).content.load(Ordering::Relaxed).is_null()
-                    && !(*prev).content.load(Ordering::Relaxed).is_null()
-                {
-                    if !xml_str_equal(
-                        (*ent).content.load(Ordering::Relaxed),
-                        (*prev).content.load(Ordering::Relaxed),
-                    ) {
-                        // goto error;
-                        return error();
-                    }
-                } else {
+            } else if !ent.content.load(Ordering::Relaxed).is_null()
+                && !prev.content.load(Ordering::Relaxed).is_null()
+            {
+                if !xml_str_equal(
+                    ent.content.load(Ordering::Relaxed),
+                    prev.content.load(Ordering::Relaxed),
+                ) {
                     // goto error;
                     return error();
                 }
+            } else {
+                // goto error;
+                return error();
             }
         }
     }

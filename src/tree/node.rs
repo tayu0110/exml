@@ -41,8 +41,8 @@ use crate::{
 use super::{
     xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node, xml_free_prop,
     xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory, NodeCommon,
-    XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlEntity, XmlNs, XML_CHECK_DTD,
-    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlNs, XML_CHECK_DTD, XML_LOCAL_NAMESPACE,
+    XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
@@ -406,11 +406,7 @@ impl XmlNode {
             }
             XmlElementType::XmlEntityRefNode => {
                 // lookup entity declaration
-                let ent: *mut XmlEntity =
-                    xml_get_doc_entity(self.document(), &self.name().unwrap());
-                if ent.is_null() {
-                    return None;
-                }
+                xml_get_doc_entity(self.document(), &self.name().unwrap())?;
 
                 let mut buf = String::new();
                 self.get_content_to(&mut buf);
@@ -557,18 +553,16 @@ impl XmlNode {
             }
             XmlElementType::XmlEntityRefNode => {
                 // lookup entity declaration
-                let ent: *mut XmlEntity =
-                    xml_get_doc_entity(self.document(), &self.name().unwrap());
-                if ent.is_null() {
+                let Some(ent) = xml_get_doc_entity(self.document(), &self.name().unwrap()) else {
                     return -1;
-                }
+                };
 
                 // an entity content can be any "well balanced chunk",
                 // i.e. the result of the content [43] production:
                 // http://www.w3.org/TR/REC-xml#NT-content
                 // -> we iterate through child nodes and recursive call
                 // xmlNodeGetContent() which handles all possible node types
-                let mut tmp = (*ent).children();
+                let mut tmp = ent.children();
                 while let Some(now) = tmp {
                     now.get_content_to(buf);
                     tmp = now.next();
@@ -924,7 +918,6 @@ impl XmlNode {
     pub unsafe fn get_string(&self, doc: *mut XmlDoc, in_line: i32) -> Option<String> {
         let mut node: *const XmlNode = self;
         let mut ret: *mut XmlChar = null_mut();
-        let mut ent: *mut XmlEntity;
 
         let attr = self
             .parent()
@@ -951,8 +944,8 @@ impl XmlNode {
                 }
             } else if matches!((*node).element_type(), XmlElementType::XmlEntityRefNode) {
                 if in_line != 0 {
-                    ent = xml_get_doc_entity(doc, &(*node).name().unwrap());
-                    if !ent.is_null() {
+                    let ent = xml_get_doc_entity(doc, &(*node).name().unwrap());
+                    if let Some(ent) = ent {
                         // an entity content can be any "well balanced chunk",
                         // i.e. the result of the content [43] production:
                         // http://www.w3.org/TR/REC-xml#NT-content.
@@ -960,7 +953,7 @@ impl XmlNode {
                         // entity reference nodes (among others).
                         // -> we recursive  call xmlNodeListGetString()
                         // which handles these types
-                        let children = (*ent).children();
+                        let children = ent.children();
                         if let Some(buffer) = children.and_then(|c| c.get_string(doc, 1)) {
                             let buffer = CString::new(buffer).unwrap();
                             ret = xml_strcat(ret, buffer.as_ptr() as *const u8);
@@ -1003,7 +996,6 @@ impl XmlNode {
 
         let mut node: *const XmlNode = self;
         let mut ret: *mut XmlChar = null_mut();
-        let mut ent: *mut XmlEntity;
 
         while !node.is_null() {
             if matches!(
@@ -1021,8 +1013,8 @@ impl XmlNode {
                 }
             } else if matches!((*node).element_type(), XmlElementType::XmlEntityRefNode) {
                 if in_line != 0 {
-                    ent = xml_get_doc_entity(doc, &(*node).name().unwrap());
-                    if !ent.is_null() {
+                    let ent = xml_get_doc_entity(doc, &(*node).name().unwrap());
+                    if let Some(ent) = ent {
                         // an entity content can be any "well balanced chunk",
                         // i.e. the result of the content [43] production:
                         // http://www.w3.org/TR/REC-xml#NT-content.
@@ -1030,7 +1022,7 @@ impl XmlNode {
                         // entity reference nodes (among others).
                         // -> we recursive  call xmlNodeListGetRawString()
                         // which handles these types
-                        let children = (*ent).children();
+                        let children = ent.children();
                         let buffer = children.and_then(|c| c.get_raw_string(doc, 1));
                         if let Some(buffer) = buffer.map(|b| CString::new(b).unwrap()) {
                             ret = xml_strcat(ret, buffer.as_ptr() as *const u8);

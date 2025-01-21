@@ -70,8 +70,8 @@ use crate::{
         xml_new_doc_node, xml_split_qname2, xml_split_qname3, NodeCommon, NodePtr, XmlAttr,
         XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur,
-        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEntity,
-        XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNotation, XmlRef,
+        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
+        XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNotation, XmlRef,
     },
 };
 
@@ -3186,12 +3186,29 @@ unsafe fn xml_validate_attribute_value2(
         | XmlAttributeType::XmlAttributeCDATA => {}
         XmlAttributeType::XmlAttributeEntity => {
             let mut ent = xml_get_doc_entity(doc, value);
-            /* yeah it's a bit messy... */
-            if ent.is_null() && (*doc).standalone == 1 {
+            // yeah it's a bit messy...
+            if ent.is_none() && (*doc).standalone == 1 {
                 (*doc).standalone = 0;
                 ent = xml_get_doc_entity(doc, value);
             }
-            if ent.is_null() {
+            if let Some(ent) = ent {
+                if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
+                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                    xml_err_valid_node(
+                        ctxt,
+                        doc as *mut XmlNode,
+                        XmlParserErrors::XmlDTDEntityType,
+                        format!(
+                            "ENTITY attribute {name} reference an entity \"{value}\" of wrong type\n"
+                        )
+                        .as_str(),
+                        Some(&name),
+                        Some(value),
+                        None,
+                    );
+                    ret = 0;
+                }
+            } else {
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
@@ -3204,30 +3221,11 @@ unsafe fn xml_validate_attribute_value2(
                     None,
                 );
                 ret = 0;
-            } else if !matches!(
-                (*ent).etype,
-                XmlEntityType::XmlExternalGeneralUnparsedEntity
-            ) {
-                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                xml_err_valid_node(
-                    ctxt,
-                    doc as *mut XmlNode,
-                    XmlParserErrors::XmlDTDEntityType,
-                    format!(
-                        "ENTITY attribute {name} reference an entity \"{value}\" of wrong type\n"
-                    )
-                    .as_str(),
-                    Some(&name),
-                    Some(value),
-                    None,
-                );
-                ret = 0;
             }
         }
         XmlAttributeType::XmlAttributeEntities => {
             let mut cur: *mut XmlChar;
             let mut save: XmlChar;
-            let mut ent: *mut XmlEntity;
             let value = CString::new(value).unwrap();
             let value = value.as_ptr() as *const u8;
 
@@ -3244,8 +3242,22 @@ unsafe fn xml_validate_attribute_value2(
                 save = *cur;
                 *cur = 0;
                 let nam = CStr::from_ptr(nam as *const i8).to_string_lossy();
-                ent = xml_get_doc_entity(doc, &nam);
-                if ent.is_null() {
+                if let Some(ent) = xml_get_doc_entity(doc, &nam) {
+                    if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
+                        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                        xml_err_valid_node(
+                            ctxt,
+                            doc as *mut XmlNode,
+                            XmlParserErrors::XmlDTDEntityType,
+                            format!("ENTITIES attribute {name} reference an entity \"{nam}\" of wrong type\n")
+                                .as_str(),
+                            Some(&name),
+                            Some(&nam),
+                            None,
+                        );
+                        ret = 0;
+                    }
+                } else {
                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
@@ -3260,23 +3272,8 @@ unsafe fn xml_validate_attribute_value2(
                         None,
                     );
                     ret = 0;
-                } else if !matches!(
-                    (*ent).etype,
-                    XmlEntityType::XmlExternalGeneralUnparsedEntity
-                ) {
-                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                    xml_err_valid_node(
-                        ctxt,
-                        doc as *mut XmlNode,
-                        XmlParserErrors::XmlDTDEntityType,
-                        format!("ENTITIES attribute {name} reference an entity \"{nam}\" of wrong type\n")
-                            .as_str(),
-                        Some(&name),
-                        Some(&nam),
-                        None,
-                    );
-                    ret = 0;
                 }
+
                 if save == 0 {
                     break;
                 }
@@ -3416,28 +3413,20 @@ unsafe fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCt
     }
 }
 
-extern "C" fn xml_validate_notation_callback(cur: *mut XmlEntity, ctxt: XmlValidCtxtPtr) {
-    if cur.is_null() {
-        return;
-    }
-    unsafe {
-        if matches!(
-            (*cur).etype,
-            XmlEntityType::XmlExternalGeneralUnparsedEntity
-        ) {
-            let notation: *mut XmlChar = (*cur).content.load(Ordering::Relaxed) as _;
+unsafe fn xml_validate_notation_callback(cur: XmlEntityPtr, ctxt: XmlValidCtxtPtr) {
+    if matches!(cur.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
+        let notation: *mut XmlChar = cur.content.load(Ordering::Relaxed) as _;
 
-            if !notation.is_null() {
-                let ret: i32 = xml_validate_notation_use(
-                    ctxt,
-                    (*cur).doc.load(Ordering::Relaxed) as _,
-                    CStr::from_ptr(notation as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-                if ret != 1 {
-                    (*ctxt).valid = 0;
-                }
+        if !notation.is_null() {
+            let ret: i32 = xml_validate_notation_use(
+                ctxt,
+                cur.doc.load(Ordering::Relaxed) as _,
+                CStr::from_ptr(notation as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            );
+            if ret != 1 {
+                (*ctxt).valid = 0;
             }
         }
     }

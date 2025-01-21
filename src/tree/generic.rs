@@ -616,13 +616,15 @@ pub trait NodeCommon {
             if !doc.is_null() {
                 if let Some(int_subset) = (*doc).int_subset {
                     if let (Some(mut table), Some(name)) = (int_subset.entities, name.as_deref()) {
-                        if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
+                        if table.lookup(name).copied().map(|e| e.as_ptr())
+                            == Some(self as *mut Self as *mut XmlEntity)
                         {
                             table.remove_entry(name, |_, _| {});
                         }
                     }
                     if let (Some(mut table), Some(name)) = (int_subset.pentities, name.as_deref()) {
-                        if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
+                        if table.lookup(name).copied().map(|e| e.as_ptr())
+                            == Some(self as *mut Self as *mut XmlEntity)
                         {
                             table.remove_entry(name, |_, _| {});
                         }
@@ -630,13 +632,15 @@ pub trait NodeCommon {
                 }
                 if let Some(ext_subset) = (*doc).ext_subset {
                     if let (Some(mut table), Some(name)) = (ext_subset.entities, name.as_deref()) {
-                        if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
+                        if table.lookup(name).copied().map(|e| e.as_ptr())
+                            == Some(self as *mut Self as *mut XmlEntity)
                         {
                             table.remove_entry(name, |_, _| {});
                         }
                     }
                     if let (Some(mut table), Some(name)) = (ext_subset.pentities, name.as_deref()) {
-                        if table.lookup(name).copied() == Some(self as *mut Self as *mut XmlEntity)
+                        if table.lookup(name).copied().map(|e| e.as_ptr())
+                            == Some(self as *mut Self as *mut XmlEntity)
                         {
                             table.remove_entry(name, |_, _| {});
                         }

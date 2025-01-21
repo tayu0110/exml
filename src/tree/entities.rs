@@ -25,7 +25,6 @@ use std::{
     any::type_name,
     borrow::Cow,
     ffi::{c_char, CStr, CString},
-    mem::size_of,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut, NonNull},
@@ -326,41 +325,40 @@ unsafe fn xml_create_entity(
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
-) -> *mut XmlEntity {
-    let ret: *mut XmlEntity = xml_malloc(size_of::<XmlEntity>()) as *mut XmlEntity;
-    if ret.is_null() {
+) -> Option<XmlEntityPtr> {
+    let Some(mut ret) = XmlEntityPtr::new(XmlEntity {
+        typ: XmlElementType::XmlEntityDecl,
+        etype: typ,
+        name: AtomicPtr::new(xml_strndup(name.as_ptr(), name.len() as i32)),
+        ..Default::default()
+    }) else {
         xml_entities_err_memory("xmlCreateEntity: malloc failed");
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlEntity::default());
-    (*ret).typ = XmlElementType::XmlEntityDecl;
+        return None;
+    };
 
     // fill the structure.
-    let name = CString::new(name).unwrap();
-    (*ret).etype = typ;
-    (*ret).name = AtomicPtr::new(xml_strdup(name.as_ptr() as *const u8) as _);
     if let Some(external_id) = external_id {
         let external_id = CString::new(external_id).unwrap();
-        (*ret).external_id = AtomicPtr::new(xml_strdup(external_id.as_ptr() as *const u8) as _);
+        ret.external_id = AtomicPtr::new(xml_strdup(external_id.as_ptr() as *const u8) as _);
     }
     if let Some(system_id) = system_id {
         let system_id = CString::new(system_id).unwrap();
-        (*ret).system_id = AtomicPtr::new(xml_strdup(system_id.as_ptr() as *const u8) as _);
+        ret.system_id = AtomicPtr::new(xml_strdup(system_id.as_ptr() as *const u8) as _);
     }
     if let Some(content) = content {
-        (*ret).length = content.len() as i32;
+        ret.length = content.len() as i32;
         let content = CString::new(content).unwrap();
-        (*ret).content = AtomicPtr::new(xml_strndup(content.as_ptr() as *const u8, (*ret).length));
+        ret.content = AtomicPtr::new(xml_strndup(content.as_ptr() as *const u8, ret.length));
     } else {
-        (*ret).length = 0;
-        (*ret).content = AtomicPtr::new(null_mut());
+        ret.length = 0;
+        ret.content = AtomicPtr::new(null_mut());
     }
     // to be computed by the layer knowing the defining entity
-    (*ret).uri = AtomicPtr::new(null_mut());
-    (*ret).orig = AtomicPtr::new(null_mut());
-    (*ret).owner = 0;
+    ret.uri = AtomicPtr::new(null_mut());
+    ret.orig = AtomicPtr::new(null_mut());
+    ret.owner = 0;
 
-    ret
+    Some(ret)
 }
 
 /// Create a new entity, this differs from xmlAddDocEntity() that if
@@ -378,16 +376,13 @@ pub unsafe fn xml_new_entity(
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
-) -> *mut XmlEntity {
+) -> Option<XmlEntityPtr> {
     if !doc.is_null() && (*doc).int_subset.is_some() {
         return xml_add_doc_entity(doc, name, typ, external_id, system_id, content);
     }
-    let ret: *mut XmlEntity = xml_create_entity(name, typ, external_id, system_id, content);
-    if ret.is_null() {
-        return null_mut();
-    }
-    (*ret).doc = AtomicPtr::new(doc as _);
-    ret
+    let mut ret = xml_create_entity(name, typ, external_id, system_id, content)?;
+    ret.doc = AtomicPtr::new(doc as _);
+    Some(ret)
 }
 
 /// Raise an error.
@@ -430,44 +425,42 @@ macro_rules! xml_entities_warn {
 
 /// clean-up an entity record.
 #[doc(alias = "xmlFreeEntity")]
-unsafe fn xml_free_entity(entity: *mut XmlEntity) {
-    if entity.is_null() {
-        return;
-    }
-
-    if !(*entity).children.load(Ordering::Relaxed).is_null()
-        && (*entity).owner == 1
-        && NodePtr::from_ptr(entity as *mut XmlNode)
-            == (*(*entity).children.load(Ordering::Relaxed)).parent()
+unsafe fn xml_free_entity(entity: XmlEntityPtr) {
+    if !entity.children.load(Ordering::Relaxed).is_null()
+        && entity.owner == 1
+        && entity.as_ptr() as *mut XmlNode
+            == (*entity.children.load(Ordering::Relaxed))
+                .parent()
+                .map_or(null_mut(), |p| p.as_ptr())
     {
-        xml_free_node_list((*entity).children.load(Ordering::Relaxed));
-        (*entity).children.store(null_mut(), Ordering::Relaxed);
+        xml_free_node_list(entity.children.load(Ordering::Relaxed));
+        entity.children.store(null_mut(), Ordering::Relaxed);
     }
-    if !(*entity).name.load(Ordering::Relaxed).is_null() {
-        xml_free((*entity).name.load(Ordering::Relaxed) as _);
-        (*entity).name.store(null_mut(), Ordering::Relaxed);
+    if !entity.name.load(Ordering::Relaxed).is_null() {
+        xml_free(entity.name.load(Ordering::Relaxed) as _);
+        entity.name.store(null_mut(), Ordering::Relaxed);
     }
-    if !(*entity).external_id.load(Ordering::Relaxed).is_null() {
-        xml_free((*entity).external_id.load(Ordering::Relaxed) as _);
-        (*entity).external_id.store(null_mut(), Ordering::Relaxed);
+    if !entity.external_id.load(Ordering::Relaxed).is_null() {
+        xml_free(entity.external_id.load(Ordering::Relaxed) as _);
+        entity.external_id.store(null_mut(), Ordering::Relaxed);
     }
-    if !(*entity).system_id.load(Ordering::Relaxed).is_null() {
-        xml_free((*entity).system_id.load(Ordering::Relaxed) as _);
-        (*entity).system_id.store(null_mut(), Ordering::Relaxed);
+    if !entity.system_id.load(Ordering::Relaxed).is_null() {
+        xml_free(entity.system_id.load(Ordering::Relaxed) as _);
+        entity.system_id.store(null_mut(), Ordering::Relaxed);
     }
-    if !(*entity).uri.load(Ordering::Relaxed).is_null() {
-        xml_free((*entity).uri.load(Ordering::Relaxed) as _);
-        (*entity).uri.store(null_mut(), Ordering::Relaxed);
+    if !entity.uri.load(Ordering::Relaxed).is_null() {
+        xml_free(entity.uri.load(Ordering::Relaxed) as _);
+        entity.uri.store(null_mut(), Ordering::Relaxed);
     }
-    if !(*entity).content.load(Ordering::Relaxed).is_null() {
-        xml_free((*entity).content.load(Ordering::Relaxed) as _);
-        (*entity).content.store(null_mut(), Ordering::Relaxed);
+    if !entity.content.load(Ordering::Relaxed).is_null() {
+        xml_free(entity.content.load(Ordering::Relaxed) as _);
+        entity.content.store(null_mut(), Ordering::Relaxed);
     }
-    if !(*entity).orig.load(Ordering::Relaxed).is_null() {
-        xml_free((*entity).orig.load(Ordering::Relaxed) as _);
-        (*entity).orig.store(null_mut(), Ordering::Relaxed);
+    if !entity.orig.load(Ordering::Relaxed).is_null() {
+        xml_free(entity.orig.load(Ordering::Relaxed) as _);
+        entity.orig.store(null_mut(), Ordering::Relaxed);
     }
-    xml_free(entity as _);
+    entity.free();
 }
 
 /// Register a new entity for an entities table.
@@ -479,22 +472,20 @@ unsafe fn xml_add_entity(
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
-) -> *mut XmlEntity {
+) -> Option<XmlEntityPtr> {
     let mut table = None;
-    let predef: *mut XmlEntity;
 
     match typ {
         XmlEntityType::XmlInternalGeneralEntity
         | XmlEntityType::XmlExternalGeneralParsedEntity
         | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-            predef = xml_get_predefined_entity(name);
-            if !predef.is_null() {
+            if let Some(predef) = xml_get_predefined_entity(name) {
                 let mut valid: i32 = 0;
 
                 // 4.6 Predefined Entities
                 if typ == XmlEntityType::XmlInternalGeneralEntity {
                     if let Some(content) = content {
-                        let c = *(*predef).content.load(Ordering::Relaxed).add(0);
+                        let c = *predef.content.load(Ordering::Relaxed).add(0);
                         if content.as_bytes() == [c]
                             && (content == ">" || content == "\'" || content == "\"")
                         {
@@ -521,7 +512,7 @@ unsafe fn xml_add_entity(
                         "xmlAddEntity: invalid redeclaration of predefined entity '{}'",
                         name
                     );
-                    return null_mut();
+                    return None;
                 }
             }
             if dtd.entities.is_none() {
@@ -538,25 +529,20 @@ unsafe fn xml_add_entity(
             table = dtd.pentities;
         }
         XmlEntityType::XmlInternalPredefinedEntity => {
-            return null_mut();
+            return None;
         }
         _ => {}
     }
-    let Some(mut table) = table else {
-        return null_mut();
-    };
-    let ret: *mut XmlEntity = xml_create_entity(name, typ, external_id, system_id, content);
-    if ret.is_null() {
-        return null_mut();
-    }
-    (*ret).doc.store(dtd.doc, Ordering::Relaxed);
+    let mut table = table?;
+    let ret = xml_create_entity(name, typ, external_id, system_id, content)?;
+    ret.doc.store(dtd.doc, Ordering::Relaxed);
 
     if table.add_entry(name, ret).is_err() {
         // entity was already defined at another level.
         xml_free_entity(ret);
-        return null_mut();
+        return None;
     }
-    ret
+    Some(ret)
 }
 
 /// Register a new entity for this document.
@@ -570,38 +556,35 @@ pub unsafe fn xml_add_doc_entity(
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
-) -> *mut XmlEntity {
+) -> Option<XmlEntityPtr> {
     if doc.is_null() {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDoc,
             "xmlAddDocEntity: document is NULL",
         );
-        return null_mut();
+        return None;
     }
     let Some(mut dtd) = (*doc).int_subset else {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDTD,
             "xmlAddDocEntity: document without internal subset",
         );
-        return null_mut();
+        return None;
     };
-    let ret: *mut XmlEntity = xml_add_entity(dtd, name, typ, external_id, system_id, content);
-    if ret.is_null() {
-        return null_mut();
-    }
+    let ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
 
     // Link it to the DTD
-    (*ret).parent.store(dtd.as_ptr(), Ordering::Relaxed);
-    (*ret).doc.store(dtd.doc, Ordering::Relaxed);
+    ret.parent.store(dtd.as_ptr(), Ordering::Relaxed);
+    ret.doc.store(dtd.doc, Ordering::Relaxed);
     if let Some(mut last) = dtd.last {
-        last.next = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*ret).prev.store(last.as_ptr(), Ordering::Relaxed);
-        dtd.last = NodePtr::from_ptr(ret as *mut XmlNode);
+        last.next = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        ret.prev.store(last.as_ptr(), Ordering::Relaxed);
+        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
     } else {
-        dtd.children = NodePtr::from_ptr(ret as *mut XmlNode);
-        dtd.last = NodePtr::from_ptr(ret as *mut XmlNode);
+        dtd.children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
     }
-    ret
+    Some(ret)
 }
 
 /// Register a new entity for this document DTD external subset.
@@ -615,38 +598,34 @@ pub unsafe fn xml_add_dtd_entity(
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
-) -> *mut XmlEntity {
+) -> Option<XmlEntityPtr> {
     if doc.is_null() {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDoc,
             "xmlAddDtdEntity: document is NULL",
         );
-        return null_mut();
+        return None;
     }
     let Some(mut dtd) = (*doc).ext_subset else {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDTD,
             "xmlAddDtdEntity: document without external subset",
         );
-        return null_mut();
+        return None;
     };
-    let ret: *mut XmlEntity = xml_add_entity(dtd, name, typ, external_id, system_id, content);
-    if ret.is_null() {
-        return null_mut();
-    }
-
+    let mut ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
     // Link it to the DTD
-    (*ret).parent.store(dtd.as_ptr(), Ordering::Relaxed);
-    (*ret).doc = dtd.doc.into();
+    ret.parent.store(dtd.as_ptr(), Ordering::Relaxed);
+    ret.doc = dtd.doc.into();
     if let Some(mut last) = dtd.last {
-        last.next = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*ret).prev.store(last.as_ptr(), Ordering::Relaxed);
-        dtd.last = NodePtr::from_ptr(ret as *mut XmlNode);
+        last.next = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        ret.prev.store(last.as_ptr(), Ordering::Relaxed);
+        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
     } else {
-        dtd.children = NodePtr::from_ptr(ret as *mut XmlNode);
-        dtd.last = NodePtr::from_ptr(ret as *mut XmlNode);
+        dtd.children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
     }
-    ret
+    Some(ret)
 }
 
 // The XML predefined entities.
@@ -766,14 +745,14 @@ static mut XML_ENTITY_APOS: XmlEntity = XmlEntity {
 ///
 /// Returns NULL if not, otherwise the entity
 #[doc(alias = "xmlGetPredefinedEntity")]
-pub unsafe fn xml_get_predefined_entity(name: &str) -> *mut XmlEntity {
+pub unsafe fn xml_get_predefined_entity(name: &str) -> Option<XmlEntityPtr> {
     match name {
-        "lt" => addr_of_mut!(XML_ENTITY_LT),
-        "gt" => addr_of_mut!(XML_ENTITY_GT),
-        "amp" => addr_of_mut!(XML_ENTITY_AMP),
-        "apos" => addr_of_mut!(XML_ENTITY_APOS),
-        "quot" => addr_of_mut!(XML_ENTITY_QUOT),
-        _ => null_mut(),
+        "lt" => XmlEntityPtr::from_raw(addr_of_mut!(XML_ENTITY_LT)).unwrap(),
+        "gt" => XmlEntityPtr::from_raw(addr_of_mut!(XML_ENTITY_GT)).unwrap(),
+        "amp" => XmlEntityPtr::from_raw(addr_of_mut!(XML_ENTITY_AMP)).unwrap(),
+        "apos" => XmlEntityPtr::from_raw(addr_of_mut!(XML_ENTITY_APOS)).unwrap(),
+        "quot" => XmlEntityPtr::from_raw(addr_of_mut!(XML_ENTITY_QUOT)).unwrap(),
+        _ => None,
     }
 }
 
@@ -783,10 +762,10 @@ pub unsafe fn xml_get_predefined_entity(name: &str) -> *mut XmlEntity {
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetEntityFromTable")]
 unsafe fn xml_get_entity_from_table(
-    table: XmlHashTableRef<'static, *mut XmlEntity>,
+    table: XmlHashTableRef<'static, XmlEntityPtr>,
     name: &str,
-) -> *mut XmlEntity {
-    table.lookup(name).map_or(null_mut(), |p| *p)
+) -> Option<XmlEntityPtr> {
+    table.lookup(name).copied()
 }
 
 /// Do an entity lookup in the document entity hash table and
@@ -795,12 +774,12 @@ unsafe fn xml_get_entity_from_table(
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDocEntity")]
-pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> *mut XmlEntity {
+pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> Option<XmlEntityPtr> {
     if !doc.is_null() {
         if let Some(int_subset) = (*doc).int_subset {
             if let Some(table) = int_subset.entities {
                 let cur = xml_get_entity_from_table(table, name);
-                if !cur.is_null() {
+                if cur.is_some() {
                     return cur;
                 }
             }
@@ -809,7 +788,7 @@ pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> *mut XmlEnti
             if let Some(ext_subset) = (*doc).ext_subset {
                 if let Some(table) = ext_subset.entities {
                     let cur = xml_get_entity_from_table(table, name);
-                    if !cur.is_null() {
+                    if cur.is_some() {
                         return cur;
                     }
                 }
@@ -825,16 +804,16 @@ pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> *mut XmlEnti
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDtdEntity")]
-pub unsafe fn xml_get_dtd_entity(doc: *mut XmlDoc, name: &str) -> *mut XmlEntity {
+pub unsafe fn xml_get_dtd_entity(doc: *mut XmlDoc, name: &str) -> Option<XmlEntityPtr> {
     if doc.is_null() {
-        return null_mut();
+        return None;
     }
     if let Some(ext_subset) = (*doc).ext_subset {
         if let Some(table) = ext_subset.entities {
             return xml_get_entity_from_table(table, name);
         }
     }
-    null_mut()
+    None
 }
 
 /// Do an entity lookup in the internal and external subsets and
@@ -842,14 +821,14 @@ pub unsafe fn xml_get_dtd_entity(doc: *mut XmlDoc, name: &str) -> *mut XmlEntity
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetParameterEntity")]
-pub unsafe fn xml_get_parameter_entity(doc: *mut XmlDoc, name: &str) -> *mut XmlEntity {
+pub unsafe fn xml_get_parameter_entity(doc: *mut XmlDoc, name: &str) -> Option<XmlEntityPtr> {
     if doc.is_null() {
-        return null_mut();
+        return None;
     }
     if let Some(int_subset) = (*doc).int_subset {
         if let Some(table) = int_subset.pentities {
             let ret = xml_get_entity_from_table(table, name);
-            if !ret.is_null() {
+            if ret.is_some() {
                 return ret;
             }
         }
@@ -859,7 +838,7 @@ pub unsafe fn xml_get_parameter_entity(doc: *mut XmlDoc, name: &str) -> *mut Xml
             return xml_get_entity_from_table(table, name);
         }
     }
-    null_mut()
+    None
 }
 
 // Macro used to grow the current buffer.
@@ -1295,40 +1274,32 @@ pub unsafe fn xml_create_entities_table() -> XmlEntitiesTablePtr {
 /// Returns the new xmlEntitiesPtr or NULL in case of error.
 #[doc(alias = "xmlCopyEntity")]
 #[cfg(feature = "libxml_tree")]
-extern "C" fn xml_copy_entity(ent: *mut XmlEntity) -> *mut XmlEntity {
-    unsafe {
-        let cur: *mut XmlEntity = xml_malloc(size_of::<XmlEntity>()) as *mut XmlEntity;
-        if cur.is_null() {
-            xml_entities_err_memory("xmlCopyEntity:: malloc failed");
-            return null_mut();
-        }
-        std::ptr::write(&mut *cur, XmlEntity::default());
-        (*cur).typ = XmlElementType::XmlEntityDecl;
-
-        (*cur).etype = (*ent).etype;
-        if !(*ent).name.load(Ordering::Relaxed).is_null() {
-            (*cur).name = AtomicPtr::new(xml_strdup((*ent).name.load(Ordering::Relaxed)) as _);
-        }
-        if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-            (*cur).external_id =
-                AtomicPtr::new(xml_strdup((*ent).external_id.load(Ordering::Relaxed)) as _);
-        }
-        if !(*ent).system_id.load(Ordering::Relaxed).is_null() {
-            (*cur).system_id =
-                AtomicPtr::new(xml_strdup((*ent).system_id.load(Ordering::Relaxed)) as _);
-        }
-        if !(*ent).content.load(Ordering::Relaxed).is_null() {
-            (*cur).content =
-                AtomicPtr::new(xml_strdup((*ent).content.load(Ordering::Relaxed)) as _);
-        }
-        if !(*ent).orig.load(Ordering::Relaxed).is_null() {
-            (*cur).orig = AtomicPtr::new(xml_strdup((*ent).orig.load(Ordering::Relaxed)) as _);
-        }
-        if !(*ent).uri.load(Ordering::Relaxed).is_null() {
-            (*cur).uri = AtomicPtr::new(xml_strdup((*ent).uri.load(Ordering::Relaxed)) as _);
-        }
-        cur
+unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
+    let mut cur = XmlEntityPtr::new(XmlEntity {
+        typ: XmlElementType::XmlEntityDecl,
+        etype: ent.etype,
+        ..Default::default()
+    })
+    .unwrap();
+    if !ent.name.load(Ordering::Relaxed).is_null() {
+        cur.name = AtomicPtr::new(xml_strdup(ent.name.load(Ordering::Relaxed)) as _);
     }
+    if !ent.external_id.load(Ordering::Relaxed).is_null() {
+        cur.external_id = AtomicPtr::new(xml_strdup(ent.external_id.load(Ordering::Relaxed)) as _);
+    }
+    if !ent.system_id.load(Ordering::Relaxed).is_null() {
+        cur.system_id = AtomicPtr::new(xml_strdup(ent.system_id.load(Ordering::Relaxed)) as _);
+    }
+    if !ent.content.load(Ordering::Relaxed).is_null() {
+        cur.content = AtomicPtr::new(xml_strdup(ent.content.load(Ordering::Relaxed)) as _);
+    }
+    if !ent.orig.load(Ordering::Relaxed).is_null() {
+        cur.orig = AtomicPtr::new(xml_strdup(ent.orig.load(Ordering::Relaxed)) as _);
+    }
+    if !ent.uri.load(Ordering::Relaxed).is_null() {
+        cur.uri = AtomicPtr::new(xml_strdup(ent.uri.load(Ordering::Relaxed)) as _);
+    }
+    Some(cur)
 }
 
 /// Build a copy of an entity table.
@@ -1337,25 +1308,15 @@ extern "C" fn xml_copy_entity(ent: *mut XmlEntity) -> *mut XmlEntity {
 #[doc(alias = "xmlCopyEntitiesTable")]
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_copy_entities_table(
-    table: XmlHashTableRef<'static, *mut XmlEntity>,
-) -> Option<XmlHashTableRef<'static, *mut XmlEntity>> {
-    let new = table.clone_with(|payload, _| xml_copy_entity(*payload));
+    table: XmlHashTableRef<'static, XmlEntityPtr>,
+) -> Option<XmlHashTableRef<'static, XmlEntityPtr>> {
+    let new = table.clone_with(|&ent, _| xml_copy_entity(ent).unwrap());
     XmlHashTableRef::from_table(new)
-}
-
-/// Deallocate the memory used by an entities in the hash table.
-#[doc(alias = "xmlFreeEntityWrapper")]
-extern "C" fn xml_free_entity_wrapper(entity: *mut c_void, _name: *const XmlChar) {
-    unsafe {
-        if !entity.is_null() {
-            xml_free_entity(entity as *mut XmlEntity);
-        }
-    }
 }
 
 /// Deallocate the memory used by an entities hash table.
 #[doc(alias = "xmlFreeEntitiesTable")]
-pub unsafe fn xml_free_entities_table(table: XmlHashTableRef<'static, *mut XmlEntity>) {
+pub unsafe fn xml_free_entities_table(table: XmlHashTableRef<'static, XmlEntityPtr>) {
     let mut table = table.into_inner();
     table.clear_with(|payload, _| {
         xml_free_entity(payload);
