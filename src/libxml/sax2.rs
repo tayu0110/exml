@@ -52,8 +52,8 @@ use crate::{
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
-        XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntity,
-        XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
+        XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
+        XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -594,8 +594,6 @@ pub unsafe fn xml_sax2_entity_decl(
     system_id: Option<&str>,
     content: Option<&str>,
 ) {
-    let ent: *mut XmlEntity;
-
     if ctx.is_none() {
         return;
     }
@@ -605,8 +603,16 @@ pub unsafe fn xml_sax2_entity_decl(
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
     if (*ctxt).in_subset == 1 {
-        ent = xml_add_doc_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
-        if ent.is_null() && (*ctxt).pedantic != 0 {
+        let ent = XmlEntityPtr::from_raw(xml_add_doc_entity(
+            (*ctxt).my_doc,
+            name,
+            typ,
+            public_id,
+            system_id,
+            content,
+        ))
+        .unwrap();
+        if ent.is_none() && (*ctxt).pedantic != 0 {
             xml_warn_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarEntityRedefined,
@@ -614,7 +620,7 @@ pub unsafe fn xml_sax2_entity_decl(
                 name
             );
         }
-        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
+        if let Some(ent) = ent.filter(|ent| ent.uri.load(Ordering::Relaxed).is_null()) {
             if let Some(system_id) = system_id {
                 let base = if !(*ctxt).input.is_null() {
                     (*(*ctxt).input)
@@ -628,17 +634,24 @@ pub unsafe fn xml_sax2_entity_decl(
 
                 if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
                     let uri = CString::new(uri).unwrap();
-                    (*ent)
-                        .uri
+                    ent.uri
                         .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
                 } else {
-                    (*ent).uri.store(null_mut(), Ordering::Relaxed);
+                    ent.uri.store(null_mut(), Ordering::Relaxed);
                 }
             }
         }
     } else if (*ctxt).in_subset == 2 {
-        ent = xml_add_dtd_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
-        if ent.is_null() && (*ctxt).pedantic != 0 {
+        let ent = XmlEntityPtr::from_raw(xml_add_dtd_entity(
+            (*ctxt).my_doc,
+            name,
+            typ,
+            public_id,
+            system_id,
+            content,
+        ))
+        .unwrap();
+        if ent.is_none() && (*ctxt).pedantic != 0 {
             if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
                 warning(
                     (*ctxt).user_data.clone(),
@@ -646,7 +659,7 @@ pub unsafe fn xml_sax2_entity_decl(
                 );
             }
         }
-        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
+        if let Some(ent) = ent.filter(|ent| ent.uri.load(Ordering::Relaxed).is_null()) {
             if let Some(system_id) = system_id {
                 let base = if !(*ctxt).input.is_null() {
                     (*(*ctxt).input)
@@ -660,11 +673,10 @@ pub unsafe fn xml_sax2_entity_decl(
 
                 if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
                     let uri = CString::new(uri).unwrap();
-                    (*ent)
-                        .uri
+                    ent.uri
                         .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
                 } else {
-                    (*ent).uri.store(null_mut(), Ordering::Relaxed);
+                    ent.uri.store(null_mut(), Ordering::Relaxed);
                 }
             }
         }
@@ -975,7 +987,6 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
     system_id: Option<&str>,
     notation_name: Option<&str>,
 ) {
-    let ent: *mut XmlEntity;
     if ctx.is_none() {
         return;
     }
@@ -986,15 +997,16 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
     };
 
     if (*ctxt).in_subset == 1 {
-        ent = xml_add_doc_entity(
+        let ent = XmlEntityPtr::from_raw(xml_add_doc_entity(
             (*ctxt).my_doc,
             name,
             XmlEntityType::XmlExternalGeneralUnparsedEntity,
             public_id,
             system_id,
             notation_name,
-        );
-        if ent.is_null() && (*ctxt).pedantic != 0 {
+        ))
+        .unwrap();
+        if ent.is_none() && (*ctxt).pedantic != 0 {
             if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
                 warning(
                     (*ctxt).user_data.clone(),
@@ -1002,7 +1014,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
                 )
             }
         }
-        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
+        if let Some(ent) = ent.filter(|ent| ent.uri.load(Ordering::Relaxed).is_null()) {
             if let Some(system_id) = system_id {
                 let base = if !(*ctxt).input.is_null() {
                     (*(*ctxt).input)
@@ -1016,24 +1028,24 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
 
                 if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
                     let uri = CString::new(uri).unwrap();
-                    (*ent)
-                        .uri
+                    ent.uri
                         .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
                 } else {
-                    (*ent).uri.store(null_mut(), Ordering::Relaxed);
+                    ent.uri.store(null_mut(), Ordering::Relaxed);
                 }
             }
         }
     } else if (*ctxt).in_subset == 2 {
-        ent = xml_add_dtd_entity(
+        let ent = XmlEntityPtr::from_raw(xml_add_dtd_entity(
             (*ctxt).my_doc,
             name,
             XmlEntityType::XmlExternalGeneralUnparsedEntity,
             public_id,
             system_id,
             notation_name,
-        );
-        if ent.is_null() && (*ctxt).pedantic != 0 {
+        ))
+        .unwrap();
+        if ent.is_none() && (*ctxt).pedantic != 0 {
             if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
                 warning(
                     (*ctxt).user_data.clone(),
@@ -1042,7 +1054,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
             }
         }
 
-        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
+        if let Some(ent) = ent.filter(|ent| ent.uri.load(Ordering::Relaxed).is_null()) {
             if let Some(system_id) = system_id {
                 let base = if !(*ctxt).input.is_null() {
                     (*(*ctxt).input)
@@ -1056,11 +1068,10 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
 
                 if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
                     let uri = CString::new(uri).unwrap();
-                    (*ent)
-                        .uri
+                    ent.uri
                         .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
                 } else {
-                    (*ent).uri.store(null_mut(), Ordering::Relaxed);
+                    ent.uri.store(null_mut(), Ordering::Relaxed);
                 }
             }
         }
