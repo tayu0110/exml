@@ -33,7 +33,7 @@ use super::{
     xml_free_ns, xml_get_doc_entity, xml_new_ns, xml_search_ns_by_namespace_strict,
     xml_search_ns_by_prefix_strict, xml_tree_err_memory, xml_tree_nslist_lookup_by_prefix,
     NodeCommon, NodePtr, XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNs,
-    XML_LOCAL_NAMESPACE,
+    XmlNsPtr, XML_LOCAL_NAMESPACE,
 };
 
 /// A function called to acquire namespaces (xmlNs) from the wrapper.
@@ -447,7 +447,8 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
     loop {
         // Lookup whether the prefix is unused in elem's ns-decls.
         if !(*elem).ns_def.is_null()
-            && !xml_tree_nslist_lookup_by_prefix((*elem).ns_def, pref).is_null()
+            && xml_tree_nslist_lookup_by_prefix(XmlNsPtr::from_raw((*elem).ns_def).unwrap(), pref)
+                .is_some()
         {
             // goto ns_next_prefix;
         } else {
@@ -457,8 +458,7 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
                     .parent()
                     .filter(|p| {
                         p.doc != p.as_ptr() as *mut XmlDoc
-                            && xml_search_ns_by_prefix_strict(doc, p.as_ptr(), pref, null_mut())
-                                == 1
+                            && xml_search_ns_by_prefix_strict(doc, p.as_ptr(), pref, None) == 1
                     })
                     .is_some()
             {
@@ -1514,47 +1514,49 @@ unsafe fn xml_dom_wrap_adopt_attr(
 
     (*attr).doc = dest_doc;
     if !(*attr).ns.is_null() {
-        let mut ns: *mut XmlNs = null_mut();
+        let mut ns = None;
 
         if !ctxt.is_null() { /* TODO: User defined. */ }
         // XML Namespace.
         if (*(*attr).ns).prefix().as_deref() == Some("xml") {
-            ns = (*dest_doc).ensure_xmldecl();
+            ns = XmlNsPtr::from_raw((*dest_doc).ensure_xmldecl()).unwrap();
         } else if dest_parent.is_null() {
             // Store in @(*destDoc).oldNs.
-            ns = xml_dom_wrap_store_ns(
+            ns = XmlNsPtr::from_raw(xml_dom_wrap_store_ns(
                 dest_doc,
                 (*(*attr).ns).href,
                 (*(*attr).ns).prefix().as_deref(),
-            );
+            ))
+            .unwrap();
         } else {
             // Declare on @destParent.
             if xml_search_ns_by_namespace_strict(
                 dest_doc,
                 dest_parent,
                 (*(*attr).ns).href,
-                &raw mut ns,
+                &mut ns,
                 1,
             ) == -1
             {
                 // goto internal_error;
                 return -1;
             }
-            if ns.is_null() {
-                ns = xml_dom_wrap_nsnorm_declare_ns_forced(
+            if ns.is_none() {
+                ns = XmlNsPtr::from_raw(xml_dom_wrap_nsnorm_declare_ns_forced(
                     dest_doc,
                     dest_parent,
                     (*(*attr).ns).href,
                     (*(*attr).ns).prefix,
                     1,
-                );
+                ))
+                .unwrap();
             }
         }
-        if ns.is_null() {
+        let Some(ns) = ns else {
             // goto internal_error;
             return -1;
-        }
-        (*attr).ns = ns;
+        };
+        (*attr).ns = ns.as_ptr();
     }
 
     (*attr).atype = None;
