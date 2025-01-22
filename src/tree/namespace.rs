@@ -18,7 +18,14 @@
 //
 // daniel@veillard.com
 
-use std::{borrow::Cow, ffi::CStr, os::raw::c_void, ptr::null_mut};
+use std::{
+    any::type_name,
+    borrow::Cow,
+    ffi::CStr,
+    ops::{Deref, DerefMut},
+    os::raw::c_void,
+    ptr::{null_mut, NonNull},
+};
 
 use libc::memset;
 
@@ -28,8 +35,8 @@ use crate::libxml::{
 };
 
 use super::{
-    xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlNode, XmlNsType,
-    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDoc, XmlElementType,
+    XmlGenericNodePtr, XmlNode, XmlNsType, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
@@ -103,6 +110,123 @@ impl NodeCommon for XmlNs {
         None
     }
     fn set_parent(&mut self, _parent: Option<NodePtr>) {}
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+pub struct XmlNsPtr(NonNull<XmlNs>);
+
+impl XmlNsPtr {
+    /// Allocate new memory and create new `XmlNsPtr` from an owned xml node.
+    ///
+    /// This method leaks allocated memory.  
+    /// Users can use `free` method for deallocating memory.
+    pub(crate) fn new(node: XmlNs) -> Option<Self> {
+        let boxed = Box::new(node);
+        NonNull::new(Box::leak(boxed)).map(Self)
+    }
+
+    /// Create `XmlNsPtr` from a raw pointer.  
+    ///
+    /// If `ptr` is a NULL pointer, return `Ok(None)`.  
+    /// If `ptr` is a valid pointer of `XmlNs`, return `Ok(Some(Self))`.  
+    /// Otherwise, return `Err`.
+    ///
+    /// # Safety
+    /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
+    pub(crate) unsafe fn from_raw(
+        ptr: *mut XmlNs,
+    ) -> Result<Option<Self>, InvalidNodePointerCastError> {
+        if ptr.is_null() {
+            return Ok(None);
+        }
+        match (*ptr).element_type() {
+            XmlElementType::XmlNamespaceDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+            _ => Err(InvalidNodePointerCastError {
+                from: (*ptr).element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+
+    pub(crate) fn as_ptr(self) -> *mut XmlNs {
+        self.0.as_ptr()
+    }
+
+    /// Deallocate memory.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn free(self) {
+        let _ = *Box::from_raw(self.0.as_ptr());
+    }
+
+    /// Acquire the ownership of the inner value.  
+    /// As a result, `self` will be invalid. `self` must not be used after performs this method.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn into_inner(self) -> Box<XmlNs> {
+        Box::from_raw(self.0.as_ptr())
+    }
+}
+
+impl Clone for XmlNsPtr {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl Copy for XmlNsPtr {}
+
+impl Deref for XmlNsPtr {
+    type Target = XmlNs;
+    fn deref(&self) -> &Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlNs`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl DerefMut for XmlNsPtr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlNs`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_mut() }
+    }
+}
+
+impl TryFrom<XmlGenericNodePtr> for XmlNsPtr {
+    type Error = InvalidNodePointerCastError;
+
+    fn try_from(value: XmlGenericNodePtr) -> Result<Self, Self::Error> {
+        match value.element_type() {
+            XmlElementType::XmlNamespaceDecl => Ok(Self(value.0.cast())),
+            _ => Err(InvalidNodePointerCastError {
+                from: value.element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+}
+
+impl From<XmlNsPtr> for XmlGenericNodePtr {
+    fn from(value: XmlNsPtr) -> Self {
+        Self(value.0 as NonNull<dyn NodeCommon>)
+    }
+}
+
+impl From<XmlNsPtr> for *mut XmlNs {
+    fn from(value: XmlNsPtr) -> Self {
+        value.0.as_ptr()
+    }
 }
 
 /// Creation of a new Namespace. This function will refuse to create
