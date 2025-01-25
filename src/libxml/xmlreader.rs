@@ -3752,7 +3752,7 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: *mut XmlAttr)
 #[doc(alias = "xmlTextReaderFreeNode")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: *mut XmlNode) {
-    use crate::tree::{NodeCommon, NodePtr, XmlDtd, XmlDtdPtr};
+    use crate::tree::{NodeCommon, NodePtr, XmlDtd, XmlDtdPtr, XmlNsPtr};
 
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
         (*(*reader).ctxt).dict
@@ -3764,7 +3764,7 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: *mut XmlNode)
         return;
     }
     if (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
-        xml_free_ns(cur as *mut XmlNs);
+        xml_free_ns(XmlNsPtr::from_raw(cur as *mut XmlNs).unwrap().unwrap());
         return;
     }
     if (*cur).element_type() == XmlElementType::XmlAttributeNode {

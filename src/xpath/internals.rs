@@ -68,7 +68,7 @@ use crate::{
     },
     tree::{
         xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlDoc, XmlElementType, XmlNode, XmlNs,
-        XML_XML_NAMESPACE,
+        XmlNsPtr, XML_XML_NAMESPACE,
     },
     xpath::{
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
@@ -1788,10 +1788,7 @@ pub const XML_NODESET_DEFAULT: usize = 10;
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNodeSetDupNs")]
-pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(
-    node: *mut XmlNode,
-    ns: *mut XmlNs,
-) -> *mut XmlNode {
+pub unsafe fn xml_xpath_node_set_dup_ns(node: *mut XmlNode, ns: *mut XmlNs) -> *mut XmlNode {
     if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
@@ -1800,21 +1797,21 @@ pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(
     }
 
     // Allocate a new Namespace and fill the fields.
-    let cur: *mut XmlNs = xml_malloc(size_of::<XmlNs>()) as *mut XmlNs;
-    if cur.is_null() {
+    let Some(mut cur) = XmlNsPtr::new(XmlNs {
+        typ: XmlElementType::XmlNamespaceDecl,
+        ..Default::default()
+    }) else {
         xml_xpath_err_memory(null_mut(), Some("duplicating namespace\n"));
         return null_mut();
-    }
-    memset(cur as _, 0, size_of::<XmlNs>());
-    (*cur).typ = XmlElementType::XmlNamespaceDecl;
+    };
     if !(*ns).href.is_null() {
-        (*cur).href = xml_strdup((*ns).href);
+        cur.href = xml_strdup((*ns).href);
     }
     if (*ns).prefix().is_some() {
-        (*cur).prefix = xml_strdup((*ns).prefix);
+        cur.prefix = xml_strdup((*ns).prefix);
     }
-    (*cur).next = node as *mut XmlNs;
-    cur as *mut XmlNode
+    cur.next = node as *mut XmlNs;
+    cur.as_ptr() as *mut XmlNode
 }
 
 /// This is the cached version of xmlXPathNewNodeSet().

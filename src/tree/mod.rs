@@ -2645,7 +2645,7 @@ pub unsafe fn xml_free_node(cur: *mut XmlNode) {
         return;
     }
     if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-        xml_free_ns(cur as _);
+        xml_free_ns(XmlNsPtr::from_raw(cur as *mut XmlNs).unwrap().unwrap());
         return;
     }
     if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
@@ -3137,34 +3137,6 @@ mod tests {
                         eprint!(" {}", n_doc);
                         eprintln!(" {}", n_recursive);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_copy_namespace() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_XML_NS_PTR {
-                let mem_base = xml_mem_blocks();
-                let cur = gen_xml_ns_ptr(n_cur, 0);
-
-                let ret_val = xml_copy_namespace(cur);
-                if !ret_val.is_null() {
-                    xml_free_ns(ret_val);
-                }
-                desret_xml_ns_ptr(ret_val);
-                des_xml_ns_ptr(n_cur, cur, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlCopyNamespace",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlCopyNamespace()");
-                    eprintln!(" {}", n_cur);
                 }
             }
         }

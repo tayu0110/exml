@@ -27,8 +27,6 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use libc::memset;
-
 use crate::{
     libxml::{
         globals::{xml_free, xml_malloc},
@@ -41,8 +39,8 @@ use crate::{
 use super::{
     xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node, xml_free_prop,
     xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory, NodeCommon,
-    XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlNs, XML_CHECK_DTD, XML_LOCAL_NAMESPACE,
-    XML_XML_NAMESPACE,
+    XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD,
+    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
@@ -1800,7 +1798,7 @@ impl XmlNode {
     ///
     /// Returns the new node or NULL in case of error.
     #[doc(alias = "xmlAddNextSibling")]
-    pub unsafe extern "C" fn add_next_sibling(&mut self, elem: *mut XmlNode) -> *mut XmlNode {
+    pub unsafe fn add_next_sibling(&mut self, elem: *mut XmlNode) -> *mut XmlNode {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return null_mut();
         }
@@ -1939,18 +1937,18 @@ impl XmlNode {
             if doc.is_null() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 // The XML-1.0 namespace is normally held on the root element.
                 // In this case exceptionally create it on the node element.
-                cur = xml_malloc(size_of::<XmlNs>()) as _;
-                if cur.is_null() {
+                let Some(cur) = XmlNsPtr::new(XmlNs {
+                    typ: XML_LOCAL_NAMESPACE,
+                    href: xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
+                    prefix: xml_strdup(c"xml".as_ptr() as _),
+                    next: self.ns_def,
+                    ..Default::default()
+                }) else {
                     xml_tree_err_memory("searching namespace");
                     return null_mut();
-                }
-                memset(cur as _, 0, size_of::<XmlNs>());
-                (*cur).typ = XML_LOCAL_NAMESPACE;
-                (*cur).href = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
-                (*cur).prefix = xml_strdup(c"xml".as_ptr() as _);
-                (*cur).next = self.ns_def;
-                self.ns_def = cur;
-                return cur;
+                };
+                self.ns_def = cur.as_ptr();
+                return cur.as_ptr();
             }
             if doc.is_null() {
                 doc = self.document();
@@ -2029,18 +2027,18 @@ impl XmlNode {
             if doc.is_null() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 // The XML-1.0 namespace is normally held on the root element.
                 // In this case exceptionally create it on the node element.
-                cur = xml_malloc(size_of::<XmlNs>()) as _;
-                if cur.is_null() {
+                let Some(cur) = XmlNsPtr::new(XmlNs {
+                    typ: XML_LOCAL_NAMESPACE,
+                    href: xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
+                    prefix: xml_strdup(c"xml".as_ptr() as _),
+                    next: self.ns_def,
+                    ..Default::default()
+                }) else {
                     xml_tree_err_memory("searching namespace");
                     return null_mut();
-                }
-                memset(cur as _, 0, size_of::<XmlNs>());
-                (*cur).typ = XML_LOCAL_NAMESPACE;
-                (*cur).href = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
-                (*cur).prefix = xml_strdup(c"xml".as_ptr() as _);
-                (*cur).next = self.ns_def;
-                self.ns_def = cur;
-                return cur;
+                };
+                self.ns_def = cur.as_ptr();
+                return cur.as_ptr();
             }
             if doc.is_null() {
                 doc = self.document();

@@ -1937,7 +1937,7 @@ impl XmlCatalogEntry {
     unsafe fn dump_xml_catalog<'a>(&self, out: impl Write + 'a) -> i32 {
         use crate::{
             io::XmlOutputBuffer,
-            tree::{NodeCommon, XmlNs},
+            tree::{NodeCommon, XmlNs, XmlNsPtr},
         };
 
         // Rebuild a catalog
@@ -1961,7 +1961,7 @@ impl XmlCatalogEntry {
         }
         let catalog: *mut XmlNode = xml_new_doc_node(doc, ns, "catalog", null_mut());
         if catalog.is_null() {
-            xml_free_ns(ns);
+            xml_free_ns(XmlNsPtr::from_raw(ns).unwrap().unwrap());
             xml_free_doc(doc);
             return -1;
         }

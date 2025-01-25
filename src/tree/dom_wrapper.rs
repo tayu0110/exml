@@ -584,7 +584,7 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
         }
         // Insert mapping.
         if xml_dom_wrap_ns_map_add_item(ns_map, -1, ns, tmpns, XML_TREE_NSMAP_DOC).is_null() {
-            xml_free_ns(tmpns);
+            xml_free_ns(XmlNsPtr::from_raw(tmpns).unwrap().unwrap());
             return -1;
         }
         *ret_ns = tmpns;
@@ -609,7 +609,7 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
             });
         }
         if xml_dom_wrap_ns_map_add_item(ns_map, -1, ns, tmpns, depth).is_null() {
-            xml_free_ns(tmpns);
+            xml_free_ns(XmlNsPtr::from_raw(tmpns).unwrap().unwrap());
             return -1;
         }
         *ret_ns = tmpns;
@@ -1041,7 +1041,11 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
     // exit:
     if !list_redund.is_null() {
         for (_, j) in (0..nb_redund).zip((0..).step_by(2)) {
-            xml_free_ns(*list_redund.add(j as usize));
+            xml_free_ns(
+                XmlNsPtr::from_raw(*list_redund.add(j as usize))
+                    .unwrap()
+                    .unwrap(),
+            );
         }
         xml_free(list_redund as _);
     }
@@ -2218,15 +2222,16 @@ pub unsafe fn xml_dom_wrap_clone_node(
                             ns = (*cur).ns_def;
                             while !ns.is_null() {
                                 // Create a new xmlNs.
-                                clone_ns = xml_malloc(size_of::<XmlNs>()) as _;
-                                if clone_ns.is_null() {
+                                let Some(new) = XmlNsPtr::new(XmlNs {
+                                    typ: XML_LOCAL_NAMESPACE,
+                                    ..Default::default()
+                                }) else {
                                     xml_tree_err_memory(
                                         "xmlDOMWrapCloneNode(): allocating namespace",
                                     );
                                     return -1;
-                                }
-                                std::ptr::write(&mut *clone_ns, XmlNs::default());
-                                (*clone_ns).typ = XML_LOCAL_NAMESPACE;
+                                };
+                                clone_ns = new.as_ptr();
 
                                 if !(*ns).href.is_null() {
                                     (*clone_ns).href = xml_strdup((*ns).href);

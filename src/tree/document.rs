@@ -40,7 +40,7 @@ use crate::{
 use super::{
     xml_free_node_list, xml_get_doc_entity, xml_new_doc_text, xml_new_reference, xml_tree_err,
     xml_tree_err_memory, NodeCommon, NodePtr, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType,
-    XmlEntityType, XmlID, XmlNode, XmlNs, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
+    XmlEntityType, XmlID, XmlNode, XmlNs, XmlNsPtr, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
@@ -683,19 +683,17 @@ impl XmlDoc {
         if !self.old_ns.is_null() {
             return self.old_ns;
         }
-        {
-            let ns = xml_malloc(size_of::<XmlNs>()) as *mut XmlNs;
-            if ns.is_null() {
-                xml_tree_err_memory("allocating the XML namespace");
-                return null_mut();
-            }
-            memset(ns as _, 0, size_of::<XmlNs>());
-            (*ns).typ = XML_LOCAL_NAMESPACE;
-            (*ns).href = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
-            (*ns).prefix = xml_strdup(c"xml".as_ptr() as _);
-            self.old_ns = ns;
-            ns
-        }
+        let Some(ns) = XmlNsPtr::new(XmlNs {
+            typ: XML_LOCAL_NAMESPACE,
+            href: xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
+            prefix: xml_strdup(c"xml".as_ptr() as _),
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("allocating the XML namespace");
+            return null_mut();
+        };
+        self.old_ns = ns.as_ptr();
+        ns.as_ptr()
     }
 }
 

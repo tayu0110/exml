@@ -27,10 +27,8 @@ use std::{
     ptr::{null_mut, NonNull},
 };
 
-use libc::memset;
-
 use crate::libxml::{
-    globals::{xml_free, xml_malloc},
+    globals::xml_free,
     xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
 };
 
@@ -260,63 +258,60 @@ pub unsafe fn xml_new_ns(
     }
 
     // Allocate a new Namespace and fill the fields.
-    let cur: *mut XmlNs = xml_malloc(size_of::<XmlNs>()) as _;
-    if cur.is_null() {
+    let Some(mut cur) = XmlNsPtr::new(XmlNs {
+        typ: XML_LOCAL_NAMESPACE,
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building namespace");
         return null_mut();
-    }
-    memset(cur as _, 0, size_of::<XmlNs>());
-    (*cur).typ = XML_LOCAL_NAMESPACE;
+    };
 
     if !href.is_null() {
-        (*cur).href = xml_strdup(href);
+        cur.href = xml_strdup(href);
     }
     if let Some(prefix) = prefix {
-        (*cur).prefix = xml_strndup(prefix.as_ptr(), prefix.len() as i32);
+        cur.prefix = xml_strndup(prefix.as_ptr(), prefix.len() as i32);
     }
 
     // Add it at the end to preserve parsing order ...
     // and checks for existing use of the prefix
     if !node.is_null() {
         if (*node).ns_def.is_null() {
-            (*node).ns_def = cur;
+            (*node).ns_def = cur.as_ptr();
         } else {
             let mut prev: *mut XmlNs = (*node).ns_def;
 
-            if ((*prev).prefix.is_null() && (*cur).prefix.is_null())
-                || xml_str_equal((*prev).prefix, (*cur).prefix)
+            if ((*prev).prefix.is_null() && cur.prefix.is_null())
+                || xml_str_equal((*prev).prefix, cur.prefix)
             {
                 xml_free_ns(cur);
                 return null_mut();
             }
             while !(*prev).next.is_null() {
                 prev = (*prev).next;
-                if ((*prev).prefix.is_null() && (*cur).prefix.is_null())
-                    || xml_str_equal((*prev).prefix, (*cur).prefix)
+                if ((*prev).prefix.is_null() && cur.prefix.is_null())
+                    || xml_str_equal((*prev).prefix, cur.prefix)
                 {
                     xml_free_ns(cur);
                     return null_mut();
                 }
             }
-            (*prev).next = cur;
+            (*prev).next = cur.as_ptr();
         }
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Free up the structures associated to a namespace
 #[doc(alias = "xmlFreeNs")]
-pub unsafe extern "C" fn xml_free_ns(cur: *mut XmlNs) {
-    if cur.is_null() {
-        return;
+pub unsafe fn xml_free_ns(cur: XmlNsPtr) {
+    if !cur.href.is_null() {
+        xml_free(cur.href as _);
     }
-    if !(*cur).href.is_null() {
-        xml_free((*cur).href as _);
+    if !cur.prefix.is_null() {
+        xml_free(cur.prefix as _);
     }
-    if !(*cur).prefix.is_null() {
-        xml_free((*cur).prefix as _);
-    }
-    xml_free(cur as _);
+    cur.free();
 }
 
 /// Free up all the structures associated to the chained namespaces.
@@ -328,7 +323,7 @@ pub unsafe fn xml_free_ns_list(mut cur: *mut XmlNs) {
     }
     while !cur.is_null() {
         next = (*cur).next;
-        xml_free_ns(cur);
+        xml_free_ns(XmlNsPtr::from_raw(cur).unwrap().unwrap());
         cur = next;
     }
 }
