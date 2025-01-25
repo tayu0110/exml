@@ -1112,10 +1112,10 @@ impl XmlNode {
         // handle QNames
         if let Some((prefix, local)) = split_qname2(name) {
             if let Some(ns) = self.search_ns(self.document(), Some(prefix)) {
-                return self.set_ns_prop(ns.as_ptr(), local, value);
+                return self.set_ns_prop(Some(ns), local, value);
             }
         }
-        self.set_ns_prop(null_mut(), name, value)
+        self.set_ns_prop(None, name, value)
     }
 
     /// Remove an attribute carried by a node.  
@@ -1147,7 +1147,7 @@ impl XmlNode {
     ))]
     pub unsafe fn set_ns_prop(
         &mut self,
-        ns: *mut XmlNs,
+        ns: Option<XmlNsPtr>,
         name: &str,
         value: Option<&str>,
     ) -> *mut XmlAttr {
@@ -1158,14 +1158,10 @@ impl XmlNode {
             tree::{xml_free_node_list, xml_new_doc_text, xml_new_prop_internal, XmlAttributeType},
         };
 
-        if !ns.is_null() && (*ns).href.is_null() {
+        if ns.map_or(false, |ns| ns.href.is_null()) {
             return null_mut();
         }
-        let href = if !ns.is_null() {
-            (*ns).href as *const i8
-        } else {
-            null_mut()
-        };
+        let href = ns.map_or(null(), |ns| ns.href as *const i8);
         let prop = self.get_prop_node_internal(
             name,
             (!href.is_null())
@@ -1184,7 +1180,7 @@ impl XmlNode {
             }
             (*prop).set_children(None);
             (*prop).set_last(None);
-            (*prop).ns = ns;
+            (*prop).ns = ns.map_or(null_mut(), |ns| ns.as_ptr());
             if let Some(value) = value {
                 let value = CString::new(value).unwrap();
                 (*prop).set_children(NodePtr::from_ptr(xml_new_doc_text(
@@ -1210,7 +1206,7 @@ impl XmlNode {
         let value = value.map(|v| CString::new(v).unwrap());
         xml_new_prop_internal(
             self,
-            ns,
+            ns.map_or(null_mut(), |ns| ns.as_ptr()),
             name,
             value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8),
         )
@@ -1221,12 +1217,8 @@ impl XmlNode {
     /// Returns 0 if successful, -1 if not found
     #[doc(alias = "xmlUnsetNsProp")]
     #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-    pub unsafe fn unset_ns_prop(&mut self, ns: *mut XmlNs, name: &str) -> i32 {
-        let href = if !ns.is_null() {
-            (*ns).href as *const i8
-        } else {
-            null_mut()
-        };
+    pub unsafe fn unset_ns_prop(&mut self, ns: Option<XmlNsPtr>, name: &str) -> i32 {
+        let href = ns.map_or(null(), |ns| ns.href as *const i8);
         let prop = self.get_prop_node_internal(
             name,
             (!href.is_null())
@@ -1244,12 +1236,12 @@ impl XmlNode {
 
     /// Associate a namespace to a node, a posteriori.
     #[doc(alias = "xmlSetNs")]
-    pub fn set_ns(&mut self, ns: *mut XmlNs) {
+    pub fn set_ns(&mut self, ns: Option<XmlNsPtr>) {
         if matches!(
             self.element_type(),
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
         ) {
-            self.ns = ns;
+            self.ns = ns.map_or(null_mut(), |ns| ns.as_ptr());
         }
     }
 
@@ -1294,9 +1286,9 @@ impl XmlNode {
         };
         if let Some(uri) = uri {
             let fixed = path_to_uri(uri);
-            self.set_ns_prop(ns.as_ptr(), "base", Some(&fixed));
+            self.set_ns_prop(Some(ns), "base", Some(&fixed));
         } else {
-            self.set_ns_prop(ns.as_ptr(), "base", None);
+            self.set_ns_prop(Some(ns), "base", None);
         }
     }
 
@@ -1332,7 +1324,7 @@ impl XmlNode {
         let Some(ns) = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap()) else {
             return;
         };
-        self.set_ns_prop(ns.as_ptr(), "lang", lang);
+        self.set_ns_prop(Some(ns), "lang", lang);
     }
 
     /// Set (or reset) the space preserving behaviour of a node,   
@@ -1369,10 +1361,10 @@ impl XmlNode {
         };
         match val {
             0 => {
-                self.set_ns_prop(ns.as_ptr(), "space", Some("default"));
+                self.set_ns_prop(Some(ns), "space", Some("default"));
             }
             1 => {
-                self.set_ns_prop(ns.as_ptr(), "space", Some("preserve"));
+                self.set_ns_prop(Some(ns), "space", Some("preserve"));
             }
             _ => {}
         }

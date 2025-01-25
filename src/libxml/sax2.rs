@@ -2020,7 +2020,7 @@ pub unsafe fn xml_sax2_start_element(
         if let Some(ns) =
             ns.filter(|ns| !ns.href.is_null() && (*ns.href.add(0) != 0 || ns.prefix().is_some()))
         {
-            (*ret).set_ns(ns.as_ptr());
+            (*ret).set_ns(Some(ns));
         }
     }
 
