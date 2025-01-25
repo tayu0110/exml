@@ -65,7 +65,7 @@ impl Default for XmlNs {
     fn default() -> Self {
         Self {
             next: null_mut(),
-            typ: XmlNsType::XmlInvalidNode,
+            typ: XmlNsType::XmlNamespaceDecl,
             href: null_mut(),
             prefix: null_mut(),
             _private: null_mut(),
