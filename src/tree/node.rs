@@ -1288,15 +1288,15 @@ impl XmlNode {
             _ => unreachable!(),
         }
 
-        let ns = self.search_ns_by_href(self.document(), XML_XML_NAMESPACE.to_str().unwrap());
-        if ns.is_null() {
+        let Some(ns) = self.search_ns_by_href(self.document(), XML_XML_NAMESPACE.to_str().unwrap())
+        else {
             return;
-        }
+        };
         if let Some(uri) = uri {
             let fixed = path_to_uri(uri);
-            self.set_ns_prop(ns, "base", Some(&fixed));
+            self.set_ns_prop(ns.as_ptr(), "base", Some(&fixed));
         } else {
-            self.set_ns_prop(ns, "base", None);
+            self.set_ns_prop(ns.as_ptr(), "base", None);
         }
     }
 
@@ -1329,11 +1329,10 @@ impl XmlNode {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
             _ => unreachable!(),
         }
-        let ns = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap());
-        if ns.is_null() {
+        let Some(ns) = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap()) else {
             return;
-        }
-        self.set_ns_prop(ns, "lang", lang);
+        };
+        self.set_ns_prop(ns.as_ptr(), "lang", lang);
     }
 
     /// Set (or reset) the space preserving behaviour of a node,   
@@ -1365,16 +1364,15 @@ impl XmlNode {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
             _ => unreachable!(),
         }
-        let ns = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap());
-        if ns.is_null() {
+        let Some(ns) = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap()) else {
             return;
-        }
+        };
         match val {
             0 => {
-                self.set_ns_prop(ns, "space", Some("default"));
+                self.set_ns_prop(ns.as_ptr(), "space", Some("default"));
             }
             1 => {
-                self.set_ns_prop(ns, "space", Some("preserve"));
+                self.set_ns_prop(ns.as_ptr(), "space", Some("preserve"));
             }
             _ => {}
         }
@@ -2005,11 +2003,15 @@ impl XmlNode {
     ///
     /// Returns the namespace pointer or NULL.
     #[doc(alias = "xmlSearchNsByHref")]
-    pub unsafe fn search_ns_by_href(&mut self, mut doc: *mut XmlDoc, href: &str) -> *mut XmlNs {
+    pub unsafe fn search_ns_by_href(
+        &mut self,
+        mut doc: *mut XmlDoc,
+        href: &str,
+    ) -> Option<XmlNsPtr> {
         let orig: *mut XmlNode = self;
 
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
+            return None;
         }
         if href == XML_XML_NAMESPACE.to_str().unwrap() {
             // Only the document can hold the XML spec namespace.
@@ -2024,22 +2026,22 @@ impl XmlNode {
                     ..Default::default()
                 }) else {
                     xml_tree_err_memory("searching namespace");
-                    return null_mut();
+                    return None;
                 };
                 self.ns_def = cur.as_ptr();
-                return cur.as_ptr();
+                return Some(cur);
             }
             if doc.is_null() {
                 doc = self.document();
                 if doc.is_null() {
-                    return null_mut();
+                    return None;
                 }
             }
             // Return the XML namespace declaration held by the doc.
             if (*doc).old_ns.is_null() {
-                return (*doc).ensure_xmldecl();
+                return XmlNsPtr::from_raw((*doc).ensure_xmldecl()).unwrap();
             } else {
-                return (*doc).old_ns;
+                return XmlNsPtr::from_raw((*doc).old_ns).unwrap();
             }
         }
         let is_attr = matches!(self.element_type(), XmlElementType::XmlAttributeNode);
@@ -2051,7 +2053,7 @@ impl XmlNode {
                     | XmlElementType::XmlEntityNode
                     | XmlElementType::XmlEntityDecl
             ) {
-                return null_mut();
+                return None;
             }
             if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
                 let href = CString::new(href).unwrap();
@@ -2062,7 +2064,7 @@ impl XmlNode {
                         && (!is_attr || now.prefix().is_some())
                         && xml_ns_in_scope(doc, orig, node, now.prefix) == 1
                     {
-                        return now.as_ptr();
+                        return Some(now);
                     }
                     cur = XmlNsPtr::from_raw(now.next).unwrap();
                 }
@@ -2074,13 +2076,13 @@ impl XmlNode {
                             && (!is_attr || (*cur).prefix().is_some())
                             && xml_ns_in_scope(doc, orig, node, cur.prefix) == 1
                     }) {
-                        return cur.as_ptr();
+                        return Some(cur);
                     }
                 }
             }
             node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
         }
-        null_mut()
+        None
     }
 
     /// This function checks that all the namespaces declared within the given tree are properly declared.

@@ -1557,10 +1557,10 @@ impl CatalogEntryListNode {
                         node = xml_new_doc_node(doc, ns, "group", null_mut());
                         (*node).set_prop("id", n.name.as_deref());
                         if let Some(value) = n.value.as_deref() {
-                            let xns: *mut XmlNs =
-                                (*node).search_ns_by_href(doc, XML_XML_NAMESPACE.to_str().unwrap());
-                            if !xns.is_null() {
-                                (*node).set_ns_prop(xns, "base", Some(value));
+                            if let Some(xns) =
+                                (*node).search_ns_by_href(doc, XML_XML_NAMESPACE.to_str().unwrap())
+                            {
+                                (*node).set_ns_prop(xns.as_ptr(), "base", Some(value));
                             }
                         }
                         match n.prefer {

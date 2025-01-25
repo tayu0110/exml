@@ -25689,15 +25689,12 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 break 'internal_error;
                             }
                         } else {
-                            let mut ns = XmlNsPtr::from_raw(
-                                (*def_attr_owner_elem).search_ns_by_href(
-                                    (*def_attr_owner_elem).doc,
-                                    CStr::from_ptr((*iattr).ns_name as *const i8)
-                                        .to_string_lossy()
-                                        .as_ref(),
-                                ),
-                            )
-                            .unwrap();
+                            let mut ns = (*def_attr_owner_elem).search_ns_by_href(
+                                (*def_attr_owner_elem).doc,
+                                CStr::from_ptr((*iattr).ns_name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            );
                             if ns.is_none() {
                                 let mut counter: i32 = 0;
                                 let mut prefix = String::new();

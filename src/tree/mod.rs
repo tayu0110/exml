@@ -1137,14 +1137,13 @@ unsafe fn xml_new_reconciled_ns(
         return null_mut();
     }
     // Search an existing namespace definition inherited.
-    let def = (*tree).search_ns_by_href(
+    if let Some(def) = (*tree).search_ns_by_href(
         doc,
         CStr::from_ptr((*ns).href as *const i8)
             .to_string_lossy()
             .as_ref(),
-    );
-    if !def.is_null() {
-        return def;
+    ) {
+        return def.as_ptr();
     }
 
     // Find a close prefix which is not already in use.
