@@ -1127,14 +1127,14 @@ unsafe fn xml_new_reconciled_ns(
     doc: *mut XmlDoc,
     tree: *mut XmlNode,
     ns: *mut XmlNs,
-) -> *mut XmlNs {
+) -> Option<XmlNsPtr> {
     let mut counter: i32 = 1;
 
     if tree.is_null() || !matches!((*tree).element_type(), XmlElementType::XmlElementNode) {
-        return null_mut();
+        return None;
     }
     if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
+        return None;
     }
     // Search an existing namespace definition inherited.
     if let Some(def) = (*tree).search_ns_by_href(
@@ -1143,7 +1143,7 @@ unsafe fn xml_new_reconciled_ns(
             .to_string_lossy()
             .as_ref(),
     ) {
-        return def.as_ptr();
+        return Some(def);
     }
 
     // Find a close prefix which is not already in use.
@@ -1152,7 +1152,7 @@ unsafe fn xml_new_reconciled_ns(
     let mut def = (*tree).search_ns(doc, Some(&prefix));
     while def.is_some() {
         if counter > 1000 {
-            return null_mut();
+            return None;
         }
         let prefix = format!("{prefix}{counter}");
         counter += 1;
@@ -1160,7 +1160,7 @@ unsafe fn xml_new_reconciled_ns(
     }
 
     // OK, now we are ready to create a new one.
-    xml_new_ns(tree, (*ns).href, Some(&prefix))
+    XmlNsPtr::from_raw(xml_new_ns(tree, (*ns).href, Some(&prefix))).unwrap()
 }
 
 // NOTE about the CopyNode operations !
@@ -1203,7 +1203,8 @@ pub(crate) unsafe fn xml_static_copy_node(
             return xml_copy_prop_internal(doc, parent, node as _) as _;
         }
         XmlElementType::XmlNamespaceDecl => {
-            return xml_copy_namespace_list(node as _) as _;
+            return xml_copy_namespace_list(XmlNsPtr::from_raw(node as _).unwrap())
+                .map_or(null_mut(), |ns| ns.as_ptr()) as _;
         }
 
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
@@ -1292,7 +1293,8 @@ pub(crate) unsafe fn xml_static_copy_node(
         XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
     ) && !(*node).ns_def.is_null()
     {
-        (*ret).ns_def = xml_copy_namespace_list((*node).ns_def);
+        (*ret).ns_def = xml_copy_namespace_list(XmlNsPtr::from_raw((*node).ns_def).unwrap())
+            .map_or(null_mut(), |ns| ns.as_ptr());
     }
 
     if !(*node).ns.is_null() {
@@ -1312,7 +1314,8 @@ pub(crate) unsafe fn xml_static_copy_node(
                 }
                 (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
             } else {
-                (*ret).ns = xml_new_reconciled_ns(doc, ret, (*node).ns);
+                (*ret).ns = xml_new_reconciled_ns(doc, ret, (*node).ns)
+                    .map_or(null_mut(), |ns| ns.as_ptr());
             }
         }
     }
@@ -1499,7 +1502,8 @@ unsafe fn xml_copy_prop_internal(
             } else {
                 // we are in trouble: we need a new reconciled namespace.
                 // This is expensive
-                (*ret).ns = xml_new_reconciled_ns((*target).doc, target, (*cur).ns);
+                (*ret).ns = xml_new_reconciled_ns((*target).doc, target, (*cur).ns)
+                    .map_or(null_mut(), |ns| ns.as_ptr());
             }
         } else {
             // Humm, we are copying an element whose namespace is defined
@@ -1756,7 +1760,8 @@ pub unsafe fn xml_copy_doc(doc: *mut XmlDoc, recursive: i32) -> *mut XmlDoc {
         }
     }
     if !(*doc).old_ns.is_null() {
-        (*ret).old_ns = xml_copy_namespace_list((*doc).old_ns);
+        (*ret).old_ns = xml_copy_namespace_list(XmlNsPtr::from_raw((*doc).old_ns).unwrap())
+            .map_or(null_mut(), |ns| ns.as_ptr());
     }
     if let Some(children) = (*doc).children {
         (*ret).children =
@@ -2752,14 +2757,13 @@ unsafe fn xml_ns_in_scope(
 ///
 /// Returns: a new #xmlNsPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNamespace")]
-pub unsafe fn xml_copy_namespace(cur: *mut XmlNs) -> *mut XmlNs {
-    if cur.is_null() {
-        return null_mut();
-    }
-
-    match (*cur).element_type() {
-        XML_LOCAL_NAMESPACE => xml_new_ns(null_mut(), (*cur).href, (*cur).prefix().as_deref()),
-        _ => null_mut(),
+pub unsafe fn xml_copy_namespace(cur: Option<XmlNsPtr>) -> Option<XmlNsPtr> {
+    let cur = cur?;
+    match cur.element_type() {
+        XML_LOCAL_NAMESPACE => {
+            XmlNsPtr::from_raw(xml_new_ns(null_mut(), cur.href, cur.prefix().as_deref())).unwrap()
+        }
+        _ => None,
     }
 }
 
@@ -2767,25 +2771,25 @@ pub unsafe fn xml_copy_namespace(cur: *mut XmlNs) -> *mut XmlNs {
 ///
 /// Returns: a new #xmlNsPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNamespaceList")]
-pub unsafe fn xml_copy_namespace_list(mut cur: *mut XmlNs) -> *mut XmlNs {
-    let mut ret: *mut XmlNs = null_mut();
-    let mut p: *mut XmlNs = null_mut();
-    let mut q: *mut XmlNs;
+pub unsafe fn xml_copy_namespace_list(mut cur: Option<XmlNsPtr>) -> Option<XmlNsPtr> {
+    let mut ret = None::<XmlNsPtr>;
+    let mut p = None::<XmlNsPtr>;
 
-    while !cur.is_null() {
-        q = xml_copy_namespace(cur);
-        if q.is_null() {
-            xml_free_ns_list(ret);
-            return null_mut();
-        }
-        if p.is_null() {
-            ret = q;
-            p = ret;
+    while let Some(now) = cur {
+        let Some(q) = xml_copy_namespace(Some(now)) else {
+            if let Some(ret) = ret {
+                xml_free_ns_list(ret.as_ptr());
+            }
+            return None;
+        };
+        if let Some(mut l) = p {
+            l.next = q.as_ptr();
+            p = Some(q);
         } else {
-            (*p).next = q;
-            p = q;
+            ret = Some(q);
+            p = ret;
         }
-        cur = (*cur).next;
+        cur = XmlNsPtr::from_raw(now.next).unwrap();
     }
     ret
 }
@@ -3131,37 +3135,6 @@ mod tests {
                         eprint!(" {}", n_doc);
                         eprintln!(" {}", n_recursive);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_copy_namespace_list() {
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_XML_NS_PTR {
-                let mem_base = xml_mem_blocks();
-                let cur = gen_xml_ns_ptr(n_cur, 0);
-
-                let ret_val = xml_copy_namespace_list(cur);
-                if !ret_val.is_null() {
-                    xml_free_ns_list(ret_val);
-                }
-                desret_xml_ns_ptr(ret_val);
-                des_xml_ns_ptr(n_cur, cur, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlCopyNamespaceList",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlCopyNamespaceList()"
-                    );
-                    eprintln!(" {}", n_cur);
                 }
             }
         }

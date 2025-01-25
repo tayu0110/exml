@@ -2120,13 +2120,12 @@ impl XmlNode {
                 }
                 if !f {
                     // OK we need to recreate a new namespace definition
-                    let n = xml_new_reconciled_ns(doc, self, (*node).ns);
-                    if !n.is_null() {
+                    if let Some(n) = xml_new_reconciled_ns(doc, self, (*node).ns) {
                         // :-( what if else ???
                         // check if we need to grow the cache buffers.
-                        new_ns.push(n);
+                        new_ns.push(n.as_ptr());
                         old_ns.push((*node).ns);
-                        (*node).ns = n;
+                        (*node).ns = n.as_ptr();
                     }
                 }
             }
@@ -2146,13 +2145,12 @@ impl XmlNode {
                         }
                         if !f {
                             // OK we need to recreate a new namespace definition
-                            let n = xml_new_reconciled_ns(doc, self, (*attr).ns);
-                            if !n.is_null() {
+                            if let Some(n) = xml_new_reconciled_ns(doc, self, (*attr).ns) {
                                 // :-( what if else ???
                                 // check if we need to grow the cache buffers.
-                                new_ns.push(n);
+                                new_ns.push(n.as_ptr());
                                 old_ns.push((*attr).ns);
-                                (*attr).ns = n;
+                                (*attr).ns = n.as_ptr();
                             }
                         }
                     }
