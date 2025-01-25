@@ -9908,7 +9908,7 @@ unsafe fn xml_schema_check_cselector_xpath(
             let count: usize = ns_list.len();
             let ns_array = ns_array.get_or_insert_with(|| vec![(null(), null()); count]);
             for (i, cur) in ns_list.into_iter().enumerate() {
-                ns_array[i] = ((*cur).href, (*cur).prefix);
+                ns_array[i] = (cur.href, cur.prefix);
             }
         }
         // TODO: Differentiate between "selector" and "field".

@@ -29,7 +29,7 @@ use std::{
 
 use crate::{
     libxml::{
-        globals::{xml_free, xml_malloc},
+        globals::xml_free,
         valid::xml_remove_id,
         xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strncat, XmlChar},
     },
@@ -705,7 +705,7 @@ impl XmlNode {
                             };
                             let ns_name = CString::new(ns_name).unwrap();
                             for cur in ns_list {
-                                if xml_str_equal((*cur).href, ns_name.as_ptr() as *const u8) {
+                                if xml_str_equal(cur.href, ns_name.as_ptr() as *const u8) {
                                     let prefix = (*cur).prefix();
                                     attr_decl = int_subset.get_qattr_desc(
                                         CStr::from_ptr(elem_qname as *const i8)
@@ -836,26 +836,21 @@ impl XmlNode {
     /// Returns an `Vec` of all the `xmlNsPtr` found.
     #[doc(alias = "xmlGetNsList")]
     #[cfg(any(feature = "libxml_tree", feature = "xpath", feature = "schema"))]
-    pub unsafe fn get_ns_list(&self, _doc: *const XmlDoc) -> Option<Vec<*mut XmlNs>> {
-        let mut cur: *mut XmlNs;
-
+    pub unsafe fn get_ns_list(&self, _doc: *const XmlDoc) -> Option<Vec<XmlNsPtr>> {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return None;
         }
 
-        let mut ret: Vec<*mut XmlNs> = vec![];
+        let mut ret: Vec<XmlNsPtr> = vec![];
         let mut node = self as *const XmlNode;
         while !node.is_null() {
             if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-                cur = (*node).ns_def;
-                'b: while !cur.is_null() {
-                    for i in 0..ret.len() {
-                        if (*cur).prefix() == (*ret[i]).prefix() {
-                            cur = (*cur).next;
-                            continue 'b;
-                        }
+                let mut cur = XmlNsPtr::from_raw((*node).ns_def).unwrap();
+                while let Some(now) = cur {
+                    if ret.iter().all(|&ret| now.prefix() != (*ret).prefix()) {
+                        ret.push(now);
                     }
-                    ret.push(cur);
+                    cur = XmlNsPtr::from_raw(now.next).unwrap()
                 }
             }
             node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -1927,7 +1922,6 @@ impl XmlNode {
         mut doc: *mut XmlDoc,
         namespace: Option<&str>,
     ) -> *mut XmlNs {
-        let mut cur: *mut XmlNs;
         let orig: *const XmlNode = self;
 
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -1974,33 +1968,30 @@ impl XmlNode {
                 return null_mut();
             }
             if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-                cur = (*node).ns_def;
-                while !cur.is_null() {
-                    if (*cur).prefix().is_none() && namespace.is_none() && !(*cur).href.is_null() {
-                        return cur;
+                let mut cur = XmlNsPtr::from_raw((*node).ns_def).unwrap();
+                while let Some(now) = cur {
+                    if now.prefix().is_none() && namespace.is_none() && !now.href.is_null() {
+                        return now.as_ptr();
                     }
-                    if (*cur).href().is_some()
-                        && (*cur).prefix().is_some()
-                        && namespace == (*cur).prefix().as_deref()
+                    if now.href().is_some()
+                        && now.prefix().is_some()
+                        && namespace == now.prefix().as_deref()
                     {
-                        return cur;
+                        return now.as_ptr();
                     }
-                    cur = (*cur).next;
+                    cur = XmlNsPtr::from_raw(now.next).unwrap();
                 }
                 if orig != node {
-                    cur = (*node).ns;
-                    if !cur.is_null() {
-                        if (*cur).prefix().is_none()
-                            && namespace.is_none()
-                            && !(*cur).href.is_null()
-                        {
-                            return cur;
+                    let cur = XmlNsPtr::from_raw((*node).ns).unwrap();
+                    if let Some(cur) = cur {
+                        if cur.prefix().is_none() && namespace.is_none() && !cur.href.is_null() {
+                            return cur.as_ptr();
                         }
-                        if (*cur).prefix().is_some()
-                            && (*cur).href().is_some()
-                            && namespace == (*cur).prefix().as_deref()
+                        if cur.prefix().is_some()
+                            && cur.href().is_some()
+                            && namespace == cur.prefix().as_deref()
                         {
-                            return cur;
+                            return cur.as_ptr();
                         }
                     }
                 }
@@ -2016,7 +2007,6 @@ impl XmlNode {
     /// Returns the namespace pointer or NULL.
     #[doc(alias = "xmlSearchNsByHref")]
     pub unsafe fn search_ns_by_href(&mut self, mut doc: *mut XmlDoc, href: &str) -> *mut XmlNs {
-        let mut cur: *mut XmlNs;
         let orig: *mut XmlNode = self;
 
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -2066,26 +2056,26 @@ impl XmlNode {
             }
             if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
                 let href = CString::new(href).unwrap();
-                cur = (*node).ns_def;
-                while !cur.is_null() {
-                    if !(*cur).href.is_null()
-                        && xml_str_equal((*cur).href, href.as_ptr() as *const u8)
-                        && (!is_attr || (*cur).prefix().is_some())
-                        && xml_ns_in_scope(doc, orig, node, (*cur).prefix) == 1
+                let mut cur = XmlNsPtr::from_raw((*node).ns_def).unwrap();
+                while let Some(now) = cur {
+                    if !now.href.is_null()
+                        && xml_str_equal(now.href, href.as_ptr() as *const u8)
+                        && (!is_attr || now.prefix().is_some())
+                        && xml_ns_in_scope(doc, orig, node, now.prefix) == 1
                     {
-                        return cur;
+                        return now.as_ptr();
                     }
-                    cur = (*cur).next;
+                    cur = XmlNsPtr::from_raw(now.next).unwrap();
                 }
                 if orig != node {
-                    cur = (*node).ns;
-                    if !cur.is_null()
-                        && !(*cur).href.is_null()
-                        && xml_str_equal((*cur).href, href.as_ptr() as *const u8)
-                        && (!is_attr || (*cur).prefix().is_some())
-                        && xml_ns_in_scope(doc, orig, node, (*cur).prefix) == 1
-                    {
-                        return cur;
+                    let cur = XmlNsPtr::from_raw((*node).ns).unwrap();
+                    if let Some(cur) = cur.filter(|cur| {
+                        !cur.href.is_null()
+                            && xml_str_equal(cur.href, href.as_ptr() as *const u8)
+                            && (!is_attr || (*cur).prefix().is_some())
+                            && xml_ns_in_scope(doc, orig, node, cur.prefix) == 1
+                    }) {
+                        return cur.as_ptr();
                     }
                 }
             }
@@ -2106,15 +2096,10 @@ impl XmlNode {
     #[doc(alias = "xmlReconciliateNs")]
     #[cfg(feature = "libxml_tree")]
     pub unsafe fn reconciliate_ns(&mut self, doc: *mut XmlDoc) -> i32 {
-        use crate::libxml::globals::xml_realloc;
-
         use super::xml_new_reconciled_ns;
 
-        let mut old_ns: *mut *mut XmlNs = null_mut();
-        let mut new_ns: *mut *mut XmlNs = null_mut();
-        let mut size_cache: i32 = 0;
-        let mut nb_cache: i32 = 0;
-        let mut n: *mut XmlNs;
+        let mut old_ns = vec![];
+        let mut new_ns = vec![];
         let mut node: *mut XmlNode = self;
         let mut attr: *mut XmlAttr;
         let ret: i32 = 0;
@@ -2132,58 +2117,22 @@ impl XmlNode {
             // Reconciliate the node namespace
             if !(*node).ns.is_null() {
                 // initialize the cache if needed
-                if size_cache == 0 {
-                    size_cache = 10;
-                    old_ns = xml_malloc(size_cache as usize * size_of::<*mut XmlNs>()) as _;
-                    if old_ns.is_null() {
-                        xml_tree_err_memory("fixing namespaces");
-                        return -1;
-                    }
-                    new_ns = xml_malloc(size_cache as usize * size_of::<*mut XmlNs>()) as _;
-                    if new_ns.is_null() {
-                        xml_tree_err_memory("fixing namespaces");
-                        xml_free(old_ns as _);
-                        return -1;
-                    }
-                }
                 let mut f = false;
-                for i in 0..nb_cache {
-                    if *old_ns.add(i as usize) == (*node).ns {
-                        (*node).ns = *new_ns.add(i as usize);
+                for (i, &old_ns) in old_ns.iter().enumerate() {
+                    if old_ns == (*node).ns {
+                        (*node).ns = new_ns[i];
                         f = true;
                         break;
                     }
                 }
                 if !f {
                     // OK we need to recreate a new namespace definition
-                    n = xml_new_reconciled_ns(doc, self, (*node).ns);
+                    let n = xml_new_reconciled_ns(doc, self, (*node).ns);
                     if !n.is_null() {
                         // :-( what if else ???
                         // check if we need to grow the cache buffers.
-                        if size_cache <= nb_cache {
-                            size_cache *= 2;
-                            old_ns = xml_realloc(
-                                old_ns as _,
-                                size_cache as usize * size_of::<*mut XmlNs>(),
-                            ) as _;
-                            if old_ns.is_null() {
-                                xml_tree_err_memory("fixing namespaces");
-                                xml_free(new_ns as _);
-                                return -1;
-                            }
-                            new_ns = xml_realloc(
-                                new_ns as _,
-                                size_cache as usize * size_of::<*mut XmlNs>(),
-                            ) as _;
-                            if new_ns.is_null() {
-                                xml_tree_err_memory("fixing namespaces");
-                                xml_free(old_ns as _);
-                                return -1;
-                            }
-                        }
-                        *new_ns.add(nb_cache as usize) = n;
-                        *old_ns.add(nb_cache as usize) = (*node).ns;
-                        nb_cache += 1;
+                        new_ns.push(n);
+                        old_ns.push((*node).ns);
                         (*node).ns = n;
                     }
                 }
@@ -2194,58 +2143,22 @@ impl XmlNode {
                 while !attr.is_null() {
                     if !(*attr).ns.is_null() {
                         // initialize the cache if needed
-                        if size_cache == 0 {
-                            size_cache = 10;
-                            old_ns = xml_malloc(size_cache as usize * size_of::<*mut XmlNs>()) as _;
-                            if old_ns.is_null() {
-                                xml_tree_err_memory("fixing namespaces");
-                                return -1;
-                            }
-                            new_ns = xml_malloc(size_cache as usize * size_of::<*mut XmlNs>()) as _;
-                            if new_ns.is_null() {
-                                xml_tree_err_memory("fixing namespaces");
-                                xml_free(old_ns as _);
-                                return -1;
-                            }
-                        }
                         let mut f = false;
-                        for i in 0..nb_cache {
-                            if *old_ns.add(i as usize) == (*attr).ns {
-                                (*attr).ns = *new_ns.add(i as usize);
+                        for (i, &old_ns) in old_ns.iter().enumerate() {
+                            if old_ns == (*attr).ns {
+                                (*attr).ns = new_ns[i];
                                 f = true;
                                 break;
                             }
                         }
                         if !f {
                             // OK we need to recreate a new namespace definition
-                            n = xml_new_reconciled_ns(doc, self, (*attr).ns);
+                            let n = xml_new_reconciled_ns(doc, self, (*attr).ns);
                             if !n.is_null() {
                                 // :-( what if else ???
                                 // check if we need to grow the cache buffers.
-                                if size_cache <= nb_cache {
-                                    size_cache *= 2;
-                                    old_ns = xml_realloc(
-                                        old_ns as _,
-                                        size_cache as usize * size_of::<*mut XmlNs>(),
-                                    ) as _;
-                                    if old_ns.is_null() {
-                                        xml_tree_err_memory("fixing namespaces");
-                                        xml_free(new_ns as _);
-                                        return -1;
-                                    }
-                                    new_ns = xml_realloc(
-                                        new_ns as _,
-                                        size_cache as usize * size_of::<*mut XmlNs>(),
-                                    ) as _;
-                                    if new_ns.is_null() {
-                                        xml_tree_err_memory("fixing namespaces");
-                                        xml_free(old_ns as _);
-                                        return -1;
-                                    }
-                                }
-                                *new_ns.add(nb_cache as usize) = n;
-                                *old_ns.add(nb_cache as usize) = (*attr).ns;
-                                nb_cache += 1;
+                                new_ns.push(n);
+                                old_ns.push((*attr).ns);
                                 (*attr).ns = n;
                             }
                         }
@@ -2286,12 +2199,6 @@ impl XmlNode {
             } else {
                 break;
             }
-        }
-        if !old_ns.is_null() {
-            xml_free(old_ns as _);
-        }
-        if !new_ns.is_null() {
-            xml_free(new_ns as _);
         }
         ret
     }

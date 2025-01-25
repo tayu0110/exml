@@ -8902,8 +8902,9 @@ pub unsafe fn xml_xpath_next_namespace(
         return null_mut();
     }
     if cur.is_null() {
-        (*(*ctxt).context).tmp_ns_list =
-            (*(*(*ctxt).context).node).get_ns_list((*(*ctxt).context).doc);
+        (*(*ctxt).context).tmp_ns_list = (*(*(*ctxt).context).node)
+            .get_ns_list((*(*ctxt).context).doc)
+            .map(|v| v.into_iter().map(|p| p.as_ptr()).collect());
         (*(*ctxt).context).tmp_ns_nr = 0;
         if let Some(list) = (*(*ctxt).context).tmp_ns_list.as_deref() {
             (*(*ctxt).context).tmp_ns_nr = list.len() as i32;
