@@ -47,7 +47,7 @@ use crate::libxml::xmlstring::xml_strncmp;
 #[cfg(not(feature = "libxml_regexp"))]
 use crate::tree::xml_free_node_list;
 #[cfg(feature = "libxml_valid")]
-use crate::tree::{XmlElementPtr, XmlNs};
+use crate::tree::{XmlElementPtr, XmlNsPtr};
 use crate::{
     error::{XmlParserErrors, __xml_raise_error},
     globals::{GenericError, GenericErrorContext, StructuredError},
@@ -3568,9 +3568,10 @@ pub unsafe fn xml_validate_element(
     doc: *mut XmlDoc,
     root: *mut XmlNode,
 ) -> i32 {
+    use crate::tree::XmlNsPtr;
+
     let mut elem: *mut XmlNode;
     let mut attr: *mut XmlAttr;
-    let mut ns: *mut XmlNs;
     let mut ret: i32 = 1;
 
     if root.is_null() {
@@ -3602,21 +3603,21 @@ pub unsafe fn xml_validate_element(
                 attr = (*attr).next;
             }
 
-            ns = (*elem).ns_def;
-            while !ns.is_null() {
+            let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
+            while let Some(now) = ns {
                 if (*elem).ns.is_null() {
-                    ret &= xml_validate_one_namespace(ctxt, doc, elem, None, ns, (*ns).href);
+                    ret &= xml_validate_one_namespace(ctxt, doc, elem, None, now, now.href);
                 } else {
                     ret &= xml_validate_one_namespace(
                         ctxt,
                         doc,
                         elem,
                         (*(*elem).ns).prefix().as_deref(),
-                        ns,
-                        (*ns).href,
+                        now,
+                        now.href,
                     );
                 }
-                ns = (*ns).next;
+                ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
 
             if let Some(children) = (*elem).children() {
@@ -4773,7 +4774,7 @@ pub unsafe fn xml_validate_one_element(
     doc: *mut XmlDoc,
     elem: *mut XmlNode,
 ) -> i32 {
-    use crate::tree::XmlNs;
+    use crate::tree::XmlNsPtr;
 
     let mut cont: XmlElementContentPtr;
     let mut child: *mut XmlNode;
@@ -5152,24 +5153,20 @@ pub unsafe fn xml_validate_one_element(
 
                 if cur_attr.prefix.is_none() && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
                 {
-                    let mut ns: *mut XmlNs;
-
-                    ns = (*elem).ns_def;
-                    while !ns.is_null() {
-                        if (*ns).prefix().is_none() {
+                    let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
+                    while let Some(now) = ns {
+                        if now.prefix().is_none() {
                             break 'found;
                         }
-                        ns = (*ns).next;
+                        ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 } else if cur_attr.prefix.as_deref() == Some("xmlns") {
-                    let mut ns: *mut XmlNs;
-
-                    ns = (*elem).ns_def;
-                    while !ns.is_null() {
-                        if cur_attr.name() == (*ns).prefix() {
+                    let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
+                    while let Some(now) = ns {
+                        if cur_attr.name() == now.prefix() {
                             break 'found;
                         }
-                        ns = (*ns).next;
+                        ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 } else {
                     let mut attrib: *mut XmlAttr;
@@ -5178,24 +5175,23 @@ pub unsafe fn xml_validate_one_element(
                     while !attrib.is_null() {
                         if xml_str_equal((*attrib).name, cur_attr.name) {
                             if let Some(prefix) = cur_attr.prefix.as_deref() {
-                                let mut name_space: *mut XmlNs = (*attrib).ns;
+                                let name_space = XmlNsPtr::from_raw((*attrib).ns)
+                                    .unwrap()
+                                    .or({ XmlNsPtr::from_raw((*elem).ns).unwrap() });
 
-                                if name_space.is_null() {
-                                    name_space = (*elem).ns;
-                                }
                                 // qualified names handling is problematic, having a
                                 // different prefix should be possible but DTDs don't
                                 // allow to define the URI instead of the prefix :-(
-                                if name_space.is_null() {
-                                    if qualified < 0 {
-                                        qualified = 0;
+                                if let Some(name_space) = name_space {
+                                    if (*name_space).prefix().as_deref() != Some(prefix) {
+                                        if qualified < 1 {
+                                            qualified = 1;
+                                        }
+                                    } else {
+                                        break 'found;
                                     }
-                                } else if (*name_space).prefix().as_deref() != Some(prefix) {
-                                    if qualified < 1 {
-                                        qualified = 1;
-                                    }
-                                } else {
-                                    break 'found;
+                                } else if qualified < 0 {
+                                    qualified = 0;
                                 }
                             } else {
                                 // We should allow applications to define namespaces
@@ -5264,12 +5260,10 @@ pub unsafe fn xml_validate_one_element(
                 // attribute checking
                 if cur_attr.prefix.is_none() && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
                 {
-                    let mut ns: *mut XmlNs;
-
-                    ns = (*elem).ns_def;
-                    while !ns.is_null() {
-                        if (*ns).prefix().is_none() {
-                            if !xml_str_equal(cur_attr.default_value, (*ns).href) {
+                    let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
+                    while let Some(now) = ns {
+                        if now.prefix().is_none() {
+                            if !xml_str_equal(cur_attr.default_value, now.href) {
                                 let elem_name = (*elem).name().unwrap();
                                 xml_err_valid_node(
                                     ctxt,
@@ -5284,17 +5278,15 @@ pub unsafe fn xml_validate_one_element(
                             }
                             break 'found;
                         }
-                        ns = (*ns).next;
+                        ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 } else if cur_attr.prefix.as_deref() == Some("xmlns") {
-                    let mut ns: *mut XmlNs;
-
-                    ns = (*elem).ns_def;
-                    while !ns.is_null() {
-                        if cur_attr.name() == (*ns).prefix() {
-                            if !xml_str_equal(cur_attr.default_value, (*ns).href) {
+                    let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
+                    while let Some(now) = ns {
+                        if cur_attr.name() == now.prefix() {
+                            if !xml_str_equal(cur_attr.default_value, now.href) {
                                 let elem_name = (*elem).name().unwrap();
-                                let prefix = (*ns).prefix().unwrap();
+                                let prefix = now.prefix().unwrap();
                                 xml_err_valid_node(
                                     ctxt,
                                     elem,
@@ -5311,7 +5303,7 @@ pub unsafe fn xml_validate_one_element(
                             }
                             break 'found;
                         }
-                        ns = (*ns).next;
+                        ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 }
             }
@@ -5665,17 +5657,18 @@ pub unsafe fn xml_validate_one_namespace(
     doc: *mut XmlDoc,
     elem: *mut XmlNode,
     prefix: Option<&str>,
-    ns: *mut XmlNs,
+    ns: XmlNsPtr,
     value: *const XmlChar,
 ) -> i32 {
     // let elemDecl: xmlElementPtr;
+
     let mut ret: i32 = 1;
 
     CHECK_DTD!(doc);
     if elem.is_null() || (*elem).name.is_null() {
         return 0;
     }
-    if ns.is_null() || (*ns).href.is_null() {
+    if ns.href.is_null() {
         return 0;
     }
 

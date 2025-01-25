@@ -53,7 +53,7 @@ use crate::{
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
+        XmlEntityType, XmlEnumeration, XmlNode, XmlNs, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -1468,7 +1468,7 @@ unsafe fn xml_sax2_attribute_internal(
                     (*ctxt).my_doc,
                     (*ctxt).node,
                     prefix,
-                    nsret,
+                    XmlNsPtr::from_raw(nsret).unwrap().unwrap(),
                     val,
                 );
             }
@@ -1549,7 +1549,7 @@ unsafe fn xml_sax2_attribute_internal(
                     (*ctxt).my_doc,
                     (*ctxt).node,
                     prefix,
-                    nsret,
+                    XmlNsPtr::from_raw(nsret).unwrap().unwrap(),
                     value,
                 );
             }
@@ -2214,7 +2214,7 @@ pub unsafe fn xml_sax2_start_element_ns(
                     (*ctxt).my_doc,
                     ret,
                     prefix,
-                    ns,
+                    XmlNsPtr::from_raw(ns).unwrap().unwrap(),
                     uri.as_ptr() as *const u8,
                 );
             }
