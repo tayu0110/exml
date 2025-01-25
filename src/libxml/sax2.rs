@@ -1327,7 +1327,6 @@ unsafe fn xml_sax2_attribute_internal(
     use super::htmltree::html_is_boolean_attr;
 
     let nval: *mut XmlChar;
-    let namespace: *mut XmlNs;
     let value = value.map(|v| CString::new(v).unwrap());
     let mut value = value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8);
 
@@ -1563,32 +1562,25 @@ unsafe fn xml_sax2_attribute_internal(
         return;
     }
 
-    if let Some(ns) = ns {
-        namespace = (*(*ctxt).node).search_ns((*ctxt).my_doc, Some(ns));
+    let namespace = if let Some(ns) = ns {
+        let namespace = (*(*ctxt).node).search_ns((*ctxt).my_doc, Some(ns));
 
-        if namespace.is_null() {
-            xml_ns_err_msg!(
-                ctxt,
-                XmlParserErrors::XmlNsErrUndefinedNamespace,
-                "Namespace prefix {} of attribute {} is not defined\n",
-                ns,
-                name
-            );
-        } else {
+        if let Some(namespace) = namespace {
             let mut prop: *mut XmlAttr;
 
             prop = (*(*ctxt).node).properties;
             while !prop.is_null() {
                 if !(*prop).ns.is_null()
                     && (Some(name) == (*prop).name().as_deref()
-                        && (namespace == (*prop).ns || (*namespace).href() == (*(*prop).ns).href()))
+                        && (namespace.as_ptr() == (*prop).ns
+                            || namespace.href() == (*(*prop).ns).href()))
                 {
                     xml_ns_err_msg!(
                         ctxt,
                         XmlParserErrors::XmlErrAttributeRedefined,
                         "Attribute {} in {} redefined\n",
                         name,
-                        (*namespace).href().unwrap()
+                        namespace.href().unwrap().into_owned()
                     );
                     (*ctxt).well_formed = 0;
                     if (*ctxt).recovery == 0 {
@@ -1601,13 +1593,27 @@ unsafe fn xml_sax2_attribute_internal(
                 }
                 prop = (*prop).next;
             }
+        } else {
+            xml_ns_err_msg!(
+                ctxt,
+                XmlParserErrors::XmlNsErrUndefinedNamespace,
+                "Namespace prefix {} of attribute {} is not defined\n",
+                ns,
+                name
+            );
         }
+        namespace
     } else {
-        namespace = null_mut();
-    }
+        None
+    };
 
     // !!!!!! <a toto:arg="" xmlns:toto="http://toto.com">
-    let ret: *mut XmlAttr = xml_new_ns_prop((*ctxt).node, namespace, name, null());
+    let ret: *mut XmlAttr = xml_new_ns_prop(
+        (*ctxt).node,
+        namespace.map_or(null_mut(), |ns| ns.as_ptr()),
+        name,
+        null(),
+    );
     if ret.is_null() {
         // goto error;
         if !nval.is_null() {
@@ -1895,10 +1901,9 @@ pub unsafe fn xml_sax2_start_element(
     fullname: &str,
     atts: &[(String, Option<String>)],
 ) {
-    use crate::{libxml::parser_internals::XML_VCTXT_DTD_VALIDATED, tree::XmlNs};
+    use crate::libxml::parser_internals::XML_VCTXT_DTD_VALIDATED;
 
     let mut parent: *mut XmlNode;
-    let mut ns: *mut XmlNs;
 
     if ctx.is_none() {
         return;
@@ -1993,13 +1998,14 @@ pub unsafe fn xml_sax2_start_element(
 
         // Search the namespace, note that since the attributes have been
         // processed, the local namespaces are available.
-        ns = (*ret).search_ns((*ctxt).my_doc, prefix);
-        if ns.is_null() && !parent.is_null() {
-            ns = (*parent).search_ns((*ctxt).my_doc, prefix);
-        }
-        if ns.is_null() {
+        let mut ns = (*ret).search_ns((*ctxt).my_doc, prefix).or_else(|| {
+            (!parent.is_null())
+                .then(|| (*parent).search_ns((*ctxt).my_doc, prefix))
+                .flatten()
+        });
+        if ns.is_none() {
             if let Some(prefix) = prefix {
-                ns = xml_new_ns(ret, null_mut(), Some(prefix));
+                ns = XmlNsPtr::from_raw(xml_new_ns(ret, null_mut(), Some(prefix))).unwrap();
                 xml_ns_warn_msg!(
                     ctxt,
                     XmlParserErrors::XmlNsErrUndefinedNamespace,
@@ -2011,11 +2017,10 @@ pub unsafe fn xml_sax2_start_element(
 
         // set the namespace node, making sure that if the default namespace
         // is unbound on a parent we simply keep it NULL
-        if !ns.is_null()
-            && !(*ns).href.is_null()
-            && (*(*ns).href.add(0) != 0 || (*ns).prefix().is_some())
+        if let Some(ns) =
+            ns.filter(|ns| !ns.href.is_null() && (*ns.href.add(0) != 0 || ns.prefix().is_some()))
         {
-            (*ret).set_ns(ns);
+            (*ret).set_ns(ns.as_ptr());
         }
     }
 
@@ -2248,12 +2253,16 @@ pub unsafe fn xml_sax2_start_element_ns(
     // Note that, if prefix is NULL, this searches for the default Ns
     if orig_uri.is_some() && (*ret).ns.is_null() {
         (*ret).ns = if !parent.is_null() {
-            (*parent).search_ns((*ctxt).my_doc, prefix)
+            (*parent)
+                .search_ns((*ctxt).my_doc, prefix)
+                .map_or(null_mut(), |ns| ns.as_ptr())
         } else {
             null_mut()
         };
         if (*ret).ns.is_null() && prefix == Some("xml") {
-            (*ret).ns = (*ret).search_ns((*ctxt).my_doc, prefix);
+            (*ret).ns = (*ret)
+                .search_ns((*ctxt).my_doc, prefix)
+                .map_or(null_mut(), |ns| ns.as_ptr());
         }
         if (*ret).ns.is_null() {
             ns = xml_new_ns(ret, null_mut(), prefix);
@@ -2432,7 +2441,7 @@ unsafe fn xml_sax2_attribute_ns(
     value: *const XmlChar,
 ) {
     let ret: *mut XmlAttr;
-    let mut namespace: *mut XmlNs = null_mut();
+    let mut namespace = None;
     let mut dup: *mut XmlChar = null_mut();
 
     // Note: if prefix.is_null(), the attribute is not in the default namespace
@@ -2457,7 +2466,7 @@ unsafe fn xml_sax2_attribute_ns(
 
         (*ret).parent = NodePtr::from_ptr((*ctxt).node);
         (*ret).doc = (*ctxt).my_doc;
-        (*ret).ns = namespace;
+        (*ret).ns = namespace.map_or(null_mut(), |ns| ns.as_ptr());
         (*ret).name = xml_strdup(localname);
 
         // link at the end to preserve order, TODO speed up with a last
@@ -2481,7 +2490,7 @@ unsafe fn xml_sax2_attribute_ns(
     } else {
         ret = xml_new_ns_prop(
             (*ctxt).node,
-            namespace,
+            namespace.map_or(null_mut(), |ns| ns.as_ptr()),
             &CStr::from_ptr(localname as *const i8).to_string_lossy(),
             null_mut(),
         );

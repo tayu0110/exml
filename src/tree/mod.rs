@@ -1128,7 +1128,6 @@ unsafe fn xml_new_reconciled_ns(
     tree: *mut XmlNode,
     ns: *mut XmlNs,
 ) -> *mut XmlNs {
-    let mut def: *mut XmlNs;
     let mut counter: i32 = 1;
 
     if tree.is_null() || !matches!((*tree).element_type(), XmlElementType::XmlElementNode) {
@@ -1138,7 +1137,7 @@ unsafe fn xml_new_reconciled_ns(
         return null_mut();
     }
     // Search an existing namespace definition inherited.
-    def = (*tree).search_ns_by_href(
+    let def = (*tree).search_ns_by_href(
         doc,
         CStr::from_ptr((*ns).href as *const i8)
             .to_string_lossy()
@@ -1151,8 +1150,8 @@ unsafe fn xml_new_reconciled_ns(
     // Find a close prefix which is not already in use.
     // Let's strip namespace prefixes longer than 20 chars !
     let prefix = (*ns).prefix().unwrap_or(Cow::Borrowed("default"));
-    def = (*tree).search_ns(doc, Some(&prefix));
-    while !def.is_null() {
+    let mut def = (*tree).search_ns(doc, Some(&prefix));
+    while def.is_some() {
         if counter > 1000 {
             return null_mut();
         }
@@ -1162,8 +1161,7 @@ unsafe fn xml_new_reconciled_ns(
     }
 
     // OK, now we are ready to create a new one.
-    def = xml_new_ns(tree, (*ns).href, Some(&prefix));
-    def
+    xml_new_ns(tree, (*ns).href, Some(&prefix))
 }
 
 // NOTE about the CopyNode operations !
@@ -1300,25 +1298,23 @@ pub(crate) unsafe fn xml_static_copy_node(
 
     if !(*node).ns.is_null() {
         let prefix = (*(*node).ns).prefix();
-        let mut ns = (*ret).search_ns(doc, prefix.as_deref());
-        if ns.is_null() {
+        if let Some(ns) = (*ret).search_ns(doc, prefix.as_deref()) {
+            // reference the existing namespace definition in our own tree.
+            (*ret).ns = ns.as_ptr();
+        } else {
             // Humm, we are copying an element whose namespace is defined
             // out of the new tree scope. Search it in the original tree
             // and add it at the top of the new tree
-            ns = (*node).search_ns((*node).doc, prefix.as_deref());
-            if !ns.is_null() {
+            if let Some(ns) = (*node).search_ns((*node).doc, prefix.as_deref()) {
                 let mut root: *mut XmlNode = ret;
 
                 while let Some(parent) = (*root).parent() {
                     root = parent.as_ptr();
                 }
-                (*ret).ns = xml_new_ns(root, (*ns).href, (*ns).prefix().as_deref());
+                (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
             } else {
                 (*ret).ns = xml_new_reconciled_ns(doc, ret, (*node).ns);
             }
-        } else {
-            // reference the existing namespace definition in our own tree.
-            (*ret).ns = ns;
         }
     }
     if (matches!((*node).element_type(), XmlElementType::XmlElementNode)
@@ -1494,16 +1490,27 @@ unsafe fn xml_copy_prop_internal(
 
     if !(*cur).ns.is_null() && !target.is_null() {
         let prefix = (*(*cur).ns).prefix();
-        let mut ns = (*target).search_ns((*target).doc, prefix.as_deref());
-        if ns.is_null() {
+        if let Some(ns) = (*target).search_ns((*target).doc, prefix.as_deref()) {
+            // we have to find something appropriate here since
+            // we can't be sure, that the namespace we found is identified
+            // by the prefix
+            if xml_str_equal(ns.href, (*(*cur).ns).href) {
+                // this is the nice case
+                (*ret).ns = ns.as_ptr();
+            } else {
+                // we are in trouble: we need a new reconciled namespace.
+                // This is expensive
+                (*ret).ns = xml_new_reconciled_ns((*target).doc, target, (*cur).ns);
+            }
+        } else {
             // Humm, we are copying an element whose namespace is defined
             // out of the new tree scope. Search it in the original tree
             // and add it at the top of the new tree
-            ns = (*cur)
+            if let Some(ns) = (*cur)
                 .parent
                 .unwrap()
-                .search_ns((*cur).doc, prefix.as_deref());
-            if !ns.is_null() {
+                .search_ns((*cur).doc, prefix.as_deref())
+            {
                 let mut root: *mut XmlNode = target;
                 let mut pred: *mut XmlNode = null_mut();
 
@@ -1515,19 +1522,7 @@ unsafe fn xml_copy_prop_internal(
                     // correct possibly cycling above the document elt
                     root = pred;
                 }
-                (*ret).ns = xml_new_ns(root, (*ns).href, (*ns).prefix().as_deref());
-            }
-        } else {
-            // we have to find something appropriate here since
-            // we can't be sure, that the namespace we found is identified
-            // by the prefix
-            if xml_str_equal((*ns).href, (*(*cur).ns).href) {
-                // this is the nice case
-                (*ret).ns = ns;
-            } else {
-                // we are in trouble: we need a new reconciled namespace.
-                // This is expensive
-                (*ret).ns = xml_new_reconciled_ns((*target).doc, target, (*cur).ns);
+                (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
             }
         }
     } else {

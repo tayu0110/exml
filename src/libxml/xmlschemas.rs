@@ -146,7 +146,7 @@ use crate::{
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlElementContentPtr,
         XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
-        XmlNs, XML_XML_NAMESPACE,
+        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
@@ -2384,14 +2384,14 @@ unsafe fn xml_schema_lookup_namespace(
             );
             return null_mut();
         }
-        let ns: *mut XmlNs = (*(*(*vctxt).inode).node).search_ns(
+        let ns = (*(*(*vctxt).inode).node).search_ns(
             (*(*(*vctxt).inode).node).doc,
             (!prefix.is_null())
                 .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                 .as_deref(),
         );
-        if !ns.is_null() {
-            return (*ns).href;
+        if let Some(ns) = ns {
+            return ns.href;
         }
         return null_mut();
     }
@@ -2472,14 +2472,14 @@ unsafe fn xml_schema_validate_notation(
             if !vctxt.is_null() {
                 ns_name = xml_schema_lookup_namespace(vctxt, prefix);
             } else if !node.is_null() {
-                let ns: *mut XmlNs = (*node).search_ns(
+                let ns = (*node).search_ns(
                     (*node).doc,
                     (!prefix.is_null())
                         .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                         .as_deref(),
                 );
-                if !ns.is_null() {
-                    ns_name = (*ns).href;
+                if let Some(ns) = ns {
+                    ns_name = ns.href;
                 }
             } else {
                 xml_free(prefix as _);
@@ -7105,7 +7105,6 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
     uri: *mut *const XmlChar,
     local: *mut *const XmlChar,
 ) -> i32 {
-    let ns: *mut XmlNs;
     let mut len: i32 = 0;
 
     *uri = null_mut();
@@ -7136,9 +7135,9 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
     }
 
     if strchr(value as *mut c_char, b':' as _).is_null() {
-        ns = (*attr).parent.unwrap().search_ns((*attr).doc, None);
-        if !ns.is_null() && !(*ns).href.is_null() && *(*ns).href.add(0) != 0 {
-            *uri = xml_dict_lookup((*ctxt).dict, (*ns).href, -1);
+        let ns = (*attr).parent.unwrap().search_ns((*attr).doc, None);
+        if let Some(ns) = ns.filter(|ns| !ns.href.is_null() && *ns.href.add(0) != 0) {
+            *uri = xml_dict_lookup((*ctxt).dict, ns.href, -1);
         } else if (*schema).flags & XML_SCHEMAS_INCLUDING_CONVERT_NS != 0 {
             // TODO: move XML_SCHEMAS_INCLUDING_CONVERT_NS to the parser context.
 
@@ -7152,11 +7151,10 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
     *local = xml_split_qname3(value, addr_of_mut!(len));
     *local = xml_dict_lookup((*ctxt).dict, *local, -1);
     let pref: *const XmlChar = xml_dict_lookup((*ctxt).dict, value, len);
-    ns = (*attr).parent.unwrap().search_ns(
+    let Some(ns) = (*attr).parent.unwrap().search_ns(
         (*attr).doc,
         Some(CStr::from_ptr(pref as *const i8).to_string_lossy()).as_deref(),
-    );
-    if ns.is_null() {
+    ) else {
         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
         xml_schema_psimple_type_err(
             ctxt,
@@ -7171,9 +7169,8 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
             None
         );
         return (*ctxt).err;
-    } else {
-        *uri = xml_dict_lookup((*ctxt).dict, (*ns).href, -1);
-    }
+    };
+    *uri = xml_dict_lookup((*ctxt).dict, ns.href, -1);
     0
 }
 
@@ -25692,15 +25689,16 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 break 'internal_error;
                             }
                         } else {
-                            let mut ns: *mut XmlNs;
-
-                            ns = (*def_attr_owner_elem).search_ns_by_href(
-                                (*def_attr_owner_elem).doc,
-                                CStr::from_ptr((*iattr).ns_name as *const i8)
-                                    .to_string_lossy()
-                                    .as_ref(),
-                            );
-                            if ns.is_null() {
+                            let mut ns = XmlNsPtr::from_raw(
+                                (*def_attr_owner_elem).search_ns_by_href(
+                                    (*def_attr_owner_elem).doc,
+                                    CStr::from_ptr((*iattr).ns_name as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                ),
+                            )
+                            .unwrap();
+                            if ns.is_none() {
                                 let mut counter: i32 = 0;
                                 let mut prefix = String::new();
 
@@ -25731,13 +25729,14 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                         break 'internal_error;
                                     }
 
-                                    !ns.is_null()
+                                    ns.is_some()
                                 } {}
-                                ns = xml_new_ns(
+                                ns = XmlNsPtr::from_raw(xml_new_ns(
                                     (*vctxt).validation_root,
                                     (*iattr).ns_name,
                                     Some(&prefix),
-                                );
+                                ))
+                                .unwrap();
                             }
                             // TODO:
                             // http://lists.w3.org/Archives/Public/www-xml-schema-comments/2005JulSep/0406.html
@@ -25745,7 +25744,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             // prefix defined for the QName?
                             xml_new_ns_prop(
                                 def_attr_owner_elem,
-                                ns,
+                                ns.map_or(null_mut(), |ns| ns.as_ptr()),
                                 &CStr::from_ptr((*iattr).local_name as *const i8).to_string_lossy(),
                                 value,
                             );

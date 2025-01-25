@@ -1773,8 +1773,11 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                             // Simplification: 4.10. QNames
                             if let Some(name) = (*cur).get_content() {
                                 if let Some((prefix, local)) = split_qname2(&name) {
-                                    let ns: *mut XmlNs = (*cur).search_ns((*cur).doc, Some(prefix));
-                                    if ns.is_null() {
+                                    if let Some(ns) = (*cur).search_ns((*cur).doc, Some(prefix)) {
+                                        (*cur).set_prop("ns", ns.href().as_deref());
+                                        let local = CString::new(local).unwrap();
+                                        (*cur).set_content(local.as_ptr() as *const u8);
+                                    } else {
                                         xml_rng_perr!(
                                             ctxt,
                                             cur,
@@ -1782,10 +1785,6 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                                             "xmlRelaxNGParse: no namespace for prefix {}\n",
                                             prefix
                                         );
-                                    } else {
-                                        (*cur).set_prop("ns", (*ns).href().as_deref());
-                                        let local = CString::new(local).unwrap();
-                                        (*cur).set_content(local.as_ptr() as *const u8);
                                     }
                                 }
                             }

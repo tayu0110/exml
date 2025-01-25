@@ -1669,18 +1669,14 @@ impl XmlTextReader {
                 }
                 ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
-        } else {
-            let ns =
-                XmlNsPtr::from_raw((*self.node).search_ns((*self.node).doc, Some(prefix))).unwrap();
-            if let Some(ns) = ns {
-                let href = ns.href;
-                ret = (*self.node).get_ns_prop(
-                    localname,
-                    (!href.is_null())
-                        .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
-                        .as_deref(),
-                );
-            }
+        } else if let Some(ns) = (*self.node).search_ns((*self.node).doc, Some(prefix)) {
+            let href = ns.href;
+            ret = (*self.node).get_ns_prop(
+                localname,
+                (!href.is_null())
+                    .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+                    .as_deref(),
+            );
         }
         ret
     }
@@ -4319,21 +4315,16 @@ pub unsafe fn xml_text_reader_lookup_namespace(
 ) -> *mut XmlChar {
     use std::ffi::CStr;
 
-    use crate::tree::XmlNsPtr;
-
     if reader.node.is_null() {
         return null_mut();
     }
 
-    let Some(ns) = XmlNsPtr::from_raw(
-        (*reader.node).search_ns(
-            (*reader.node).doc,
-            (!prefix.is_null())
-                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                .as_deref(),
-        ),
-    )
-    .unwrap() else {
+    let Some(ns) = (*reader.node).search_ns(
+        (*reader.node).doc,
+        (!prefix.is_null())
+            .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+            .as_deref(),
+    ) else {
         return null_mut();
     };
     xml_strdup(ns.href)

@@ -44,7 +44,7 @@ use crate::{
     list::XmlList,
     tree::{
         xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlDoc, XmlElementType, XmlNode,
-        XmlNs, XML_XML_NAMESPACE,
+        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
     xpath::XmlNodeSet,
@@ -336,7 +336,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 let prefix = (*ns).prefix();
                 let tmp = (*cur).search_ns(cur.doc, prefix.as_deref());
 
-                if tmp == ns
+                if tmp == XmlNsPtr::from_raw(ns).unwrap()
                     && !xml_c14n_is_xml_ns(ns)
                     && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
                 {
@@ -946,7 +946,6 @@ impl<T> XmlC14NCtx<'_, T> {
     /// Returns 0 on success or -1 on fail.
     #[doc(alias = "xmlExcC14NProcessNamespacesAxis")]
     unsafe fn exc_c14n_process_namespaces_axis(&mut self, cur: &mut XmlNode, visible: bool) -> i32 {
-        let mut ns: *mut XmlNs;
         let mut has_empty_ns = false;
         let mut has_visibly_utilized_empty_ns = false;
         let mut has_empty_ns_in_inclusive_list = false;
@@ -984,18 +983,17 @@ impl<T> XmlC14NCtx<'_, T> {
                     Some(prefix.as_str())
                 };
 
-                ns = cur.search_ns(cur.doc, prefix);
-                if !ns.is_null()
-                    && !xml_c14n_is_xml_ns(ns)
-                    && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
-                {
+                let ns = cur.search_ns(cur.doc, prefix);
+                if let Some(ns) = ns.filter(|ns| {
+                    !xml_c14n_is_xml_ns(ns.as_ptr()) && self.is_visible(Some(&**ns), Some(cur))
+                }) {
                     let already_rendered = (*self.ns_rendered).find(Some(&*ns));
                     if visible {
                         // TODO: replace `cur` to `Rc<XmlNode>`
-                        (*self.ns_rendered).add(ns, cur as *const XmlNode as _);
+                        (*self.ns_rendered).add(ns.as_ptr(), cur as *const XmlNode as _);
                     }
                     if !already_rendered {
-                        list.insert_lower_bound(ns);
+                        list.insert_lower_bound(ns.as_ptr());
                     }
                     if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                         has_empty_ns = true;
@@ -1005,12 +1003,13 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // add node namespace
-        if !cur.ns.is_null() {
-            ns = cur.ns;
+        let ns = if !cur.ns.is_null() {
+            cur.ns
         } else {
-            ns = cur.search_ns(cur.doc, None);
             has_visibly_utilized_empty_ns = true;
-        }
+            cur.search_ns(cur.doc, None)
+                .map_or(null_mut(), |p| p.as_ptr())
+        };
         if !ns.is_null() && !xml_c14n_is_xml_ns(ns) {
             if visible
                 && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))

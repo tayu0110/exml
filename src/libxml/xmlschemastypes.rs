@@ -63,7 +63,7 @@ use crate::{
     tree::{
         xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
         xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttr, XmlAttributeType,
-        XmlElementType, XmlEntityType, XmlNode, XmlNs,
+        XmlElementType, XmlEntityType, XmlNode,
     },
     xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };
@@ -2716,7 +2716,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     let mut prefix: *mut XmlChar = null_mut();
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
-                                    let ns: *mut XmlNs = (*node).search_ns(
+                                    let ns = (*node).search_ns(
                                         (*node).doc,
                                         (!prefix.is_null())
                                             .then(|| {
@@ -2725,15 +2725,15 @@ unsafe fn xml_schema_val_atomic_type(
                                             })
                                             .as_deref(),
                                     );
-                                    if ns.is_null() && !prefix.is_null() {
+                                    if ns.is_none() && !prefix.is_null() {
                                         xml_free(prefix as _);
                                         if !local.is_null() {
                                             xml_free(local as _);
                                         }
                                         break 'return1;
                                     }
-                                    if !ns.is_null() {
-                                        uri = (*ns).href;
+                                    if let Some(ns) = ns {
+                                        uri = ns.href;
                                     }
                                     if !prefix.is_null() {
                                         xml_free(prefix as _);
@@ -2975,18 +2975,19 @@ unsafe fn xml_schema_val_atomic_type(
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
                                     if !prefix.is_null() {
-                                        let ns: *mut XmlNs = (*node).search_ns(
+                                        if let Some(ns) = (*node).search_ns(
                                             (*node).doc,
                                             Some(
                                                 CStr::from_ptr(prefix as *const i8)
                                                     .to_string_lossy()
                                                     .as_ref(),
                                             ),
-                                        );
-                                        if ns.is_null() {
+                                        ) {
+                                            if !val.is_null() {
+                                                uri = xml_strdup(ns.href);
+                                            }
+                                        } else {
                                             ret = 1;
-                                        } else if !val.is_null() {
-                                            uri = xml_strdup((*ns).href);
                                         }
                                     }
                                     if !local.is_null() && (val.is_null() || ret != 0) {

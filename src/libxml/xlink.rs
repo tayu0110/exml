@@ -26,7 +26,7 @@ use std::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use crate::tree::{XmlDoc, XmlElementType, XmlNode, XmlNs};
+use crate::tree::{XmlDoc, XmlElementType, XmlNode};
 
 use super::xmlstring::{xml_str_equal, XmlChar};
 
@@ -195,15 +195,14 @@ pub unsafe fn xlink_is_link(mut doc: *mut XmlDoc, node: *mut XmlNode) -> XlinkTy
             ret = XlinkType::XlinkTypeSimple;
         } else if typ == "extended" {
             if let Some(role) = (*node).get_ns_prop("role", Some(XLINK_NAMESPACE)) {
-                let xlink: *mut XmlNs = (*node).search_ns(doc, Some(XLINK_NAMESPACE));
-                if xlink.is_null() {
-                    /* Humm, fallback method */
-                    if role == "xlink:external-linkset" {
+                if let Some(xlink) = (*node).search_ns(doc, Some(XLINK_NAMESPACE)) {
+                    let buf = format!("{}:external-linkset", (*xlink).prefix().unwrap());
+                    if role == buf {
                         // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 } else {
-                    let buf = format!("{}:external-linkset", (*xlink).prefix().unwrap());
-                    if role == buf {
+                    // Humm, fallback method
+                    if role == "xlink:external-linkset" {
                         // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 }

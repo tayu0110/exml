@@ -1111,9 +1111,8 @@ impl XmlNode {
 
         // handle QNames
         if let Some((prefix, local)) = split_qname2(name) {
-            let ns = self.search_ns(self.document(), Some(prefix));
-            if !ns.is_null() {
-                return self.set_ns_prop(ns, local, value);
+            if let Some(ns) = self.search_ns(self.document(), Some(prefix)) {
+                return self.set_ns_prop(ns.as_ptr(), local, value);
             }
         }
         self.set_ns_prop(null_mut(), name, value)
@@ -1921,11 +1920,11 @@ impl XmlNode {
         &mut self,
         mut doc: *mut XmlDoc,
         namespace: Option<&str>,
-    ) -> *mut XmlNs {
+    ) -> Option<XmlNsPtr> {
         let orig: *const XmlNode = self;
 
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
+            return None;
         }
         if namespace == Some("xml") {
             if doc.is_null() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
@@ -1939,22 +1938,22 @@ impl XmlNode {
                     ..Default::default()
                 }) else {
                     xml_tree_err_memory("searching namespace");
-                    return null_mut();
+                    return None;
                 };
                 self.ns_def = cur.as_ptr();
-                return cur.as_ptr();
+                return Some(cur);
             }
             if doc.is_null() {
                 doc = self.document();
                 if doc.is_null() {
-                    return null_mut();
+                    return None;
                 }
             }
             // Return the XML namespace declaration held by the doc.
             if (*doc).old_ns.is_null() {
-                return (*doc).ensure_xmldecl() as _;
+                return XmlNsPtr::from_raw((*doc).ensure_xmldecl()).unwrap();
             } else {
-                return (*doc).old_ns;
+                return XmlNsPtr::from_raw((*doc).old_ns).unwrap();
             }
         }
         let mut node = self as *mut XmlNode;
@@ -1965,19 +1964,19 @@ impl XmlNode {
                     | XmlElementType::XmlEntityNode
                     | XmlElementType::XmlEntityDecl
             ) {
-                return null_mut();
+                return None;
             }
             if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
                 let mut cur = XmlNsPtr::from_raw((*node).ns_def).unwrap();
                 while let Some(now) = cur {
                     if now.prefix().is_none() && namespace.is_none() && !now.href.is_null() {
-                        return now.as_ptr();
+                        return Some(now);
                     }
                     if now.href().is_some()
                         && now.prefix().is_some()
                         && namespace == now.prefix().as_deref()
                     {
-                        return now.as_ptr();
+                        return Some(now);
                     }
                     cur = XmlNsPtr::from_raw(now.next).unwrap();
                 }
@@ -1985,20 +1984,20 @@ impl XmlNode {
                     let cur = XmlNsPtr::from_raw((*node).ns).unwrap();
                     if let Some(cur) = cur {
                         if cur.prefix().is_none() && namespace.is_none() && !cur.href.is_null() {
-                            return cur.as_ptr();
+                            return Some(cur);
                         }
                         if cur.prefix().is_some()
                             && cur.href().is_some()
                             && namespace == cur.prefix().as_deref()
                         {
-                            return cur.as_ptr();
+                            return Some(cur);
                         }
                     }
                 }
             }
             node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
         }
-        null_mut()
+        None
     }
 
     /// Search a Ns aliasing a given URI.
