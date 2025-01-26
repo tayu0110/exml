@@ -1226,7 +1226,7 @@ impl<T> XmlC14NCtx<'_, T> {
         let res = CString::new(res).unwrap();
         attr = xml_new_ns_prop(
             null_mut(),
-            xml_base_attr.ns,
+            XmlNsPtr::from_raw(xml_base_attr.ns).unwrap(),
             "base",
             res.as_ptr() as *const u8,
         );

@@ -29,7 +29,7 @@ use crate::libxml::{
 
 use super::{
     xml_free_prop, xml_new_prop_internal, xml_tree_err_memory, NodeCommon, NodePtr,
-    XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
+    XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNs, XmlNsPtr, __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -214,7 +214,7 @@ pub unsafe fn xml_new_prop(
     }
 
     let n = CStr::from_ptr(name as *const i8).to_string_lossy();
-    xml_new_prop_internal(node, null_mut(), &n, value)
+    xml_new_prop_internal(node, None, &n, value)
 }
 
 /// Create a new property tagged with a namespace and carried by a node.  
@@ -222,7 +222,7 @@ pub unsafe fn xml_new_prop(
 #[doc(alias = "xmlNewNsProp")]
 pub unsafe fn xml_new_ns_prop(
     node: *mut XmlNode,
-    ns: *mut XmlNs,
+    ns: Option<XmlNsPtr>,
     name: &str,
     value: *const XmlChar,
 ) -> *mut XmlAttr {
@@ -234,7 +234,7 @@ pub unsafe fn xml_new_ns_prop(
 #[doc(alias = "xmlNewNsPropEatName")]
 pub unsafe fn xml_new_ns_prop_eat_name(
     node: *mut XmlNode,
-    ns: *mut XmlNs,
+    ns: Option<XmlNsPtr>,
     name: *mut XmlChar,
     value: *const XmlChar,
 ) -> *mut XmlAttr {

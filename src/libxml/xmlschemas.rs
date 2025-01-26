@@ -25741,7 +25741,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             // prefix defined for the QName?
                             xml_new_ns_prop(
                                 def_attr_owner_elem,
-                                ns.map_or(null_mut(), |ns| ns.as_ptr()),
+                                ns,
                                 &CStr::from_ptr((*iattr).local_name as *const i8).to_string_lossy(),
                                 value,
                             );

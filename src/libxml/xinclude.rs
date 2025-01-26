@@ -56,7 +56,7 @@ use crate::{
         xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
         xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc,
-        XmlElementType, XmlEntityPtr, XmlEntityType, XmlNode, XML_XML_NAMESPACE,
+        XmlElementType, XmlEntityPtr, XmlEntityType, XmlNode, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::{build_uri, escape_url, XmlURI},
     xpath::{
@@ -2311,7 +2311,12 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeR
             xml_free_node(now.as_ptr());
             child = next;
         }
-        end = xml_new_doc_node((*cur).doc, (*cur).ns, &(*cur).name().unwrap(), null_mut());
+        end = xml_new_doc_node(
+            (*cur).doc,
+            XmlNsPtr::from_raw((*cur).ns).unwrap(),
+            &(*cur).name().unwrap(),
+            null_mut(),
+        );
         if end.is_null() {
             xml_xinclude_err!(
                 ctxt,

@@ -1608,12 +1608,7 @@ unsafe fn xml_sax2_attribute_internal(
     };
 
     // !!!!!! <a toto:arg="" xmlns:toto="http://toto.com">
-    let ret: *mut XmlAttr = xml_new_ns_prop(
-        (*ctxt).node,
-        namespace.map_or(null_mut(), |ns| ns.as_ptr()),
-        name,
-        null(),
-    );
+    let ret: *mut XmlAttr = xml_new_ns_prop((*ctxt).node, namespace, name, null());
     if ret.is_null() {
         // goto error;
         if !nval.is_null() {
@@ -1946,7 +1941,7 @@ pub unsafe fn xml_sax2_start_element(
     // Note : the namespace resolution is deferred until the end of the
     //        attributes parsing, since local namespace can be defined as
     //        an attribute at this level.
-    let ret: *mut XmlNode = xml_new_doc_node((*ctxt).my_doc, null_mut(), name, null_mut());
+    let ret: *mut XmlNode = xml_new_doc_node((*ctxt).my_doc, None, name, null_mut());
     if ret.is_null() {
         xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
         return;
@@ -2165,9 +2160,9 @@ pub unsafe fn xml_sax2_start_element_ns(
         }
     } else {
         if let Some(lname) = lname {
-            ret = xml_new_doc_node((*ctxt).my_doc, null_mut(), &lname, null_mut());
+            ret = xml_new_doc_node((*ctxt).my_doc, None, &lname, null_mut());
         } else {
-            ret = xml_new_doc_node((*ctxt).my_doc, null_mut(), localname, null_mut());
+            ret = xml_new_doc_node((*ctxt).my_doc, None, localname, null_mut());
         }
         if ret.is_null() {
             xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");
@@ -2490,7 +2485,7 @@ unsafe fn xml_sax2_attribute_ns(
     } else {
         ret = xml_new_ns_prop(
             (*ctxt).node,
-            namespace.map_or(null_mut(), |ns| ns.as_ptr()),
+            namespace,
             &CStr::from_ptr(localname as *const i8).to_string_lossy(),
             null_mut(),
         );

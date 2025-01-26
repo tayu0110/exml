@@ -1525,7 +1525,7 @@ impl CatalogEntryListNode {
         ns: *mut XmlNs,
         cgroup: Option<&Arc<RwLock<Self>>>,
     ) {
-        use crate::tree::NodeCommon;
+        use crate::tree::{NodeCommon, XmlNsPtr};
 
         let mut node: *mut XmlNode;
         // add all the catalog entries
@@ -1548,13 +1548,23 @@ impl CatalogEntryListNode {
                         }
                     }
                     XmlCatalogEntryType::XmlCataNextCatalog => {
-                        node = xml_new_doc_node(doc, ns, "nextCatalog", null_mut());
+                        node = xml_new_doc_node(
+                            doc,
+                            XmlNsPtr::from_raw(ns).unwrap(),
+                            "nextCatalog",
+                            null_mut(),
+                        );
                         (*node).set_prop("catalog", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataNone => {}
                     XmlCatalogEntryType::XmlCataGroup => {
-                        node = xml_new_doc_node(doc, ns, "group", null_mut());
+                        node = xml_new_doc_node(
+                            doc,
+                            XmlNsPtr::from_raw(ns).unwrap(),
+                            "group",
+                            null_mut(),
+                        );
                         (*node).set_prop("id", n.name.as_deref());
                         if let Some(value) = n.value.as_deref() {
                             if let Some(xns) =
@@ -1578,49 +1588,89 @@ impl CatalogEntryListNode {
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataPublic => {
-                        node = xml_new_doc_node(doc, ns, "public", null_mut());
+                        node = xml_new_doc_node(
+                            doc,
+                            XmlNsPtr::from_raw(ns).unwrap(),
+                            "public",
+                            null_mut(),
+                        );
                         (*node).set_prop("publicId", n.name.as_deref());
                         (*node).set_prop("uri", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataSystem => {
-                        node = xml_new_doc_node(doc, ns, "system", null_mut());
+                        node = xml_new_doc_node(
+                            doc,
+                            XmlNsPtr::from_raw(ns).unwrap(),
+                            "system",
+                            null_mut(),
+                        );
                         (*node).set_prop("systemId", n.name.as_deref());
                         (*node).set_prop("uri", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataRewriteSystem => {
-                        node = xml_new_doc_node(doc, ns, "rewriteSystem", null_mut());
+                        node = xml_new_doc_node(
+                            doc,
+                            XmlNsPtr::from_raw(ns).unwrap(),
+                            "rewriteSystem",
+                            null_mut(),
+                        );
                         (*node).set_prop("systemIdStartString", n.name.as_deref());
                         (*node).set_prop("rewritePrefix", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataDelegatePublic => {
-                        node = xml_new_doc_node(doc, ns, "delegatePublic", null_mut());
+                        node = xml_new_doc_node(
+                            doc,
+                            XmlNsPtr::from_raw(ns).unwrap(),
+                            "delegatePublic",
+                            null_mut(),
+                        );
                         (*node).set_prop("publicIdStartString", n.name.as_deref());
                         (*node).set_prop("catalog", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataDelegateSystem => {
-                        node = xml_new_doc_node(doc, ns, "delegateSystem", null_mut());
+                        node = xml_new_doc_node(
+                            doc,
+                            XmlNsPtr::from_raw(ns).unwrap(),
+                            "delegateSystem",
+                            null_mut(),
+                        );
                         (*node).set_prop("systemIdStartString", n.name.as_deref());
                         (*node).set_prop("catalog", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataURI => {
-                        node = xml_new_doc_node(doc, ns, "uri", null_mut());
+                        node = xml_new_doc_node(
+                            doc,
+                            XmlNsPtr::from_raw(ns).unwrap(),
+                            "uri",
+                            null_mut(),
+                        );
                         (*node).set_prop("name", n.name.as_deref());
                         (*node).set_prop("uri", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataRewriteURI => {
-                        node = xml_new_doc_node(doc, ns, "rewriteURI", null_mut());
+                        node = xml_new_doc_node(
+                            doc,
+                            XmlNsPtr::from_raw(ns).unwrap(),
+                            "rewriteURI",
+                            null_mut(),
+                        );
                         (*node).set_prop("uriStartString", n.name.as_deref());
                         (*node).set_prop("rewritePrefix", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataDelegateURI => {
-                        node = xml_new_doc_node(doc, ns, "delegateURI", null_mut());
+                        node = xml_new_doc_node(
+                            doc,
+                            XmlNsPtr::from_raw(ns).unwrap(),
+                            "delegateURI",
+                            null_mut(),
+                        );
                         (*node).set_prop("uriStartString", n.name.as_deref());
                         (*node).set_prop("catalog", n.value.as_deref());
                         (*catalog).add_child(node);
@@ -1959,7 +2009,8 @@ impl XmlCatalogEntry {
             xml_free_doc(doc);
             return -1;
         }
-        let catalog: *mut XmlNode = xml_new_doc_node(doc, ns, "catalog", null_mut());
+        let catalog: *mut XmlNode =
+            xml_new_doc_node(doc, XmlNsPtr::from_raw(ns).unwrap(), "catalog", null_mut());
         if catalog.is_null() {
             xml_free_ns(XmlNsPtr::from_raw(ns).unwrap().unwrap());
             xml_free_doc(doc);

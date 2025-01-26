@@ -2284,7 +2284,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         (*new_doc).int_subset = (*doc).int_subset;
         (*new_doc).ext_subset = (*doc).ext_subset;
     }
-    let new_root: *mut XmlNode = xml_new_doc_node(new_doc, null_mut(), "pseudoroot", null());
+    let new_root: *mut XmlNode = xml_new_doc_node(new_doc, None, "pseudoroot", null());
     if new_root.is_null() {
         if replaced {
             (*ctxt).sax = oldsax;
@@ -2439,7 +2439,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
             (*new_doc).url = (*doc).url.clone();
         }
     }
-    let new_root: *mut XmlNode = xml_new_doc_node(new_doc, null_mut(), "pseudoroot", null());
+    let new_root: *mut XmlNode = xml_new_doc_node(new_doc, None, "pseudoroot", null());
     if new_root.is_null() {
         let sax = (*ctxt).sax.take();
         (*new_doc).int_subset = None;

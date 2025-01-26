@@ -69,6 +69,7 @@ use crate::{
     tree::{
         xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node, xml_new_doc_text,
         xml_validate_ncname, NodeCommon, NodePtr, XmlAttr, XmlDoc, XmlElementType, XmlNode, XmlNs,
+        XmlNsPtr,
     },
     uri::{build_uri, escape_url_except, XmlURI},
 };
@@ -1708,8 +1709,12 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                         if let Some(name) = (*cur).get_prop("name") {
                             let cname = CString::new(name.as_str()).unwrap();
                             if let Some(mut children) = (*cur).children() {
-                                let node: *mut XmlNode =
-                                    xml_new_doc_node((*cur).doc, (*cur).ns, "name", null_mut());
+                                let node: *mut XmlNode = xml_new_doc_node(
+                                    (*cur).doc,
+                                    XmlNsPtr::from_raw((*cur).ns).unwrap(),
+                                    "name",
+                                    null_mut(),
+                                );
                                 if !node.is_null() {
                                     children.add_prev_sibling(node);
                                     text =
@@ -1720,7 +1725,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                             } else {
                                 text = xml_new_child(
                                     cur,
-                                    (*cur).ns,
+                                    XmlNsPtr::from_raw((*cur).ns).unwrap(),
                                     "name",
                                     cname.as_ptr() as *const u8,
                                 );

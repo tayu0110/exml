@@ -1948,8 +1948,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             .map_or(null_mut(), |c| c.as_ptr());
         last = (*(*ctxt).my_doc).last.map_or(null_mut(), |l| l.as_ptr());
     }
-    let new_root: *mut XmlNode =
-        xml_new_doc_node((*ctxt).my_doc, null_mut(), "pseudoroot", null_mut());
+    let new_root: *mut XmlNode = xml_new_doc_node((*ctxt).my_doc, None, "pseudoroot", null_mut());
     if new_root.is_null() {
         (*oldctxt).sax = (*ctxt).sax.take();
         (*ctxt).sax = oldsax;

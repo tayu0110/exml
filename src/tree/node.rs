@@ -1206,7 +1206,7 @@ impl XmlNode {
         let value = value.map(|v| CString::new(v).unwrap());
         xml_new_prop_internal(
             self,
-            ns.map_or(null_mut(), |ns| ns.as_ptr()),
+            ns,
             name,
             value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8),
         )
@@ -2108,23 +2108,24 @@ impl XmlNode {
         }
         while !node.is_null() {
             // Reconciliate the node namespace
-            if !(*node).ns.is_null() {
+            if let Some(mut node_ns) = XmlNsPtr::from_raw((*node).ns).unwrap() {
                 // initialize the cache if needed
                 let mut f = false;
                 for (i, &old_ns) in old_ns.iter().enumerate() {
                     if old_ns == (*node).ns {
                         (*node).ns = new_ns[i];
+                        node_ns = XmlNsPtr::from_raw(new_ns[i]).unwrap().unwrap();
                         f = true;
                         break;
                     }
                 }
                 if !f {
                     // OK we need to recreate a new namespace definition
-                    if let Some(n) = xml_new_reconciled_ns(doc, self, (*node).ns) {
+                    if let Some(n) = xml_new_reconciled_ns(doc, self, node_ns) {
                         // :-( what if else ???
                         // check if we need to grow the cache buffers.
                         new_ns.push(n.as_ptr());
-                        old_ns.push((*node).ns);
+                        old_ns.push(node_ns.as_ptr());
                         (*node).ns = n.as_ptr();
                     }
                 }
@@ -2133,23 +2134,24 @@ impl XmlNode {
             if matches!((*node).typ, XmlElementType::XmlElementNode) {
                 attr = (*node).properties;
                 while !attr.is_null() {
-                    if !(*attr).ns.is_null() {
+                    if let Some(mut attr_ns) = XmlNsPtr::from_raw((*attr).ns).unwrap() {
                         // initialize the cache if needed
                         let mut f = false;
                         for (i, &old_ns) in old_ns.iter().enumerate() {
                             if old_ns == (*attr).ns {
                                 (*attr).ns = new_ns[i];
+                                attr_ns = XmlNsPtr::from_raw(new_ns[i]).unwrap().unwrap();
                                 f = true;
                                 break;
                             }
                         }
                         if !f {
                             // OK we need to recreate a new namespace definition
-                            if let Some(n) = xml_new_reconciled_ns(doc, self, (*attr).ns) {
+                            if let Some(n) = xml_new_reconciled_ns(doc, self, attr_ns) {
                                 // :-( what if else ???
                                 // check if we need to grow the cache buffers.
                                 new_ns.push(n.as_ptr());
-                                old_ns.push((*attr).ns);
+                                old_ns.push(attr_ns.as_ptr());
                                 (*attr).ns = n.as_ptr();
                             }
                         }
