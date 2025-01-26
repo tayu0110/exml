@@ -78,9 +78,9 @@ pub type XmlNsMapItemPtr = *mut XmlNsMapItem;
 pub struct XmlNsMapItem {
     next: XmlNsMapItemPtr,
     prev: XmlNsMapItemPtr,
-    old_ns: *mut XmlNs, /* old ns decl reference */
-    new_ns: *mut XmlNs, /* new ns decl reference */
-    shadow_depth: i32,  /* Shadowed at this depth */
+    old_ns: Option<XmlNsPtr>, /* old ns decl reference */
+    new_ns: *mut XmlNs,       /* new ns decl reference */
+    shadow_depth: i32,        /* Shadowed at this depth */
     /// depth:
     /// `>= 0` == @node's ns-decls
     /// `-1`   == @parent's ns-decls
@@ -95,7 +95,7 @@ impl Default for XmlNsMapItem {
         Self {
             next: null_mut(),
             prev: null_mut(),
-            old_ns: null_mut(),
+            old_ns: None,
             new_ns: null_mut(),
             shadow_depth: 0,
             depth: 0,
@@ -224,7 +224,7 @@ const XML_TREE_NSMAP_CUSTOM: i32 = -4;
 unsafe fn xml_dom_wrap_ns_map_add_item(
     nsmap: *mut XmlNsMapPtr,
     position: i32,
-    old_ns: *mut XmlNs,
+    old_ns: Option<XmlNsPtr>,
     new_ns: *mut XmlNs,
     depth: i32,
 ) -> XmlNsMapItemPtr {
@@ -297,7 +297,6 @@ unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
     node: *mut XmlNode,
 ) -> i32 {
     let mut cur: *mut XmlNode;
-    let mut ns: *mut XmlNs;
     let mut mi: XmlNsMapItemPtr;
     let mut shadowed: i32;
 
@@ -313,31 +312,28 @@ unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
         if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
             && !(*cur).ns_def.is_null()
         {
-            ns = (*cur).ns_def;
-            loop {
+            let mut ns = XmlNsPtr::from_raw((*cur).ns_def).unwrap();
+            while let Some(now) = ns {
                 shadowed = 0;
                 if XML_NSMAP_NOTEMPTY!(*map) {
                     // Skip shadowed prefixes.
                     XML_NSMAP_FOREACH!(*map, mi, {
-                        if (*ns).prefix() == (*(*mi).new_ns).prefix() {
+                        if now.prefix() == (*(*mi).new_ns).prefix() {
                             shadowed = 1;
                             break;
                         }
                     });
                 }
                 // Insert mapping.
-                mi = xml_dom_wrap_ns_map_add_item(map, 0, null_mut(), ns, XML_TREE_NSMAP_PARENT);
+                mi =
+                    xml_dom_wrap_ns_map_add_item(map, 0, None, now.as_ptr(), XML_TREE_NSMAP_PARENT);
                 if mi.is_null() {
                     return -1;
                 }
                 if shadowed != 0 {
                     (*mi).shadow_depth = 0;
                 }
-                ns = (*ns).next;
-
-                if ns.is_null() {
-                    break;
-                }
+                ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
         }
         cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -350,30 +346,14 @@ unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
 /// Returns 0 on success, -1 on internal errors.
 #[doc(alias = "xmlDOMWrapNSNormAddNsMapItem2")]
 unsafe fn xml_dom_wrap_ns_norm_add_ns_map_item2(
-    list: *mut *mut *mut XmlNs,
-    size: *mut i32,
+    list: &mut Vec<*mut XmlNs>,
+    // size: *mut i32,
     number: *mut i32,
     old_ns: *mut XmlNs,
     new_ns: *mut XmlNs,
 ) -> i32 {
-    if !(*list).is_null() {
-        *list = xml_malloc(6 * size_of::<*mut XmlNs>()) as _;
-        if !(*list).is_null() {
-            xml_tree_err_memory("alloc ns map item");
-            return -1;
-        }
-        *size = 3;
-        *number = 0;
-    } else if *number >= *size {
-        *size *= 2;
-        *list = xml_realloc(*list as _, (*size) as usize * 2 * size_of::<*mut XmlNs>()) as _;
-        if !(*list).is_null() {
-            xml_tree_err_memory("realloc ns map item");
-            return -1;
-        }
-    }
-    *(*list).add(2 * (*number) as usize) = old_ns;
-    *(*list).add(2 * (*number) as usize + 1) = new_ns;
+    list.push(old_ns);
+    list.push(new_ns);
     (*number) += 1;
     0
 }
@@ -524,7 +504,7 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
     doc: *mut XmlDoc,
     elem: *mut XmlNode,
     ns: *mut XmlNs,
-    ret_ns: *mut *mut XmlNs,
+    ret_ns: &mut *mut XmlNs,
     ns_map: *mut XmlNsMapPtr,
     depth: i32,
     ancestors_only: i32,
@@ -569,7 +549,7 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
                 xml_str_equal((*(*mi).new_ns).href, (*ns).href) )
             {
                 // Set the mapping.
-                (*mi).old_ns = ns;
+                (*mi).old_ns = XmlNsPtr::from_raw(ns).unwrap();
                 *ret_ns = (*mi).new_ns;
                 return 0;
             }
@@ -583,7 +563,15 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
             return -1;
         }
         // Insert mapping.
-        if xml_dom_wrap_ns_map_add_item(ns_map, -1, ns, tmpns, XML_TREE_NSMAP_DOC).is_null() {
+        if xml_dom_wrap_ns_map_add_item(
+            ns_map,
+            -1,
+            XmlNsPtr::from_raw(ns).unwrap(),
+            tmpns,
+            XML_TREE_NSMAP_DOC,
+        )
+        .is_null()
+        {
             xml_free_ns(XmlNsPtr::from_raw(tmpns).unwrap().unwrap());
             return -1;
         }
@@ -608,7 +596,9 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
                 }
             });
         }
-        if xml_dom_wrap_ns_map_add_item(ns_map, -1, ns, tmpns, depth).is_null() {
+        if xml_dom_wrap_ns_map_add_item(ns_map, -1, XmlNsPtr::from_raw(ns).unwrap(), tmpns, depth)
+            .is_null()
+        {
             xml_free_ns(XmlNsPtr::from_raw(tmpns).unwrap().unwrap());
             return -1;
         }
@@ -635,8 +625,6 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
     let mut depth: i32 = -1;
     let mut adoptns: i32;
     let mut parnsdone: i32 = 0;
-    let mut ns: *mut XmlNs = null_mut();
-    let mut prevns: *mut XmlNs;
     let mut cur: *mut XmlNode;
     let mut cur_elem: *mut XmlNode = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
@@ -649,8 +637,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
         } else {
             0
         };
-    let mut list_redund: *mut *mut XmlNs = null_mut();
-    let mut size_redund: i32 = 0;
+    let mut list_redund = vec![];
     let mut nb_redund: i32 = 0;
 
     if elem.is_null()
@@ -673,9 +660,9 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         depth += 1;
                         // Namespace declarations.
                         if !(*cur).ns_def.is_null() {
-                            prevns = null_mut();
-                            ns = (*cur).ns_def;
-                            'b: while !ns.is_null() {
+                            let mut prevns = None::<XmlNsPtr>;
+                            let mut ns = XmlNsPtr::from_raw((*cur).ns_def).unwrap();
+                            'b: while let Some(cur_ns) = ns {
                                 if parnsdone == 0 {
                                     if let Some(parent) = (*elem)
                                         .parent()
@@ -698,29 +685,29 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                                     XML_NSMAP_FOREACH!(ns_map, mi, {
                                         if (*mi).depth >= XML_TREE_NSMAP_PARENT
                                             && (*mi).shadow_depth == -1
-                                            && (*ns).prefix() == (*(*mi).new_ns).prefix()
-                                            && (*ns).href() == (*(*mi).new_ns).href()
+                                            && cur_ns.prefix() == (*(*mi).new_ns).prefix()
+                                            && cur_ns.href() == (*(*mi).new_ns).href()
                                         {
                                             // A redundant ns-decl was found.
                                             // Add it to the list of redundant ns-decls.
                                             if xml_dom_wrap_ns_norm_add_ns_map_item2(
-                                                &raw mut list_redund,
-                                                &raw mut size_redund,
+                                                &mut list_redund,
+                                                // &raw mut size_redund,
                                                 &raw mut nb_redund,
-                                                ns,
+                                                cur_ns.as_ptr(),
                                                 (*mi).new_ns,
                                             ) == -1
                                             {
                                                 break 'internal_error;
                                             }
                                             // Remove the ns-decl from the element-node.
-                                            if !prevns.is_null() {
-                                                (*prevns).next = (*ns).next;
+                                            if let Some(mut prevns) = prevns {
+                                                prevns.next = cur_ns.next;
                                             } else {
-                                                (*cur).ns_def = (*ns).next;
+                                                (*cur).ns_def = cur_ns.next;
                                             }
                                             // goto next_ns_decl;
-                                            ns = (*ns).next;
+                                            ns = XmlNsPtr::from_raw(cur_ns.next).unwrap();
                                             continue 'b;
                                         }
                                     });
@@ -728,7 +715,10 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
 
                                 // Skip ns-references handling if the referenced
                                 // ns-decl is declared on the same element.
-                                if !(*cur).ns.is_null() && adoptns != 0 && (*cur).ns == ns {
+                                if !(*cur).ns.is_null()
+                                    && adoptns != 0
+                                    && XmlNsPtr::from_raw((*cur).ns).unwrap() == Some(cur_ns)
+                                {
                                     adoptns = 0;
                                 }
                                 // Does it shadow any ns-decl?
@@ -736,22 +726,28 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                                     XML_NSMAP_FOREACH!(ns_map, mi, {
                                         if (*mi).depth >= XML_TREE_NSMAP_PARENT
                                             && (*mi).shadow_depth == -1
-                                            && (*ns).prefix() == (*(*mi).new_ns).prefix()
+                                            && cur_ns.prefix() == (*(*mi).new_ns).prefix()
                                         {
                                             (*mi).shadow_depth = depth;
                                         }
                                     });
                                 }
                                 // Push mapping.
-                                if xml_dom_wrap_ns_map_add_item(&raw mut ns_map, -1, ns, ns, depth)
-                                    .is_null()
+                                if xml_dom_wrap_ns_map_add_item(
+                                    &raw mut ns_map,
+                                    -1,
+                                    Some(cur_ns),
+                                    cur_ns.as_ptr(),
+                                    depth,
+                                )
+                                .is_null()
                                 {
                                     break 'internal_error;
                                 }
 
-                                prevns = ns;
+                                prevns = Some(cur_ns);
                                 // next_ns_decl:
-                                ns = (*ns).next;
+                                ns = XmlNsPtr::from_raw(cur_ns.next).unwrap();
                             }
                         }
                         if adoptns == 0 {
@@ -800,19 +796,19 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                             parnsdone = 1;
                         }
                         // Adjust the reference if this was a redundant ns-decl.
-                        if !list_redund.is_null() {
-                            for (_, j) in (0..nb_redund).zip((0..).step_by(2)) {
-                                if (*cur).ns == *list_redund.add(j) {
-                                    (*cur).ns = *list_redund.add(j + 1);
-                                    break;
-                                }
+                        for (_, j) in (0..nb_redund).zip((0..).step_by(2)) {
+                            if (*cur).ns == list_redund[j] {
+                                (*cur).ns = list_redund[j + 1];
+                                break;
                             }
                         }
                         // Adopt ns-references.
                         if XML_NSMAP_NOTEMPTY!(ns_map) {
                             // Search for a mapping.
                             XML_NSMAP_FOREACH!(ns_map, mi, {
-                                if (*mi).shadow_depth == -1 && ((*cur).ns == (*mi).old_ns) {
+                                if (*mi).shadow_depth == -1
+                                    && XmlNsPtr::from_raw((*cur).ns).unwrap() == (*mi).old_ns
+                                {
                                     (*cur).ns = (*mi).new_ns;
                                     // goto ns_end;
                                     if matches!(
@@ -831,11 +827,12 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                             });
                         }
                         // Acquire a normalized ns-decl and add it to the map.
+                        let mut ns = null_mut();
                         if xml_dom_wrap_ns_norm_acquire_normalized_ns(
                             doc,
                             cur_elem,
                             (*cur).ns,
-                            &raw mut ns,
+                            &mut ns,
                             &raw mut ns_map,
                             depth,
                             ancestors_only,
@@ -877,19 +874,19 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                             parnsdone = 1;
                         }
                         // Adjust the reference if this was a redundant ns-decl.
-                        if !list_redund.is_null() {
-                            for (_, j) in (0..nb_redund).zip((0..).step_by(2)) {
-                                if (*cur).ns == *list_redund.add(j) {
-                                    (*cur).ns = *list_redund.add(j + 1);
-                                    break;
-                                }
+                        for (_, j) in (0..nb_redund).zip((0..).step_by(2)) {
+                            if (*cur).ns == list_redund[j] {
+                                (*cur).ns = list_redund[j + 1];
+                                break;
                             }
                         }
                         // Adopt ns-references.
                         if XML_NSMAP_NOTEMPTY!(ns_map) {
                             // Search for a mapping.
                             XML_NSMAP_FOREACH!(ns_map, mi, {
-                                if (*mi).shadow_depth == -1 && ((*cur).ns == (*mi).old_ns) {
+                                if (*mi).shadow_depth == -1
+                                    && XmlNsPtr::from_raw((*cur).ns).unwrap() == (*mi).old_ns
+                                {
                                     (*cur).ns = (*mi).new_ns;
                                     // goto ns_end;
                                     if matches!(
@@ -908,11 +905,12 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                             });
                         }
                         // Acquire a normalized ns-decl and add it to the map.
+                        let mut ns = null_mut();
                         if xml_dom_wrap_ns_norm_acquire_normalized_ns(
                             doc,
                             cur_elem,
                             (*cur).ns,
-                            &raw mut ns,
+                            &mut ns,
                             &raw mut ns_map,
                             depth,
                             ancestors_only,
@@ -1039,15 +1037,8 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
         ret = -1;
     }
     // exit:
-    if !list_redund.is_null() {
-        for (_, j) in (0..nb_redund).zip((0..).step_by(2)) {
-            xml_free_ns(
-                XmlNsPtr::from_raw(*list_redund.add(j as usize))
-                    .unwrap()
-                    .unwrap(),
-            );
-        }
-        xml_free(list_redund as _);
+    for (_, j) in (0..nb_redund).zip((0..).step_by(2)) {
+        xml_free_ns(XmlNsPtr::from_raw(list_redund[j]).unwrap().unwrap());
     }
     if !ns_map.is_null() {
         xml_dom_wrap_ns_map_free(ns_map);
@@ -1081,7 +1072,6 @@ unsafe fn xml_dom_wrap_adopt_branch(
     let mut cur_elem: *mut XmlNode = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
-    let mut ns: *mut XmlNs = null_mut();
     let mut depth: i32 = -1;
     // gather @parent's ns-decls.
     let mut parnsdone: i32;
@@ -1169,14 +1159,14 @@ unsafe fn xml_dom_wrap_adopt_branch(
 
                                     parnsdone = 1;
                                 }
-                                ns = (*cur).ns_def;
-                                while !ns.is_null() {
+                                let mut ns = XmlNsPtr::from_raw((*cur).ns_def).unwrap();
+                                while let Some(now) = ns {
                                     // Does it shadow any ns-decl?
                                     if XML_NSMAP_NOTEMPTY!(ns_map) {
                                         XML_NSMAP_FOREACH!(ns_map, mi, {
                                             if (*mi).depth >= XML_TREE_NSMAP_PARENT
                                                 && (*mi).shadow_depth == -1
-                                                && (*ns).prefix() == (*(*mi).new_ns).prefix()
+                                                && now.prefix() == (*(*mi).new_ns).prefix()
                                             {
                                                 (*mi).shadow_depth = depth;
                                             }
@@ -1186,15 +1176,15 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                     if xml_dom_wrap_ns_map_add_item(
                                         &raw mut ns_map,
                                         -1,
-                                        ns,
-                                        ns,
+                                        Some(now),
+                                        now.as_ptr(),
                                         depth,
                                     )
                                     .is_null()
                                     {
                                         break 'internal_error;
                                     }
-                                    ns = (*ns).next;
+                                    ns = XmlNsPtr::from_raw(now.next).unwrap();
                                 }
                             }
                             /* No namespace, no fun. */
@@ -1216,7 +1206,10 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                 if XML_NSMAP_NOTEMPTY!(ns_map) {
                                     // Search for a mapping.
                                     XML_NSMAP_FOREACH!(ns_map, mi, {
-                                        if (*mi).shadow_depth == -1 && ((*cur).ns == (*mi).old_ns) {
+                                        if (*mi).shadow_depth == -1
+                                            && XmlNsPtr::from_raw((*cur).ns).unwrap()
+                                                == (*mi).old_ns
+                                        {
                                             (*cur).ns = (*mi).new_ns;
                                             // goto ns_end;
                                             ns_end = true;
@@ -1229,7 +1222,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                     // No matching namespace in scope. We need a new one.
                                     if !ctxt.is_null() && (*ctxt).get_ns_for_node_func.is_some() {
                                         // User-defined behaviour.
-                                        ns = ((*ctxt).get_ns_for_node_func.unwrap())(
+                                        let ns = ((*ctxt).get_ns_for_node_func.unwrap())(
                                             ctxt,
                                             cur,
                                             (*(*cur).ns).href,
@@ -1240,7 +1233,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                         if xml_dom_wrap_ns_map_add_item(
                                             &raw mut ns_map,
                                             -1,
-                                            (*cur).ns,
+                                            XmlNsPtr::from_raw((*cur).ns).unwrap(),
                                             ns,
                                             XML_TREE_NSMAP_CUSTOM,
                                         )
@@ -1251,6 +1244,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                         (*cur).ns = ns;
                                     } else {
                                         // Acquire a normalized ns-decl and add it to the map.
+                                        let mut ns = null_mut();
                                         if xml_dom_wrap_ns_norm_acquire_normalized_ns(
                                             dest_doc,
                                             // ns-decls on curElem or on (*destDoc).oldNs
@@ -1260,7 +1254,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                                 null_mut()
                                             },
                                             (*cur).ns,
-                                            &raw mut ns,
+                                            &mut ns,
                                             &raw mut ns_map,
                                             depth,
                                             ancestors_only,
@@ -1310,7 +1304,10 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                 if XML_NSMAP_NOTEMPTY!(ns_map) {
                                     // Search for a mapping.
                                     XML_NSMAP_FOREACH!(ns_map, mi, {
-                                        if (*mi).shadow_depth == -1 && ((*cur).ns == (*mi).old_ns) {
+                                        if (*mi).shadow_depth == -1
+                                            && XmlNsPtr::from_raw((*cur).ns).unwrap()
+                                                == (*mi).old_ns
+                                        {
                                             (*cur).ns = (*mi).new_ns;
                                             // goto ns_end;
                                             ns_end = true;
@@ -1323,7 +1320,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                     // No matching namespace in scope. We need a new one.
                                     if !ctxt.is_null() && (*ctxt).get_ns_for_node_func.is_some() {
                                         // User-defined behaviour.
-                                        ns = ((*ctxt).get_ns_for_node_func.unwrap())(
+                                        let ns = ((*ctxt).get_ns_for_node_func.unwrap())(
                                             ctxt,
                                             cur,
                                             (*(*cur).ns).href,
@@ -1334,7 +1331,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                         if xml_dom_wrap_ns_map_add_item(
                                             &raw mut ns_map,
                                             -1,
-                                            (*cur).ns,
+                                            XmlNsPtr::from_raw((*cur).ns).unwrap(),
                                             ns,
                                             XML_TREE_NSMAP_CUSTOM,
                                         )
@@ -1345,6 +1342,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                         (*cur).ns = ns;
                                     } else {
                                         // Acquire a normalized ns-decl and add it to the map.
+                                        let mut ns = null_mut();
                                         if xml_dom_wrap_ns_norm_acquire_normalized_ns(
                                             dest_doc,
                                             // ns-decls on curElem or on (*destDoc).oldNs
@@ -1354,7 +1352,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                                 null_mut()
                                             },
                                             (*cur).ns,
-                                            &raw mut ns,
+                                            &mut ns,
                                             &raw mut ns_map,
                                             depth,
                                             ancestors_only,
@@ -1748,10 +1746,8 @@ pub unsafe fn xml_dom_wrap_remove_node(
     mut node: *mut XmlNode,
     _options: i32,
 ) -> i32 {
-    let mut list: *mut *mut XmlNs = null_mut();
-    let mut size_list: i32 = 0;
+    let mut list = vec![];
     let mut nb_list: i32 = 0;
-    let mut ns: *mut XmlNs;
 
     if node.is_null() || doc.is_null() || (*node).doc != doc {
         return -1;
@@ -1782,63 +1778,57 @@ pub unsafe fn xml_dom_wrap_remove_node(
         match (*node).element_type() {
             XmlElementType::XmlElementNode => {
                 if ctxt.is_null() && !(*node).ns_def.is_null() {
-                    ns = (*node).ns_def;
-                    while {
+                    let mut ns = XmlNsPtr::from_raw((*node).ns_def).unwrap();
+                    while let Some(now) = ns {
                         if xml_dom_wrap_ns_norm_add_ns_map_item2(
-                            &raw mut list,
-                            &raw mut size_list,
+                            &mut list,
+                            // &raw mut size_list,
                             &raw mut nb_list,
-                            ns,
-                            ns,
+                            now.as_ptr(),
+                            now.as_ptr(),
                         ) == -1
                         {
                             // goto internal_error;
-                            if !list.is_null() {
-                                xml_free(list as _);
-                            }
                             return -1;
                         }
-                        ns = (*ns).next;
-                        !ns.is_null()
-                    } {}
+                        ns = XmlNsPtr::from_raw(now.next).unwrap();
+                    }
                 }
 
                 if !(*node).ns.is_null() {
                     // Find a mapping.
-                    if !list.is_null() {
-                        for (_, j) in (0..nb_list).zip((0..).step_by(2)) {
-                            if (*node).ns == *list.add(j) {
-                                (*node).ns = *list.add(j + 1);
-                                // goto next_node;
-                                if let Some(children) = (*node).children().filter(|_| {
-                                    matches!((*node).element_type(), XmlElementType::XmlElementNode)
-                                }) {
-                                    node = children.as_ptr();
-                                    continue 'main;
+                    for (_, j) in (0..nb_list).zip((0..).step_by(2)) {
+                        if (*node).ns == list[j] {
+                            (*node).ns = list[j + 1];
+                            // goto next_node;
+                            if let Some(children) = (*node).children().filter(|_| {
+                                matches!((*node).element_type(), XmlElementType::XmlElementNode)
+                            }) {
+                                node = children.as_ptr();
+                                continue 'main;
+                            }
+                            // next_sibling:
+                            'next_sibling: loop {
+                                if node.is_null() {
+                                    break;
                                 }
-                                // next_sibling:
-                                'next_sibling: loop {
-                                    if node.is_null() {
-                                        break;
-                                    }
-                                    if let Some(next) = (*node).next {
-                                        node = next.as_ptr();
-                                    } else {
-                                        node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
-                                        // goto next_sibling;
-                                        continue 'next_sibling;
-                                    }
-
-                                    if node.is_null() {
-                                        break 'main;
-                                    }
-
-                                    continue 'main;
+                                if let Some(next) = (*node).next {
+                                    node = next.as_ptr();
+                                } else {
+                                    node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                                    // goto next_sibling;
+                                    continue 'next_sibling;
                                 }
+
+                                if node.is_null() {
+                                    break 'main;
+                                }
+
+                                continue 'main;
                             }
                         }
                     }
-                    ns = null_mut();
+                    let mut ns = null_mut();
                     if !ctxt.is_null() {
                         // User defined.
                     } else {
@@ -1850,26 +1840,20 @@ pub unsafe fn xml_dom_wrap_remove_node(
                         );
                         if ns.is_null() {
                             // goto internal_error;
-                            if !list.is_null() {
-                                xml_free(list as _);
-                            }
                             return -1;
                         }
                     }
                     if !ns.is_null() {
                         // Add mapping.
                         if xml_dom_wrap_ns_norm_add_ns_map_item2(
-                            &raw mut list,
-                            &raw mut size_list,
+                            &mut list,
+                            // &raw mut size_list,
                             &raw mut nb_list,
                             (*node).ns,
                             ns,
                         ) == -1
                         {
                             // goto internal_error;
-                            if !list.is_null() {
-                                xml_free(list as _);
-                            }
                             return -1;
                         }
                     }
@@ -1885,40 +1869,38 @@ pub unsafe fn xml_dom_wrap_remove_node(
             XmlElementType::XmlAttributeNode => {
                 if !(*node).ns.is_null() {
                     // Find a mapping.
-                    if !list.is_null() {
-                        for (_, j) in (0..nb_list).zip((0..).step_by(2)) {
-                            if (*node).ns == *list.add(j) {
-                                (*node).ns = *list.add(j + 1);
-                                // goto next_node;
-                                if let Some(children) = (*node).children().filter(|_| {
-                                    matches!((*node).element_type(), XmlElementType::XmlElementNode)
-                                }) {
-                                    node = children.as_ptr();
-                                    continue 'main;
+                    for (_, j) in (0..nb_list).zip((0..).step_by(2)) {
+                        if (*node).ns == list[j] {
+                            (*node).ns = list[j + 1];
+                            // goto next_node;
+                            if let Some(children) = (*node).children().filter(|_| {
+                                matches!((*node).element_type(), XmlElementType::XmlElementNode)
+                            }) {
+                                node = children.as_ptr();
+                                continue 'main;
+                            }
+                            // next_sibling:
+                            'next_sibling: loop {
+                                if node.is_null() {
+                                    break;
                                 }
-                                // next_sibling:
-                                'next_sibling: loop {
-                                    if node.is_null() {
-                                        break;
-                                    }
-                                    if let Some(next) = (*node).next {
-                                        node = next.as_ptr();
-                                    } else {
-                                        node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
-                                        // goto next_sibling;
-                                        continue 'next_sibling;
-                                    }
-
-                                    if node.is_null() {
-                                        break 'main;
-                                    }
-
-                                    continue 'main;
+                                if let Some(next) = (*node).next {
+                                    node = next.as_ptr();
+                                } else {
+                                    node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                                    // goto next_sibling;
+                                    continue 'next_sibling;
                                 }
+
+                                if node.is_null() {
+                                    break 'main;
+                                }
+
+                                continue 'main;
                             }
                         }
                     }
-                    ns = null_mut();
+                    let mut ns = null_mut();
                     if !ctxt.is_null() {
                         // User defined.
                     } else {
@@ -1930,26 +1912,20 @@ pub unsafe fn xml_dom_wrap_remove_node(
                         );
                         if ns.is_null() {
                             // goto internal_error;
-                            if !list.is_null() {
-                                xml_free(list as _);
-                            }
                             return -1;
                         }
                     }
                     if !ns.is_null() {
                         // Add mapping.
                         if xml_dom_wrap_ns_norm_add_ns_map_item2(
-                            &raw mut list,
-                            &raw mut size_list,
+                            &mut list,
+                            // &raw mut size_list,
                             &raw mut nb_list,
                             (*node).ns,
                             ns,
                         ) == -1
                         {
                             // goto internal_error;
-                            if !list.is_null() {
-                                xml_free(list as _);
-                            }
                             return -1;
                         }
                     }
@@ -2010,9 +1986,6 @@ pub unsafe fn xml_dom_wrap_remove_node(
         }
     }
 
-    if !list.is_null() {
-        xml_free(list as _);
-    }
     0
 
     // internal_error:
@@ -2056,22 +2029,17 @@ pub unsafe fn xml_dom_wrap_clone_node(
     let mut cur_elem: *mut XmlNode = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
-    let mut ns: *mut XmlNs = null_mut();
     let mut depth: i32 = -1;
     // let adoptStr: i32 = 1;
     // gather @parent's ns-decls.
     let mut parnsdone: i32 = 0;
     // @ancestorsOnly:
     // TODO: @ancestorsOnly should be set per option.
-    //
     let ancestors_only: i32 = 0;
     let mut result_clone: *mut XmlNode = null_mut();
     let mut clone: *mut XmlNode;
     let mut parent_clone: *mut XmlNode = null_mut();
     let mut prev_clone: *mut XmlNode = null_mut();
-    let mut clone_ns: *mut XmlNs;
-    let mut clone_ns_def_slot: *mut *mut XmlNs;
-    // The destination dict
 
     if node.is_null() || res_node.is_null() || dest_doc.is_null() {
         return -1;
@@ -2218,11 +2186,11 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 parnsdone = 1;
                             }
                             // Clone namespace declarations.
-                            clone_ns_def_slot = &raw mut (*clone).ns_def;
-                            ns = (*cur).ns_def;
-                            while !ns.is_null() {
+                            let mut clone_ns_def_slot = None::<XmlNsPtr>;
+                            let mut ns = XmlNsPtr::from_raw((*cur).ns_def).unwrap();
+                            while let Some(now) = ns {
                                 // Create a new xmlNs.
-                                let Some(new) = XmlNsPtr::new(XmlNs {
+                                let Some(mut new) = XmlNsPtr::new(XmlNs {
                                     typ: XML_LOCAL_NAMESPACE,
                                     ..Default::default()
                                 }) else {
@@ -2231,18 +2199,21 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                     );
                                     return -1;
                                 };
-                                clone_ns = new.as_ptr();
 
-                                if !(*ns).href.is_null() {
-                                    (*clone_ns).href = xml_strdup((*ns).href);
+                                if !now.href.is_null() {
+                                    new.href = xml_strdup(now.href);
                                 }
-                                if (*ns).prefix().is_some() {
-                                    (*clone_ns).prefix = xml_strdup((*ns).prefix);
+                                if now.prefix().is_some() {
+                                    new.prefix = xml_strdup(now.prefix);
                                 }
 
-                                *clone_ns_def_slot = clone_ns;
-                                let mut p = (*clone_ns).next;
-                                clone_ns_def_slot = &raw mut p;
+                                if let Some(mut last) = clone_ns_def_slot {
+                                    last.next = new.as_ptr();
+                                    clone_ns_def_slot = Some(new);
+                                } else {
+                                    clone_ns_def_slot = Some(new);
+                                    (*clone).ns_def = new.as_ptr();
+                                }
 
                                 // Note that for custom handling of ns-references,
                                 // the ns-decls need not be stored in the ns-map,
@@ -2253,7 +2224,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                         XML_NSMAP_FOREACH!(ns_map, mi, {
                                             if ((*mi).depth >= XML_TREE_NSMAP_PARENT)
                                                 && (*mi).shadow_depth == -1
-                                                && (*ns).prefix() == (*(*mi).new_ns).prefix()
+                                                && now.prefix() == (*(*mi).new_ns).prefix()
                                             {
                                                 // Mark as shadowed at the current depth.
                                                 (*mi).shadow_depth = depth;
@@ -2264,8 +2235,8 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                     if xml_dom_wrap_ns_map_add_item(
                                         &raw mut ns_map,
                                         -1,
-                                        ns,
-                                        clone_ns,
+                                        Some(now),
+                                        new.as_ptr(),
                                         depth,
                                     )
                                     .is_null()
@@ -2273,7 +2244,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                         break 'internal_error;
                                     }
                                 }
-                                ns = (*ns).next;
+                                ns = XmlNsPtr::from_raw(now.next).unwrap();
                             }
                         }
                         // (*cur).ns will be processed further down.
@@ -2356,7 +2327,9 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         if XML_NSMAP_NOTEMPTY!(ns_map) {
                             // Search for a mapping.
                             XML_NSMAP_FOREACH!(ns_map, mi, {
-                                if (*mi).shadow_depth == -1 && ((*cur).ns == (*mi).old_ns) {
+                                if (*mi).shadow_depth == -1
+                                    && XmlNsPtr::from_raw((*cur).ns).unwrap() == (*mi).old_ns
+                                {
                                     // This is the nice case: a mapping was found.
                                     (*clone).ns = (*mi).new_ns;
                                     // goto end_ns_reference;
@@ -2370,7 +2343,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                             // No matching namespace in scope. We need a new one.
                             if !ctxt.is_null() && (*ctxt).get_ns_for_node_func.is_some() {
                                 // User-defined behaviour.
-                                ns = ((*ctxt).get_ns_for_node_func.unwrap())(
+                                let ns = ((*ctxt).get_ns_for_node_func.unwrap())(
                                     ctxt,
                                     cur,
                                     (*(*cur).ns).href,
@@ -2380,7 +2353,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 if xml_dom_wrap_ns_map_add_item(
                                     &raw mut ns_map,
                                     -1,
-                                    (*cur).ns,
+                                    XmlNsPtr::from_raw((*cur).ns).unwrap(),
                                     ns,
                                     XML_TREE_NSMAP_CUSTOM,
                                 )
@@ -2391,6 +2364,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 (*clone).ns = ns;
                             } else {
                                 // Acquire a normalized ns-decl and add it to the map.
+                                let mut ns = null_mut();
                                 if xml_dom_wrap_ns_norm_acquire_normalized_ns(
                                     dest_doc,
                                     // ns-decls on curElem or on (*destDoc).oldNs
@@ -2400,7 +2374,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                         null_mut()
                                     },
                                     (*cur).ns,
-                                    &raw mut ns,
+                                    &mut ns,
                                     &raw mut ns_map,
                                     depth,
                                     // if we need to search only in the ancestor-axis
