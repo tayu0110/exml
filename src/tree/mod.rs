@@ -987,7 +987,7 @@ pub unsafe fn xml_free_doc(cur: *mut XmlDoc) {
         xml_free_node_list(children.as_ptr());
     }
     if !(*cur).old_ns.is_null() {
-        xml_free_ns_list((*cur).old_ns);
+        xml_free_ns_list(XmlNsPtr::from_raw((*cur).old_ns).unwrap().unwrap());
     }
 
     (*cur).version = None;
@@ -2562,7 +2562,7 @@ pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
         return;
     }
     if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-        xml_free_ns_list(cur as _);
+        xml_free_ns_list(XmlNsPtr::from_raw(cur as _).unwrap().unwrap());
         return;
     }
     loop {
@@ -2612,7 +2612,7 @@ pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
                 || matches!((*cur).element_type(), XmlElementType::XmlXIncludeEnd))
                 && !(*cur).ns_def.is_null()
             {
-                xml_free_ns_list((*cur).ns_def);
+                xml_free_ns_list(XmlNsPtr::from_raw((*cur).ns_def).unwrap().unwrap());
             }
 
             // When a node is a text node or a comment, it uses a global static
@@ -2699,7 +2699,7 @@ pub unsafe fn xml_free_node(cur: *mut XmlNode) {
             xml_free_prop_list((*cur).properties);
         }
         if !(*cur).ns_def.is_null() {
-            xml_free_ns_list((*cur).ns_def);
+            xml_free_ns_list(XmlNsPtr::from_raw((*cur).ns_def).unwrap().unwrap());
         }
     } else if !(*cur).content.is_null()
         && !matches!((*cur).element_type(), XmlElementType::XmlEntityRefNode)
@@ -2789,7 +2789,7 @@ pub unsafe fn xml_copy_namespace_list(mut cur: Option<XmlNsPtr>) -> Option<XmlNs
     while let Some(now) = cur {
         let Some(q) = xml_copy_namespace(Some(now)) else {
             if let Some(ret) = ret {
-                xml_free_ns_list(ret.as_ptr());
+                xml_free_ns_list(ret);
             }
             return None;
         };

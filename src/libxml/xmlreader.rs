@@ -3592,7 +3592,7 @@ unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: *m
 #[doc(alias = "xmlTextReaderFreeNodeList")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: *mut XmlNode) {
-    use crate::tree::{NodeCommon, NodePtr};
+    use crate::tree::{NodeCommon, NodePtr, XmlNsPtr};
 
     let mut next: *mut XmlNode;
     let mut parent: *mut XmlNode;
@@ -3607,7 +3607,7 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: *mut
         return;
     }
     if (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
-        xml_free_ns_list(cur as *mut XmlNs);
+        xml_free_ns_list(XmlNsPtr::from_raw(cur as *mut XmlNs).unwrap().unwrap());
         return;
     }
     if matches!(
@@ -3664,14 +3664,13 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: *mut
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlXIncludeStart
                     | XmlElementType::XmlXIncludeEnd
-            ) && !(*cur).ns_def.is_null()
-            {
-                xml_free_ns_list((*cur).ns_def);
+            ) {
+                if let Some(ns_def) = XmlNsPtr::from_raw((*cur).ns_def).unwrap() {
+                    xml_free_ns_list(ns_def);
+                }
             }
 
-            /*
-             * we don't free element names here they are interned now
-             */
+            // we don't free element names here they are interned now
             if !matches!(
                 (*cur).element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCommentNode
@@ -3808,14 +3807,13 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: *mut XmlNode)
         XmlElementType::XmlElementNode
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd
-    ) && !(*cur).ns_def.is_null()
-    {
-        xml_free_ns_list((*cur).ns_def);
+    ) {
+        if let Some(ns_def) = XmlNsPtr::from_raw((*cur).ns_def).unwrap() {
+            xml_free_ns_list(ns_def);
+        }
     }
 
-    /*
-     * we don't free names here they are interned now
-     */
+    // we don't free names here they are interned now
     if !matches!(
         (*cur).element_type(),
         XmlElementType::XmlTextNode | XmlElementType::XmlCommentNode
@@ -4215,7 +4213,7 @@ pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const 
 #[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: *mut XmlDoc) {
-    use crate::tree::NodeCommon;
+    use crate::tree::{NodeCommon, XmlNsPtr};
 
     if cur.is_null() {
         return;
@@ -4255,7 +4253,7 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: *mut XmlDoc)
     }
     (*cur).encoding = None;
     if !(*cur).old_ns.is_null() {
-        xml_free_ns_list((*cur).old_ns);
+        xml_free_ns_list(XmlNsPtr::from_raw((*cur).old_ns).unwrap().unwrap());
     }
     (*cur).url = None;
 

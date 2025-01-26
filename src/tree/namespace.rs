@@ -316,14 +316,11 @@ pub unsafe fn xml_free_ns(cur: XmlNsPtr) {
 
 /// Free up all the structures associated to the chained namespaces.
 #[doc(alias = "xmlFreeNsList")]
-pub unsafe fn xml_free_ns_list(mut cur: *mut XmlNs) {
-    let mut next: *mut XmlNs;
-    if cur.is_null() {
-        return;
-    }
-    while !cur.is_null() {
-        next = (*cur).next;
-        xml_free_ns(XmlNsPtr::from_raw(cur).unwrap().unwrap());
-        cur = next;
+pub unsafe fn xml_free_ns_list(cur: XmlNsPtr) {
+    let mut next = XmlNsPtr::from_raw(cur.next).unwrap();
+    xml_free_ns(cur);
+    while let Some(now) = next {
+        next = XmlNsPtr::from_raw(now.next).unwrap();
+        xml_free_ns(now);
     }
 }
