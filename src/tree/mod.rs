@@ -2918,7 +2918,7 @@ unsafe fn xml_search_ns_by_prefix_strict(
     }
     if IS_STR_XML!(prefix) {
         if let Some(ret_ns) = ret_ns {
-            *ret_ns = XmlNsPtr::from_raw((*doc).ensure_xmldecl()).unwrap();
+            *ret_ns = (*doc).ensure_xmldecl();
             if ret_ns.is_none() {
                 return -1;
             }
@@ -2981,7 +2981,7 @@ unsafe fn xml_search_ns_by_namespace_strict(
 
     *ret_ns = None;
     if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) {
-        *ret_ns = XmlNsPtr::from_raw((*doc).ensure_xmldecl()).unwrap();
+        *ret_ns = (*doc).ensure_xmldecl();
         if ret_ns.is_none() {
             return -1;
         }

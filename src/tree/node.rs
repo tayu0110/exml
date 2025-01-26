@@ -1941,7 +1941,7 @@ impl XmlNode {
             }
             // Return the XML namespace declaration held by the doc.
             if (*doc).old_ns.is_null() {
-                return XmlNsPtr::from_raw((*doc).ensure_xmldecl()).unwrap();
+                return (*doc).ensure_xmldecl();
             } else {
                 return XmlNsPtr::from_raw((*doc).old_ns).unwrap();
             }
@@ -2031,7 +2031,7 @@ impl XmlNode {
             }
             // Return the XML namespace declaration held by the doc.
             if (*doc).old_ns.is_null() {
-                return XmlNsPtr::from_raw((*doc).ensure_xmldecl()).unwrap();
+                return (*doc).ensure_xmldecl();
             } else {
                 return XmlNsPtr::from_raw((*doc).old_ns).unwrap();
             }

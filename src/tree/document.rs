@@ -679,9 +679,9 @@ impl XmlDoc {
     ///
     /// Returns the XML ns-struct or null_mut() on API and internal errors.
     #[doc(alias = "xmlTreeEnsureXMLDecl")]
-    pub(super) unsafe fn ensure_xmldecl(&mut self) -> *mut XmlNs {
+    pub(super) unsafe fn ensure_xmldecl(&mut self) -> Option<XmlNsPtr> {
         if !self.old_ns.is_null() {
-            return self.old_ns;
+            return XmlNsPtr::from_raw(self.old_ns).unwrap();
         }
         let Some(ns) = XmlNsPtr::new(XmlNs {
             typ: XML_LOCAL_NAMESPACE,
@@ -690,10 +690,10 @@ impl XmlDoc {
             ..Default::default()
         }) else {
             xml_tree_err_memory("allocating the XML namespace");
-            return null_mut();
+            return None;
         };
         self.old_ns = ns.as_ptr();
-        ns.as_ptr()
+        Some(ns)
     }
 }
 

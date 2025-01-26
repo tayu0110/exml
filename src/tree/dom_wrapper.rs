@@ -368,34 +368,27 @@ unsafe fn xml_dom_wrap_store_ns(
     ns_name: *const XmlChar,
     prefix: Option<&str>,
 ) -> *mut XmlNs {
-    let mut ns: *mut XmlNs;
-
     if doc.is_null() {
         return null_mut();
     }
-    ns = (*doc).ensure_xmldecl();
-    if ns.is_null() {
+    let Some(mut ns) = (*doc).ensure_xmldecl() else {
         return null_mut();
-    }
-    if !(*ns).next.is_null() {
-        /* Reuse. */
-        ns = (*ns).next;
-        while !ns.is_null() {
-            if (*ns).prefix().as_deref() == prefix && xml_str_equal((*ns).href, ns_name) {
-                return ns;
+    };
+    if let Some(next) = XmlNsPtr::from_raw(ns.next).unwrap() {
+        if next.prefix().as_deref() == prefix && xml_str_equal(next.href, ns_name) {
+            return next.as_ptr();
+        }
+        ns = next;
+        while let Some(next) = XmlNsPtr::from_raw(ns.next).unwrap() {
+            if next.prefix().as_deref() == prefix && xml_str_equal(next.href, ns_name) {
+                return next.as_ptr();
             }
-            if (*ns).next.is_null() {
-                break;
-            }
-            ns = (*ns).next;
+            ns = next;
         }
     }
     // Create.
-    if !ns.is_null() {
-        (*ns).next = xml_new_ns(null_mut(), ns_name, prefix);
-        return (*ns).next;
-    }
-    null_mut()
+    ns.next = xml_new_ns(null_mut(), ns_name, prefix);
+    ns.next
 }
 
 /// Declares a new namespace on @elem. It tries to use the
@@ -520,7 +513,7 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
     // Handle XML namespace.
     if (*ns).prefix().as_deref() == Some("xml") {
         // Insert XML namespace mapping.
-        *ret_ns = (*doc).ensure_xmldecl();
+        *ret_ns = (*doc).ensure_xmldecl().map_or(null_mut(), |ns| ns.as_ptr());
         if (*ret_ns).is_null() {
             return -1;
         }
@@ -1521,7 +1514,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
         if !ctxt.is_null() { /* TODO: User defined. */ }
         // XML Namespace.
         if (*(*attr).ns).prefix().as_deref() == Some("xml") {
-            ns = XmlNsPtr::from_raw((*dest_doc).ensure_xmldecl()).unwrap();
+            ns = (*dest_doc).ensure_xmldecl();
         } else if dest_parent.is_null() {
             // Store in @(*destDoc).oldNs.
             ns = XmlNsPtr::from_raw(xml_dom_wrap_store_ns(
