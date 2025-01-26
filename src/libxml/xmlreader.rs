@@ -4213,7 +4213,7 @@ pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const 
 #[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: *mut XmlDoc) {
-    use crate::tree::{NodeCommon, XmlNsPtr};
+    use crate::tree::NodeCommon;
 
     if cur.is_null() {
         return;
@@ -4252,8 +4252,8 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: *mut XmlDoc)
         xml_free((*cur).name as _);
     }
     (*cur).encoding = None;
-    if !(*cur).old_ns.is_null() {
-        xml_free_ns_list(XmlNsPtr::from_raw((*cur).old_ns).unwrap().unwrap());
+    if let Some(old_ns) = (*cur).old_ns.take() {
+        xml_free_ns_list(old_ns);
     }
     (*cur).url = None;
 

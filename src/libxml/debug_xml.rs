@@ -37,7 +37,7 @@ use crate::{
     tree::{
         xml_free_node_list, xml_get_doc_entity, xml_validate_name, NodeCommon, NodePtr, XmlAttr,
         XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElement,
-        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlNode, XmlNs,
+        XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlNode, XmlNs, XmlNsPtr,
     },
 };
 
@@ -1271,8 +1271,8 @@ impl XmlDebugCtxt<'_> {
                     writeln!(self.output, "standalone=true");
                 }
             }
-            if !doc.old_ns.is_null() {
-                self.dump_namespace_list(Some(&*doc.old_ns));
+            if let Some(old_ns) = doc.old_ns {
+                self.dump_namespace_list(Some(&*old_ns));
             }
         }
     }
@@ -1499,8 +1499,8 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: *mut XmlNs) -> i32 {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
         )
     }) {
-        let old_ns: *mut XmlNs = node.as_document_node().unwrap().as_ref().old_ns;
-        if old_ns == ns {
+        let old_ns = node.as_document_node().unwrap().as_ref().old_ns;
+        if old_ns == XmlNsPtr::from_raw(ns).unwrap() {
             return 1;
         }
     }

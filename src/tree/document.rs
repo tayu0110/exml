@@ -70,7 +70,7 @@ pub struct XmlDoc {
     // the document external subset
     pub(crate) ext_subset: Option<XmlDtdPtr>,
     // Global namespace, the old way
-    pub(crate) old_ns: *mut XmlNs,
+    pub(crate) old_ns: Option<XmlNsPtr>,
     // the XML version string
     pub(crate) version: Option<String>,
     // external initial encoding, if any
@@ -680,8 +680,8 @@ impl XmlDoc {
     /// Returns the XML ns-struct or null_mut() on API and internal errors.
     #[doc(alias = "xmlTreeEnsureXMLDecl")]
     pub(super) unsafe fn ensure_xmldecl(&mut self) -> Option<XmlNsPtr> {
-        if !self.old_ns.is_null() {
-            return XmlNsPtr::from_raw(self.old_ns).unwrap();
+        if let Some(old_ns) = self.old_ns {
+            return Some(old_ns);
         }
         let Some(ns) = XmlNsPtr::new(XmlNs {
             typ: XML_LOCAL_NAMESPACE,
@@ -692,7 +692,7 @@ impl XmlDoc {
             xml_tree_err_memory("allocating the XML namespace");
             return None;
         };
-        self.old_ns = ns.as_ptr();
+        self.old_ns = Some(ns);
         Some(ns)
     }
 }
@@ -759,7 +759,7 @@ impl Default for XmlDoc {
             standalone: 0,
             int_subset: None,
             ext_subset: None,
-            old_ns: null_mut(),
+            old_ns: None,
             version: None,
             encoding: None,
             ids: None,

@@ -1940,10 +1940,10 @@ impl XmlNode {
                 }
             }
             // Return the XML namespace declaration held by the doc.
-            if (*doc).old_ns.is_null() {
+            if (*doc).old_ns.is_none() {
                 return (*doc).ensure_xmldecl();
             } else {
-                return XmlNsPtr::from_raw((*doc).old_ns).unwrap();
+                return (*doc).old_ns;
             }
         }
         let mut node = self as *mut XmlNode;
@@ -2030,10 +2030,10 @@ impl XmlNode {
                 }
             }
             // Return the XML namespace declaration held by the doc.
-            if (*doc).old_ns.is_null() {
+            if (*doc).old_ns.is_none() {
                 return (*doc).ensure_xmldecl();
             } else {
-                return XmlNsPtr::from_raw((*doc).old_ns).unwrap();
+                return (*doc).old_ns;
             }
         }
         let is_attr = matches!(self.element_type(), XmlElementType::XmlAttributeNode);

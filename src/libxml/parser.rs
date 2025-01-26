@@ -2366,7 +2366,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     (*new_doc).int_subset = None;
     (*new_doc).ext_subset = None;
     // This leaks the namespace list if doc.is_null()
-    (*new_doc).old_ns = null_mut();
+    (*new_doc).old_ns = None;
     xml_free_doc(new_doc);
 
     ret

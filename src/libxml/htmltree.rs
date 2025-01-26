@@ -98,7 +98,7 @@ pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlCh
     (*cur).name = null_mut();
     (*cur).children = None;
     (*cur).ext_subset = None;
-    (*cur).old_ns = null_mut();
+    (*cur).old_ns = None;
     (*cur).encoding = None;
     (*cur).standalone = 1;
     (*cur).compression = 0;

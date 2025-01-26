@@ -986,8 +986,8 @@ pub unsafe fn xml_free_doc(cur: *mut XmlDoc) {
     if let Some(children) = (*cur).children() {
         xml_free_node_list(children.as_ptr());
     }
-    if !(*cur).old_ns.is_null() {
-        xml_free_ns_list(XmlNsPtr::from_raw((*cur).old_ns).unwrap().unwrap());
+    if let Some(old_ns) = (*cur).old_ns.take() {
+        xml_free_ns_list(old_ns);
     }
 
     (*cur).version = None;
@@ -1762,9 +1762,8 @@ pub unsafe fn xml_copy_doc(doc: *mut XmlDoc, recursive: i32) -> *mut XmlDoc {
             ret_int_subset.parent = ret;
         }
     }
-    if !(*doc).old_ns.is_null() {
-        (*ret).old_ns = xml_copy_namespace_list(XmlNsPtr::from_raw((*doc).old_ns).unwrap())
-            .map_or(null_mut(), |ns| ns.as_ptr());
+    if (*doc).old_ns.is_some() {
+        (*ret).old_ns = xml_copy_namespace_list((*doc).old_ns);
     }
     if let Some(children) = (*doc).children {
         (*ret).children =
