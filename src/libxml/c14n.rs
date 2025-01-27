@@ -53,7 +53,7 @@ use crate::{
 use super::{
     globals::{xml_free, xml_malloc_atomic, xml_realloc},
     uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
-    xmlstring::{xml_str_equal, xml_strcmp, xml_strlen, XmlChar},
+    xmlstring::{xml_strcmp, xml_strlen, XmlChar},
 };
 
 // Predefined values for C14N modes
@@ -92,12 +92,12 @@ pub enum XmlC14NPosition {
 
 pub type XmlC14NVisibleNsStackPtr = *mut XmlC14NVisibleNsStack;
 #[repr(C)]
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct XmlC14NVisibleNsStack {
     ns_cur_end: usize,           /* number of nodes in the set */
     ns_prev_start: usize,        /* the beginning of the stack for previous visible node */
     ns_prev_end: usize,          /* the end of the stack for previous visible node */
-    ns_tab: Vec<*mut XmlNs>,     /* array of ns in no particular order */
+    ns_tab: Vec<XmlNsPtr>,       /* array of ns in no particular order */
     node_tab: Vec<*mut XmlNode>, /* array of nodes in no particular order */
 }
 
@@ -133,29 +133,15 @@ impl XmlC14NVisibleNsStack {
 
         let start = if has_empty_ns { 0 } else { self.ns_prev_start };
         for &ns1 in self.ns_tab[start..self.ns_cur_end].iter().rev() {
-            if xml_c14n_str_equal(
-                prefix,
-                if !ns1.is_null() {
-                    (*ns1).prefix
-                } else {
-                    null_mut()
-                },
-            ) {
-                return xml_c14n_str_equal(
-                    href,
-                    if !ns1.is_null() {
-                        (*ns1).href
-                    } else {
-                        null_mut()
-                    },
-                );
+            if xml_c14n_str_equal(prefix, ns1.prefix) {
+                return xml_c14n_str_equal(href, ns1.href);
             }
         }
         has_empty_ns
     }
 
     #[doc(alias = "xmlC14NVisibleNsStackAdd")]
-    fn add(&mut self, ns: *mut XmlNs, node: *mut XmlNode) {
+    fn add(&mut self, ns: XmlNsPtr, node: *mut XmlNode) {
         if self.ns_cur_end == self.ns_tab.len() {
             self.ns_tab.push(ns);
             self.node_tab.push(node);
@@ -331,27 +317,27 @@ impl<T> XmlC14NCtx<'_, T> {
         // check all namespaces
         let mut n = cur as *mut XmlNode;
         while !n.is_null() {
-            let mut ns = (*n).ns_def;
-            while !ns.is_null() {
-                let prefix = (*ns).prefix();
+            let mut ns = XmlNsPtr::from_raw((*n).ns_def).unwrap();
+            while let Some(now) = ns {
+                let prefix = now.prefix();
                 let tmp = (*cur).search_ns(cur.doc, prefix.as_deref());
 
-                if tmp == XmlNsPtr::from_raw(ns).unwrap()
-                    && !xml_c14n_is_xml_ns(ns)
-                    && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
+                if tmp == Some(now)
+                    && !xml_c14n_is_xml_ns(now)
+                    && self.is_visible(Some(&*now), Some(cur))
                 {
-                    let already_rendered = (*self.ns_rendered).find(Some(&*ns));
+                    let already_rendered = (*self.ns_rendered).find(Some(&*now));
                     if visible {
-                        (*self.ns_rendered).add(ns, cur);
+                        (*self.ns_rendered).add(now, cur);
                     }
                     if !already_rendered {
-                        list.insert_lower_bound(ns);
+                        list.insert_lower_bound(now);
                     }
-                    if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
+                    if now.prefix().map_or(0, |pre| pre.len()) == 0 {
                         has_empty_ns = true;
                     }
                 }
-                ns = (*ns).next;
+                ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
             n = (*n).parent().map_or(null_mut(), |p| p.as_ptr());
         }
@@ -368,7 +354,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        list.walk(|data| self.print_namespaces(&**data) != 0);
+        list.walk(|data| self.print_namespaces(data) != 0);
 
         // Cleanup
         0
@@ -980,16 +966,16 @@ impl<T> XmlC14NCtx<'_, T> {
                 };
 
                 let ns = cur.search_ns(cur.doc, prefix);
-                if let Some(ns) = ns.filter(|ns| {
-                    !xml_c14n_is_xml_ns(ns.as_ptr()) && self.is_visible(Some(&**ns), Some(cur))
-                }) {
+                if let Some(ns) = ns
+                    .filter(|&ns| !xml_c14n_is_xml_ns(ns) && self.is_visible(Some(&*ns), Some(cur)))
+                {
                     let already_rendered = (*self.ns_rendered).find(Some(&*ns));
                     if visible {
                         // TODO: replace `cur` to `Rc<XmlNode>`
-                        (*self.ns_rendered).add(ns.as_ptr(), cur as *const XmlNode as _);
+                        (*self.ns_rendered).add(ns, cur as *const XmlNode as _);
                     }
                     if !already_rendered {
-                        list.insert_lower_bound(ns.as_ptr());
+                        list.insert_lower_bound(ns);
                     }
                     if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                         has_empty_ns = true;
@@ -1005,16 +991,16 @@ impl<T> XmlC14NCtx<'_, T> {
             has_visibly_utilized_empty_ns = true;
             cur.search_ns(cur.doc, None)
         };
-        if let Some(ns) = ns.filter(|&ns| !xml_c14n_is_xml_ns(ns.as_ptr())) {
+        if let Some(ns) = ns.filter(|&ns| !xml_c14n_is_xml_ns(ns)) {
             if visible
                 && self.is_visible(Some(&*ns), Some(cur))
                 && self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*ns)) == 0
             {
-                list.insert_lower_bound(ns.as_ptr());
+                list.insert_lower_bound(ns);
             }
             if visible {
                 // TODO: replace `cur` to `Rc<XmlNode>`
-                (*self.ns_rendered).add(ns.as_ptr(), cur as *const XmlNode as _);
+                (*self.ns_rendered).add(ns, cur as *const XmlNode as _);
             }
             if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                 has_empty_ns = true;
@@ -1027,18 +1013,18 @@ impl<T> XmlC14NCtx<'_, T> {
             // we need to check that attribute is visible and has non
             // default namespace (XML Namespaces: "default namespaces
             // do not apply directly to attributes")
-            if !(*attr).ns.is_null()
-                && !xml_c14n_is_xml_ns((*attr).ns)
-                && self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur))
-            {
+            if let Some(attr_ns) = XmlNsPtr::from_raw((*attr).ns).unwrap().filter(|&ns| {
+                !xml_c14n_is_xml_ns(ns)
+                    && self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur))
+            }) {
                 let already_rendered =
-                    self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*(*attr).ns));
+                    self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*attr_ns));
                 // TODO: replace `cur` to `Rc<XmlNode>`
-                (*self.ns_rendered).add((*attr).ns, cur as *const XmlNode as _);
+                (*self.ns_rendered).add(attr_ns, cur as *const XmlNode as _);
                 if already_rendered == 0 && visible {
-                    list.insert_lower_bound((*attr).ns);
+                    list.insert_lower_bound(attr_ns);
                 }
-                if (*(*attr).ns).prefix().map_or(0, |pre| pre.len()) == 0 {
+                if attr_ns.prefix().map_or(0, |pre| pre.len()) == 0 {
                     has_empty_ns = true;
                 }
             } else if !(*attr).ns.is_null()
@@ -1070,7 +1056,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        list.walk(|data| self.print_namespaces(&**data) != 0);
+        list.walk(|data| self.print_namespaces(data) != 0);
 
         // Cleanup
         0
@@ -1099,27 +1085,11 @@ impl<T> XmlC14NCtx<'_, T> {
             (xml_c14n_str_equal(prefix, null_mut()) && xml_c14n_str_equal(href, null_mut())) as _;
 
         for (i, &ns1) in cur.ns_tab[..cur.ns_cur_end].iter().enumerate().rev() {
-            if xml_c14n_str_equal(
-                prefix,
-                if !ns1.is_null() {
-                    (*ns1).prefix
-                } else {
-                    null_mut()
-                },
-            ) {
-                if xml_c14n_str_equal(
-                    href,
-                    if !ns1.is_null() {
-                        (*ns1).href
-                    } else {
-                        null_mut()
-                    },
-                ) {
+            if xml_c14n_str_equal(prefix, ns1.prefix) {
+                if xml_c14n_str_equal(href, ns1.href) {
                     let node = cur.node_tab[i];
-                    return self.is_visible(
-                        (!ns1.is_null()).then(|| &*ns1 as _),
-                        (!node.is_null()).then(|| &*node as _),
-                    ) as i32;
+                    return self.is_visible(Some(&*ns1), (!node.is_null()).then(|| &*node as _))
+                        as i32;
                 } else {
                     return 0;
                 }
@@ -1652,18 +1622,18 @@ unsafe fn xml_c14n_err_relative_namespace(ns_uri: &str) {
 ///
 /// Returns -1 if ns1 < ns2, 0 if ns1 == ns2 or 1 if ns1 > ns2.
 #[doc(alias = "xmlC14NNsCompare")]
-unsafe fn xml_c14n_ns_compare(ns1: *mut XmlNs, ns2: *mut XmlNs) -> i32 {
+unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> i32 {
     if ns1 == ns2 {
         return 0;
     }
-    if ns1.is_null() {
-        return -1;
-    }
-    if ns2.is_null() {
-        return 1;
-    }
+    // if ns1.is_null() {
+    //     return -1;
+    // }
+    // if ns2.is_null() {
+    //     return 1;
+    // }
 
-    xml_strcmp((*ns1).prefix, (*ns2).prefix)
+    xml_strcmp(ns1.prefix, ns2.prefix)
 }
 
 /// Check whether `ns` is a default 'xml:' namespace with `href="http://www.w3.org/XML/1998/namespace"`.  
@@ -1672,10 +1642,9 @@ unsafe fn xml_c14n_ns_compare(ns1: *mut XmlNs, ns2: *mut XmlNs) -> i32 {
 /// Please refer to the document of `xmlC14NIsXmlNs` for original libxml2.
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlNs")]
-unsafe fn xml_c14n_is_xml_ns(ns: *mut XmlNs) -> bool {
-    !ns.is_null()
-        && xml_str_equal((*ns).prefix as _, c"xml".as_ptr() as _)
-        && xml_str_equal((*ns).href as _, XML_XML_NAMESPACE.as_ptr() as _)
+unsafe fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
+    ns.prefix().as_deref() == Some("xml")
+        && ns.href().as_deref() == Some(XML_XML_NAMESPACE.to_str().unwrap())
 }
 
 #[doc(alias = "xmlC14NStrEqual")]
@@ -1750,7 +1719,8 @@ unsafe fn xml_c14n_attrs_compare(attr1: *mut XmlAttr, attr2: *mut XmlAttr) -> i3
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlAttr")]
 unsafe fn xml_c14n_is_xml_attr(attr: *mut XmlAttr) -> bool {
-    !(*attr).ns.is_null() && xml_c14n_is_xml_ns((*attr).ns)
+    let ns = XmlNsPtr::from_raw((*attr).ns).unwrap();
+    ns.map_or(false, |ns| xml_c14n_is_xml_ns(ns))
 }
 
 // Macro used to grow the current buffer.
