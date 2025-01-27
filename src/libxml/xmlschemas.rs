@@ -146,7 +146,7 @@ use crate::{
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlElementContentPtr,
         XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
-        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        XmlNs, XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
@@ -25725,12 +25725,11 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
 
                                     ns.is_some()
                                 } {}
-                                ns = XmlNsPtr::from_raw(xml_new_ns(
+                                ns = xml_new_ns(
                                     (*vctxt).validation_root,
                                     (*iattr).ns_name,
                                     Some(&prefix),
-                                ))
-                                .unwrap();
+                                );
                             }
                             // TODO:
                             // http://lists.w3.org/Archives/Public/www-xml-schema-comments/2005JulSep/0406.html

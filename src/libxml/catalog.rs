@@ -1985,10 +1985,7 @@ impl XmlCatalogEntry {
     #[doc(alias = "xmlDumpXMLCatalog")]
     #[cfg(feature = "libxml_output")]
     unsafe fn dump_xml_catalog<'a>(&self, out: impl Write + 'a) -> i32 {
-        use crate::{
-            io::XmlOutputBuffer,
-            tree::{NodeCommon, XmlNs, XmlNsPtr},
-        };
+        use crate::{io::XmlOutputBuffer, tree::NodeCommon};
 
         // Rebuild a catalog
         let doc: *mut XmlDoc = xml_new_doc(None);
@@ -2004,22 +2001,20 @@ impl XmlCatalogEntry {
 
         (*doc).add_child(dtd.map_or(null_mut(), |dtd| dtd.as_ptr()) as _);
 
-        let ns: *mut XmlNs = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, None);
-        if ns.is_null() {
+        let Some(ns) = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, None) else {
             xml_free_doc(doc);
             return -1;
-        }
-        let catalog: *mut XmlNode =
-            xml_new_doc_node(doc, XmlNsPtr::from_raw(ns).unwrap(), "catalog", null_mut());
+        };
+        let catalog: *mut XmlNode = xml_new_doc_node(doc, Some(ns), "catalog", null_mut());
         if catalog.is_null() {
-            xml_free_ns(XmlNsPtr::from_raw(ns).unwrap().unwrap());
+            xml_free_ns(ns);
             xml_free_doc(doc);
             return -1;
         }
-        (*catalog).ns_def = XmlNsPtr::from_raw(ns).unwrap();
+        (*catalog).ns_def = Some(ns);
         (*doc).add_child(catalog as _);
 
-        self.dump_xml_catalog_node(catalog, doc, ns, None);
+        self.dump_xml_catalog_node(catalog, doc, ns.as_ptr(), None);
 
         // reserialize it
         let Some(buf) = XmlOutputBuffer::from_writer(out, None) else {

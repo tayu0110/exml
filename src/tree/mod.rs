@@ -1160,7 +1160,7 @@ unsafe fn xml_new_reconciled_ns(
     }
 
     // OK, now we are ready to create a new one.
-    XmlNsPtr::from_raw(xml_new_ns(tree, ns.href, Some(&prefix))).unwrap()
+    xml_new_ns(tree, ns.href, Some(&prefix))
 }
 
 // NOTE about the CopyNode operations !
@@ -1311,8 +1311,7 @@ pub(crate) unsafe fn xml_static_copy_node(
                 while let Some(parent) = (*root).parent() {
                     root = parent.as_ptr();
                 }
-                (*ret).ns =
-                    XmlNsPtr::from_raw(xml_new_ns(root, ns.href, ns.prefix().as_deref())).unwrap();
+                (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
             } else {
                 (*ret).ns = xml_new_reconciled_ns(doc, ret, node_ns);
             }
@@ -1527,7 +1526,8 @@ unsafe fn xml_copy_prop_internal(
                     // correct possibly cycling above the document elt
                     root = pred;
                 }
-                (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
+                (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref())
+                    .map_or(null_mut(), |ns| ns.as_ptr());
             }
         }
     } else {
@@ -2760,9 +2760,7 @@ unsafe fn xml_ns_in_scope(
 pub unsafe fn xml_copy_namespace(cur: Option<XmlNsPtr>) -> Option<XmlNsPtr> {
     let cur = cur?;
     match cur.element_type() {
-        XML_LOCAL_NAMESPACE => {
-            XmlNsPtr::from_raw(xml_new_ns(null_mut(), cur.href, cur.prefix().as_deref())).unwrap()
-        }
+        XML_LOCAL_NAMESPACE => xml_new_ns(null_mut(), cur.href, cur.prefix().as_deref()),
         _ => None,
     }
 }

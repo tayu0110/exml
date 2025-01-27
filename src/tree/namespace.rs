@@ -240,15 +240,15 @@ pub unsafe fn xml_new_ns(
     node: *mut XmlNode,
     href: *const XmlChar,
     prefix: Option<&str>,
-) -> *mut XmlNs {
+) -> Option<XmlNsPtr> {
     if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-        return null_mut();
+        return None;
     }
 
     if prefix == Some("xml") {
-        /* xml namespace is predefined, no need to add it */
+        // xml namespace is predefined, no need to add it
         if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) {
-            return null_mut();
+            return None;
         }
 
         // Problem, this is an attempt to bind xml prefix to a wrong
@@ -264,7 +264,7 @@ pub unsafe fn xml_new_ns(
         ..Default::default()
     }) else {
         xml_tree_err_memory("building namespace");
-        return null_mut();
+        return None;
     };
 
     if !href.is_null() {
@@ -283,7 +283,7 @@ pub unsafe fn xml_new_ns(
                 || xml_str_equal(prev.prefix, cur.prefix)
             {
                 xml_free_ns(cur);
-                return null_mut();
+                return None;
             }
             while !prev.next.is_null() {
                 prev = XmlNsPtr::from_raw(prev.next).unwrap().unwrap();
@@ -291,7 +291,7 @@ pub unsafe fn xml_new_ns(
                     || xml_str_equal(prev.prefix, cur.prefix)
                 {
                     xml_free_ns(cur);
-                    return null_mut();
+                    return None;
                 }
             }
             prev.next = cur.as_ptr();
@@ -299,7 +299,7 @@ pub unsafe fn xml_new_ns(
             (*node).ns_def = Some(cur);
         }
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Free up the structures associated to a namespace

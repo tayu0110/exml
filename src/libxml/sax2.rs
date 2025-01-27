@@ -53,7 +53,7 @@ use crate::{
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlNode, XmlNs, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -1322,8 +1322,6 @@ unsafe fn xml_sax2_attribute_internal(
     value: Option<&str>,
     prefix: Option<&str>,
 ) {
-    use crate::tree::XmlNs;
-
     use super::htmltree::html_is_boolean_attr;
 
     let nval: *mut XmlChar;
@@ -1451,12 +1449,12 @@ unsafe fn xml_sax2_attribute_internal(
         }
 
         // a default namespace definition
-        let nsret: *mut XmlNs = xml_new_ns((*ctxt).node, val, None);
+        let nsret = xml_new_ns((*ctxt).node, val, None);
 
         #[cfg(feature = "libxml_valid")]
         {
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
-            if !nsret.is_null()
+            if nsret.is_some()
                 && (*ctxt).validate != 0
                 && (*ctxt).well_formed != 0
                 && !(*ctxt).my_doc.is_null()
@@ -1467,7 +1465,7 @@ unsafe fn xml_sax2_attribute_internal(
                     (*ctxt).my_doc,
                     (*ctxt).node,
                     prefix,
-                    XmlNsPtr::from_raw(nsret).unwrap().unwrap(),
+                    nsret.unwrap(),
                     val,
                 );
             }
@@ -1533,11 +1531,11 @@ unsafe fn xml_sax2_attribute_internal(
         }
 
         // a standard namespace definition
-        let nsret: *mut XmlNs = xml_new_ns((*ctxt).node, val, Some(name));
+        let nsret = xml_new_ns((*ctxt).node, val, Some(name));
         #[cfg(feature = "libxml_valid")]
         {
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
-            if !nsret.is_null()
+            if nsret.is_some()
                 && (*ctxt).validate != 0
                 && (*ctxt).well_formed != 0
                 && !(*ctxt).my_doc.is_null()
@@ -1548,7 +1546,7 @@ unsafe fn xml_sax2_attribute_internal(
                     (*ctxt).my_doc,
                     (*ctxt).node,
                     prefix,
-                    XmlNsPtr::from_raw(nsret).unwrap().unwrap(),
+                    nsret.unwrap(),
                     value,
                 );
             }
@@ -2000,7 +1998,7 @@ pub unsafe fn xml_sax2_start_element(
         });
         if ns.is_none() {
             if let Some(prefix) = prefix {
-                ns = XmlNsPtr::from_raw(xml_new_ns(ret, null_mut(), Some(prefix))).unwrap();
+                ns = xml_new_ns(ret, null_mut(), Some(prefix));
                 xml_ns_warn_msg!(
                     ctxt,
                     XmlParserErrors::XmlNsErrUndefinedNamespace,
@@ -2182,23 +2180,21 @@ pub unsafe fn xml_sax2_start_element_ns(
     // Build the namespace list
     for (pref, uri) in namespaces {
         let uri = CString::new(uri.as_str()).unwrap();
-        let ns = xml_new_ns(null_mut(), uri.as_ptr() as *const u8, pref.as_deref());
-        if !ns.is_null() {
-            if last.is_null() {
-                (*ret).ns_def = XmlNsPtr::from_raw(ns).unwrap();
-                last = ns;
-            } else {
-                (*last).next = ns;
-                last = ns;
-            }
-            if orig_uri.is_some() && prefix == pref.as_deref() {
-                (*ret).ns = XmlNsPtr::from_raw(ns).unwrap();
-            }
-        } else {
+        let Some(ns) = xml_new_ns(null_mut(), uri.as_ptr() as *const u8, pref.as_deref()) else {
             // any out of memory error would already have been raised
             // but we can't be guaranteed it's the actual error due to the
             // API, best is to skip in this case
             continue;
+        };
+        if last.is_null() {
+            (*ret).ns_def = Some(ns);
+            last = ns.as_ptr();
+        } else {
+            (*last).next = ns.as_ptr();
+            last = ns.as_ptr();
+        }
+        if orig_uri.is_some() && prefix == pref.as_deref() {
+            (*ret).ns = Some(ns);
         }
         #[cfg(feature = "libxml_valid")]
         {
@@ -2213,7 +2209,7 @@ pub unsafe fn xml_sax2_start_element_ns(
                     (*ctxt).my_doc,
                     ret,
                     prefix,
-                    XmlNsPtr::from_raw(ns).unwrap().unwrap(),
+                    ns,
                     uri.as_ptr() as *const u8,
                 );
             }
@@ -2255,8 +2251,7 @@ pub unsafe fn xml_sax2_start_element_ns(
             (*ret).ns = (*ret).search_ns((*ctxt).my_doc, prefix);
         }
         if (*ret).ns.is_none() {
-            let ns = xml_new_ns(ret, null_mut(), prefix);
-            if ns.is_null() {
+            if xml_new_ns(ret, null_mut(), prefix).is_none() {
                 xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");
                 return;
             }

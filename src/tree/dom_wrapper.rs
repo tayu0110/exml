@@ -384,7 +384,7 @@ unsafe fn xml_dom_wrap_store_ns(
         }
     }
     // Create.
-    ns.next = xml_new_ns(null_mut(), ns_name, prefix);
+    ns.next = xml_new_ns(null_mut(), ns_name, prefix).map_or(null_mut(), |ns| ns.as_ptr());
     XmlNsPtr::from_raw(ns.next).unwrap()
 }
 
@@ -438,20 +438,17 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
                     (!pref.is_null())
                         .then(|| CStr::from_ptr(pref as *const i8).to_string_lossy())
                         .as_deref(),
-                );
-                if ret.is_null() {
-                    return None;
-                }
+                )?;
                 if let Some(ns_def) = (*elem).ns_def {
                     let mut ns2 = ns_def;
                     while let Some(next) = XmlNsPtr::from_raw(ns2.next).unwrap() {
                         ns2 = next;
                     }
-                    ns2.next = ret;
+                    ns2.next = ret.as_ptr();
                 } else {
-                    (*elem).ns_def = XmlNsPtr::from_raw(ret).unwrap();
+                    (*elem).ns_def = Some(ret);
                 }
-                return XmlNsPtr::from_raw(ret).unwrap();
+                return Some(ret);
             }
         }
         // ns_next_prefix:
