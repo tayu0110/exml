@@ -948,7 +948,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur
                 && (*cur)
                     .parent
                     .filter(|p| {
-                        p.ns.is_null()
+                        p.ns.is_none()
                             && (xml_strcasecmp((*cur).name, c"href".as_ptr() as _) == 0
                                 || xml_strcasecmp((*cur).name, c"action".as_ptr() as _) == 0
                                 || xml_strcasecmp((*cur).name, c"src".as_ptr() as _) == 0
@@ -1047,18 +1047,16 @@ pub unsafe fn html_node_dump_format_output(
                 }
 
                 // Get specific HTML info for that node.
-                let info = if (*cur).ns.is_null() {
+                let info = if (*cur).ns.is_none() {
                     html_tag_lookup((*cur).name().as_deref().unwrap())
                 } else {
                     None
                 };
 
                 buf.write_str("<");
-                if !(*cur).ns.is_null() {
-                    if let Some(prefix) = (*(*cur).ns).prefix() {
-                        buf.write_str(&prefix);
-                        buf.write_str(":");
-                    }
+                if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                    buf.write_str(&prefix);
+                    buf.write_str(":");
                 }
 
                 buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
@@ -1097,11 +1095,9 @@ pub unsafe fn html_node_dump_format_output(
                     buf.write_str(">");
                 } else {
                     buf.write_str("></");
-                    if !(*cur).ns.is_null() {
-                        if let Some(prefix) = (*(*cur).ns).prefix() {
-                            buf.write_str(&prefix);
-                            buf.write_str(":");
-                        }
+                    if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                        buf.write_str(&prefix);
+                        buf.write_str(":");
                     }
 
                     buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
@@ -1216,7 +1212,7 @@ pub unsafe fn html_node_dump_format_output(
             ) {
                 buf.write_str("\n");
             } else {
-                let info = if format != 0 && (*cur).ns.is_null() {
+                let info = if format != 0 && (*cur).ns.is_none() {
                     html_tag_lookup((*cur).name().as_deref().unwrap())
                 } else {
                     None
@@ -1237,11 +1233,9 @@ pub unsafe fn html_node_dump_format_output(
                 }
 
                 buf.write_str("</");
-                if !(*cur).ns.is_null() {
-                    if let Some(prefix) = (*(*cur).ns).prefix() {
-                        buf.write_str(&prefix);
-                        buf.write_str(":");
-                    }
+                if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                    buf.write_str(&prefix);
+                    buf.write_str(":");
                 }
 
                 buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());

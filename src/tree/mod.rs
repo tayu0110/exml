@@ -1297,11 +1297,11 @@ pub(crate) unsafe fn xml_static_copy_node(
             .map_or(null_mut(), |ns| ns.as_ptr());
     }
 
-    if let Some(node_ns) = XmlNsPtr::from_raw((*node).ns).unwrap() {
+    if let Some(node_ns) = (*node).ns {
         let prefix = node_ns.prefix();
         if let Some(ns) = (*ret).search_ns(doc, prefix.as_deref()) {
             // reference the existing namespace definition in our own tree.
-            (*ret).ns = ns.as_ptr();
+            (*ret).ns = Some(ns);
         } else {
             // Humm, we are copying an element whose namespace is defined
             // out of the new tree scope. Search it in the original tree
@@ -1312,10 +1312,10 @@ pub(crate) unsafe fn xml_static_copy_node(
                 while let Some(parent) = (*root).parent() {
                     root = parent.as_ptr();
                 }
-                (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
-            } else {
                 (*ret).ns =
-                    xml_new_reconciled_ns(doc, ret, node_ns).map_or(null_mut(), |ns| ns.as_ptr());
+                    XmlNsPtr::from_raw(xml_new_ns(root, ns.href, ns.prefix().as_deref())).unwrap();
+            } else {
+                (*ret).ns = xml_new_reconciled_ns(doc, ret, node_ns);
             }
         }
     }
@@ -1885,7 +1885,7 @@ pub unsafe fn xml_new_node(ns: Option<XmlNsPtr>, name: *const XmlChar) -> *mut X
     (*cur).typ = XmlElementType::XmlElementNode;
 
     (*cur).name = xml_strdup(name);
-    (*cur).ns = ns.map_or(null_mut(), |ns| ns.as_ptr());
+    (*cur).ns = ns;
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
@@ -1919,7 +1919,7 @@ pub unsafe fn xml_new_node_eat_name(ns: Option<XmlNsPtr>, name: *mut XmlChar) ->
     (*cur).typ = XmlElementType::XmlElementNode;
 
     (*cur).name = name;
-    (*cur).ns = ns.map_or(null_mut(), |ns| ns.as_ptr());
+    (*cur).ns = ns;
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
@@ -1956,12 +1956,7 @@ pub unsafe fn xml_new_child(
     // Allocate a new node
     if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
         if ns.is_none() {
-            cur = xml_new_doc_node(
-                (*parent).doc,
-                XmlNsPtr::from_raw((*parent).ns).unwrap(),
-                name,
-                content,
-            );
+            cur = xml_new_doc_node((*parent).doc, (*parent).ns, name, content);
         } else {
             cur = xml_new_doc_node((*parent).doc, ns, name, content);
         }
@@ -2337,12 +2332,7 @@ pub unsafe fn xml_new_text_child(
     // Allocate a new node
     if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
         if ns.is_none() {
-            cur = xml_new_doc_raw_node(
-                (*parent).doc,
-                XmlNsPtr::from_raw((*parent).ns).unwrap(),
-                name,
-                content,
-            );
+            cur = xml_new_doc_raw_node((*parent).doc, (*parent).ns, name, content);
         } else {
             cur = xml_new_doc_raw_node((*parent).doc, ns, name, content);
         }

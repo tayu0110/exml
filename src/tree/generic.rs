@@ -379,15 +379,8 @@ pub trait NodeCommon {
             if !(*(self as *mut Self as *mut XmlNode)).properties.is_null() {
                 // check if an attribute with the same name exists
 
-                let lastattr = if (*cur).ns.is_null() {
-                    (*(self as *mut Self as *mut XmlNode)).has_ns_prop(
-                        CStr::from_ptr((*cur).name as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        None,
-                    )
-                } else {
-                    let href = (*(*cur).ns).href;
+                let lastattr = if let Some(ns) = (*cur).ns {
+                    let href = ns.href;
                     (*(self as *mut Self as *mut XmlNode)).has_ns_prop(
                         CStr::from_ptr((*cur).name as *const i8)
                             .to_string_lossy()
@@ -395,6 +388,13 @@ pub trait NodeCommon {
                         (!href.is_null())
                             .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
                             .as_deref(),
+                    )
+                } else {
+                    (*(self as *mut Self as *mut XmlNode)).has_ns_prop(
+                        CStr::from_ptr((*cur).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        None,
                     )
                 };
                 if !lastattr.is_null()

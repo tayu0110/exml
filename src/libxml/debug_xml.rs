@@ -321,8 +321,8 @@ impl XmlDebugCtxt<'_> {
                 self.ns_check_scope(node, ns);
                 ns = (*ns).next;
             }
-            if !node.as_node().unwrap().as_ref().ns.is_null() {
-                self.ns_check_scope(node, node.as_node().unwrap().as_ref().ns);
+            if let Some(ns) = node.as_node().unwrap().as_ref().ns {
+                self.ns_check_scope(node, ns.as_ptr());
             }
         } else if let Some(attr) = node
             .as_attribute_node()
@@ -916,8 +916,8 @@ impl XmlDebugCtxt<'_> {
                     self.dump_spaces();
                     write!(self.output, "ELEMENT ");
                     let node = node.as_node().unwrap();
-                    if !node.as_ref().ns.is_null() {
-                        if let Some(prefix) = (*node.as_ref().ns).prefix() {
+                    if let Some(ns) = node.as_ref().ns {
+                        if let Some(prefix) = ns.prefix() {
                             self.dump_string(Some(&prefix));
                         }
                         write!(self.output, ":");
@@ -1715,10 +1715,8 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: *mut Xml
     match (*node).element_type() {
         XmlElementType::XmlElementNode => {
             if !(*node).name.is_null() {
-                if !(*node).ns.is_null() {
-                    if let Some(prefix) = (*(*node).ns).prefix() {
-                        write!(output, "{prefix}:");
-                    }
+                if let Some(prefix) = (*node).ns.as_deref().and_then(|ns| ns.prefix()) {
+                    write!(output, "{prefix}:");
                 }
                 let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
                 write!(output, "{name}");
@@ -2452,10 +2450,8 @@ pub unsafe fn xml_shell_du(
             for _ in 0..indent {
                 write!((*ctxt).output, "  ");
             }
-            if !(*node).ns.is_null() {
-                if let Some(prefix) = (*(*node).ns).prefix() {
-                    write!((*ctxt).output, "{prefix}:");
-                }
+            if let Some(prefix) = (*node).ns.as_deref().and_then(|ns| ns.prefix()) {
+                write!((*ctxt).output, "{prefix}:");
             }
             let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
             writeln!((*ctxt).output, "{name}");
@@ -2939,16 +2935,16 @@ pub unsafe fn xml_shell<'a>(
                 c"%s > ".as_ptr(),
                 c"/".as_ptr(),
             );
-        } else if !(*ctxt).node.is_null()
-            && !(*(*ctxt).node).name.is_null()
-            && !(*(*ctxt).node).ns.is_null()
-            && !(*(*(*ctxt).node).ns).prefix.is_null()
+        } else if let Some(prefix) = (*(*ctxt).node)
+            .ns
+            .map(|ns| ns.prefix)
+            .filter(|p| !p.is_null() && !(*ctxt).node.is_null() && !(*(*ctxt).node).name.is_null())
         {
             snprintf(
                 prompt.as_mut_ptr() as _,
                 prompt.len(),
                 c"%s:%s > ".as_ptr(),
-                (*(*(*ctxt).node).ns).prefix,
+                prefix,
                 (*(*ctxt).node).name,
             );
         } else if !(*ctxt).node.is_null() && !(*(*ctxt).node).name.is_null() {

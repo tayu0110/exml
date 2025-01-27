@@ -434,10 +434,11 @@ macro_rules! IS_SCHEMATRON {
     ($node:expr, $elem:expr) => {
         !$node.is_null()
             && ((*$node).element_type() == XmlElementType::XmlElementNode)
-            && !(*$node).ns.is_null()
             && xml_str_equal((*$node).name, $elem)
-            && (xml_str_equal((*(*$node).ns).href, XML_SCHEMATRON_NS.as_ptr() as _)
-                || xml_str_equal((*(*$node).ns).href, XML_OLD_SCHEMATRON_NS.as_ptr() as _))
+            && (*$node).ns.map_or(false, |ns| {
+                xml_str_equal(ns.href, XML_SCHEMATRON_NS.as_ptr() as _)
+                    || xml_str_equal(ns.href, XML_OLD_SCHEMATRON_NS.as_ptr() as _)
+            })
     };
 }
 
@@ -445,9 +446,10 @@ macro_rules! NEXT_SCHEMATRON {
     ($node:expr) => {
         while !$node.is_null() {
             if ((*$node).element_type() == XmlElementType::XmlElementNode)
-                && !(*$node).ns.is_null()
-                && (xml_str_equal((*(*$node).ns).href, XML_SCHEMATRON_NS.as_ptr() as _)
-                    || xml_str_equal((*(*$node).ns).href, XML_OLD_SCHEMATRON_NS.as_ptr() as _))
+                && (*$node).ns.map_or(false, |ns| {
+                    xml_str_equal(ns.href, XML_SCHEMATRON_NS.as_ptr() as _)
+                        || xml_str_equal(ns.href, XML_OLD_SCHEMATRON_NS.as_ptr() as _)
+                })
             {
                 break;
             }
@@ -1513,11 +1515,11 @@ unsafe fn xml_schematron_format_report(
                 }
             }
 
-            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
+            if let Some(prefix) = (*node).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                ret = xml_strcat(ret, prefix);
+                ret = xml_strcat(ret, c":".as_ptr() as _);
                 ret = xml_strcat(ret, (*node).name);
             } else {
-                ret = xml_strcat(ret, (*(*node).ns).prefix);
-                ret = xml_strcat(ret, c":".as_ptr() as _);
                 ret = xml_strcat(ret, (*node).name);
             }
         } else if IS_SCHEMATRON!(child, c"value-of".as_ptr() as _) {

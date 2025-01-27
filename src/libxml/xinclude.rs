@@ -56,7 +56,7 @@ use crate::{
         xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
         xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc,
-        XmlElementType, XmlEntityPtr, XmlEntityType, XmlNode, XmlNsPtr, XML_XML_NAMESPACE,
+        XmlElementType, XmlEntityPtr, XmlEntityType, XmlNode, XML_XML_NAMESPACE,
     },
     uri::{build_uri, escape_url, XmlURI},
     xpath::{
@@ -236,13 +236,13 @@ unsafe fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: *mut XmlNode) -
     if (*node).element_type() != XmlElementType::XmlElementNode {
         return 0;
     }
-    if (*node).ns.is_null() {
+    let Some(node_ns) = (*node).ns else {
         return 0;
-    }
-    if xml_str_equal((*(*node).ns).href, XINCLUDE_NS.as_ptr() as _)
-        || xml_str_equal((*(*node).ns).href, XINCLUDE_OLD_NS.as_ptr() as _)
+    };
+    if xml_str_equal(node_ns.href, XINCLUDE_NS.as_ptr() as _)
+        || xml_str_equal(node_ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
     {
-        if xml_str_equal((*(*node).ns).href, XINCLUDE_OLD_NS.as_ptr() as _) && (*ctxt).legacy == 0 {
+        if xml_str_equal(node_ns.href, XINCLUDE_OLD_NS.as_ptr() as _) && (*ctxt).legacy == 0 {
             (*ctxt).legacy = 1;
         }
         if (*node).name().as_deref() == Some(XINCLUDE_NODE) {
@@ -251,9 +251,10 @@ unsafe fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: *mut XmlNode) -
 
             while !child.is_null() {
                 if (*child).element_type() == XmlElementType::XmlElementNode
-                    && !(*child).ns.is_null()
-                    && (xml_str_equal((*(*child).ns).href, XINCLUDE_NS.as_ptr() as _)
-                        || xml_str_equal((*(*child).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
+                    && (*child).ns.map_or(false, |ns| {
+                        xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
+                            || xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+                    })
                 {
                     if (*child).name().as_deref() == Some(XINCLUDE_NODE) {
                         xml_xinclude_err!(
@@ -286,14 +287,10 @@ unsafe fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: *mut XmlNode) -
         if (*node).name().as_deref() == Some(XINCLUDE_FALLBACK)
             && ((*node).parent().is_none()
                 || (*node).parent().unwrap().element_type() != XmlElementType::XmlElementNode
-                || (*node).parent().unwrap().ns.is_null()
-                || (!xml_str_equal(
-                    (*(*node).parent().unwrap().ns).href,
-                    XINCLUDE_NS.as_ptr() as _,
-                ) && !xml_str_equal(
-                    (*(*node).parent().unwrap().ns).href,
-                    XINCLUDE_OLD_NS.as_ptr() as _,
-                ))
+                || (*node).parent().unwrap().ns.map_or(true, |ns| {
+                    !xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
+                        && !xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+                })
                 || (*node).parent().unwrap().name().as_deref() != Some(XINCLUDE_NODE))
         {
             xml_xinclude_err!(
@@ -907,10 +904,11 @@ unsafe fn xml_xinclude_copy_node(
             XmlElementType::XmlDocumentNode | XmlElementType::XmlDTDNode
         ) {
         } else if (*cur).element_type() == XmlElementType::XmlElementNode
-            && !(*cur).ns.is_null()
             && (*cur).name().as_deref() == Some(XINCLUDE_NODE)
-            && (xml_str_equal((*(*cur).ns).href, XINCLUDE_NS.as_ptr() as _)
-                || xml_str_equal((*(*cur).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
+            && (*cur).ns.map_or(false, |ns| {
+                xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
+                    || xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+            })
         {
             let refe: XmlXincludeRefPtr = xml_xinclude_expand_node(ctxt, cur);
 
@@ -919,9 +917,7 @@ unsafe fn xml_xinclude_copy_node(
                 xml_free_node_list(result);
                 return null_mut();
             }
-            /*
-             * TODO: Insert xmlElementType::XML_XINCLUDE_START and xmlElementType::XML_XINCLUDE_END nodes
-             */
+            // TODO: Insert xmlElementType::XML_XINCLUDE_START and xmlElementType::XML_XINCLUDE_END nodes
             if !(*refe).inc.is_null() {
                 copy = xml_static_copy_node_list((*refe).inc, (*ctxt).doc, insert_parent);
                 if copy.is_null() {
@@ -2162,10 +2158,11 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeRefP
         let mut children = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
         while !children.is_null() {
             if (*children).element_type() == XmlElementType::XmlElementNode
-                && !(*children).ns.is_null()
                 && (*children).name().as_deref() == Some(XINCLUDE_FALLBACK)
-                && (xml_str_equal((*(*children).ns).href, XINCLUDE_NS.as_ptr() as _)
-                    || xml_str_equal((*(*children).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
+                && (*children).ns.map_or(false, |ns| {
+                    xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
+                        || xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+                })
             {
                 ret = xml_xinclude_load_fallback(ctxt, children, refe);
                 break;
@@ -2311,12 +2308,7 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeR
             xml_free_node(now.as_ptr());
             child = next;
         }
-        end = xml_new_doc_node(
-            (*cur).doc,
-            XmlNsPtr::from_raw((*cur).ns).unwrap(),
-            &(*cur).name().unwrap(),
-            null_mut(),
-        );
+        end = xml_new_doc_node((*cur).doc, (*cur).ns, &(*cur).name().unwrap(), null_mut());
         if end.is_null() {
             xml_xinclude_err!(
                 ctxt,

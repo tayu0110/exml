@@ -658,11 +658,9 @@ impl<T> XmlC14NCtx<'_, T> {
             }
             self.buf.borrow_mut().write_str("<");
 
-            if !cur.ns.is_null() {
-                if let Some(prefix) = (*cur.ns).prefix().filter(|pre| !pre.is_empty()) {
-                    self.buf.borrow_mut().write_str(&prefix);
-                    self.buf.borrow_mut().write_str(":");
-                }
+            if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
+                self.buf.borrow_mut().write_str(&prefix);
+                self.buf.borrow_mut().write_str(":");
             }
 
             self.buf
@@ -702,11 +700,9 @@ impl<T> XmlC14NCtx<'_, T> {
         }
         if visible {
             self.buf.borrow_mut().write_str("</");
-            if !cur.ns.is_null() {
-                if let Some(prefix) = (*cur.ns).prefix().filter(|pre| !pre.is_empty()) {
-                    self.buf.borrow_mut().write_str(&prefix);
-                    self.buf.borrow_mut().write_str(":");
-                }
+            if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
+                self.buf.borrow_mut().write_str(&prefix);
+                self.buf.borrow_mut().write_str(":");
             }
 
             self.buf
@@ -1003,23 +999,22 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // add node namespace
-        let ns = if !cur.ns.is_null() {
+        let ns = if cur.ns.is_some() {
             cur.ns
         } else {
             has_visibly_utilized_empty_ns = true;
             cur.search_ns(cur.doc, None)
-                .map_or(null_mut(), |p| p.as_ptr())
         };
-        if !ns.is_null() && !xml_c14n_is_xml_ns(ns) {
+        if let Some(ns) = ns.filter(|&ns| !xml_c14n_is_xml_ns(ns.as_ptr())) {
             if visible
-                && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
+                && self.is_visible(Some(&*ns), Some(cur))
                 && self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*ns)) == 0
             {
-                list.insert_lower_bound(ns);
+                list.insert_lower_bound(ns.as_ptr());
             }
             if visible {
                 // TODO: replace `cur` to `Rc<XmlNode>`
-                (*self.ns_rendered).add(ns, cur as *const XmlNode as _);
+                (*self.ns_rendered).add(ns.as_ptr(), cur as *const XmlNode as _);
             }
             if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                 has_empty_ns = true;

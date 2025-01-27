@@ -842,11 +842,9 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                     xml_node_dump_output_internal(ctxt, cur);
                 } else {
                     ctxt.buf.borrow_mut().write_bytes(b"<");
-                    if !(*cur).ns.is_null() {
-                        if let Some(prefix) = (*(*cur).ns).prefix() {
-                            ctxt.buf.borrow_mut().write_str(&prefix);
-                            ctxt.buf.borrow_mut().write_bytes(b":");
-                        }
+                    if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                        ctxt.buf.borrow_mut().write_str(&prefix);
+                        ctxt.buf.borrow_mut().write_bytes(b":");
                     }
 
                     ctxt.buf
@@ -901,11 +899,9 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                             ctxt.write_ws_non_sig(1);
                         }
                         ctxt.buf.borrow_mut().write_bytes(b"></");
-                        if !(*cur).ns.is_null() {
-                            if let Some(prefix) = (*(*cur).ns).prefix() {
-                                ctxt.buf.borrow_mut().write_str(&prefix);
-                                ctxt.buf.borrow_mut().write_bytes(b":");
-                            }
+                        if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                            ctxt.buf.borrow_mut().write_str(&prefix);
+                            ctxt.buf.borrow_mut().write_bytes(b":");
                         }
 
                         ctxt.buf
@@ -1082,11 +1078,9 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                 }
 
                 ctxt.buf.borrow_mut().write_bytes(b"</");
-                if !(*cur).ns.is_null() {
-                    if let Some(prefix) = (*(*cur).ns).prefix() {
-                        ctxt.buf.borrow_mut().write_str(&prefix);
-                        ctxt.buf.borrow_mut().write_bytes(b":");
-                    }
+                if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                    ctxt.buf.borrow_mut().write_str(&prefix);
+                    ctxt.buf.borrow_mut().write_bytes(b":");
                 }
 
                 ctxt.buf
@@ -1264,7 +1258,10 @@ unsafe fn xhtml_is_empty(node: &XmlNode) -> bool {
     if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
         return false;
     }
-    if !node.ns.is_null() && (*node.ns).href().as_deref() != Some(XHTML_NS_NAME) {
+    if node
+        .ns
+        .map_or(false, |ns| ns.href().as_deref() != Some(XHTML_NS_NAME))
+    {
         return false;
     }
     if node.children().is_some() {
@@ -1377,11 +1374,9 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                 }
 
                 ctxt.buf.borrow_mut().write_bytes(b"<");
-                if !(*cur).ns.is_null() {
-                    if let Some(prefix) = (*(*cur).ns).prefix() {
-                        ctxt.buf.borrow_mut().write_str(&prefix);
-                        ctxt.buf.borrow_mut().write_bytes(b":");
-                    }
+                if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                    ctxt.buf.borrow_mut().write_str(&prefix);
+                    ctxt.buf.borrow_mut().write_bytes(b":");
                 }
 
                 ctxt.buf
@@ -1391,7 +1386,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                     xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
                 }
                 if (*cur).name().as_deref() == Some("html")
-                    && (*cur).ns.is_null()
+                    && (*cur).ns.is_none()
                     && (*cur).ns_def.is_null()
                 {
                     // 3.1.1. Strictly Conforming Documents A.3.1.1 3/
@@ -1478,7 +1473,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                     parent = cur;
                     cur = children.as_ptr();
                     continue;
-                } else if ((*cur).ns.is_null() || (*(*cur).ns).prefix().is_none())
+                } else if (*cur).ns.map_or(true, |ns| ns.prefix().is_none())
                     && (xhtml_is_empty(&*cur) && addmeta == 0)
                 {
                     // C.2. Empty Elements
@@ -1516,11 +1511,9 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                     }
                     // C.3. Element Minimization and Empty Element Content
                     ctxt.buf.borrow_mut().write_bytes(b"</");
-                    if !(*cur).ns.is_null() {
-                        if let Some(prefix) = (*(*cur).ns).prefix() {
-                            ctxt.buf.borrow_mut().write_str(&prefix);
-                            ctxt.buf.borrow_mut().write_bytes(b":");
-                        }
+                    if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                        ctxt.buf.borrow_mut().write_str(&prefix);
+                        ctxt.buf.borrow_mut().write_bytes(b":");
                     }
 
                     ctxt.buf
@@ -1665,11 +1658,9 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                 }
 
                 ctxt.buf.borrow_mut().write_bytes(b"</");
-                if !(*cur).ns.is_null() {
-                    if let Some(prefix) = (*(*cur).ns).prefix() {
-                        ctxt.buf.borrow_mut().write_str(&prefix);
-                        ctxt.buf.borrow_mut().write_bytes(b":");
-                    }
+                if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                    ctxt.buf.borrow_mut().write_str(&prefix);
+                    ctxt.buf.borrow_mut().write_bytes(b":");
                 }
 
                 ctxt.buf

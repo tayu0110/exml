@@ -1419,17 +1419,17 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                 }
 
                                 // Namespace test
-                                if (*node).ns.is_null() {
-                                    if !(*step).value2.is_null() {
-                                        break 'rollback;
+                                if let Some(ns) = (*node).ns {
+                                    if !ns.href.is_null() {
+                                        if (*step).value2.is_null() {
+                                            break 'rollback;
+                                        }
+                                        if !xml_str_equal((*step).value2, ns.href) {
+                                            break 'rollback;
+                                        }
                                     }
-                                } else if !(*(*node).ns).href.is_null() {
-                                    if (*step).value2.is_null() {
-                                        break 'rollback;
-                                    }
-                                    if !xml_str_equal((*step).value2, (*(*node).ns).href) {
-                                        break 'rollback;
-                                    }
+                                } else if !(*step).value2.is_null() {
+                                    break 'rollback;
                                 }
                                 break 'to_continue;
                             }
@@ -1480,14 +1480,14 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                         break 'rollback;
                                     }
                                 }
-                                /* Namespace test */
-                                if (*node).ns.is_null() {
-                                    if !(*step).value2.is_null() {
+                                // Namespace test
+                                if let Some(ns) = (*node).ns {
+                                    if !(*step).value2.is_null()
+                                        && !xml_str_equal((*step).value2, ns.href)
+                                    {
                                         break 'rollback;
                                     }
-                                } else if !(*step).value2.is_null()
-                                    && !xml_str_equal((*step).value2, (*(*node).ns).href)
-                                {
+                                } else if !(*step).value2.is_null() {
                                     break 'rollback;
                                 }
                                 break 'to_continue;
@@ -1514,18 +1514,18 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                 if !xml_str_equal((*step).value, (*node).name) {
                                     break 'rollback;
                                 }
-                                /* Namespace test */
-                                if (*node).ns.is_null() {
-                                    if !(*step).value2.is_null() {
-                                        break 'rollback;
+                                // Namespace test
+                                if let Some(ns) = (*node).ns {
+                                    if !ns.href.is_null() {
+                                        if (*step).value2.is_null() {
+                                            break 'rollback;
+                                        }
+                                        if !xml_str_equal((*step).value2, ns.href) {
+                                            break 'rollback;
+                                        }
                                     }
-                                } else if !(*(*node).ns).href.is_null() {
-                                    if (*step).value2.is_null() {
-                                        break 'rollback;
-                                    }
-                                    if !xml_str_equal((*step).value2, (*(*node).ns).href) {
-                                        break 'rollback;
-                                    }
+                                } else if !(*step).value2.is_null() {
+                                    break 'rollback;
                                 }
                                 break 'to_continue;
                             }
@@ -1563,18 +1563,15 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                     ) && *(*step).value.add(0) == *(*node).name.add(0)
                                         && xml_str_equal((*step).value, (*node).name)
                                     {
-                                        /* Namespace test */
-                                        if (*node).ns.is_null() {
-                                            if (*step).value2.is_null() {
+                                        // Namespace test
+                                        if let Some(ns) = (*node).ns {
+                                            if !ns.href.is_null()
+                                                && (!(*step).value2.is_null()
+                                                    && xml_str_equal((*step).value2, ns.href))
+                                            {
                                                 break;
                                             }
-                                        } else if !(*(*node).ns).href.is_null()
-                                            && (!(*step).value2.is_null()
-                                                && xml_str_equal(
-                                                    (*step).value2,
-                                                    (*(*node).ns).href,
-                                                ))
-                                        {
+                                        } else if (*step).value2.is_null() {
                                             break;
                                         }
                                     }
@@ -1597,17 +1594,17 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                 {
                                     break 'rollback;
                                 }
-                                if (*node).ns.is_null() {
-                                    if !(*step).value.is_null() {
-                                        break 'rollback;
+                                if let Some(ns) = (*node).ns {
+                                    if !ns.href.is_null() {
+                                        if (*step).value.is_null() {
+                                            break 'rollback;
+                                        }
+                                        if !xml_str_equal((*step).value, ns.href) {
+                                            break 'rollback;
+                                        }
                                     }
-                                } else if !(*(*node).ns).href.is_null() {
-                                    if (*step).value.is_null() {
-                                        break 'rollback;
-                                    }
-                                    if !xml_str_equal((*step).value, (*(*node).ns).href) {
-                                        break 'rollback;
-                                    }
+                                } else if !(*step).value.is_null() {
+                                    break 'rollback;
                                 }
                             }
                             XmlPatOp::XmlOpAll => {

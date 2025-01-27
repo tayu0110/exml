@@ -2065,8 +2065,8 @@ pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: *mut XmlAttr
         let fattr: [XmlChar; 50] = [0; 50];
 
         let fullelemname: *mut XmlChar =
-            if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
-                xml_build_qname((*elem).name, (*(*elem).ns).prefix, felem.as_ptr() as _, 50)
+            if let Some(prefix) = (*elem).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                xml_build_qname((*elem).name, prefix, felem.as_ptr() as _, 50)
             } else {
                 (*elem).name as *mut XmlChar
             };
@@ -2421,15 +2421,11 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: *mut XmlDoc) -> i32 
     if let Some(int_subset) = (*doc).int_subset.filter(|dtd| !dtd.name.is_null()) {
         // Check first the document root against the NQName
         if !xml_str_equal(int_subset.name, (*root).name) {
-            if !(*root).ns.is_null() && (*(*root).ns).prefix().is_some() {
+            if let Some(prefix) = (*root).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
                 let mut fname: [XmlChar; 50] = [0; 50];
 
-                let fullname: *mut XmlChar = xml_build_qname(
-                    (*root).name,
-                    (*(*root).ns).prefix as _,
-                    fname.as_mut_ptr(),
-                    50,
-                );
+                let fullname: *mut XmlChar =
+                    xml_build_qname((*root).name, prefix, fname.as_mut_ptr(), 50);
                 if fullname.is_null() {
                     xml_verr_memory(ctxt, None);
                     return 0;
@@ -2702,15 +2698,10 @@ pub unsafe fn xml_valid_normalize_attribute_value(
         return null_mut();
     }
 
-    if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
+    if let Some(prefix) = (*elem).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
         let mut fname: [XmlChar; 50] = [0; 50];
 
-        let fullname: *mut XmlChar = xml_build_qname(
-            (*elem).name,
-            (*(*elem).ns).prefix as _,
-            fname.as_mut_ptr(),
-            50,
-        );
+        let fullname: *mut XmlChar = xml_build_qname((*elem).name, prefix, fname.as_mut_ptr(), 50);
         if fullname.is_null() {
             return null_mut();
         }
@@ -2776,15 +2767,10 @@ pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
     }
 
     let mut attr_decl = None;
-    if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
+    if let Some(prefix) = (*elem).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
         let mut fname: [XmlChar; 50] = [0; 50];
 
-        let fullname: *mut XmlChar = xml_build_qname(
-            (*elem).name,
-            (*(*elem).ns).prefix as _,
-            fname.as_mut_ptr(),
-            50,
-        );
+        let fullname: *mut XmlChar = xml_build_qname((*elem).name, prefix, fname.as_mut_ptr(), 50);
         if fullname.is_null() {
             return null_mut();
         }
@@ -3605,17 +3591,17 @@ pub unsafe fn xml_validate_element(
 
             let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
             while let Some(now) = ns {
-                if (*elem).ns.is_null() {
-                    ret &= xml_validate_one_namespace(ctxt, doc, elem, None, now, now.href);
-                } else {
+                if let Some(elem_ns) = (*elem).ns {
                     ret &= xml_validate_one_namespace(
                         ctxt,
                         doc,
                         elem,
-                        (*(*elem).ns).prefix().as_deref(),
+                        elem_ns.prefix().as_deref(),
                         now,
                         now.href,
                     );
+                } else {
+                    ret &= xml_validate_one_namespace(ctxt, doc, elem, None, now, now.href);
                 }
                 ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
@@ -3661,11 +3647,7 @@ unsafe fn xml_valid_get_elem_decl(
     }
 
     // Fetch the declaration for the qualified name
-    let mut prefix = None;
-    if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
-        prefix = (*(*elem).ns).prefix();
-    }
-
+    let prefix = (*elem).ns.as_deref().and_then(|ns| ns.prefix());
     let mut elem_decl = None;
     if let Some(prefix) = prefix {
         elem_decl =
@@ -3852,17 +3834,15 @@ unsafe fn xml_snprintf_elements(buf: *mut c_char, size: i32, node: *mut XmlNode,
         }
         match (*cur).element_type() {
             XmlElementType::XmlElementNode => {
-                if !(*cur).ns.is_null() {
-                    if let Some(prefix) = (*(*cur).ns).prefix() {
-                        if size - len < prefix.len() as i32 + 10 {
-                            if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
-                                strcat(buf, c" ...".as_ptr() as _);
-                            }
-                            return;
+                if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                    if size - len < prefix.len() as i32 + 10 {
+                        if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
+                            strcat(buf, c" ...".as_ptr() as _);
                         }
-                        strncat(buf, prefix.as_ptr() as *const i8, prefix.len());
-                        strcat(buf, c":".as_ptr() as _);
+                        return;
                     }
+                    strncat(buf, prefix.as_ptr() as *const i8, prefix.len());
+                    strcat(buf, c":".as_ptr() as _);
                 }
                 if size - len < xml_strlen((*cur).name) + 10 {
                     if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
@@ -4490,12 +4470,14 @@ unsafe fn xml_validate_element_content(
                                 break 'fail;
                             }
                             XmlElementType::XmlElementNode => {
-                                if !(*cur).ns.is_null() && (*(*cur).ns).prefix().is_some() {
+                                if let Some(prefix) =
+                                    (*cur).ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
+                                {
                                     let mut fname: [XmlChar; 50] = [0; 50];
 
                                     let fullname: *mut XmlChar = xml_build_qname(
                                         (*cur).name,
-                                        (*(*cur).ns).prefix as _,
+                                        prefix as _,
                                         fname.as_mut_ptr(),
                                         50,
                                     );
@@ -4814,7 +4796,7 @@ pub unsafe fn xml_validate_one_element(
                 );
                 return 0;
             }
-            if !(*elem).ns.is_null() {
+            if (*elem).ns.is_some() {
                 xml_err_valid_node(
                     ctxt,
                     elem,
@@ -4984,12 +4966,14 @@ pub unsafe fn xml_validate_one_element(
                         'child_ok: {
                             if matches!((*child).element_type(), XmlElementType::XmlElementNode) {
                                 name = (*child).name;
-                                if !(*child).ns.is_null() && (*(*child).ns).prefix().is_some() {
+                                if let Some(prefix) =
+                                    (*child).ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
+                                {
                                     let mut fname: [XmlChar; 50] = [0; 50];
 
                                     let fullname: *mut XmlChar = xml_build_qname(
                                         (*child).name,
-                                        (*(*child).ns).prefix,
+                                        prefix,
                                         fname.as_mut_ptr() as _,
                                         50,
                                     );
@@ -5175,9 +5159,8 @@ pub unsafe fn xml_validate_one_element(
                     while !attrib.is_null() {
                         if xml_str_equal((*attrib).name, cur_attr.name) {
                             if let Some(prefix) = cur_attr.prefix.as_deref() {
-                                let name_space = XmlNsPtr::from_raw((*attrib).ns)
-                                    .unwrap()
-                                    .or({ XmlNsPtr::from_raw((*elem).ns).unwrap() });
+                                let name_space =
+                                    XmlNsPtr::from_raw((*attrib).ns).unwrap().or((*elem).ns);
 
                                 // qualified names handling is problematic, having a
                                 // different prefix should be possible but DTDs don't
@@ -5349,15 +5332,11 @@ pub unsafe fn xml_validate_one_attribute(
     }
 
     let mut attr_decl = None;
-    if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
+    if let Some(prefix) = (*elem).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
         let mut fname: [XmlChar; 50] = [0; 50];
 
-        let fullname: *mut XmlChar = xml_build_qname(
-            (*elem).name,
-            (*(*elem).ns).prefix as _,
-            fname.as_mut_ptr(),
-            50,
-        );
+        let fullname: *mut XmlChar =
+            xml_build_qname((*elem).name, prefix as _, fname.as_mut_ptr(), 50);
         if fullname.is_null() {
             return 0;
         }

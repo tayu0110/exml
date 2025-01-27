@@ -4019,11 +4019,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                                 xml_stream_push(
                                     patstream,
                                     (*cur).name,
-                                    if !(*cur).ns.is_null() {
-                                        (*(*cur).ns).href
-                                    } else {
-                                        null_mut()
-                                    },
+                                    (*cur).ns.map_or(null_mut(), |ns| ns.href),
                                 )
                             } else if eval_all_nodes != 0 {
                                 xml_stream_push_node(
@@ -4947,7 +4943,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                     if matches!(axis, XmlXPathAxisVal::AxisAttribute) {
                         if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode)
                             && (prefix.is_null()
-                                || (!(*cur).ns.is_null() && xml_str_equal(uri, (*(*cur).ns).href)))
+                                || (*cur).ns.map_or(false, |ns| xml_str_equal(uri, ns.href)))
                         {
                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
@@ -4957,7 +4953,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                         }
                     } else if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                         && (prefix.is_null()
-                            || (!(*cur).ns.is_null() && xml_str_equal(uri, (*(*cur).ns).href)))
+                            || (*cur).ns.map_or(false, |ns| xml_str_equal(uri, ns.href)))
                     {
                         xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                     }
@@ -4981,11 +4977,10 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                         XmlElementType::XmlElementNode => {
                             if xml_str_equal(name, (*cur).name) {
                                 if prefix.is_null() {
-                                    if (*cur).ns.is_null() {
+                                    if (*cur).ns.is_none() {
                                         xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     }
-                                } else if !(*cur).ns.is_null()
-                                    && xml_str_equal(uri, (*(*cur).ns).href)
+                                } else if (*cur).ns.map_or(false, |ns| xml_str_equal(uri, ns.href))
                                 {
                                     xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                 }
@@ -6986,21 +6981,10 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
                 XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
                     if *(*table[i]).name.add(0) == b' ' {
                         value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
-                    } else if (*table[i]).ns.is_null() || (*(*table[i]).ns).prefix().is_none() {
-                        value_push(
-                            ctxt,
-                            xml_xpath_cache_new_string(
-                                (*ctxt).context,
-                                (*table[i]).name().as_deref(),
-                            ),
-                        );
-                    } else {
-                        let mut fullname = xml_build_qname(
-                            (*table[i]).name,
-                            (*(*table[i]).ns).prefix,
-                            null_mut(),
-                            0,
-                        );
+                    } else if let Some(prefix) =
+                        (*table[i]).ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
+                    {
+                        let mut fullname = xml_build_qname((*table[i]).name, prefix, null_mut(), 0);
                         if fullname == (*table[i]).name as _ {
                             fullname = xml_strdup((*table[i]).name);
                         }
@@ -7019,6 +7003,14 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
                             ),
                         );
                         xml_free(fullname as _);
+                    } else {
+                        value_push(
+                            ctxt,
+                            xml_xpath_cache_new_string(
+                                (*ctxt).context,
+                                (*table[i]).name().as_deref(),
+                            ),
+                        );
                     }
                 }
                 _ => {
@@ -9563,11 +9555,8 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: XmlXPathParserContextPtr, m
             let i = 0; /* Should be first in document order !!!!! */
             match (*table[i]).element_type() {
                 XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-                    if (*table[i]).ns.is_null() {
-                        value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
-                    } else {
-                        let href = (*(*table[i]).ns).href;
-
+                    if let Some(ns) = (*table[i]).ns {
+                        let href = ns.href;
                         value_push(
                             ctxt,
                             xml_xpath_cache_new_string(
@@ -9577,6 +9566,8 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: XmlXPathParserContextPtr, m
                                     .as_deref(),
                             ),
                         );
+                    } else {
+                        value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
                     }
                 }
                 _ => {

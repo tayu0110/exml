@@ -622,9 +622,10 @@ impl XmlTextReader {
                     && self.state != XmlTextReaderState::Backtrack
                     && !self.node.is_null()
                     && (*self.node).element_type() == XmlElementType::XmlElementNode
-                    && !(*self.node).ns.is_null()
-                    && (xml_str_equal((*(*self.node).ns).href, XINCLUDE_NS.as_ptr() as _)
-                        || xml_str_equal((*(*self.node).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
+                    && (*self.node).ns.map_or(false, |ns| {
+                        xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
+                            || xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+                    })
                 {
                     if self.xincctxt.is_null() {
                         self.xincctxt = xml_xinclude_new_context((*self.ctxt).my_doc);
@@ -1231,18 +1232,9 @@ impl XmlTextReader {
             && !self.ctxt.is_null()
             && (*self.ctxt).validate == 1
         {
-            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
-                (*self.ctxt).valid &= xml_validate_push_element(
-                    addr_of_mut!((*self.ctxt).vctxt),
-                    (*self.ctxt).my_doc,
-                    node,
-                    (*node).name,
-                );
-            } else {
-                /* TODO use the BuildQName interface */
-                let mut qname: *mut XmlChar;
-
-                qname = xml_strdup((*(*node).ns).prefix);
+            if let Some(prefix) = (*node).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                // TODO use the BuildQName interface
+                let mut qname = xml_strdup(prefix);
                 qname = xml_strcat(qname, c":".as_ptr() as _);
                 qname = xml_strcat(qname, (*node).name);
                 (*self.ctxt).valid &= xml_validate_push_element(
@@ -1254,6 +1246,13 @@ impl XmlTextReader {
                 if !qname.is_null() {
                     xml_free(qname as _);
                 }
+            } else {
+                (*self.ctxt).valid &= xml_validate_push_element(
+                    addr_of_mut!((*self.ctxt).vctxt),
+                    (*self.ctxt).my_doc,
+                    node,
+                    (*node).name,
+                );
             }
         }
         #[cfg(feature = "schema")]
@@ -1295,18 +1294,10 @@ impl XmlTextReader {
             && !self.ctxt.is_null()
             && (*self.ctxt).validate == 1
         {
-            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
-                (*self.ctxt).valid &= xml_validate_pop_element(
-                    addr_of_mut!((*self.ctxt).vctxt),
-                    (*self.ctxt).my_doc,
-                    node,
-                    (*node).name,
-                );
-            } else {
-                /* TODO use the BuildQName interface */
-                let mut qname: *mut XmlChar;
+            if let Some(prefix) = (*node).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                // TODO use the BuildQName interface
 
-                qname = xml_strdup((*(*node).ns).prefix);
+                let mut qname = xml_strdup(prefix);
                 qname = xml_strcat(qname, c":".as_ptr() as _);
                 qname = xml_strcat(qname, (*node).name);
                 (*self.ctxt).valid &= xml_validate_pop_element(
@@ -1318,6 +1309,13 @@ impl XmlTextReader {
                 if !qname.is_null() {
                     xml_free(qname as _);
                 }
+            } else {
+                (*self.ctxt).valid &= xml_validate_pop_element(
+                    addr_of_mut!((*self.ctxt).vctxt),
+                    (*self.ctxt).my_doc,
+                    node,
+                    (*node).name,
+                );
             }
         }
         #[cfg(feature = "schema")]
@@ -2541,15 +2539,15 @@ impl XmlTextReader {
         };
         match (*node).element_type() {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-                if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
+                let Some(prefix) = (*node).ns.as_deref().and_then(|ns| ns.prefix()) else {
                     return (!(*node).name.is_null()).then(|| {
                         CStr::from_ptr((*node).name as *const i8)
                             .to_string_lossy()
                             .into_owned()
                     });
-                }
+                };
 
-                let mut ret = (*(*node).ns).prefix().unwrap().into_owned();
+                let mut ret = prefix.into_owned();
                 ret.push(':');
                 ret.push_str((*node).name().unwrap().as_ref());
                 Some(ret)
@@ -2633,9 +2631,9 @@ impl XmlTextReader {
         ) {
             return None;
         }
-        if !(*node).ns.is_null() {
+        if let Some(ns) = (*node).ns {
             return Some(
-                CStr::from_ptr((*(*node).ns).href as *const i8)
+                CStr::from_ptr(ns.href as *const i8)
                     .to_string_lossy()
                     .into_owned(),
             );
@@ -2670,10 +2668,8 @@ impl XmlTextReader {
         ) {
             return None;
         }
-        if !(*node).ns.is_null() {
-            if let Some(prefix) = (*(*node).ns).prefix() {
-                return Some(prefix.into_owned());
-            }
+        if let Some(prefix) = (*node).ns.as_deref().and_then(|ns| ns.prefix()) {
+            return Some(prefix.into_owned());
         }
         None
     }
@@ -4017,10 +4013,10 @@ pub unsafe fn xml_text_reader_const_name(reader: &mut XmlTextReader) -> *const X
     };
     match (*node).element_type() {
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
+            let Some(prefix) = (*node).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) else {
                 return (*node).name;
-            }
-            CONSTQSTR!(reader, (*(*node).ns).prefix, (*node).name)
+            };
+            CONSTQSTR!(reader, prefix, (*node).name)
         }
         XmlElementType::XmlTextNode => CONSTSTR!(reader, c"#text".as_ptr() as _),
         XmlElementType::XmlCDATASectionNode => {
@@ -4085,8 +4081,8 @@ pub unsafe fn xml_text_reader_const_namespace_uri(reader: &mut XmlTextReader) ->
     ) {
         return null_mut();
     }
-    if !(*node).ns.is_null() {
-        return CONSTSTR!(reader, (*(*node).ns).href);
+    if let Some(ns) = (*node).ns {
+        return CONSTSTR!(reader, ns.href);
     }
     null_mut()
 }
@@ -4120,8 +4116,8 @@ pub unsafe fn xml_text_reader_const_prefix(reader: &mut XmlTextReader) -> *const
     ) {
         return null_mut();
     }
-    if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
-        return CONSTSTR!(reader, (*(*node).ns).prefix);
+    if let Some(prefix) = (*node).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+        return CONSTSTR!(reader, prefix);
     }
     null_mut()
 }

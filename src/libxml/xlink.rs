@@ -180,9 +180,9 @@ pub unsafe fn xlink_is_link(mut doc: *mut XmlDoc, node: *mut XmlNode) -> XlinkTy
     }
     if !doc.is_null() && (*doc).typ == XmlElementType::XmlHTMLDocumentNode {
         // This is an HTML document.
-    } else if !(*node).ns.is_null()
-        && xml_str_equal((*(*node).ns).href, XHTML_NAMESPACE.as_ptr() as _)
-    {
+    } else if (*node).ns.map_or(false, |ns| {
+        xml_str_equal(ns.href, XHTML_NAMESPACE.as_ptr() as _)
+    }) {
         // !!!! We really need an IS_XHTML_ELEMENT function from HTMLtree.h @@@
         // This is an XHTML element within an XML document
         // Check whether it's one of the element able to carry links

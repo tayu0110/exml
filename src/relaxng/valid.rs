@@ -201,13 +201,9 @@ impl XmlRelaxNGValidCtxt {
         }
         self.pnode = elem;
         self.pstate = 0;
-        if !(*elem).ns.is_null() {
-            ret = xml_reg_exec_push_string2(
-                self.elem,
-                (*elem).name,
-                (*(*elem).ns).href,
-                self as *mut Self as _,
-            );
+        if let Some(ns) = (*elem).ns {
+            ret =
+                xml_reg_exec_push_string2(self.elem, (*elem).name, ns.href, self as *mut Self as _);
         } else {
             ret = xml_reg_exec_push_string(self.elem, (*elem).name, self as *mut Self as _);
         }

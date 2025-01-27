@@ -2615,10 +2615,9 @@ unsafe fn xml_parse_xml_catalog_node_list(
     cgroup: Option<XmlCatalogEntry>,
 ) {
     while !cur.is_null() {
-        if !(*cur).ns.is_null()
-            && !(*(*cur).ns).href.is_null()
-            && xml_str_equal((*(*cur).ns).href, XML_CATALOGS_NAMESPACE.as_ptr() as _)
-        {
+        if (*cur).ns.map_or(false, |ns| {
+            !ns.href.is_null() && xml_str_equal(ns.href, XML_CATALOGS_NAMESPACE.as_ptr() as _)
+        }) {
             xml_parse_xml_catalog_node(cur, prefer, parent.clone(), cgroup.clone());
         }
         cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
@@ -2652,9 +2651,9 @@ unsafe fn xml_parse_xml_catalog_file(
     cur = (*doc).get_root_element();
     if !cur.is_null()
         && xml_str_equal((*cur).name, c"catalog".as_ptr() as _)
-        && !(*cur).ns.is_null()
-        && !(*(*cur).ns).href.is_null()
-        && xml_str_equal((*(*cur).ns).href, XML_CATALOGS_NAMESPACE.as_ptr() as _)
+        && (*cur).ns.map_or(false, |ns| {
+            !ns.href.is_null() && xml_str_equal(ns.href, XML_CATALOGS_NAMESPACE.as_ptr() as _)
+        })
     {
         let parent = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,

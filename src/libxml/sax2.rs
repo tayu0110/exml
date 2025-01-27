@@ -2193,7 +2193,7 @@ pub unsafe fn xml_sax2_start_element_ns(
                 last = ns;
             }
             if orig_uri.is_some() && prefix == pref.as_deref() {
-                (*ret).ns = ns;
+                (*ret).ns = XmlNsPtr::from_raw(ns).unwrap();
             }
         } else {
             // any out of memory error would already have been raised
@@ -2246,20 +2246,16 @@ pub unsafe fn xml_sax2_start_element_ns(
 
     // Search the namespace if it wasn't already found
     // Note that, if prefix is NULL, this searches for the default Ns
-    if orig_uri.is_some() && (*ret).ns.is_null() {
+    if orig_uri.is_some() && (*ret).ns.is_none() {
         (*ret).ns = if !parent.is_null() {
-            (*parent)
-                .search_ns((*ctxt).my_doc, prefix)
-                .map_or(null_mut(), |ns| ns.as_ptr())
+            (*parent).search_ns((*ctxt).my_doc, prefix)
         } else {
-            null_mut()
+            None
         };
-        if (*ret).ns.is_null() && prefix == Some("xml") {
-            (*ret).ns = (*ret)
-                .search_ns((*ctxt).my_doc, prefix)
-                .map_or(null_mut(), |ns| ns.as_ptr());
+        if (*ret).ns.is_none() && prefix == Some("xml") {
+            (*ret).ns = (*ret).search_ns((*ctxt).my_doc, prefix);
         }
-        if (*ret).ns.is_null() {
+        if (*ret).ns.is_none() {
             ns = xml_new_ns(ret, null_mut(), prefix);
             if ns.is_null() {
                 xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");

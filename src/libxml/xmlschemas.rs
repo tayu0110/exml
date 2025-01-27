@@ -600,9 +600,10 @@ macro_rules! WXS_ILIST_IS_EMPTY {
 macro_rules! IS_SCHEMA {
     ($node:expr, $type:expr) => {
         !$node.is_null()
-            && !(*$node).ns.is_null()
             && xml_str_equal((*$node).name, $type as _)
-            && xml_str_equal((*(*$node).ns).href, XML_SCHEMA_NS.as_ptr() as _)
+            && (*$node).ns.map_or(false, |ns| {
+                xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _)
+            })
     };
 }
 
@@ -1968,10 +1969,10 @@ unsafe fn xml_schema_format_item_for_report(
             item_node
         };
         *buf = xml_strdup(c"Element '".as_ptr() as _);
-        if !(*elem).ns.is_null() {
+        if let Some(ns) = (*elem).ns {
             *buf = xml_strcat(
                 *buf,
-                xml_schema_format_qname(addr_of_mut!(str), (*(*elem).ns).href, (*elem).name),
+                xml_schema_format_qname(addr_of_mut!(str), ns.href, (*elem).name),
             );
             FREE_AND_NULL!(str);
         } else {
@@ -1981,14 +1982,10 @@ unsafe fn xml_schema_format_item_for_report(
     }
     if !item_node.is_null() && (*item_node).element_type() == XmlElementType::XmlAttributeNode {
         *buf = xml_strcat(*buf, c", attribute '".as_ptr() as _);
-        if !(*item_node).ns.is_null() {
+        if let Some(ns) = (*item_node).ns {
             *buf = xml_strcat(
                 *buf,
-                xml_schema_format_qname(
-                    addr_of_mut!(str),
-                    (*(*item_node).ns).href,
-                    (*item_node).name,
-                ),
+                xml_schema_format_qname(addr_of_mut!(str), ns.href, (*item_node).name),
             );
             FREE_AND_NULL!(str);
         } else {
@@ -2027,10 +2024,10 @@ unsafe fn xml_schema_format_node_for_error(
             let elem: *mut XmlNode = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
 
             *msg = xml_strdup(c"Element '".as_ptr() as _);
-            if !(*elem).ns.is_null() {
+            if let Some(ns) = (*elem).ns {
                 *msg = xml_strcat(
                     *msg,
-                    xml_schema_format_qname(addr_of_mut!(str), (*(*elem).ns).href, (*elem).name),
+                    xml_schema_format_qname(addr_of_mut!(str), ns.href, (*elem).name),
                 );
             } else {
                 *msg = xml_strcat(
@@ -2044,10 +2041,10 @@ unsafe fn xml_schema_format_node_for_error(
         } else {
             *msg = xml_strdup(c"Element '".as_ptr() as _);
         }
-        if !(*node).ns.is_null() {
+        if let Some(ns) = (*node).ns {
             *msg = xml_strcat(
                 *msg,
-                xml_schema_format_qname(addr_of_mut!(str), (*(*node).ns).href, (*node).name),
+                xml_schema_format_qname(addr_of_mut!(str), ns.href, (*node).name),
             );
         } else {
             *msg = xml_strcat(
@@ -25296,8 +25293,8 @@ unsafe fn xml_schema_format_error_node_qname(
     node: *mut XmlNode,
 ) -> *const XmlChar {
     if !node.is_null() {
-        if !(*node).ns.is_null() {
-            return xml_schema_format_qname(str, (*(*node).ns).href, (*node).name);
+        if let Some(ns) = (*node).ns {
+            return xml_schema_format_qname(str, ns.href, (*node).name);
         } else {
             return xml_schema_format_qname(str, null_mut(), (*node).name);
         }
@@ -27772,8 +27769,8 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 (*ielem).node = node;
                 (*ielem).node_line = (*node).line as _;
                 (*ielem).local_name = (*node).name;
-                if !(*node).ns.is_null() {
-                    (*ielem).ns_name = (*(*node).ns).href;
+                if let Some(ns) = (*node).ns {
+                    (*ielem).ns_name = ns.href;
                 }
                 (*ielem).flags |= XML_SCHEMA_ELEM_INFO_EMPTY;
                 // Register attributes.

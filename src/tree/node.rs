@@ -56,13 +56,13 @@ pub struct XmlNode {
     pub doc: *mut XmlDoc,             /* the containing document */
 
     /* End of common part */
-    pub(crate) ns: *mut XmlNs, /* pointer to the associated namespace */
-    pub content: *mut XmlChar, /* the content */
+    pub(crate) ns: Option<XmlNsPtr>, /* pointer to the associated namespace */
+    pub content: *mut XmlChar,       /* the content */
     pub(crate) properties: *mut XmlAttr, /* properties list */
-    pub ns_def: *mut XmlNs,    /* namespace definitions on this node */
-    pub(crate) psvi: *mut c_void, /* for type/PSVI information */
-    pub(crate) line: u16,      /* line number */
-    pub(crate) extra: u16,     /* extra data for XPath/XSLT */
+    pub ns_def: *mut XmlNs,          /* namespace definitions on this node */
+    pub(crate) psvi: *mut c_void,    /* for type/PSVI information */
+    pub(crate) line: u16,            /* line number */
+    pub(crate) extra: u16,           /* extra data for XPath/XSLT */
 }
 
 impl XmlNode {
@@ -189,8 +189,8 @@ impl XmlNode {
             } else if matches!(current.element_type(), XmlElementType::XmlElementNode) {
                 generic = 0;
                 sep = "/";
-                if !current.ns.is_null() {
-                    name = if let Some(prefix) = (*current.ns).prefix() {
+                if let Some(ns) = current.ns {
+                    name = if let Some(prefix) = ns.prefix() {
                         Cow::Owned(format!("{prefix}:{}", current.name().unwrap(),))
                     } else {
                         // We cannot express named elements in the default
@@ -210,9 +210,10 @@ impl XmlNode {
                         && (generic != 0
                             || (current.name() == now.name()
                                 && (now.ns == current.ns
-                                    || (!now.ns.is_null()
-                                        && !current.ns.is_null()
-                                        && (*current.ns).prefix() == (*now.ns).prefix()))))
+                                    || current
+                                        .ns
+                                        .zip(now.ns)
+                                        .map_or(false, |(c, n)| c.prefix() == n.prefix()))))
                     {
                         occur += 1;
                     }
@@ -225,9 +226,10 @@ impl XmlNode {
                             && (generic != 0
                                 || (current.name() == now.name()
                                     && (now.ns == current.ns
-                                        || (!now.ns.is_null()
-                                            && !current.ns.is_null()
-                                            && (*current.ns).prefix() == (*now.ns).prefix()))))
+                                        || current
+                                            .ns
+                                            .zip(now.ns)
+                                            .map_or(false, |(c, n)| c.prefix() == n.prefix()))))
                         {
                             occur += 1;
                         }
@@ -339,8 +341,8 @@ impl XmlNode {
                 current.parent()
             } else if matches!(current.element_type(), XmlElementType::XmlAttributeNode) {
                 sep = "/@";
-                if !current.ns.is_null() {
-                    name = if let Some(prefix) = (*current.ns).prefix() {
+                if let Some(ns) = current.ns {
+                    name = if let Some(prefix) = ns.prefix() {
                         format!("{prefix}:{}", current.name().unwrap()).into()
                     } else {
                         format!("{}", current.name().unwrap()).into()
@@ -661,8 +663,8 @@ impl XmlNode {
                     let mut tmpstr: *mut XmlChar = null_mut();
 
                     // We need the QName of the element for the DTD-lookup.
-                    if !self.ns.is_null() && !(*self.ns).prefix.is_null() {
-                        tmpstr = xml_strdup((*self.ns).prefix);
+                    if let Some(prefix) = self.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                        tmpstr = xml_strdup(prefix);
                         tmpstr = xml_strcat(tmpstr, c":".as_ptr() as _);
                         tmpstr = xml_strcat(tmpstr, self.name);
                         if tmpstr.is_null() {
@@ -1241,7 +1243,7 @@ impl XmlNode {
             self.element_type(),
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
         ) {
-            self.ns = ns.map_or(null_mut(), |ns| ns.as_ptr());
+            self.ns = ns;
         }
     }
 
@@ -1971,7 +1973,7 @@ impl XmlNode {
                     cur = XmlNsPtr::from_raw(now.next).unwrap();
                 }
                 if orig != node {
-                    let cur = XmlNsPtr::from_raw((*node).ns).unwrap();
+                    let cur = (*node).ns;
                     if let Some(cur) = cur {
                         if cur.prefix().is_none() && namespace.is_none() && !cur.href.is_null() {
                             return Some(cur);
@@ -2061,7 +2063,7 @@ impl XmlNode {
                     cur = XmlNsPtr::from_raw(now.next).unwrap();
                 }
                 if orig != node {
-                    let cur = XmlNsPtr::from_raw((*node).ns).unwrap();
+                    let cur = (*node).ns;
                     if let Some(cur) = cur.filter(|cur| {
                         !cur.href.is_null()
                             && xml_str_equal(cur.href, href.as_ptr() as *const u8)
@@ -2108,25 +2110,24 @@ impl XmlNode {
         }
         while !node.is_null() {
             // Reconciliate the node namespace
-            if let Some(mut node_ns) = XmlNsPtr::from_raw((*node).ns).unwrap() {
+            if let Some(node_ns) = (*node).ns.as_mut() {
                 // initialize the cache if needed
                 let mut f = false;
                 for (i, &old_ns) in old_ns.iter().enumerate() {
-                    if old_ns == (*node).ns {
-                        (*node).ns = new_ns[i];
-                        node_ns = XmlNsPtr::from_raw(new_ns[i]).unwrap().unwrap();
+                    if old_ns == node_ns.as_ptr() {
+                        *node_ns = XmlNsPtr::from_raw(new_ns[i]).unwrap().unwrap();
                         f = true;
                         break;
                     }
                 }
                 if !f {
                     // OK we need to recreate a new namespace definition
-                    if let Some(n) = xml_new_reconciled_ns(doc, self, node_ns) {
+                    if let Some(n) = xml_new_reconciled_ns(doc, self, *node_ns) {
                         // :-( what if else ???
                         // check if we need to grow the cache buffers.
                         new_ns.push(n.as_ptr());
                         old_ns.push(node_ns.as_ptr());
-                        (*node).ns = n.as_ptr();
+                        *node_ns = n;
                     }
                 }
             }
@@ -2209,7 +2210,7 @@ impl Default for XmlNode {
             next: None,
             prev: None,
             doc: null_mut(),
-            ns: null_mut(),
+            ns: None,
             content: null_mut(),
             properties: null_mut(),
             ns_def: null_mut(),
@@ -2355,16 +2356,9 @@ unsafe fn add_prop_sibling(
         return null_mut();
     }
 
-    /* check if an attribute with the same name exists */
-    let attr = if (*prop).ns.is_null() {
-        (*cur).parent.expect("Internal Error").has_ns_prop(
-            CStr::from_ptr((*prop).name as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-            None,
-        )
-    } else {
-        let href = (*(*prop).ns).href;
+    // check if an attribute with the same name exists
+    let attr = if let Some(ns) = (*prop).ns {
+        let href = ns.href;
         (*cur).parent.expect("Internal Error").has_ns_prop(
             CStr::from_ptr((*prop).name as *const i8)
                 .to_string_lossy()
@@ -2372,6 +2366,13 @@ unsafe fn add_prop_sibling(
             (!href.is_null())
                 .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
                 .as_deref(),
+        )
+    } else {
+        (*cur).parent.expect("Internal Error").has_ns_prop(
+            CStr::from_ptr((*prop).name as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+            None,
         )
     };
 
