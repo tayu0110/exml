@@ -1291,10 +1291,9 @@ pub(crate) unsafe fn xml_static_copy_node(
     if matches!(
         (*node).element_type(),
         XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
-    ) && !(*node).ns_def.is_null()
+    ) && (*node).ns_def.is_some()
     {
-        (*ret).ns_def = xml_copy_namespace_list(XmlNsPtr::from_raw((*node).ns_def).unwrap())
-            .map_or(null_mut(), |ns| ns.as_ptr());
+        (*ret).ns_def = xml_copy_namespace_list((*node).ns_def);
     }
 
     if let Some(node_ns) = (*node).ns {
@@ -2596,12 +2595,13 @@ pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
             {
                 xml_free((*cur).content as _);
             }
-            if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+            if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                 || matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
-                || matches!((*cur).element_type(), XmlElementType::XmlXIncludeEnd))
-                && !(*cur).ns_def.is_null()
+                || matches!((*cur).element_type(), XmlElementType::XmlXIncludeEnd)
             {
-                xml_free_ns_list(XmlNsPtr::from_raw((*cur).ns_def).unwrap().unwrap());
+                if let Some(ns_def) = (*cur).ns_def {
+                    xml_free_ns_list(ns_def);
+                }
             }
 
             // When a node is a text node or a comment, it uses a global static
@@ -2687,8 +2687,8 @@ pub unsafe fn xml_free_node(cur: *mut XmlNode) {
         if !(*cur).properties.is_null() {
             xml_free_prop_list((*cur).properties);
         }
-        if !(*cur).ns_def.is_null() {
-            xml_free_ns_list(XmlNsPtr::from_raw((*cur).ns_def).unwrap().unwrap());
+        if let Some(ns_def) = (*cur).ns_def.take() {
+            xml_free_ns_list(ns_def);
         }
     } else if !(*cur).content.is_null()
         && !matches!((*cur).element_type(), XmlElementType::XmlEntityRefNode)
@@ -2730,7 +2730,7 @@ unsafe fn xml_ns_in_scope(
             return -1;
         }
         if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-            let mut tst = XmlNsPtr::from_raw((*node).ns_def).unwrap();
+            let mut tst = (*node).ns_def;
             while let Some(now) = tst {
                 if now.prefix().is_none() && prefix.is_null() {
                     return 0;
@@ -2917,7 +2917,7 @@ unsafe fn xml_search_ns_by_prefix_strict(
     cur = node;
     loop {
         if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-            let mut ns = XmlNsPtr::from_raw((*cur).ns_def).unwrap();
+            let mut ns = (*cur).ns_def;
             while let Some(now) = ns {
                 if prefix == now.prefix || xml_str_equal(prefix, now.prefix) {
                     // Disabled namespaces, e.g. xmlns:abc="".
@@ -2979,8 +2979,8 @@ unsafe fn xml_search_ns_by_namespace_strict(
     cur = node;
     loop {
         if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-            if !(*cur).ns_def.is_null() {
-                let mut ns = XmlNsPtr::from_raw((*cur).ns_def).unwrap();
+            if (*cur).ns_def.is_some() {
+                let mut ns = (*cur).ns_def;
                 while let Some(now) = ns {
                     if prefixed != 0 && now.prefix().is_none() {
                         ns = XmlNsPtr::from_raw(now.next).unwrap();
@@ -2989,7 +2989,7 @@ unsafe fn xml_search_ns_by_namespace_strict(
                     if !prev.is_null() {
                         // Check the last level of ns-decls for a
                         // shadowing prefix.
-                        let mut prevns = XmlNsPtr::from_raw((*prev).ns_def).unwrap();
+                        let mut prevns = (*prev).ns_def;
                         while let Some(pns) = prevns {
                             if pns.prefix() == now.prefix()
                                 || (pns.prefix().is_some()

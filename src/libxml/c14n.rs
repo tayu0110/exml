@@ -223,9 +223,9 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         let mut ns = cur.ns_def;
-        while !ns.is_null() {
-            if xml_strlen((*ns).href as _) > 0 {
-                let uri: XmlURIPtr = xml_parse_uri((*ns).href as _);
+        while let Some(now) = ns {
+            if xml_strlen(now.href as _) > 0 {
+                let uri: XmlURIPtr = xml_parse_uri(now.href as _);
                 if uri.is_null() {
                     xml_c14n_err_internal("parsing namespace uri");
                     return -1;
@@ -238,7 +238,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 }
                 xml_free_uri(uri);
             }
-            ns = (*ns).next as _;
+            ns = XmlNsPtr::from_raw(now.next).unwrap();
         }
         0
     }
@@ -317,7 +317,7 @@ impl<T> XmlC14NCtx<'_, T> {
         // check all namespaces
         let mut n = cur as *mut XmlNode;
         while !n.is_null() {
-            let mut ns = XmlNsPtr::from_raw((*n).ns_def).unwrap();
+            let mut ns = (*n).ns_def;
             while let Some(now) = ns {
                 let prefix = now.prefix();
                 let tmp = (*cur).search_ns(cur.doc, prefix.as_deref());

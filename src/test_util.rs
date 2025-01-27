@@ -709,7 +709,11 @@ pub(crate) fn des_eaten_name(_no: i32, _val: *mut XmlChar, _nr: i32) {}
 unsafe fn get_api_ns() -> *mut XmlNs {
     get_api_root();
     if !API_ROOT.get().is_null() {
-        API_NS.set((*API_ROOT.get()).ns_def);
+        API_NS.set(
+            (*API_ROOT.get())
+                .ns_def
+                .map_or(null_mut(), |ns| ns.as_ptr()),
+        );
     }
     API_NS.get()
 }

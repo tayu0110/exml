@@ -59,7 +59,7 @@ pub struct XmlNode {
     pub(crate) ns: Option<XmlNsPtr>, /* pointer to the associated namespace */
     pub content: *mut XmlChar,       /* the content */
     pub(crate) properties: *mut XmlAttr, /* properties list */
-    pub ns_def: *mut XmlNs,          /* namespace definitions on this node */
+    pub ns_def: Option<XmlNsPtr>,    /* namespace definitions on this node */
     pub(crate) psvi: *mut c_void,    /* for type/PSVI information */
     pub(crate) line: u16,            /* line number */
     pub(crate) extra: u16,           /* extra data for XPath/XSLT */
@@ -847,7 +847,7 @@ impl XmlNode {
         let mut node = self as *const XmlNode;
         while !node.is_null() {
             if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-                let mut cur = XmlNsPtr::from_raw((*node).ns_def).unwrap();
+                let mut cur = (*node).ns_def;
                 while let Some(now) = cur {
                     if ret.iter().all(|&ret| now.prefix() != (*ret).prefix()) {
                         ret.push(now);
@@ -1926,13 +1926,13 @@ impl XmlNode {
                     typ: XML_LOCAL_NAMESPACE,
                     href: xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
                     prefix: xml_strdup(c"xml".as_ptr() as _),
-                    next: self.ns_def,
+                    next: self.ns_def.map_or(null_mut(), |ns| ns.as_ptr()),
                     ..Default::default()
                 }) else {
                     xml_tree_err_memory("searching namespace");
                     return None;
                 };
-                self.ns_def = cur.as_ptr();
+                self.ns_def = Some(cur);
                 return Some(cur);
             }
             if doc.is_null() {
@@ -1959,7 +1959,7 @@ impl XmlNode {
                 return None;
             }
             if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-                let mut cur = XmlNsPtr::from_raw((*node).ns_def).unwrap();
+                let mut cur = (*node).ns_def;
                 while let Some(now) = cur {
                     if now.prefix().is_none() && namespace.is_none() && !now.href.is_null() {
                         return Some(now);
@@ -2016,13 +2016,13 @@ impl XmlNode {
                     typ: XML_LOCAL_NAMESPACE,
                     href: xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
                     prefix: xml_strdup(c"xml".as_ptr() as _),
-                    next: self.ns_def,
+                    next: self.ns_def.map_or(null_mut(), |ns| ns.as_ptr()),
                     ..Default::default()
                 }) else {
                     xml_tree_err_memory("searching namespace");
                     return None;
                 };
-                self.ns_def = cur.as_ptr();
+                self.ns_def = Some(cur);
                 return Some(cur);
             }
             if doc.is_null() {
@@ -2051,7 +2051,7 @@ impl XmlNode {
             }
             if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
                 let href = CString::new(href).unwrap();
-                let mut cur = XmlNsPtr::from_raw((*node).ns_def).unwrap();
+                let mut cur = (*node).ns_def;
                 while let Some(now) = cur {
                     if !now.href.is_null()
                         && xml_str_equal(now.href, href.as_ptr() as *const u8)
@@ -2213,7 +2213,7 @@ impl Default for XmlNode {
             ns: None,
             content: null_mut(),
             properties: null_mut(),
-            ns_def: null_mut(),
+            ns_def: None,
             psvi: null_mut(),
             line: 0,
             extra: 0,

@@ -310,9 +310,9 @@ unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
     cur = node;
     while !cur.is_null() && cur != (*cur).doc as _ {
         if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-            && !(*cur).ns_def.is_null()
+            && (*cur).ns_def.is_some()
         {
-            let mut ns = XmlNsPtr::from_raw((*cur).ns_def).unwrap();
+            let mut ns = (*cur).ns_def;
             while let Some(now) = ns {
                 shadowed = 0;
                 if XML_NSMAP_NOTEMPTY!(*map) {
@@ -415,9 +415,8 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
     pref = prefix;
     loop {
         // Lookup whether the prefix is unused in elem's ns-decls.
-        if !(*elem).ns_def.is_null()
-            && xml_tree_nslist_lookup_by_prefix(XmlNsPtr::from_raw((*elem).ns_def).unwrap(), pref)
-                .is_some()
+        if (*elem).ns_def.is_some()
+            && xml_tree_nslist_lookup_by_prefix((*elem).ns_def, pref).is_some()
         {
             // goto ns_next_prefix;
         } else {
@@ -443,14 +442,14 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
                 if ret.is_null() {
                     return None;
                 }
-                if let Some(ns_def) = XmlNsPtr::from_raw((*elem).ns_def).unwrap() {
+                if let Some(ns_def) = (*elem).ns_def {
                     let mut ns2 = ns_def;
                     while let Some(next) = XmlNsPtr::from_raw(ns2.next).unwrap() {
                         ns2 = next;
                     }
                     ns2.next = ret;
                 } else {
-                    (*elem).ns_def = ret;
+                    (*elem).ns_def = XmlNsPtr::from_raw(ret).unwrap();
                 }
                 return XmlNsPtr::from_raw(ret).unwrap();
             }
@@ -638,9 +637,9 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         cur_elem = cur;
                         depth += 1;
                         // Namespace declarations.
-                        if !(*cur).ns_def.is_null() {
+                        if (*cur).ns_def.is_some() {
                             let mut prevns = None::<XmlNsPtr>;
-                            let mut ns = XmlNsPtr::from_raw((*cur).ns_def).unwrap();
+                            let mut ns = (*cur).ns_def;
                             'b: while let Some(cur_ns) = ns {
                                 if parnsdone == 0 {
                                     if let Some(parent) = (*elem)
@@ -683,7 +682,8 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                                             if let Some(mut prevns) = prevns {
                                                 prevns.next = cur_ns.next;
                                             } else {
-                                                (*cur).ns_def = cur_ns.next;
+                                                (*cur).ns_def =
+                                                    XmlNsPtr::from_raw(cur_ns.next).unwrap();
                                             }
                                             // goto next_ns_decl;
                                             ns = XmlNsPtr::from_raw(cur_ns.next).unwrap();
@@ -1117,7 +1117,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             // - Note that for custom handling of ns-references,
                             //   the ns-decls need not be stored in the ns-map,
                             //   since they won't be referenced by (*node).ns.
-                            if !(*cur).ns_def.is_null()
+                            if (*cur).ns_def.is_some()
                                 && (ctxt.is_null() || (*ctxt).get_ns_for_node_func.is_none())
                             {
                                 if parnsdone == 0 {
@@ -1132,7 +1132,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
 
                                     parnsdone = 1;
                                 }
-                                let mut ns = XmlNsPtr::from_raw((*cur).ns_def).unwrap();
+                                let mut ns = (*cur).ns_def;
                                 while let Some(now) = ns {
                                     // Does it shadow any ns-decl?
                                     if XML_NSMAP_NOTEMPTY!(ns_map) {
@@ -1739,8 +1739,8 @@ pub unsafe fn xml_dom_wrap_remove_node(
     'main: loop {
         match (*node).element_type() {
             XmlElementType::XmlElementNode => {
-                if ctxt.is_null() && !(*node).ns_def.is_null() {
-                    let mut ns = XmlNsPtr::from_raw((*node).ns_def).unwrap();
+                if ctxt.is_null() && (*node).ns_def.is_some() {
+                    let mut ns = (*node).ns_def;
                     while let Some(now) = ns {
                         if xml_dom_wrap_ns_norm_add_ns_map_item2(
                             &mut list,
@@ -2133,7 +2133,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         cur_elem = cur;
                         depth += 1;
                         // Namespace declarations.
-                        if !(*cur).ns_def.is_null() {
+                        if (*cur).ns_def.is_some() {
                             if parnsdone == 0 {
                                 if !dest_parent.is_null() && ctxt.is_null() {
                                     // Gather @parent's in-scope ns-decls.
@@ -2149,7 +2149,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                             }
                             // Clone namespace declarations.
                             let mut clone_ns_def_slot = None::<XmlNsPtr>;
-                            let mut ns = XmlNsPtr::from_raw((*cur).ns_def).unwrap();
+                            let mut ns = (*cur).ns_def;
                             while let Some(now) = ns {
                                 // Create a new xmlNs.
                                 let Some(mut new) = XmlNsPtr::new(XmlNs {
@@ -2174,7 +2174,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                     clone_ns_def_slot = Some(new);
                                 } else {
                                     clone_ns_def_slot = Some(new);
-                                    (*clone).ns_def = new.as_ptr();
+                                    (*clone).ns_def = Some(new);
                                 }
 
                                 // Note that for custom handling of ns-references,

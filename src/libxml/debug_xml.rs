@@ -133,10 +133,10 @@ impl XmlDebugCtxt<'_> {
 
     /// Report if a given namespace is is not in scope.
     #[doc(alias = "xmlCtxtNsCheckScope")]
-    unsafe fn ns_check_scope(&mut self, node: &impl NodeCommon, ns: *mut XmlNs) {
+    unsafe fn ns_check_scope(&mut self, node: &impl NodeCommon, ns: XmlNsPtr) {
         let ret: i32 = xml_ns_check_scope(node, ns);
         if ret == -2 {
-            if let Some(prefix) = (*ns).prefix() {
+            if let Some(prefix) = ns.prefix() {
                 xml_debug_err!(
                     self,
                     XmlParserErrors::XmlCheckNsScope,
@@ -152,7 +152,7 @@ impl XmlDebugCtxt<'_> {
             }
         }
         if ret == -3 {
-            if let Some(prefix) = (*ns).prefix() {
+            if let Some(prefix) = ns.prefix() {
                 xml_debug_err!(
                     self,
                     XmlParserErrors::XmlCheckNsAncestor,
@@ -314,21 +314,19 @@ impl XmlDebugCtxt<'_> {
             );
         }
         if node.element_type() == XmlElementType::XmlElementNode {
-            let mut ns: *mut XmlNs;
-
-            ns = node.as_node().unwrap().as_ref().ns_def;
-            while !ns.is_null() {
-                self.ns_check_scope(node, ns);
-                ns = (*ns).next;
+            let mut ns = node.as_node().unwrap().as_ref().ns_def;
+            while let Some(now) = ns {
+                self.ns_check_scope(node, now);
+                ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
             if let Some(ns) = node.as_node().unwrap().as_ref().ns {
-                self.ns_check_scope(node, ns.as_ptr());
+                self.ns_check_scope(node, ns);
             }
-        } else if let Some(attr) = node
+        } else if let Some(ns) = node
             .as_attribute_node()
-            .filter(|attr| !attr.as_ref().ns.is_null())
+            .and_then(|attr| XmlNsPtr::from_raw(attr.as_ref().ns).unwrap())
         {
-            self.ns_check_scope(node, attr.as_ref().ns);
+            self.ns_check_scope(node, ns);
         }
 
         if !matches!(
@@ -1064,11 +1062,12 @@ impl XmlDebugCtxt<'_> {
             writeln!(self.output, "PBM: doc.is_null() !!!");
         }
         self.depth += 1;
-        if let Some(node) = node.as_node().filter(|n| {
-            n.as_ref().element_type() == XmlElementType::XmlElementNode
-                && !n.as_ref().ns_def.is_null()
-        }) {
-            self.dump_namespace_list(Some(&*node.as_ref().ns_def));
+        if let Some(ns_def) = node
+            .as_node()
+            .filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
+            .and_then(|node| node.as_ref().ns_def)
+        {
+            self.dump_namespace_list(Some(&*ns_def));
         }
         if let Some(node) = node.as_node().filter(|n| {
             n.as_ref().element_type() == XmlElementType::XmlElementNode
@@ -1448,11 +1447,7 @@ const DUMP_TEXT_TYPE: i32 = 1;
 /// -2 if the namespace is not in scope,
 /// and -3 if not on an ancestor node.
 #[doc(alias = "xmlNsCheckScope")]
-unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: *mut XmlNs) -> i32 {
-    if ns.is_null() {
-        return -1;
-    }
-
+unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
     if !matches!(
         node.element_type(),
         XmlElementType::XmlElementNode
@@ -1480,14 +1475,14 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: *mut XmlNs) -> i32 {
             XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
         ) {
             let mut cur = now.as_node().unwrap().as_ref().ns_def;
-            while !cur.is_null() {
-                if cur == ns {
+            while let Some(now) = cur {
+                if now == ns {
                     return 1;
                 }
-                if (*cur).prefix() == (*ns).prefix() {
+                if now.prefix() == ns.prefix() {
                     return -2;
                 }
-                cur = (*cur).next;
+                cur = XmlNsPtr::from_raw(now.next).unwrap();
             }
         }
         node = now.parent().map(|p| &*p.as_ptr() as &dyn NodeCommon);
@@ -1500,7 +1495,7 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: *mut XmlNs) -> i32 {
         )
     }) {
         let old_ns = node.as_document_node().unwrap().as_ref().old_ns;
-        if old_ns == XmlNsPtr::from_raw(ns).unwrap() {
+        if old_ns == Some(ns) {
             return 1;
         }
     }
@@ -1703,7 +1698,7 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: *mut Xml
         } else {
             write!(output, "-");
         }
-        if !(*node).ns_def.is_null() {
+        if (*node).ns_def.is_some() {
             write!(output, "n");
         } else {
             write!(output, "-");
@@ -2813,25 +2808,23 @@ unsafe fn xml_shell_register_root_namespaces(
 ) -> i32 {
     use crate::xpath::internals::xml_xpath_register_ns;
 
-    let mut ns: *mut XmlNs;
-
     if root.is_null()
         || (*root).element_type() != XmlElementType::XmlElementNode
-        || (*root).ns_def.is_null()
+        || (*root).ns_def.is_none()
         || ctxt.is_null()
         || (*ctxt).pctxt.is_null()
     {
         return -1;
     }
-    ns = (*root).ns_def;
-    while !ns.is_null() {
-        if let Some(prefix) = (*ns).prefix() {
+    let mut ns = (*root).ns_def;
+    while let Some(now) = ns {
+        if let Some(prefix) = now.prefix() {
             let prefix = CString::new(prefix.as_ref()).unwrap();
-            xml_xpath_register_ns((*ctxt).pctxt, prefix.as_ptr() as *const u8, (*ns).href);
+            xml_xpath_register_ns((*ctxt).pctxt, prefix.as_ptr() as *const u8, now.href);
         } else {
-            xml_xpath_register_ns((*ctxt).pctxt, c"defaultns".as_ptr() as _, (*ns).href);
+            xml_xpath_register_ns((*ctxt).pctxt, c"defaultns".as_ptr() as _, now.href);
         }
-        ns = (*ns).next;
+        ns = XmlNsPtr::from_raw(now.next).unwrap();
     }
     0
 }

@@ -2098,7 +2098,6 @@ pub unsafe fn xml_sax2_start_element_ns(
 ) {
     let ret: *mut XmlNode;
     let mut last: *mut XmlNs = null_mut();
-    let mut ns: *mut XmlNs;
 
     if ctx.is_none() {
         return;
@@ -2183,10 +2182,10 @@ pub unsafe fn xml_sax2_start_element_ns(
     // Build the namespace list
     for (pref, uri) in namespaces {
         let uri = CString::new(uri.as_str()).unwrap();
-        ns = xml_new_ns(null_mut(), uri.as_ptr() as *const u8, pref.as_deref());
+        let ns = xml_new_ns(null_mut(), uri.as_ptr() as *const u8, pref.as_deref());
         if !ns.is_null() {
             if last.is_null() {
-                (*ret).ns_def = ns;
+                (*ret).ns_def = XmlNsPtr::from_raw(ns).unwrap();
                 last = ns;
             } else {
                 (*last).next = ns;
@@ -2256,7 +2255,7 @@ pub unsafe fn xml_sax2_start_element_ns(
             (*ret).ns = (*ret).search_ns((*ctxt).my_doc, prefix);
         }
         if (*ret).ns.is_none() {
-            ns = xml_new_ns(ret, null_mut(), prefix);
+            let ns = xml_new_ns(ret, null_mut(), prefix);
             if ns.is_null() {
                 xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");
                 return;

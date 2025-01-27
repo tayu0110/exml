@@ -850,8 +850,8 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                     ctxt.buf
                         .borrow_mut()
                         .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-                    if !(*cur).ns_def.is_null() {
-                        xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
+                    if let Some(ns_def) = (*cur).ns_def {
+                        xml_ns_list_dump_output_ctxt(ctxt, ns_def.as_ptr());
                     }
                     attr = (*cur).properties;
                     while !attr.is_null() {
@@ -1382,12 +1382,12 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                 ctxt.buf
                     .borrow_mut()
                     .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-                if !(*cur).ns_def.is_null() {
-                    xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
+                if let Some(ns_def) = (*cur).ns_def {
+                    xml_ns_list_dump_output_ctxt(ctxt, ns_def.as_ptr());
                 }
                 if (*cur).name().as_deref() == Some("html")
                     && (*cur).ns.is_none()
-                    && (*cur).ns_def.is_null()
+                    && (*cur).ns_def.is_none()
                 {
                     // 3.1.1. Strictly Conforming Documents A.3.1.1 3/
 

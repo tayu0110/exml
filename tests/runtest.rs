@@ -4002,7 +4002,7 @@ unsafe fn pattern_test(
             },
             xmlreader::{xml_free_text_reader, xml_reader_walker},
         },
-        tree::XmlNs,
+        tree::XmlNsPtr,
     };
 
     let mut patternc: XmlPatternPtr;
@@ -4085,15 +4085,13 @@ unsafe fn pattern_test(
                     // ret = 1;
                 } else {
                     let mut namespaces: [(*const u8, *const u8); 20] = [(null(), null()); 20];
-                    let mut ns: *mut XmlNs;
-
                     let root: *mut XmlNode = (*doc).get_root_element();
-                    ns = (*root).ns_def;
+                    let mut ns = (*root).ns_def;
                     let mut j = 0;
-                    while j < 10 && !ns.is_null() {
-                        namespaces[j] = ((*ns).href, (*ns).prefix);
+                    while let Some(now) = ns.filter(|_| j < 10) {
+                        namespaces[j] = (now.href, now.prefix);
                         j += 1;
-                        ns = (*ns).next;
+                        ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
 
                     patternc = xml_patterncompile(str.as_ptr(), 0, Some(namespaces[..=j].to_vec()));
@@ -4159,7 +4157,7 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             xmlstring::xml_str_equal,
         },
-        tree::XmlNs,
+        tree::XmlNsPtr,
         xpath::{
             internals::xml_xpath_register_ns, xml_xpath_eval_expression, xml_xpath_free_context,
             xml_xpath_new_context, XmlXPathContextPtr,
@@ -4167,7 +4165,6 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
     };
 
     let mut node: *mut XmlNode;
-    let mut ns: *mut XmlNs;
 
     // load XPath expr as a file
     set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
@@ -4215,19 +4212,19 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
     }
 
     // Register namespaces
-    ns = (*node).ns_def;
-    while !ns.is_null() {
-        if xml_xpath_register_ns(ctx, (*ns).prefix, (*ns).href) != 0 {
+    let mut ns = (*node).ns_def;
+    while let Some(now) = ns {
+        if xml_xpath_register_ns(ctx, now.prefix, now.href) != 0 {
             eprintln!(
                 "Error: unable to register NS with prefix=\"{}\" and href=\"{}\"",
-                CStr::from_ptr((*ns).prefix as _).to_string_lossy(),
-                CStr::from_ptr((*ns).href as _).to_string_lossy(),
+                CStr::from_ptr(now.prefix as _).to_string_lossy(),
+                CStr::from_ptr(now.href as _).to_string_lossy(),
             );
             xml_xpath_free_context(ctx);
             xml_free_doc(doc);
             return null_mut();
         }
-        ns = (*ns).next;
+        ns = XmlNsPtr::from_raw(now.next).unwrap();
     }
 
     // Evaluate xpath

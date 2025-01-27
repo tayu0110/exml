@@ -1872,14 +1872,18 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                         // children we just moved).  We'll just stick it on to the end
                         // of (*cur).parent's list, since it's never going to be re-serialized
                         // (bug 143738).
-                        if !(*cur).ns_def.is_null() && (*cur).parent().is_some() {
-                            let mut par_def: *mut XmlNs =
-                                addr_of_mut!((*cur).parent().unwrap().ns_def) as *mut XmlNs;
-                            while !(*par_def).next.is_null() {
-                                par_def = (*par_def).next;
+                        if let Some(mut parent) = (*cur).parent() {
+                            if let Some(ns_def) = (*cur).ns_def.take() {
+                                if let Some(par_def) = parent.ns_def {
+                                    let mut last = par_def;
+                                    while let Some(next) = XmlNsPtr::from_raw(last.next).unwrap() {
+                                        last = next;
+                                    }
+                                    last.next = ns_def.as_ptr();
+                                } else {
+                                    parent.ns_def = Some(ns_def);
+                                }
                             }
-                            (*par_def).next = (*cur).ns_def;
-                            (*cur).ns_def = null_mut();
                         }
                         delete = cur;
                         break 'skip_children;

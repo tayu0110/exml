@@ -131,9 +131,10 @@ impl XmlNsPtr {
     ///
     /// # Safety
     /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
-    pub(crate) unsafe fn from_raw(
-        ptr: *mut XmlNs,
-    ) -> Result<Option<Self>, InvalidNodePointerCastError> {
+    ///
+    /// # Todo
+    /// - Fix to the private method.
+    pub unsafe fn from_raw(ptr: *mut XmlNs) -> Result<Option<Self>, InvalidNodePointerCastError> {
         if ptr.is_null() {
             return Ok(None);
         }
@@ -276,27 +277,26 @@ pub unsafe fn xml_new_ns(
     // Add it at the end to preserve parsing order ...
     // and checks for existing use of the prefix
     if !node.is_null() {
-        if (*node).ns_def.is_null() {
-            (*node).ns_def = cur.as_ptr();
-        } else {
-            let mut prev: *mut XmlNs = (*node).ns_def;
-
-            if ((*prev).prefix.is_null() && cur.prefix.is_null())
-                || xml_str_equal((*prev).prefix, cur.prefix)
+        if let Some(ns_def) = (*node).ns_def {
+            let mut prev = ns_def;
+            if (prev.prefix.is_null() && cur.prefix.is_null())
+                || xml_str_equal(prev.prefix, cur.prefix)
             {
                 xml_free_ns(cur);
                 return null_mut();
             }
-            while !(*prev).next.is_null() {
-                prev = (*prev).next;
-                if ((*prev).prefix.is_null() && cur.prefix.is_null())
-                    || xml_str_equal((*prev).prefix, cur.prefix)
+            while !prev.next.is_null() {
+                prev = XmlNsPtr::from_raw(prev.next).unwrap().unwrap();
+                if (prev.prefix.is_null() && cur.prefix.is_null())
+                    || xml_str_equal(prev.prefix, cur.prefix)
                 {
                     xml_free_ns(cur);
                     return null_mut();
                 }
             }
-            (*prev).next = cur.as_ptr();
+            prev.next = cur.as_ptr();
+        } else {
+            (*node).ns_def = Some(cur);
         }
     }
     cur.as_ptr()

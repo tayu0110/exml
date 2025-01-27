@@ -122,7 +122,7 @@ use crate::{
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
         NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNs,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNsPtr,
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
@@ -2137,14 +2137,13 @@ pub unsafe fn xml_parse_in_node_context(
         // initialize the SAX2 namespaces stack
         cur = node;
         while !cur.is_null() && (*cur).element_type() == XmlElementType::XmlElementNode {
-            let mut ns: *mut XmlNs = (*cur).ns_def;
-
-            while !ns.is_null() {
-                if xml_get_namespace(ctxt, (*ns).prefix().as_deref()).is_none() {
-                    (*ctxt).ns_push((*ns).prefix().as_deref(), &(*ns).href().unwrap());
+            let mut ns = (*cur).ns_def;
+            while let Some(now) = ns {
+                if xml_get_namespace(ctxt, now.prefix().as_deref()).is_none() {
+                    (*ctxt).ns_push(now.prefix().as_deref(), &now.href().unwrap());
                     nsnr += 1;
                 }
-                ns = (*ns).next as _;
+                ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
             cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
         }

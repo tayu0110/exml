@@ -1574,7 +1574,7 @@ impl XmlTextReader {
         };
 
         if (*node).element_type() == XmlElementType::XmlElementNode
-            && (!(*node).properties.is_null() || !(*node).ns_def.is_null())
+            && (!(*node).properties.is_null() || (*node).ns_def.is_some())
         {
             return true;
         }
@@ -1636,7 +1636,7 @@ impl XmlTextReader {
         let Some((prefix, localname)) = split_qname2(name) else {
             // Namespace default decl
             if name == "xmlns" {
-                let mut ns = XmlNsPtr::from_raw((*self.node).ns_def).unwrap();
+                let mut ns = (*self.node).ns_def;
                 while let Some(now) = ns {
                     if now.prefix().is_none() {
                         return Some(
@@ -1655,7 +1655,7 @@ impl XmlTextReader {
         // Namespace default decl
         let mut ret = None;
         if prefix == "xmlns" {
-            let mut ns = XmlNsPtr::from_raw((*self.node).ns_def).unwrap();
+            let mut ns = (*self.node).ns_def;
             while let Some(now) = ns {
                 if now.prefix().as_deref() == Some(localname) {
                     ret = Some(
@@ -1692,7 +1692,7 @@ impl XmlTextReader {
     ) -> Option<String> {
         use std::ffi::CStr;
 
-        use crate::tree::NodeCommon;
+        use crate::tree::{NodeCommon, XmlNsPtr};
 
         if self.node.is_null() {
             return None;
@@ -1709,17 +1709,17 @@ impl XmlTextReader {
         if namespace_uri == Some("http://www.w3.org/2000/xmlns/") {
             let prefix = (local_name != "xmlns").then_some(local_name);
             let mut ns = (*self.node).ns_def;
-            while !ns.is_null() {
-                if (prefix.is_none() && (*ns).prefix().is_none())
-                    || (*ns).prefix().as_deref() == Some(local_name)
+            while let Some(now) = ns {
+                if (prefix.is_none() && now.prefix().is_none())
+                    || now.prefix().as_deref() == Some(local_name)
                 {
                     return Some(
-                        CStr::from_ptr((*ns).href as *const i8)
+                        CStr::from_ptr(now.href as *const i8)
                             .to_string_lossy()
                             .into_owned(),
                     );
                 }
-                ns = (*ns).next;
+                ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
             return None;
         }
@@ -1751,7 +1751,7 @@ impl XmlTextReader {
             return None;
         }
 
-        let mut ns = XmlNsPtr::from_raw((*self.node).ns_def).unwrap();
+        let mut ns = (*self.node).ns_def;
         let mut i = 0;
         while let Some(now) = ns.filter(|_| i < no) {
             ns = XmlNsPtr::from_raw(now.next).unwrap();
@@ -1937,7 +1937,7 @@ impl XmlTextReader {
         let Some((prefix, localname)) = split_qname2(name) else {
             // Namespace default decl
             if name == "xmlns" {
-                let mut ns = XmlNsPtr::from_raw((*self.node).ns_def).unwrap();
+                let mut ns = (*self.node).ns_def;
                 while let Some(now) = ns {
                     if now.prefix().is_none() {
                         self.curnode = now.as_ptr() as *mut XmlNode;
@@ -1966,7 +1966,7 @@ impl XmlTextReader {
 
         // Namespace default decl
         if prefix == "xmlns" {
-            let mut ns = XmlNsPtr::from_raw((*self.node).ns_def).unwrap();
+            let mut ns = (*self.node).ns_def;
             while let Some(now) = ns {
                 if now.prefix().as_deref() == Some(localname) {
                     self.curnode = now.as_ptr() as *mut XmlNode;
@@ -2013,7 +2013,7 @@ impl XmlTextReader {
 
         if namespace_uri == "http://www.w3.org/2000/xmlns/" {
             let prefix = (local_name != "xmlns").then_some(local_name);
-            let mut ns = XmlNsPtr::from_raw((*self.node).ns_def).unwrap();
+            let mut ns = (*self.node).ns_def;
             while let Some(now) = ns {
                 if (prefix.is_none() && now.prefix().is_none())
                     || now.prefix().as_deref() == Some(local_name)
@@ -2063,7 +2063,7 @@ impl XmlTextReader {
 
         self.curnode = null_mut();
 
-        let mut ns = XmlNsPtr::from_raw((*self.node).ns_def).unwrap();
+        let mut ns = (*self.node).ns_def;
         let mut i = 0;
         while let Some(now) = ns.filter(|_| i < no) {
             ns = XmlNsPtr::from_raw(now.next).unwrap();
@@ -2108,8 +2108,8 @@ impl XmlTextReader {
             return 0;
         }
 
-        if !(*self.node).ns_def.is_null() {
-            self.curnode = (*self.node).ns_def as *mut XmlNode;
+        if let Some(ns_def) = (*self.node).ns_def {
+            self.curnode = ns_def.as_ptr() as *mut XmlNode;
             return 1;
         }
         if !(*self.node).properties.is_null() {
@@ -3661,7 +3661,7 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: *mut
                     | XmlElementType::XmlXIncludeStart
                     | XmlElementType::XmlXIncludeEnd
             ) {
-                if let Some(ns_def) = XmlNsPtr::from_raw((*cur).ns_def).unwrap() {
+                if let Some(ns_def) = (*cur).ns_def {
                     xml_free_ns_list(ns_def);
                 }
             }
@@ -3804,7 +3804,7 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: *mut XmlNode)
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd
     ) {
-        if let Some(ns_def) = XmlNsPtr::from_raw((*cur).ns_def).unwrap() {
+        if let Some(ns_def) = (*cur).ns_def {
             xml_free_ns_list(ns_def);
         }
     }
@@ -3933,7 +3933,7 @@ pub unsafe fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32
         ret += 1;
         attr = (*attr).next;
     }
-    let mut ns = XmlNsPtr::from_raw((*node).ns_def).unwrap();
+    let mut ns = (*node).ns_def;
     while let Some(now) = ns {
         ret += 1;
         ns = XmlNsPtr::from_raw(now.next).unwrap();

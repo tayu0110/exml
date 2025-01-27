@@ -2016,7 +2016,7 @@ impl XmlCatalogEntry {
             xml_free_doc(doc);
             return -1;
         }
-        (*catalog).ns_def = ns;
+        (*catalog).ns_def = XmlNsPtr::from_raw(ns).unwrap();
         (*doc).add_child(catalog as _);
 
         self.dump_xml_catalog_node(catalog, doc, ns, None);

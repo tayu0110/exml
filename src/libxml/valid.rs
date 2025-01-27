@@ -3589,7 +3589,7 @@ pub unsafe fn xml_validate_element(
                 attr = (*attr).next;
             }
 
-            let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
+            let mut ns = (*elem).ns_def;
             while let Some(now) = ns {
                 if let Some(elem_ns) = (*elem).ns {
                     ret &= xml_validate_one_namespace(
@@ -5137,7 +5137,7 @@ pub unsafe fn xml_validate_one_element(
 
                 if cur_attr.prefix.is_none() && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
                 {
-                    let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
+                    let mut ns = (*elem).ns_def;
                     while let Some(now) = ns {
                         if now.prefix().is_none() {
                             break 'found;
@@ -5145,7 +5145,7 @@ pub unsafe fn xml_validate_one_element(
                         ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 } else if cur_attr.prefix.as_deref() == Some("xmlns") {
-                    let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
+                    let mut ns = (*elem).ns_def;
                     while let Some(now) = ns {
                         if cur_attr.name() == now.prefix() {
                             break 'found;
@@ -5243,7 +5243,7 @@ pub unsafe fn xml_validate_one_element(
                 // attribute checking
                 if cur_attr.prefix.is_none() && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
                 {
-                    let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
+                    let mut ns = (*elem).ns_def;
                     while let Some(now) = ns {
                         if now.prefix().is_none() {
                             if !xml_str_equal(cur_attr.default_value, now.href) {
@@ -5264,7 +5264,7 @@ pub unsafe fn xml_validate_one_element(
                         ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 } else if cur_attr.prefix.as_deref() == Some("xmlns") {
-                    let mut ns = XmlNsPtr::from_raw((*elem).ns_def).unwrap();
+                    let mut ns = (*elem).ns_def;
                     while let Some(now) = ns {
                         if cur_attr.name() == now.prefix() {
                             if !xml_str_equal(cur_attr.default_value, now.href) {
