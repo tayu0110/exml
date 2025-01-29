@@ -53,7 +53,7 @@ use crate::{
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlNode, XmlNs, __XML_REGISTER_CALLBACKS,
+        XmlEntityType, XmlEnumeration, XmlNode, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -2095,7 +2095,6 @@ pub unsafe fn xml_sax2_start_element_ns(
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ret: *mut XmlNode;
-    let mut last: *mut XmlNs = null_mut();
 
     if ctx.is_none() {
         return;
@@ -2178,6 +2177,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         (*(*ctxt).my_doc).add_child(ret);
     }
     // Build the namespace list
+    let mut last = None::<XmlNsPtr>;
     for (pref, uri) in namespaces {
         let uri = CString::new(uri.as_str()).unwrap();
         let Some(ns) = xml_new_ns(null_mut(), uri.as_ptr() as *const u8, pref.as_deref()) else {
@@ -2186,12 +2186,12 @@ pub unsafe fn xml_sax2_start_element_ns(
             // API, best is to skip in this case
             continue;
         };
-        if last.is_null() {
-            (*ret).ns_def = Some(ns);
-            last = ns.as_ptr();
+        if let Some(mut l) = last {
+            l.next = ns.as_ptr();
+            last = Some(ns);
         } else {
-            (*last).next = ns.as_ptr();
-            last = ns.as_ptr();
+            (*ret).ns_def = Some(ns);
+            last = Some(ns);
         }
         if orig_uri.is_some() && prefix == pref.as_deref() {
             (*ret).ns = Some(ns);
