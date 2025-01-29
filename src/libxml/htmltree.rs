@@ -1061,7 +1061,7 @@ pub unsafe fn html_node_dump_format_output(
 
                 buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
                 if let Some(ns_def) = (*cur).ns_def {
-                    xml_ns_list_dump_output(buf, ns_def.as_ptr());
+                    xml_ns_list_dump_output(buf, Some(ns_def));
                 }
                 attr = (*cur).properties;
                 while !attr.is_null() {

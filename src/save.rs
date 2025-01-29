@@ -50,7 +50,7 @@ use crate::{
     tree::{
         is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttribute,
         XmlAttributePtr, XmlDoc, XmlDtd, XmlDtdPtr, XmlElement, XmlElementPtr, XmlElementType,
-        XmlEntity, XmlNotation, XmlNs, XML_LOCAL_NAMESPACE,
+        XmlEntity, XmlNotation, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -631,16 +631,13 @@ fn escape_entities(src: &str, dst: &mut String) -> i32 {
 #[doc(alias = "xmlNsDumpOutput")]
 unsafe fn xml_ns_dump_output(
     mut buf: Option<&mut XmlOutputBuffer>,
-    cur: *mut XmlNs,
+    cur: XmlNsPtr,
     mut ctxt: Option<&mut XmlSaveCtxt>,
 ) {
-    if cur.is_null() {
-        return;
-    }
     if buf.is_none() && ctxt.is_none() {
         return;
     };
-    if matches!((*cur).element_type(), XML_LOCAL_NAMESPACE) && !(*cur).href.is_null() {
+    if matches!(cur.element_type(), XML_LOCAL_NAMESPACE) && !cur.href.is_null() {
         if (*cur).prefix().as_deref() == Some("xml") {
             return;
         }
@@ -656,7 +653,7 @@ unsafe fn xml_ns_dump_output(
 
         let write = |buf: &mut XmlOutputBuffer| {
             // Within the context of an element attributes
-            if let Some(prefix) = (*cur).prefix() {
+            if let Some(prefix) = cur.prefix() {
                 buf.write_bytes(b"xmlns:");
                 buf.write_str(&prefix);
             } else {
@@ -664,7 +661,7 @@ unsafe fn xml_ns_dump_output(
             }
             buf.write_bytes(b"=");
             if let Some(mut buf) = buf.buffer {
-                buf.push_quoted_cstr(CStr::from_ptr((*cur).href as *const i8));
+                buf.push_quoted_cstr(CStr::from_ptr(cur.href as *const i8));
             }
         };
         if let Some(buf) = buf {
@@ -706,10 +703,10 @@ unsafe fn xml_buf_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut Xm
 /// Dump a list of local namespace definitions to a save context.
 /// Should be called in the context of attribute dumps.
 #[doc(alias = "xmlNsListDumpOutputCtxt")]
-unsafe fn xml_ns_list_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, mut cur: *mut XmlNs) {
-    while !cur.is_null() {
-        xml_ns_dump_output(None, cur, Some(ctxt));
-        cur = (*cur).next;
+unsafe fn xml_ns_list_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, mut cur: Option<XmlNsPtr>) {
+    while let Some(now) = cur {
+        xml_ns_dump_output(None, now, Some(ctxt));
+        cur = XmlNsPtr::from_raw(now.next).unwrap();
     }
 }
 
@@ -851,7 +848,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                         .borrow_mut()
                         .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
                     if let Some(ns_def) = (*cur).ns_def {
-                        xml_ns_list_dump_output_ctxt(ctxt, ns_def.as_ptr());
+                        xml_ns_list_dump_output_ctxt(ctxt, Some(ns_def));
                     }
                     attr = (*cur).properties;
                     while !attr.is_null() {
@@ -1037,7 +1034,10 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                 xml_attr_dump_output(ctxt, &*(cur as *const XmlAttr));
             }
             XmlElementType::XmlNamespaceDecl => {
-                xml_ns_dump_output_ctxt(ctxt, cur as _);
+                xml_ns_dump_output_ctxt(
+                    ctxt,
+                    XmlNsPtr::from_raw(cur as *mut XmlNs).unwrap().unwrap(),
+                );
             }
             _ => {}
         }
@@ -1161,7 +1161,7 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
 /// Dump a local Namespace definition to a save context.
 /// Should be called in the context of attribute dumps.
 #[doc(alias = "xmlNsDumpOutputCtxt")]
-unsafe fn xml_ns_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, cur: *mut XmlNs) {
+unsafe fn xml_ns_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, cur: XmlNsPtr) {
     xml_ns_dump_output(None, cur, Some(ctxt));
 }
 
@@ -1315,7 +1315,10 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                 ctxt.doc_content_dump_output(cur as _);
             }
             XmlElementType::XmlNamespaceDecl => {
-                xml_ns_dump_output_ctxt(ctxt, cur as _);
+                xml_ns_dump_output_ctxt(
+                    ctxt,
+                    XmlNsPtr::from_raw(cur as *mut XmlNs).unwrap().unwrap(),
+                );
             }
             XmlElementType::XmlDTDNode => {
                 xml_dtd_dump_output(
@@ -1383,7 +1386,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                     .borrow_mut()
                     .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
                 if let Some(ns_def) = (*cur).ns_def {
-                    xml_ns_list_dump_output_ctxt(ctxt, ns_def.as_ptr());
+                    xml_ns_list_dump_output_ctxt(ctxt, Some(ns_def));
                 }
                 if (*cur).name().as_deref() == Some("html")
                     && (*cur).ns.is_none()
@@ -1819,9 +1822,9 @@ pub(crate) unsafe fn attr_serialize_text_content<'a>(
 /// Dump a list of local Namespace definitions.
 /// Should be called in the context of attributes dumps.
 #[doc(alias = "xmlNsListDumpOutput")]
-pub(crate) unsafe fn xml_ns_list_dump_output(buf: &mut XmlOutputBuffer, mut cur: *mut XmlNs) {
-    while !cur.is_null() {
-        xml_ns_dump_output(Some(buf), cur, None);
-        cur = (*cur).next;
+pub(crate) unsafe fn xml_ns_list_dump_output(buf: &mut XmlOutputBuffer, mut cur: Option<XmlNsPtr>) {
+    while let Some(now) = cur {
+        xml_ns_dump_output(Some(buf), now, None);
+        cur = XmlNsPtr::from_raw(now.next).unwrap();
     }
 }
