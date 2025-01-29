@@ -146,7 +146,7 @@ use crate::{
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlElementContentPtr,
         XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
-        XmlNs, XML_XML_NAMESPACE,
+        XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
@@ -5632,7 +5632,7 @@ unsafe fn xml_schema_get_prop_node(node: *mut XmlNode, name: *const c_char) -> *
     }
     prop = (*node).properties;
     while !prop.is_null() {
-        if (*prop).ns.is_null() && xml_str_equal((*prop).name, name as _) {
+        if (*prop).ns.is_none() && xml_str_equal((*prop).name, name as _) {
             return prop;
         }
         prop = (*prop).next;
@@ -6347,11 +6347,11 @@ unsafe fn xml_schema_new_annot(
 
 unsafe fn xml_schema_format_qname_ns(
     buf: *mut *mut XmlChar,
-    ns: *mut XmlNs,
+    ns: Option<XmlNsPtr>,
     local_name: *const XmlChar,
 ) -> *const XmlChar {
-    if !ns.is_null() {
-        xml_schema_format_qname(buf, (*ns).href, local_name)
+    if let Some(ns) = ns {
+        xml_schema_format_qname(buf, ns.href, local_name)
     } else {
         xml_schema_format_qname(buf, null_mut(), local_name)
     }
@@ -6452,9 +6452,10 @@ unsafe fn xml_schema_get_prop_node_ns(
     }
     prop = (*node).properties;
     while !prop.is_null() {
-        if !(*prop).ns.is_null()
-            && xml_str_equal((*prop).name, name as _)
-            && xml_str_equal((*(*prop).ns).href, uri as _)
+        if xml_str_equal((*prop).name, name as _)
+            && (*prop)
+                .ns
+                .map_or(false, |ns| xml_str_equal(ns.href, uri as _))
         {
             return prop;
         }
@@ -6566,9 +6567,10 @@ unsafe fn xml_schema_parse_annotation(
     };
     attr = (*node).properties;
     while !attr.is_null() {
-        if ((*attr).ns.is_null() && !xml_str_equal((*attr).name, c"id".as_ptr() as _))
-            || (!(*attr).ns.is_null()
-                && xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _))
+        if ((*attr).ns.is_none() && !xml_str_equal((*attr).name, c"id".as_ptr() as _))
+            || (*attr).ns.map_or(false, |ns| {
+                xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _)
+            })
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
@@ -6591,9 +6593,10 @@ unsafe fn xml_schema_parse_annotation(
             // Content: ({any})*
             attr = (*child).properties;
             while !attr.is_null() {
-                if ((*attr).ns.is_null() && !xml_str_equal((*attr).name, c"source".as_ptr() as _))
-                    || (!(*attr).ns.is_null()
-                        && xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _))
+                if ((*attr).ns.is_none() && !xml_str_equal((*attr).name, c"source".as_ptr() as _))
+                    || (*attr).ns.map_or(false, |ns| {
+                        xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _)
+                    })
                 {
                     xml_schema_pillegal_attr_err(
                         ctxt,
@@ -6621,8 +6624,11 @@ unsafe fn xml_schema_parse_annotation(
             // Content: ({any})*
             attr = (*child).properties;
             while !attr.is_null() {
-                if (*attr).ns.is_null() {
-                    if !xml_str_equal((*attr).name, c"source".as_ptr() as _) {
+                if let Some(ns) = (*attr).ns {
+                    if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _)
+                        || (xml_str_equal((*attr).name, c"lang".as_ptr() as _)
+                            && !xml_str_equal(ns.href, XML_XML_NAMESPACE.as_ptr() as _))
+                    {
                         xml_schema_pillegal_attr_err(
                             ctxt,
                             XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -6630,10 +6636,7 @@ unsafe fn xml_schema_parse_annotation(
                             attr,
                         );
                     }
-                } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _)
-                    || (xml_str_equal((*attr).name, c"lang".as_ptr() as _)
-                        && !xml_str_equal((*(*attr).ns).href, XML_XML_NAMESPACE.as_ptr() as _))
-                {
+                } else if !xml_str_equal((*attr).name, c"source".as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -6896,10 +6899,8 @@ unsafe fn xml_schema_parse_include_or_redefine_attrs(
     // Applies for both <include> and <redefine>.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"schemaLocation".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     pctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -6907,7 +6908,9 @@ unsafe fn xml_schema_parse_include_or_redefine_attrs(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"schemaLocation".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -7940,12 +7943,8 @@ unsafe fn xml_schema_parse_model_group_def_ref(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"ref".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -7953,7 +7952,11 @@ unsafe fn xml_schema_parse_model_group_def_ref(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"ref".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -8142,7 +8145,11 @@ unsafe fn xml_schema_parse_local_attribute(
     attr = (*node).properties;
     while !attr.is_null() {
         'attr_next: {
-            if (*attr).ns.is_null() {
+            if let Some(ns) = (*attr).ns {
+                if !xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
+                    break 'attr_next;
+                }
+            } else {
                 if is_ref != 0 {
                     if xml_str_equal((*attr).name, c"id".as_ptr() as _) {
                         xml_schema_pval_attr_node_id(pctxt, attr);
@@ -8248,8 +8255,6 @@ unsafe fn xml_schema_parse_local_attribute(
                     }
                     break 'attr_next;
                 }
-            } else if !xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
-                break 'attr_next;
             }
 
             xml_schema_pillegal_attr_err(
@@ -8614,10 +8619,8 @@ unsafe fn xml_schema_parse_attribute_group_ref(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"ref".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     pctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -8625,7 +8628,9 @@ unsafe fn xml_schema_parse_attribute_group_ref(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"ref".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -8982,11 +8987,8 @@ unsafe fn xml_schema_parse_any_attribute(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"namespace".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"processContents".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -8994,7 +8996,10 @@ unsafe fn xml_schema_parse_any_attribute(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"namespace".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"processContents".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9055,10 +9060,8 @@ unsafe fn xml_schema_parse_extension(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"base".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9066,7 +9069,9 @@ unsafe fn xml_schema_parse_extension(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"base".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9217,8 +9222,8 @@ unsafe fn xml_schema_parse_simple_content(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _) {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9226,7 +9231,7 @@ unsafe fn xml_schema_parse_simple_content(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9331,10 +9336,8 @@ unsafe fn xml_schema_parse_complex_content(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"mixed".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9342,7 +9345,9 @@ unsafe fn xml_schema_parse_complex_content(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"mixed".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9523,92 +9528,91 @@ unsafe fn xml_schema_parse_complex_type(
     // Handle attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if xml_str_equal((*attr).name, c"id".as_ptr() as _) {
-                // Attribute "id".
-                xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
-            } else if xml_str_equal((*attr).name, c"mixed".as_ptr() as _) {
-                // Attribute "mixed".
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
+                xml_schema_pillegal_attr_err(
+                    ctxt,
+                    XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                    null_mut(),
+                    attr,
+                );
+            }
+        } else if xml_str_equal((*attr).name, c"id".as_ptr() as _) {
+            // Attribute "id".
+            xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
+        } else if xml_str_equal((*attr).name, c"mixed".as_ptr() as _) {
+            // Attribute "mixed".
+            if xml_schema_pget_bool_node_value(ctxt, null_mut(), attr as *mut XmlNode) != 0 {
+                (*typ).flags |= XML_SCHEMAS_TYPE_MIXED;
+            }
+        } else if top_level != 0 {
+            // Attributes of global complex type definitions.
+            if xml_str_equal((*attr).name, c"name".as_ptr() as _) {
+                // Pass.
+            } else if xml_str_equal((*attr).name, c"abstract".as_ptr() as _) {
+                // Attribute "abstract".
                 if xml_schema_pget_bool_node_value(ctxt, null_mut(), attr as *mut XmlNode) != 0 {
-                    (*typ).flags |= XML_SCHEMAS_TYPE_MIXED;
+                    (*typ).flags |= XML_SCHEMAS_TYPE_ABSTRACT;
                 }
-            } else if top_level != 0 {
-                // Attributes of global complex type definitions.
-                if xml_str_equal((*attr).name, c"name".as_ptr() as _) {
-                    // Pass.
-                } else if xml_str_equal((*attr).name, c"abstract".as_ptr() as _) {
-                    // Attribute "abstract".
-                    if xml_schema_pget_bool_node_value(ctxt, null_mut(), attr as *mut XmlNode) != 0
-                    {
-                        (*typ).flags |= XML_SCHEMAS_TYPE_ABSTRACT;
-                    }
-                } else if xml_str_equal((*attr).name, c"final".as_ptr() as _) {
-                    // Attribute "final".
-                    attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
-                    if xml_schema_pval_attr_block_final(
-                        attr_value,
-                        addr_of_mut!((*typ).flags),
-                        -1,
-                        XML_SCHEMAS_TYPE_FINAL_EXTENSION,
-                        XML_SCHEMAS_TYPE_FINAL_RESTRICTION,
-                        -1,
-                        -1,
-                        -1,
-                    ) != 0
-                    {
-                        let attr_value = CStr::from_ptr(attr_value as *const i8).to_string_lossy();
-                        xml_schema_psimple_type_err(
-                            ctxt,
-                            XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
-                            null_mut(),
-                            attr as *mut XmlNode,
-                            null_mut(),
-                            c"(#all | List of (extension | restriction))".as_ptr() as _,
-                            Some(&attr_value),
-                            None,
-                            None,
-                            None,
-                        );
-                    } else {
-                        is_final = 1;
-                    }
-                } else if xml_str_equal((*attr).name, c"block".as_ptr() as _) {
-                    // Attribute "block".
-                    attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
-                    if xml_schema_pval_attr_block_final(
-                        attr_value,
-                        addr_of_mut!((*typ).flags),
-                        -1,
-                        XML_SCHEMAS_TYPE_BLOCK_EXTENSION,
-                        XML_SCHEMAS_TYPE_BLOCK_RESTRICTION,
-                        -1,
-                        -1,
-                        -1,
-                    ) != 0
-                    {
-                        let attr_value = CStr::from_ptr(attr_value as *const i8).to_string_lossy();
-                        xml_schema_psimple_type_err(
-                            ctxt,
-                            XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
-                            null_mut(),
-                            attr as *mut XmlNode,
-                            null_mut(),
-                            c"(#all | List of (extension | restriction)) ".as_ptr() as _,
-                            Some(&attr_value),
-                            None,
-                            None,
-                            None,
-                        );
-                    } else {
-                        block = 1;
-                    }
-                } else {
-                    xml_schema_pillegal_attr_err(
+            } else if xml_str_equal((*attr).name, c"final".as_ptr() as _) {
+                // Attribute "final".
+                attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+                if xml_schema_pval_attr_block_final(
+                    attr_value,
+                    addr_of_mut!((*typ).flags),
+                    -1,
+                    XML_SCHEMAS_TYPE_FINAL_EXTENSION,
+                    XML_SCHEMAS_TYPE_FINAL_RESTRICTION,
+                    -1,
+                    -1,
+                    -1,
+                ) != 0
+                {
+                    let attr_value = CStr::from_ptr(attr_value as *const i8).to_string_lossy();
+                    xml_schema_psimple_type_err(
                         ctxt,
-                        XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                        XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr,
+                        attr as *mut XmlNode,
+                        null_mut(),
+                        c"(#all | List of (extension | restriction))".as_ptr() as _,
+                        Some(&attr_value),
+                        None,
+                        None,
+                        None,
                     );
+                } else {
+                    is_final = 1;
+                }
+            } else if xml_str_equal((*attr).name, c"block".as_ptr() as _) {
+                // Attribute "block".
+                attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+                if xml_schema_pval_attr_block_final(
+                    attr_value,
+                    addr_of_mut!((*typ).flags),
+                    -1,
+                    XML_SCHEMAS_TYPE_BLOCK_EXTENSION,
+                    XML_SCHEMAS_TYPE_BLOCK_RESTRICTION,
+                    -1,
+                    -1,
+                    -1,
+                ) != 0
+                {
+                    let attr_value = CStr::from_ptr(attr_value as *const i8).to_string_lossy();
+                    xml_schema_psimple_type_err(
+                        ctxt,
+                        XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
+                        null_mut(),
+                        attr as *mut XmlNode,
+                        null_mut(),
+                        c"(#all | List of (extension | restriction)) ".as_ptr() as _,
+                        Some(&attr_value),
+                        None,
+                        None,
+                        None,
+                    );
+                } else {
+                    block = 1;
                 }
             } else {
                 xml_schema_pillegal_attr_err(
@@ -9618,7 +9622,7 @@ unsafe fn xml_schema_parse_complex_type(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9626,6 +9630,7 @@ unsafe fn xml_schema_parse_complex_type(
                 attr,
             );
         }
+
         attr = (*attr).next;
     }
     if block == 0 {
@@ -9954,10 +9959,8 @@ unsafe fn xml_schema_parse_idcselector_and_field(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"xpath".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -9965,7 +9968,9 @@ unsafe fn xml_schema_parse_idcselector_and_field(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"xpath".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10059,12 +10064,8 @@ unsafe fn xml_schema_parse_idc(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                && (idc_category != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
-                    || !xml_str_equal((*attr).name, c"refer".as_ptr() as _))
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10072,7 +10073,11 @@ unsafe fn xml_schema_parse_idc(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"name".as_ptr() as _)
+            && (idc_category != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
+                || !xml_str_equal((*attr).name, c"refer".as_ptr() as _))
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10328,27 +10333,27 @@ unsafe fn xml_schema_parse_element(
                 // Check for illegal attributes.
                 attr = (*node).properties;
                 while !attr.is_null() {
-                    if (*attr).ns.is_null() {
-                        if xml_str_equal((*attr).name, c"ref".as_ptr() as _)
-                            || xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                            || xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                            || xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
-                            || xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
-                        {
-                            attr = (*attr).next;
-                            continue;
-                        } else {
-                            // SPEC (3.3.3 : 2.2)
-                            xml_schema_pcustom_attr_err(ctxt, XmlParserErrors::XmlSchemapSrcElement2_2, null_mut(), null_mut(), attr, c"Only the attributes 'minOccurs', 'maxOccurs' and 'id' are allowed in addition to 'ref'".as_ptr() as _);
-                            break;
+                    if let Some(ns) = (*attr).ns {
+                        if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
+                            xml_schema_pillegal_attr_err(
+                                ctxt,
+                                XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                                null_mut(),
+                                attr,
+                            );
                         }
-                    } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
-                        xml_schema_pillegal_attr_err(
-                            ctxt,
-                            XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
-                            null_mut(),
-                            attr,
-                        );
+                    } else if xml_str_equal((*attr).name, c"ref".as_ptr() as _)
+                        || xml_str_equal((*attr).name, c"name".as_ptr() as _)
+                        || xml_str_equal((*attr).name, c"id".as_ptr() as _)
+                        || xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
+                        || xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
+                    {
+                        attr = (*attr).next;
+                        continue;
+                    } else {
+                        // SPEC (3.3.3 : 2.2)
+                        xml_schema_pcustom_attr_err(ctxt, XmlParserErrors::XmlSchemapSrcElement2_2, null_mut(), null_mut(), attr, c"Only the attributes 'minOccurs', 'maxOccurs' and 'id' are allowed in addition to 'ref'".as_ptr() as _);
+                        break;
                     }
                     attr = (*attr).next;
                 }
@@ -10440,30 +10445,27 @@ unsafe fn xml_schema_parse_element(
         // Check for illegal attributes.
         attr = (*node).properties;
         while !attr.is_null() {
-            if (*attr).ns.is_null() {
-                if !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"type".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"default".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"fixed".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"block".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"nillable".as_ptr() as _)
-                {
-                    if top_level == 0 {
-                        if !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
-                            && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
-                            && !xml_str_equal((*attr).name, c"form".as_ptr() as _)
-                        {
-                            xml_schema_pillegal_attr_err(
-                                ctxt,
-                                XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
-                                null_mut(),
-                                attr,
-                            );
-                        }
-                    } else if !xml_str_equal((*attr).name, c"final".as_ptr() as _)
-                        && !xml_str_equal((*attr).name, c"abstract".as_ptr() as _)
-                        && !xml_str_equal((*attr).name, c"substitutionGroup".as_ptr() as _)
+            if let Some(ns) = (*attr).ns {
+                if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
+                    xml_schema_pillegal_attr_err(
+                        ctxt,
+                        XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                        null_mut(),
+                        attr,
+                    );
+                }
+            } else if !xml_str_equal((*attr).name, c"name".as_ptr() as _)
+                && !xml_str_equal((*attr).name, c"type".as_ptr() as _)
+                && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+                && !xml_str_equal((*attr).name, c"default".as_ptr() as _)
+                && !xml_str_equal((*attr).name, c"fixed".as_ptr() as _)
+                && !xml_str_equal((*attr).name, c"block".as_ptr() as _)
+                && !xml_str_equal((*attr).name, c"nillable".as_ptr() as _)
+            {
+                if top_level == 0 {
+                    if !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
+                        && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
+                        && !xml_str_equal((*attr).name, c"form".as_ptr() as _)
                     {
                         xml_schema_pillegal_attr_err(
                             ctxt,
@@ -10472,14 +10474,17 @@ unsafe fn xml_schema_parse_element(
                             attr,
                         );
                     }
+                } else if !xml_str_equal((*attr).name, c"final".as_ptr() as _)
+                    && !xml_str_equal((*attr).name, c"abstract".as_ptr() as _)
+                    && !xml_str_equal((*attr).name, c"substitutionGroup".as_ptr() as _)
+                {
+                    xml_schema_pillegal_attr_err(
+                        ctxt,
+                        XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                        null_mut(),
+                        attr,
+                    );
                 }
-            } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
-                xml_schema_pillegal_attr_err(
-                    ctxt,
-                    XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
-                    null_mut(),
-                    attr,
-                );
             }
             attr = (*attr).next;
         }
@@ -10760,13 +10765,8 @@ unsafe fn xml_schema_parse_any(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"namespace".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"processContents".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10774,7 +10774,12 @@ unsafe fn xml_schema_parse_any(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"namespace".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"processContents".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10903,11 +10908,8 @@ unsafe fn xml_schema_parse_model_group(
         // Check for illegal attributes.
         attr = (*node).properties;
         while !attr.is_null() {
-            if (*attr).ns.is_null() {
-                if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
-                {
+            if let Some(ns) = (*attr).ns {
+                if xml_str_equal(ns.href as _, XML_SCHEMA_NS.as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10915,7 +10917,10 @@ unsafe fn xml_schema_parse_model_group(
                         attr,
                     );
                 }
-            } else if xml_str_equal((*(*attr).ns).href as _, XML_SCHEMA_NS.as_ptr() as _) {
+            } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+                && !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
+                && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
+            {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10929,8 +10934,8 @@ unsafe fn xml_schema_parse_model_group(
         // Check for illegal attributes.
         attr = (*node).properties;
         while !attr.is_null() {
-            if (*attr).ns.is_null() {
-                if !xml_str_equal((*attr).name, c"id".as_ptr() as _) {
+            if let Some(ns) = (*attr).ns {
+                if xml_str_equal(ns.href as _, XML_SCHEMA_NS.as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -10938,7 +10943,7 @@ unsafe fn xml_schema_parse_model_group(
                         attr,
                     );
                 }
-            } else if xml_str_equal((*(*attr).ns).href as _, XML_SCHEMA_NS.as_ptr() as _) {
+            } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -11291,10 +11296,8 @@ unsafe fn xml_schema_parse_restriction(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"base".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -11302,7 +11305,9 @@ unsafe fn xml_schema_parse_restriction(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"base".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -11618,10 +11623,8 @@ unsafe fn xml_schema_parse_list(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"itemType".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -11629,7 +11632,9 @@ unsafe fn xml_schema_parse_list(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"itemType".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -11747,10 +11752,8 @@ unsafe fn xml_schema_parse_union(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"memberTypes".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -11758,7 +11761,9 @@ unsafe fn xml_schema_parse_union(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"memberTypes".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12019,8 +12024,8 @@ unsafe fn xml_schema_parse_simple_type(
         // Check for illegal attributes.
         attr = (*node).properties;
         while !attr.is_null() {
-            if (*attr).ns.is_null() {
-                if !xml_str_equal((*attr).name, c"id".as_ptr() as _) {
+            if let Some(ns) = (*attr).ns {
+                if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12028,7 +12033,7 @@ unsafe fn xml_schema_parse_simple_type(
                         attr,
                     );
                 }
-            } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+            } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12060,11 +12065,8 @@ unsafe fn xml_schema_parse_simple_type(
         // Check for illegal attributes.
         attr = (*node).properties;
         while !attr.is_null() {
-            if (*attr).ns.is_null() {
-                if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"final".as_ptr() as _)
-                {
+            if let Some(ns) = (*attr).ns {
+                if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12072,7 +12074,10 @@ unsafe fn xml_schema_parse_simple_type(
                         attr,
                     );
                 }
-            } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+            } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+                && !xml_str_equal((*attr).name, c"name".as_ptr() as _)
+                && !xml_str_equal((*attr).name, c"final".as_ptr() as _)
+            {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12280,10 +12285,8 @@ unsafe fn xml_schema_parse_model_group_definition(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12291,7 +12294,9 @@ unsafe fn xml_schema_parse_model_group_definition(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"name".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12450,10 +12455,8 @@ unsafe fn xml_schema_parse_attribute_group_definition(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     pctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12461,7 +12464,9 @@ unsafe fn xml_schema_parse_attribute_group_definition(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"name".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12764,11 +12769,8 @@ unsafe fn xml_schema_parse_import(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"namespace".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"schemaLocation".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     pctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -12776,7 +12778,10 @@ unsafe fn xml_schema_parse_import(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"namespace".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"schemaLocation".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -13062,13 +13067,8 @@ unsafe fn xml_schema_parse_global_attribute(
     // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
-        if (*attr).ns.is_null() {
-            if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"default".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"fixed".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"type".as_ptr() as _)
-            {
+        if let Some(ns) = (*attr).ns {
+            if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     pctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -13076,7 +13076,12 @@ unsafe fn xml_schema_parse_global_attribute(
                     attr,
                 );
             }
-        } else if xml_str_equal((*(*attr).ns).href, XML_SCHEMA_NS.as_ptr() as _) {
+        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"default".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"fixed".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"name".as_ptr() as _)
+            && !xml_str_equal((*attr).name, c"type".as_ptr() as _)
+        {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
@@ -27778,8 +27783,8 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 if !(*node).properties.is_null() {
                     attr = (*node).properties;
                     while {
-                        if !(*attr).ns.is_null() {
-                            ns_name = (*(*attr).ns).href;
+                        if let Some(ns) = (*attr).ns {
+                            ns_name = ns.href;
                         } else {
                             ns_name = null_mut();
                         }

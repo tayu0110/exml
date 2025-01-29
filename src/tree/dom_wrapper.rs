@@ -1476,29 +1476,20 @@ unsafe fn xml_dom_wrap_adopt_attr(
     }
 
     (*attr).doc = dest_doc;
-    if !(*attr).ns.is_null() {
+    if let Some(attr_ns) = (*attr).ns {
         let mut ns = None;
 
         if !ctxt.is_null() { /* TODO: User defined. */ }
         // XML Namespace.
-        if (*(*attr).ns).prefix().as_deref() == Some("xml") {
+        if attr_ns.prefix().as_deref() == Some("xml") {
             ns = (*dest_doc).ensure_xmldecl();
         } else if dest_parent.is_null() {
             // Store in @(*destDoc).oldNs.
-            ns = xml_dom_wrap_store_ns(
-                dest_doc,
-                (*(*attr).ns).href,
-                (*(*attr).ns).prefix().as_deref(),
-            );
+            ns = xml_dom_wrap_store_ns(dest_doc, attr_ns.href, attr_ns.prefix().as_deref());
         } else {
             // Declare on @destParent.
-            if xml_search_ns_by_namespace_strict(
-                dest_doc,
-                dest_parent,
-                (*(*attr).ns).href,
-                &mut ns,
-                1,
-            ) == -1
+            if xml_search_ns_by_namespace_strict(dest_doc, dest_parent, attr_ns.href, &mut ns, 1)
+                == -1
             {
                 // goto internal_error;
                 return -1;
@@ -1507,8 +1498,8 @@ unsafe fn xml_dom_wrap_adopt_attr(
                 ns = xml_dom_wrap_nsnorm_declare_ns_forced(
                     dest_doc,
                     dest_parent,
-                    (*(*attr).ns).href,
-                    (*(*attr).ns).prefix,
+                    attr_ns.href,
+                    attr_ns.prefix,
                     1,
                 );
             }
@@ -1517,7 +1508,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
             // goto internal_error;
             return -1;
         };
-        (*attr).ns = ns.as_ptr();
+        (*attr).ns = Some(ns);
     }
 
     (*attr).atype = None;

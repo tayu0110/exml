@@ -930,11 +930,9 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur
         return;
     }
     buf.write_str(" ");
-    if !(*cur).ns.is_null() {
-        if let Some(prefix) = (*(*cur).ns).prefix() {
-            buf.write_str(&prefix);
-            buf.write_str(":");
-        }
+    if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+        buf.write_str(&prefix);
+        buf.write_str(":");
     }
 
     buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
@@ -944,7 +942,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur
     {
         if let Some(value) = children.get_string(doc, 0) {
             buf.write_str("=");
-            if (*cur).ns.is_null()
+            if (*cur).ns.is_none()
                 && (*cur)
                     .parent
                     .filter(|p| {

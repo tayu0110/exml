@@ -4991,11 +4991,10 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
 
                             if xml_str_equal(name, (*attr).name) {
                                 if prefix.is_null() {
-                                    if (*attr).ns.is_null() || (*(*attr).ns).prefix().is_none() {
+                                    if (*attr).ns.map_or(true, |ns| ns.prefix().is_none()) {
                                         xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     }
-                                } else if !(*attr).ns.is_null()
-                                    && xml_str_equal(uri, (*(*attr).ns).href)
+                                } else if (*attr).ns.map_or(false, |ns| xml_str_equal(uri, ns.href))
                                 {
                                     xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                 }

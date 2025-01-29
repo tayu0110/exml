@@ -29,7 +29,7 @@ use crate::libxml::{
 
 use super::{
     xml_free_prop, xml_new_prop_internal, xml_tree_err_memory, NodeCommon, NodePtr,
-    XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNs, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+    XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNsPtr, __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -43,7 +43,7 @@ pub struct XmlAttr {
     pub(crate) next: *mut XmlAttr,              /* next sibling link  */
     pub(crate) prev: *mut XmlAttr,              /* previous sibling link  */
     pub(crate) doc: *mut XmlDoc,                /* the containing document */
-    pub(crate) ns: *mut XmlNs,                  /* pointer to the associated namespace */
+    pub(crate) ns: Option<XmlNsPtr>,            /* pointer to the associated namespace */
     pub(crate) atype: Option<XmlAttributeType>, /* the attribute type if validating */
     pub(crate) psvi: *mut c_void,               /* for type/PSVI information */
 }
@@ -96,7 +96,7 @@ impl Default for XmlAttr {
             next: null_mut(),
             prev: null_mut(),
             doc: null_mut(),
-            ns: null_mut(),
+            ns: None,
             atype: None,
             psvi: null_mut(),
         }

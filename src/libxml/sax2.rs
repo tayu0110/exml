@@ -1568,10 +1568,10 @@ unsafe fn xml_sax2_attribute_internal(
 
             prop = (*(*ctxt).node).properties;
             while !prop.is_null() {
-                if !(*prop).ns.is_null()
-                    && (Some(name) == (*prop).name().as_deref()
-                        && (namespace.as_ptr() == (*prop).ns
-                            || namespace.href() == (*(*prop).ns).href()))
+                if Some(name) == (*prop).name().as_deref()
+                    && (*prop)
+                        .ns
+                        .map_or(false, |ns| namespace == ns || namespace.href() == ns.href())
                 {
                     xml_ns_err_msg!(
                         ctxt,
@@ -2451,7 +2451,7 @@ unsafe fn xml_sax2_attribute_ns(
 
         (*ret).parent = NodePtr::from_ptr((*ctxt).node);
         (*ret).doc = (*ctxt).my_doc;
-        (*ret).ns = namespace.map_or(null_mut(), |ns| ns.as_ptr());
+        (*ret).ns = namespace;
         (*ret).name = xml_strdup(localname);
 
         // link at the end to preserve order, TODO speed up with a last

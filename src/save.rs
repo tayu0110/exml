@@ -750,11 +750,9 @@ unsafe fn xml_attr_dump_output(ctxt: &mut XmlSaveCtxt, cur: &XmlAttr) {
         ctxt.buf.borrow_mut().write_bytes(b" ");
     }
     let mut buf = ctxt.buf.borrow_mut();
-    if !cur.ns.is_null() {
-        if let Some(prefix) = (*cur.ns).prefix() {
-            buf.write_str(&prefix);
-            buf.write_bytes(b":");
-        }
+    if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
+        buf.write_str(&prefix);
+        buf.write_bytes(b":");
     }
 
     buf.write_str(&cur.name().unwrap());
@@ -1185,18 +1183,19 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mut XmlA
 
     let parent = (*cur).parent;
     while !cur.is_null() {
-        if (*cur).ns.is_null() && (*cur).name().as_deref() == Some("id") {
+        if (*cur).ns.is_none() && (*cur).name().as_deref() == Some("id") {
             id = cur;
-        } else if (*cur).ns.is_null() && (*cur).name().as_deref() == Some("name") {
+        } else if (*cur).ns.is_none() && (*cur).name().as_deref() == Some("name") {
             name = cur;
-        } else if (*cur).ns.is_null() && (*cur).name().as_deref() == Some("lang") {
+        } else if (*cur).ns.is_none() && (*cur).name().as_deref() == Some("lang") {
             lang = cur;
-        } else if !(*cur).ns.is_null()
-            && (*cur).name().as_deref() == Some("lang")
-            && (*(*cur).ns).prefix().as_deref() == Some("xml")
+        } else if (*cur).name().as_deref() == Some("lang")
+            && (*cur)
+                .ns
+                .map_or(false, |ns| ns.prefix().as_deref() == Some("xml"))
         {
             xml_lang = cur;
-        } else if (*cur).ns.is_null()
+        } else if (*cur).ns.is_none()
             && (*cur)
                 .children
                 .map_or(true, |c| c.content.is_null() || *c.content.add(0) == 0)

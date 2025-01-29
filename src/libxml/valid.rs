@@ -2036,9 +2036,10 @@ pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: *mut XmlAttr
     if attr.is_null() || (*attr).name.is_null() {
         return 0;
     }
-    if !(*attr).ns.is_null()
-        && (*attr).name().as_deref() == Some("id")
-        && (*(*attr).ns).prefix().as_deref() == Some("xml")
+    if (*attr).name().as_deref() == Some("id")
+        && (*attr)
+            .ns
+            .map_or(false, |ns| ns.prefix().as_deref() == Some("xml"))
     {
         return 1;
     }
@@ -2072,8 +2073,8 @@ pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: *mut XmlAttr
             };
 
         let fullattrname: *mut XmlChar =
-            if !(*attr).ns.is_null() && (*(*attr).ns).prefix().is_some() {
-                xml_build_qname((*attr).name, (*(*attr).ns).prefix, fattr.as_ptr() as _, 50)
+            if let Some(prefix) = (*attr).ns.map(|ns| ns.prefix).filter(|pre| !pre.is_null()) {
+                xml_build_qname((*attr).name, prefix, fattr.as_ptr() as _, 50)
             } else {
                 (*attr).name as *mut XmlChar
             };
@@ -5159,8 +5160,7 @@ pub unsafe fn xml_validate_one_element(
                     while !attrib.is_null() {
                         if xml_str_equal((*attrib).name, cur_attr.name) {
                             if let Some(prefix) = cur_attr.prefix.as_deref() {
-                                let name_space =
-                                    XmlNsPtr::from_raw((*attrib).ns).unwrap().or((*elem).ns);
+                                let name_space = (*attrib).ns.or((*elem).ns);
 
                                 // qualified names handling is problematic, having a
                                 // different prefix should be possible but DTDs don't
@@ -5340,14 +5340,14 @@ pub unsafe fn xml_validate_one_attribute(
         if fullname.is_null() {
             return 0;
         }
-        if !(*attr).ns.is_null() {
+        if let Some(attr_ns) = (*attr).ns {
             attr_decl = (*doc).int_subset.and_then(|dtd| {
                 dtd.get_qattr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
                     (*attr).name().as_deref().unwrap(),
-                    (*(*attr).ns).prefix().as_deref(),
+                    attr_ns.prefix().as_deref(),
                 )
             });
             if attr_decl.is_none() && (*doc).ext_subset.is_some() {
@@ -5357,7 +5357,7 @@ pub unsafe fn xml_validate_one_attribute(
                             .to_string_lossy()
                             .as_ref(),
                         (*attr).name().as_deref().unwrap(),
-                        (*(*attr).ns).prefix().as_deref(),
+                        attr_ns.prefix().as_deref(),
                     )
                 });
             }
@@ -5386,12 +5386,12 @@ pub unsafe fn xml_validate_one_attribute(
         }
     }
     if attr_decl.is_none() {
-        if !(*attr).ns.is_null() {
+        if let Some(attr_ns) = (*attr).ns {
             attr_decl = (*doc).int_subset.and_then(|dtd| {
                 dtd.get_qattr_desc(
                     (*elem).name().unwrap().as_ref(),
                     (*attr).name().as_deref().unwrap(),
-                    (*(*attr).ns).prefix().as_deref(),
+                    attr_ns.prefix().as_deref(),
                 )
             });
             if attr_decl.is_none() && (*doc).ext_subset.is_some() {
@@ -5399,7 +5399,7 @@ pub unsafe fn xml_validate_one_attribute(
                     dtd.get_qattr_desc(
                         (*elem).name().unwrap().as_ref(),
                         (*attr).name().as_deref().unwrap(),
-                        (*(*attr).ns).prefix().as_deref(),
+                        attr_ns.prefix().as_deref(),
                     )
                 });
             }

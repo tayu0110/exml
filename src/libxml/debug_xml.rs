@@ -322,10 +322,7 @@ impl XmlDebugCtxt<'_> {
             if let Some(ns) = node.as_node().unwrap().as_ref().ns {
                 self.ns_check_scope(node, ns);
             }
-        } else if let Some(ns) = node
-            .as_attribute_node()
-            .and_then(|attr| XmlNsPtr::from_raw(attr.as_ref().ns).unwrap())
-        {
+        } else if let Some(ns) = node.as_attribute_node().and_then(|attr| attr.as_ref().ns) {
             self.ns_check_scope(node, ns);
         }
 

@@ -624,10 +624,11 @@ impl XmlNode {
                 // We want the attr to be in the specified namespace.
                 let ns_name = CString::new(ns_name).unwrap();
                 while !prop.is_null() {
-                    if !(*prop).ns.is_null()
-                        && (*prop).name().as_deref() == Some(name)
-                        && ((*(*prop).ns).href == ns_name.as_ptr() as _
-                            || xml_str_equal((*(*prop).ns).href, ns_name.as_ptr() as *const u8))
+                    if (*prop).name().as_deref() == Some(name)
+                        && (*prop).ns.map_or(false, |ns| {
+                            ns.href == ns_name.as_ptr() as _
+                                || xml_str_equal(ns.href, ns_name.as_ptr() as *const u8)
+                        })
                     {
                         return prop;
                     }
@@ -638,7 +639,7 @@ impl XmlNode {
             } else {
                 // We want the attr to be in no namespace.
                 while {
-                    if (*prop).ns.is_null() && (*prop).name().as_deref() == Some(name) {
+                    if (*prop).ns.is_none() && (*prop).name().as_deref() == Some(name) {
                         return prop;
                     }
                     prop = (*prop)
@@ -1182,7 +1183,7 @@ impl XmlNode {
             }
             (*prop).set_children(None);
             (*prop).set_last(None);
-            (*prop).ns = ns.map_or(null_mut(), |ns| ns.as_ptr());
+            (*prop).ns = ns;
             if let Some(value) = value {
                 let value = CString::new(value).unwrap();
                 (*prop).set_children(NodePtr::from_ptr(xml_new_doc_text(
@@ -2114,8 +2115,8 @@ impl XmlNode {
                 // initialize the cache if needed
                 let mut f = false;
                 for (i, &old_ns) in old_ns.iter().enumerate() {
-                    if old_ns == node_ns.as_ptr() {
-                        *node_ns = XmlNsPtr::from_raw(new_ns[i]).unwrap().unwrap();
+                    if old_ns == *node_ns {
+                        *node_ns = new_ns[i];
                         f = true;
                         break;
                     }
@@ -2125,8 +2126,8 @@ impl XmlNode {
                     if let Some(n) = xml_new_reconciled_ns(doc, self, *node_ns) {
                         // :-( what if else ???
                         // check if we need to grow the cache buffers.
-                        new_ns.push(n.as_ptr());
-                        old_ns.push(node_ns.as_ptr());
+                        new_ns.push(n);
+                        old_ns.push(*node_ns);
                         *node_ns = n;
                     }
                 }
@@ -2135,13 +2136,13 @@ impl XmlNode {
             if matches!((*node).typ, XmlElementType::XmlElementNode) {
                 attr = (*node).properties;
                 while !attr.is_null() {
-                    if let Some(mut attr_ns) = XmlNsPtr::from_raw((*attr).ns).unwrap() {
+                    if let Some(mut attr_ns) = (*attr).ns {
                         // initialize the cache if needed
                         let mut f = false;
                         for (i, &old_ns) in old_ns.iter().enumerate() {
-                            if old_ns == (*attr).ns {
-                                (*attr).ns = new_ns[i];
-                                attr_ns = XmlNsPtr::from_raw(new_ns[i]).unwrap().unwrap();
+                            if Some(old_ns) == (*attr).ns {
+                                (*attr).ns = Some(new_ns[i]);
+                                attr_ns = new_ns[i];
                                 f = true;
                                 break;
                             }
@@ -2151,9 +2152,9 @@ impl XmlNode {
                             if let Some(n) = xml_new_reconciled_ns(doc, self, attr_ns) {
                                 // :-( what if else ???
                                 // check if we need to grow the cache buffers.
-                                new_ns.push(n.as_ptr());
-                                old_ns.push(attr_ns.as_ptr());
-                                (*attr).ns = n.as_ptr();
+                                new_ns.push(n);
+                                old_ns.push(attr_ns);
+                                (*attr).ns = Some(n);
                             }
                         }
                     }

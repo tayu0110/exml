@@ -1013,7 +1013,7 @@ impl<T> XmlC14NCtx<'_, T> {
             // we need to check that attribute is visible and has non
             // default namespace (XML Namespaces: "default namespaces
             // do not apply directly to attributes")
-            if let Some(attr_ns) = XmlNsPtr::from_raw((*attr).ns).unwrap().filter(|&ns| {
+            if let Some(attr_ns) = (*attr).ns.filter(|&ns| {
                 !xml_c14n_is_xml_ns(ns)
                     && self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur))
             }) {
@@ -1027,10 +1027,9 @@ impl<T> XmlC14NCtx<'_, T> {
                 if attr_ns.prefix().map_or(0, |pre| pre.len()) == 0 {
                     has_empty_ns = true;
                 }
-            } else if !(*attr).ns.is_null()
-                && (*(*attr).ns).prefix().map_or(0, |pre| pre.len()) == 0
-                && xml_strlen((*(*attr).ns).href) == 0
-            {
+            } else if (*attr).ns.map_or(false, |ns| {
+                ns.prefix().map_or(0, |pre| pre.len()) == 0 && xml_strlen(ns.href) == 0
+            }) {
                 has_visibly_utilized_empty_ns = true;
             }
             attr = (*attr).next;
@@ -1191,7 +1190,7 @@ impl<T> XmlC14NCtx<'_, T> {
         let res = CString::new(res).unwrap();
         attr = xml_new_ns_prop(
             null_mut(),
-            XmlNsPtr::from_raw(xml_base_attr.ns).unwrap(),
+            xml_base_attr.ns,
             "base",
             res.as_ptr() as *const u8,
         );
@@ -1220,11 +1219,14 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         self.buf.borrow_mut().write_str(" ");
-        if !(*attr).ns.is_null() {
-            if let Some(prefix) = (*(*attr).ns).prefix().filter(|pre| !pre.is_empty()) {
-                self.buf.borrow_mut().write_str(&prefix);
-                self.buf.borrow_mut().write_str(":");
-            }
+        if let Some(prefix) = (*attr)
+            .ns
+            .as_deref()
+            .and_then(|ns| ns.prefix())
+            .filter(|p| !p.is_empty())
+        {
+            self.buf.borrow_mut().write_str(&prefix);
+            self.buf.borrow_mut().write_str(":");
         }
 
         self.buf.borrow_mut().write_str(&(*attr).name().unwrap());
@@ -1694,20 +1696,20 @@ unsafe fn xml_c14n_attrs_compare(attr1: *mut XmlAttr, attr2: *mut XmlAttr) -> i3
     // Attributes in the default namespace are first
     // because the default namespace is not applied to
     // unqualified attributes
-    if (*attr1).ns.is_null() {
+    let Some(attr1_ns) = (*attr1).ns else {
         return -1;
-    }
-    if (*attr2).ns.is_null() {
+    };
+    let Some(attr2_ns) = (*attr2).ns else {
         return 1;
-    }
-    if (*(*attr1).ns).prefix().is_none() {
+    };
+    if attr1_ns.prefix().is_none() {
         return -1;
     }
-    if (*(*attr2).ns).prefix().is_none() {
+    if attr2_ns.prefix().is_none() {
         return 1;
     }
 
-    let mut ret: i32 = xml_strcmp((*(*attr1).ns).href, (*(*attr2).ns).href);
+    let mut ret: i32 = xml_strcmp(attr1_ns.href, attr2_ns.href);
     if ret == 0 {
         ret = xml_strcmp((*attr1).name, (*attr2).name);
     }
@@ -1719,7 +1721,7 @@ unsafe fn xml_c14n_attrs_compare(attr1: *mut XmlAttr, attr2: *mut XmlAttr) -> i3
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlAttr")]
 unsafe fn xml_c14n_is_xml_attr(attr: *mut XmlAttr) -> bool {
-    let ns = XmlNsPtr::from_raw((*attr).ns).unwrap();
+    let ns = (*attr).ns;
     ns.map_or(false, |ns| xml_c14n_is_xml_ns(ns))
 }
 

@@ -1025,7 +1025,7 @@ unsafe fn xml_new_prop_internal(
         doc = (*node).doc;
         (*cur).doc = doc;
     }
-    (*cur).ns = ns.map_or(null_mut(), |ns| ns.as_ptr());
+    (*cur).ns = ns;
 
     (*cur).name = xml_strndup(name.as_ptr(), name.len() as i32);
 
@@ -1488,10 +1488,7 @@ unsafe fn xml_copy_prop_internal(
     }
     (*ret).parent = NodePtr::from_ptr(target);
 
-    if let Some(cur_ns) = XmlNsPtr::from_raw((*cur).ns)
-        .unwrap()
-        .filter(|_| !target.is_null())
-    {
+    if let Some(cur_ns) = (*cur).ns.filter(|_| !target.is_null()) {
         let prefix = cur_ns.prefix();
         if let Some(ns) = (*target).search_ns((*target).doc, prefix.as_deref()) {
             // we have to find something appropriate here since
@@ -1499,12 +1496,11 @@ unsafe fn xml_copy_prop_internal(
             // by the prefix
             if xml_str_equal(ns.href, cur_ns.href) {
                 // this is the nice case
-                (*ret).ns = ns.as_ptr();
+                (*ret).ns = Some(ns);
             } else {
                 // we are in trouble: we need a new reconciled namespace.
                 // This is expensive
-                (*ret).ns = xml_new_reconciled_ns((*target).doc, target, cur_ns)
-                    .map_or(null_mut(), |ns| ns.as_ptr());
+                (*ret).ns = xml_new_reconciled_ns((*target).doc, target, cur_ns);
             }
         } else {
             // Humm, we are copying an element whose namespace is defined
@@ -1526,12 +1522,11 @@ unsafe fn xml_copy_prop_internal(
                     // correct possibly cycling above the document elt
                     root = pred;
                 }
-                (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref())
-                    .map_or(null_mut(), |ns| ns.as_ptr());
+                (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
             }
         }
     } else {
-        (*ret).ns = null_mut();
+        (*ret).ns = None;
     }
 
     if let Some(children) = (*cur).children() {

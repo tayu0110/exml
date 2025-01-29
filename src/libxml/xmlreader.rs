@@ -1954,7 +1954,7 @@ impl XmlTextReader {
                 //   - same attribute names
                 //   - and the attribute carrying that namespace
                 if (*prop).name().as_deref() == Some(name)
-                    && ((*prop).ns.is_null() || (*(*prop).ns).prefix().is_none())
+                    && (*prop).ns.map_or(true, |ns| ns.prefix().is_none())
                 {
                     self.curnode = prop as *mut XmlNode;
                     return 1;
@@ -1982,8 +1982,9 @@ impl XmlTextReader {
                 //   - same attribute names
                 //   - and the attribute carrying that namespace
                 if (*prop).name().as_deref() == Some(localname)
-                    && !(*prop).ns.is_null()
-                    && (*(*prop).ns).prefix().as_deref() == Some(prefix)
+                    && (*prop)
+                        .ns
+                        .map_or(false, |ns| ns.prefix().as_deref() == Some(prefix))
                 {
                     self.curnode = prop as *mut XmlNode;
                     return 1;
@@ -2032,7 +2033,9 @@ impl XmlTextReader {
             //   - same attribute names
             //   - and the attribute carrying that namespace
             if (*prop).name().as_deref() == Some(local_name)
-                && (!(*prop).ns.is_null() && (*(*prop).ns).href().as_deref() == Some(namespace_uri))
+                && (*prop)
+                    .ns
+                    .map_or(false, |ns| ns.href().as_deref() == Some(namespace_uri))
             {
                 self.curnode = prop as *mut XmlNode;
                 return 1;

@@ -1093,7 +1093,10 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
     cur = (*node).properties;
     while !cur.is_null() {
         next = (*cur).next;
-        if (*cur).ns.is_null() || (*(*cur).ns).href().as_deref() == Some(XML_RELAXNG_NS) {
+        if (*cur)
+            .ns
+            .map_or(true, |ns| ns.href().as_deref() == Some(XML_RELAXNG_NS))
+        {
             if (*cur).name().as_deref() == Some("name") {
                 if (*node).name().as_deref() != Some("element")
                     && (*node).name().as_deref() != Some("attribute")
@@ -6819,10 +6822,13 @@ unsafe fn xml_relaxng_attribute_match(
     }
     if !(*define).ns.is_null() {
         if *(*define).ns.add(0) == 0 {
-            if !(*prop).ns.is_null() {
+            if (*prop).ns.is_some() {
                 return 0;
             }
-        } else if (*prop).ns.is_null() || !xml_str_equal((*define).ns, (*(*prop).ns).href) {
+        } else if (*prop)
+            .ns
+            .map_or(true, |ns| !xml_str_equal((*define).ns, ns.href))
+        {
             return 0;
         }
     }
@@ -6888,8 +6894,10 @@ unsafe fn xml_relaxng_validate_attribute(
             tmp = *(*(*ctxt).state).attrs.add(i as usize);
             if !tmp.is_null()
                 && xml_str_equal((*define).name, (*tmp).name)
-                && ((((*define).ns.is_null() || *(*define).ns.add(0) == 0) && (*tmp).ns.is_null())
-                    || (!(*tmp).ns.is_null() && xml_str_equal((*define).ns, (*(*tmp).ns).href)))
+                && ((((*define).ns.is_null() || *(*define).ns.add(0) == 0) && (*tmp).ns.is_none())
+                    || (*tmp)
+                        .ns
+                        .map_or(false, |ns| xml_str_equal((*define).ns, ns.href)))
             {
                 prop = tmp;
                 j = i;
