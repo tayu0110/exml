@@ -1090,8 +1090,8 @@ pub unsafe fn xml_xpath_ns_lookup(
 
     if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
         for &ns in namespaces {
-            if ns.is_null() && (*ns).prefix().as_deref() == Some(prefix.as_ref()) {
-                return (*ns).href;
+            if ns.prefix().as_deref() == Some(prefix.as_ref()) {
+                return ns.href;
             }
         }
     }
@@ -1928,7 +1928,7 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
                 let namespaces =
                     namespaces.get_or_insert_with(|| vec![(null(), null()); table.len()]);
                 for (i, &ns) in table.iter().enumerate() {
-                    namespaces[i] = ((*ns).href, (*ns).prefix);
+                    namespaces[i] = (ns.href, ns.prefix);
                 }
             }
         }
@@ -8893,9 +8893,8 @@ pub unsafe fn xml_xpath_next_namespace(
         return null_mut();
     }
     if cur.is_null() {
-        (*(*ctxt).context).tmp_ns_list = (*(*(*ctxt).context).node)
-            .get_ns_list((*(*ctxt).context).doc)
-            .map(|v| v.into_iter().map(|p| p.as_ptr()).collect());
+        (*(*ctxt).context).tmp_ns_list =
+            (*(*(*ctxt).context).node).get_ns_list((*(*ctxt).context).doc);
         (*(*ctxt).context).tmp_ns_nr = 0;
         if let Some(list) = (*(*ctxt).context).tmp_ns_list.as_deref() {
             (*(*ctxt).context).tmp_ns_nr = list.len() as i32;
@@ -8907,7 +8906,7 @@ pub unsafe fn xml_xpath_next_namespace(
     if (*(*ctxt).context).tmp_ns_nr > 0 {
         (*(*ctxt).context).tmp_ns_nr -= 1;
         (*(*ctxt).context).tmp_ns_list.as_deref().unwrap()[(*(*ctxt).context).tmp_ns_nr as usize]
-            as *mut XmlNode
+            .as_ptr() as *mut XmlNode
     } else {
         (*(*ctxt).context).tmp_ns_list = None;
         null_mut()

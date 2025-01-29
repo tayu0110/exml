@@ -63,7 +63,7 @@ use crate::{
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, XmlChar},
     },
-    tree::{NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlNode, XmlNs},
+    tree::{NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlNode, XmlNsPtr},
 };
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
@@ -256,8 +256,8 @@ pub struct XmlXPathContext {
     pub(crate) axis: XmlXPathAxisPtr, /* Array of defined axis */
 
     // the namespace nodes of the context node
-    pub(crate) namespaces: Option<Vec<*mut XmlNs>>, /* Array of namespaces */
-    pub(crate) user: *mut c_void,                   /* function to free */
+    pub(crate) namespaces: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
+    pub(crate) user: *mut c_void,                 /* function to free */
 
     // extra variables
     pub(crate) context_size: i32,       /* the context size */
@@ -285,8 +285,8 @@ pub struct XmlXPathContext {
     pub(crate) func_lookup_data: *mut c_void,                    /* function lookup data */
 
     // temporary namespace lists kept for walking the namespace axis
-    pub(crate) tmp_ns_list: Option<Vec<*mut XmlNs>>, /* Array of namespaces */
-    pub(crate) tmp_ns_nr: i32,                       /* number of namespaces in scope */
+    pub(crate) tmp_ns_list: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
+    pub(crate) tmp_ns_nr: i32,                     /* number of namespaces in scope */
 
     // error reporting mechanism
     pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
