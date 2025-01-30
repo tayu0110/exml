@@ -43,8 +43,8 @@ use crate::{
     io::{write_quoted, XmlOutputBuffer},
     list::XmlList,
     tree::{
-        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlDoc, XmlElementType, XmlNode,
-        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc,
+        XmlElementType, XmlNode, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
     xpath::XmlNodeSet,
@@ -394,7 +394,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // Create a sorted list to store element attributes
-        let mut list = XmlList::<*mut XmlAttr>::new(
+        let mut list = XmlList::new(
             None,
             Rc::new(
                 |&attr1, &attr2| match xml_c14n_attrs_compare(attr1, attr2) {
@@ -417,13 +417,13 @@ impl<T> XmlC14NCtx<'_, T> {
                 // nodes in this merged attribute list.
 
                 // Add all visible attributes from current node.
-                let mut attr = cur.properties;
-                while !attr.is_null() {
+                let mut attr = XmlAttrPtr::from_raw(cur.properties).unwrap();
+                while let Some(now) = attr {
                     // check that attribute is visible
-                    if self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur)) {
-                        list.insert_lower_bound(attr);
+                    if self.is_visible(Some(&*now), Some(cur)) {
+                        list.insert_lower_bound(now);
                     }
-                    attr = (*attr).next;
+                    attr = XmlAttrPtr::from_raw(now.next).unwrap();
                 }
 
                 // Handle xml attributes
@@ -437,12 +437,12 @@ impl<T> XmlC14NCtx<'_, T> {
                     // If XPath node-set is not specified then the parent is always visible!
                     let mut tmp = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
                     while !tmp.is_null() {
-                        attr = (*tmp).properties;
-                        while !attr.is_null() {
-                            if xml_c14n_is_xml_attr(attr) && list.search(&attr).is_none() {
-                                list.insert_lower_bound(attr);
+                        let mut attr = XmlAttrPtr::from_raw((*tmp).properties).unwrap();
+                        while let Some(now) = attr {
+                            if xml_c14n_is_xml_attr(now.as_ptr()) && list.search(&now).is_none() {
+                                list.insert_lower_bound(now);
                             }
-                            attr = (*attr).next;
+                            attr = XmlAttrPtr::from_raw(now.next).unwrap();
                         }
                         tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
                     }
@@ -453,13 +453,13 @@ impl<T> XmlC14NCtx<'_, T> {
                 // are not imported into orphan nodes of the document subset
 
                 // Add all visible attributes from current node.
-                let mut attr = cur.properties;
-                while !attr.is_null() {
+                let mut attr = XmlAttrPtr::from_raw(cur.properties).unwrap();
+                while let Some(now) = attr {
                     // check that attribute is visible
-                    if self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur)) {
-                        list.insert_lower_bound(attr);
+                    if self.is_visible(Some(&*now), Some(cur)) {
+                        list.insert_lower_bound(now);
                     }
-                    attr = (*attr).next;
+                    attr = XmlAttrPtr::from_raw(now.next).unwrap();
                 }
             }
             XmlC14NMode::XmlC14N1_1 => {
@@ -491,33 +491,33 @@ impl<T> XmlC14NCtx<'_, T> {
                 // as ordinary attributes.
 
                 // special processing for 1.1 spec
-                let mut xml_base_attr: *mut XmlAttr = null_mut();
-                let mut xml_lang_attr: *mut XmlAttr = null_mut();
-                let mut xml_space_attr: *mut XmlAttr = null_mut();
+                let mut xml_base_attr = None;
+                let mut xml_lang_attr = None;
+                let mut xml_space_attr = None;
 
                 // Add all visible attributes from current node.
-                let mut attr = cur.properties;
-                while !attr.is_null() {
+                let mut attr = XmlAttrPtr::from_raw(cur.properties).unwrap();
+                while let Some(now) = attr {
                     // special processing for XML attribute kiks in only when we have invisible parents
-                    if !parent_visible || !xml_c14n_is_xml_attr(attr) {
+                    if !parent_visible || !xml_c14n_is_xml_attr(now.as_ptr()) {
                         // check that attribute is visible
-                        if self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur)) {
-                            list.insert_lower_bound(attr);
+                        if self.is_visible(Some(&*now), Some(cur)) {
+                            list.insert_lower_bound(now);
                         }
                     } else {
                         let mut matched: i32 = 0;
 
                         // check for simple inheritance attributes
                         if matched == 0
-                            && xml_lang_attr.is_null()
-                            && (*attr).name().as_deref() == Some("lang")
+                            && xml_lang_attr.is_none()
+                            && now.name().as_deref() == Some("lang")
                         {
                             xml_lang_attr = attr;
                             matched = 1;
                         }
                         if matched == 0
-                            && xml_space_attr.is_null()
-                            && (*attr).name().as_deref() == Some("space")
+                            && xml_space_attr.is_none()
+                            && now.name().as_deref() == Some("space")
                         {
                             xml_space_attr = attr;
                             matched = 1;
@@ -525,51 +525,49 @@ impl<T> XmlC14NCtx<'_, T> {
 
                         // check for base attr
                         if matched == 0
-                            && xml_base_attr.is_null()
-                            && (*attr).name().as_deref() == Some("base")
+                            && xml_base_attr.is_none()
+                            && now.name().as_deref() == Some("base")
                         {
                             xml_base_attr = attr;
                             matched = 1;
                         }
 
                         // otherwise, it is a normal attribute, so just check if it is visible
-                        if matched == 0
-                            && self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur))
-                        {
-                            list.insert_lower_bound(attr);
+                        if matched == 0 && self.is_visible(Some(&*now), Some(cur)) {
+                            list.insert_lower_bound(now);
                         }
                     }
 
                     // move to the next one
-                    attr = (*attr).next;
+                    attr = XmlAttrPtr::from_raw(now.next).unwrap();
                 }
 
                 // special processing for XML attribute kiks in only when we have invisible parents
                 if parent_visible {
                     // simple inheritance attributes - copy
-                    if xml_lang_attr.is_null() {
+                    if xml_lang_attr.is_none() {
                         xml_lang_attr = self.find_hidden_parent_attr(
                             (*cur).parent().map(|p| &*p.as_ptr()),
                             "lang",
                             XML_XML_NAMESPACE.to_str().unwrap(),
                         );
                     }
-                    if !xml_lang_attr.is_null() {
-                        list.insert_lower_bound(xml_lang_attr);
+                    if let Some(attr) = xml_lang_attr {
+                        list.insert_lower_bound(attr);
                     }
-                    if xml_space_attr.is_null() {
+                    if xml_space_attr.is_none() {
                         xml_space_attr = self.find_hidden_parent_attr(
                             (*cur).parent().map(|p| &*p.as_ptr()),
                             "space",
                             XML_XML_NAMESPACE.to_str().unwrap(),
                         );
                     }
-                    if !xml_space_attr.is_null() {
-                        list.insert_lower_bound(xml_space_attr);
+                    if let Some(attr) = xml_space_attr {
+                        list.insert_lower_bound(attr);
                     }
 
                     // base uri attribute - fix up
-                    if xml_base_attr.is_null() {
+                    if xml_base_attr.is_none() {
                         // if we don't have base uri attribute, check if we have a "hidden" one above
                         xml_base_attr = self.find_hidden_parent_attr(
                             (*cur).parent().map(|p| &*p.as_ptr()),
@@ -577,14 +575,14 @@ impl<T> XmlC14NCtx<'_, T> {
                             XML_XML_NAMESPACE.to_str().unwrap(),
                         );
                     }
-                    if !xml_base_attr.is_null() {
-                        xml_base_attr = self.fixup_base_attr(&*xml_base_attr);
-                        if !xml_base_attr.is_null() {
-                            list.insert_lower_bound(xml_base_attr);
+                    if let Some(attr) = xml_base_attr {
+                        xml_base_attr = self.fixup_base_attr(&attr);
+                        if let Some(mut attr) = xml_base_attr {
+                            list.insert_lower_bound(attr);
 
                             // note that we MUST delete returned attr node ourselves!
-                            (*xml_base_attr).next = attrs_to_delete;
-                            attrs_to_delete = xml_base_attr;
+                            attr.next = attrs_to_delete;
+                            attrs_to_delete = attr.as_ptr();
                         }
                     }
                 }
@@ -1106,33 +1104,31 @@ impl<T> XmlC14NCtx<'_, T> {
         mut cur: Option<&XmlNode>,
         name: &str,
         ns: &str,
-    ) -> *mut XmlAttr {
+    ) -> Option<XmlAttrPtr> {
         while let Some(now) =
             cur.filter(|&now| !self.is_visible(Some(now), now.parent().map(|p| &*p.as_ptr() as _)))
         {
             if let Some(res) = now.has_ns_prop(name, Some(ns)) {
-                return match res {
-                    Ok(res) => res.as_ptr(),
-                    Err(res) => res.as_ptr() as *mut XmlAttr,
-                };
+                // Is this `unwrap` OK ????
+                return Some(res.unwrap());
             }
 
             cur = now.parent().map(|p| &*p.as_ptr());
         }
 
-        null_mut()
+        None
     }
 
     /// Fixes up the xml:base attribute
     ///
     /// Returns the newly created attribute or NULL
     #[doc(alias = "xmlC14NFixupBaseAttr")]
-    unsafe fn fixup_base_attr(&mut self, xml_base_attr: &XmlAttr) -> *mut XmlAttr {
+    unsafe fn fixup_base_attr(&mut self, xml_base_attr: &XmlAttr) -> Option<XmlAttrPtr> {
         let mut cur: *mut XmlNode;
 
         let Some(parent) = xml_base_attr.parent() else {
             xml_c14n_err_param("processing xml:base attribute");
-            return null_mut();
+            return None;
         };
 
         // start from current value
@@ -1141,7 +1137,7 @@ impl<T> XmlC14NCtx<'_, T> {
             .and_then(|c| c.get_string(self.doc, 1))
         else {
             xml_c14n_err_internal("processing xml:base attribute - can't get attr value");
-            return null_mut();
+            return None;
         };
 
         // go up the stack until we find a node that we rendered already
@@ -1159,7 +1155,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     Err(attr) => attr.children.and_then(|c| c.get_string(self.doc, 1)),
                 }) else {
                     xml_c14n_err_internal("processing xml:base attribute - can't get attr value");
-                    return null_mut();
+                    return None;
                 };
 
                 // we need to add '/' if our current base uri ends with '..' or '.'
@@ -1172,7 +1168,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 // build uri
                 let Some(tmp_str2) = build_uri(&res, &tmp_str) else {
                     xml_c14n_err_internal("processing xml:base attribute - can't construct uri");
-                    return null_mut();
+                    return None;
                 };
 
                 res = tmp_str2;
@@ -1184,24 +1180,24 @@ impl<T> XmlC14NCtx<'_, T> {
 
         // check if result uri is empty or not
         if res.is_empty() {
-            return null_mut();
+            return None;
         }
 
         // create and return the new attribute node
         let res = CString::new(res).unwrap();
-        let attr = xml_new_ns_prop(
+        let Some(attr) = XmlAttrPtr::from_raw(xml_new_ns_prop(
             null_mut(),
             xml_base_attr.ns,
             "base",
             res.as_ptr() as *const u8,
-        );
-        if attr.is_null() {
+        ))
+        .unwrap() else {
             xml_c14n_err_internal("processing xml:base attribute - can't construct attribute");
-            return null_mut();
-        }
+            return None;
+        };
 
         // done
-        attr
+        Some(attr)
     }
 
     /// Prints out canonical attribute urrent node to the
@@ -1211,16 +1207,11 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns 1 on success or 0 on fail.
     #[doc(alias = "xmlC14NPrintAttrs")]
-    unsafe fn print_attrs(&mut self, attr: *mut XmlAttr) -> bool {
+    unsafe fn print_attrs(&mut self, attr: XmlAttrPtr) -> bool {
         let buffer: *mut XmlChar;
 
-        if attr.is_null() {
-            xml_c14n_err_param("writing attributes");
-            return false;
-        }
-
         self.buf.borrow_mut().write_str(" ");
-        if let Some(prefix) = (*attr)
+        if let Some(prefix) = attr
             .ns
             .as_deref()
             .and_then(|ns| ns.prefix())
@@ -1230,11 +1221,11 @@ impl<T> XmlC14NCtx<'_, T> {
             self.buf.borrow_mut().write_str(":");
         }
 
-        self.buf.borrow_mut().write_str(&(*attr).name().unwrap());
+        self.buf.borrow_mut().write_str(&attr.name().unwrap());
         self.buf.borrow_mut().write_str("=\"");
 
         // todo: should we log an error if value==NULL ?
-        if let Some(value) = (*attr).children().and_then(|c| c.get_string(self.doc, 1)) {
+        if let Some(value) = attr.children().and_then(|c| c.get_string(self.doc, 1)) {
             let value = CString::new(value).unwrap();
             buffer = xml_c11n_normalize_attr(value.as_ptr() as *const u8);
             if !buffer.is_null() {
@@ -1678,29 +1669,29 @@ const XML_NAMESPACES_DEFAULT: usize = 16;
 ///
 /// Returns -1 if attr1 < attr2, 0 if attr1 == attr2 or 1 if attr1 > attr2.
 #[doc(alias = "xmlC14NAttrsCompare")]
-unsafe fn xml_c14n_attrs_compare(attr1: *mut XmlAttr, attr2: *mut XmlAttr) -> i32 {
+unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> i32 {
     // Simple cases
     if attr1 == attr2 {
         return 0;
     }
-    if attr1.is_null() {
-        return -1;
-    }
-    if attr2.is_null() {
-        return 1;
-    }
+    // if attr1.is_null() {
+    //     return -1;
+    // }
+    // if attr2.is_null() {
+    //     return 1;
+    // }
 
-    if (*attr1).ns == (*attr2).ns {
-        return xml_strcmp((*attr1).name, (*attr2).name);
+    if attr1.ns == attr2.ns {
+        return xml_strcmp(attr1.name, attr2.name);
     }
 
     // Attributes in the default namespace are first
     // because the default namespace is not applied to
     // unqualified attributes
-    let Some(attr1_ns) = (*attr1).ns else {
+    let Some(attr1_ns) = attr1.ns else {
         return -1;
     };
-    let Some(attr2_ns) = (*attr2).ns else {
+    let Some(attr2_ns) = attr2.ns else {
         return 1;
     };
     if attr1_ns.prefix().is_none() {
@@ -1712,7 +1703,7 @@ unsafe fn xml_c14n_attrs_compare(attr1: *mut XmlAttr, attr2: *mut XmlAttr) -> i3
 
     let mut ret: i32 = xml_strcmp(attr1_ns.href, attr2_ns.href);
     if ret == 0 {
-        ret = xml_strcmp((*attr1).name, (*attr2).name);
+        ret = xml_strcmp(attr1.name, attr2.name);
     }
     ret
 }

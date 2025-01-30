@@ -130,7 +130,7 @@ impl NodeCommon for XmlAttribute {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct XmlAttributePtr(NonNull<XmlAttribute>);
 
 impl XmlAttributePtr {
