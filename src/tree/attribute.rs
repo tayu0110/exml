@@ -397,7 +397,7 @@ pub(super) unsafe fn xml_new_prop_internal(
             CStr::from_ptr(value as *const i8)
                 .to_string_lossy()
                 .as_ref(),
-            cur,
+            XmlAttrPtr::from_raw(cur).unwrap().unwrap(),
         );
     }
 

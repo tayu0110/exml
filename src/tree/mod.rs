@@ -1455,7 +1455,12 @@ unsafe fn xml_copy_prop_internal(
     {
         let children = (*cur).children;
         if let Some(id) = children.and_then(|c| c.get_string((*cur).doc, 1)) {
-            xml_add_id(null_mut(), (*target).doc, &id, ret);
+            xml_add_id(
+                null_mut(),
+                (*target).doc,
+                &id,
+                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
+            );
         }
     }
     ret

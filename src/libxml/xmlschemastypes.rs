@@ -2804,7 +2804,7 @@ unsafe fn xml_schema_val_atomic_type(
                                                 CStr::from_ptr(strip as *const i8)
                                                     .to_string_lossy()
                                                     .as_ref(),
-                                                attr.as_ptr(),
+                                                attr,
                                             );
                                             xml_free(strip as _);
                                             res
@@ -2815,7 +2815,7 @@ unsafe fn xml_schema_val_atomic_type(
                                                 CStr::from_ptr(value as *const i8)
                                                     .to_string_lossy()
                                                     .as_ref(),
-                                                attr.as_ptr(),
+                                                attr,
                                             )
                                         };
                                         if res.is_none() {

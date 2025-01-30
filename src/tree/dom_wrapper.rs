@@ -2355,7 +2355,14 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     {
                         let children = (*cur).children();
                         if let Some(id_val) = children.and_then(|c| c.get_string((*cur).doc, 1)) {
-                            if xml_add_id(null_mut(), dest_doc, &id_val, cur as _).is_none() {
+                            if xml_add_id(
+                                null_mut(),
+                                dest_doc,
+                                &id_val,
+                                XmlAttrPtr::from_raw(cur as _).unwrap().unwrap(),
+                            )
+                            .is_none()
+                            {
                                 // TODO: error message.
                                 break 'internal_error;
                             }

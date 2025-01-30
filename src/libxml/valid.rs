@@ -1949,7 +1949,7 @@ pub unsafe fn xml_add_id<'a>(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
     value: &str,
-    attr: *mut XmlAttr,
+    mut attr: XmlAttrPtr,
 ) -> Option<&'a XmlID> {
     if doc.is_null() {
         return None;
@@ -1957,9 +1957,9 @@ pub unsafe fn xml_add_id<'a>(
     if value.is_empty() {
         return None;
     }
-    if attr.is_null() {
-        return None;
-    }
+    // if attr.is_null() {
+    //     return None;
+    // }
 
     // Create the ID table if needed.
     let table = (*doc)
@@ -1971,13 +1971,13 @@ pub unsafe fn xml_add_id<'a>(
     ret.doc = doc;
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
-        ret.name = (*attr).name().map(|n| n.into_owned());
+        ret.name = attr.name().map(|n| n.into_owned());
         ret.attr = None;
     } else {
-        ret.attr = XmlAttrPtr::from_raw(attr).unwrap();
+        ret.attr = Some(attr);
         ret.name = None;
     }
-    ret.lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
+    ret.lineno = attr.parent.map_or(-1, |p| p.get_line_no() as i32);
 
     if table.add_entry(value, ret).is_err() {
         // The id is already defined in this DTD.
@@ -1985,7 +1985,7 @@ pub unsafe fn xml_add_id<'a>(
         if !ctxt.is_null() {
             xml_err_valid_node(
                 ctxt,
-                (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
+                attr.parent.map_or(null_mut(), |p| p.as_ptr()),
                 XmlParserErrors::XmlDTDIDRedefined,
                 format!("ID {value} already defined\n").as_str(),
                 Some(value),
@@ -1995,9 +1995,7 @@ pub unsafe fn xml_add_id<'a>(
         }
         return None;
     }
-    if !attr.is_null() {
-        (*attr).atype = Some(XmlAttributeType::XmlAttributeID);
-    }
+    attr.atype = Some(XmlAttributeType::XmlAttributeID);
     table.lookup(value).map(|res| &**res)
 }
 
@@ -5484,7 +5482,7 @@ pub unsafe fn xml_validate_one_attribute(
             CStr::from_ptr(value as *const i8)
                 .to_string_lossy()
                 .as_ref(),
-            attr,
+            XmlAttrPtr::from_raw(attr).unwrap().unwrap(),
         )
         .is_none()
     {

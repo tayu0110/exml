@@ -1728,7 +1728,7 @@ unsafe fn xml_sax2_attribute_internal(
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                ret,
+                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
             );
         } else if xml_is_id(
             (*ctxt).my_doc,
@@ -1742,7 +1742,7 @@ unsafe fn xml_sax2_attribute_internal(
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                ret,
+                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
             );
         } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
             xml_add_ref(
@@ -2649,7 +2649,7 @@ unsafe fn xml_sax2_attribute_ns(
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                ret,
+                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
             );
         } else if xml_is_id(
             (*ctxt).my_doc,
@@ -2663,7 +2663,7 @@ unsafe fn xml_sax2_attribute_ns(
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                ret,
+                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
             );
         } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
             xml_add_ref(

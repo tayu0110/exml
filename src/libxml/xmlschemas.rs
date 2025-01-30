@@ -144,7 +144,7 @@ use crate::{
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
-        XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlElementContentPtr,
+        XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlElementContentPtr,
         XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
         XmlNsPtr, XML_XML_NAMESPACE,
     },
@@ -5838,7 +5838,7 @@ unsafe fn xml_schema_pval_attr_node_id(ctxt: XmlSchemaParserCtxtPtr, attr: *mut 
                     CStr::from_ptr(value as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                    attr,
+                    XmlAttrPtr::from_raw(attr).unwrap().unwrap(),
                 );
                 if res.is_none() {
                     ret = XmlParserErrors::XmlSchemapS4sAttrInvalidValue as i32;
