@@ -1751,7 +1751,7 @@ unsafe fn xml_sax2_attribute_internal(
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                ret,
+                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
             );
         }
     }
@@ -2672,7 +2672,7 @@ unsafe fn xml_sax2_attribute_ns(
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                ret,
+                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
             );
         }
     }

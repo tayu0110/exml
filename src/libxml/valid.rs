@@ -2205,14 +2205,14 @@ pub(crate) unsafe fn xml_add_ref(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
     value: &str,
-    attr: *mut XmlAttr,
+    attr: XmlAttrPtr,
 ) -> Option<()> {
     if doc.is_null() {
         return None;
     }
-    if attr.is_null() {
-        return None;
-    }
+    // if attr.is_null() {
+    //     return None;
+    // }
 
     // Create the Ref table if needed.
     let table = (*doc).refs.get_or_insert_with(HashMap::new);
@@ -2223,13 +2223,13 @@ pub(crate) unsafe fn xml_add_ref(
     // fill the structure.
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
-        ret.name = (*attr).name().map(|n| n.into_owned());
-        ret.attr = null_mut();
+        ret.name = attr.name().map(|n| n.into_owned());
+        ret.attr = None;
     } else {
         ret.name = None;
-        ret.attr = attr;
+        ret.attr = Some(attr);
     }
-    ret.lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
+    ret.lineno = attr.parent.map_or(-1, |p| p.get_line_no() as i32);
 
     // To add a reference :-
     // References are maintained as a list of references,
@@ -2335,7 +2335,7 @@ pub(crate) unsafe fn xml_remove_ref(doc: *mut XmlDoc, attr: *mut XmlAttr) -> i32
     // will have enough data to be able to remove the entry.
 
     // Remove the supplied attr from our list
-    ref_list.remove_first_by(|refe| refe.attr == attr);
+    ref_list.remove_first_by(|refe| refe.attr == XmlAttrPtr::from_raw(attr).unwrap());
 
     // If the list is empty then remove the list entry in the hash
     if ref_list.is_empty() {
@@ -5498,7 +5498,7 @@ pub unsafe fn xml_validate_one_attribute(
         CStr::from_ptr(value as *const i8)
             .to_string_lossy()
             .as_ref(),
-        attr,
+        XmlAttrPtr::from_raw(attr).unwrap().unwrap(),
     )
     .is_none()
     {
@@ -6013,11 +6013,73 @@ pub unsafe fn xml_validate_one_namespace(
 
 #[doc(alias = "xmlValidateRef")]
 unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const XmlChar) {
-    if refe.attr.is_null() && refe.name.is_none() {
+    if refe.attr.is_none() && refe.name.is_none() {
         return;
     }
-    let attr: *mut XmlAttr = refe.attr;
-    if attr.is_null() {
+    if let Some(attr) = refe.attr {
+        if matches!(attr.atype, Some(XmlAttributeType::XmlAttributeIDREF)) {
+            if xml_get_id((*ctxt).doc, name).is_none() {
+                let attr_name = attr.name().unwrap();
+                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                xml_err_valid_node(
+                    ctxt,
+                    attr.parent.map_or(null_mut(), |p| p.as_ptr()),
+                    XmlParserErrors::XmlDTDUnknownID,
+                    format!("IDREF attribute {attr_name} references an unknown ID \"{name}\"\n")
+                        .as_str(),
+                    Some(&attr_name),
+                    Some(&name),
+                    None,
+                );
+                (*ctxt).valid = 0;
+            }
+        } else if matches!(attr.atype, Some(XmlAttributeType::XmlAttributeIDREFS)) {
+            let mut str: *mut XmlChar;
+            let mut cur: *mut XmlChar;
+            let mut save: XmlChar;
+
+            let dup: *mut XmlChar = xml_strdup(name);
+            if dup.is_null() {
+                xml_verr_memory(ctxt, Some("IDREFS split"));
+                (*ctxt).valid = 0;
+                return;
+            }
+            cur = dup;
+            while *cur != 0 {
+                str = cur;
+                while *cur != 0 && !xml_is_blank_char(*cur as u32) {
+                    cur = cur.add(1);
+                }
+                save = *cur;
+                *cur = 0;
+                if xml_get_id((*ctxt).doc, str).is_none() {
+                    let attr_name = attr.name().unwrap();
+                    let str = CStr::from_ptr(str as *const i8).to_string_lossy();
+                    xml_err_valid_node(
+                        ctxt,
+                        attr.parent.map_or(null_mut(), |p| p.as_ptr()),
+                        XmlParserErrors::XmlDTDUnknownID,
+                        format!(
+                            "IDREFS attribute {attr_name} references an unknown ID \"{str}\"\n"
+                        )
+                        .as_str(),
+                        Some(&attr_name),
+                        Some(&str),
+                        None,
+                    );
+                    (*ctxt).valid = 0;
+                }
+                if save == 0 {
+                    break;
+                }
+                *cur = save;
+                while xml_is_blank_char(*cur as u32) {
+                    cur = cur.add(1);
+                }
+            }
+            xml_free(dup as _);
+        }
+    } else {
         let mut str: *mut XmlChar;
         let mut cur: *mut XmlChar;
         let mut save: XmlChar;
@@ -6044,65 +6106,6 @@ unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const Xm
                     refe.name.as_deref().unwrap(),
                     refe.lineno,
                     CStr::from_ptr(str as *const i8).to_string_lossy()
-                );
-                (*ctxt).valid = 0;
-            }
-            if save == 0 {
-                break;
-            }
-            *cur = save;
-            while xml_is_blank_char(*cur as u32) {
-                cur = cur.add(1);
-            }
-        }
-        xml_free(dup as _);
-    } else if matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeIDREF)) {
-        if xml_get_id((*ctxt).doc, name).is_none() {
-            let attr_name = (*attr).name().unwrap();
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-            xml_err_valid_node(
-                ctxt,
-                (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
-                XmlParserErrors::XmlDTDUnknownID,
-                format!("IDREF attribute {attr_name} references an unknown ID \"{name}\"\n")
-                    .as_str(),
-                Some(&attr_name),
-                Some(&name),
-                None,
-            );
-            (*ctxt).valid = 0;
-        }
-    } else if matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeIDREFS)) {
-        let mut str: *mut XmlChar;
-        let mut cur: *mut XmlChar;
-        let mut save: XmlChar;
-
-        let dup: *mut XmlChar = xml_strdup(name);
-        if dup.is_null() {
-            xml_verr_memory(ctxt, Some("IDREFS split"));
-            (*ctxt).valid = 0;
-            return;
-        }
-        cur = dup;
-        while *cur != 0 {
-            str = cur;
-            while *cur != 0 && !xml_is_blank_char(*cur as u32) {
-                cur = cur.add(1);
-            }
-            save = *cur;
-            *cur = 0;
-            if xml_get_id((*ctxt).doc, str).is_none() {
-                let attr_name = (*attr).name().unwrap();
-                let str = CStr::from_ptr(str as *const i8).to_string_lossy();
-                xml_err_valid_node(
-                    ctxt,
-                    (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
-                    XmlParserErrors::XmlDTDUnknownID,
-                    format!("IDREFS attribute {attr_name} references an unknown ID \"{str}\"\n")
-                        .as_str(),
-                    Some(&attr_name),
-                    Some(&str),
-                    None,
                 );
                 (*ctxt).valid = 0;
             }
