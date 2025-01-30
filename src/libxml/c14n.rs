@@ -1107,13 +1107,14 @@ impl<T> XmlC14NCtx<'_, T> {
         name: &str,
         ns: &str,
     ) -> *mut XmlAttr {
-        let mut res: *mut XmlAttr;
         while let Some(now) =
             cur.filter(|&now| !self.is_visible(Some(now), now.parent().map(|p| &*p.as_ptr() as _)))
         {
-            res = now.has_ns_prop(name, Some(ns));
-            if !res.is_null() {
-                return res;
+            if let Some(res) = now.has_ns_prop(name, Some(ns)) {
+                return match res {
+                    Ok(res) => res.as_ptr(),
+                    Err(res) => res.as_ptr() as *mut XmlAttr,
+                };
             }
 
             cur = now.parent().map(|p| &*p.as_ptr());
@@ -1128,7 +1129,6 @@ impl<T> XmlC14NCtx<'_, T> {
     #[doc(alias = "xmlC14NFixupBaseAttr")]
     unsafe fn fixup_base_attr(&mut self, xml_base_attr: &XmlAttr) -> *mut XmlAttr {
         let mut cur: *mut XmlNode;
-        let mut attr: *mut XmlAttr;
 
         let Some(parent) = xml_base_attr.parent() else {
             xml_c14n_err_param("processing xml:base attribute");
@@ -1152,11 +1152,12 @@ impl<T> XmlC14NCtx<'_, T> {
                 (*cur).parent().map(|p| &*p.as_ptr() as _),
             )
         {
-            attr = (*cur).has_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
-            if !attr.is_null() {
-                /* get attr value */
-                let Some(mut tmp_str) = (*attr).children.and_then(|c| c.get_string(self.doc, 1))
-                else {
+            if let Some(attr) = (*cur).has_ns_prop("base", XML_XML_NAMESPACE.to_str().ok()) {
+                // get attr value
+                let Some(mut tmp_str) = (match attr {
+                    Ok(attr) => attr.children.and_then(|c| c.get_string(self.doc, 1)),
+                    Err(attr) => attr.children.and_then(|c| c.get_string(self.doc, 1)),
+                }) else {
                     xml_c14n_err_internal("processing xml:base attribute - can't get attr value");
                     return null_mut();
                 };
@@ -1188,7 +1189,7 @@ impl<T> XmlC14NCtx<'_, T> {
 
         // create and return the new attribute node
         let res = CString::new(res).unwrap();
-        attr = xml_new_ns_prop(
+        let attr = xml_new_ns_prop(
             null_mut(),
             xml_base_attr.ns,
             "base",

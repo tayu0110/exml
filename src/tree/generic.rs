@@ -13,8 +13,8 @@ use crate::{
 
 use super::{
     xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge, NodePtr, XmlAttr,
-    XmlAttribute, XmlDoc, XmlDtd, XmlDtdPtr, XmlElement, XmlElementType, XmlEntity, XmlNode, XmlNs,
-    XML_XML_NAMESPACE,
+    XmlAttrPtr, XmlAttribute, XmlDoc, XmlDtd, XmlDtdPtr, XmlElement, XmlElementType, XmlEntity,
+    XmlNode, XmlNs, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -397,16 +397,17 @@ pub trait NodeCommon {
                         None,
                     )
                 };
-                if !lastattr.is_null()
-                    && lastattr != cur as _
-                    && !matches!((*lastattr).typ, XmlElementType::XmlAttributeDecl)
-                {
+                if let Some(mut lastattr) = lastattr.and_then(|attr| attr.ok()).filter(|&attr| {
+                    attr != XmlAttrPtr::from_raw(cur as *mut XmlAttr).unwrap().unwrap()
+                }) {
                     // different instance, destroy it (attributes must be unique)
                     (*lastattr).unlink();
-                    xml_free_prop(lastattr);
+                    xml_free_prop(lastattr.as_ptr());
                 }
-                if lastattr == cur as _ {
-                    return cur;
+                match lastattr {
+                    Some(Ok(attr)) if attr.as_ptr() == cur as *mut XmlAttr => return cur,
+                    Some(Err(attr)) if attr.as_ptr() == cur as *mut XmlAttribute => return cur,
+                    _ => {}
                 }
             }
             if (*(self as *mut Self as *mut XmlNode)).properties.is_null() {

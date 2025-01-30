@@ -39,8 +39,8 @@ use crate::{
 use super::{
     xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node, xml_free_prop,
     xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory, NodeCommon,
-    XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD,
-    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    XmlAttr, XmlAttrPtr, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlElementType, XmlNs,
+    XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
@@ -606,14 +606,17 @@ impl XmlNode {
         0
     }
 
+    /// If `use_dtd` is `true` and no suitable attribute is found,
+    /// and a Default/Fixed attribute declaration is found,
+    /// this method may return `Err(XmlAttributePtr)` pointing to that declaration.
     unsafe fn get_prop_node_internal(
         &self,
         name: &str,
         ns_name: Option<&str>,
         use_dtd: bool,
-    ) -> *mut XmlAttr {
+    ) -> Option<Result<XmlAttrPtr, XmlAttributePtr>> {
         if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
-            return null_mut();
+            return None;
         }
 
         if !self.properties.is_null() {
@@ -628,7 +631,7 @@ impl XmlNode {
                                 || xml_str_equal(ns.href, ns_name.as_ptr() as *const u8)
                         })
                     {
-                        return now.as_ptr();
+                        return Some(Ok(now));
                     }
                     prop = XmlAttrPtr::from_raw(now.next).unwrap();
                 }
@@ -636,7 +639,7 @@ impl XmlNode {
                 // We want the attr to be in no namespace.
                 while let Some(now) = prop {
                     if now.ns.is_none() && now.name().as_deref() == Some(name) {
-                        return now.as_ptr();
+                        return Some(Ok(now));
                     }
                     prop = XmlAttrPtr::from_raw(now.next).unwrap();
                 }
@@ -646,7 +649,7 @@ impl XmlNode {
         #[cfg(feature = "libxml_tree")]
         {
             if !use_dtd {
-                return null_mut();
+                return None;
             }
             // Check if there is a default/fixed attribute declaration in
             // the internal or external subset.
@@ -662,7 +665,7 @@ impl XmlNode {
                         tmpstr = xml_strcat(tmpstr, c":".as_ptr() as _);
                         tmpstr = xml_strcat(tmpstr, self.name);
                         if tmpstr.is_null() {
-                            return null_mut();
+                            return None;
                         }
                         elem_qname = tmpstr;
                     } else {
@@ -697,7 +700,7 @@ impl XmlNode {
                                 if !tmpstr.is_null() {
                                     xml_free(tmpstr as _);
                                 }
-                                return null_mut();
+                                return None;
                             };
                             let ns_name = CString::new(ns_name).unwrap();
                             for cur in ns_list {
@@ -756,12 +759,12 @@ impl XmlNode {
                     if let Some(attr_decl) =
                         attr_decl.filter(|attr_decl| !attr_decl.default_value.is_null())
                     {
-                        return attr_decl.as_ptr() as _;
+                        return Some(Err(attr_decl));
                     }
                 }
             }
         }
-        null_mut()
+        None
     }
 
     /// Search and get the value of an attribute associated to a node.  
@@ -800,11 +803,11 @@ impl XmlNode {
     #[doc(alias = "xmlGetNsProp")]
     pub unsafe fn get_ns_prop(&self, name: &str, name_space: Option<&str>) -> Option<String> {
         let prop =
-            self.get_prop_node_internal(name, name_space, XML_CHECK_DTD.load(Ordering::Relaxed));
-        if prop.is_null() {
-            return None;
+            self.get_prop_node_internal(name, name_space, XML_CHECK_DTD.load(Ordering::Relaxed))?;
+        match prop {
+            Ok(prop) => prop.get_prop_node_value_internal(),
+            Err(prop) => prop.get_prop_node_value_internal(),
         }
-        (*prop).get_prop_node_value_internal()
     }
 
     /// Search and get the value of an attribute associated to a node
@@ -820,11 +823,12 @@ impl XmlNode {
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetNoNsProp")]
     pub unsafe fn get_no_ns_prop(&self, name: &str) -> Option<String> {
-        let prop = self.get_prop_node_internal(name, None, XML_CHECK_DTD.load(Ordering::Relaxed));
-        if prop.is_null() {
-            return None;
+        let prop =
+            self.get_prop_node_internal(name, None, XML_CHECK_DTD.load(Ordering::Relaxed))?;
+        match prop {
+            Ok(prop) => prop.get_prop_node_value_internal(),
+            Err(prop) => prop.get_prop_node_value_internal(),
         }
-        (*prop).get_prop_node_value_internal()
     }
 
     /// Search all the namespace applying to a given element.
@@ -1121,12 +1125,11 @@ impl XmlNode {
     #[doc(alias = "xmlUnsetProp")]
     #[cfg(any(feature = "libxml_tree", feature = "schema"))]
     pub unsafe fn unset_prop(&mut self, name: &str) -> i32 {
-        let prop = self.get_prop_node_internal(name, None, false);
-        if prop.is_null() {
+        let Some(Ok(mut prop)) = self.get_prop_node_internal(name, None, false) else {
             return -1;
-        }
-        (*prop).unlink();
-        xml_free_prop(prop);
+        };
+        prop.unlink();
+        xml_free_prop(prop.as_ptr());
         0
     }
 
@@ -1157,46 +1160,43 @@ impl XmlNode {
         if ns.map_or(false, |ns| ns.href.is_null()) {
             return null_mut();
         }
-        let href = ns.map_or(null(), |ns| ns.href as *const i8);
         let prop = self.get_prop_node_internal(
             name,
-            (!href.is_null())
-                .then(|| CStr::from_ptr(href).to_string_lossy())
-                .as_deref(),
+            ns.as_deref().and_then(|ns| ns.href()).as_deref(),
             false,
         );
-        if !prop.is_null() {
+        if let Some(Ok(mut prop)) = prop {
             // Modify the attribute's value.
-            if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
-                xml_remove_id(self.document(), prop);
-                (*prop).atype = Some(XmlAttributeType::XmlAttributeID);
+            if matches!(prop.atype, Some(XmlAttributeType::XmlAttributeID)) {
+                xml_remove_id(self.document(), prop.as_ptr());
+                prop.atype = Some(XmlAttributeType::XmlAttributeID);
             }
-            if let Some(children) = (*prop).children() {
+            if let Some(children) = prop.children() {
                 xml_free_node_list(children.as_ptr());
             }
-            (*prop).set_children(None);
-            (*prop).set_last(None);
-            (*prop).ns = ns;
+            prop.set_children(None);
+            prop.set_last(None);
+            prop.ns = ns;
             if let Some(value) = value {
                 let value = CString::new(value).unwrap();
-                (*prop).set_children(NodePtr::from_ptr(xml_new_doc_text(
+                prop.set_children(NodePtr::from_ptr(xml_new_doc_text(
                     self.doc,
                     value.as_ptr() as *const u8,
                 )));
-                (*prop).set_last(None);
-                let mut tmp = (*prop).children();
+                prop.set_last(None);
+                let mut tmp = prop.children();
                 while let Some(mut now) = tmp {
-                    now.parent = NodePtr::from_ptr(prop as *mut XmlNode);
+                    now.parent = NodePtr::from_ptr(prop.as_ptr() as *mut XmlNode);
                     if now.next().is_none() {
-                        (*prop).set_last(Some(now));
+                        prop.set_last(Some(now));
                     }
                     tmp = now.next();
                 }
             }
-            if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
-                xml_add_id(null_mut(), self.document(), value.unwrap(), prop);
+            if matches!(prop.atype, Some(XmlAttributeType::XmlAttributeID)) {
+                xml_add_id(null_mut(), self.document(), value.unwrap(), prop.as_ptr());
             }
-            return prop;
+            return prop.as_ptr();
         }
         // No equal attr found; create a new one.
         let value = value.map(|v| CString::new(v).unwrap());
@@ -1214,19 +1214,15 @@ impl XmlNode {
     #[doc(alias = "xmlUnsetNsProp")]
     #[cfg(any(feature = "libxml_tree", feature = "schema"))]
     pub unsafe fn unset_ns_prop(&mut self, ns: Option<XmlNsPtr>, name: &str) -> i32 {
-        let href = ns.map_or(null(), |ns| ns.href as *const i8);
-        let prop = self.get_prop_node_internal(
+        let Some(Ok(mut prop)) = self.get_prop_node_internal(
             name,
-            (!href.is_null())
-                .then(|| CStr::from_ptr(href).to_string_lossy())
-                .as_deref(),
+            ns.as_deref().and_then(|ns| ns.prefix()).as_deref(),
             false,
-        );
-        if prop.is_null() {
+        ) else {
             return -1;
-        }
-        (*prop).unlink();
-        xml_free_prop(prop);
+        };
+        prop.unlink();
+        xml_free_prop(prop.as_ptr());
         0
     }
 
@@ -1622,7 +1618,11 @@ impl XmlNode {
     ///
     /// Returns the attribute or the attribute declaration or NULL if neither was found.
     #[doc(alias = "xmlHasNsProp")]
-    pub unsafe fn has_ns_prop(&self, name: &str, namespace: Option<&str>) -> *mut XmlAttr {
+    pub unsafe fn has_ns_prop(
+        &self,
+        name: &str,
+        namespace: Option<&str>,
+    ) -> Option<Result<XmlAttrPtr, XmlAttributePtr>> {
         self.get_prop_node_internal(name, namespace, XML_CHECK_DTD.load(Ordering::Relaxed))
     }
 
@@ -2385,9 +2385,9 @@ unsafe fn add_prop_sibling(
     if let Some(mut parent) = (*prop).parent.filter(|_| (*prop).prev.is_none()) {
         parent.properties = prop as _;
     }
-    if !attr.is_null() && ((*attr).typ != XmlElementType::XmlAttributeDecl) {
-        /* different instance, destroy it (attributes must be unique) */
-        (*attr).remove_prop();
+    if let Some(Ok(mut attr)) = attr {
+        /* ifferent instance, destroy it (attributes must e unique) */
+        attr.remove_prop();
     }
     prop
 }
