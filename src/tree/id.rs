@@ -20,14 +20,14 @@
 
 use std::ptr::null_mut;
 
-use super::{XmlAttr, XmlDoc};
+use super::{XmlAttr, XmlAttrPtr, XmlDoc};
 
 /// An XML ID instance.
 #[repr(C)]
 pub struct XmlID {
     pub(crate) next: Option<Box<XmlID>>, /* next ID */
     pub(crate) value: String,            /* The ID name */
-    pub(crate) attr: *mut XmlAttr,       /* The attribute holding it */
+    pub(crate) attr: Option<XmlAttrPtr>, /* The attribute holding it */
     pub(crate) name: Option<String>,     /* The attribute if attr is not available */
     pub(crate) lineno: i32,              /* The line number if attr is not available */
     pub(crate) doc: *mut XmlDoc,         /* The document holding the ID */
@@ -38,7 +38,7 @@ impl Default for XmlID {
         Self {
             next: None,
             value: "".to_owned(),
-            attr: null_mut(),
+            attr: None,
             name: None,
             lineno: 0,
             doc: null_mut(),

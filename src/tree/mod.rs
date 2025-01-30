@@ -56,7 +56,7 @@ use crate::{
             xml_register_node_default_value,
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-        valid::{xml_add_id, xml_is_id, xml_remove_id},
+        valid::{xml_add_id, xml_is_id},
         xmlstring::{xml_str_equal, xml_strdup, xml_strncat, xml_strndup, XmlChar},
     },
 };
@@ -1011,32 +1011,6 @@ pub unsafe fn xml_free_prop_list(mut cur: *mut XmlAttr) {
         xml_free_prop(cur);
         cur = next;
     }
-}
-
-/// Free one attribute, all the content is freed too
-#[doc(alias = "xmlFreeProp")]
-pub unsafe fn xml_free_prop(cur: *mut XmlAttr) {
-    if cur.is_null() {
-        return;
-    }
-
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    // && xmlDeregisterNodeDefaultValue.is_some()
-    {
-        xml_deregister_node_default_value(cur as _);
-    }
-
-    // Check for ID removal -> leading to invalid references !
-    if !(*cur).doc.is_null() && matches!((*cur).atype, Some(XmlAttributeType::XmlAttributeID)) {
-        xml_remove_id((*cur).doc, cur);
-    }
-    if let Some(children) = (*cur).children() {
-        xml_free_node_list(children.as_ptr());
-    }
-    if !(*cur).name.is_null() {
-        xml_free((*cur).name as _);
-    }
-    xml_free(cur as _);
 }
 
 /// This function tries to locate a namespace definition in a tree

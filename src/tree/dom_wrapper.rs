@@ -32,8 +32,8 @@ use crate::libxml::{
 use super::{
     xml_free_ns, xml_get_doc_entity, xml_new_ns, xml_search_ns_by_namespace_strict,
     xml_search_ns_by_prefix_strict, xml_tree_err_memory, xml_tree_nslist_lookup_by_prefix,
-    NodeCommon, NodePtr, XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNs,
-    XmlNsPtr, XML_LOCAL_NAMESPACE,
+    NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlElementType, XmlNode,
+    XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE,
 };
 
 /// A function called to acquire namespaces (xmlNs) from the wrapper.
@@ -1340,7 +1340,10 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                     Some(XmlAttributeType::XmlAttributeID)
                                 )
                             {
-                                xml_remove_id(source_doc, cur as _);
+                                xml_remove_id(
+                                    source_doc,
+                                    XmlAttrPtr::from_raw(cur as _).unwrap().unwrap(),
+                                );
                             }
                             (*cur).as_attribute_node().unwrap().as_mut().atype = None;
                             (*cur).as_attribute_node().unwrap().as_mut().psvi = null_mut();

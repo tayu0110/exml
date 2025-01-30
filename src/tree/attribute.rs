@@ -31,15 +31,17 @@ use std::{
 use libc::memset;
 
 use crate::libxml::{
-    globals::{xml_free, xml_malloc, xml_register_node_default_value},
-    valid::{xml_add_id, xml_is_id},
+    globals::{
+        xml_deregister_node_default_value, xml_free, xml_malloc, xml_register_node_default_value,
+    },
+    valid::{xml_add_id, xml_is_id, xml_remove_id},
     xmlstring::{xml_strdup, xml_strndup, XmlChar},
 };
 
 use super::{
-    xml_free_prop, xml_new_doc_text, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
-    NodePtr, XmlAttributeType, XmlDoc, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNsPtr,
-    __XML_REGISTER_CALLBACKS,
+    xml_free_node_list, xml_new_doc_text, xml_tree_err_memory, InvalidNodePointerCastError,
+    NodeCommon, NodePtr, XmlAttributeType, XmlDoc, XmlElementType, XmlGenericNodePtr, XmlNode,
+    XmlNsPtr, __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -450,4 +452,30 @@ pub unsafe fn xml_new_ns_prop_eat_name(
     let res = xml_new_prop_internal(node, ns, &n, value);
     xml_free(name as _);
     res
+}
+
+/// Free one attribute, all the content is freed too
+#[doc(alias = "xmlFreeProp")]
+pub unsafe fn xml_free_prop(cur: *mut XmlAttr) {
+    if cur.is_null() {
+        return;
+    }
+
+    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+    // && xmlDeregisterNodeDefaultValue.is_some()
+    {
+        xml_deregister_node_default_value(cur as _);
+    }
+
+    // Check for ID removal -> leading to invalid references !
+    if !(*cur).doc.is_null() && matches!((*cur).atype, Some(XmlAttributeType::XmlAttributeID)) {
+        xml_remove_id((*cur).doc, XmlAttrPtr::from_raw(cur).unwrap().unwrap());
+    }
+    if let Some(children) = (*cur).children() {
+        xml_free_node_list(children.as_ptr());
+    }
+    if !(*cur).name.is_null() {
+        xml_free((*cur).name as _);
+    }
+    xml_free(cur as _);
 }

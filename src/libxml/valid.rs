@@ -68,7 +68,7 @@ use crate::{
     tree::{
         xml_build_qname, xml_free_attribute, xml_free_element, xml_free_node, xml_get_doc_entity,
         xml_new_doc_node, xml_split_qname2, xml_split_qname3, NodeCommon, NodePtr, XmlAttr,
-        XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
+        XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur,
         XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
         XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNotation, XmlRef,
@@ -1972,9 +1972,9 @@ pub unsafe fn xml_add_id<'a>(
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
         ret.name = (*attr).name().map(|n| n.into_owned());
-        ret.attr = null_mut();
+        ret.attr = None;
     } else {
-        ret.attr = attr;
+        ret.attr = XmlAttrPtr::from_raw(attr).unwrap();
         ret.name = None;
     }
     ret.lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
@@ -2017,12 +2017,14 @@ pub unsafe fn xml_get_id(doc: *mut XmlDoc, id: *const XmlChar) -> Option<NonNull
 
     let table = (*doc).ids.as_deref()?;
     let id_ptr = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())?;
-    if id_ptr.attr.is_null() {
-        // We are operating on a stream, return a well known reference
-        // since the attribute node doesn't exist anymore
-        return NonNull::new(doc as *mut dyn NodeCommon);
+    match id_ptr.attr {
+        Some(attr) => NonNull::new(attr.as_ptr() as *mut dyn NodeCommon),
+        None => {
+            // We are operating on a stream, return a well known reference
+            // since the attribute node doesn't exist anymore
+            NonNull::new(doc as *mut dyn NodeCommon)
+        }
     }
-    NonNull::new(id_ptr.attr as *mut dyn NodeCommon)
 }
 
 /// Determine whether an attribute is of type ID. In case we have DTD(s)
@@ -2158,11 +2160,8 @@ unsafe fn xml_valid_normalize_string(str: *mut XmlChar) {
 ///
 /// Returns -1 if the lookup failed and 0 otherwise
 #[doc(alias = "xmlRemoveID")]
-pub unsafe fn xml_remove_id(doc: *mut XmlDoc, attr: *mut XmlAttr) -> i32 {
+pub unsafe fn xml_remove_id(doc: *mut XmlDoc, mut attr: XmlAttrPtr) -> i32 {
     if doc.is_null() {
-        return -1;
-    }
-    if attr.is_null() {
         return -1;
     }
 
@@ -2170,7 +2169,7 @@ pub unsafe fn xml_remove_id(doc: *mut XmlDoc, attr: *mut XmlAttr) -> i32 {
         return -1;
     };
 
-    let Some(id) = (*attr).children.and_then(|c| c.get_string(doc, 1)) else {
+    let Some(id) = attr.children.and_then(|c| c.get_string(doc, 1)) else {
         return -1;
     };
     let id = CString::new(id).unwrap();
@@ -2182,7 +2181,7 @@ pub unsafe fn xml_remove_id(doc: *mut XmlDoc, attr: *mut XmlAttr) -> i32 {
         xml_free(id as _);
         return -1;
     };
-    if id_ptr.attr != attr {
+    if id_ptr.attr != Some(attr) {
         xml_free(id as _);
         return -1;
     }
@@ -2192,7 +2191,7 @@ pub unsafe fn xml_remove_id(doc: *mut XmlDoc, attr: *mut XmlAttr) -> i32 {
         |_, _| {},
     );
     xml_free(id as _);
-    (*attr).atype = None;
+    attr.atype = None;
     0
 }
 
@@ -7484,37 +7483,6 @@ mod tests {
                             eprint!(" {}", n_elem);
                             eprintln!(" {}", n_attr);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_remove_id() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let attr = gen_xml_attr_ptr(n_attr, 1);
-
-                    let ret_val = xml_remove_id(doc, attr);
-                    desret_int(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_xml_attr_ptr(n_attr, attr, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlRemoveID",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlRemoveID()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_attr);
                     }
                 }
             }

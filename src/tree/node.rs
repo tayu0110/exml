@@ -1168,7 +1168,7 @@ impl XmlNode {
         if let Some(Ok(mut prop)) = prop {
             // Modify the attribute's value.
             if matches!(prop.atype, Some(XmlAttributeType::XmlAttributeID)) {
-                xml_remove_id(self.document(), prop.as_ptr());
+                xml_remove_id(self.document(), prop);
                 prop.atype = Some(XmlAttributeType::XmlAttributeID);
             }
             if let Some(children) = prop.children() {
@@ -1512,7 +1512,7 @@ impl XmlNode {
                 let mut prop = XmlAttrPtr::from_raw(self.properties).unwrap();
                 while let Some(mut now) = prop {
                     if matches!(now.atype, Some(XmlAttributeType::XmlAttributeID)) {
-                        xml_remove_id(self.document(), now.as_ptr());
+                        xml_remove_id(self.document(), now);
                     }
 
                     if now.document() != doc {
