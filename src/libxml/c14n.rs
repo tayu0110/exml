@@ -386,7 +386,7 @@ impl<T> XmlC14NCtx<'_, T> {
     /// Returns 0 on success or -1 on fail.
     #[doc(alias = "xmlC14NProcessAttrsAxis")]
     unsafe fn process_attrs_axis(&mut self, cur: &XmlNode, parent_visible: bool) -> i32 {
-        let mut attrs_to_delete: *mut XmlAttr = null_mut();
+        let mut attrs_to_delete = None::<XmlAttrPtr>;
 
         if !matches!(cur.element_type(), XmlElementType::XmlElementNode) {
             xml_c14n_err_param("processing attributes axis");
@@ -439,7 +439,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     while !tmp.is_null() {
                         let mut attr = XmlAttrPtr::from_raw((*tmp).properties).unwrap();
                         while let Some(now) = attr {
-                            if xml_c14n_is_xml_attr(now.as_ptr()) && list.search(&now).is_none() {
+                            if xml_c14n_is_xml_attr(now) && list.search(&now).is_none() {
                                 list.insert_lower_bound(now);
                             }
                             attr = XmlAttrPtr::from_raw(now.next).unwrap();
@@ -499,7 +499,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 let mut attr = XmlAttrPtr::from_raw(cur.properties).unwrap();
                 while let Some(now) = attr {
                     // special processing for XML attribute kiks in only when we have invisible parents
-                    if !parent_visible || !xml_c14n_is_xml_attr(now.as_ptr()) {
+                    if !parent_visible || !xml_c14n_is_xml_attr(now) {
                         // check that attribute is visible
                         if self.is_visible(Some(&*now), Some(cur)) {
                             list.insert_lower_bound(now);
@@ -581,8 +581,8 @@ impl<T> XmlC14NCtx<'_, T> {
                             list.insert_lower_bound(attr);
 
                             // note that we MUST delete returned attr node ourselves!
-                            attr.next = attrs_to_delete;
-                            attrs_to_delete = attr.as_ptr();
+                            attr.next = attrs_to_delete.map_or(null_mut(), |attr| attr.as_ptr());
+                            attrs_to_delete = Some(attr);
                         }
                     }
                 }
@@ -593,7 +593,7 @@ impl<T> XmlC14NCtx<'_, T> {
         list.walk(|data| self.print_attrs(*data));
 
         // Cleanup
-        xml_free_prop_list(attrs_to_delete);
+        xml_free_prop_list(attrs_to_delete.map_or(null_mut(), |attr| attr.as_ptr()));
         0
     }
 
@@ -1712,8 +1712,8 @@ unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> i32 {
 /// Return `true` if so, otherwise return false.
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlAttr")]
-unsafe fn xml_c14n_is_xml_attr(attr: *mut XmlAttr) -> bool {
-    let ns = (*attr).ns;
+unsafe fn xml_c14n_is_xml_attr(attr: XmlAttrPtr) -> bool {
+    let ns = attr.ns;
     ns.map_or(false, |ns| xml_c14n_is_xml_ns(ns))
 }
 
