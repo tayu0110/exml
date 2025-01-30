@@ -48,7 +48,7 @@ use crate::{
         valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
     },
     tree::{
-        is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttribute,
+        is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttribute,
         XmlAttributePtr, XmlDoc, XmlDtd, XmlDtdPtr, XmlElement, XmlElementPtr, XmlElementType,
         XmlEntity, XmlNotation, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
@@ -769,7 +769,6 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
 
     let mut unformatted_node: *mut XmlNode = null_mut();
     let mut parent: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut start: *mut u8;
     let mut end: *mut u8;
 
@@ -848,10 +847,10 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                     if let Some(ns_def) = (*cur).ns_def {
                         xml_ns_list_dump_output_ctxt(ctxt, Some(ns_def));
                     }
-                    attr = (*cur).properties;
-                    while !attr.is_null() {
-                        xml_attr_dump_output(ctxt, &*attr);
-                        attr = (*attr).next;
+                    let mut attr = XmlAttrPtr::from_raw((*cur).properties).unwrap();
+                    while let Some(now) = attr {
+                        xml_attr_dump_output(ctxt, &now);
+                        attr = XmlAttrPtr::from_raw(now.next).unwrap();
                     }
 
                     if let Some(children) = (*cur).children() {
@@ -1166,83 +1165,87 @@ unsafe fn xml_ns_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, cur: XmlNsPtr) {
 /// Dump a list of XML attributes
 #[doc(alias = "xhtmlAttrListDumpOutput")]
 #[cfg(feature = "html")]
-unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mut XmlAttr) {
+unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<XmlAttrPtr>) {
     use crate::{
         libxml::htmltree::html_is_boolean_attr,
         tree::{xml_free_node, xml_new_doc_text, XmlNode},
     };
 
-    let mut xml_lang: *mut XmlAttr = null_mut();
-    let mut lang: *mut XmlAttr = null_mut();
-    let mut name: *mut XmlAttr = null_mut();
-    let mut id: *mut XmlAttr = null_mut();
-
-    if cur.is_null() {
+    if cur.is_none() {
         return;
     }
 
-    let parent = (*cur).parent;
-    while !cur.is_null() {
-        if (*cur).ns.is_none() && (*cur).name().as_deref() == Some("id") {
+    let mut xml_lang = None;
+    let mut lang = None;
+    let mut name = None;
+    let mut id = None;
+    let parent = cur.unwrap().parent;
+    while let Some(mut now) = cur {
+        if now.ns.is_none() && now.name().as_deref() == Some("id") {
             id = cur;
-        } else if (*cur).ns.is_none() && (*cur).name().as_deref() == Some("name") {
+        } else if now.ns.is_none() && now.name().as_deref() == Some("name") {
             name = cur;
-        } else if (*cur).ns.is_none() && (*cur).name().as_deref() == Some("lang") {
+        } else if now.ns.is_none() && now.name().as_deref() == Some("lang") {
             lang = cur;
-        } else if (*cur).name().as_deref() == Some("lang")
-            && (*cur)
+        } else if now.name().as_deref() == Some("lang")
+            && now
                 .ns
                 .map_or(false, |ns| ns.prefix().as_deref() == Some("xml"))
         {
             xml_lang = cur;
-        } else if (*cur).ns.is_none()
-            && (*cur)
+        } else if now.ns.is_none()
+            && now
                 .children
                 .map_or(true, |c| c.content.is_null() || *c.content.add(0) == 0)
-            && html_is_boolean_attr((*cur).name) != 0
+            && html_is_boolean_attr(now.name) != 0
         {
-            if let Some(children) = (*cur).children {
+            if let Some(children) = now.children {
                 xml_free_node(children.as_ptr());
             }
-            (*cur).children = NodePtr::from_ptr(xml_new_doc_text((*cur).doc, (*cur).name));
-            if let Some(mut children) = (*cur).children {
-                children.set_parent(NodePtr::from_ptr(cur as *mut XmlNode));
+            now.children = NodePtr::from_ptr(xml_new_doc_text(now.doc, now.name));
+            if let Some(mut children) = now.children {
+                children.set_parent(NodePtr::from_ptr(now.as_ptr() as *mut XmlNode));
             }
         }
-        xml_attr_dump_output(ctxt, &*cur);
-        cur = (*cur).next;
+        xml_attr_dump_output(ctxt, &now);
+        cur = XmlAttrPtr::from_raw(now.next).unwrap();
     }
     let mut buf = ctxt.buf.borrow_mut();
     // C.8
-    if (!name.is_null() && id.is_null())
-        && parent
-            .filter(|p| {
-                !p.name.is_null()
-                    && (p.name().as_deref() == Some("a")
-                        || p.name().as_deref() == Some("p")
-                        || p.name().as_deref() == Some("div")
-                        || p.name().as_deref() == Some("img")
-                        || p.name().as_deref() == Some("map")
-                        || p.name().as_deref() == Some("applet")
-                        || p.name().as_deref() == Some("form")
-                        || p.name().as_deref() == Some("frame")
-                        || p.name().as_deref() == Some("iframe"))
-            })
-            .is_some()
-    {
+    if let Some(name) = name.filter(|_| {
+        id.is_none()
+            && parent
+                .filter(|p| {
+                    !p.name.is_null()
+                        && (p.name().as_deref() == Some("a")
+                            || p.name().as_deref() == Some("p")
+                            || p.name().as_deref() == Some("div")
+                            || p.name().as_deref() == Some("img")
+                            || p.name().as_deref() == Some("map")
+                            || p.name().as_deref() == Some("applet")
+                            || p.name().as_deref() == Some("form")
+                            || p.name().as_deref() == Some("frame")
+                            || p.name().as_deref() == Some("iframe"))
+                })
+                .is_some()
+    }) {
         buf.write_bytes(b" id=\"");
-        xml_attr_serialize_content(&mut buf, &*name);
+        xml_attr_serialize_content(&mut buf, &name);
         buf.write_bytes(b"\"");
     }
     // C.7.
-    if !lang.is_null() && xml_lang.is_null() {
-        buf.write_bytes(b" xml:lang=\"");
-        xml_attr_serialize_content(&mut buf, &*lang);
-        buf.write_bytes(b"\"");
-    } else if !xml_lang.is_null() && lang.is_null() {
-        buf.write_bytes(b" lang=\"");
-        xml_attr_serialize_content(&mut buf, &*xml_lang);
-        buf.write_bytes(b"\"");
+    match (lang, xml_lang) {
+        (Some(lang), None) => {
+            buf.write_bytes(b" xml:lang=\"");
+            xml_attr_serialize_content(&mut buf, &lang);
+            buf.write_bytes(b"\"");
+        }
+        (None, Some(xml_lang)) => {
+            buf.write_bytes(b" lang=\"");
+            xml_attr_serialize_content(&mut buf, &xml_lang);
+            buf.write_bytes(b"\"");
+        }
+        _ => {}
     }
 }
 
@@ -1398,7 +1401,10 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                         .write_str(" xmlns=\"http://www.w3.org/1999/xhtml\"");
                 }
                 if !(*cur).properties.is_null() {
-                    xhtml_attr_list_dump_output(ctxt, (*cur).properties);
+                    xhtml_attr_list_dump_output(
+                        ctxt,
+                        XmlAttrPtr::from_raw((*cur).properties).unwrap(),
+                    );
                 }
 
                 if !parent.is_null()
