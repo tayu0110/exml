@@ -6882,16 +6882,14 @@ unsafe fn xml_relaxng_validate_attribute(
     let ret: i32;
     let oldvalue: *mut XmlChar;
     let mut prop: *mut XmlAttr = null_mut();
-    let mut tmp: *mut XmlAttr;
     let oldseq: *mut XmlNode;
 
     if (*(*ctxt).state).nb_attr_left <= 0 {
         return -1;
     }
     if !(*define).name.is_null() {
-        let mut j = (*(*ctxt).state).nb_attrs;
-        for i in 0..(*(*ctxt).state).nb_attrs {
-            tmp = *(*(*ctxt).state).attrs.add(i as usize);
+        let mut j = (*(*ctxt).state).attrs.len();
+        for (i, &tmp) in (*(*ctxt).state).attrs.iter().enumerate() {
             if !tmp.is_null()
                 && xml_str_equal((*define).name, (*tmp).name)
                 && ((((*define).ns.is_null() || *(*define).ns.add(0) == 0) && (*tmp).ns.is_none())
@@ -6928,16 +6926,15 @@ unsafe fn xml_relaxng_validate_attribute(
             (*(*ctxt).state).seq = oldseq;
             if ret == 0 {
                 // flag the attribute as processed
-                *(*(*ctxt).state).attrs.add(j as usize) = null_mut();
+                (*(*ctxt).state).attrs[j] = null_mut();
                 (*(*ctxt).state).nb_attr_left -= 1;
             }
         } else {
             ret = -1;
         }
     } else {
-        let mut j = (*(*ctxt).state).nb_attrs;
-        for i in 0..(*(*ctxt).state).nb_attrs {
-            tmp = *(*(*ctxt).state).attrs.add(i as usize);
+        let mut j = (*(*ctxt).state).attrs.len();
+        for (i, &tmp) in (*(*ctxt).state).attrs.iter().enumerate() {
             if !tmp.is_null() && xml_relaxng_attribute_match(ctxt, define, tmp) == 1 {
                 prop = tmp;
                 j = i;
@@ -6967,7 +6964,7 @@ unsafe fn xml_relaxng_validate_attribute(
             (*(*ctxt).state).seq = oldseq;
             if ret == 0 {
                 // flag the attribute as processed
-                *(*(*ctxt).state).attrs.add(j as usize) = null_mut();
+                (*(*ctxt).state).attrs[j] = null_mut();
                 (*(*ctxt).state).nb_attr_left -= 1;
             }
         } else {
@@ -7177,17 +7174,17 @@ unsafe fn xml_relaxng_validate_element_end(ctxt: XmlRelaxNGValidCtxtPtr, dolog: 
             return -1;
         }
     }
-    for i in 0..(*state).nb_attrs {
-        if !(*(*state).attrs.add(i as usize)).is_null() {
+    for (i, &attr) in (*state).attrs.iter().enumerate() {
+        if !attr.is_null() {
             if dolog != 0 {
                 VALID_ERR3!(
                     ctxt,
                     XmlRelaxNGValidErr::XmlRelaxngErrInvalidattr,
-                    (*(*(*state).attrs.add(i as usize))).name,
+                    (*attr).name,
                     (*(*state).node).name
                 );
             }
-            return -1 - i;
+            return -1 - i as i32;
         }
     }
     0
@@ -7313,39 +7310,11 @@ unsafe fn xml_relaxng_copy_valid_state(
         }
         std::ptr::write(&mut *ret, XmlRelaxNGValidState::default());
     }
-    let attrs: *mut *mut XmlAttr = (*ret).attrs;
-    let max_attrs: u32 = (*ret).max_attrs as _;
+    let attrs = take(&mut (*ret).attrs);
     memcpy(ret as _, state as _, size_of::<XmlRelaxNGValidState>());
-    (*ret).attrs = attrs;
-    (*ret).max_attrs = max_attrs as _;
-    if (*state).nb_attrs > 0 {
-        if (*ret).attrs.is_null() {
-            (*ret).max_attrs = (*state).max_attrs;
-            (*ret).attrs = xml_malloc((*ret).max_attrs as usize * size_of::<*mut XmlAttr>()) as _;
-            if (*ret).attrs.is_null() {
-                xml_rng_verr_memory(ctxt, "allocating states\n");
-                (*ret).nb_attrs = 0;
-                return ret;
-            }
-        } else if (*ret).max_attrs < (*state).nb_attrs {
-            let tmp: *mut *mut XmlAttr = xml_realloc(
-                (*ret).attrs as _,
-                (*state).max_attrs as usize * size_of::<*mut XmlAttr>(),
-            ) as _;
-            if tmp.is_null() {
-                xml_rng_verr_memory(ctxt, "allocating states\n");
-                (*ret).nb_attrs = 0;
-                return ret;
-            }
-            (*ret).max_attrs = (*state).max_attrs;
-            (*ret).attrs = tmp;
-        }
-        memcpy(
-            (*ret).attrs as _,
-            (*state).attrs as _,
-            (*state).nb_attrs as usize * size_of::<*mut XmlAttr>(),
-        );
-    }
+    std::ptr::write(&mut (*ret).attrs, attrs);
+    (*ret).attrs.clear();
+    (*ret).attrs.extend((*state).attrs.iter().cloned());
     ret
 }
 
@@ -7373,7 +7342,7 @@ unsafe fn xml_relaxng_equal_valid_state(
     if (*state1).nb_attr_left != (*state2).nb_attr_left {
         return 0;
     }
-    if (*state1).nb_attrs != (*state2).nb_attrs {
+    if (*state1).attrs.len() != (*state2).attrs.len() {
         return 0;
     }
     if (*state1).endvalue != (*state2).endvalue {
@@ -7382,12 +7351,11 @@ unsafe fn xml_relaxng_equal_valid_state(
     if (*state1).value != (*state2).value && !xml_str_equal((*state1).value, (*state2).value) {
         return 0;
     }
-    for i in 0..(*state1).nb_attrs {
-        if *(*state1).attrs.add(i as usize) != *(*state2).attrs.add(i as usize) {
-            return 0;
-        }
-    }
-    1
+    (*state1)
+        .attrs
+        .iter()
+        .zip((*state2).attrs.iter())
+        .all(|(a1, a2)| a1 == a2) as i32
 }
 
 /// Add a RelaxNG validation state to the container

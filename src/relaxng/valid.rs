@@ -1,6 +1,9 @@
-use std::{borrow::Cow, ptr::null_mut};
+use std::{
+    borrow::Cow,
+    ptr::{drop_in_place, null_mut},
+};
 
-use libc::{memcpy, memset};
+use libc::memset;
 
 use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
@@ -17,7 +20,7 @@ use crate::{
         },
     },
     relaxng::{VALID_ERR, VALID_ERR2},
-    tree::{NodeCommon, XmlAttr, XmlDoc, XmlNode},
+    tree::{NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc, XmlNode},
 };
 
 use super::{xml_rng_verr_memory, XmlRelaxNGDefinePtr};
@@ -40,14 +43,14 @@ pub type XmlRelaxNGValidStatePtr = *mut XmlRelaxNGValidState;
 #[doc(alias = "xmlRelaxNGValidState")]
 #[repr(C)]
 pub struct XmlRelaxNGValidState {
-    pub(crate) node: *mut XmlNode,       // the current node
-    pub(crate) seq: *mut XmlNode,        // the sequence of children left to validate
-    pub(crate) nb_attrs: i32,            // the number of attributes
-    pub(crate) max_attrs: i32,           // the size of attrs
-    pub(crate) nb_attr_left: i32,        // the number of attributes left to validate
-    pub(crate) value: *mut u8,           // the value when operating on string
-    pub(crate) endvalue: *mut u8,        // the end value when operating on string
-    pub(crate) attrs: *mut *mut XmlAttr, // the array of attributes
+    pub(crate) node: *mut XmlNode, // the current node
+    pub(crate) seq: *mut XmlNode,  // the sequence of children left to validate
+    // pub(crate) nb_attrs: i32,            // the number of attributes
+    // pub(crate) max_attrs: i32,           // the size of attrs
+    pub(crate) nb_attr_left: i32, // the number of attributes left to validate
+    pub(crate) value: *mut u8,    // the value when operating on string
+    pub(crate) endvalue: *mut u8, // the end value when operating on string
+    pub(crate) attrs: Vec<*mut XmlAttr>, // the array of attributes
 }
 
 impl Default for XmlRelaxNGValidState {
@@ -55,12 +58,12 @@ impl Default for XmlRelaxNGValidState {
         Self {
             node: null_mut(),
             seq: null_mut(),
-            nb_attrs: 0,
-            max_attrs: 0,
+            // nb_attrs: 0,
+            // max_attrs: 0,
             nb_attr_left: 0,
             value: null_mut(),
             endvalue: null_mut(),
-            attrs: null_mut(),
+            attrs: vec![],
         }
     }
 }
@@ -488,7 +491,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
             xml_rng_verr_memory(ctxt, "allocating states\n");
             return null_mut();
         }
-        memset(ret as _, 0, size_of::<XmlRelaxNGValidState>());
+        std::ptr::write(&mut *ret, XmlRelaxNGValidState::default());
     }
     (*ret).value = null_mut();
     (*ret).endvalue = null_mut();
@@ -499,47 +502,20 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
         (*ret).node = node;
         (*ret).seq = (*node).children().map_or(null_mut(), |c| c.as_ptr());
     }
-    (*ret).nb_attrs = 0;
+    (*ret).attrs.clear();
     if nb_attrs > 0 {
-        if (*ret).attrs.is_null() {
-            if nb_attrs < 4 {
-                (*ret).max_attrs = 4;
-            } else {
-                (*ret).max_attrs = nb_attrs as _;
-            }
-            (*ret).attrs = xml_malloc((*ret).max_attrs as usize * size_of::<*mut XmlAttr>()) as _;
-            if (*ret).attrs.is_null() {
-                xml_rng_verr_memory(ctxt, "allocating states\n");
-                return ret;
-            }
-        } else if (*ret).max_attrs < nb_attrs as i32 {
-            let tmp: *mut *mut XmlAttr =
-                xml_realloc((*ret).attrs as _, nb_attrs * size_of::<*mut XmlAttr>()) as _;
-            if tmp.is_null() {
-                xml_rng_verr_memory(ctxt, "allocating states\n");
-                return ret;
-            }
-            (*ret).attrs = tmp;
-            (*ret).max_attrs = nb_attrs as _;
-        }
-        (*ret).nb_attrs = nb_attrs as _;
         if nb_attrs < MAX_ATTR {
-            memcpy(
-                (*ret).attrs as _,
-                attrs.as_ptr() as _,
-                size_of::<*mut XmlAttr>() * nb_attrs,
-            );
+            (*ret).attrs.resize(nb_attrs, null_mut());
+            (*ret).attrs[..nb_attrs].copy_from_slice(&attrs[..nb_attrs]);
         } else {
-            attr = (*node).properties;
-            nb_attrs = 0;
-            while !attr.is_null() {
-                *(*ret).attrs.add(nb_attrs) = attr;
-                nb_attrs += 1;
-                attr = (*attr).next;
+            let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+            while let Some(now) = attr {
+                (*ret).attrs.push(now.as_ptr());
+                attr = XmlAttrPtr::from_raw(now.next).unwrap();
             }
         }
     }
-    (*ret).nb_attr_left = (*ret).nb_attrs;
+    (*ret).nb_attr_left = (*ret).attrs.len() as i32;
     ret
 }
 
@@ -557,9 +533,7 @@ pub(crate) unsafe fn xml_relaxng_free_valid_state(
         (*ctxt).free_state = xml_relaxng_new_states(ctxt, 40);
     }
     if ctxt.is_null() || (*ctxt).free_state.is_null() {
-        if !(*state).attrs.is_null() {
-            xml_free((*state).attrs as _);
-        }
+        drop_in_place(state);
         xml_free(state as _);
     } else {
         xml_relaxng_add_states_uniq(ctxt, (*ctxt).free_state, state);
