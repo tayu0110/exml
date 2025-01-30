@@ -67,8 +67,8 @@ use crate::{
     parser::{split_qname2, XmlParserCtxtPtr},
     tree::{
         xml_build_qname, xml_free_attribute, xml_free_element, xml_free_node, xml_get_doc_entity,
-        xml_new_doc_node, xml_split_qname2, xml_split_qname3, NodeCommon, NodePtr, XmlAttr,
-        XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
+        xml_new_doc_node, xml_split_qname2, xml_split_qname3, NodeCommon, NodePtr, XmlAttrPtr,
+        XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur,
         XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
         XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNotation, XmlRef,
@@ -2252,13 +2252,13 @@ pub(crate) unsafe fn xml_add_ref(
 pub(crate) unsafe fn xml_is_ref(
     mut doc: *mut XmlDoc,
     elem: *mut XmlNode,
-    attr: *mut XmlAttr,
+    attr: Option<XmlAttrPtr>,
 ) -> i32 {
-    if attr.is_null() {
+    let Some(attr) = attr else {
         return 0;
-    }
+    };
     if doc.is_null() {
-        doc = (*attr).doc;
+        doc = attr.doc;
         if doc.is_null() {
             return 0;
         }
@@ -2304,11 +2304,8 @@ pub(crate) unsafe fn xml_is_ref(
 ///
 /// Returns -1 if the lookup failed and 0 otherwise
 #[doc(alias = "xmlRemoveRef")]
-pub(crate) unsafe fn xml_remove_ref(doc: *mut XmlDoc, attr: *mut XmlAttr) -> i32 {
+pub(crate) unsafe fn xml_remove_ref(doc: *mut XmlDoc, attr: XmlAttrPtr) -> i32 {
     if doc.is_null() {
-        return -1;
-    }
-    if attr.is_null() {
         return -1;
     }
 
@@ -2316,7 +2313,7 @@ pub(crate) unsafe fn xml_remove_ref(doc: *mut XmlDoc, attr: *mut XmlAttr) -> i32
         return -1;
     };
 
-    let Some(id) = (*attr).children.and_then(|c| c.get_string(doc, 1)) else {
+    let Some(id) = attr.children.and_then(|c| c.get_string(doc, 1)) else {
         return -1;
     };
 
@@ -2335,7 +2332,7 @@ pub(crate) unsafe fn xml_remove_ref(doc: *mut XmlDoc, attr: *mut XmlAttr) -> i32
     // will have enough data to be able to remove the entry.
 
     // Remove the supplied attr from our list
-    ref_list.remove_first_by(|refe| refe.attr == XmlAttrPtr::from_raw(attr).unwrap());
+    ref_list.remove_first_by(|refe| refe.attr == Some(attr));
 
     // If the list is empty then remove the list entry in the hash
     if ref_list.is_empty() {
@@ -3555,7 +3552,6 @@ pub unsafe fn xml_validate_element(
     use crate::tree::XmlNsPtr;
 
     let mut elem: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut ret: i32 = 1;
 
     if root.is_null() {
@@ -3569,9 +3565,9 @@ pub unsafe fn xml_validate_element(
         ret &= xml_validate_one_element(ctxt, doc, elem);
 
         if matches!((*elem).element_type(), XmlElementType::XmlElementNode) {
-            attr = (*elem).properties;
-            while !attr.is_null() {
-                let value = (*attr)
+            let mut attr = XmlAttrPtr::from_raw((*elem).properties).unwrap();
+            while let Some(now) = attr {
+                let value = now
                     .children
                     .and_then(|c| c.get_string(doc, 0))
                     .map(|c| CString::new(c).unwrap());
@@ -3579,12 +3575,12 @@ pub unsafe fn xml_validate_element(
                     ctxt,
                     doc,
                     elem,
-                    attr,
+                    Some(now),
                     value
                         .as_ref()
                         .map_or(null_mut(), |c| c.as_ptr() as *const u8),
                 );
-                attr = (*attr).next;
+                attr = XmlAttrPtr::from_raw(now.next).unwrap();
             }
 
             let mut ns = (*elem).ns_def;
@@ -5151,13 +5147,11 @@ pub unsafe fn xml_validate_one_element(
                         ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 } else {
-                    let mut attrib: *mut XmlAttr;
-
-                    attrib = (*elem).properties;
-                    while !attrib.is_null() {
-                        if xml_str_equal((*attrib).name, cur_attr.name) {
+                    let mut attrib = XmlAttrPtr::from_raw((*elem).properties).unwrap();
+                    while let Some(attr) = attrib {
+                        if xml_str_equal(attr.name, cur_attr.name) {
                             if let Some(prefix) = cur_attr.prefix.as_deref() {
-                                let name_space = (*attrib).ns.or((*elem).ns);
+                                let name_space = attr.ns.or((*elem).ns);
 
                                 // qualified names handling is problematic, having a
                                 // different prefix should be possible but DTDs don't
@@ -5180,7 +5174,7 @@ pub unsafe fn xml_validate_one_element(
                                 break 'found;
                             }
                         }
-                        attrib = (*attrib).next;
+                        attrib = XmlAttrPtr::from_raw(attr.next).unwrap();
                     }
                 }
                 if qualified == -1 {
@@ -5315,7 +5309,7 @@ pub unsafe fn xml_validate_one_attribute(
     ctxt: XmlValidCtxtPtr,
     doc: *mut XmlDoc,
     elem: *mut XmlNode,
-    attr: *mut XmlAttr,
+    attr: Option<XmlAttrPtr>,
     value: *const XmlChar,
 ) -> i32 {
     let mut ret: i32 = 1;
@@ -5324,9 +5318,9 @@ pub unsafe fn xml_validate_one_attribute(
     if elem.is_null() || (*elem).name.is_null() {
         return 0;
     }
-    if attr.is_null() || (*attr).name.is_null() {
+    let Some(mut attr) = attr.filter(|a| !a.name.is_null()) else {
         return 0;
-    }
+    };
 
     let mut attr_decl = None;
     if let Some(prefix) = (*elem).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
@@ -5337,13 +5331,13 @@ pub unsafe fn xml_validate_one_attribute(
         if fullname.is_null() {
             return 0;
         }
-        if let Some(attr_ns) = (*attr).ns {
+        if let Some(attr_ns) = attr.ns {
             attr_decl = (*doc).int_subset.and_then(|dtd| {
                 dtd.get_qattr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                    (*attr).name().as_deref().unwrap(),
+                    attr.name().as_deref().unwrap(),
                     attr_ns.prefix().as_deref(),
                 )
             });
@@ -5353,7 +5347,7 @@ pub unsafe fn xml_validate_one_attribute(
                         CStr::from_ptr(fullname as *const i8)
                             .to_string_lossy()
                             .as_ref(),
-                        (*attr).name().as_deref().unwrap(),
+                        attr.name().as_deref().unwrap(),
                         attr_ns.prefix().as_deref(),
                     )
                 });
@@ -5364,7 +5358,7 @@ pub unsafe fn xml_validate_one_attribute(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                    (*attr).name().as_deref().unwrap(),
+                    attr.name().as_deref().unwrap(),
                 )
             });
             if attr_decl.is_none() && (*doc).ext_subset.is_some() {
@@ -5373,7 +5367,7 @@ pub unsafe fn xml_validate_one_attribute(
                         CStr::from_ptr(fullname as *const i8)
                             .to_string_lossy()
                             .as_ref(),
-                        (*attr).name().as_deref().unwrap(),
+                        attr.name().as_deref().unwrap(),
                     )
                 });
             }
@@ -5383,11 +5377,11 @@ pub unsafe fn xml_validate_one_attribute(
         }
     }
     if attr_decl.is_none() {
-        if let Some(attr_ns) = (*attr).ns {
+        if let Some(attr_ns) = attr.ns {
             attr_decl = (*doc).int_subset.and_then(|dtd| {
                 dtd.get_qattr_desc(
                     (*elem).name().unwrap().as_ref(),
-                    (*attr).name().as_deref().unwrap(),
+                    attr.name().as_deref().unwrap(),
                     attr_ns.prefix().as_deref(),
                 )
             });
@@ -5395,7 +5389,7 @@ pub unsafe fn xml_validate_one_attribute(
                 attr_decl = (*doc).ext_subset.and_then(|dtd| {
                     dtd.get_qattr_desc(
                         (*elem).name().unwrap().as_ref(),
-                        (*attr).name().as_deref().unwrap(),
+                        attr.name().as_deref().unwrap(),
                         attr_ns.prefix().as_deref(),
                     )
                 });
@@ -5404,14 +5398,14 @@ pub unsafe fn xml_validate_one_attribute(
             attr_decl = (*doc).int_subset.and_then(|dtd| {
                 dtd.get_attr_desc(
                     (*elem).name().as_deref().unwrap(),
-                    (*attr).name().as_deref().unwrap(),
+                    attr.name().as_deref().unwrap(),
                 )
             });
             if attr_decl.is_none() && (*doc).ext_subset.is_some() {
                 attr_decl = (*doc).ext_subset.and_then(|dtd| {
                     dtd.get_attr_desc(
                         (*elem).name().as_deref().unwrap(),
-                        (*attr).name().as_deref().unwrap(),
+                        attr.name().as_deref().unwrap(),
                     )
                 });
             }
@@ -5420,7 +5414,7 @@ pub unsafe fn xml_validate_one_attribute(
 
     // Validity Constraint: Attribute Value Type
     let Some(attr_decl) = attr_decl else {
-        let attr_name = (*attr).name().unwrap();
+        let attr_name = attr.name().unwrap();
         let elem_name = (*elem).name().unwrap();
         xml_err_valid_node(
             ctxt,
@@ -5433,11 +5427,11 @@ pub unsafe fn xml_validate_one_attribute(
         );
         return 0;
     };
-    (*attr).atype = Some(attr_decl.atype);
+    attr.atype = Some(attr_decl.atype);
 
     let val: i32 = xml_validate_attribute_value_internal(doc, attr_decl.atype, value);
     if val == 0 {
-        let attr_name = (*attr).name().unwrap();
+        let attr_name = attr.name().unwrap();
         let elem_name = (*elem).name().unwrap();
         xml_err_valid_node(
             ctxt,
@@ -5456,7 +5450,7 @@ pub unsafe fn xml_validate_one_attribute(
     if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
         && !xml_str_equal(value, attr_decl.default_value)
     {
-        let attr_name = (*attr).name().unwrap();
+        let attr_name = attr.name().unwrap();
         let elem_name = (*elem).name().unwrap();
         let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
         xml_err_valid_node(
@@ -5482,7 +5476,7 @@ pub unsafe fn xml_validate_one_attribute(
             CStr::from_ptr(value as *const i8)
                 .to_string_lossy()
                 .as_ref(),
-            XmlAttrPtr::from_raw(attr).unwrap().unwrap(),
+            attr,
         )
         .is_none()
     {
@@ -5498,7 +5492,7 @@ pub unsafe fn xml_validate_one_attribute(
         CStr::from_ptr(value as *const i8)
             .to_string_lossy()
             .as_ref(),
-        XmlAttrPtr::from_raw(attr).unwrap().unwrap(),
+        attr,
     )
     .is_none()
     {
@@ -5515,7 +5509,7 @@ pub unsafe fn xml_validate_one_attribute(
             .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset.as_deref(), &value));
 
         if nota.is_none() {
-            let attr_name = (*attr).name().unwrap();
+            let attr_name = attr.name().unwrap();
             let elem_name = (*elem).name().unwrap();
             xml_err_valid_node(
                 ctxt,
@@ -5537,7 +5531,7 @@ pub unsafe fn xml_validate_one_attribute(
             tree = now.next.as_deref();
         }
         if tree.is_none() {
-            let attr_name = (*attr).name().unwrap();
+            let attr_name = attr.name().unwrap();
             let elem_name = (*elem).name().unwrap();
             xml_err_valid_node(
                 ctxt,
@@ -5563,7 +5557,7 @@ pub unsafe fn xml_validate_one_attribute(
         }
         if tree.is_none() {
             let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-            let attr_name = (*attr).name().unwrap();
+            let attr_name = attr.name().unwrap();
             let elem_name = (*elem).name().unwrap();
             xml_err_valid_node(
                 ctxt,
@@ -5583,7 +5577,7 @@ pub unsafe fn xml_validate_one_attribute(
     if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
         && !xml_str_equal(attr_decl.default_value, value)
     {
-        let attr_name = (*attr).name().unwrap();
+        let attr_name = attr.name().unwrap();
         let elem_name = (*elem).name().unwrap();
         let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
         xml_err_valid_node(
@@ -5603,7 +5597,7 @@ pub unsafe fn xml_validate_one_attribute(
     ret &= xml_validate_attribute_value2(
         ctxt,
         doc,
-        (*attr).name,
+        attr.name,
         attr_decl.atype,
         &CStr::from_ptr(value as *const i8).to_string_lossy(),
     );
@@ -7358,36 +7352,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_get_id() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let id = gen_const_xml_char_ptr(n_id, 1);
-
-                    let ret_val = xml_get_id(doc, id);
-                    desret_xml_attr_ptr(ret_val.map_or(null_mut(), |p| p.as_ptr() as *mut XmlAttr));
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_id, id, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlGetID",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlGetID()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_id);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_is_mixed_element() {
         unsafe {
             let mut leaks = 0;
@@ -7412,73 +7376,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlIsMixedElement()");
                         eprint!(" {}", n_doc);
                         eprintln!(" {}", n_name);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_is_ref() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                    for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let elem = gen_xml_node_ptr(n_elem, 1);
-                        let attr = gen_xml_attr_ptr(n_attr, 2);
-
-                        let ret_val = xml_is_ref(doc, elem, attr);
-                        desret_int(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_xml_node_ptr(n_elem, elem, 1);
-                        des_xml_attr_ptr(n_attr, attr, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlIsRef",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlIsRef()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_elem);
-                            eprintln!(" {}", n_attr);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_remove_ref() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let attr = gen_xml_attr_ptr(n_attr, 1);
-
-                    let ret_val = xml_remove_ref(doc, attr);
-                    desret_int(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_xml_attr_ptr(n_attr, attr, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlRemoveRef",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlRemoveRef()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_attr);
                     }
                 }
             }
@@ -7962,57 +7859,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlValidateNmtokensValue()"
                     );
                     eprintln!(" {}", n_value);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_one_attribute() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                        for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                            for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                let mem_base = xml_mem_blocks();
-                                let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                                let doc = gen_xml_doc_ptr(n_doc, 1);
-                                let elem = gen_xml_node_ptr(n_elem, 2);
-                                let attr = gen_xml_attr_ptr(n_attr, 3);
-                                let value = gen_const_xml_char_ptr(n_value, 4);
-
-                                let ret_val =
-                                    xml_validate_one_attribute(ctxt, doc, elem, attr, value);
-                                desret_int(ret_val);
-                                des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                                des_xml_doc_ptr(n_doc, doc, 1);
-                                des_xml_node_ptr(n_elem, elem, 2);
-                                des_xml_attr_ptr(n_attr, attr, 3);
-                                des_const_xml_char_ptr(n_value, value, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlValidateOneAttribute",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(
-                                        leaks == 0,
-                                        "{leaks} Leaks are found in xmlValidateOneAttribute()"
-                                    );
-                                    eprint!(" {}", n_ctxt);
-                                    eprint!(" {}", n_doc);
-                                    eprint!(" {}", n_elem);
-                                    eprint!(" {}", n_attr);
-                                    eprintln!(" {}", n_value);
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }

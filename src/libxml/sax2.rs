@@ -1608,33 +1608,35 @@ unsafe fn xml_sax2_attribute_internal(
     };
 
     // !!!!!! <a toto:arg="" xmlns:toto="http://toto.com">
-    let ret: *mut XmlAttr = xml_new_ns_prop((*ctxt).node, namespace, name, null());
-    if ret.is_null() {
+    let Some(mut ret) =
+        XmlAttrPtr::from_raw(xml_new_ns_prop((*ctxt).node, namespace, name, null())).unwrap()
+    else {
         // goto error;
         if !nval.is_null() {
             xml_free(nval as _);
         }
-    }
+        return;
+    };
 
     if (*ctxt).replace_entities == 0 && (*ctxt).html == 0 {
-        (*ret).children = if (*ctxt).my_doc.is_null() {
+        ret.children = if (*ctxt).my_doc.is_null() {
             None
         } else {
             NodePtr::from_ptr((*(*ctxt).my_doc).get_node_list(value))
         };
-        let mut tmp = (*ret).children;
+        let mut tmp = ret.children;
         while let Some(mut now) = tmp {
-            now.set_parent(NodePtr::from_ptr(ret as *mut XmlNode));
+            now.set_parent(NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode));
             if now.next.is_none() {
-                (*ret).last = Some(now);
+                ret.last = Some(now);
             }
             tmp = now.next;
         }
     } else if !value.is_null() {
-        (*ret).children = NodePtr::from_ptr(xml_new_doc_text((*ctxt).my_doc, value));
-        (*ret).last = (*ret).children;
-        if let Some(mut children) = (*ret).children {
-            children.set_parent(NodePtr::from_ptr(ret as *mut XmlNode));
+        ret.children = NodePtr::from_ptr(xml_new_doc_text((*ctxt).my_doc, value));
+        ret.last = ret.children;
+        if let Some(mut children) = ret.children {
+            children.set_parent(NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode));
         }
     }
 
@@ -1661,7 +1663,7 @@ unsafe fn xml_sax2_attribute_internal(
                     addr_of_mut!((*ctxt).vctxt) as _,
                     (*ctxt).my_doc,
                     (*ctxt).node,
-                    ret,
+                    Some(ret),
                     value,
                 );
             } else {
@@ -1683,7 +1685,7 @@ unsafe fn xml_sax2_attribute_internal(
                     addr_of_mut!((*ctxt).vctxt) as _,
                     (*ctxt).my_doc,
                     (*ctxt).node,
-                    ret,
+                    Some(ret),
                     val,
                 );
                 xml_free(val as _);
@@ -1693,7 +1695,7 @@ unsafe fn xml_sax2_attribute_internal(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
                 (*ctxt).node,
-                ret,
+                Some(ret),
                 value,
             );
         }
@@ -1701,12 +1703,12 @@ unsafe fn xml_sax2_attribute_internal(
         && (((*ctxt).replace_entities == 0 && (*ctxt).external != 2)
             || ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0))
             // Don't create IDs containing entity references
-        && (*ret)
+        && ret
             .children
             .filter(|c| matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none())
             .is_some()
     {
-        let content: *mut XmlChar = (*ret).children.unwrap().content;
+        let content: *mut XmlChar = ret.children.unwrap().content;
         // when validating, the ID registration is done at the attribute
         // validation level. Otherwise we have to do specific handling here.
         if fullname == "xml:id" {
@@ -1728,30 +1730,25 @@ unsafe fn xml_sax2_attribute_internal(
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
+                ret,
             );
-        } else if xml_is_id(
-            (*ctxt).my_doc,
-            (*ctxt).node,
-            XmlAttrPtr::from_raw(ret).unwrap(),
-        ) != 0
-        {
+        } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
+                ret,
             );
-        } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
+        } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
             xml_add_ref(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
+                ret,
             );
         }
     }
@@ -2547,7 +2544,7 @@ unsafe fn xml_sax2_attribute_ns(
                         addr_of_mut!((*ctxt).vctxt) as _,
                         (*ctxt).my_doc,
                         (*ctxt).node,
-                        ret,
+                        XmlAttrPtr::from_raw(ret).unwrap(),
                         value.as_ptr() as *const u8,
                     );
                 } else {
@@ -2591,7 +2588,7 @@ unsafe fn xml_sax2_attribute_ns(
                         addr_of_mut!((*ctxt).vctxt) as _,
                         (*ctxt).my_doc,
                         (*ctxt).node,
-                        ret,
+                        XmlAttrPtr::from_raw(ret).unwrap(),
                         dup,
                     );
                 }
@@ -2604,7 +2601,7 @@ unsafe fn xml_sax2_attribute_ns(
                     addr_of_mut!((*ctxt).vctxt) as _,
                     (*ctxt).my_doc,
                     (*ctxt).node,
-                    ret,
+                    XmlAttrPtr::from_raw(ret).unwrap(),
                     dup,
                 );
             }
@@ -2665,7 +2662,12 @@ unsafe fn xml_sax2_attribute_ns(
                     .as_ref(),
                 XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
             );
-        } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
+        } else if xml_is_ref(
+            (*ctxt).my_doc,
+            (*ctxt).node,
+            XmlAttrPtr::from_raw(ret).unwrap(),
+        ) != 0
+        {
             xml_add_ref(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
