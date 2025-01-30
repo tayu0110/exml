@@ -39,6 +39,10 @@ use super::{
 
 #[repr(C)]
 pub struct XmlNs {
+    // TODO: Change to `Option<XmlGenericNodePtr>`.
+    //       `next` can be treated as `Option<XmlNsPtr>` in most cases,
+    //       but must be `Option<XmlGenericNodePtr>`
+    //       because different types of node pointers may be stored for XPath.
     pub next: *mut XmlNs,             /* next Ns link for this node  */
     pub(crate) typ: XmlNsType,        /* global or local */
     pub href: *const XmlChar,         /* URL for the namespace */

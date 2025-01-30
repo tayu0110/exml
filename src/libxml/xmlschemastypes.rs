@@ -62,8 +62,8 @@ use crate::{
     },
     tree::{
         xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
-        xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttr, XmlAttributeType,
-        XmlElementType, XmlEntityType, XmlNode,
+        xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttr, XmlAttrPtr,
+        XmlAttributeType, XmlElementType, XmlEntityType, XmlNode,
     },
     xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };
@@ -2789,14 +2789,13 @@ unsafe fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: *mut XmlAttr =
-                                        (*node).as_attribute_node().unwrap().as_ptr();
+                                    let mut attr = XmlAttrPtr::from_raw(node as *mut XmlAttr)
+                                        .unwrap()
+                                        .unwrap();
 
                                     // NOTE: the IDness might have already be declared in the DTD
-                                    if !matches!(
-                                        (*attr).atype,
-                                        Some(XmlAttributeType::XmlAttributeID)
-                                    ) {
+                                    if !matches!(attr.atype, Some(XmlAttributeType::XmlAttributeID))
+                                    {
                                         let strip: *mut XmlChar = xml_schema_strip(value);
                                         let res = if !strip.is_null() {
                                             let res = xml_add_id(
@@ -2805,7 +2804,7 @@ unsafe fn xml_schema_val_atomic_type(
                                                 CStr::from_ptr(strip as *const i8)
                                                     .to_string_lossy()
                                                     .as_ref(),
-                                                attr,
+                                                attr.as_ptr(),
                                             );
                                             xml_free(strip as _);
                                             res
@@ -2816,13 +2815,13 @@ unsafe fn xml_schema_val_atomic_type(
                                                 CStr::from_ptr(value as *const i8)
                                                     .to_string_lossy()
                                                     .as_ref(),
-                                                attr,
+                                                attr.as_ptr(),
                                             )
                                         };
                                         if res.is_none() {
                                             ret = 2;
                                         } else {
-                                            (*attr).atype = Some(XmlAttributeType::XmlAttributeID);
+                                            attr.atype = Some(XmlAttributeType::XmlAttributeID);
                                         }
                                     }
                                 }
@@ -2842,8 +2841,9 @@ unsafe fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: *mut XmlAttr =
-                                        (*node).as_attribute_node().unwrap().as_ptr();
+                                    let mut attr = XmlAttrPtr::from_raw(node as *mut XmlAttr)
+                                        .unwrap()
+                                        .unwrap();
 
                                     let strip: *mut XmlChar = xml_schema_strip(value);
                                     if !strip.is_null() {
@@ -2853,7 +2853,7 @@ unsafe fn xml_schema_val_atomic_type(
                                             CStr::from_ptr(strip as *const i8)
                                                 .to_string_lossy()
                                                 .as_ref(),
-                                            attr,
+                                            attr.as_ptr(),
                                         );
                                         xml_free(strip as _);
                                     } else {
@@ -2863,10 +2863,10 @@ unsafe fn xml_schema_val_atomic_type(
                                             CStr::from_ptr(value as *const i8)
                                                 .to_string_lossy()
                                                 .as_ref(),
-                                            attr,
+                                            attr.as_ptr(),
                                         );
                                     }
-                                    (*attr).atype = Some(XmlAttributeType::XmlAttributeIDREF);
+                                    attr.atype = Some(XmlAttributeType::XmlAttributeIDREF);
                                 }
                                 break 'done;
                             }
@@ -2886,10 +2886,11 @@ unsafe fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: *mut XmlAttr =
-                                        (*node).as_attribute_node().unwrap().as_ptr();
+                                    let mut attr = XmlAttrPtr::from_raw(node as *mut XmlAttr)
+                                        .unwrap()
+                                        .unwrap();
 
-                                    (*attr).atype = Some(XmlAttributeType::XmlAttributeIDREFS);
+                                    attr.atype = Some(XmlAttributeType::XmlAttributeIDREFS);
                                 }
                                 break 'done;
                             }
@@ -2932,10 +2933,11 @@ unsafe fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: *mut XmlAttr =
-                                        (*node).as_attribute_node().unwrap().as_ptr();
+                                    let mut attr = XmlAttrPtr::from_raw(node as *mut XmlAttr)
+                                        .unwrap()
+                                        .unwrap();
 
-                                    (*attr).atype = Some(XmlAttributeType::XmlAttributeEntity);
+                                    attr.atype = Some(XmlAttributeType::XmlAttributeEntity);
                                 }
                                 break 'done;
                             }
@@ -2958,10 +2960,11 @@ unsafe fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: *mut XmlAttr =
-                                        (*node).as_attribute_node().unwrap().as_ptr();
+                                    let mut attr = XmlAttrPtr::from_raw(node as *mut XmlAttr)
+                                        .unwrap()
+                                        .unwrap();
 
-                                    (*attr).atype = Some(XmlAttributeType::XmlAttributeEntities);
+                                    attr.atype = Some(XmlAttributeType::XmlAttributeEntities);
                                 }
                                 break 'done;
                             }

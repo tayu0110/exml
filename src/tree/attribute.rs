@@ -18,18 +18,28 @@
 //
 // daniel@veillard.com
 
-use std::{borrow::Cow, ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
+use std::{
+    any::type_name,
+    borrow::Cow,
+    ffi::CStr,
+    ops::{Deref, DerefMut},
+    os::raw::c_void,
+    ptr::{null_mut, NonNull},
+    sync::atomic::Ordering,
+};
 
 use libc::memset;
 
 use crate::libxml::{
     globals::{xml_free, xml_malloc, xml_register_node_default_value},
-    xmlstring::{xml_strdup, XmlChar},
+    valid::{xml_add_id, xml_is_id},
+    xmlstring::{xml_strdup, xml_strndup, XmlChar},
 };
 
 use super::{
-    xml_free_prop, xml_new_prop_internal, xml_tree_err_memory, NodeCommon, NodePtr,
-    XmlAttributeType, XmlDoc, XmlElementType, XmlNode, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+    xml_free_prop, xml_new_doc_text, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
+    NodePtr, XmlAttributeType, XmlDoc, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNsPtr,
+    __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -149,6 +159,123 @@ impl NodeCommon for XmlAttr {
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+pub struct XmlAttrPtr(NonNull<XmlAttr>);
+
+impl XmlAttrPtr {
+    /// Allocate new memory and create new `XmlAttrPtr` from an owned xml node.
+    ///
+    /// This method leaks allocated memory.  
+    /// Users can use `free` method for deallocating memory.
+    pub(crate) fn new(node: XmlAttr) -> Option<Self> {
+        let boxed = Box::new(node);
+        NonNull::new(Box::leak(boxed)).map(Self)
+    }
+
+    /// Create `XmlAttrPtr` from a raw pointer.  
+    ///
+    /// If `ptr` is a NULL pointer, return `Ok(None)`.  
+    /// If `ptr` is a valid pointer of `XmlAttr`, return `Ok(Some(Self))`.  
+    /// Otherwise, return `Err`.
+    ///
+    /// # Safety
+    /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
+    pub(crate) unsafe fn from_raw(
+        ptr: *mut XmlAttr,
+    ) -> Result<Option<Self>, InvalidNodePointerCastError> {
+        if ptr.is_null() {
+            return Ok(None);
+        }
+        match (*ptr).element_type() {
+            XmlElementType::XmlAttributeNode => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+            _ => Err(InvalidNodePointerCastError {
+                from: (*ptr).element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+
+    pub(crate) fn as_ptr(self) -> *mut XmlAttr {
+        self.0.as_ptr()
+    }
+
+    /// Deallocate memory.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn free(self) {
+        let _ = *Box::from_raw(self.0.as_ptr());
+    }
+
+    /// Acquire the ownership of the inner value.  
+    /// As a result, `self` will be invalid. `self` must not be used after performs this method.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn into_inner(self) -> Box<XmlAttr> {
+        Box::from_raw(self.0.as_ptr())
+    }
+}
+
+impl Clone for XmlAttrPtr {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl Copy for XmlAttrPtr {}
+
+impl Deref for XmlAttrPtr {
+    type Target = XmlAttr;
+    fn deref(&self) -> &Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlAttr`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl DerefMut for XmlAttrPtr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlAttr`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_mut() }
+    }
+}
+
+impl TryFrom<XmlGenericNodePtr> for XmlAttrPtr {
+    type Error = InvalidNodePointerCastError;
+
+    fn try_from(value: XmlGenericNodePtr) -> Result<Self, Self::Error> {
+        match value.element_type() {
+            XmlElementType::XmlAttributeNode => Ok(Self(value.0.cast())),
+            _ => Err(InvalidNodePointerCastError {
+                from: value.element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+}
+
+impl From<XmlAttrPtr> for XmlGenericNodePtr {
+    fn from(value: XmlAttrPtr) -> Self {
+        Self(value.0 as NonNull<dyn NodeCommon>)
+    }
+}
+
+impl From<XmlAttrPtr> for *mut XmlAttr {
+    fn from(value: XmlAttrPtr) -> Self {
+        value.0.as_ptr()
+    }
+}
+
 /// Create a new property carried by a document.  
 /// Returns a pointer to the attribute
 ///
@@ -190,6 +317,83 @@ pub unsafe fn xml_new_doc_prop(
             }
             tmp = now.next();
         }
+    }
+
+    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+    //  && xmlRegisterNodeDefaultValue.is_some()
+    {
+        xml_register_node_default_value(cur as _);
+    }
+    cur
+}
+
+pub(super) unsafe fn xml_new_prop_internal(
+    node: *mut XmlNode,
+    ns: Option<XmlNsPtr>,
+    name: &str,
+    value: *const XmlChar,
+) -> *mut XmlAttr {
+    let mut doc: *mut XmlDoc = null_mut();
+
+    if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
+        return null_mut();
+    }
+
+    // Allocate a new property and fill the fields.
+    let cur: *mut XmlAttr = xml_malloc(size_of::<XmlAttr>()) as _;
+    if cur.is_null() {
+        xml_tree_err_memory("building attribute");
+        return null_mut();
+    }
+    memset(cur as _, 0, size_of::<XmlAttr>());
+    (*cur).typ = XmlElementType::XmlAttributeNode;
+
+    (*cur).parent = NodePtr::from_ptr(node);
+    if !node.is_null() {
+        doc = (*node).doc;
+        (*cur).doc = doc;
+    }
+    (*cur).ns = ns;
+
+    (*cur).name = xml_strndup(name.as_ptr(), name.len() as i32);
+
+    if !value.is_null() {
+        (*cur).children = NodePtr::from_ptr(xml_new_doc_text(doc, value));
+        (*cur).set_last(None);
+        let mut tmp = (*cur).children;
+        while let Some(mut now) = tmp {
+            now.set_parent(NodePtr::from_ptr(cur as *mut XmlNode));
+            if now.next.is_none() {
+                (*cur).last = Some(now);
+            }
+            tmp = now.next;
+        }
+    }
+
+    // Add it at the end to preserve parsing order ...
+    if !node.is_null() {
+        if (*node).properties.is_null() {
+            (*node).properties = cur;
+        } else {
+            let mut prev: *mut XmlAttr = (*node).properties;
+
+            while !(*prev).next.is_null() {
+                prev = (*prev).next;
+            }
+            (*prev).next = cur;
+            (*cur).prev = prev;
+        }
+    }
+
+    if !value.is_null() && !node.is_null() && (xml_is_id((*node).doc, node, cur) == 1) {
+        xml_add_id(
+            null_mut(),
+            (*node).doc,
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+            cur,
+        );
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0

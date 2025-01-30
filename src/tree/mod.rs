@@ -45,7 +45,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
-use libc::{memcpy, memset, strlen};
+use libc::{memcpy, strlen};
 
 use crate::{
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
@@ -997,83 +997,6 @@ pub unsafe fn xml_free_doc(cur: *mut XmlDoc) {
     (*cur).encoding = None;
     (*cur).url = None;
     xml_free(cur as _);
-}
-
-unsafe fn xml_new_prop_internal(
-    node: *mut XmlNode,
-    ns: Option<XmlNsPtr>,
-    name: &str,
-    value: *const XmlChar,
-) -> *mut XmlAttr {
-    let mut doc: *mut XmlDoc = null_mut();
-
-    if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-        return null_mut();
-    }
-
-    // Allocate a new property and fill the fields.
-    let cur: *mut XmlAttr = xml_malloc(size_of::<XmlAttr>()) as _;
-    if cur.is_null() {
-        xml_tree_err_memory("building attribute");
-        return null_mut();
-    }
-    memset(cur as _, 0, size_of::<XmlAttr>());
-    (*cur).typ = XmlElementType::XmlAttributeNode;
-
-    (*cur).parent = NodePtr::from_ptr(node);
-    if !node.is_null() {
-        doc = (*node).doc;
-        (*cur).doc = doc;
-    }
-    (*cur).ns = ns;
-
-    (*cur).name = xml_strndup(name.as_ptr(), name.len() as i32);
-
-    if !value.is_null() {
-        (*cur).children = NodePtr::from_ptr(xml_new_doc_text(doc, value));
-        (*cur).set_last(None);
-        let mut tmp = (*cur).children;
-        while let Some(mut now) = tmp {
-            now.set_parent(NodePtr::from_ptr(cur as *mut XmlNode));
-            if now.next.is_none() {
-                (*cur).last = Some(now);
-            }
-            tmp = now.next;
-        }
-    }
-
-    // Add it at the end to preserve parsing order ...
-    if !node.is_null() {
-        if (*node).properties.is_null() {
-            (*node).properties = cur;
-        } else {
-            let mut prev: *mut XmlAttr = (*node).properties;
-
-            while !(*prev).next.is_null() {
-                prev = (*prev).next;
-            }
-            (*prev).next = cur;
-            (*cur).prev = prev;
-        }
-    }
-
-    if !value.is_null() && !node.is_null() && (xml_is_id((*node).doc, node, cur) == 1) {
-        xml_add_id(
-            null_mut(),
-            (*node).doc,
-            CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-            cur,
-        );
-    }
-
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur as _);
-    }
-    cur
 }
 
 /// Free a property and all its siblings, all the children are freed too.

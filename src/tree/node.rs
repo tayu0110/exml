@@ -39,7 +39,7 @@ use crate::{
 use super::{
     xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node, xml_free_prop,
     xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory, NodeCommon,
-    XmlAttr, XmlAttributeType, XmlDoc, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD,
+    XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD,
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
@@ -612,41 +612,34 @@ impl XmlNode {
         ns_name: Option<&str>,
         use_dtd: bool,
     ) -> *mut XmlAttr {
-        let mut prop: *mut XmlAttr;
-
         if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
             return null_mut();
         }
 
         if !self.properties.is_null() {
-            prop = self.properties;
+            let mut prop = XmlAttrPtr::from_raw(self.properties).unwrap();
             if let Some(ns_name) = ns_name {
                 // We want the attr to be in the specified namespace.
                 let ns_name = CString::new(ns_name).unwrap();
-                while !prop.is_null() {
-                    if (*prop).name().as_deref() == Some(name)
-                        && (*prop).ns.map_or(false, |ns| {
+                while let Some(now) = prop {
+                    if now.name().as_deref() == Some(name)
+                        && now.ns.map_or(false, |ns| {
                             ns.href == ns_name.as_ptr() as _
                                 || xml_str_equal(ns.href, ns_name.as_ptr() as *const u8)
                         })
                     {
-                        return prop;
+                        return now.as_ptr();
                     }
-                    prop = (*prop)
-                        .next()
-                        .map_or(null_mut(), |p| p.as_ptr() as *mut XmlAttr);
+                    prop = XmlAttrPtr::from_raw(now.next).unwrap();
                 }
             } else {
                 // We want the attr to be in no namespace.
-                while {
-                    if (*prop).ns.is_none() && (*prop).name().as_deref() == Some(name) {
-                        return prop;
+                while let Some(now) = prop {
+                    if now.ns.is_none() && now.name().as_deref() == Some(name) {
+                        return now.as_ptr();
                     }
-                    prop = (*prop)
-                        .next()
-                        .map_or(null_mut(), |p| p.as_ptr() as *mut XmlAttr);
-                    !prop.is_null()
-                } {}
+                    prop = XmlAttrPtr::from_raw(now.next).unwrap();
+                }
             }
         }
 
@@ -1515,23 +1508,21 @@ impl XmlNode {
     /// update all nodes under the tree to point to the right document
     #[doc(alias = "xmlSetTreeDoc")]
     pub unsafe fn set_doc(&mut self, doc: *mut XmlDoc) {
-        let mut prop: *mut XmlAttr;
-
         if self.element_type() == XmlElementType::XmlNamespaceDecl {
             return;
         }
         if self.document() != doc {
             if matches!(self.element_type(), XmlElementType::XmlElementNode) {
-                prop = self.properties;
-                while !prop.is_null() {
-                    if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
-                        xml_remove_id(self.document(), prop);
+                let mut prop = XmlAttrPtr::from_raw(self.properties).unwrap();
+                while let Some(mut now) = prop {
+                    if matches!(now.atype, Some(XmlAttributeType::XmlAttributeID)) {
+                        xml_remove_id(self.document(), now.as_ptr());
                     }
 
-                    if (*prop).document() != doc {
-                        (*prop).set_document(doc);
+                    if now.document() != doc {
+                        now.set_document(doc);
                     }
-                    if let Some(mut children) = (*prop).children() {
+                    if let Some(mut children) = now.children() {
                         children.set_doc_all_sibling(doc);
                     }
 
@@ -1540,11 +1531,11 @@ impl XmlNode {
                     //       The underlying problem is that xmlRemoveID is only called
                     //       if a node is destroyed, not if it's unlinked.
                     // if (xmlIsID(doc, tree, prop)) {
-                    //     XmlChar *idVal = xmlNodeListGetString(doc, (*prop).children, 1);
+                    //     XmlChar *idVal = xmlNodeListGetString(doc, now.children, 1);
                     //     xmlAddID(null_mut(), doc, idVal, prop);
                     // }
 
-                    prop = (*prop).next;
+                    prop = XmlAttrPtr::from_raw(now.next).unwrap();
                 }
             }
             if matches!(self.element_type(), XmlElementType::XmlEntityRefNode) {
@@ -2097,7 +2088,6 @@ impl XmlNode {
         let mut old_ns = vec![];
         let mut new_ns = vec![];
         let mut node: *mut XmlNode = self;
-        let mut attr: *mut XmlAttr;
         let ret: i32 = 0;
 
         if !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
@@ -2134,14 +2124,14 @@ impl XmlNode {
             }
             // now check for namespace held by attributes on the node.
             if matches!((*node).typ, XmlElementType::XmlElementNode) {
-                attr = (*node).properties;
-                while !attr.is_null() {
-                    if let Some(mut attr_ns) = (*attr).ns {
+                let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+                while let Some(mut now) = attr {
+                    if let Some(mut attr_ns) = now.ns {
                         // initialize the cache if needed
                         let mut f = false;
                         for (i, &old_ns) in old_ns.iter().enumerate() {
-                            if Some(old_ns) == (*attr).ns {
-                                (*attr).ns = Some(new_ns[i]);
+                            if Some(old_ns) == now.ns {
+                                now.ns = Some(new_ns[i]);
                                 attr_ns = new_ns[i];
                                 f = true;
                                 break;
@@ -2154,11 +2144,11 @@ impl XmlNode {
                                 // check if we need to grow the cache buffers.
                                 new_ns.push(n);
                                 old_ns.push(attr_ns);
-                                (*attr).ns = Some(n);
+                                now.ns = Some(n);
                             }
                         }
                     }
-                    attr = (*attr).next;
+                    attr = XmlAttrPtr::from_raw(now.next).unwrap();
                 }
             }
 
