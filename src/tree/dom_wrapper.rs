@@ -2347,7 +2347,11 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     // Handle ID attributes.
                     if matches!((*clone).element_type(), XmlElementType::XmlAttributeNode)
                         && (*clone).parent().is_some()
-                        && xml_is_id(dest_doc, (*clone).parent().unwrap().as_ptr(), clone as _) != 0
+                        && xml_is_id(
+                            dest_doc,
+                            (*clone).parent().unwrap().as_ptr(),
+                            XmlAttrPtr::from_raw(clone as _).unwrap(),
+                        ) != 0
                     {
                         let children = (*cur).children();
                         if let Some(id_val) = children.and_then(|c| c.get_string((*cur).doc, 1)) {

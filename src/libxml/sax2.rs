@@ -51,7 +51,7 @@ use crate::{
         xml_get_predefined_entity, xml_new_cdata_block, xml_new_char_ref, xml_new_doc,
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
-        NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
+        NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
         XmlEntityType, XmlEnumeration, XmlNode, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
@@ -1322,6 +1322,8 @@ unsafe fn xml_sax2_attribute_internal(
     value: Option<&str>,
     prefix: Option<&str>,
 ) {
+    use crate::tree::XmlAttrPtr;
+
     use super::htmltree::html_is_boolean_attr;
 
     let nval: *mut XmlChar;
@@ -1728,7 +1730,12 @@ unsafe fn xml_sax2_attribute_internal(
                     .as_ref(),
                 ret,
             );
-        } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
+        } else if xml_is_id(
+            (*ctxt).my_doc,
+            (*ctxt).node,
+            XmlAttrPtr::from_raw(ret).unwrap(),
+        ) != 0
+        {
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
@@ -2644,7 +2651,12 @@ unsafe fn xml_sax2_attribute_ns(
                     .as_ref(),
                 ret,
             );
-        } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
+        } else if xml_is_id(
+            (*ctxt).my_doc,
+            (*ctxt).node,
+            XmlAttrPtr::from_raw(ret).unwrap(),
+        ) != 0
+        {
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,

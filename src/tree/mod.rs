@@ -1450,7 +1450,7 @@ unsafe fn xml_copy_prop_internal(
         && (*(*cur).doc).ids.is_some()
         && (*cur)
             .parent
-            .filter(|p| xml_is_id((*cur).doc, p.as_ptr(), cur) != 0)
+            .filter(|p| xml_is_id((*cur).doc, p.as_ptr(), XmlAttrPtr::from_raw(cur).unwrap()) != 0)
             .is_some()
     {
         let children = (*cur).children;

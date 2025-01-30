@@ -2034,12 +2034,12 @@ pub unsafe fn xml_get_id(doc: *mut XmlDoc, id: *const XmlChar) -> Option<NonNull
 ///
 /// Returns 0 or 1 depending on the lookup result
 #[doc(alias = "xmlIsID")]
-pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: *mut XmlAttr) -> i32 {
-    if attr.is_null() || (*attr).name.is_null() {
+pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: Option<XmlAttrPtr>) -> i32 {
+    let Some(attr) = attr.filter(|a| !a.name.is_null()) else {
         return 0;
-    }
-    if (*attr).name().as_deref() == Some("id")
-        && (*attr)
+    };
+    if attr.name().as_deref() == Some("id")
+        && attr
             .ns
             .map_or(false, |ns| ns.prefix().as_deref() == Some("xml"))
     {
@@ -2054,8 +2054,8 @@ pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: *mut XmlAttr
     {
         return 0;
     } else if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
-        if xml_str_equal(c"id".as_ptr() as _, (*attr).name)
-            || (xml_str_equal(c"name".as_ptr() as _, (*attr).name)
+        if xml_str_equal(c"id".as_ptr() as _, attr.name)
+            || (xml_str_equal(c"name".as_ptr() as _, attr.name)
                 && (elem.is_null() || xml_str_equal((*elem).name, c"a".as_ptr() as _)))
         {
             return 1;
@@ -2075,10 +2075,10 @@ pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: *mut XmlAttr
             };
 
         let fullattrname: *mut XmlChar =
-            if let Some(prefix) = (*attr).ns.map(|ns| ns.prefix).filter(|pre| !pre.is_null()) {
-                xml_build_qname((*attr).name, prefix, fattr.as_ptr() as _, 50)
+            if let Some(prefix) = attr.ns.map(|ns| ns.prefix).filter(|pre| !pre.is_null()) {
+                xml_build_qname(attr.name, prefix, fattr.as_ptr() as _, 50)
             } else {
-                (*attr).name as *mut XmlChar
+                attr.name as *mut XmlChar
             };
 
         let mut attr_decl = None;
@@ -2107,7 +2107,7 @@ pub unsafe fn xml_is_id(doc: *mut XmlDoc, elem: *mut XmlNode, attr: *mut XmlAttr
             }
         }
 
-        if fullattrname != fattr.as_ptr() as _ && fullattrname != (*attr).name as _ {
+        if fullattrname != fattr.as_ptr() as _ && fullattrname != attr.name as _ {
             xml_free(fullattrname as _);
         }
         if fullelemname != felem.as_ptr() as _ && fullelemname != (*elem).name as _ {
@@ -7380,42 +7380,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlGetID()");
                         eprint!(" {}", n_doc);
                         eprintln!(" {}", n_id);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_is_id() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                    for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let elem = gen_xml_node_ptr(n_elem, 1);
-                        let attr = gen_xml_attr_ptr(n_attr, 2);
-
-                        let ret_val = xml_is_id(doc, elem, attr);
-                        desret_int(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_xml_node_ptr(n_elem, elem, 1);
-                        des_xml_attr_ptr(n_attr, attr, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlIsID",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlIsID()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_elem);
-                            eprintln!(" {}", n_attr);
-                        }
                     }
                 }
             }

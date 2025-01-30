@@ -387,7 +387,10 @@ pub(super) unsafe fn xml_new_prop_internal(
         }
     }
 
-    if !value.is_null() && !node.is_null() && (xml_is_id((*node).doc, node, cur) == 1) {
+    if !value.is_null()
+        && !node.is_null()
+        && (xml_is_id((*node).doc, node, XmlAttrPtr::from_raw(cur).unwrap()) == 1)
+    {
         xml_add_id(
             null_mut(),
             (*node).doc,
