@@ -1467,19 +1467,19 @@ unsafe fn xml_dom_wrap_adopt_branch(
 unsafe fn xml_dom_wrap_adopt_attr(
     ctxt: XmlDOMWrapCtxtPtr,
     _source_doc: *mut XmlDoc,
-    attr: *mut XmlAttr,
+    mut attr: XmlAttrPtr,
     dest_doc: *mut XmlDoc,
     dest_parent: *mut XmlNode,
     _options: i32,
 ) -> i32 {
     let mut cur: *mut XmlNode;
 
-    if !attr.is_null() || dest_doc.is_null() {
+    if dest_doc.is_null() {
         return -1;
     }
 
-    (*attr).doc = dest_doc;
-    if let Some(attr_ns) = (*attr).ns {
+    attr.doc = dest_doc;
+    if let Some(attr_ns) = attr.ns {
         let mut ns = None;
 
         if !ctxt.is_null() { /* TODO: User defined. */ }
@@ -1511,13 +1511,13 @@ unsafe fn xml_dom_wrap_adopt_attr(
             // goto internal_error;
             return -1;
         };
-        (*attr).ns = Some(ns);
+        attr.ns = Some(ns);
     }
 
-    (*attr).atype = None;
-    (*attr).psvi = null_mut();
+    attr.atype = None;
+    attr.psvi = null_mut();
     // Walk content.
-    let Some(children) = (*attr).children else {
+    let Some(children) = attr.children else {
         return 0;
     };
     cur = children.as_ptr();
@@ -1552,7 +1552,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
         }
         // next_sibling:
         'next_sibling: loop {
-            if cur == attr as _ {
+            if cur == attr.as_ptr() as _ {
                 break;
             }
             if let Some(next) = (*cur).next {
@@ -1646,7 +1646,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
         return xml_dom_wrap_adopt_attr(
             ctxt,
             source_doc,
-            node as _,
+            XmlAttrPtr::from_raw(node as *mut XmlAttr).unwrap().unwrap(),
             dest_doc,
             dest_parent,
             options,

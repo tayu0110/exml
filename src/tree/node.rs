@@ -529,7 +529,7 @@ impl XmlNode {
             }
             XmlElementType::XmlAttributeNode => {
                 let attr: *mut XmlAttr = self as *const XmlNode as _;
-                let mut tmp = (*attr).children();
+                let mut tmp = (*attr).children;
 
                 while let Some(now) = tmp {
                     if matches!(now.element_type(), XmlElementType::XmlTextNode) {
@@ -782,11 +782,10 @@ impl XmlNode {
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetProp")]
     pub unsafe fn get_prop(&self, name: &str) -> Option<String> {
-        let prop = self.has_prop(name);
-        if prop.is_null() {
-            return None;
+        match self.has_prop(name)? {
+            Ok(prop) => prop.get_prop_node_value_internal(),
+            Err(prop) => prop.get_prop_node_value_internal(),
         }
-        (*prop).get_prop_node_value_internal()
     }
 
     /// Search and get the value of an attribute associated to a node.
@@ -1102,11 +1101,11 @@ impl XmlNode {
         feature = "schema",
         feature = "html"
     ))]
-    pub unsafe fn set_prop(&mut self, name: &str, value: Option<&str>) -> *mut XmlAttr {
+    pub unsafe fn set_prop(&mut self, name: &str, value: Option<&str>) -> Option<XmlAttrPtr> {
         use crate::parser::split_qname2;
 
         if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
-            return null_mut();
+            return None;
         }
 
         // handle QNames
@@ -1149,7 +1148,7 @@ impl XmlNode {
         ns: Option<XmlNsPtr>,
         name: &str,
         value: Option<&str>,
-    ) -> *mut XmlAttr {
+    ) -> Option<XmlAttrPtr> {
         use std::ptr::null;
 
         use crate::{
@@ -1158,7 +1157,7 @@ impl XmlNode {
         };
 
         if ns.map_or(false, |ns| ns.href.is_null()) {
-            return null_mut();
+            return None;
         }
         let prop = self.get_prop_node_internal(
             name,
@@ -1196,7 +1195,7 @@ impl XmlNode {
             if matches!(prop.atype, Some(XmlAttributeType::XmlAttributeID)) {
                 xml_add_id(null_mut(), self.document(), value.unwrap(), prop);
             }
-            return prop.as_ptr();
+            return Some(prop);
         }
         // No equal attr found; create a new one.
         let value = value.map(|v| CString::new(v).unwrap());
@@ -1206,7 +1205,6 @@ impl XmlNode {
             name,
             value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8),
         )
-        .map_or(null_mut(), |prop| prop.as_ptr())
     }
 
     /// Remove an attribute carried by a node.
@@ -1570,20 +1568,20 @@ impl XmlNode {
     ///
     /// Returns the attribute or the attribute declaration or NULL if neither was found.
     #[doc(alias = "xmlHasProp")]
-    pub unsafe fn has_prop(&self, name: &str) -> *mut XmlAttr {
+    pub unsafe fn has_prop(&self, name: &str) -> Option<Result<XmlAttrPtr, XmlAttributePtr>> {
         if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
-            return null_mut();
+            return None;
         }
         // Check on the properties attached to the node
-        let mut prop = self.properties;
-        while !prop.is_null() {
-            if (*prop).name().as_deref() == Some(name) {
-                return prop;
+        let mut prop = XmlAttrPtr::from_raw(self.properties).unwrap();
+        while let Some(now) = prop {
+            if now.name().as_deref() == Some(name) {
+                return Some(Ok(now));
             }
-            prop = (*prop).next;
+            prop = XmlAttrPtr::from_raw(now.next).unwrap();
         }
         if !XML_CHECK_DTD.load(Ordering::Relaxed) {
-            return null_mut();
+            return None;
         }
 
         // Check if there is a default declaration in the internal or external subsets
@@ -1601,11 +1599,11 @@ impl XmlNode {
                 {
                     // return attribute declaration only if a default value is given
                     // (that includes #FIXED declarations)
-                    return attr_decl.as_ptr() as *mut XmlAttr;
+                    return Some(Err(attr_decl));
                 }
             }
         }
-        null_mut()
+        None
     }
 
     /// Search for an attribute associated to a node.

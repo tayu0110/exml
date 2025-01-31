@@ -1270,7 +1270,7 @@ unsafe fn xml_relaxng_load_external_ref(
     // transmit the ns if needed
     if let Some(ns) = ns {
         root = (*doc).get_root_element();
-        if !root.is_null() && (*root).has_prop("ns").is_null() {
+        if !root.is_null() && (*root).has_prop("ns").is_none() {
             (*root).set_prop("ns", Some(ns));
         }
     }
@@ -1418,7 +1418,7 @@ unsafe fn xml_relaxng_load_include(
     // transmit the ns if needed
     if let Some(ns) = ns {
         root = (*doc).get_root_element();
-        if !root.is_null() && (*root).has_prop("ns").is_null() {
+        if !root.is_null() && (*root).has_prop("ns").is_none() {
             (*root).set_prop("ns", Some(ns));
         }
     }
@@ -1759,7 +1759,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                     {
                         // Simplification 4.8. name attribute of element
                         // and attribute elements
-                        if (*cur).has_prop("ns").is_null() {
+                        if (*cur).has_prop("ns").is_none() {
                             let mut ns = None;
 
                             let mut node = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -1861,7 +1861,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                         ins = cur;
                         while !child.is_null() {
                             if let Some(ns) =
-                                ns.as_deref().filter(|_| (*child).has_prop("ns").is_null())
+                                ns.as_deref().filter(|_| (*child).has_prop("ns").is_none())
                             {
                                 (*child).set_prop("ns", Some(ns));
                             }

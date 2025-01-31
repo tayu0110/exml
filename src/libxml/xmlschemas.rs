@@ -20372,10 +20372,15 @@ unsafe fn xml_schema_check_elem_props_correct(
             return -1;
         }
         if !(*elem_decl).node.is_null() {
-            if (*elem_decl).flags & XML_SCHEMAS_ELEM_FIXED != 0 {
-                node = (*(*elem_decl).node).has_prop("fixed") as *mut XmlNode;
+            let attr = if (*elem_decl).flags & XML_SCHEMAS_ELEM_FIXED != 0 {
+                (*(*elem_decl).node).has_prop("fixed")
             } else {
-                node = (*(*elem_decl).node).has_prop("default") as *mut XmlNode;
+                (*(*elem_decl).node).has_prop("default")
+            };
+            match attr {
+                Some(Ok(attr)) => node = attr.as_ptr() as *mut XmlNode,
+                Some(Err(attr)) => node = attr.as_ptr() as *mut XmlNode,
+                _ => node = null_mut(),
             }
         }
         let vcret: i32 = xml_schema_parse_check_cos_valid_default(

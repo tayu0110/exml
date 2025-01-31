@@ -806,7 +806,11 @@ unsafe fn get_api_attr() -> *mut XmlAttr {
         snprintf(name.as_mut_ptr() as _, 20, c"foo%d".as_ptr() as _, NR);
         NR += 1;
         let name = CStr::from_ptr(name.as_ptr() as *const i8).to_string_lossy();
-        API_ATTR.set((*API_ROOT.get()).set_prop(name.as_ref(), Some("bar")));
+        API_ATTR.set(
+            (*API_ROOT.get())
+                .set_prop(name.as_ref(), Some("bar"))
+                .map_or(null_mut(), |prop| prop.as_ptr()),
+        );
     }
     API_ATTR.get()
 }
