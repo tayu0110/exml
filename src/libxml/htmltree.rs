@@ -34,7 +34,7 @@ use crate::{
     encoding::XmlCharEncoding,
     tree::{
         xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop, NodeCommon, XmlAttr,
-        XmlDoc, XmlDocProperties, XmlElementType, XmlNode, __XML_REGISTER_CALLBACKS,
+        XmlAttrPtr, XmlDoc, XmlDocProperties, XmlElementType, XmlNode, __XML_REGISTER_CALLBACKS,
     },
 };
 #[cfg(feature = "libxml_output")]
@@ -195,23 +195,22 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             && !(*cur).name.is_null())
             && xml_str_equal((*cur).name, c"meta".as_ptr() as _)
         {
-            let mut attr: *mut XmlAttr = (*cur).properties;
-            let mut http: i32;
+            let mut attr = XmlAttrPtr::from_raw((*cur).properties).unwrap();
+            let mut http = 0;
             let mut value: *const XmlChar;
 
             content = null_mut();
-            http = 0;
-            while !attr.is_null() {
-                if let Some(children) = (*attr).children.filter(|c| {
+            while let Some(now) = attr {
+                if let Some(children) = now.children.filter(|c| {
                     matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none()
                 }) {
                     value = children.content;
-                    if xml_strcasecmp((*attr).name, c"http-equiv".as_ptr() as _) == 0
+                    if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
                         && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
                     {
                         http = 1;
                     } else if !value.is_null()
-                        && xml_strcasecmp((*attr).name, c"content".as_ptr() as _) == 0
+                        && xml_strcasecmp(now.name, c"content".as_ptr() as _) == 0
                     {
                         content = value;
                     }
@@ -250,7 +249,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
                         );
                     }
                 }
-                attr = (*attr).next;
+                attr = XmlAttrPtr::from_raw(now.next).unwrap();
             }
         }
         cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
@@ -399,23 +398,22 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
             && !(*cur).name.is_null())
             && (xml_strcasecmp((*cur).name, c"meta".as_ptr() as _) == 0)
         {
-            let mut attr: *mut XmlAttr = (*cur).properties;
-            let mut http: i32;
+            let mut attr = XmlAttrPtr::from_raw((*cur).properties).unwrap();
+            let mut http = 0;
             let mut value: *const XmlChar;
 
             content = None;
-            http = 0;
-            while !attr.is_null() {
-                if let Some(children) = (*attr).children.filter(|c| {
+            while let Some(now) = attr {
+                if let Some(children) = now.children.filter(|c| {
                     matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none()
                 }) {
                     value = children.content;
-                    if xml_strcasecmp((*attr).name, c"http-equiv".as_ptr() as _) == 0
+                    if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
                         && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
                     {
                         http = 1;
                     } else if !value.is_null()
-                        && xml_strcasecmp((*attr).name, c"content".as_ptr() as _) == 0
+                        && xml_strcasecmp(now.name, c"content".as_ptr() as _) == 0
                     {
                         content = Some(
                             CStr::from_ptr(value as *const i8)
@@ -427,7 +425,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                         break;
                     }
                 }
-                attr = (*attr).next;
+                attr = XmlAttrPtr::from_raw(now.next).unwrap();
             }
             if http != 0 && content.is_some() {
                 meta = cur;
@@ -916,7 +914,7 @@ unsafe fn html_dtd_dump_output(
 /// Dump an HTML attribute
 #[doc(alias = "htmlAttrDumpOutput")]
 #[cfg(feature = "libxml_output")]
-unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur: *mut XmlAttr) {
+unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur: &XmlAttr) {
     use std::ffi::CStr;
 
     use crate::{libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
@@ -926,31 +924,28 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur
     // a { character (see Section B.7.1 of the HTML 4.0 Recommendation).
     // This is implemented in xmlEncodeEntitiesReentrant
 
-    if cur.is_null() {
-        return;
-    }
     buf.write_str(" ");
-    if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+    if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
         buf.write_str(&prefix);
         buf.write_str(":");
     }
 
-    buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-    if let Some(children) = (*cur)
+    buf.write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
+    if let Some(children) = cur
         .children
-        .filter(|_| html_is_boolean_attr((*cur).name as _) == 0)
+        .filter(|_| html_is_boolean_attr(cur.name as _) == 0)
     {
         if let Some(value) = children.get_string(doc, 0) {
             buf.write_str("=");
-            if (*cur).ns.is_none()
-                && (*cur)
+            if cur.ns.is_none()
+                && cur
                     .parent
                     .filter(|p| {
                         p.ns.is_none()
-                            && (xml_strcasecmp((*cur).name, c"href".as_ptr() as _) == 0
-                                || xml_strcasecmp((*cur).name, c"action".as_ptr() as _) == 0
-                                || xml_strcasecmp((*cur).name, c"src".as_ptr() as _) == 0
-                                || (xml_strcasecmp((*cur).name, c"name".as_ptr() as _) == 0
+                            && (xml_strcasecmp(cur.name, c"href".as_ptr() as _) == 0
+                                || xml_strcasecmp(cur.name, c"action".as_ptr() as _) == 0
+                                || xml_strcasecmp(cur.name, c"src".as_ptr() as _) == 0
+                                || (xml_strcasecmp(cur.name, c"name".as_ptr() as _) == 0
                                     && xml_strcasecmp(p.name, c"a".as_ptr() as _) == 0))
                     })
                     .is_some()
@@ -1002,7 +997,6 @@ pub unsafe fn html_node_dump_format_output(
     };
 
     let mut parent: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
 
     xml_init_parser();
 
@@ -1061,10 +1055,10 @@ pub unsafe fn html_node_dump_format_output(
                 if let Some(ns_def) = (*cur).ns_def {
                     xml_ns_list_dump_output(buf, Some(ns_def));
                 }
-                attr = (*cur).properties;
-                while !attr.is_null() {
-                    html_attr_dump_output(buf, doc, attr);
-                    attr = (*attr).next;
+                let mut attr = XmlAttrPtr::from_raw((*cur).properties).unwrap();
+                while let Some(now) = attr {
+                    html_attr_dump_output(buf, doc, &now);
+                    attr = XmlAttrPtr::from_raw(now.next).unwrap();
                 }
 
                 if info.map_or(false, |info| info.empty != 0) {
@@ -1116,7 +1110,11 @@ pub unsafe fn html_node_dump_format_output(
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                html_attr_dump_output(buf, doc, (*cur).as_attribute_node().unwrap().as_ptr());
+                html_attr_dump_output(
+                    buf,
+                    doc,
+                    &XmlAttrPtr::from_raw(cur as *mut XmlAttr).unwrap().unwrap(),
+                );
             }
 
             HTML_TEXT_NODE => 'to_break: {
