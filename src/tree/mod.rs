@@ -999,20 +999,6 @@ pub unsafe fn xml_free_doc(cur: *mut XmlDoc) {
     xml_free(cur as _);
 }
 
-/// Free a property and all its siblings, all the children are freed too.
-#[doc(alias = "xmlFreePropList")]
-pub unsafe fn xml_free_prop_list(mut cur: *mut XmlAttr) {
-    let mut next: *mut XmlAttr;
-    if cur.is_null() {
-        return;
-    }
-    while !cur.is_null() {
-        next = (*cur).next;
-        xml_free_prop(cur);
-        cur = next;
-    }
-}
-
 /// This function tries to locate a namespace definition in a tree
 /// ancestors, or create a new namespace definition node similar to
 /// @ns trying to reuse the same prefix. However if the given prefix is
@@ -1489,7 +1475,7 @@ pub unsafe fn xml_copy_prop_list(target: *mut XmlNode, mut cur: *mut XmlAttr) ->
     while !cur.is_null() {
         q = xml_copy_prop(target, cur);
         if q.is_null() {
-            xml_free_prop_list(ret);
+            xml_free_prop_list(XmlAttrPtr::from_raw(ret).unwrap());
             return null_mut();
         }
         if p.is_null() {
@@ -2482,7 +2468,7 @@ pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
                 || matches!((*cur).element_type(), XmlElementType::XmlXIncludeEnd))
                 && !(*cur).properties.is_null()
             {
-                xml_free_prop_list((*cur).properties);
+                xml_free_prop_list(XmlAttrPtr::from_raw((*cur).properties).unwrap());
             }
             if !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                 && !matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
@@ -2545,7 +2531,7 @@ pub unsafe fn xml_free_node(cur: *mut XmlNode) {
         return;
     }
     if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
-        xml_free_prop(cur as _);
+        xml_free_prop(XmlAttrPtr::from_raw(cur as _).unwrap().unwrap());
         return;
     }
 
@@ -2582,7 +2568,7 @@ pub unsafe fn xml_free_node(cur: *mut XmlNode) {
             | XmlElementType::XmlXIncludeEnd
     ) {
         if !(*cur).properties.is_null() {
-            xml_free_prop_list((*cur).properties);
+            xml_free_prop_list(XmlAttrPtr::from_raw((*cur).properties).unwrap());
         }
         if let Some(ns_def) = (*cur).ns_def.take() {
             xml_free_ns_list(ns_def);

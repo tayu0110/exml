@@ -27,7 +27,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use libc::{memcpy, memset};
+use libc::memcpy;
 
 use crate::{
     encoding::{detect_encoding, XmlCharEncoding},
@@ -2450,9 +2450,8 @@ unsafe fn xml_sax2_attribute_ns(
         ret = (*ctxt).free_attrs;
         (*ctxt).free_attrs = (*ret).next;
         (*ctxt).free_attrs_nr -= 1;
-        memset(ret as _, 0, size_of::<XmlAttr>());
+        std::ptr::write(&mut *ret, XmlAttr::default());
         (*ret).typ = XmlElementType::XmlAttributeNode;
-
         (*ret).parent = NodePtr::from_ptr((*ctxt).node);
         (*ret).doc = (*ctxt).my_doc;
         (*ret).ns = namespace;

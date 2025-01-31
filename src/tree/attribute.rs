@@ -28,12 +28,8 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use libc::memset;
-
 use crate::libxml::{
-    globals::{
-        xml_deregister_node_default_value, xml_free, xml_malloc, xml_register_node_default_value,
-    },
+    globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
     valid::{xml_add_id, xml_is_id, xml_remove_id},
     xmlstring::{xml_strdup, xml_strndup, XmlChar},
 };
@@ -58,42 +54,6 @@ pub struct XmlAttr {
     pub(crate) ns: Option<XmlNsPtr>,            /* pointer to the associated namespace */
     pub(crate) atype: Option<XmlAttributeType>, /* the attribute type if validating */
     pub(crate) psvi: *mut c_void,               /* for type/PSVI information */
-}
-
-impl XmlAttr {
-    /// Unlink and free one attribute, all the content is freed too.
-    ///
-    /// Note this doesn't work for namespace definition attributes.
-    ///
-    /// Returns 0 if success and -1 in case of error.
-    #[doc(alias = "xmlRemoveProp")]
-    pub unsafe fn remove_prop(&mut self) -> i32 {
-        let mut tmp: *mut XmlAttr;
-        let Some(mut parent) = self.parent else {
-            return -1;
-        };
-        tmp = parent.properties;
-        if tmp == self {
-            parent.properties = self.next;
-            if !self.next.is_null() {
-                (*self.next).prev = null_mut();
-            }
-            xml_free_prop(self);
-            return 0;
-        }
-        while !tmp.is_null() {
-            if (*tmp).next == self {
-                (*tmp).next = self.next;
-                if !(*tmp).next.is_null() {
-                    (*(*tmp).next).prev = tmp;
-                }
-                xml_free_prop(self);
-                return 0;
-            }
-            tmp = (*tmp).next;
-        }
-        -1
-    }
 }
 
 impl Default for XmlAttr {
@@ -219,6 +179,39 @@ impl XmlAttrPtr {
     pub(crate) unsafe fn into_inner(self) -> Box<XmlAttr> {
         Box::from_raw(self.0.as_ptr())
     }
+
+    /// Unlink and free one attribute, all the content is freed too.
+    ///
+    /// Note this doesn't work for namespace definition attributes.
+    ///
+    /// Returns 0 if success and -1 in case of error.
+    #[doc(alias = "xmlRemoveProp")]
+    pub unsafe fn remove_prop(&mut self) -> i32 {
+        let Some(mut parent) = self.parent else {
+            return -1;
+        };
+        let mut tmp = XmlAttrPtr::from_raw(parent.properties).unwrap();
+        if tmp == Some(*self) {
+            parent.properties = self.next;
+            if !self.next.is_null() {
+                (*self.next).prev = null_mut();
+            }
+            xml_free_prop(*self);
+            return 0;
+        }
+        while let Some(mut now) = tmp {
+            if now.next == self.as_ptr() {
+                now.next = self.next;
+                if !now.next.is_null() {
+                    (*now.next).prev = now.as_ptr();
+                }
+                xml_free_prop(*self);
+                return 0;
+            }
+            tmp = XmlAttrPtr::from_raw(now.next).unwrap();
+        }
+        -1
+    }
 }
 
 impl Clone for XmlAttrPtr {
@@ -296,26 +289,26 @@ pub unsafe fn xml_new_doc_prop(
     }
 
     // Allocate a new property and fill the fields.
-    let cur: *mut XmlAttr = xml_malloc(size_of::<XmlAttr>()) as _;
-    if cur.is_null() {
+    let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
+        typ: XmlElementType::XmlAttributeNode,
+        name: xml_strdup(name),
+        doc,
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building attribute");
         return null_mut();
-    }
-    memset(cur as _, 0, size_of::<XmlAttr>());
-    (*cur).typ = XmlElementType::XmlAttributeNode;
-    (*cur).name = xml_strdup(name);
-    (*cur).doc = doc;
+    };
     if !value.is_null() {
-        (*cur).children = (!doc.is_null())
+        cur.children = (!doc.is_null())
             .then(|| NodePtr::from_ptr((*doc).get_node_list(value)))
             .flatten();
-        (*cur).last = None;
+        cur.last = None;
 
-        let mut tmp = (*cur).children();
+        let mut tmp = cur.children();
         while let Some(mut now) = tmp {
-            now.set_parent(NodePtr::from_ptr(cur as *mut XmlNode));
+            now.set_parent(NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode));
             if now.next.is_none() {
-                (*cur).set_last(Some(now));
+                cur.set_last(Some(now));
             }
             tmp = now.next();
         }
@@ -324,9 +317,9 @@ pub unsafe fn xml_new_doc_prop(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 pub(super) unsafe fn xml_new_prop_internal(
@@ -342,31 +335,30 @@ pub(super) unsafe fn xml_new_prop_internal(
     }
 
     // Allocate a new property and fill the fields.
-    let cur: *mut XmlAttr = xml_malloc(size_of::<XmlAttr>()) as _;
-    if cur.is_null() {
+    let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
+        typ: XmlElementType::XmlAttributeNode,
+        parent: NodePtr::from_ptr(node),
+        ns,
+        name: xml_strndup(name.as_ptr(), name.len() as i32),
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building attribute");
         return null_mut();
-    }
-    memset(cur as _, 0, size_of::<XmlAttr>());
-    (*cur).typ = XmlElementType::XmlAttributeNode;
+    };
 
-    (*cur).parent = NodePtr::from_ptr(node);
     if !node.is_null() {
         doc = (*node).doc;
-        (*cur).doc = doc;
+        cur.doc = doc;
     }
-    (*cur).ns = ns;
-
-    (*cur).name = xml_strndup(name.as_ptr(), name.len() as i32);
 
     if !value.is_null() {
-        (*cur).children = NodePtr::from_ptr(xml_new_doc_text(doc, value));
-        (*cur).set_last(None);
-        let mut tmp = (*cur).children;
+        cur.children = NodePtr::from_ptr(xml_new_doc_text(doc, value));
+        cur.set_last(None);
+        let mut tmp = cur.children;
         while let Some(mut now) = tmp {
-            now.set_parent(NodePtr::from_ptr(cur as *mut XmlNode));
+            now.set_parent(NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode));
             if now.next.is_none() {
-                (*cur).last = Some(now);
+                cur.last = Some(now);
             }
             tmp = now.next;
         }
@@ -374,39 +366,34 @@ pub(super) unsafe fn xml_new_prop_internal(
 
     // Add it at the end to preserve parsing order ...
     if !node.is_null() {
-        if (*node).properties.is_null() {
-            (*node).properties = cur;
-        } else {
-            let mut prev: *mut XmlAttr = (*node).properties;
-
-            while !(*prev).next.is_null() {
-                prev = (*prev).next;
+        if let Some(mut prev) = XmlAttrPtr::from_raw((*node).properties).unwrap() {
+            while let Some(next) = XmlAttrPtr::from_raw(prev.next).unwrap() {
+                prev = next;
             }
-            (*prev).next = cur;
-            (*cur).prev = prev;
+            prev.next = cur.as_ptr();
+            cur.prev = prev.as_ptr();
+        } else {
+            (*node).properties = cur.as_ptr();
         }
     }
 
-    if !value.is_null()
-        && !node.is_null()
-        && (xml_is_id((*node).doc, node, XmlAttrPtr::from_raw(cur).unwrap()) == 1)
-    {
+    if !value.is_null() && !node.is_null() && xml_is_id((*node).doc, node, Some(cur)) == 1 {
         xml_add_id(
             null_mut(),
             (*node).doc,
             CStr::from_ptr(value as *const i8)
                 .to_string_lossy()
                 .as_ref(),
-            XmlAttrPtr::from_raw(cur).unwrap().unwrap(),
+            cur,
         );
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Create a new property carried by a node.  
@@ -459,26 +446,35 @@ pub unsafe fn xml_new_ns_prop_eat_name(
 
 /// Free one attribute, all the content is freed too
 #[doc(alias = "xmlFreeProp")]
-pub unsafe fn xml_free_prop(cur: *mut XmlAttr) {
-    if cur.is_null() {
-        return;
-    }
-
+pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
     {
-        xml_deregister_node_default_value(cur as _);
+        xml_deregister_node_default_value(cur.as_ptr() as _);
     }
 
     // Check for ID removal -> leading to invalid references !
-    if !(*cur).doc.is_null() && matches!((*cur).atype, Some(XmlAttributeType::XmlAttributeID)) {
-        xml_remove_id((*cur).doc, XmlAttrPtr::from_raw(cur).unwrap().unwrap());
+    if !cur.doc.is_null() && matches!(cur.atype, Some(XmlAttributeType::XmlAttributeID)) {
+        xml_remove_id(cur.doc, cur);
     }
-    if let Some(children) = (*cur).children() {
+    if let Some(children) = cur.children() {
         xml_free_node_list(children.as_ptr());
     }
-    if !(*cur).name.is_null() {
-        xml_free((*cur).name as _);
+    if !cur.name.is_null() {
+        xml_free(cur.name as _);
     }
-    xml_free(cur as _);
+    cur.free();
+}
+
+/// Free a property and all its siblings, all the children are freed too.
+#[doc(alias = "xmlFreePropList")]
+pub unsafe fn xml_free_prop_list(cur: Option<XmlAttrPtr>) {
+    if let Some(cur) = cur {
+        let mut next = XmlAttrPtr::from_raw(cur.next).unwrap();
+        xml_free_prop(cur);
+        while let Some(now) = next {
+            next = XmlAttrPtr::from_raw(now.next).unwrap();
+            xml_free_prop(now);
+        }
+    }
 }

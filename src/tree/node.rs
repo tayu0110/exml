@@ -1129,7 +1129,7 @@ impl XmlNode {
             return -1;
         };
         prop.unlink();
-        xml_free_prop(prop.as_ptr());
+        xml_free_prop(prop);
         0
     }
 
@@ -1222,7 +1222,7 @@ impl XmlNode {
             return -1;
         };
         prop.unlink();
-        xml_free_prop(prop.as_ptr());
+        xml_free_prop(prop);
         0
     }
 

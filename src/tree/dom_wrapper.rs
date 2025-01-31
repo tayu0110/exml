@@ -23,7 +23,7 @@ use std::{ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 use libc::snprintf;
 
 use crate::libxml::{
-    globals::{xml_free, xml_malloc, xml_realloc},
+    globals::{xml_free, xml_malloc},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::{xml_add_id, xml_is_id, xml_remove_id},
     xmlstring::{xml_str_equal, xml_strdup, XmlChar},
@@ -2071,12 +2071,11 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     XmlElementType::XmlAttributeNode => {
                         // Attributes (xmlAttr).
                         // Use xmlRealloc to avoid -Warray-bounds warning
-                        clone = xml_realloc(null_mut(), size_of::<XmlAttr>()) as _;
-                        if clone.is_null() {
+                        let Some(new) = XmlAttrPtr::new(XmlAttr::default()) else {
                             xml_tree_err_memory("xmlDOMWrapCloneNode(): allocating an attr-node");
                             break 'internal_error;
-                        }
-                        std::ptr::write(&mut *(clone as *mut XmlAttr), XmlAttr::default());
+                        };
+                        clone = new.as_ptr() as *mut XmlNode;
                         // Set hierarchical links.
                         // TODO: Change this to add to the end of attributes.
                         if !result_clone.is_null() {

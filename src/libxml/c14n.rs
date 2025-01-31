@@ -593,7 +593,7 @@ impl<T> XmlC14NCtx<'_, T> {
         list.walk(|data| self.print_attrs(*data));
 
         // Cleanup
-        xml_free_prop_list(attrs_to_delete.map_or(null_mut(), |attr| attr.as_ptr()));
+        xml_free_prop_list(attrs_to_delete);
         0
     }
 

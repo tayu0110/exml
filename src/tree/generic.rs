@@ -402,7 +402,7 @@ pub trait NodeCommon {
                 }) {
                     // different instance, destroy it (attributes must be unique)
                     (*lastattr).unlink();
-                    xml_free_prop(lastattr.as_ptr());
+                    xml_free_prop(lastattr);
                 }
                 match lastattr {
                     Some(Ok(attr)) if attr.as_ptr() == cur as *mut XmlAttr => return cur,
