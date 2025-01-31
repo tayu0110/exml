@@ -1185,13 +1185,12 @@ impl<T> XmlC14NCtx<'_, T> {
 
         // create and return the new attribute node
         let res = CString::new(res).unwrap();
-        let Some(attr) = XmlAttrPtr::from_raw(xml_new_ns_prop(
+        let Some(attr) = xml_new_ns_prop(
             null_mut(),
             xml_base_attr.ns,
             "base",
             res.as_ptr() as *const u8,
-        ))
-        .unwrap() else {
+        ) else {
             xml_c14n_err_internal("processing xml:base attribute - can't construct attribute");
             return None;
         };

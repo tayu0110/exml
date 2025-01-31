@@ -31,13 +31,14 @@ use std::{
 use crate::libxml::{
     globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
     valid::{xml_add_id, xml_is_id, xml_remove_id},
-    xmlstring::{xml_strdup, xml_strndup, XmlChar},
+    xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
 };
 
 use super::{
-    xml_free_node_list, xml_new_doc_text, xml_tree_err_memory, InvalidNodePointerCastError,
-    NodeCommon, NodePtr, XmlAttributeType, XmlDoc, XmlElementType, XmlGenericNodePtr, XmlNode,
-    XmlNsPtr, __XML_REGISTER_CALLBACKS,
+    xml_free_node_list, xml_new_doc_text, xml_new_ns, xml_new_reconciled_ns,
+    xml_static_copy_node_list, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
+    NodePtr, XmlAttributeType, XmlDoc, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNsPtr,
+    __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -283,9 +284,9 @@ pub unsafe fn xml_new_doc_prop(
     doc: *mut XmlDoc,
     name: *const XmlChar,
     value: *const XmlChar,
-) -> *mut XmlAttr {
+) -> Option<XmlAttrPtr> {
     if name.is_null() {
-        return null_mut();
+        return None;
     }
 
     // Allocate a new property and fill the fields.
@@ -296,7 +297,7 @@ pub unsafe fn xml_new_doc_prop(
         ..Default::default()
     }) else {
         xml_tree_err_memory("building attribute");
-        return null_mut();
+        return None;
     };
     if !value.is_null() {
         cur.children = (!doc.is_null())
@@ -319,7 +320,7 @@ pub unsafe fn xml_new_doc_prop(
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 pub(super) unsafe fn xml_new_prop_internal(
@@ -327,11 +328,11 @@ pub(super) unsafe fn xml_new_prop_internal(
     ns: Option<XmlNsPtr>,
     name: &str,
     value: *const XmlChar,
-) -> *mut XmlAttr {
+) -> Option<XmlAttrPtr> {
     let mut doc: *mut XmlDoc = null_mut();
 
     if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-        return null_mut();
+        return None;
     }
 
     // Allocate a new property and fill the fields.
@@ -343,7 +344,7 @@ pub(super) unsafe fn xml_new_prop_internal(
         ..Default::default()
     }) else {
         xml_tree_err_memory("building attribute");
-        return null_mut();
+        return None;
     };
 
     if !node.is_null() {
@@ -393,7 +394,7 @@ pub(super) unsafe fn xml_new_prop_internal(
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Create a new property carried by a node.  
@@ -404,9 +405,9 @@ pub unsafe fn xml_new_prop(
     node: *mut XmlNode,
     name: *const XmlChar,
     value: *const XmlChar,
-) -> *mut XmlAttr {
+) -> Option<XmlAttrPtr> {
     if name.is_null() {
-        return null_mut();
+        return None;
     }
 
     let n = CStr::from_ptr(name as *const i8).to_string_lossy();
@@ -421,7 +422,7 @@ pub unsafe fn xml_new_ns_prop(
     ns: Option<XmlNsPtr>,
     name: &str,
     value: *const XmlChar,
-) -> *mut XmlAttr {
+) -> Option<XmlAttrPtr> {
     xml_new_prop_internal(node, ns, name, value)
 }
 
@@ -433,15 +434,146 @@ pub unsafe fn xml_new_ns_prop_eat_name(
     ns: Option<XmlNsPtr>,
     name: *mut XmlChar,
     value: *const XmlChar,
-) -> *mut XmlAttr {
+) -> Option<XmlAttrPtr> {
     if name.is_null() {
-        return null_mut();
+        return None;
     }
 
     let n = CStr::from_ptr(name as *const i8).to_string_lossy();
     let res = xml_new_prop_internal(node, ns, &n, value);
     xml_free(name as _);
     res
+}
+
+pub(super) unsafe fn xml_copy_prop_internal(
+    doc: *mut XmlDoc,
+    target: *mut XmlNode,
+    cur: XmlAttrPtr,
+) -> Option<XmlAttrPtr> {
+    if !target.is_null() && !matches!((*target).element_type(), XmlElementType::XmlElementNode) {
+        return None;
+    }
+    let mut ret = if !target.is_null() {
+        xml_new_doc_prop((*target).doc, cur.name, null_mut())
+    } else if !doc.is_null() {
+        xml_new_doc_prop(doc, cur.name, null_mut())
+    } else if let Some(parent) = cur.parent() {
+        xml_new_doc_prop(parent.doc, cur.name, null_mut())
+    } else if let Some(children) = cur.children() {
+        xml_new_doc_prop(children.doc, cur.name, null_mut())
+    } else {
+        xml_new_doc_prop(null_mut(), cur.name, null_mut())
+    }?;
+    ret.parent = NodePtr::from_ptr(target);
+
+    if let Some(cur_ns) = cur.ns.filter(|_| !target.is_null()) {
+        let prefix = cur_ns.prefix();
+        if let Some(ns) = (*target).search_ns((*target).doc, prefix.as_deref()) {
+            // we have to find something appropriate here since
+            // we can't be sure, that the namespace we found is identified
+            // by the prefix
+            if xml_str_equal(ns.href, cur_ns.href) {
+                // this is the nice case
+                ret.ns = Some(ns);
+            } else {
+                // we are in trouble: we need a new reconciled namespace.
+                // This is expensive
+                ret.ns = xml_new_reconciled_ns((*target).doc, target, cur_ns);
+            }
+        } else {
+            // Humm, we are copying an element whose namespace is defined
+            // out of the new tree scope. Search it in the original tree
+            // and add it at the top of the new tree
+            if let Some(ns) = cur.parent.unwrap().search_ns(cur.doc, prefix.as_deref()) {
+                let mut root: *mut XmlNode = target;
+                let mut pred: *mut XmlNode = null_mut();
+
+                while let Some(parent) = (*root).parent() {
+                    pred = root;
+                    root = parent.as_ptr();
+                }
+                if root == (*target).doc as _ {
+                    // correct possibly cycling above the document elt
+                    root = pred;
+                }
+                ret.ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
+            }
+        }
+    } else {
+        ret.ns = None;
+    }
+
+    if let Some(children) = cur.children() {
+        ret.children = NodePtr::from_ptr(xml_static_copy_node_list(
+            children.as_ptr(),
+            ret.doc,
+            ret.as_ptr() as _,
+        ));
+        ret.last = None;
+        let mut tmp = ret.children;
+        while let Some(now) = tmp {
+            // (*tmp).parent = ret;
+            if now.next.is_none() {
+                ret.last = Some(now);
+            }
+            tmp = now.next;
+        }
+    }
+    // Try to handle IDs
+    if !target.is_null()
+        && !(*target).doc.is_null()
+        && !cur.doc.is_null()
+        && (*cur.doc).ids.is_some()
+        && cur
+            .parent
+            .filter(|p| xml_is_id(cur.doc, p.as_ptr(), Some(cur)) != 0)
+            .is_some()
+    {
+        let children = cur.children;
+        if let Some(id) = children.and_then(|c| c.get_string(cur.doc, 1)) {
+            xml_add_id(null_mut(), (*target).doc, &id, ret);
+        }
+    }
+    Some(ret)
+}
+
+/// Do a copy of the attribute.
+///
+/// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyProp")]
+pub unsafe fn xml_copy_prop(target: *mut XmlNode, cur: XmlAttrPtr) -> Option<XmlAttrPtr> {
+    xml_copy_prop_internal(null_mut(), target, cur)
+}
+
+/// Do a copy of an attribute list.
+///
+/// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyPropList")]
+pub unsafe fn xml_copy_prop_list(
+    target: *mut XmlNode,
+    mut cur: Option<XmlAttrPtr>,
+) -> Option<XmlAttrPtr> {
+    if !target.is_null() && !matches!((*target).element_type(), XmlElementType::XmlElementNode) {
+        return None;
+    }
+    let mut ret = None;
+    let mut p = None::<XmlAttrPtr>;
+    while let Some(now) = cur {
+        let Some(mut q) = xml_copy_prop(target, now) else {
+            xml_free_prop_list(ret);
+            return None;
+        };
+        if let Some(mut np) = p {
+            np.next = q.as_ptr();
+            q.prev = np.as_ptr();
+            p = Some(q);
+        } else {
+            ret = Some(q);
+            p = Some(q);
+        }
+        cur = XmlAttrPtr::from_raw(now.next).unwrap();
+    }
+    ret
 }
 
 /// Free one attribute, all the content is freed too

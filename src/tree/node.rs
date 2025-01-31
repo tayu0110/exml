@@ -1206,6 +1206,7 @@ impl XmlNode {
             name,
             value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8),
         )
+        .map_or(null_mut(), |prop| prop.as_ptr())
     }
 
     /// Remove an attribute carried by a node.

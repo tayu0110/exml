@@ -1322,8 +1322,6 @@ unsafe fn xml_sax2_attribute_internal(
     value: Option<&str>,
     prefix: Option<&str>,
 ) {
-    use crate::tree::XmlAttrPtr;
-
     use super::htmltree::html_is_boolean_attr;
 
     let nval: *mut XmlChar;
@@ -1608,9 +1606,7 @@ unsafe fn xml_sax2_attribute_internal(
     };
 
     // !!!!!! <a toto:arg="" xmlns:toto="http://toto.com">
-    let Some(mut ret) =
-        XmlAttrPtr::from_raw(xml_new_ns_prop((*ctxt).node, namespace, name, null())).unwrap()
-    else {
+    let Some(mut ret) = xml_new_ns_prop((*ctxt).node, namespace, name, null()) else {
         // goto error;
         if !nval.is_null() {
             xml_free(nval as _);
@@ -2481,7 +2477,8 @@ unsafe fn xml_sax2_attribute_ns(
             namespace,
             &CStr::from_ptr(localname as *const i8).to_string_lossy(),
             null_mut(),
-        );
+        )
+        .map_or(null_mut(), |prop| prop.as_ptr());
         if ret.is_null() {
             xml_err_memory(ctxt, Some("xmlSAX2AttributeNs"));
             return;

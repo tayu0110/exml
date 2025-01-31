@@ -56,7 +56,6 @@ use crate::{
             xml_register_node_default_value,
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-        valid::{xml_add_id, xml_is_id},
         xmlstring::{xml_str_equal, xml_strdup, xml_strncat, xml_strndup, XmlChar},
     },
 };
@@ -1083,7 +1082,12 @@ pub(crate) unsafe fn xml_static_copy_node(
         | XmlElementType::XmlXIncludeStart
         | XmlElementType::XmlXIncludeEnd => {}
         XmlElementType::XmlAttributeNode => {
-            return xml_copy_prop_internal(doc, parent, node as _) as _;
+            return xml_copy_prop_internal(
+                doc,
+                parent,
+                XmlAttrPtr::from_raw(node as _).unwrap().unwrap(),
+            )
+            .map_or(null_mut(), |prop| prop.as_ptr()) as _;
         }
         XmlElementType::XmlNamespaceDecl => {
             return xml_copy_namespace_list(XmlNsPtr::from_raw(node as _).unwrap())
@@ -1204,7 +1208,9 @@ pub(crate) unsafe fn xml_static_copy_node(
         || matches!((*node).element_type(), XmlElementType::XmlXIncludeStart))
         && !(*node).properties.is_null()
     {
-        (*ret).properties = xml_copy_prop_list(ret, (*node).properties);
+        (*ret).properties =
+            xml_copy_prop_list(ret, XmlAttrPtr::from_raw((*node).properties).unwrap())
+                .map_or(null_mut(), |prop| prop.as_ptr());
     }
     if matches!((*node).element_type(), XmlElementType::XmlEntityRefNode) {
         if doc.is_null() || (*node).doc != doc {
@@ -1340,155 +1346,6 @@ pub(crate) unsafe fn xml_static_copy_node_list(
     // error:
     //     xmlFreeNodeList(ret);
     //     return null_mut();
-}
-
-unsafe fn xml_copy_prop_internal(
-    doc: *mut XmlDoc,
-    target: *mut XmlNode,
-    cur: *mut XmlAttr,
-) -> *mut XmlAttr {
-    let ret: *mut XmlAttr;
-
-    if cur.is_null() {
-        return null_mut();
-    }
-    if !target.is_null() && !matches!((*target).element_type(), XmlElementType::XmlElementNode) {
-        return null_mut();
-    }
-    if !target.is_null() {
-        ret = xml_new_doc_prop((*target).doc, (*cur).name, null_mut());
-    } else if !doc.is_null() {
-        ret = xml_new_doc_prop(doc, (*cur).name, null_mut());
-    } else if let Some(parent) = (*cur).parent() {
-        ret = xml_new_doc_prop(parent.doc, (*cur).name, null_mut());
-    } else if let Some(children) = (*cur).children() {
-        ret = xml_new_doc_prop(children.doc, (*cur).name, null_mut());
-    } else {
-        ret = xml_new_doc_prop(null_mut(), (*cur).name, null_mut());
-    }
-    if ret.is_null() {
-        return null_mut();
-    }
-    (*ret).parent = NodePtr::from_ptr(target);
-
-    if let Some(cur_ns) = (*cur).ns.filter(|_| !target.is_null()) {
-        let prefix = cur_ns.prefix();
-        if let Some(ns) = (*target).search_ns((*target).doc, prefix.as_deref()) {
-            // we have to find something appropriate here since
-            // we can't be sure, that the namespace we found is identified
-            // by the prefix
-            if xml_str_equal(ns.href, cur_ns.href) {
-                // this is the nice case
-                (*ret).ns = Some(ns);
-            } else {
-                // we are in trouble: we need a new reconciled namespace.
-                // This is expensive
-                (*ret).ns = xml_new_reconciled_ns((*target).doc, target, cur_ns);
-            }
-        } else {
-            // Humm, we are copying an element whose namespace is defined
-            // out of the new tree scope. Search it in the original tree
-            // and add it at the top of the new tree
-            if let Some(ns) = (*cur)
-                .parent
-                .unwrap()
-                .search_ns((*cur).doc, prefix.as_deref())
-            {
-                let mut root: *mut XmlNode = target;
-                let mut pred: *mut XmlNode = null_mut();
-
-                while let Some(parent) = (*root).parent() {
-                    pred = root;
-                    root = parent.as_ptr();
-                }
-                if root == (*target).doc as _ {
-                    // correct possibly cycling above the document elt
-                    root = pred;
-                }
-                (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
-            }
-        }
-    } else {
-        (*ret).ns = None;
-    }
-
-    if let Some(children) = (*cur).children() {
-        (*ret).children = NodePtr::from_ptr(xml_static_copy_node_list(
-            children.as_ptr(),
-            (*ret).doc,
-            ret as _,
-        ));
-        (*ret).last = None;
-        let mut tmp = (*ret).children;
-        while let Some(now) = tmp {
-            // (*tmp).parent = ret;
-            if now.next.is_none() {
-                (*ret).last = Some(now);
-            }
-            tmp = now.next;
-        }
-    }
-    // Try to handle IDs
-    if !target.is_null()
-        && !cur.is_null()
-        && !(*target).doc.is_null()
-        && !(*cur).doc.is_null()
-        && (*(*cur).doc).ids.is_some()
-        && (*cur)
-            .parent
-            .filter(|p| xml_is_id((*cur).doc, p.as_ptr(), XmlAttrPtr::from_raw(cur).unwrap()) != 0)
-            .is_some()
-    {
-        let children = (*cur).children;
-        if let Some(id) = children.and_then(|c| c.get_string((*cur).doc, 1)) {
-            xml_add_id(
-                null_mut(),
-                (*target).doc,
-                &id,
-                XmlAttrPtr::from_raw(ret).unwrap().unwrap(),
-            );
-        }
-    }
-    ret
-}
-
-/// Do a copy of the attribute.
-///
-/// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
-#[doc(alias = "xmlCopyProp")]
-pub unsafe fn xml_copy_prop(target: *mut XmlNode, cur: *mut XmlAttr) -> *mut XmlAttr {
-    xml_copy_prop_internal(null_mut(), target, cur)
-}
-
-/// Do a copy of an attribute list.
-///
-/// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
-#[doc(alias = "xmlCopyPropList")]
-pub unsafe fn xml_copy_prop_list(target: *mut XmlNode, mut cur: *mut XmlAttr) -> *mut XmlAttr {
-    let mut ret: *mut XmlAttr = null_mut();
-    let mut p: *mut XmlAttr = null_mut();
-    let mut q: *mut XmlAttr;
-
-    if !target.is_null() && !matches!((*target).element_type(), XmlElementType::XmlElementNode) {
-        return null_mut();
-    }
-    while !cur.is_null() {
-        q = xml_copy_prop(target, cur);
-        if q.is_null() {
-            xml_free_prop_list(XmlAttrPtr::from_raw(ret).unwrap());
-            return null_mut();
-        }
-        if p.is_null() {
-            ret = q;
-            p = q;
-        } else {
-            (*p).next = q;
-            (*q).prev = p;
-            p = q;
-        }
-        cur = (*cur).next;
-    }
-    ret
 }
 
 /// Do a copy of the dtd.
@@ -3078,66 +2935,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_copy_prop() {
-        unsafe {
-            let mut leaks = 0;
-            for n_target in 0..GEN_NB_XML_NODE_PTR {
-                for n_cur in 0..GEN_NB_XML_ATTR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let target = gen_xml_node_ptr(n_target, 0);
-                    let cur = gen_xml_attr_ptr(n_cur, 1);
-
-                    let ret_val = xml_copy_prop(target, cur);
-                    desret_xml_attr_ptr(ret_val);
-                    des_xml_node_ptr(n_target, target, 0);
-                    des_xml_attr_ptr(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCopyProp",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlCopyProp()");
-                        eprint!(" {}", n_target);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_copy_prop_list() {
-        unsafe {
-            let mut leaks = 0;
-            for n_target in 0..GEN_NB_XML_NODE_PTR {
-                for n_cur in 0..GEN_NB_XML_ATTR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let target = gen_xml_node_ptr(n_target, 0);
-                    let cur = gen_xml_attr_ptr(n_cur, 1);
-
-                    let ret_val = xml_copy_prop_list(target, cur);
-                    desret_xml_attr_ptr(ret_val);
-                    des_xml_node_ptr(n_target, target, 0);
-                    des_xml_attr_ptr(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCopyPropList",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlCopyPropList()");
-                        eprint!(" {}", n_target);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_domwrap_clone_node() {
         unsafe {
             let mut leaks = 0;
@@ -3410,41 +3207,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_new_doc_prop() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let value = gen_const_xml_char_ptr(n_value, 2);
-
-                        let ret_val = xml_new_doc_prop(doc, name, value);
-                        desret_xml_attr_ptr(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_value, value, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNewDocProp",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDocProp()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_value);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_new_doc_text() {
         unsafe {
             let mut leaks = 0;
@@ -3505,45 +3267,6 @@ mod tests {
                             eprint!(" {}", n_doc);
                             eprint!(" {}", n_content);
                             eprintln!(" {}", n_len);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_prop() {
-        #[cfg(any(feature = "libxml_tree", feature = "html", feature = "schema"))]
-        unsafe {
-            let mut leaks = 0;
-            #[cfg(feature = "libxml_tree")]
-            {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let node = gen_xml_node_ptr(n_node, 0);
-                            let name = gen_const_xml_char_ptr(n_name, 1);
-                            let value = gen_const_xml_char_ptr(n_value, 2);
-
-                            let ret_val = xml_new_prop(node, name, value);
-                            desret_xml_attr_ptr(ret_val);
-                            des_xml_node_ptr(n_node, node, 0);
-                            des_const_xml_char_ptr(n_name, name, 1);
-                            des_const_xml_char_ptr(n_value, value, 2);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlNewProp",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlNewProp()");
-                                eprint!(" {}", n_node);
-                                eprint!(" {}", n_name);
-                                eprintln!(" {}", n_value);
-                            }
                         }
                     }
                 }

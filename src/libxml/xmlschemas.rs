@@ -25678,7 +25678,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
 
                         if (*iattr).ns_name.is_null() {
                             if xml_new_prop(def_attr_owner_elem, (*iattr).local_name, value)
-                                .is_null()
+                                .is_none()
                             {
                                 VERROR_INT!(
                                     vctxt,
