@@ -5624,20 +5624,18 @@ unsafe fn xml_schema_clear_schema_defaults(schema: XmlSchemaPtr) {
 ///
 /// Returns the attribute or NULL if not present.
 #[doc(alias = "xmlSchemaGetPropNode")]
-unsafe fn xml_schema_get_prop_node(node: *mut XmlNode, name: *const c_char) -> *mut XmlAttr {
-    let mut prop: *mut XmlAttr;
-
+unsafe fn xml_schema_get_prop_node(node: *mut XmlNode, name: *const c_char) -> Option<XmlAttrPtr> {
     if node.is_null() || name.is_null() {
-        return null_mut();
+        return None;
     }
-    prop = (*node).properties;
-    while !prop.is_null() {
-        if (*prop).ns.is_none() && xml_str_equal((*prop).name, name as _) {
-            return prop;
+    let mut prop = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(now) = prop {
+        if now.ns.is_none() && xml_str_equal(now.name, name as _) {
+            return Some(now);
         }
-        prop = (*prop).next;
+        prop = XmlAttrPtr::from_raw(now.next).unwrap();
     }
-    null_mut()
+    None
 }
 
 unsafe fn xml_schema_get_node_content_no_dict(node: *mut XmlNode) -> Option<String> {
@@ -5895,11 +5893,10 @@ unsafe fn xml_schema_pval_attr_id(
     owner_elem: *mut XmlNode,
     name: *const XmlChar,
 ) -> i32 {
-    let attr: *mut XmlAttr = xml_schema_get_prop_node(owner_elem, name as _);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(owner_elem, name as _) else {
         return 0;
-    }
-    xml_schema_pval_attr_node_id(ctxt, attr)
+    };
+    xml_schema_pval_attr_node_id(ctxt, attr.as_ptr())
 }
 
 unsafe fn xml_schema_get_node_content(
@@ -6168,7 +6165,6 @@ unsafe fn xml_schema_parse_schema_element(
     schema: XmlSchemaPtr,
     node: *mut XmlNode,
 ) -> i32 {
-    let mut attr: *mut XmlAttr;
     let mut val: *const XmlChar;
     let mut res: i32;
     let old_errs: i32 = (*ctxt).nberrors;
@@ -6190,12 +6186,11 @@ unsafe fn xml_schema_parse_schema_element(
         //     }
         // }
         'exit: {
-            attr = xml_schema_get_prop_node(node, c"targetNamespace".as_ptr() as _);
-            if !attr.is_null() {
+            if let Some(attr) = xml_schema_get_prop_node(node, c"targetNamespace".as_ptr() as _) {
                 res = xml_schema_pval_attr_node(
                     ctxt,
                     null_mut(),
-                    attr,
+                    attr.as_ptr(),
                     xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
                     null_mut(),
                 );
@@ -6205,9 +6200,9 @@ unsafe fn xml_schema_parse_schema_element(
                     break 'exit;
                 }
             }
-            attr = xml_schema_get_prop_node(node, c"elementFormDefault".as_ptr() as _);
-            if !attr.is_null() {
-                val = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+            if let Some(attr) = xml_schema_get_prop_node(node, c"elementFormDefault".as_ptr() as _)
+            {
+                val = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
                 res = xml_schema_pval_attr_form_default(
                     val,
                     addr_of_mut!((*schema).flags),
@@ -6220,7 +6215,7 @@ unsafe fn xml_schema_parse_schema_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapElemFormDefaultValue,
                         null_mut(),
-                        attr as *mut XmlNode,
+                        attr.as_ptr() as *mut XmlNode,
                         null_mut(),
                         c"(qualified | unqualified)".as_ptr() as _,
                         Some(&val),
@@ -6230,9 +6225,10 @@ unsafe fn xml_schema_parse_schema_element(
                     );
                 }
             }
-            attr = xml_schema_get_prop_node(node, c"attributeFormDefault".as_ptr() as _);
-            if !attr.is_null() {
-                val = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+            if let Some(attr) =
+                xml_schema_get_prop_node(node, c"attributeFormDefault".as_ptr() as _)
+            {
+                val = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
                 res = xml_schema_pval_attr_form_default(
                     val,
                     addr_of_mut!((*schema).flags),
@@ -6245,7 +6241,7 @@ unsafe fn xml_schema_parse_schema_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapAttrFormDefaultValue,
                         null_mut(),
-                        attr as *mut XmlNode,
+                        attr.as_ptr() as *mut XmlNode,
                         null_mut(),
                         c"(qualified | unqualified)".as_ptr() as _,
                         Some(&val),
@@ -6255,9 +6251,8 @@ unsafe fn xml_schema_parse_schema_element(
                     );
                 }
             }
-            attr = xml_schema_get_prop_node(node, c"finalDefault".as_ptr() as _);
-            if !attr.is_null() {
-                val = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+            if let Some(attr) = xml_schema_get_prop_node(node, c"finalDefault".as_ptr() as _) {
+                val = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
                 res = xml_schema_pval_attr_block_final(
                     val,
                     addr_of_mut!((*schema).flags),
@@ -6275,7 +6270,7 @@ unsafe fn xml_schema_parse_schema_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr as *mut XmlNode,
+                        attr.as_ptr() as *mut XmlNode,
                         null_mut(),
                         c"(#all | List of (extension | restriction | list | union))".as_ptr() as _,
                         Some(&val),
@@ -6285,9 +6280,8 @@ unsafe fn xml_schema_parse_schema_element(
                     );
                 }
             }
-            attr = xml_schema_get_prop_node(node, c"blockDefault".as_ptr() as _);
-            if !attr.is_null() {
-                val = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+            if let Some(attr) = xml_schema_get_prop_node(node, c"blockDefault".as_ptr() as _) {
+                val = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
                 res = xml_schema_pval_attr_block_final(
                     val,
                     addr_of_mut!((*schema).flags),
@@ -6305,7 +6299,7 @@ unsafe fn xml_schema_parse_schema_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr as *mut XmlNode,
+                        attr.as_ptr() as *mut XmlNode,
                         null_mut(),
                         c"(#all | List of (extension | restriction | substitution))".as_ptr() as _,
                         Some(&val),
@@ -6426,14 +6420,13 @@ unsafe fn xml_schema_pval_attr(
         );
         return -1;
     }
-    let attr: *mut XmlAttr = xml_schema_get_prop_node(owner_elem, name);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(owner_elem, name) else {
         if !value.is_null() {
             *value = null_mut();
         }
         return 0;
-    }
-    xml_schema_pval_attr_node(ctxt, owner_item, attr, typ, value)
+    };
+    xml_schema_pval_attr_node(ctxt, owner_item, attr.as_ptr(), typ, value)
 }
 
 /// Seeks an attribute with a local name of @name and a namespace URI of @uri.
@@ -6444,24 +6437,20 @@ unsafe fn xml_schema_get_prop_node_ns(
     node: *mut XmlNode,
     uri: *const c_char,
     name: *const c_char,
-) -> *mut XmlAttr {
-    let mut prop: *mut XmlAttr;
-
+) -> Option<XmlAttrPtr> {
     if node.is_null() || name.is_null() {
-        return null_mut();
+        return None;
     }
-    prop = (*node).properties;
-    while !prop.is_null() {
-        if xml_str_equal((*prop).name, name as _)
-            && (*prop)
-                .ns
-                .map_or(false, |ns| xml_str_equal(ns.href, uri as _))
+    let mut prop = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(now) = prop {
+        if xml_str_equal(now.name, name as _)
+            && now.ns.map_or(false, |ns| xml_str_equal(ns.href, uri as _))
         {
-            return prop;
+            return Some(now);
         }
-        prop = (*prop).next;
+        prop = XmlAttrPtr::from_raw(now.next).unwrap();
     }
-    null_mut()
+    None
 }
 
 /// Handle a parser error
@@ -6549,7 +6538,6 @@ unsafe fn xml_schema_parse_annotation(
     needed: i32,
 ) -> XmlSchemaAnnotPtr {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut barked: i32 = 0;
 
     // INFO: S4S completed.
@@ -6565,10 +6553,10 @@ unsafe fn xml_schema_parse_annotation(
     } else {
         null_mut()
     };
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if ((*attr).ns.is_none() && !xml_str_equal((*attr).name, c"id".as_ptr() as _))
-            || (*attr).ns.map_or(false, |ns| {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(now) = attr {
+        if (now.ns.is_none() && !xml_str_equal(now.name, c"id".as_ptr() as _))
+            || now.ns.map_or(false, |ns| {
                 xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _)
             })
         {
@@ -6576,10 +6564,10 @@ unsafe fn xml_schema_parse_annotation(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                now.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(now.next).unwrap();
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // And now for the children...
@@ -6591,10 +6579,10 @@ unsafe fn xml_schema_parse_annotation(
             // source = anyURI
             // {any attributes with non-schema namespace . . .}>
             // Content: ({any})*
-            attr = (*child).properties;
-            while !attr.is_null() {
-                if ((*attr).ns.is_none() && !xml_str_equal((*attr).name, c"source".as_ptr() as _))
-                    || (*attr).ns.map_or(false, |ns| {
+            let mut attr = XmlAttrPtr::from_raw((*child).properties).unwrap();
+            while let Some(now) = attr {
+                if (now.ns.is_none() && !xml_str_equal(now.name, c"source".as_ptr() as _))
+                    || now.ns.map_or(false, |ns| {
                         xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _)
                     })
                 {
@@ -6602,10 +6590,10 @@ unsafe fn xml_schema_parse_annotation(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                         null_mut(),
-                        attr,
+                        now.as_ptr(),
                     );
                 }
-                attr = (*attr).next;
+                attr = XmlAttrPtr::from_raw(now.next).unwrap();
             }
             xml_schema_pval_attr(
                 ctxt,
@@ -6622,41 +6610,40 @@ unsafe fn xml_schema_parse_annotation(
             // source = anyURI
             // {any attributes with non-schema namespace . . .}>
             // Content: ({any})*
-            attr = (*child).properties;
-            while !attr.is_null() {
-                if let Some(ns) = (*attr).ns {
+            let mut attr = XmlAttrPtr::from_raw((*child).properties).unwrap();
+            while let Some(cur_attr) = attr {
+                if let Some(ns) = cur_attr.ns {
                     if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _)
-                        || (xml_str_equal((*attr).name, c"lang".as_ptr() as _)
+                        || (xml_str_equal(cur_attr.name, c"lang".as_ptr() as _)
                             && !xml_str_equal(ns.href, XML_XML_NAMESPACE.as_ptr() as _))
                     {
                         xml_schema_pillegal_attr_err(
                             ctxt,
                             XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                             null_mut(),
-                            attr,
+                            cur_attr.as_ptr(),
                         );
                     }
-                } else if !xml_str_equal((*attr).name, c"source".as_ptr() as _) {
+                } else if !xml_str_equal(cur_attr.name, c"source".as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                         null_mut(),
-                        attr,
+                        cur_attr.as_ptr(),
                     );
                 }
-                attr = (*attr).next;
+                attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
             }
             // Attribute "xml:lang".
-            attr = xml_schema_get_prop_node_ns(
+            if let Some(attr) = xml_schema_get_prop_node_ns(
                 child,
                 XML_XML_NAMESPACE.as_ptr() as _,
                 c"lang".as_ptr() as _,
-            );
-            if !attr.is_null() {
+            ) {
                 xml_schema_pval_attr_node(
                     ctxt,
                     null_mut(),
-                    attr,
+                    attr.as_ptr(),
                     xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasLanguage),
                     null_mut(),
                 );
@@ -6888,8 +6875,6 @@ unsafe fn xml_schema_parse_include_or_redefine_attrs(
     schema_location: *mut *mut XmlChar,
     typ: i32,
 ) -> i32 {
-    let mut attr: *mut XmlAttr;
-
     if pctxt.is_null() || schema.is_null() || node.is_null() || schema_location.is_null() {
         return -1;
     }
@@ -6897,38 +6882,37 @@ unsafe fn xml_schema_parse_include_or_redefine_attrs(
     *schema_location = null_mut();
     // Check for illegal attributes.
     // Applies for both <include> and <redefine>.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     pctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"schemaLocation".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"schemaLocation".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     xml_schema_pval_attr_id(pctxt, node, c"id".as_ptr() as _);
     // Preliminary step, extract the URI-Reference and make an URI from the base.
     // Attribute "schemaLocation" is mandatory.
-    attr = xml_schema_get_prop_node(node, c"schemaLocation".as_ptr() as _);
-    if !attr.is_null() {
+    if let Some(attr) = xml_schema_get_prop_node(node, c"schemaLocation".as_ptr() as _) {
         if xml_schema_pval_attr_node(
             pctxt,
             null_mut(),
-            attr,
+            attr.as_ptr(),
             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
             schema_location as _,
         ) != 0
@@ -7207,13 +7191,12 @@ unsafe fn xml_schema_pval_attr_qname(
     uri: *mut *const XmlChar,
     local: *mut *const XmlChar,
 ) -> i32 {
-    let attr: *mut XmlAttr = xml_schema_get_prop_node(owner_elem, name);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(owner_elem, name) else {
         *local = null_mut();
         *uri = null_mut();
         return 0;
-    }
-    xml_schema_pval_attr_node_qname(ctxt, schema, owner_item, attr, uri, local)
+    };
+    xml_schema_pval_attr_node_qname(ctxt, schema, owner_item, attr.as_ptr(), uri, local)
 }
 
 macro_rules! ADD_ANNOTATION {
@@ -7363,11 +7346,10 @@ unsafe fn xml_get_min_occurs(
     let mut cur: *const XmlChar;
     let mut ret: i32 = 0;
 
-    let attr: *mut XmlAttr = xml_schema_get_prop_node(node, c"minOccurs".as_ptr() as _);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(node, c"minOccurs".as_ptr() as _) else {
         return def;
-    }
-    let val: *const XmlChar = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+    };
+    let val: *const XmlChar = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
     if val.is_null() {
         return def;
     }
@@ -7382,7 +7364,7 @@ unsafe fn xml_get_min_occurs(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
-            attr as *mut XmlNode,
+            attr.as_ptr() as *mut XmlNode,
             null_mut(),
             expected,
             Some(&val),
@@ -7417,7 +7399,7 @@ unsafe fn xml_get_min_occurs(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
-            attr as *mut XmlNode,
+            attr.as_ptr() as *mut XmlNode,
             null_mut(),
             expected,
             Some(&val),
@@ -7445,11 +7427,10 @@ unsafe fn xml_get_max_occurs(
     let mut cur: *const XmlChar;
     let mut ret: i32 = 0;
 
-    let attr: *mut XmlAttr = xml_schema_get_prop_node(node, c"maxOccurs".as_ptr() as _);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(node, c"maxOccurs".as_ptr() as _) else {
         return def;
-    }
-    let val: *const XmlChar = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+    };
+    let val: *const XmlChar = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
     if val.is_null() {
         return def;
     }
@@ -7462,7 +7443,7 @@ unsafe fn xml_get_max_occurs(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                 null_mut(),
-                attr as *mut XmlNode,
+                attr.as_ptr() as *mut XmlNode,
                 null_mut(),
                 expected,
                 Some(&val),
@@ -7488,7 +7469,7 @@ unsafe fn xml_get_max_occurs(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
-            attr as *mut XmlNode,
+            attr.as_ptr() as *mut XmlNode,
             null_mut(),
             expected,
             Some(&val),
@@ -7523,7 +7504,7 @@ unsafe fn xml_get_max_occurs(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             null_mut(),
-            attr as *mut XmlNode,
+            attr.as_ptr() as *mut XmlNode,
             null_mut(),
             expected,
             Some(&val),
@@ -7630,7 +7611,8 @@ unsafe fn xml_schema_pcheck_particle_correct_2(
                 XmlParserErrors::XmlSchemapPPropsCorrect2_2,
                 null_mut(),
                 null_mut(),
-                xml_schema_get_prop_node(node, c"maxOccurs".as_ptr() as _),
+                xml_schema_get_prop_node(node, c"maxOccurs".as_ptr() as _)
+                    .map_or(null_mut(), |prop| prop.as_ptr()),
                 c"The value must be greater than or equal to 1".as_ptr() as _,
             );
             return XmlParserErrors::XmlSchemapPPropsCorrect2_2 as i32;
@@ -7641,7 +7623,8 @@ unsafe fn xml_schema_pcheck_particle_correct_2(
                 XmlParserErrors::XmlSchemapPPropsCorrect2_1,
                 null_mut(),
                 null_mut(),
-                xml_schema_get_prop_node(node, c"minOccurs".as_ptr() as _),
+                xml_schema_get_prop_node(node, c"minOccurs".as_ptr() as _)
+                    .map_or(null_mut(), |prop| prop.as_ptr()),
                 c"The value must not be greater than the value of 'maxOccurs'".as_ptr() as _,
             );
             return XmlParserErrors::XmlSchemapPPropsCorrect2_1 as i32;
@@ -7900,7 +7883,6 @@ unsafe fn xml_schema_parse_model_group_def_ref(
     node: *mut XmlNode,
 ) -> XmlSchemaTreeItemPtr {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut refe: *const XmlChar = null();
     let mut ref_ns: *const XmlChar = null();
 
@@ -7908,8 +7890,7 @@ unsafe fn xml_schema_parse_model_group_def_ref(
         return null_mut();
     }
 
-    attr = xml_schema_get_prop_node(node, c"ref".as_ptr() as _);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(node, c"ref".as_ptr() as _) else {
         xml_schema_pmissing_attr_err(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -7919,18 +7900,19 @@ unsafe fn xml_schema_parse_model_group_def_ref(
             None,
         );
         return null_mut();
-    } else if xml_schema_pval_attr_node_qname(
+    };
+    if xml_schema_pval_attr_node_qname(
         ctxt,
         schema,
         null_mut(),
-        attr,
+        attr.as_ptr(),
         addr_of_mut!(ref_ns),
         addr_of_mut!(refe),
     ) != 0
     {
         return null_mut();
     }
-    xml_schema_check_reference(ctxt, schema, node, attr, ref_ns);
+    xml_schema_check_reference(ctxt, schema, node, attr.as_ptr(), ref_ns);
     let min: i32 = xml_get_min_occurs(ctxt, node, 0, -1, 1, c"xs:nonNegativeInteger".as_ptr() as _);
     let max: i32 = xml_get_max_occurs(
         ctxt,
@@ -7941,30 +7923,30 @@ unsafe fn xml_schema_parse_model_group_def_ref(
         c"(xs:nonNegativeInteger | unbounded)".as_ptr() as _,
     );
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"ref".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"ref".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     let item: XmlSchemaParticlePtr = xml_schema_add_particle(ctxt, node, min, max);
@@ -8104,7 +8086,6 @@ unsafe fn xml_schema_parse_local_attribute(
     let mut ns: *const XmlChar = null();
     let mut using: XmlSchemaAttributeUsePtr = null_mut();
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut tmp_ns: *const XmlChar = null();
     let mut tmp_name: *const XmlChar = null();
     let mut def_value: *const XmlChar = null();
@@ -8122,60 +8103,60 @@ unsafe fn xml_schema_parse_local_attribute(
     if pctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
     }
-    attr = xml_schema_get_prop_node(node, c"ref".as_ptr() as _);
-    if !attr.is_null() {
+    if let Some(attr) = xml_schema_get_prop_node(node, c"ref".as_ptr() as _) {
         if xml_schema_pval_attr_node_qname(
             pctxt,
             schema,
             null_mut(),
-            attr,
+            attr.as_ptr(),
             addr_of_mut!(tmp_ns),
             addr_of_mut!(tmp_name),
         ) != 0
         {
             return null_mut();
         }
-        if xml_schema_check_reference(pctxt, schema, node, attr, tmp_ns) != 0 {
+        if xml_schema_check_reference(pctxt, schema, node, attr.as_ptr(), tmp_ns) != 0 {
             return null_mut();
         }
         is_ref = 1;
     }
     let nberrors: i32 = (*pctxt).nberrors;
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
         'attr_next: {
-            if let Some(ns) = (*attr).ns {
+            if let Some(ns) = cur_attr.ns {
                 if !xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                     break 'attr_next;
                 }
             } else {
                 if is_ref != 0 {
-                    if xml_str_equal((*attr).name, c"id".as_ptr() as _) {
-                        xml_schema_pval_attr_node_id(pctxt, attr);
+                    if xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
+                        xml_schema_pval_attr_node_id(pctxt, cur_attr.as_ptr());
                         break 'attr_next;
-                    } else if xml_str_equal((*attr).name, c"ref".as_ptr() as _) {
+                    } else if xml_str_equal(cur_attr.name, c"ref".as_ptr() as _) {
                         break 'attr_next;
                     }
-                } else if xml_str_equal((*attr).name, c"name".as_ptr() as _) {
+                } else if xml_str_equal(cur_attr.name, c"name".as_ptr() as _) {
                     break 'attr_next;
-                } else if xml_str_equal((*attr).name, c"id".as_ptr() as _) {
-                    xml_schema_pval_attr_node_id(pctxt, attr);
+                } else if xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
+                    xml_schema_pval_attr_node_id(pctxt, cur_attr.as_ptr());
                     break 'attr_next;
-                } else if xml_str_equal((*attr).name, c"type".as_ptr() as _) {
+                } else if xml_str_equal(cur_attr.name, c"type".as_ptr() as _) {
                     xml_schema_pval_attr_node_qname(
                         pctxt,
                         schema,
                         null_mut(),
-                        attr,
+                        cur_attr.as_ptr(),
                         addr_of_mut!(tmp_ns),
                         addr_of_mut!(tmp_name),
                     );
                     break 'attr_next;
-                } else if xml_str_equal((*attr).name, c"form".as_ptr() as _) {
+                } else if xml_str_equal(cur_attr.name, c"form".as_ptr() as _) {
                     // Evaluate the target namespace
                     has_form = 1;
-                    attr_value = xml_schema_get_node_content(pctxt, attr as *mut XmlNode);
+                    attr_value =
+                        xml_schema_get_node_content(pctxt, cur_attr.as_ptr() as *mut XmlNode);
                     if xml_str_equal(attr_value, c"qualified".as_ptr() as _) {
                         ns = (*pctxt).target_namespace;
                     } else if !xml_str_equal(attr_value, c"unqualified".as_ptr() as _) {
@@ -8184,7 +8165,7 @@ unsafe fn xml_schema_parse_local_attribute(
                             pctxt,
                             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                             null_mut(),
-                            attr as *mut XmlNode,
+                            cur_attr.as_ptr() as *mut XmlNode,
                             null_mut(),
                             c"(qualified | unqualified)".as_ptr() as _,
                             Some(&attr_value),
@@ -8195,8 +8176,9 @@ unsafe fn xml_schema_parse_local_attribute(
                     }
                     break 'attr_next;
                 }
-                if xml_str_equal((*attr).name, c"use".as_ptr() as _) {
-                    attr_value = xml_schema_get_node_content(pctxt, attr as *mut XmlNode);
+                if xml_str_equal(cur_attr.name, c"use".as_ptr() as _) {
+                    attr_value =
+                        xml_schema_get_node_content(pctxt, cur_attr.as_ptr() as *mut XmlNode);
                     // TODO: Maybe we need to normalize the value beforehand.
                     if xml_str_equal(attr_value, c"optional".as_ptr() as _) {
                         occurs = XML_SCHEMAS_ATTR_USE_OPTIONAL;
@@ -8210,7 +8192,7 @@ unsafe fn xml_schema_parse_local_attribute(
                             pctxt,
                             XmlParserErrors::XmlSchemapInvalidAttrUse,
                             null_mut(),
-                            attr as *mut XmlNode,
+                            cur_attr.as_ptr() as *mut XmlNode,
                             null_mut(),
                             c"(optional | prohibited | required)".as_ptr() as _,
                             Some(&attr_value),
@@ -8220,7 +8202,7 @@ unsafe fn xml_schema_parse_local_attribute(
                         );
                     }
                     break 'attr_next;
-                } else if xml_str_equal((*attr).name, c"default".as_ptr() as _) {
+                } else if xml_str_equal(cur_attr.name, c"default".as_ptr() as _) {
                     // 3.2.3 : 1
                     // default and fixed must not both be present.
                     if !def_value.is_null() {
@@ -8228,16 +8210,17 @@ unsafe fn xml_schema_parse_local_attribute(
                             pctxt,
                             XmlParserErrors::XmlSchemapSrcAttribute1,
                             null_mut(),
-                            attr,
+                            cur_attr.as_ptr(),
                             c"default".as_ptr() as _,
                             c"fixed".as_ptr() as _,
                         );
                     } else {
-                        def_value = xml_schema_get_node_content(pctxt, attr as *mut XmlNode);
+                        def_value =
+                            xml_schema_get_node_content(pctxt, cur_attr.as_ptr() as *mut XmlNode);
                         def_value_type = WXS_ATTR_DEF_VAL_DEFAULT;
                     }
                     break 'attr_next;
-                } else if xml_str_equal((*attr).name, c"fixed".as_ptr() as _) {
+                } else if xml_str_equal(cur_attr.name, c"fixed".as_ptr() as _) {
                     // 3.2.3 : 1
                     // default and fixed must not both be present.
                     if !def_value.is_null() {
@@ -8245,12 +8228,13 @@ unsafe fn xml_schema_parse_local_attribute(
                             pctxt,
                             XmlParserErrors::XmlSchemapSrcAttribute1,
                             null_mut(),
-                            attr,
+                            cur_attr.as_ptr(),
                             c"default".as_ptr() as _,
                             c"fixed".as_ptr() as _,
                         );
                     } else {
-                        def_value = xml_schema_get_node_content(pctxt, attr as *mut XmlNode);
+                        def_value =
+                            xml_schema_get_node_content(pctxt, cur_attr.as_ptr() as *mut XmlNode);
                         def_value_type = WXS_ATTR_DEF_VAL_FIXED;
                     }
                     break 'attr_next;
@@ -8261,12 +8245,12 @@ unsafe fn xml_schema_parse_local_attribute(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
 
         // attr_next:
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     // 3.2.3 : 2
     // If default and use are both present, use must have
@@ -8310,8 +8294,7 @@ unsafe fn xml_schema_parse_local_attribute(
                 None,
             );
         }
-        attr = xml_schema_get_prop_node(node, c"name".as_ptr() as _);
-        if attr.is_null() {
+        let Some(attr) = xml_schema_get_prop_node(node, c"name".as_ptr() as _) else {
             xml_schema_pmissing_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -8321,11 +8304,11 @@ unsafe fn xml_schema_parse_local_attribute(
                 None,
             );
             return null_mut();
-        }
+        };
         if xml_schema_pval_attr_node(
             pctxt,
             null_mut(),
-            attr,
+            attr.as_ptr(),
             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
             addr_of_mut!(name),
         ) != 0
@@ -8339,7 +8322,7 @@ unsafe fn xml_schema_parse_local_attribute(
                 pctxt,
                 XmlParserErrors::XmlSchemapNoXmlns,
                 null_mut(),
-                attr as *mut XmlNode,
+                attr.as_ptr() as *mut XmlNode,
                 xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
                 null_mut(),
                 None,
@@ -8584,7 +8567,6 @@ unsafe fn xml_schema_parse_attribute_group_ref(
 ) -> XmlSchemaQnameRefPtr {
     let ret: XmlSchemaQnameRefPtr;
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut ref_ns: *const XmlChar = null();
     let mut refe: *const XmlChar = null();
 
@@ -8592,8 +8574,7 @@ unsafe fn xml_schema_parse_attribute_group_ref(
         return null_mut();
     }
 
-    attr = xml_schema_get_prop_node(node, c"ref".as_ptr() as _);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(node, c"ref".as_ptr() as _) else {
         xml_schema_pmissing_attr_err(
             pctxt,
             XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -8603,42 +8584,42 @@ unsafe fn xml_schema_parse_attribute_group_ref(
             None,
         );
         return null_mut();
-    }
+    };
     xml_schema_pval_attr_node_qname(
         pctxt,
         schema,
         null_mut(),
-        attr,
+        attr.as_ptr(),
         addr_of_mut!(ref_ns),
         addr_of_mut!(refe),
     );
-    if xml_schema_check_reference(pctxt, schema, node, attr, ref_ns) != 0 {
+    if xml_schema_check_reference(pctxt, schema, node, attr.as_ptr(), ref_ns) != 0 {
         return null_mut();
     }
 
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     pctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"ref".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"ref".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     // Attribute ID
     xml_schema_pval_attr_id(pctxt, node, c"id".as_ptr() as _);
@@ -8859,102 +8840,108 @@ unsafe fn xml_schema_parse_wildcard_ns(
         ret = XmlParserErrors::XmlSchemapS4sAttrInvalidValue as i32;
     }
     // Build the namespace constraints.
-    let attr: *mut XmlAttr = xml_schema_get_prop_node(node, c"namespace".as_ptr() as _);
-    let ns: *const XmlChar = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+    let attr = xml_schema_get_prop_node(node, c"namespace".as_ptr() as _);
+    let ns: *const XmlChar = xml_schema_get_node_content(
+        ctxt,
+        attr.map_or(null_mut(), |attr| attr.as_ptr()) as *mut XmlNode,
+    );
     if ns.is_null() {
         return -1;
     }
-    if attr.is_null() || xml_str_equal(ns, c"##any".as_ptr() as _) {
-        (*wildc).any = 1;
-    } else if xml_str_equal(ns, c"##other".as_ptr() as _) {
-        (*wildc).neg_ns_set = xml_schema_new_wildcard_ns_constraint(ctxt);
-        if (*wildc).neg_ns_set.is_null() {
-            return -1;
-        }
-        (*(*wildc).neg_ns_set).value = (*ctxt).target_namespace;
-    } else {
-        let mut end: *const XmlChar;
-        let mut cur: *const XmlChar;
+    if let Some(attr) = attr.filter(|_| !xml_str_equal(ns, c"##any".as_ptr() as _)) {
+        if xml_str_equal(ns, c"##other".as_ptr() as _) {
+            (*wildc).neg_ns_set = xml_schema_new_wildcard_ns_constraint(ctxt);
+            if (*wildc).neg_ns_set.is_null() {
+                return -1;
+            }
+            (*(*wildc).neg_ns_set).value = (*ctxt).target_namespace;
+        } else {
+            let mut end: *const XmlChar;
+            let mut cur: *const XmlChar;
 
-        cur = ns;
-        loop {
-            while xml_is_blank_char(*cur as u32) {
-                cur = cur.add(1);
-            }
-            end = cur;
-            while *end != 0 && !xml_is_blank_char(*end as u32) {
-                end = end.add(1);
-            }
-            if end == cur {
-                break;
-            }
-            ns_item = xml_strndup(cur, end.offset_from(cur) as _);
-            if xml_str_equal(ns_item, c"##other".as_ptr() as _)
-                || xml_str_equal(ns_item, c"##any".as_ptr() as _)
-            {
-                let ns_item = CStr::from_ptr(ns_item as *const i8).to_string_lossy();
-                xml_schema_psimple_type_err(
-                    ctxt,
-                    XmlParserErrors::XmlSchemapWildcardInvalidNsMember,
-                    null_mut(),
-                    attr as *mut XmlNode,
-                    null_mut(),
-                    c"((##any | ##other) | List of (xs:anyURI | (##targetNamespace | ##local)))"
-                        .as_ptr() as _,
-                    Some(&ns_item),
-                    None,
-                    None,
-                    None,
-                );
-                ret = XmlParserErrors::XmlSchemapWildcardInvalidNsMember as i32;
-            } else {
-                if xml_str_equal(ns_item, c"##targetNamespace".as_ptr() as _) {
-                    dictns_item = (*ctxt).target_namespace;
-                } else if xml_str_equal(ns_item, c"##local".as_ptr() as _) {
-                    dictns_item = null_mut();
-                } else {
-                    // Validate the item (anyURI).
-                    xml_schema_pval_attr_node_value(
+            cur = ns;
+            loop {
+                while xml_is_blank_char(*cur as u32) {
+                    cur = cur.add(1);
+                }
+                end = cur;
+                while *end != 0 && !xml_is_blank_char(*end as u32) {
+                    end = end.add(1);
+                }
+                if end == cur {
+                    break;
+                }
+                ns_item = xml_strndup(cur, end.offset_from(cur) as _);
+                if xml_str_equal(ns_item, c"##other".as_ptr() as _)
+                    || xml_str_equal(ns_item, c"##any".as_ptr() as _)
+                {
+                    let ns_item = CStr::from_ptr(ns_item as *const i8).to_string_lossy();
+                    xml_schema_psimple_type_err(
                         ctxt,
+                        XmlParserErrors::XmlSchemapWildcardInvalidNsMember,
                         null_mut(),
-                        attr,
-                        ns_item,
-                        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
+                        attr.as_ptr() as *mut XmlNode,
+                        null_mut(),
+                        c"((##any | ##other) | List of (xs:anyURI | (##targetNamespace | ##local)))"
+                            .as_ptr() as _,
+                        Some(&ns_item),
+                        None,
+                        None,
+                        None,
                     );
-                    dictns_item = xml_dict_lookup((*ctxt).dict, ns_item, -1);
-                }
-                // Avoid duplicate namespaces.
-                tmp = (*wildc).ns_set;
-                while !tmp.is_null() {
-                    if dictns_item == (*tmp).value {
-                        break;
+                    ret = XmlParserErrors::XmlSchemapWildcardInvalidNsMember as i32;
+                } else {
+                    if xml_str_equal(ns_item, c"##targetNamespace".as_ptr() as _) {
+                        dictns_item = (*ctxt).target_namespace;
+                    } else if xml_str_equal(ns_item, c"##local".as_ptr() as _) {
+                        dictns_item = null_mut();
+                    } else {
+                        // Validate the item (anyURI).
+                        xml_schema_pval_attr_node_value(
+                            ctxt,
+                            null_mut(),
+                            attr.as_ptr(),
+                            ns_item,
+                            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
+                        );
+                        dictns_item = xml_dict_lookup((*ctxt).dict, ns_item, -1);
                     }
-                    tmp = (*tmp).next;
-                }
-                if tmp.is_null() {
-                    tmp = xml_schema_new_wildcard_ns_constraint(ctxt);
+                    // Avoid duplicate namespaces.
+                    tmp = (*wildc).ns_set;
+                    while !tmp.is_null() {
+                        if dictns_item == (*tmp).value {
+                            break;
+                        }
+                        tmp = (*tmp).next;
+                    }
                     if tmp.is_null() {
-                        xml_free(ns_item as _);
-                        return -1;
+                        tmp = xml_schema_new_wildcard_ns_constraint(ctxt);
+                        if tmp.is_null() {
+                            xml_free(ns_item as _);
+                            return -1;
+                        }
+                        (*tmp).value = dictns_item;
+                        (*tmp).next = null_mut();
+                        if (*wildc).ns_set.is_null() {
+                            (*wildc).ns_set = tmp;
+                        } else if !last_ns.is_null() {
+                            (*last_ns).next = tmp;
+                        }
+                        last_ns = tmp;
                     }
-                    (*tmp).value = dictns_item;
-                    (*tmp).next = null_mut();
-                    if (*wildc).ns_set.is_null() {
-                        (*wildc).ns_set = tmp;
-                    } else if !last_ns.is_null() {
-                        (*last_ns).next = tmp;
-                    }
-                    last_ns = tmp;
                 }
-            }
-            xml_free(ns_item as _);
-            cur = end;
+                xml_free(ns_item as _);
+                cur = end;
 
-            if *cur == 0 {
-                break;
+                if *cur == 0 {
+                    break;
+                }
             }
         }
+    } else {
+        (*wildc).any = 1;
     }
+
     ret
 }
 
@@ -8969,7 +8956,6 @@ unsafe fn xml_schema_parse_any_attribute(
     node: *mut XmlNode,
 ) -> XmlSchemaWildcardPtr {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
@@ -8985,29 +8971,29 @@ unsafe fn xml_schema_parse_any_attribute(
         return null_mut();
     }
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"namespace".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"processContents".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"namespace".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"processContents".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // Parse the namespace list.
@@ -9048,7 +9034,6 @@ unsafe fn xml_schema_parse_extension(
     parent_type: XmlSchemaTypeType,
 ) -> XmlSchemaTypePtr {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
@@ -9058,28 +9043,28 @@ unsafe fn xml_schema_parse_extension(
     (*typ).flags |= XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION;
 
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"base".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"base".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
 
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
@@ -9206,7 +9191,6 @@ unsafe fn xml_schema_parse_simple_content(
     has_restriction_or_extension: *mut i32,
 ) -> i32 {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
 
     if ctxt.is_null()
         || schema.is_null()
@@ -9220,26 +9204,26 @@ unsafe fn xml_schema_parse_simple_content(
     let typ: XmlSchemaTypePtr = (*ctxt).ctxt_type;
     (*typ).content_type = XmlSchemaContentType::XmlSchemaContentSimple;
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _) {
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
 
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
@@ -9321,7 +9305,6 @@ unsafe fn xml_schema_parse_complex_content(
     has_restriction_or_extension: *mut i32,
 ) -> i32 {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
 
     if ctxt.is_null()
         || schema.is_null()
@@ -9334,28 +9317,28 @@ unsafe fn xml_schema_parse_complex_content(
     // Not a component, don't create it.
     let typ: XmlSchemaTypePtr = (*ctxt).ctxt_type;
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"mixed".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"mixed".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
 
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
@@ -9444,7 +9427,6 @@ unsafe fn xml_schema_parse_complex_type(
     let typ: XmlSchemaTypePtr;
     let mut child: *mut XmlNode;
     let mut name: *const XmlChar = null();
-    let mut attr: *mut XmlAttr;
     let mut attr_value: *const XmlChar;
     // #ifdef ENABLE_NAMED_LOCALS
     //     let buf: [c_char; 40];
@@ -9460,8 +9442,7 @@ unsafe fn xml_schema_parse_complex_type(
     let ctxt_type: XmlSchemaTypePtr = (*ctxt).ctxt_type;
 
     if top_level != 0 {
-        attr = xml_schema_get_prop_node(node, c"name".as_ptr() as _);
-        if attr.is_null() {
+        let Some(attr) = xml_schema_get_prop_node(node, c"name".as_ptr() as _) else {
             xml_schema_pmissing_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -9471,10 +9452,11 @@ unsafe fn xml_schema_parse_complex_type(
                 None,
             );
             return null_mut();
-        } else if xml_schema_pval_attr_node(
+        };
+        if xml_schema_pval_attr_node(
             ctxt,
             null_mut(),
-            attr,
+            attr.as_ptr(),
             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
             addr_of_mut!(name),
         ) != 0
@@ -9526,37 +9508,44 @@ unsafe fn xml_schema_parse_complex_type(
     }
     (*typ).target_namespace = (*ctxt).target_namespace;
     // Handle attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if xml_str_equal((*attr).name, c"id".as_ptr() as _) {
+        } else if xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
             // Attribute "id".
             xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
-        } else if xml_str_equal((*attr).name, c"mixed".as_ptr() as _) {
+        } else if xml_str_equal(cur_attr.name, c"mixed".as_ptr() as _) {
             // Attribute "mixed".
-            if xml_schema_pget_bool_node_value(ctxt, null_mut(), attr as *mut XmlNode) != 0 {
+            if xml_schema_pget_bool_node_value(ctxt, null_mut(), cur_attr.as_ptr() as *mut XmlNode)
+                != 0
+            {
                 (*typ).flags |= XML_SCHEMAS_TYPE_MIXED;
             }
         } else if top_level != 0 {
             // Attributes of global complex type definitions.
-            if xml_str_equal((*attr).name, c"name".as_ptr() as _) {
+            if xml_str_equal(cur_attr.name, c"name".as_ptr() as _) {
                 // Pass.
-            } else if xml_str_equal((*attr).name, c"abstract".as_ptr() as _) {
+            } else if xml_str_equal(cur_attr.name, c"abstract".as_ptr() as _) {
                 // Attribute "abstract".
-                if xml_schema_pget_bool_node_value(ctxt, null_mut(), attr as *mut XmlNode) != 0 {
+                if xml_schema_pget_bool_node_value(
+                    ctxt,
+                    null_mut(),
+                    cur_attr.as_ptr() as *mut XmlNode,
+                ) != 0
+                {
                     (*typ).flags |= XML_SCHEMAS_TYPE_ABSTRACT;
                 }
-            } else if xml_str_equal((*attr).name, c"final".as_ptr() as _) {
+            } else if xml_str_equal(cur_attr.name, c"final".as_ptr() as _) {
                 // Attribute "final".
-                attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+                attr_value = xml_schema_get_node_content(ctxt, cur_attr.as_ptr() as *mut XmlNode);
                 if xml_schema_pval_attr_block_final(
                     attr_value,
                     addr_of_mut!((*typ).flags),
@@ -9573,7 +9562,7 @@ unsafe fn xml_schema_parse_complex_type(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr as *mut XmlNode,
+                        cur_attr.as_ptr() as *mut XmlNode,
                         null_mut(),
                         c"(#all | List of (extension | restriction))".as_ptr() as _,
                         Some(&attr_value),
@@ -9584,9 +9573,9 @@ unsafe fn xml_schema_parse_complex_type(
                 } else {
                     is_final = 1;
                 }
-            } else if xml_str_equal((*attr).name, c"block".as_ptr() as _) {
+            } else if xml_str_equal(cur_attr.name, c"block".as_ptr() as _) {
                 // Attribute "block".
-                attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+                attr_value = xml_schema_get_node_content(ctxt, cur_attr.as_ptr() as *mut XmlNode);
                 if xml_schema_pval_attr_block_final(
                     attr_value,
                     addr_of_mut!((*typ).flags),
@@ -9603,7 +9592,7 @@ unsafe fn xml_schema_parse_complex_type(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr as *mut XmlNode,
+                        cur_attr.as_ptr() as *mut XmlNode,
                         null_mut(),
                         c"(#all | List of (extension | restriction)) ".as_ptr() as _,
                         Some(&attr_value),
@@ -9619,7 +9608,7 @@ unsafe fn xml_schema_parse_complex_type(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
         } else {
@@ -9627,11 +9616,11 @@ unsafe fn xml_schema_parse_complex_type(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
 
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     if block == 0 {
         // Apply default "block" values.
@@ -9803,7 +9792,7 @@ unsafe fn xml_get_boolean_prop(
             ctxt,
             XmlParserErrors::XmlSchemapInvalidBoolean,
             null_mut(),
-            xml_schema_get_prop_node(node, name) as _,
+            xml_schema_get_prop_node(node, name).map_or(null_mut(), |attr| attr.as_ptr()) as _,
             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasBoolean) as _,
             null_mut(),
             Some(&val),
@@ -9954,31 +9943,30 @@ unsafe fn xml_schema_parse_idcselector_and_field(
     is_field: i32,
 ) -> XmlSchemaIdcselectPtr {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
 
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"xpath".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"xpath".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     // Create the item.
     let item: XmlSchemaIdcselectPtr =
@@ -9993,8 +9981,21 @@ unsafe fn xml_schema_parse_idcselector_and_field(
     }
     memset(item as _, 0, size_of::<XmlSchemaIdcselect>());
     // Attribute "xpath" (mandatory).
-    attr = xml_schema_get_prop_node(node, c"xpath".as_ptr() as _);
-    if attr.is_null() {
+    if let Some(attr) = xml_schema_get_prop_node(node, c"xpath".as_ptr() as _) {
+        (*item).xpath = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
+        // URGENT TODO: "field"s have an other syntax than "selector"s.
+
+        if xml_schema_check_cselector_xpath(ctxt, idc, item, attr.as_ptr(), is_field) == -1 {
+            xml_schema_perr(
+                ctxt,
+                attr.as_ptr() as *mut XmlNode,
+                XmlParserErrors::XmlSchemapInternal,
+                "Internal error: xmlSchemaParseIDCSelectorAndField, validating the XPath expression of a IDC selector.\n",
+                None,
+                None
+            );
+        }
+    } else {
         xml_schema_pmissing_attr_err(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -10003,20 +10004,6 @@ unsafe fn xml_schema_parse_idcselector_and_field(
             Some("name"),
             None,
         );
-    } else {
-        (*item).xpath = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
-        // URGENT TODO: "field"s have an other syntax than "selector"s.
-
-        if xml_schema_check_cselector_xpath(ctxt, idc, item, attr, is_field) == -1 {
-            xml_schema_perr(
-                ctxt,
-                attr as *mut XmlNode,
-                XmlParserErrors::XmlSchemapInternal,
-                "Internal error: xmlSchemaParseIDCSelectorAndField, validating the XPath expression of a IDC selector.\n",
-                None,
-                None
-            );
-        }
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // And now for the children...
@@ -10056,40 +10043,38 @@ unsafe fn xml_schema_parse_idc(
     target_namespace: *const XmlChar,
 ) -> XmlSchemaIDCPtr {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut name: *const XmlChar = null();
     let mut field: XmlSchemaIdcselectPtr;
     let mut last_field: XmlSchemaIdcselectPtr = null_mut();
 
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"name".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
             && (idc_category != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
-                || !xml_str_equal((*attr).name, c"refer".as_ptr() as _))
+                || !xml_str_equal(cur_attr.name, c"refer".as_ptr() as _))
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     // Attribute "name" (mandatory).
-    attr = xml_schema_get_prop_node(node, c"name".as_ptr() as _);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(node, c"name".as_ptr() as _) else {
         xml_schema_pmissing_attr_err(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -10099,10 +10084,11 @@ unsafe fn xml_schema_parse_idc(
             None,
         );
         return null_mut();
-    } else if xml_schema_pval_attr_node(
+    };
+    if xml_schema_pval_attr_node(
         ctxt,
         null_mut(),
-        attr,
+        attr.as_ptr(),
         xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
         addr_of_mut!(name),
     ) != 0
@@ -10119,17 +10105,7 @@ unsafe fn xml_schema_parse_idc(
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     if idc_category == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
         // Attribute "refer" (mandatory).
-        attr = xml_schema_get_prop_node(node, c"refer".as_ptr() as _);
-        if attr.is_null() {
-            xml_schema_pmissing_attr_err(
-                ctxt,
-                XmlParserErrors::XmlSchemapS4sAttrMissing,
-                null_mut(),
-                node,
-                Some("refer"),
-                None,
-            );
-        } else {
+        if let Some(attr) = xml_schema_get_prop_node(node, c"refer".as_ptr() as _) {
             // Create a reference item.
             (*item).refe = xml_schema_new_qname_ref(
                 ctxt,
@@ -10144,11 +10120,26 @@ unsafe fn xml_schema_parse_idc(
                 ctxt,
                 schema,
                 null_mut(),
-                attr,
+                attr.as_ptr(),
                 addr_of_mut!((*(*item).refe).target_namespace),
                 addr_of_mut!((*(*item).refe).name),
             );
-            xml_schema_check_reference(ctxt, schema, node, attr, (*(*item).refe).target_namespace);
+            xml_schema_check_reference(
+                ctxt,
+                schema,
+                node,
+                attr.as_ptr(),
+                (*(*item).refe).target_namespace,
+            );
+        } else {
+            xml_schema_pmissing_attr_err(
+                ctxt,
+                XmlParserErrors::XmlSchemapS4sAttrMissing,
+                null_mut(),
+                node,
+                Some("refer"),
+                None,
+            );
         }
     }
     // And now for the children...
@@ -10234,7 +10225,6 @@ unsafe fn xml_schema_parse_element(
     let mut particle: XmlSchemaParticlePtr = null_mut();
     let mut annot: XmlSchemaAnnotPtr = null_mut();
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let min: i32;
     let max: i32;
     let mut is_ref: i32 = 0;
@@ -10253,10 +10243,10 @@ unsafe fn xml_schema_parse_element(
     // If we get a "ref" attribute on a local <element> we will assume it's
     // a reference - even if there's a "name" attribute; this seems to be more
     // robust.
-    let name_attr: *mut XmlAttr = xml_schema_get_prop_node(node, c"name".as_ptr() as _);
-    attr = xml_schema_get_prop_node(node, c"ref".as_ptr() as _);
-    if top_level != 0 || attr.is_null() {
-        if name_attr.is_null() {
+    let name_attr = xml_schema_get_prop_node(node, c"name".as_ptr() as _);
+    let attr = xml_schema_get_prop_node(node, c"ref".as_ptr() as _);
+    if top_level != 0 || attr.is_none() {
+        if name_attr.is_none() {
             xml_schema_pmissing_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -10314,48 +10304,55 @@ unsafe fn xml_schema_parse_element(
                     ctxt,
                     schema,
                     null_mut(),
-                    attr,
+                    attr.unwrap().as_ptr(),
                     addr_of_mut!(ref_ns),
                     addr_of_mut!(refe),
                 );
-                xml_schema_check_reference(ctxt, schema, node, attr, ref_ns);
+                xml_schema_check_reference(ctxt, schema, node, attr.unwrap().as_ptr(), ref_ns);
                 // SPEC (3.3.3 : 2.1) "One of ref or name must be present, but not both"
-                if !name_attr.is_null() {
+                if let Some(name_attr) = name_attr {
                     xml_schema_pmutual_excl_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapSrcElement2_1,
                         null_mut(),
-                        name_attr,
+                        name_attr.as_ptr(),
                         c"ref".as_ptr() as _,
                         c"name".as_ptr() as _,
                     );
                 }
                 // Check for illegal attributes.
-                attr = (*node).properties;
-                while !attr.is_null() {
-                    if let Some(ns) = (*attr).ns {
+                let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+                while let Some(cur_attr) = attr {
+                    if let Some(ns) = cur_attr.ns {
                         if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                             xml_schema_pillegal_attr_err(
                                 ctxt,
                                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                                 null_mut(),
-                                attr,
+                                cur_attr.as_ptr(),
                             );
                         }
-                    } else if xml_str_equal((*attr).name, c"ref".as_ptr() as _)
-                        || xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                        || xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                        || xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
-                        || xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
+                    } else if xml_str_equal(cur_attr.name, c"ref".as_ptr() as _)
+                        || xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+                        || xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+                        || xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
+                        || xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
                     {
-                        attr = (*attr).next;
+                        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
                         continue;
                     } else {
                         // SPEC (3.3.3 : 2.2)
-                        xml_schema_pcustom_attr_err(ctxt, XmlParserErrors::XmlSchemapSrcElement2_2, null_mut(), null_mut(), attr, c"Only the attributes 'minOccurs', 'maxOccurs' and 'id' are allowed in addition to 'ref'".as_ptr() as _);
+                        xml_schema_pcustom_attr_err(
+                            ctxt,
+                            XmlParserErrors::XmlSchemapSrcElement2_2,
+                            null_mut(),
+                            null_mut(),
+                            cur_attr.as_ptr(),
+                            c"Only the attributes 'minOccurs', 'maxOccurs' and 'id' are allowed in addition to 'ref'".as_ptr() as _
+                        );
                         break;
                     }
-                    attr = (*attr).next;
+                    attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
                 }
                 // No children except <annotation> expected.
                 if !child.is_null() {
@@ -10402,7 +10399,7 @@ unsafe fn xml_schema_parse_element(
         if xml_schema_pval_attr_node(
             ctxt,
             null_mut(),
-            name_attr,
+            name_attr.map_or(null_mut(), |attr| attr.as_ptr()),
             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
             addr_of_mut!(name),
         ) != 0
@@ -10412,30 +10409,27 @@ unsafe fn xml_schema_parse_element(
         // Evaluate the target namespace.
         if top_level != 0 {
             ns = (*ctxt).target_namespace;
-        } else {
-            attr = xml_schema_get_prop_node(node, c"form".as_ptr() as _);
-            if !attr.is_null() {
-                attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
-                if xml_str_equal(attr_value, c"qualified".as_ptr() as _) {
-                    ns = (*ctxt).target_namespace;
-                } else if !xml_str_equal(attr_value, c"unqualified".as_ptr() as _) {
-                    let attr_value = CStr::from_ptr(attr_value as *const i8).to_string_lossy();
-                    xml_schema_psimple_type_err(
-                        ctxt,
-                        XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
-                        null_mut(),
-                        attr as *mut XmlNode,
-                        null_mut(),
-                        c"(qualified | unqualified)".as_ptr() as _,
-                        Some(&attr_value),
-                        None,
-                        None,
-                        None,
-                    );
-                }
-            } else if (*schema).flags & XML_SCHEMAS_QUALIF_ELEM != 0 {
+        } else if let Some(attr) = xml_schema_get_prop_node(node, c"form".as_ptr() as _) {
+            attr_value = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
+            if xml_str_equal(attr_value, c"qualified".as_ptr() as _) {
                 ns = (*ctxt).target_namespace;
+            } else if !xml_str_equal(attr_value, c"unqualified".as_ptr() as _) {
+                let attr_value = CStr::from_ptr(attr_value as *const i8).to_string_lossy();
+                xml_schema_psimple_type_err(
+                    ctxt,
+                    XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
+                    null_mut(),
+                    attr.as_ptr() as *mut XmlNode,
+                    null_mut(),
+                    c"(qualified | unqualified)".as_ptr() as _,
+                    Some(&attr_value),
+                    None,
+                    None,
+                    None,
+                );
             }
+        } else if (*schema).flags & XML_SCHEMAS_QUALIF_ELEM != 0 {
+            ns = (*ctxt).target_namespace;
         }
         decl = xml_schema_add_element(ctxt, name, ns, node, top_level);
         if decl.is_null() {
@@ -10443,50 +10437,50 @@ unsafe fn xml_schema_parse_element(
         }
 
         // Check for illegal attributes.
-        attr = (*node).properties;
-        while !attr.is_null() {
-            if let Some(ns) = (*attr).ns {
+        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        while let Some(cur_attr) = attr {
+            if let Some(ns) = cur_attr.ns {
                 if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                         null_mut(),
-                        attr,
+                        cur_attr.as_ptr(),
                     );
                 }
-            } else if !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"type".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"default".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"fixed".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"block".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"nillable".as_ptr() as _)
+            } else if !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+                && !xml_str_equal(cur_attr.name, c"type".as_ptr() as _)
+                && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+                && !xml_str_equal(cur_attr.name, c"default".as_ptr() as _)
+                && !xml_str_equal(cur_attr.name, c"fixed".as_ptr() as _)
+                && !xml_str_equal(cur_attr.name, c"block".as_ptr() as _)
+                && !xml_str_equal(cur_attr.name, c"nillable".as_ptr() as _)
             {
                 if top_level == 0 {
-                    if !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
-                        && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
-                        && !xml_str_equal((*attr).name, c"form".as_ptr() as _)
+                    if !xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
+                        && !xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
+                        && !xml_str_equal(cur_attr.name, c"form".as_ptr() as _)
                     {
                         xml_schema_pillegal_attr_err(
                             ctxt,
                             XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                             null_mut(),
-                            attr,
+                            cur_attr.as_ptr(),
                         );
                     }
-                } else if !xml_str_equal((*attr).name, c"final".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"abstract".as_ptr() as _)
-                    && !xml_str_equal((*attr).name, c"substitutionGroup".as_ptr() as _)
+                } else if !xml_str_equal(cur_attr.name, c"final".as_ptr() as _)
+                    && !xml_str_equal(cur_attr.name, c"abstract".as_ptr() as _)
+                    && !xml_str_equal(cur_attr.name, c"substitutionGroup".as_ptr() as _)
                 {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                         null_mut(),
-                        attr,
+                        cur_attr.as_ptr(),
                     );
                 }
             }
-            attr = (*attr).next;
+            attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
         }
         // Extract/validate attributes.
         if top_level != 0 {
@@ -10506,16 +10500,8 @@ unsafe fn xml_schema_parse_element(
                 (*decl).flags |= XML_SCHEMAS_ELEM_ABSTRACT;
             }
             // Attribute "final".
-            attr = xml_schema_get_prop_node(node, c"final".as_ptr() as _);
-            if attr.is_null() {
-                if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_EXTENSION != 0 {
-                    (*decl).flags |= XML_SCHEMAS_ELEM_FINAL_EXTENSION;
-                }
-                if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION != 0 {
-                    (*decl).flags |= XML_SCHEMAS_ELEM_FINAL_RESTRICTION;
-                }
-            } else {
-                attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+            if let Some(attr) = xml_schema_get_prop_node(node, c"final".as_ptr() as _) {
+                attr_value = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
                 if xml_schema_pval_attr_block_final(
                     attr_value,
                     addr_of_mut!((*decl).flags),
@@ -10532,7 +10518,7 @@ unsafe fn xml_schema_parse_element(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                         null_mut(),
-                        attr as *mut XmlNode,
+                        attr.as_ptr() as *mut XmlNode,
                         null_mut(),
                         c"(#all | List of (extension | restriction))".as_ptr() as _,
                         Some(&attr_value),
@@ -10541,23 +10527,18 @@ unsafe fn xml_schema_parse_element(
                         None,
                     );
                 }
+            } else {
+                if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_EXTENSION != 0 {
+                    (*decl).flags |= XML_SCHEMAS_ELEM_FINAL_EXTENSION;
+                }
+                if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION != 0 {
+                    (*decl).flags |= XML_SCHEMAS_ELEM_FINAL_RESTRICTION;
+                }
             }
         }
         // Attribute "block".
-        attr = xml_schema_get_prop_node(node, c"block".as_ptr() as _);
-        if attr.is_null() {
-            // Apply default "block" values.
-            if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION != 0 {
-                (*decl).flags |= XML_SCHEMAS_ELEM_BLOCK_RESTRICTION;
-            }
-            if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION != 0 {
-                (*decl).flags |= XML_SCHEMAS_ELEM_BLOCK_EXTENSION;
-            }
-            if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION != 0 {
-                (*decl).flags |= XML_SCHEMAS_ELEM_BLOCK_SUBSTITUTION;
-            }
-        } else {
-            attr_value = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+        if let Some(attr) = xml_schema_get_prop_node(node, c"block".as_ptr() as _) {
+            attr_value = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
             if xml_schema_pval_attr_block_final(
                 attr_value,
                 addr_of_mut!((*decl).flags),
@@ -10574,7 +10555,7 @@ unsafe fn xml_schema_parse_element(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                     null_mut(),
-                    attr as *mut XmlNode,
+                    attr.as_ptr() as *mut XmlNode,
                     null_mut(),
                     c"(#all | List of (extension | restriction | substitution))".as_ptr() as _,
                     Some(&attr_value),
@@ -10583,27 +10564,36 @@ unsafe fn xml_schema_parse_element(
                     None,
                 );
             }
+        } else {
+            // Apply default "block" values.
+            if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION != 0 {
+                (*decl).flags |= XML_SCHEMAS_ELEM_BLOCK_RESTRICTION;
+            }
+            if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION != 0 {
+                (*decl).flags |= XML_SCHEMAS_ELEM_BLOCK_EXTENSION;
+            }
+            if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION != 0 {
+                (*decl).flags |= XML_SCHEMAS_ELEM_BLOCK_SUBSTITUTION;
+            }
         }
         if xml_get_boolean_prop(ctxt, node, c"nillable".as_ptr() as _, 0) != 0 {
             (*decl).flags |= XML_SCHEMAS_ELEM_NILLABLE;
         }
 
-        attr = xml_schema_get_prop_node(node, c"type".as_ptr() as _);
-        if !attr.is_null() {
+        if let Some(attr) = xml_schema_get_prop_node(node, c"type".as_ptr() as _) {
             xml_schema_pval_attr_node_qname(
                 ctxt,
                 schema,
                 null_mut(),
-                attr,
+                attr.as_ptr(),
                 addr_of_mut!((*decl).named_type_ns),
                 addr_of_mut!((*decl).named_type),
             );
-            xml_schema_check_reference(ctxt, schema, node, attr, (*decl).named_type_ns);
+            xml_schema_check_reference(ctxt, schema, node, attr.as_ptr(), (*decl).named_type_ns);
         }
         (*decl).value = xml_schema_get_prop(ctxt, node, c"default".as_ptr() as _);
-        attr = xml_schema_get_prop_node(node, c"fixed".as_ptr() as _);
-        if !attr.is_null() {
-            fixed = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+        if let Some(attr) = xml_schema_get_prop_node(node, c"fixed".as_ptr() as _) {
+            fixed = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
             if !(*decl).value.is_null() {
                 // 3.3.3 : 1
                 // default and fixed must not both be present.
@@ -10611,7 +10601,7 @@ unsafe fn xml_schema_parse_element(
                     ctxt,
                     XmlParserErrors::XmlSchemapSrcElement1,
                     null_mut(),
-                    attr,
+                    attr.as_ptr(),
                     c"default".as_ptr() as _,
                     c"fixed".as_ptr() as _,
                 );
@@ -10755,39 +10745,37 @@ unsafe fn xml_schema_parse_any(
     node: *mut XmlNode,
 ) -> XmlSchemaParticlePtr {
     let mut child: *mut XmlNode;
-
-    let mut attr: *mut XmlAttr;
     let mut annot: XmlSchemaAnnotPtr = null_mut();
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
     }
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"namespace".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"processContents".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"namespace".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"processContents".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // minOccurs/maxOccurs.
@@ -10867,7 +10855,6 @@ unsafe fn xml_schema_parse_model_group(
 ) -> XmlSchemaTreeItemPtr {
     let mut particle: XmlSchemaParticlePtr = null_mut();
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut min: i32 = 1;
     let mut max: i32 = 1;
     let mut is_elem_ref: i32 = 0;
@@ -10906,52 +10893,52 @@ unsafe fn xml_schema_parse_model_group(
         }
         (*particle).children = item as XmlSchemaTreeItemPtr;
         // Check for illegal attributes.
-        attr = (*node).properties;
-        while !attr.is_null() {
-            if let Some(ns) = (*attr).ns {
+        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        while let Some(cur_attr) = attr {
+            if let Some(ns) = cur_attr.ns {
                 if xml_str_equal(ns.href as _, XML_SCHEMA_NS.as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                         null_mut(),
-                        attr,
+                        cur_attr.as_ptr(),
                     );
                 }
-            } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"maxOccurs".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"minOccurs".as_ptr() as _)
+            } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+                && !xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
+                && !xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
             {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-            attr = (*attr).next;
+            attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
         }
     } else {
         // Check for illegal attributes.
-        attr = (*node).properties;
-        while !attr.is_null() {
-            if let Some(ns) = (*attr).ns {
+        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        while let Some(cur_attr) = attr {
+            if let Some(ns) = cur_attr.ns {
                 if xml_str_equal(ns.href as _, XML_SCHEMA_NS.as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                         null_mut(),
-                        attr,
+                        cur_attr.as_ptr(),
                     );
                 }
-            } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _) {
+            } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-            attr = (*attr).next;
+            attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
         }
     }
 
@@ -11284,7 +11271,6 @@ unsafe fn xml_schema_parse_restriction(
     parent_type: XmlSchemaTypeType,
 ) -> XmlSchemaTypePtr {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
@@ -11294,28 +11280,28 @@ unsafe fn xml_schema_parse_restriction(
     (*typ).flags |= XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION;
 
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"base".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"base".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     // Extract and validate attributes.
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
@@ -11608,7 +11594,6 @@ unsafe fn xml_schema_parse_list(
     node: *mut XmlNode,
 ) -> XmlSchemaTypePtr {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
@@ -11621,28 +11606,28 @@ unsafe fn xml_schema_parse_list(
     // then the `simple ur-type definition`."
     (*typ).base_type = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnysimpletype);
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"itemType".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"itemType".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
 
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
@@ -11710,7 +11695,7 @@ unsafe fn xml_schema_parse_list(
     }
     if (*typ).base.is_null()
         && (*typ).subtypes.is_null()
-        && xml_schema_get_prop_node(node, c"itemType".as_ptr() as _).is_null()
+        && xml_schema_get_prop_node(node, c"itemType".as_ptr() as _).is_none()
     {
         xml_schema_pcustom_err(
             ctxt,
@@ -11736,7 +11721,6 @@ unsafe fn xml_schema_parse_union(
     node: *mut XmlNode,
 ) -> i32 {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut cur: *const XmlChar;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
@@ -11750,34 +11734,34 @@ unsafe fn xml_schema_parse_union(
     // then the `simple ur-type definition`."
     (*typ).base_type = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnysimpletype);
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"memberTypes".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"memberTypes".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // Attribute "memberTypes". This is a list of QNames.
     // TODO: Check the value to contain anything.
-    attr = xml_schema_get_prop_node(node, c"memberTypes".as_ptr() as _);
-    if !attr.is_null() {
+    let attr = xml_schema_get_prop_node(node, c"memberTypes".as_ptr() as _);
+    if let Some(attr) = attr {
         let mut end: *const XmlChar;
         let mut tmp: *mut XmlChar;
         let mut local_name: *const XmlChar = null();
@@ -11786,7 +11770,7 @@ unsafe fn xml_schema_parse_union(
         let mut last_link: XmlSchemaTypeLinkPtr = null_mut();
         let mut refe: XmlSchemaQnameRefPtr;
 
-        cur = xml_schema_get_node_content(ctxt, attr as *mut XmlNode);
+        cur = xml_schema_get_node_content(ctxt, attr.as_ptr() as *mut XmlNode);
         if cur.is_null() {
             return -1;
         }
@@ -11815,7 +11799,7 @@ unsafe fn xml_schema_parse_union(
                 ctxt,
                 schema,
                 null_mut(),
-                attr,
+                attr.as_ptr(),
                 tmp,
                 addr_of_mut!(ns_name) as _,
                 addr_of_mut!(local_name),
@@ -11904,7 +11888,7 @@ unsafe fn xml_schema_parse_union(
             c"(annotation?, simpleType*)".as_ptr() as _,
         );
     }
-    if attr.is_null() && (*typ).subtypes.is_null() {
+    if attr.is_none() && (*typ).subtypes.is_null() {
         // src-union-memberTypes-or-simpleTypes
         // Either the memberTypes [attribute] of the <union> element must
         // be non-empty or there must be at least one simpleType [child].
@@ -11935,7 +11919,6 @@ unsafe fn xml_schema_parse_simple_type(
     let typ: XmlSchemaTypePtr;
     let mut child: *mut XmlNode;
     let mut attr_value: *const XmlChar = null();
-    let mut attr: *mut XmlAttr;
     let mut has_restriction: i32 = 0;
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
@@ -11943,8 +11926,7 @@ unsafe fn xml_schema_parse_simple_type(
     }
 
     if top_level != 0 {
-        attr = xml_schema_get_prop_node(node, c"name".as_ptr() as _);
-        if attr.is_null() {
+        let Some(attr) = xml_schema_get_prop_node(node, c"name".as_ptr() as _) else {
             xml_schema_pmissing_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -11954,42 +11936,41 @@ unsafe fn xml_schema_parse_simple_type(
                 None,
             );
             return null_mut();
-        } else {
-            if xml_schema_pval_attr_node(
-                ctxt,
-                null_mut(),
-                attr,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
-                addr_of_mut!(attr_value),
-            ) != 0
-            {
+        };
+        if xml_schema_pval_attr_node(
+            ctxt,
+            null_mut(),
+            attr.as_ptr(),
+            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+            addr_of_mut!(attr_value),
+        ) != 0
+        {
+            return null_mut();
+        }
+        // Skip built-in types.
+        if (*ctxt).is_s4_s != 0 {
+            if (*ctxt).is_redefine != 0 {
+                // REDEFINE: Disallow redefinition of built-in-types.
+                // TODO: It seems that the spec does not say anything
+                // about this case.
+                xml_schema_pcustom_err(
+                    ctxt,
+                    XmlParserErrors::XmlSchemapSrcRedefine,
+                    null_mut(),
+                    node,
+                    "Redefinition of built-in simple types is not supported",
+                    None,
+                );
                 return null_mut();
             }
-            // Skip built-in types.
-            if (*ctxt).is_s4_s != 0 {
-                if (*ctxt).is_redefine != 0 {
-                    // REDEFINE: Disallow redefinition of built-in-types.
-                    // TODO: It seems that the spec does not say anything
-                    // about this case.
-                    xml_schema_pcustom_err(
-                        ctxt,
-                        XmlParserErrors::XmlSchemapSrcRedefine,
-                        null_mut(),
-                        node,
-                        "Redefinition of built-in simple types is not supported",
-                        None,
-                    );
-                    return null_mut();
-                }
-                let bi_type: XmlSchemaTypePtr = xml_schema_get_predefined_type(
-                    CStr::from_ptr(attr_value as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                    XML_SCHEMA_NS.to_str().unwrap(),
-                );
-                if !bi_type.is_null() {
-                    return bi_type;
-                }
+            let bi_type: XmlSchemaTypePtr = xml_schema_get_predefined_type(
+                CStr::from_ptr(attr_value as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                XML_SCHEMA_NS.to_str().unwrap(),
+            );
+            if !bi_type.is_null() {
+                return bi_type;
             }
         }
     }
@@ -12022,26 +12003,26 @@ unsafe fn xml_schema_parse_simple_type(
         (*typ).typ = XmlSchemaTypeType::XmlSchemaTypeSimple;
         (*typ).content_type = XmlSchemaContentType::XmlSchemaContentSimple;
         // Check for illegal attributes.
-        attr = (*node).properties;
-        while !attr.is_null() {
-            if let Some(ns) = (*attr).ns {
+        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        while let Some(cur_attr) = attr {
+            if let Some(ns) = cur_attr.ns {
                 if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                         null_mut(),
-                        attr,
+                        cur_attr.as_ptr(),
                     );
                 }
-            } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _) {
+            } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-            attr = (*attr).next;
+            attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
         }
     } else {
         // Parse as global simple type definition.
@@ -12063,43 +12044,32 @@ unsafe fn xml_schema_parse_simple_type(
         (*typ).content_type = XmlSchemaContentType::XmlSchemaContentSimple;
         (*typ).flags |= XML_SCHEMAS_TYPE_GLOBAL;
         // Check for illegal attributes.
-        attr = (*node).properties;
-        while !attr.is_null() {
-            if let Some(ns) = (*attr).ns {
+        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        while let Some(cur_attr) = attr {
+            if let Some(ns) = cur_attr.ns {
                 if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                     xml_schema_pillegal_attr_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                         null_mut(),
-                        attr,
+                        cur_attr.as_ptr(),
                     );
                 }
-            } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-                && !xml_str_equal((*attr).name, c"final".as_ptr() as _)
+            } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+                && !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+                && !xml_str_equal(cur_attr.name, c"final".as_ptr() as _)
             {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-            attr = (*attr).next;
+            attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
         }
         // Attribute "final".
-        attr = xml_schema_get_prop_node(node, c"final".as_ptr() as _);
-        if attr.is_null() {
-            if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION != 0 {
-                (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_RESTRICTION;
-            }
-            if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_LIST != 0 {
-                (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_LIST;
-            }
-            if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_UNION != 0 {
-                (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_UNION;
-            }
-        } else {
+        if let Some(attr) = xml_schema_get_prop_node(node, c"final".as_ptr() as _) {
             attr_value = xml_schema_get_prop(ctxt, node, c"final".as_ptr() as _);
             if xml_schema_pval_attr_block_final(
                 attr_value,
@@ -12117,7 +12087,7 @@ unsafe fn xml_schema_parse_simple_type(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                     typ as XmlSchemaBasicItemPtr,
-                    attr as *mut XmlNode,
+                    attr.as_ptr() as *mut XmlNode,
                     null_mut(),
                     c"(#all | List of (list | union | restriction)".as_ptr() as _,
                     Some(&attr_value),
@@ -12125,6 +12095,16 @@ unsafe fn xml_schema_parse_simple_type(
                     None,
                     None,
                 );
+            }
+        } else {
+            if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION != 0 {
+                (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_RESTRICTION;
+            }
+            if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_LIST != 0 {
+                (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_LIST;
+            }
+            if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_UNION != 0 {
+                (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_UNION;
             }
         }
     }
@@ -12249,15 +12229,13 @@ unsafe fn xml_schema_parse_model_group_definition(
     node: *mut XmlNode,
 ) -> XmlSchemaModelGroupDefPtr {
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut name: *const XmlChar = null();
 
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
     }
 
-    attr = xml_schema_get_prop_node(node, c"name".as_ptr() as _);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(node, c"name".as_ptr() as _) else {
         xml_schema_pmissing_attr_err(
             ctxt,
             XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -12267,10 +12245,11 @@ unsafe fn xml_schema_parse_model_group_definition(
             None,
         );
         return null_mut();
-    } else if xml_schema_pval_attr_node(
+    };
+    if xml_schema_pval_attr_node(
         ctxt,
         null_mut(),
-        attr,
+        attr.as_ptr(),
         xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
         addr_of_mut!(name),
     ) != 0
@@ -12283,28 +12262,28 @@ unsafe fn xml_schema_parse_model_group_definition(
         return null_mut();
     }
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // And now for the children...
@@ -12410,17 +12389,14 @@ unsafe fn xml_schema_parse_attribute_group_definition(
     node: *mut XmlNode,
 ) -> XmlSchemaAttributeGroupPtr {
     let mut name: *const XmlChar = null();
-
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
     let mut has_refs: i32 = 0;
 
     if pctxt.is_null() || schema.is_null() || node.is_null() {
         return null_mut();
     }
 
-    attr = xml_schema_get_prop_node(node, c"name".as_ptr() as _);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(node, c"name".as_ptr() as _) else {
         xml_schema_pmissing_attr_err(
             pctxt,
             XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -12430,12 +12406,12 @@ unsafe fn xml_schema_parse_attribute_group_definition(
             None,
         );
         return null_mut();
-    }
+    };
     // The name is crucial, exit if invalid.
     if xml_schema_pval_attr_node(
         pctxt,
         null_mut(),
-        attr,
+        attr.as_ptr(),
         xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
         addr_of_mut!(name),
     ) != 0
@@ -12453,28 +12429,28 @@ unsafe fn xml_schema_parse_attribute_group_definition(
         return null_mut();
     }
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     pctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"id".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     // Attribute ID
     xml_schema_pval_attr_id(pctxt, node, c"id".as_ptr() as _);
@@ -12758,7 +12734,6 @@ unsafe fn xml_schema_parse_import(
     let mut child: *mut XmlNode;
     let mut namespace_name: *const XmlChar = null();
     let mut schema_location: *const XmlChar = null();
-    let mut attr: *mut XmlAttr;
     let mut ret: i32;
     let mut bucket: XmlSchemaBucketPtr = null_mut();
 
@@ -12767,29 +12742,29 @@ unsafe fn xml_schema_parse_import(
     }
 
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     pctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"namespace".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"schemaLocation".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"namespace".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"schemaLocation".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     // Extract and validate attributes.
     if xml_schema_pval_attr(
@@ -12981,7 +12956,6 @@ unsafe fn xml_schema_parse_global_attribute(
 ) -> XmlSchemaAttributePtr {
     let mut attr_value: *const XmlChar = null();
     let mut child: *mut XmlNode;
-    let mut attr: *mut XmlAttr;
 
     // Note that the w3c spec assumes the schema to be validated with schema
     // for schemas beforehand.
@@ -12992,8 +12966,7 @@ unsafe fn xml_schema_parse_global_attribute(
     }
     // 3.2.3 : 3.1
     // One of ref or name must be present, but not both
-    attr = xml_schema_get_prop_node(node, c"name".as_ptr() as _);
-    if attr.is_null() {
+    let Some(attr) = xml_schema_get_prop_node(node, c"name".as_ptr() as _) else {
         xml_schema_pmissing_attr_err(
             pctxt,
             XmlParserErrors::XmlSchemapS4sAttrMissing,
@@ -13003,11 +12976,11 @@ unsafe fn xml_schema_parse_global_attribute(
             None,
         );
         return null_mut();
-    }
+    };
     if xml_schema_pval_attr_node(
         pctxt,
         null_mut(),
-        attr,
+        attr.as_ptr(),
         xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
         addr_of_mut!(attr_value),
     ) != 0
@@ -13021,7 +12994,7 @@ unsafe fn xml_schema_parse_global_attribute(
             pctxt,
             XmlParserErrors::XmlSchemapNoXmlns,
             null_mut(),
-            attr as *mut XmlNode,
+            attr.as_ptr() as *mut XmlNode,
             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
             null_mut(),
             None,
@@ -13065,31 +13038,31 @@ unsafe fn xml_schema_parse_global_attribute(
     (*ret).flags |= XML_SCHEMAS_ATTR_GLOBAL;
 
     // Check for illegal attributes.
-    attr = (*node).properties;
-    while !attr.is_null() {
-        if let Some(ns) = (*attr).ns {
+    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = attr {
+        if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
                 xml_schema_pillegal_attr_err(
                     pctxt,
                     XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                     null_mut(),
-                    attr,
+                    cur_attr.as_ptr(),
                 );
             }
-        } else if !xml_str_equal((*attr).name, c"id".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"default".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"fixed".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"name".as_ptr() as _)
-            && !xml_str_equal((*attr).name, c"type".as_ptr() as _)
+        } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"default".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"fixed".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+            && !xml_str_equal(cur_attr.name, c"type".as_ptr() as _)
         {
             xml_schema_pillegal_attr_err(
                 pctxt,
                 XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
                 null_mut(),
-                attr,
+                cur_attr.as_ptr(),
             );
         }
-        attr = (*attr).next;
+        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
     }
     xml_schema_pval_attr_qname(
         pctxt,
@@ -13108,8 +13081,7 @@ unsafe fn xml_schema_parse_global_attribute(
         (*ret).flags |= XML_SCHEMAS_ATTR_FIXED;
     }
     // Attribute "default".
-    attr = xml_schema_get_prop_node(node, c"default".as_ptr() as _);
-    if !attr.is_null() {
+    if let Some(attr) = xml_schema_get_prop_node(node, c"default".as_ptr() as _) {
         // 3.2.3 : 1
         // default and fixed must not both be present.
         if (*ret).flags & XML_SCHEMAS_ATTR_FIXED != 0 {
@@ -13117,12 +13089,12 @@ unsafe fn xml_schema_parse_global_attribute(
                 pctxt,
                 XmlParserErrors::XmlSchemapSrcAttribute1,
                 ret as XmlSchemaBasicItemPtr,
-                attr,
+                attr.as_ptr(),
                 c"default".as_ptr() as _,
                 c"fixed".as_ptr() as _,
             );
         } else {
-            (*ret).def_value = xml_schema_get_node_content(pctxt, attr as *mut XmlNode);
+            (*ret).def_value = xml_schema_get_node_content(pctxt, attr.as_ptr() as *mut XmlNode);
         }
     }
     // And now for the children...
@@ -27728,7 +27700,6 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
 }
 
 unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
-    let mut attr: *mut XmlAttr;
     let mut ret: i32 = 0;
     let mut ielem: XmlSchemaNodeInfoPtr = null_mut();
     let mut node: *mut XmlNode;
@@ -27786,17 +27757,17 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 // DOC VAL TODO: We do not register namespace declaration attributes yet.
                 (*vctxt).nb_attr_infos = 0;
                 if !(*node).properties.is_null() {
-                    attr = (*node).properties;
-                    while {
-                        if let Some(ns) = (*attr).ns {
+                    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+                    while let Some(cur_attr) = attr {
+                        if let Some(ns) = cur_attr.ns {
                             ns_name = ns.href;
                         } else {
                             ns_name = null_mut();
                         }
                         // Note that we give it the line number of the parent element.
-                        let value = (*attr)
+                        let value = cur_attr
                             .children
-                            .and_then(|c| c.get_string((*attr).doc, 1))
+                            .and_then(|c| c.get_string(cur_attr.doc, 1))
                             .map(|c| CString::new(c).unwrap());
                         let value = xml_strdup(
                             value
@@ -27805,9 +27776,9 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         );
                         ret = xml_schema_validator_push_attribute(
                             vctxt,
-                            attr as *mut XmlNode,
+                            cur_attr.as_ptr() as *mut XmlNode,
                             (*ielem).node_line,
-                            (*attr).name,
+                            cur_attr.name,
                             ns_name,
                             0,
                             value,
@@ -27822,9 +27793,8 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             // goto internal_error;
                             return -1;
                         }
-                        attr = (*attr).next;
-                        !attr.is_null()
-                    } {}
+                        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+                    }
                 }
                 // Validate the element.
                 ret = xml_schema_validate_elem(vctxt);
