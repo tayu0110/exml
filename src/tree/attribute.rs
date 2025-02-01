@@ -50,7 +50,7 @@ pub struct XmlAttr {
     pub(crate) last: Option<NodePtr>,           /* NULL */
     pub(crate) parent: Option<NodePtr>,         /* child->parent link */
     pub(crate) next: Option<XmlAttrPtr>,        /* next sibling link  */
-    pub(crate) prev: *mut XmlAttr,              /* previous sibling link  */
+    pub(crate) prev: Option<XmlAttrPtr>,        /* previous sibling link  */
     pub(crate) doc: *mut XmlDoc,                /* the containing document */
     pub(crate) ns: Option<XmlNsPtr>,            /* pointer to the associated namespace */
     pub(crate) atype: Option<XmlAttributeType>, /* the attribute type if validating */
@@ -67,7 +67,7 @@ impl Default for XmlAttr {
             last: None,
             parent: None,
             next: None,
-            prev: null_mut(),
+            prev: None,
             doc: null_mut(),
             ns: None,
             atype: None,
@@ -112,10 +112,13 @@ impl NodeCommon for XmlAttr {
         })
     }
     fn prev(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.prev as *mut XmlNode)
+        self.prev
+            .and_then(|prev| NodePtr::from_ptr(prev.as_ptr() as *mut XmlNode))
     }
     fn set_prev(&mut self, prev: Option<NodePtr>) {
-        self.prev = prev.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlAttr;
+        self.prev = prev.and_then(|prev| unsafe {
+            XmlAttrPtr::from_raw(prev.as_ptr() as *mut XmlAttr).unwrap()
+        })
     }
     fn parent(&self) -> Option<NodePtr> {
         self.parent
@@ -198,7 +201,7 @@ impl XmlAttrPtr {
         if tmp == Some(*self) {
             parent.properties = self.next.map_or(null_mut(), |next| next.as_ptr());
             if let Some(mut next) = self.next {
-                next.prev = null_mut();
+                next.prev = None;
             }
             xml_free_prop(*self);
             return 0;
@@ -207,7 +210,7 @@ impl XmlAttrPtr {
             if now.next == Some(*self) {
                 now.next = self.next;
                 if let Some(mut next) = now.next {
-                    next.prev = now.as_ptr();
+                    next.prev = Some(now);
                 }
                 xml_free_prop(*self);
                 return 0;
@@ -375,7 +378,7 @@ pub(super) unsafe fn xml_new_prop_internal(
                 prev = next;
             }
             prev.next = Some(cur);
-            cur.prev = prev.as_ptr();
+            cur.prev = Some(prev);
         } else {
             (*node).properties = cur.as_ptr();
         }
@@ -568,7 +571,7 @@ pub unsafe fn xml_copy_prop_list(
         };
         if let Some(mut np) = p {
             np.next = Some(q);
-            q.prev = np.as_ptr();
+            q.prev = Some(np);
             p = Some(q);
         } else {
             ret = Some(q);

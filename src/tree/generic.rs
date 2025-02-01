@@ -418,7 +418,7 @@ pub trait NodeCommon {
                     lastattr = next;
                 }
                 lastattr.next = XmlAttrPtr::from_raw(cur as _).unwrap();
-                (*(cur as *mut XmlAttr)).prev = lastattr.as_ptr();
+                (*(cur as *mut XmlAttr)).prev = Some(lastattr);
             } else {
                 (*(self as *mut Self as *mut XmlNode)).properties = cur as _;
             }

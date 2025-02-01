@@ -2456,7 +2456,7 @@ unsafe fn xml_sax2_attribute_ns(
                 prev = next;
             }
             prev.next = Some(ret);
-            ret.prev = prev.as_ptr();
+            ret.prev = Some(prev);
         } else {
             (*(*ctxt).node).properties = ret.as_ptr();
         }
