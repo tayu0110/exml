@@ -249,7 +249,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
                         );
                     }
                 }
-                attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                attr = now.next;
             }
         }
         cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
@@ -425,7 +425,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                         break;
                     }
                 }
-                attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                attr = now.next;
             }
             if http != 0 && content.is_some() {
                 meta = cur;
@@ -1058,7 +1058,7 @@ pub unsafe fn html_node_dump_format_output(
                 let mut attr = XmlAttrPtr::from_raw((*cur).properties).unwrap();
                 while let Some(now) = attr {
                     html_attr_dump_output(buf, doc, &now);
-                    attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                    attr = now.next;
                 }
 
                 if info.map_or(false, |info| info.empty != 0) {

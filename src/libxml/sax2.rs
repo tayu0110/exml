@@ -1587,7 +1587,7 @@ unsafe fn xml_sax2_attribute_internal(
                         xml_free(nval as _);
                     }
                 }
-                prop = XmlAttrPtr::from_raw(now.next).unwrap();
+                prop = now.next;
             }
         } else {
             xml_ns_err_msg!(
@@ -2441,7 +2441,7 @@ unsafe fn xml_sax2_attribute_ns(
     // allocate the node
     let mut ret = if !(*ctxt).free_attrs.is_null() {
         let mut ret = XmlAttrPtr::from_raw((*ctxt).free_attrs).unwrap().unwrap();
-        (*ctxt).free_attrs = ret.next;
+        (*ctxt).free_attrs = ret.next.map_or(null_mut(), |next| next.as_ptr());
         (*ctxt).free_attrs_nr -= 1;
         std::ptr::write(&mut *ret, XmlAttr::default());
         ret.typ = XmlElementType::XmlAttributeNode;
@@ -2452,10 +2452,10 @@ unsafe fn xml_sax2_attribute_ns(
 
         // link at the end to preserve order, TODO speed up with a last
         if let Some(mut prev) = XmlAttrPtr::from_raw((*(*ctxt).node).properties).unwrap() {
-            while let Some(next) = XmlAttrPtr::from_raw(prev.next).unwrap() {
+            while let Some(next) = prev.next {
                 prev = next;
             }
-            prev.next = ret.as_ptr();
+            prev.next = Some(ret);
             ret.prev = prev.as_ptr();
         } else {
             (*(*ctxt).node).properties = ret.as_ptr();

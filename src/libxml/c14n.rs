@@ -423,7 +423,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     if self.is_visible(Some(&*now), Some(cur)) {
                         list.insert_lower_bound(now);
                     }
-                    attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                    attr = now.next;
                 }
 
                 // Handle xml attributes
@@ -442,7 +442,7 @@ impl<T> XmlC14NCtx<'_, T> {
                             if xml_c14n_is_xml_attr(now) && list.search(&now).is_none() {
                                 list.insert_lower_bound(now);
                             }
-                            attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                            attr = now.next;
                         }
                         tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
                     }
@@ -459,7 +459,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     if self.is_visible(Some(&*now), Some(cur)) {
                         list.insert_lower_bound(now);
                     }
-                    attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                    attr = now.next;
                 }
             }
             XmlC14NMode::XmlC14N1_1 => {
@@ -539,7 +539,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     }
 
                     // move to the next one
-                    attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                    attr = now.next;
                 }
 
                 // special processing for XML attribute kiks in only when we have invisible parents
@@ -581,7 +581,7 @@ impl<T> XmlC14NCtx<'_, T> {
                             list.insert_lower_bound(attr);
 
                             // note that we MUST delete returned attr node ourselves!
-                            attr.next = attrs_to_delete.map_or(null_mut(), |attr| attr.as_ptr());
+                            attr.next = attrs_to_delete;
                             attrs_to_delete = Some(attr);
                         }
                     }
@@ -1006,14 +1006,13 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // add attributes
-        let mut attr = cur.properties;
-        while !attr.is_null() {
+        let mut attr = XmlAttrPtr::from_raw(cur.properties).unwrap();
+        while let Some(cur_attr) = attr {
             // we need to check that attribute is visible and has non
             // default namespace (XML Namespaces: "default namespaces
             // do not apply directly to attributes")
-            if let Some(attr_ns) = (*attr).ns.filter(|&ns| {
-                !xml_c14n_is_xml_ns(ns)
-                    && self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur))
+            if let Some(attr_ns) = cur_attr.ns.filter(|&ns| {
+                !xml_c14n_is_xml_ns(ns) && self.is_visible(Some(&*cur_attr), Some(cur))
             }) {
                 let already_rendered =
                     self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*attr_ns));
@@ -1025,12 +1024,12 @@ impl<T> XmlC14NCtx<'_, T> {
                 if attr_ns.prefix().map_or(0, |pre| pre.len()) == 0 {
                     has_empty_ns = true;
                 }
-            } else if (*attr).ns.map_or(false, |ns| {
+            } else if cur_attr.ns.map_or(false, |ns| {
                 ns.prefix().map_or(0, |pre| pre.len()) == 0 && xml_strlen(ns.href) == 0
             }) {
                 has_visibly_utilized_empty_ns = true;
             }
-            attr = (*attr).next;
+            attr = cur_attr.next;
         }
 
         // Process xmlns=""

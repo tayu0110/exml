@@ -888,8 +888,7 @@ impl XmlDebugCtxt<'_> {
     unsafe fn dump_attr_list(&mut self, mut attr: Option<&XmlAttr>) {
         while let Some(now) = attr {
             self.dump_attr(Some(now));
-            let next = now.next;
-            attr = (!next.is_null()).then(|| &*next);
+            attr = now.next.as_deref();
         }
     }
 

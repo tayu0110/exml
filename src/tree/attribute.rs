@@ -49,7 +49,7 @@ pub struct XmlAttr {
     pub(crate) children: Option<NodePtr>,       /* the value of the property */
     pub(crate) last: Option<NodePtr>,           /* NULL */
     pub(crate) parent: Option<NodePtr>,         /* child->parent link */
-    pub(crate) next: *mut XmlAttr,              /* next sibling link  */
+    pub(crate) next: Option<XmlAttrPtr>,        /* next sibling link  */
     pub(crate) prev: *mut XmlAttr,              /* previous sibling link  */
     pub(crate) doc: *mut XmlDoc,                /* the containing document */
     pub(crate) ns: Option<XmlNsPtr>,            /* pointer to the associated namespace */
@@ -66,7 +66,7 @@ impl Default for XmlAttr {
             children: None,
             last: None,
             parent: None,
-            next: null_mut(),
+            next: None,
             prev: null_mut(),
             doc: null_mut(),
             ns: None,
@@ -103,10 +103,13 @@ impl NodeCommon for XmlAttr {
         self.last = last;
     }
     fn next(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.next as *mut XmlNode)
+        self.next
+            .and_then(|next| NodePtr::from_ptr(next.as_ptr() as *mut XmlNode))
     }
     fn set_next(&mut self, next: Option<NodePtr>) {
-        self.next = next.map_or(null_mut(), |n| n.as_ptr()) as *mut XmlAttr;
+        self.next = next.and_then(|next| unsafe {
+            XmlAttrPtr::from_raw(next.as_ptr() as *mut XmlAttr).unwrap()
+        })
     }
     fn prev(&self) -> Option<NodePtr> {
         NodePtr::from_ptr(self.prev as *mut XmlNode)
@@ -193,23 +196,23 @@ impl XmlAttrPtr {
         };
         let mut tmp = XmlAttrPtr::from_raw(parent.properties).unwrap();
         if tmp == Some(*self) {
-            parent.properties = self.next;
-            if !self.next.is_null() {
-                (*self.next).prev = null_mut();
+            parent.properties = self.next.map_or(null_mut(), |next| next.as_ptr());
+            if let Some(mut next) = self.next {
+                next.prev = null_mut();
             }
             xml_free_prop(*self);
             return 0;
         }
         while let Some(mut now) = tmp {
-            if now.next == self.as_ptr() {
+            if now.next == Some(*self) {
                 now.next = self.next;
-                if !now.next.is_null() {
-                    (*now.next).prev = now.as_ptr();
+                if let Some(mut next) = now.next {
+                    next.prev = now.as_ptr();
                 }
                 xml_free_prop(*self);
                 return 0;
             }
-            tmp = XmlAttrPtr::from_raw(now.next).unwrap();
+            tmp = now.next;
         }
         -1
     }
@@ -368,10 +371,10 @@ pub(super) unsafe fn xml_new_prop_internal(
     // Add it at the end to preserve parsing order ...
     if !node.is_null() {
         if let Some(mut prev) = XmlAttrPtr::from_raw((*node).properties).unwrap() {
-            while let Some(next) = XmlAttrPtr::from_raw(prev.next).unwrap() {
+            while let Some(next) = prev.next {
                 prev = next;
             }
-            prev.next = cur.as_ptr();
+            prev.next = Some(cur);
             cur.prev = prev.as_ptr();
         } else {
             (*node).properties = cur.as_ptr();
@@ -564,14 +567,14 @@ pub unsafe fn xml_copy_prop_list(
             return None;
         };
         if let Some(mut np) = p {
-            np.next = q.as_ptr();
+            np.next = Some(q);
             q.prev = np.as_ptr();
             p = Some(q);
         } else {
             ret = Some(q);
             p = Some(q);
         }
-        cur = XmlAttrPtr::from_raw(now.next).unwrap();
+        cur = now.next;
     }
     ret
 }
@@ -602,10 +605,10 @@ pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
 #[doc(alias = "xmlFreePropList")]
 pub unsafe fn xml_free_prop_list(cur: Option<XmlAttrPtr>) {
     if let Some(cur) = cur {
-        let mut next = XmlAttrPtr::from_raw(cur.next).unwrap();
+        let mut next = cur.next;
         xml_free_prop(cur);
         while let Some(now) = next {
-            next = XmlAttrPtr::from_raw(now.next).unwrap();
+            next = now.next;
             xml_free_prop(now);
         }
     }

@@ -410,16 +410,17 @@ pub trait NodeCommon {
                     _ => {}
                 }
             }
-            if (*(self as *mut Self as *mut XmlNode)).properties.is_null() {
-                (*(self as *mut Self as *mut XmlNode)).properties = cur as _;
-            } else {
+            if let Some(mut lastattr) =
+                XmlAttrPtr::from_raw((*(self as *mut Self as *mut XmlNode)).properties).unwrap()
+            {
                 // find the end
-                let mut lastattr = (*(self as *mut Self as *mut XmlNode)).properties;
-                while !(*lastattr).next.is_null() {
-                    lastattr = (*lastattr).next;
+                while let Some(next) = lastattr.next {
+                    lastattr = next;
                 }
-                (*lastattr).next = cur as _;
-                (*(cur as *mut XmlAttr)).prev = lastattr;
+                lastattr.next = XmlAttrPtr::from_raw(cur as _).unwrap();
+                (*(cur as *mut XmlAttr)).prev = lastattr.as_ptr();
+            } else {
+                (*(self as *mut Self as *mut XmlNode)).properties = cur as _;
             }
         } else if self.children().is_none() {
             self.set_children(NodePtr::from_ptr(cur));
@@ -652,7 +653,9 @@ pub trait NodeCommon {
         if let Some(mut parent) = self.parent() {
             if matches!(self.element_type(), XmlElementType::XmlAttributeNode) {
                 if parent.properties == self as *mut Self as *mut XmlAttr {
-                    parent.properties = (*(self as *mut Self as *mut XmlAttr)).next;
+                    parent.properties = (*(self as *mut Self as *mut XmlAttr))
+                        .next
+                        .map_or(null_mut(), |next| next.as_ptr());
                 }
             } else {
                 if parent.children() == NodePtr::from_ptr(self as *mut Self as *mut XmlNode) {

@@ -49,8 +49,8 @@ use crate::{
     },
     parser::{__xml_err_encoding, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int},
     tree::{
-        xml_free_doc, XmlAttr, XmlAttributeType, XmlDoc, XmlEntityType, XmlNode, XML_ENT_EXPANDING,
-        XML_ENT_PARSED, XML_XML_NAMESPACE,
+        xml_free_doc, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlEntityType, XmlNode,
+        XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
@@ -1901,13 +1901,10 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         }
     }
     if !(*ctxt).free_attrs.is_null() {
-        let mut cur: *mut XmlAttr;
-        let mut next: *mut XmlAttr;
-
-        cur = (*ctxt).free_attrs;
-        while !cur.is_null() {
-            next = (*cur).next;
-            xml_free(cur as _);
+        let mut cur = XmlAttrPtr::from_raw((*ctxt).free_attrs).unwrap();
+        while let Some(now) = cur {
+            let next = now.next;
+            now.free();
             cur = next;
         }
     }

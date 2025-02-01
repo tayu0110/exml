@@ -1197,7 +1197,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
                 );
             }
         }
-        cur = XmlAttrPtr::from_raw(next).unwrap();
+        cur = next;
     }
 }
 

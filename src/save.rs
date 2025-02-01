@@ -850,7 +850,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                     let mut attr = XmlAttrPtr::from_raw((*cur).properties).unwrap();
                     while let Some(now) = attr {
                         xml_attr_dump_output(ctxt, &now);
-                        attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                        attr = now.next;
                     }
 
                     if let Some(children) = (*cur).children() {
@@ -1208,7 +1208,7 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
             }
         }
         xml_attr_dump_output(ctxt, &now);
-        cur = XmlAttrPtr::from_raw(now.next).unwrap();
+        cur = now.next;
     }
     let mut buf = ctxt.buf.borrow_mut();
     // C.8

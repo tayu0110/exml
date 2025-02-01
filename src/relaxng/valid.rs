@@ -482,7 +482,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
             } else {
                 nb_attrs += 1;
             }
-            attr = XmlAttrPtr::from_raw(now.next).unwrap();
+            attr = now.next;
         }
     }
     if !(*ctxt).free_state.is_null() && (*(*ctxt).free_state).nb_state > 0 {
@@ -515,7 +515,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
             let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
             while let Some(now) = attr {
                 (*ret).attrs.push(Some(now));
-                attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                attr = now.next;
             }
         }
     }

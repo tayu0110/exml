@@ -5633,7 +5633,7 @@ unsafe fn xml_schema_get_prop_node(node: *mut XmlNode, name: *const c_char) -> O
         if now.ns.is_none() && xml_str_equal(now.name, name as _) {
             return Some(now);
         }
-        prop = XmlAttrPtr::from_raw(now.next).unwrap();
+        prop = now.next;
     }
     None
 }
@@ -6456,7 +6456,7 @@ unsafe fn xml_schema_get_prop_node_ns(
         {
             return Some(now);
         }
-        prop = XmlAttrPtr::from_raw(now.next).unwrap();
+        prop = now.next;
     }
     None
 }
@@ -6575,7 +6575,7 @@ unsafe fn xml_schema_parse_annotation(
                 now,
             );
         }
-        attr = XmlAttrPtr::from_raw(now.next).unwrap();
+        attr = now.next;
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // And now for the children...
@@ -6601,7 +6601,7 @@ unsafe fn xml_schema_parse_annotation(
                         now,
                     );
                 }
-                attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                attr = now.next;
             }
             xml_schema_pval_attr(
                 ctxt,
@@ -6640,7 +6640,7 @@ unsafe fn xml_schema_parse_annotation(
                         cur_attr,
                     );
                 }
-                attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+                attr = cur_attr.next;
             }
             // Attribute "xml:lang".
             if let Some(attr) = xml_schema_get_prop_node_ns(
@@ -6911,7 +6911,7 @@ unsafe fn xml_schema_parse_include_or_redefine_attrs(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     xml_schema_pval_attr_id(pctxt, node, c"id".as_ptr() as _);
     // Preliminary step, extract the URI-Reference and make an URI from the base.
@@ -7948,7 +7948,7 @@ unsafe fn xml_schema_parse_model_group_def_ref(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     let item: XmlSchemaParticlePtr = xml_schema_add_particle(ctxt, node, min, max);
@@ -8252,7 +8252,7 @@ unsafe fn xml_schema_parse_local_attribute(
         }
 
         // attr_next:
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     // 3.2.3 : 2
     // If default and use are both present, use must have
@@ -8621,7 +8621,7 @@ unsafe fn xml_schema_parse_attribute_group_ref(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     // Attribute ID
     xml_schema_pval_attr_id(pctxt, node, c"id".as_ptr() as _);
@@ -8995,7 +8995,7 @@ unsafe fn xml_schema_parse_any_attribute(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // Parse the namespace list.
@@ -9066,7 +9066,7 @@ unsafe fn xml_schema_parse_extension(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
 
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
@@ -9225,7 +9225,7 @@ unsafe fn xml_schema_parse_simple_content(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
 
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
@@ -9340,7 +9340,7 @@ unsafe fn xml_schema_parse_complex_content(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
 
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
@@ -9622,7 +9622,7 @@ unsafe fn xml_schema_parse_complex_type(
             );
         }
 
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     if block == 0 {
         // Apply default "block" values.
@@ -9960,7 +9960,7 @@ unsafe fn xml_schema_parse_idcselector_and_field(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     // Create the item.
     let item: XmlSchemaIdcselectPtr =
@@ -10065,7 +10065,7 @@ unsafe fn xml_schema_parse_idc(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     // Attribute "name" (mandatory).
     let Some(attr) = xml_schema_get_prop_node(node, c"name".as_ptr() as _) else {
@@ -10332,7 +10332,7 @@ unsafe fn xml_schema_parse_element(
                         || xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
                         || xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
                     {
-                        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+                        attr = cur_attr.next;
                         continue;
                     } else {
                         // SPEC (3.3.3 : 2.2)
@@ -10346,7 +10346,7 @@ unsafe fn xml_schema_parse_element(
                         );
                         break;
                     }
-                    attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+                    attr = cur_attr.next;
                 }
                 // No children except <annotation> expected.
                 if !child.is_null() {
@@ -10475,7 +10475,7 @@ unsafe fn xml_schema_parse_element(
                     );
                 }
             }
-            attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+            attr = cur_attr.next;
         }
         // Extract/validate attributes.
         if top_level != 0 {
@@ -10770,7 +10770,7 @@ unsafe fn xml_schema_parse_any(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // minOccurs/maxOccurs.
@@ -10910,7 +10910,7 @@ unsafe fn xml_schema_parse_model_group(
                     cur_attr,
                 );
             }
-            attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+            attr = cur_attr.next;
         }
     } else {
         // Check for illegal attributes.
@@ -10933,7 +10933,7 @@ unsafe fn xml_schema_parse_model_group(
                     cur_attr,
                 );
             }
-            attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+            attr = cur_attr.next;
         }
     }
 
@@ -11296,7 +11296,7 @@ unsafe fn xml_schema_parse_restriction(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     // Extract and validate attributes.
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
@@ -11622,7 +11622,7 @@ unsafe fn xml_schema_parse_list(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
 
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
@@ -11750,7 +11750,7 @@ unsafe fn xml_schema_parse_union(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // Attribute "memberTypes". This is a list of QNames.
@@ -12017,7 +12017,7 @@ unsafe fn xml_schema_parse_simple_type(
                     cur_attr,
                 );
             }
-            attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+            attr = cur_attr.next;
         }
     } else {
         // Parse as global simple type definition.
@@ -12061,7 +12061,7 @@ unsafe fn xml_schema_parse_simple_type(
                     cur_attr,
                 );
             }
-            attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+            attr = cur_attr.next;
         }
         // Attribute "final".
         if let Some(attr) = xml_schema_get_prop_node(node, c"final".as_ptr() as _) {
@@ -12278,7 +12278,7 @@ unsafe fn xml_schema_parse_model_group_definition(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // And now for the children...
@@ -12445,7 +12445,7 @@ unsafe fn xml_schema_parse_attribute_group_definition(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     // Attribute ID
     xml_schema_pval_attr_id(pctxt, node, c"id".as_ptr() as _);
@@ -12759,7 +12759,7 @@ unsafe fn xml_schema_parse_import(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     // Extract and validate attributes.
     if xml_schema_pval_attr(
@@ -13057,7 +13057,7 @@ unsafe fn xml_schema_parse_global_attribute(
                 cur_attr,
             );
         }
-        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+        attr = cur_attr.next;
     }
     xml_schema_pval_attr_qname(
         pctxt,
@@ -27788,7 +27788,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             // goto internal_error;
                             return -1;
                         }
-                        attr = XmlAttrPtr::from_raw(cur_attr.next).unwrap();
+                        attr = cur_attr.next;
                     }
                 }
                 // Validate the element.

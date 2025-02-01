@@ -633,7 +633,7 @@ impl XmlNode {
                     {
                         return Some(Ok(now));
                     }
-                    prop = XmlAttrPtr::from_raw(now.next).unwrap();
+                    prop = now.next;
                 }
             } else {
                 // We want the attr to be in no namespace.
@@ -641,7 +641,7 @@ impl XmlNode {
                     if now.ns.is_none() && now.name().as_deref() == Some(name) {
                         return Some(Ok(now));
                     }
-                    prop = XmlAttrPtr::from_raw(now.next).unwrap();
+                    prop = now.next;
                 }
             }
         }
@@ -1530,7 +1530,7 @@ impl XmlNode {
                     //     xmlAddID(null_mut(), doc, idVal, prop);
                     // }
 
-                    prop = XmlAttrPtr::from_raw(now.next).unwrap();
+                    prop = now.next;
                 }
             }
             if matches!(self.element_type(), XmlElementType::XmlEntityRefNode) {
@@ -1578,7 +1578,7 @@ impl XmlNode {
             if now.name().as_deref() == Some(name) {
                 return Some(Ok(now));
             }
-            prop = XmlAttrPtr::from_raw(now.next).unwrap();
+            prop = now.next;
         }
         if !XML_CHECK_DTD.load(Ordering::Relaxed) {
             return None;
@@ -2147,7 +2147,7 @@ impl XmlNode {
                             }
                         }
                     }
-                    attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                    attr = now.next;
                 }
             }
 

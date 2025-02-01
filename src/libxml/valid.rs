@@ -3580,7 +3580,7 @@ pub unsafe fn xml_validate_element(
                         .as_ref()
                         .map_or(null_mut(), |c| c.as_ptr() as *const u8),
                 );
-                attr = XmlAttrPtr::from_raw(now.next).unwrap();
+                attr = now.next;
             }
 
             let mut ns = (*elem).ns_def;
@@ -5174,7 +5174,7 @@ pub unsafe fn xml_validate_one_element(
                                 break 'found;
                             }
                         }
-                        attrib = XmlAttrPtr::from_raw(attr.next).unwrap();
+                        attrib = attr.next;
                     }
                 }
                 if qualified == -1 {

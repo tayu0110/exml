@@ -1765,7 +1765,7 @@ impl XmlTextReader {
         }
         let mut cur = XmlAttrPtr::from_raw((*self.node).properties).unwrap()?;
         for _ in i..no {
-            cur = XmlAttrPtr::from_raw(cur.next).unwrap()?;
+            cur = cur.next?;
         }
         // TODO walk the DTD if present
 
@@ -1947,7 +1947,7 @@ impl XmlTextReader {
                     self.curnode = now.as_ptr() as *mut XmlNode;
                     return 1;
                 }
-                prop = XmlAttrPtr::from_raw(now.next).unwrap();
+                prop = now.next;
             }
             return 0;
         };
@@ -1977,7 +1977,7 @@ impl XmlTextReader {
                     self.curnode = now.as_ptr() as *mut XmlNode;
                     return 1;
                 }
-                prop = XmlAttrPtr::from_raw(now.next).unwrap();
+                prop = now.next;
             }
         }
         0
@@ -2028,7 +2028,7 @@ impl XmlTextReader {
                 self.curnode = now.as_ptr() as *mut XmlNode;
                 return 1;
             }
-            prop = XmlAttrPtr::from_raw(now.next).unwrap();
+            prop = now.next;
         }
         0
     }
@@ -2069,7 +2069,7 @@ impl XmlTextReader {
         };
 
         for _ in i..no {
-            let Some(next) = XmlAttrPtr::from_raw(cur.next).unwrap() else {
+            let Some(next) = cur.next else {
                 return 0;
             };
             cur = next;
@@ -3564,7 +3564,7 @@ macro_rules! DICT_FREE {
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: Option<XmlAttrPtr>) {
     while let Some(now) = cur {
-        let next = XmlAttrPtr::from_raw(now.next).unwrap();
+        let next = now.next;
         xml_text_reader_free_prop(reader, now);
         cur = next;
     }
@@ -3716,7 +3716,7 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPt
         && !(*reader).ctxt.is_null()
         && (*(*reader).ctxt).free_attrs_nr < MAX_FREE_NODES
     {
-        cur.next = (*(*reader).ctxt).free_attrs;
+        cur.next = XmlAttrPtr::from_raw((*(*reader).ctxt).free_attrs).unwrap();
         (*(*reader).ctxt).free_attrs = cur.as_ptr();
         (*(*reader).ctxt).free_attrs_nr += 1;
     } else {
@@ -3922,7 +3922,7 @@ pub unsafe fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32
     let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
     while let Some(now) = attr {
         ret += 1;
-        attr = XmlAttrPtr::from_raw(now.next).unwrap();
+        attr = now.next;
     }
     let mut ns = (*node).ns_def;
     while let Some(now) = ns {
