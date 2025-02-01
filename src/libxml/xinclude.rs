@@ -47,8 +47,8 @@ use crate::{
             XmlParserOption, XML_DETECT_IDS,
         },
         parser_internals::xml_string_current_char,
-        uri::{xml_build_relative_uri, xml_free_uri, xml_parse_uri, xml_save_uri, XmlURIPtr},
-        xmlstring::{xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, XmlChar},
+        uri::{xml_free_uri, xml_parse_uri, xml_save_uri, XmlURIPtr},
+        xmlstring::{xml_str_equal, xml_strcmp, xml_strdup, XmlChar},
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
     parser::{xml_free_input_stream, xml_free_parser_ctxt, xml_new_parser_ctxt, XmlParserInputPtr},
@@ -58,14 +58,14 @@ use crate::{
         xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc,
         XmlElementType, XmlEntityPtr, XmlEntityType, XmlNode, XML_XML_NAMESPACE,
     },
-    uri::{build_uri, escape_url, XmlURI},
+    uri::{build_relative_uri, build_uri, escape_url, XmlURI},
     xpath::{
         xml_xpath_free_context, xml_xpath_free_object, XmlXPathContextPtr, XmlXPathObjectPtr,
         XmlXPathObjectType,
     },
 };
 
-use super::chvalid::xml_is_char;
+use super::{chvalid::xml_is_char, xmlstring::xml_strndup};
 
 /// A constant defining the Xinclude namespace: `http://www.w3.org/2003/XInclude`
 pub const XINCLUDE_NS: &CStr = c"http://www.w3.org/2003/XInclude";
@@ -1688,18 +1688,25 @@ unsafe fn xml_xinclude_load_doc(
 
             // The base is only adjusted if "necessary", i.e. if the xinclude node
             // has a base specified, or the URL is relative
-            let base = (*(*refe).elem)
-                .get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok())
-                .map(|b| CString::new(b).unwrap());
-            let mut base = base
-                .as_ref()
-                .map_or(null_mut(), |b| xml_strdup(b.as_ptr() as *const u8));
-            if base.is_null() {
+            let base = (*(*refe).elem).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
+            let mut cbase = base
+                .as_deref()
+                .map_or(null_mut(), |b| xml_strndup(b.as_ptr(), b.len() as i32));
+            if cbase.is_null() {
                 // No xml:base on the xinclude node, so we check whether the
                 // URI base is different than (relative to) the context base
-                let cur_base = xml_build_relative_uri(url, (*ctxt).base);
-                if cur_base.is_null() {
-                    let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+                let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+                if let Some(cur_base) = build_relative_uri(
+                    &url,
+                    (!(*ctxt).base.is_null())
+                        .then(|| CStr::from_ptr((*ctxt).base as *const i8).to_string_lossy())
+                        .as_deref(),
+                ) {
+                    // If the URI doesn't contain a slash, it's not relative
+                    if cur_base.contains('/') {
+                        cbase = xml_strndup(cur_base.as_ptr(), cur_base.len() as i32);
+                    }
+                } else {
                     // Error return
                     xml_xinclude_err!(
                         ctxt,
@@ -1708,16 +1715,9 @@ unsafe fn xml_xinclude_load_doc(
                         "trying to build relative URI from {}\n",
                         url
                     );
-                } else {
-                    /* If the URI doesn't contain a slash, it's not relative */
-                    if xml_strchr(cur_base, b'/').is_null() {
-                        xml_free(cur_base as _);
-                    } else {
-                        base = cur_base;
-                    }
                 }
             }
-            if !base.is_null() {
+            if !cbase.is_null() {
                 // Adjustment may be needed
                 node = (*refe).inc;
                 while !node.is_null() {
@@ -1729,7 +1729,9 @@ unsafe fn xml_xinclude_load_doc(
                             // the specified xml:base or the relative URI
                             if (*(*node).doc).url.as_deref() == Some(cur_base.as_str()) {
                                 (*node).set_base(Some(
-                                    CStr::from_ptr(base as *const i8).to_string_lossy().as_ref(),
+                                    CStr::from_ptr(cbase as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
                                 ));
                             } else {
                                 // If the element already has an xml:base set,
@@ -1738,7 +1740,7 @@ unsafe fn xml_xinclude_load_doc(
                                 if let Some(xml_base) =
                                     (*node).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok())
                                 {
-                                    let base = CStr::from_ptr(base as *const i8).to_string_lossy();
+                                    let base = CStr::from_ptr(cbase as *const i8).to_string_lossy();
                                     let rel_base = build_uri(&xml_base, &base);
                                     if let Some(rel_base) = rel_base {
                                         (*node).set_base(Some(&rel_base));
@@ -1757,13 +1759,15 @@ unsafe fn xml_xinclude_load_doc(
                         } else {
                             // If no current base, set it
                             (*node).set_base(Some(
-                                CStr::from_ptr(base as *const i8).to_string_lossy().as_ref(),
+                                CStr::from_ptr(cbase as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
                             ));
                         }
                     }
                     node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
                 }
-                xml_free(base as _);
+                xml_free(cbase as _);
             }
         }
         ret = 0;
@@ -2141,7 +2145,9 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeRefP
 
     // Save the base for this include (saving the current one)
     let old_base: *mut XmlChar = (*ctxt).base;
-    (*ctxt).base = base.as_ref().map_or(null_mut(), |b| b.as_ptr() as *mut u8);
+    (*ctxt).base = base
+        .as_deref()
+        .map_or(null_mut(), |b| xml_strndup(b.as_ptr(), b.len() as i32));
 
     if xml != 0 {
         ret = xml_xinclude_load_doc(ctxt, uri.as_ptr() as *const u8, refe);
@@ -2151,6 +2157,7 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeRefP
     }
 
     // Restore the original base before checking for fallback
+    xml_free((*ctxt).base as _);
     (*ctxt).base = old_base;
 
     if ret < 0 {
