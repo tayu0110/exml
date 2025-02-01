@@ -67,8 +67,8 @@ use crate::{
         },
     },
     tree::{
-        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlDoc, XmlElementType, XmlNode, XmlNs,
-        XmlNsPtr, XML_XML_NAMESPACE,
+        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlDoc, XmlElementType, XmlNode,
+        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xpath::{
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
@@ -4987,15 +4987,14 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                             }
                         }
                         XmlElementType::XmlAttributeNode => {
-                            let attr: *mut XmlAttr = (*cur).as_attribute_node().unwrap().as_ptr();
+                            let attr = XmlAttrPtr::from_raw(cur as *mut XmlAttr).unwrap().unwrap();
 
-                            if xml_str_equal(name, (*attr).name) {
+                            if xml_str_equal(name, attr.name) {
                                 if prefix.is_null() {
-                                    if (*attr).ns.map_or(true, |ns| ns.prefix().is_none()) {
+                                    if attr.ns.map_or(true, |ns| ns.prefix().is_none()) {
                                         xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     }
-                                } else if (*attr).ns.map_or(false, |ns| xml_str_equal(uri, ns.href))
-                                {
+                                } else if attr.ns.map_or(false, |ns| xml_str_equal(uri, ns.href)) {
                                     xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                 }
                             }
@@ -8716,12 +8715,10 @@ pub unsafe fn xml_xpath_next_parent(
                 return parent.as_ptr();
             }
             XmlElementType::XmlAttributeNode => {
-                let att: *mut XmlAttr = (*(*(*ctxt).context).node)
-                    .as_attribute_node()
+                let att = XmlAttrPtr::from_raw((*(*ctxt).context).node as *mut XmlAttr)
                     .unwrap()
-                    .as_ptr();
-
-                return (*att).parent.map_or(null_mut(), |p| p.as_ptr());
+                    .unwrap();
+                return att.parent.map_or(null_mut(), |p| p.as_ptr());
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
@@ -9087,12 +9084,10 @@ pub unsafe fn xml_xpath_next_ancestor(
                 return parent.as_ptr();
             }
             XmlElementType::XmlAttributeNode => {
-                let tmp: *mut XmlAttr = (*(*(*ctxt).context).node)
-                    .as_attribute_node()
+                let tmp = XmlAttrPtr::from_raw((*(*ctxt).context).node as *mut XmlAttr)
                     .unwrap()
-                    .as_ptr();
-
-                return (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
+                    .unwrap();
+                return tmp.parent().map_or(null_mut(), |p| p.as_ptr());
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
