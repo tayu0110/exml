@@ -20,7 +20,7 @@ use crate::{
         },
     },
     relaxng::{VALID_ERR, VALID_ERR2},
-    tree::{NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc, XmlNode},
+    tree::{NodeCommon, XmlAttrPtr, XmlDoc, XmlElementType, XmlNode},
 };
 
 use super::{xml_rng_verr_memory, XmlRelaxNGDefinePtr};
@@ -50,7 +50,7 @@ pub struct XmlRelaxNGValidState {
     pub(crate) nb_attr_left: i32, // the number of attributes left to validate
     pub(crate) value: *mut u8,    // the value when operating on string
     pub(crate) endvalue: *mut u8, // the end value when operating on string
-    pub(crate) attrs: Vec<*mut XmlAttr>, // the array of attributes
+    pub(crate) attrs: Vec<Option<XmlAttrPtr>>, // the array of attributes
 }
 
 impl Default for XmlRelaxNGValidState {
@@ -454,8 +454,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     node: *mut XmlNode,
 ) -> XmlRelaxNGValidStatePtr {
     let ret: XmlRelaxNGValidStatePtr;
-    let mut attr: *mut XmlAttr;
-    let mut attrs: [*mut XmlAttr; MAX_ATTR] = [null_mut(); MAX_ATTR];
+    let mut attrs: [Option<XmlAttrPtr>; MAX_ATTR] = [None; MAX_ATTR];
     let mut nb_attrs: usize = 0;
     let mut root: *mut XmlNode = null_mut();
 
@@ -468,16 +467,22 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
         if root.is_null() {
             return null_mut();
         }
-    } else {
-        attr = (*node).properties;
-        while !attr.is_null() {
+    } else if (*node).element_type() != XmlElementType::XmlDocumentNode {
+        // In original libxml2, `node` is treats as truly `XmlNode`,
+        // but it may actually be `XmlDoc`.
+        // If the `node` is `XmlDoc`,
+        // this may be a misbehavior because it erroneously collects an external subset.
+        // Therefore, insert a check to see if the `node` is an `XmlNode`.
+
+        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        while let Some(now) = attr {
             if nb_attrs < MAX_ATTR {
-                attrs[nb_attrs] = attr;
+                attrs[nb_attrs] = Some(now);
                 nb_attrs += 1;
             } else {
                 nb_attrs += 1;
             }
-            attr = (*attr).next;
+            attr = XmlAttrPtr::from_raw(now.next).unwrap();
         }
     }
     if !(*ctxt).free_state.is_null() && (*(*ctxt).free_state).nb_state > 0 {
@@ -505,12 +510,11 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     (*ret).attrs.clear();
     if nb_attrs > 0 {
         if nb_attrs < MAX_ATTR {
-            (*ret).attrs.resize(nb_attrs, null_mut());
-            (*ret).attrs[..nb_attrs].copy_from_slice(&attrs[..nb_attrs]);
+            (*ret).attrs.extend(attrs.iter().copied().take(nb_attrs));
         } else {
             let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
             while let Some(now) = attr {
-                (*ret).attrs.push(now.as_ptr());
+                (*ret).attrs.push(Some(now));
                 attr = XmlAttrPtr::from_raw(now.next).unwrap();
             }
         }

@@ -68,8 +68,8 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node, xml_new_doc_text,
-        xml_validate_ncname, NodeCommon, NodePtr, XmlAttr, XmlDoc, XmlElementType, XmlNode, XmlNs,
-        XmlNsPtr,
+        xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDoc, XmlElementType, XmlNode,
+        XmlNs, XmlNsPtr,
     },
     uri::{build_uri, escape_url_except, XmlURI},
 };
@@ -1087,17 +1087,14 @@ unsafe fn xml_relaxng_is_blank(mut str: *mut XmlChar) -> i32 {
 /// Check all the attributes on the given node
 #[doc(alias = "xmlRelaxNGCleanupAttributes")]
 unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *mut XmlNode) {
-    let mut cur: *mut XmlAttr;
-    let mut next: *mut XmlAttr;
-
-    cur = (*node).properties;
-    while !cur.is_null() {
-        next = (*cur).next;
-        if (*cur)
+    let mut cur = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    while let Some(cur_attr) = cur {
+        let next = cur_attr.next;
+        if cur_attr
             .ns
             .map_or(true, |ns| ns.href().as_deref() == Some(XML_RELAXNG_NS))
         {
-            if (*cur).name().as_deref() == Some("name") {
+            if cur_attr.name().as_deref() == Some("name") {
                 if (*node).name().as_deref() != Some("element")
                     && (*node).name().as_deref() != Some("attribute")
                     && (*node).name().as_deref() != Some("ref")
@@ -1110,11 +1107,11 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
                         node,
                         XmlParserErrors::XmlRngpForbiddenAttribute,
                         "Attribute {} is not allowed on {}\n",
-                        (*cur).name().unwrap(),
+                        cur_attr.name().unwrap().into_owned(),
                         (*node).name().unwrap()
                     );
                 }
-            } else if (*cur).name().as_deref() == Some("type") {
+            } else if cur_attr.name().as_deref() == Some("type") {
                 if (*node).name().as_deref() != Some("value")
                     && (*node).name().as_deref() != Some("data")
                 {
@@ -1123,11 +1120,11 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
                         node,
                         XmlParserErrors::XmlRngpForbiddenAttribute,
                         "Attribute {} is not allowed on {}\n",
-                        (*cur).name().unwrap(),
+                        cur_attr.name().unwrap().into_owned(),
                         (*node).name().unwrap()
                     );
                 }
-            } else if (*cur).name().as_deref() == Some("href") {
+            } else if cur_attr.name().as_deref() == Some("href") {
                 if (*node).name().as_deref() != Some("externalRef")
                     && (*node).name().as_deref() != Some("include")
                 {
@@ -1136,11 +1133,11 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
                         node,
                         XmlParserErrors::XmlRngpForbiddenAttribute,
                         "Attribute {} is not allowed on {}\n",
-                        (*cur).name().unwrap(),
+                        cur_attr.name().unwrap().into_owned(),
                         (*node).name().unwrap()
                     );
                 }
-            } else if (*cur).name().as_deref() == Some("combine") {
+            } else if cur_attr.name().as_deref() == Some("combine") {
                 if (*node).name().as_deref() != Some("start")
                     && (*node).name().as_deref() != Some("define")
                 {
@@ -1149,12 +1146,12 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
                         node,
                         XmlParserErrors::XmlRngpForbiddenAttribute,
                         "Attribute {} is not allowed on {}\n",
-                        (*cur).name().unwrap(),
+                        cur_attr.name().unwrap().into_owned(),
                         (*node).name().unwrap()
                     );
                 }
-            } else if (*cur).name().as_deref() == Some("datatypeLibrary") {
-                if let Some(val) = (*cur).children.and_then(|c| c.get_string((*node).doc, 1)) {
+            } else if cur_attr.name().as_deref() == Some("datatypeLibrary") {
+                if let Some(val) = cur_attr.children.and_then(|c| c.get_string((*node).doc, 1)) {
                     if !val.is_empty() {
                         if let Some(uri) = XmlURI::parse(&val) {
                             if uri.scheme.is_none() {
@@ -1163,7 +1160,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
                                     node,
                                     XmlParserErrors::XmlRngpURINotAbsolute,
                                     "Attribute {} URI {} is not absolute\n",
-                                    (*cur).name().unwrap(),
+                                    cur_attr.name().unwrap().into_owned(),
                                     val
                                 );
                             }
@@ -1173,7 +1170,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
                                     node,
                                     XmlParserErrors::XmlRngpURIFragment,
                                     "Attribute {} URI {} has a fragment ID\n",
-                                    (*cur).name().unwrap(),
+                                    cur_attr.name().unwrap().into_owned(),
                                     val
                                 );
                             }
@@ -1183,24 +1180,24 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
                                 node,
                                 XmlParserErrors::XmlRngpInvalidURI,
                                 "Attribute {} contains invalid URI {}\n",
-                                (*cur).name().unwrap(),
+                                cur_attr.name().unwrap().into_owned(),
                                 val
                             );
                         }
                     }
                 }
-            } else if (*cur).name().as_deref() != Some("ns") {
+            } else if cur_attr.name().as_deref() != Some("ns") {
                 xml_rng_perr!(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpUnknownAttribute,
                     "Unknown attribute {} on {}\n",
-                    (*cur).name().unwrap(),
+                    cur_attr.name().unwrap().into_owned(),
                     (*node).name().unwrap()
                 );
             }
         }
-        cur = next;
+        cur = XmlAttrPtr::from_raw(next).unwrap();
     }
 }
 
@@ -6813,19 +6810,19 @@ unsafe fn xml_relaxng_validate_value_content(
 unsafe fn xml_relaxng_attribute_match(
     _ctxt: XmlRelaxNGValidCtxtPtr,
     mut define: XmlRelaxNGDefinePtr,
-    prop: *mut XmlAttr,
+    prop: XmlAttrPtr,
 ) -> i32 {
     let mut ret: i32;
 
-    if !(*define).name.is_null() && !xml_str_equal((*define).name, (*prop).name) {
+    if !(*define).name.is_null() && !xml_str_equal((*define).name, prop.name) {
         return 0;
     }
     if !(*define).ns.is_null() {
         if *(*define).ns.add(0) == 0 {
-            if (*prop).ns.is_some() {
+            if prop.ns.is_some() {
                 return 0;
             }
-        } else if (*prop)
+        } else if prop
             .ns
             .map_or(true, |ns| !xml_str_equal((*define).ns, ns.href))
         {
@@ -6881,38 +6878,35 @@ unsafe fn xml_relaxng_validate_attribute(
 ) -> i32 {
     let ret: i32;
     let oldvalue: *mut XmlChar;
-    let mut prop: *mut XmlAttr = null_mut();
     let oldseq: *mut XmlNode;
 
     if (*(*ctxt).state).nb_attr_left <= 0 {
         return -1;
     }
     if !(*define).name.is_null() {
-        let mut j = (*(*ctxt).state).attrs.len();
-        for (i, &tmp) in (*(*ctxt).state).attrs.iter().enumerate() {
-            if !tmp.is_null()
-                && xml_str_equal((*define).name, (*tmp).name)
-                && ((((*define).ns.is_null() || *(*define).ns.add(0) == 0) && (*tmp).ns.is_none())
-                    || (*tmp)
-                        .ns
-                        .map_or(false, |ns| xml_str_equal((*define).ns, ns.href)))
-            {
-                prop = tmp;
-                j = i;
-                break;
-            }
-        }
-        if !prop.is_null() {
-            let value = (*prop)
+        if let Some((j, prop)) = (*(*ctxt).state)
+            .attrs
+            .iter()
+            .enumerate()
+            .filter_map(|(i, a)| a.map(|a| (i, a)))
+            .find(|&(_, tmp)| {
+                xml_str_equal((*define).name, tmp.name)
+                    && ((((*define).ns.is_null() || *(*define).ns.add(0) == 0) && tmp.ns.is_none())
+                        || tmp
+                            .ns
+                            .map_or(false, |ns| xml_str_equal((*define).ns, ns.href)))
+            })
+        {
+            let value = prop
                 .children
-                .and_then(|c| c.get_string((*prop).doc, 1))
+                .and_then(|c| c.get_string(prop.doc, 1))
                 .map(|c| CString::new(c).unwrap());
             let mut value = value
                 .as_ref()
                 .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
             oldvalue = (*(*ctxt).state).value;
             oldseq = (*(*ctxt).state).seq;
-            (*(*ctxt).state).seq = prop as _;
+            (*(*ctxt).state).seq = prop.as_ptr() as _;
             (*(*ctxt).state).value = value;
             (*(*ctxt).state).endvalue = null_mut();
             ret = xml_relaxng_validate_value_content(ctxt, (*define).content);
@@ -6926,50 +6920,47 @@ unsafe fn xml_relaxng_validate_attribute(
             (*(*ctxt).state).seq = oldseq;
             if ret == 0 {
                 // flag the attribute as processed
-                (*(*ctxt).state).attrs[j] = null_mut();
+                (*(*ctxt).state).attrs[j] = None;
                 (*(*ctxt).state).nb_attr_left -= 1;
             }
         } else {
             ret = -1;
+        }
+    } else if let Some((j, prop)) = (*(*ctxt).state)
+        .attrs
+        .iter()
+        .copied()
+        .enumerate()
+        .filter_map(|(i, a)| a.map(|a| (i, a)))
+        .find(|&(_, tmp)| xml_relaxng_attribute_match(ctxt, define, tmp) == 1)
+    {
+        let value = prop
+            .children
+            .and_then(|c| c.get_string(prop.doc, 1))
+            .map(|c| CString::new(c).unwrap());
+        let mut value = value
+            .as_ref()
+            .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
+        oldvalue = (*(*ctxt).state).value;
+        oldseq = (*(*ctxt).state).seq;
+        (*(*ctxt).state).seq = prop.as_ptr() as _;
+        (*(*ctxt).state).value = value;
+        ret = xml_relaxng_validate_value_content(ctxt, (*define).content);
+        if !(*(*ctxt).state).value.is_null() {
+            value = (*(*ctxt).state).value;
+        }
+        if !value.is_null() {
+            xml_free(value as _);
+        }
+        (*(*ctxt).state).value = oldvalue;
+        (*(*ctxt).state).seq = oldseq;
+        if ret == 0 {
+            // flag the attribute as processed
+            (*(*ctxt).state).attrs[j] = None;
+            (*(*ctxt).state).nb_attr_left -= 1;
         }
     } else {
-        let mut j = (*(*ctxt).state).attrs.len();
-        for (i, &tmp) in (*(*ctxt).state).attrs.iter().enumerate() {
-            if !tmp.is_null() && xml_relaxng_attribute_match(ctxt, define, tmp) == 1 {
-                prop = tmp;
-                j = i;
-                break;
-            }
-        }
-        if !prop.is_null() {
-            let value = (*prop)
-                .children
-                .and_then(|c| c.get_string((*prop).doc, 1))
-                .map(|c| CString::new(c).unwrap());
-            let mut value = value
-                .as_ref()
-                .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
-            oldvalue = (*(*ctxt).state).value;
-            oldseq = (*(*ctxt).state).seq;
-            (*(*ctxt).state).seq = prop as _;
-            (*(*ctxt).state).value = value;
-            ret = xml_relaxng_validate_value_content(ctxt, (*define).content);
-            if !(*(*ctxt).state).value.is_null() {
-                value = (*(*ctxt).state).value;
-            }
-            if !value.is_null() {
-                xml_free(value as _);
-            }
-            (*(*ctxt).state).value = oldvalue;
-            (*(*ctxt).state).seq = oldseq;
-            if ret == 0 {
-                // flag the attribute as processed
-                (*(*ctxt).state).attrs[j] = null_mut();
-                (*(*ctxt).state).nb_attr_left -= 1;
-            }
-        } else {
-            ret = -1;
-        }
+        ret = -1;
     }
 
     ret
@@ -7175,12 +7166,12 @@ unsafe fn xml_relaxng_validate_element_end(ctxt: XmlRelaxNGValidCtxtPtr, dolog: 
         }
     }
     for (i, &attr) in (*state).attrs.iter().enumerate() {
-        if !attr.is_null() {
+        if let Some(attr) = attr {
             if dolog != 0 {
                 VALID_ERR3!(
                     ctxt,
                     XmlRelaxNGValidErr::XmlRelaxngErrInvalidattr,
-                    (*attr).name,
+                    attr.name,
                     (*(*state).node).name
                 );
             }
