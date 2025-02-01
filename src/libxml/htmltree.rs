@@ -195,7 +195,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             && !(*cur).name.is_null())
             && xml_str_equal((*cur).name, c"meta".as_ptr() as _)
         {
-            let mut attr = XmlAttrPtr::from_raw((*cur).properties).unwrap();
+            let mut attr = (*cur).properties;
             let mut http = 0;
             let mut value: *const XmlChar;
 
@@ -398,7 +398,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
             && !(*cur).name.is_null())
             && (xml_strcasecmp((*cur).name, c"meta".as_ptr() as _) == 0)
         {
-            let mut attr = XmlAttrPtr::from_raw((*cur).properties).unwrap();
+            let mut attr = (*cur).properties;
             let mut http = 0;
             let mut value: *const XmlChar;
 
@@ -1055,7 +1055,7 @@ pub unsafe fn html_node_dump_format_output(
                 if let Some(ns_def) = (*cur).ns_def {
                     xml_ns_list_dump_output(buf, Some(ns_def));
                 }
-                let mut attr = XmlAttrPtr::from_raw((*cur).properties).unwrap();
+                let mut attr = (*cur).properties;
                 while let Some(now) = attr {
                     html_attr_dump_output(buf, doc, &now);
                     attr = now.next;

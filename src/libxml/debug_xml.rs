@@ -254,7 +254,7 @@ impl XmlDebugCtxt<'_> {
                     .parent()
                     .filter(|p| {
                         node as *const dyn NodeCommon as *mut XmlNode
-                            != p.properties as *mut XmlNode
+                            != p.properties.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNode
                     })
                     .is_some()
                 {
@@ -1065,11 +1065,12 @@ impl XmlDebugCtxt<'_> {
         {
             self.dump_namespace_list(Some(&*ns_def));
         }
-        if let Some(node) = node.as_node().filter(|n| {
-            n.as_ref().element_type() == XmlElementType::XmlElementNode
-                && !n.as_ref().properties.is_null()
-        }) {
-            self.dump_attr_list(Some(&*node.as_ref().properties));
+        if let Some(prop) = node
+            .as_node()
+            .filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
+            .and_then(|n| n.as_ref().properties)
+        {
+            self.dump_attr_list(Some(&*prop));
         }
         if node.element_type() != XmlElementType::XmlEntityRefNode {
             if node.element_type() != XmlElementType::XmlElementNode && self.check == 0 {
@@ -1689,7 +1690,7 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: *mut Xml
         }
     }
     if (*node).element_type() != XmlElementType::XmlNamespaceDecl {
-        if !(*node).properties.is_null() {
+        if (*node).properties.is_some() {
             write!(output, "a");
         } else {
             write!(output, "-");

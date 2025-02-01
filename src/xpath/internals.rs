@@ -8935,7 +8935,9 @@ pub unsafe fn xml_xpath_next_attribute(
         if (*(*ctxt).context).node == (*(*ctxt).context).doc as *mut XmlNode {
             return null_mut();
         }
-        return (*(*(*ctxt).context).node).properties as *mut XmlNode;
+        return (*(*(*ctxt).context).node)
+            .properties
+            .map_or(null_mut(), |prop| prop.as_ptr()) as *mut XmlNode;
     }
     (*cur).next.map_or(null_mut(), |n| n.as_ptr())
 }

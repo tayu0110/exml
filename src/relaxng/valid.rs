@@ -474,7 +474,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
         // this may be a misbehavior because it erroneously collects an external subset.
         // Therefore, insert a check to see if the `node` is an `XmlNode`.
 
-        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        let mut attr = (*node).properties;
         while let Some(now) = attr {
             if nb_attrs < MAX_ATTR {
                 attrs[nb_attrs] = Some(now);
@@ -512,7 +512,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
         if nb_attrs < MAX_ATTR {
             (*ret).attrs.extend(attrs.iter().copied().take(nb_attrs));
         } else {
-            let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+            let mut attr = (*node).properties;
             while let Some(now) = attr {
                 (*ret).attrs.push(Some(now));
                 attr = now.next;

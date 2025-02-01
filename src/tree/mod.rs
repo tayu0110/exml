@@ -1206,11 +1206,9 @@ pub(crate) unsafe fn xml_static_copy_node(
     }
     if (matches!((*node).element_type(), XmlElementType::XmlElementNode)
         || matches!((*node).element_type(), XmlElementType::XmlXIncludeStart))
-        && !(*node).properties.is_null()
+        && (*node).properties.is_some()
     {
-        (*ret).properties =
-            xml_copy_prop_list(ret, XmlAttrPtr::from_raw((*node).properties).unwrap())
-                .map_or(null_mut(), |prop| prop.as_ptr());
+        (*ret).properties = xml_copy_prop_list(ret, (*node).properties);
     }
     if matches!((*node).element_type(), XmlElementType::XmlEntityRefNode) {
         if doc.is_null() || (*node).doc != doc {
@@ -2211,8 +2209,8 @@ pub unsafe fn xml_replace_node(old: *mut XmlNode, cur: *mut XmlNode) -> *mut Xml
     }
     if let Some(mut parent) = (*cur).parent() {
         if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
-            if parent.properties == old as _ {
-                parent.properties = cur as _;
+            if parent.properties.map_or(null_mut(), |prop| prop.as_ptr()) == old as _ {
+                parent.properties = XmlAttrPtr::from_raw(cur as _).unwrap();
             }
         } else {
             if parent.children() == NodePtr::from_ptr(old) {
@@ -2272,7 +2270,7 @@ pub unsafe fn xml_text_concat(node: *mut XmlNode, content: &str) -> i32 {
     }
     // need to check if content is currently in the dictionary
     (*node).content = xml_strncat((*node).content, content.as_ptr(), content.len() as i32);
-    (*node).properties = null_mut();
+    (*node).properties = None;
     if (*node).content.is_null() {
         return -1;
     }
@@ -2323,9 +2321,9 @@ pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
             if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                 || matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
                 || matches!((*cur).element_type(), XmlElementType::XmlXIncludeEnd))
-                && !(*cur).properties.is_null()
+                && (*cur).properties.is_some()
             {
-                xml_free_prop_list(XmlAttrPtr::from_raw((*cur).properties).unwrap());
+                xml_free_prop_list((*cur).properties);
             }
             if !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                 && !matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
@@ -2424,8 +2422,8 @@ pub unsafe fn xml_free_node(cur: *mut XmlNode) {
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd
     ) {
-        if !(*cur).properties.is_null() {
-            xml_free_prop_list(XmlAttrPtr::from_raw((*cur).properties).unwrap());
+        if (*cur).properties.is_some() {
+            xml_free_prop_list((*cur).properties);
         }
         if let Some(ns_def) = (*cur).ns_def.take() {
             xml_free_ns_list(ns_def);

@@ -1087,7 +1087,7 @@ unsafe fn xml_relaxng_is_blank(mut str: *mut XmlChar) -> i32 {
 /// Check all the attributes on the given node
 #[doc(alias = "xmlRelaxNGCleanupAttributes")]
 unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *mut XmlNode) {
-    let mut cur = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut cur = (*node).properties;
     while let Some(cur_attr) = cur {
         let next = cur_attr.next;
         if cur_attr

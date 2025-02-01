@@ -417,7 +417,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 // nodes in this merged attribute list.
 
                 // Add all visible attributes from current node.
-                let mut attr = XmlAttrPtr::from_raw(cur.properties).unwrap();
+                let mut attr = cur.properties;
                 while let Some(now) = attr {
                     // check that attribute is visible
                     if self.is_visible(Some(&*now), Some(cur)) {
@@ -437,7 +437,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     // If XPath node-set is not specified then the parent is always visible!
                     let mut tmp = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
                     while !tmp.is_null() {
-                        let mut attr = XmlAttrPtr::from_raw((*tmp).properties).unwrap();
+                        let mut attr = (*tmp).properties;
                         while let Some(now) = attr {
                             if xml_c14n_is_xml_attr(now) && list.search(&now).is_none() {
                                 list.insert_lower_bound(now);
@@ -453,7 +453,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 // are not imported into orphan nodes of the document subset
 
                 // Add all visible attributes from current node.
-                let mut attr = XmlAttrPtr::from_raw(cur.properties).unwrap();
+                let mut attr = cur.properties;
                 while let Some(now) = attr {
                     // check that attribute is visible
                     if self.is_visible(Some(&*now), Some(cur)) {
@@ -496,7 +496,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 let mut xml_space_attr = None;
 
                 // Add all visible attributes from current node.
-                let mut attr = XmlAttrPtr::from_raw(cur.properties).unwrap();
+                let mut attr = cur.properties;
                 while let Some(now) = attr {
                     // special processing for XML attribute kiks in only when we have invisible parents
                     if !parent_visible || !xml_c14n_is_xml_attr(now) {
@@ -1006,7 +1006,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // add attributes
-        let mut attr = XmlAttrPtr::from_raw(cur.properties).unwrap();
+        let mut attr = cur.properties;
         while let Some(cur_attr) = attr {
             // we need to check that attribute is visible and has non
             // default namespace (XML Namespaces: "default namespaces

@@ -1564,7 +1564,7 @@ unsafe fn xml_sax2_attribute_internal(
         let namespace = (*(*ctxt).node).search_ns((*ctxt).my_doc, Some(ns));
 
         if let Some(namespace) = namespace {
-            let mut prop = XmlAttrPtr::from_raw((*(*ctxt).node).properties).unwrap();
+            let mut prop = (*(*ctxt).node).properties;
             while let Some(now) = prop {
                 if Some(name) == now.name().as_deref()
                     && now
@@ -2451,14 +2451,14 @@ unsafe fn xml_sax2_attribute_ns(
         ret.name = xml_strdup(localname);
 
         // link at the end to preserve order, TODO speed up with a last
-        if let Some(mut prev) = XmlAttrPtr::from_raw((*(*ctxt).node).properties).unwrap() {
+        if let Some(mut prev) = (*(*ctxt).node).properties {
             while let Some(next) = prev.next {
                 prev = next;
             }
             prev.next = Some(ret);
             ret.prev = Some(prev);
         } else {
-            (*(*ctxt).node).properties = ret.as_ptr();
+            (*(*ctxt).node).properties = Some(ret);
         }
 
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0

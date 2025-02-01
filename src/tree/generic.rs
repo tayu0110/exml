@@ -376,7 +376,7 @@ pub trait NodeCommon {
             if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 return null_mut();
             }
-            if !(*(self as *mut Self as *mut XmlNode)).properties.is_null() {
+            if (*(self as *mut Self as *mut XmlNode)).properties.is_some() {
                 // check if an attribute with the same name exists
 
                 let lastattr = if let Some(ns) = (*cur).ns {
@@ -410,9 +410,7 @@ pub trait NodeCommon {
                     _ => {}
                 }
             }
-            if let Some(mut lastattr) =
-                XmlAttrPtr::from_raw((*(self as *mut Self as *mut XmlNode)).properties).unwrap()
-            {
+            if let Some(mut lastattr) = (*(self as *mut Self as *mut XmlNode)).properties {
                 // find the end
                 while let Some(next) = lastattr.next {
                     lastattr = next;
@@ -420,7 +418,8 @@ pub trait NodeCommon {
                 lastattr.next = XmlAttrPtr::from_raw(cur as _).unwrap();
                 (*(cur as *mut XmlAttr)).prev = Some(lastattr);
             } else {
-                (*(self as *mut Self as *mut XmlNode)).properties = cur as _;
+                (*(self as *mut Self as *mut XmlNode)).properties =
+                    XmlAttrPtr::from_raw(cur as _).unwrap();
             }
         } else if self.children().is_none() {
             self.set_children(NodePtr::from_ptr(cur));
@@ -652,10 +651,10 @@ pub trait NodeCommon {
         }
         if let Some(mut parent) = self.parent() {
             if matches!(self.element_type(), XmlElementType::XmlAttributeNode) {
-                if parent.properties == self as *mut Self as *mut XmlAttr {
-                    parent.properties = (*(self as *mut Self as *mut XmlAttr))
-                        .next
-                        .map_or(null_mut(), |next| next.as_ptr());
+                if parent.properties.map_or(null_mut(), |prop| prop.as_ptr())
+                    == self as *mut Self as *mut XmlAttr
+                {
+                    parent.properties = (*(self as *mut Self as *mut XmlAttr)).next;
                 }
             } else {
                 if parent.children() == NodePtr::from_ptr(self as *mut Self as *mut XmlNode) {

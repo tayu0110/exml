@@ -3565,7 +3565,7 @@ pub unsafe fn xml_validate_element(
         ret &= xml_validate_one_element(ctxt, doc, elem);
 
         if matches!((*elem).element_type(), XmlElementType::XmlElementNode) {
-            let mut attr = XmlAttrPtr::from_raw((*elem).properties).unwrap();
+            let mut attr = (*elem).properties;
             while let Some(now) = attr {
                 let value = now
                     .children
@@ -5147,7 +5147,7 @@ pub unsafe fn xml_validate_one_element(
                         ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 } else {
-                    let mut attrib = XmlAttrPtr::from_raw((*elem).properties).unwrap();
+                    let mut attrib = (*elem).properties;
                     while let Some(attr) = attrib {
                         if xml_str_equal(attr.name, cur_attr.name) {
                             if let Some(prefix) = cur_attr.prefix.as_deref() {

@@ -726,30 +726,30 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         }
                         if adoptns == 0 {
                             // goto ns_end;
-                            if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                                && !(*cur).properties.is_null()
-                            {
-                                // Process attributes.
-                                cur = (*cur).properties as _;
-                                if cur.is_null() {
-                                    break 'main;
+                            if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+                                if let Some(prop) = (*cur).properties {
+                                    // Process attributes.
+                                    cur = prop.as_ptr() as _;
+                                    if cur.is_null() {
+                                        break 'main;
+                                    }
+                                    continue 'main;
                                 }
-                                continue 'main;
                             }
                         }
 
                         // No ns, no fun.
                         if (*cur).ns.is_none() {
                             // goto ns_end;
-                            if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                                && !(*cur).properties.is_null()
-                            {
-                                // Process attributes.
-                                cur = (*cur).properties as _;
-                                if cur.is_null() {
-                                    break 'main;
+                            if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+                                if let Some(prop) = (*cur).properties {
+                                    // Process attributes.
+                                    cur = prop.as_ptr() as _;
+                                    if cur.is_null() {
+                                        break 'main;
+                                    }
+                                    continue 'main;
                                 }
-                                continue 'main;
                             }
                         }
 
@@ -786,14 +786,15 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                                     if matches!(
                                         (*cur).element_type(),
                                         XmlElementType::XmlElementNode
-                                    ) && !(*cur).properties.is_null()
-                                    {
-                                        // Process attributes.
-                                        cur = (*cur).properties as _;
-                                        if cur.is_null() {
-                                            break 'main;
+                                    ) {
+                                        if let Some(prop) = (*cur).properties {
+                                            // Process attributes.
+                                            cur = prop.as_ptr() as _;
+                                            if cur.is_null() {
+                                                break 'main;
+                                            }
+                                            continue 'main;
                                         }
-                                        continue 'main;
                                     }
                                 }
                             });
@@ -817,15 +818,15 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         (*cur).ns = ns;
 
                         // ns_end:
-                        if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                            && !(*cur).properties.is_null()
-                        {
-                            // Process attributes.
-                            cur = (*cur).properties as _;
-                            if cur.is_null() {
-                                break 'main;
+                        if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+                            if let Some(prop) = (*cur).properties {
+                                // Process attributes.
+                                cur = prop.as_ptr() as _;
+                                if cur.is_null() {
+                                    break 'main;
+                                }
+                                continue 'main;
                             }
-                            continue 'main;
                         }
                     }
                     XmlElementType::XmlAttributeNode => {
@@ -862,14 +863,15 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                                     if matches!(
                                         (*cur).element_type(),
                                         XmlElementType::XmlElementNode
-                                    ) && !(*cur).properties.is_null()
-                                    {
-                                        // Process attributes.
-                                        cur = (*cur).properties as _;
-                                        if cur.is_null() {
-                                            break 'main;
+                                    ) {
+                                        if let Some(prop) = (*cur).properties {
+                                            // Process attributes.
+                                            cur = prop.as_ptr() as _;
+                                            if cur.is_null() {
+                                                break 'main;
+                                            }
+                                            continue 'main;
                                         }
-                                        continue 'main;
                                     }
                                 }
                             });
@@ -893,15 +895,15 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         (*cur).ns = ns;
 
                         // ns_end:
-                        if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                            && !(*cur).properties.is_null()
-                        {
-                            // Process attributes.
-                            cur = (*cur).properties as _;
-                            if cur.is_null() {
-                                break 'main;
+                        if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+                            if let Some(prop) = (*cur).properties {
+                                // Process attributes.
+                                cur = prop.as_ptr() as _;
+                                if cur.is_null() {
+                                    break 'main;
+                                }
+                                continue 'main;
                             }
-                            continue 'main;
                         }
                     }
                     _ => {
@@ -1244,9 +1246,9 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             (*cur).line = 0;
                             (*cur).extra = 0;
                             // Walk attributes.
-                            if !(*cur).properties.is_null() {
+                            if let Some(prop) = (*cur).properties {
                                 // Process first attribute node.
-                                cur = (*cur).properties as _;
+                                cur = prop.as_ptr() as _;
                                 continue;
                             }
                         }
@@ -1812,11 +1814,11 @@ pub unsafe fn xml_dom_wrap_remove_node(
                     }
                     (*node).ns = ns;
                 }
-                if matches!((*node).element_type(), XmlElementType::XmlElementNode)
-                    && !(*node).properties.is_null()
-                {
-                    node = (*node).properties as _;
-                    continue;
+                if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
+                    if let Some(prop) = (*node).properties {
+                        node = prop.as_ptr() as _;
+                        continue;
+                    }
                 }
             }
             XmlElementType::XmlAttributeNode => {
@@ -1884,11 +1886,11 @@ pub unsafe fn xml_dom_wrap_remove_node(
                     }
                     (*node).ns = ns;
                 }
-                if matches!((*node).element_type(), XmlElementType::XmlElementNode)
-                    && !(*node).properties.is_null()
-                {
-                    node = (*node).properties as _;
-                    continue;
+                if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
+                    if let Some(prop) = (*node).properties {
+                        node = prop.as_ptr() as _;
+                        continue;
+                    }
                 }
             }
             _ => {
@@ -2084,7 +2086,8 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 (*prev_clone).next = NodePtr::from_ptr(clone);
                                 (*clone).prev = NodePtr::from_ptr(prev_clone);
                             } else {
-                                (*parent_clone).properties = clone as _;
+                                (*parent_clone).properties =
+                                    XmlAttrPtr::from_raw(clone as _).unwrap();
                             }
                         } else {
                             result_clone = clone;
@@ -2370,13 +2373,13 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     // The following will traverse the tree **************************
                     //
                     // Walk the element's attributes before descending into child-nodes.
-                    if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                        && !(*cur).properties.is_null()
-                    {
-                        prev_clone = null_mut();
-                        parent_clone = clone;
-                        cur = (*cur).properties as _;
-                        continue 'main;
+                    if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+                        if let Some(prop) = (*cur).properties {
+                            prev_clone = null_mut();
+                            parent_clone = clone;
+                            cur = prop.as_ptr() as _;
+                            continue 'main;
+                        }
                     }
                     // into_content:
                     // Descend into child-nodes.

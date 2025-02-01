@@ -5628,7 +5628,7 @@ unsafe fn xml_schema_get_prop_node(node: *mut XmlNode, name: *const c_char) -> O
     if node.is_null() || name.is_null() {
         return None;
     }
-    let mut prop = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut prop = (*node).properties;
     while let Some(now) = prop {
         if now.ns.is_none() && xml_str_equal(now.name, name as _) {
             return Some(now);
@@ -6449,7 +6449,7 @@ unsafe fn xml_schema_get_prop_node_ns(
     if node.is_null() || name.is_null() {
         return None;
     }
-    let mut prop = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut prop = (*node).properties;
     while let Some(now) = prop {
         if xml_str_equal(now.name, name as _)
             && now.ns.map_or(false, |ns| xml_str_equal(ns.href, uri as _))
@@ -6561,7 +6561,7 @@ unsafe fn xml_schema_parse_annotation(
     } else {
         null_mut()
     };
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(now) = attr {
         if (now.ns.is_none() && !xml_str_equal(now.name, c"id".as_ptr() as _))
             || now.ns.map_or(false, |ns| {
@@ -6587,7 +6587,7 @@ unsafe fn xml_schema_parse_annotation(
             // source = anyURI
             // {any attributes with non-schema namespace . . .}>
             // Content: ({any})*
-            let mut attr = XmlAttrPtr::from_raw((*child).properties).unwrap();
+            let mut attr = (*child).properties;
             while let Some(now) = attr {
                 if (now.ns.is_none() && !xml_str_equal(now.name, c"source".as_ptr() as _))
                     || now.ns.map_or(false, |ns| {
@@ -6618,7 +6618,7 @@ unsafe fn xml_schema_parse_annotation(
             // source = anyURI
             // {any attributes with non-schema namespace . . .}>
             // Content: ({any})*
-            let mut attr = XmlAttrPtr::from_raw((*child).properties).unwrap();
+            let mut attr = (*child).properties;
             while let Some(cur_attr) = attr {
                 if let Some(ns) = cur_attr.ns {
                     if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _)
@@ -6890,7 +6890,7 @@ unsafe fn xml_schema_parse_include_or_redefine_attrs(
     *schema_location = null_mut();
     // Check for illegal attributes.
     // Applies for both <include> and <redefine>.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -7925,7 +7925,7 @@ unsafe fn xml_schema_parse_model_group_def_ref(
         c"(xs:nonNegativeInteger | unbounded)".as_ptr() as _,
     );
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -8124,7 +8124,7 @@ unsafe fn xml_schema_parse_local_attribute(
     }
     let nberrors: i32 = (*pctxt).nberrors;
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         'attr_next: {
             if let Some(ns) = cur_attr.ns {
@@ -8600,7 +8600,7 @@ unsafe fn xml_schema_parse_attribute_group_ref(
     }
 
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -8973,7 +8973,7 @@ unsafe fn xml_schema_parse_any_attribute(
         return null_mut();
     }
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -9045,7 +9045,7 @@ unsafe fn xml_schema_parse_extension(
     (*typ).flags |= XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION;
 
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -9206,7 +9206,7 @@ unsafe fn xml_schema_parse_simple_content(
     let typ: XmlSchemaTypePtr = (*ctxt).ctxt_type;
     (*typ).content_type = XmlSchemaContentType::XmlSchemaContentSimple;
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -9319,7 +9319,7 @@ unsafe fn xml_schema_parse_complex_content(
     // Not a component, don't create it.
     let typ: XmlSchemaTypePtr = (*ctxt).ctxt_type;
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -9510,7 +9510,7 @@ unsafe fn xml_schema_parse_complex_type(
     }
     (*typ).target_namespace = (*ctxt).target_namespace;
     // Handle attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -9939,7 +9939,7 @@ unsafe fn xml_schema_parse_idcselector_and_field(
     let mut child: *mut XmlNode;
 
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -10042,7 +10042,7 @@ unsafe fn xml_schema_parse_idc(
     let mut last_field: XmlSchemaIdcselectPtr = null_mut();
 
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -10315,7 +10315,7 @@ unsafe fn xml_schema_parse_element(
                     );
                 }
                 // Check for illegal attributes.
-                let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+                let mut attr = (*node).properties;
                 while let Some(cur_attr) = attr {
                     if let Some(ns) = cur_attr.ns {
                         if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -10432,7 +10432,7 @@ unsafe fn xml_schema_parse_element(
         }
 
         // Check for illegal attributes.
-        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        let mut attr = (*node).properties;
         while let Some(cur_attr) = attr {
             if let Some(ns) = cur_attr.ns {
                 if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -10746,7 +10746,7 @@ unsafe fn xml_schema_parse_any(
         return null_mut();
     }
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -10888,7 +10888,7 @@ unsafe fn xml_schema_parse_model_group(
         }
         (*particle).children = item as XmlSchemaTreeItemPtr;
         // Check for illegal attributes.
-        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        let mut attr = (*node).properties;
         while let Some(cur_attr) = attr {
             if let Some(ns) = cur_attr.ns {
                 if xml_str_equal(ns.href as _, XML_SCHEMA_NS.as_ptr() as _) {
@@ -10914,7 +10914,7 @@ unsafe fn xml_schema_parse_model_group(
         }
     } else {
         // Check for illegal attributes.
-        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        let mut attr = (*node).properties;
         while let Some(cur_attr) = attr {
             if let Some(ns) = cur_attr.ns {
                 if xml_str_equal(ns.href as _, XML_SCHEMA_NS.as_ptr() as _) {
@@ -11275,7 +11275,7 @@ unsafe fn xml_schema_parse_restriction(
     (*typ).flags |= XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION;
 
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -11601,7 +11601,7 @@ unsafe fn xml_schema_parse_list(
     // then the `simple ur-type definition`."
     (*typ).base_type = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnysimpletype);
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -11729,7 +11729,7 @@ unsafe fn xml_schema_parse_union(
     // then the `simple ur-type definition`."
     (*typ).base_type = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnysimpletype);
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -11998,7 +11998,7 @@ unsafe fn xml_schema_parse_simple_type(
         (*typ).typ = XmlSchemaTypeType::XmlSchemaTypeSimple;
         (*typ).content_type = XmlSchemaContentType::XmlSchemaContentSimple;
         // Check for illegal attributes.
-        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        let mut attr = (*node).properties;
         while let Some(cur_attr) = attr {
             if let Some(ns) = cur_attr.ns {
                 if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -12039,7 +12039,7 @@ unsafe fn xml_schema_parse_simple_type(
         (*typ).content_type = XmlSchemaContentType::XmlSchemaContentSimple;
         (*typ).flags |= XML_SCHEMAS_TYPE_GLOBAL;
         // Check for illegal attributes.
-        let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        let mut attr = (*node).properties;
         while let Some(cur_attr) = attr {
             if let Some(ns) = cur_attr.ns {
                 if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -12257,7 +12257,7 @@ unsafe fn xml_schema_parse_model_group_definition(
         return null_mut();
     }
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -12424,7 +12424,7 @@ unsafe fn xml_schema_parse_attribute_group_definition(
         return null_mut();
     }
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -12737,7 +12737,7 @@ unsafe fn xml_schema_parse_import(
     }
 
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -13033,7 +13033,7 @@ unsafe fn xml_schema_parse_global_attribute(
     (*ret).flags |= XML_SCHEMAS_ATTR_GLOBAL;
 
     // Check for illegal attributes.
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(cur_attr) = attr {
         if let Some(ns) = cur_attr.ns {
             if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _) {
@@ -27751,8 +27751,8 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 // Register attributes.
                 // DOC VAL TODO: We do not register namespace declaration attributes yet.
                 (*vctxt).nb_attr_infos = 0;
-                if !(*node).properties.is_null() {
-                    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+                if (*node).properties.is_some() {
+                    let mut attr = (*node).properties;
                     while let Some(cur_attr) = attr {
                         if let Some(ns) = cur_attr.ns {
                             ns_name = ns.href;

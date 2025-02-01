@@ -1574,7 +1574,7 @@ impl XmlTextReader {
         };
 
         if (*node).element_type() == XmlElementType::XmlElementNode
-            && (!(*node).properties.is_null() || (*node).ns_def.is_some())
+            && ((*node).properties.is_some() || (*node).ns_def.is_some())
         {
             return true;
         }
@@ -1763,7 +1763,7 @@ impl XmlTextReader {
                     .into_owned(),
             );
         }
-        let mut cur = XmlAttrPtr::from_raw((*self.node).properties).unwrap()?;
+        let mut cur = (*self.node).properties?;
         for _ in i..no {
             cur = cur.next?;
         }
@@ -1910,7 +1910,7 @@ impl XmlTextReader {
     pub unsafe fn move_to_attribute(&mut self, name: &str) -> i32 {
         use crate::{
             parser::split_qname2,
-            tree::{NodeCommon, XmlAttrPtr, XmlNsPtr},
+            tree::{NodeCommon, XmlNsPtr},
         };
 
         if self.node.is_null() {
@@ -1936,7 +1936,7 @@ impl XmlTextReader {
                 return 0;
             }
 
-            let mut prop = XmlAttrPtr::from_raw((*self.node).properties).unwrap();
+            let mut prop = (*self.node).properties;
             while let Some(now) = prop {
                 // One need to have
                 //   - same attribute names
@@ -1964,7 +1964,7 @@ impl XmlTextReader {
             }
         // goto not_found;
         } else {
-            let mut prop = XmlAttrPtr::from_raw((*self.node).properties).unwrap();
+            let mut prop = (*self.node).properties;
             while let Some(now) = prop {
                 // One need to have
                 //   - same attribute names
@@ -1990,7 +1990,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToAttributeNs")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_attribute_ns(&mut self, local_name: &str, namespace_uri: &str) -> i32 {
-        use crate::tree::{NodeCommon, XmlAttrPtr, XmlNsPtr};
+        use crate::tree::{NodeCommon, XmlNsPtr};
 
         if self.node.is_null() {
             return -1;
@@ -2015,7 +2015,7 @@ impl XmlTextReader {
             return 0;
         }
 
-        let mut prop = XmlAttrPtr::from_raw((*node).properties).unwrap();
+        let mut prop = (*node).properties;
         while let Some(now) = prop {
             // One need to have
             //   - same attribute names
@@ -2040,7 +2040,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToAttributeNo")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_attribute_no(&mut self, no: i32) -> i32 {
-        use crate::tree::{NodeCommon, XmlAttrPtr, XmlNsPtr};
+        use crate::tree::{NodeCommon, XmlNsPtr};
 
         if self.node.is_null() {
             return -1;
@@ -2064,7 +2064,7 @@ impl XmlTextReader {
             return 1;
         }
 
-        let Some(mut cur) = XmlAttrPtr::from_raw((*self.node).properties).unwrap() else {
+        let Some(mut cur) = (*self.node).properties else {
             return 0;
         };
 
@@ -2100,8 +2100,8 @@ impl XmlTextReader {
             self.curnode = ns_def.as_ptr() as *mut XmlNode;
             return 1;
         }
-        if !(*self.node).properties.is_null() {
-            self.curnode = (*self.node).properties as *mut XmlNode;
+        if let Some(prop) = (*self.node).properties {
+            self.curnode = prop.as_ptr() as *mut XmlNode;
             return 1;
         }
         0
@@ -2134,8 +2134,8 @@ impl XmlTextReader {
                 self.curnode = ns.next as *mut XmlNode;
                 return 1;
             }
-            if !(*self.node).properties.is_null() {
-                self.curnode = (*self.node).properties as *mut XmlNode;
+            if let Some(prop) = (*self.node).properties {
+                self.curnode = prop.as_ptr() as *mut XmlNode;
                 return 1;
             }
             return 0;
@@ -3628,12 +3628,9 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: *mut
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlXIncludeStart
                     | XmlElementType::XmlXIncludeEnd
-            ) && !(*cur).properties.is_null()
+            ) && (*cur).properties.is_some()
             {
-                xml_text_reader_free_prop_list(
-                    &mut *reader,
-                    XmlAttrPtr::from_raw((*cur).properties).unwrap(),
-                );
+                xml_text_reader_free_prop_list(&mut *reader, (*cur).properties);
             }
             if !matches!(
                 (*cur).element_type(),
@@ -3774,12 +3771,9 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: *mut XmlNode)
         XmlElementType::XmlElementNode
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd
-    ) && !(*cur).properties.is_null()
+    ) && (*cur).properties.is_some()
     {
-        xml_text_reader_free_prop_list(
-            &mut *reader,
-            XmlAttrPtr::from_raw((*cur).properties).unwrap(),
-        );
+        xml_text_reader_free_prop_list(&mut *reader, (*cur).properties);
     }
     if !matches!(
         (*cur).element_type(),
@@ -3919,7 +3913,7 @@ pub unsafe fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32
         return 0;
     }
     ret = 0;
-    let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+    let mut attr = (*node).properties;
     while let Some(now) = attr {
         ret += 1;
         attr = now.next;

@@ -791,9 +791,9 @@ unsafe fn get_api_attr() -> *mut XmlAttr {
     if API_ROOT.get().is_null() {
         return null_mut();
     }
-    if !(*API_ROOT.get()).properties.is_null() {
-        API_ATTR.set((*API_ROOT.get()).properties);
-        return (*API_ROOT.get()).properties;
+    if let Some(prop) = (*API_ROOT.get()).properties {
+        API_ATTR.set(prop.as_ptr());
+        return prop.as_ptr();
     }
     API_ATTR.set(null_mut());
     #[cfg(any(

@@ -58,7 +58,7 @@ pub struct XmlNode {
     /* End of common part */
     pub(crate) ns: Option<XmlNsPtr>, /* pointer to the associated namespace */
     pub content: *mut XmlChar,       /* the content */
-    pub(crate) properties: *mut XmlAttr, /* properties list */
+    pub(crate) properties: Option<XmlAttrPtr>, /* properties list */
     pub ns_def: Option<XmlNsPtr>,    /* namespace definitions on this node */
     pub(crate) psvi: *mut c_void,    /* for type/PSVI information */
     pub(crate) line: u16,            /* line number */
@@ -619,8 +619,8 @@ impl XmlNode {
             return None;
         }
 
-        if !self.properties.is_null() {
-            let mut prop = XmlAttrPtr::from_raw(self.properties).unwrap();
+        if self.properties.is_some() {
+            let mut prop = self.properties;
             if let Some(ns_name) = ns_name {
                 // We want the attr to be in the specified namespace.
                 let ns_name = CString::new(ns_name).unwrap();
@@ -1409,7 +1409,7 @@ impl XmlNode {
                 } else {
                     self.content = null_mut();
                 }
-                self.properties = null_mut();
+                self.properties = None;
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlHTMLDocumentNode
@@ -1484,7 +1484,7 @@ impl XmlNode {
                 } else {
                     self.content = null_mut();
                 }
-                self.properties = null_mut();
+                self.properties = None;
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDTDNode
@@ -1508,7 +1508,7 @@ impl XmlNode {
         }
         if self.document() != doc {
             if matches!(self.element_type(), XmlElementType::XmlElementNode) {
-                let mut prop = XmlAttrPtr::from_raw(self.properties).unwrap();
+                let mut prop = self.properties;
                 while let Some(mut now) = prop {
                     if matches!(now.atype, Some(XmlAttributeType::XmlAttributeID)) {
                         xml_remove_id(self.document(), now);
@@ -1573,7 +1573,7 @@ impl XmlNode {
             return None;
         }
         // Check on the properties attached to the node
-        let mut prop = XmlAttrPtr::from_raw(self.properties).unwrap();
+        let mut prop = self.properties;
         while let Some(now) = prop {
             if now.name().as_deref() == Some(name) {
                 return Some(Ok(now));
@@ -2123,7 +2123,7 @@ impl XmlNode {
             }
             // now check for namespace held by attributes on the node.
             if matches!((*node).typ, XmlElementType::XmlElementNode) {
-                let mut attr = XmlAttrPtr::from_raw((*node).properties).unwrap();
+                let mut attr = (*node).properties;
                 while let Some(mut now) = attr {
                     if let Some(mut attr_ns) = now.ns {
                         // initialize the cache if needed
@@ -2202,7 +2202,7 @@ impl Default for XmlNode {
             doc: null_mut(),
             ns: None,
             content: null_mut(),
-            properties: null_mut(),
+            properties: None,
             ns_def: None,
             psvi: null_mut(),
             line: 0,
@@ -2382,7 +2382,7 @@ unsafe fn add_prop_sibling(
         (*cur).prev = NodePtr::from_ptr(prop);
     }
     if let Some(mut parent) = (*prop).parent.filter(|_| (*prop).prev.is_none()) {
-        parent.properties = prop as _;
+        parent.properties = XmlAttrPtr::from_raw(prop as _).unwrap();
     }
     if let Some(Ok(mut attr)) = attr {
         /* ifferent instance, destroy it (attributes must e unique) */

@@ -197,9 +197,9 @@ impl XmlAttrPtr {
         let Some(mut parent) = self.parent else {
             return -1;
         };
-        let mut tmp = XmlAttrPtr::from_raw(parent.properties).unwrap();
+        let mut tmp = parent.properties;
         if tmp == Some(*self) {
-            parent.properties = self.next.map_or(null_mut(), |next| next.as_ptr());
+            parent.properties = self.next;
             if let Some(mut next) = self.next {
                 next.prev = None;
             }
@@ -373,14 +373,14 @@ pub(super) unsafe fn xml_new_prop_internal(
 
     // Add it at the end to preserve parsing order ...
     if !node.is_null() {
-        if let Some(mut prev) = XmlAttrPtr::from_raw((*node).properties).unwrap() {
+        if let Some(mut prev) = (*node).properties {
             while let Some(next) = prev.next {
                 prev = next;
             }
             prev.next = Some(cur);
             cur.prev = Some(prev);
         } else {
-            (*node).properties = cur.as_ptr();
+            (*node).properties = Some(cur);
         }
     }
 

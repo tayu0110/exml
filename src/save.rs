@@ -847,7 +847,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                     if let Some(ns_def) = (*cur).ns_def {
                         xml_ns_list_dump_output_ctxt(ctxt, Some(ns_def));
                     }
-                    let mut attr = XmlAttrPtr::from_raw((*cur).properties).unwrap();
+                    let mut attr = (*cur).properties;
                     while let Some(now) = attr {
                         xml_attr_dump_output(ctxt, &now);
                         attr = now.next;
@@ -1400,11 +1400,8 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                         .borrow_mut()
                         .write_str(" xmlns=\"http://www.w3.org/1999/xhtml\"");
                 }
-                if !(*cur).properties.is_null() {
-                    xhtml_attr_list_dump_output(
-                        ctxt,
-                        XmlAttrPtr::from_raw((*cur).properties).unwrap(),
-                    );
+                if (*cur).properties.is_some() {
+                    xhtml_attr_list_dump_output(ctxt, (*cur).properties);
                 }
 
                 if !parent.is_null()
