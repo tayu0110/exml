@@ -55,7 +55,7 @@ use crate::{
     tree::{
         xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
-        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc,
+        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc, XmlDocPtr,
         XmlElementType, XmlEntityPtr, XmlEntityType, XmlNode, XML_XML_NAMESPACE,
     },
     uri::{build_relative_uri, build_uri, escape_url, XmlURI},
@@ -2459,7 +2459,8 @@ pub unsafe fn xml_xinclude_process_tree_flags_data(
         return -1;
     }
 
-    let ctxt: XmlXincludeCtxtPtr = xml_xinclude_new_context((*tree).doc);
+    let ctxt: XmlXincludeCtxtPtr =
+        xml_xinclude_new_context(XmlDocPtr::from_raw((*tree).doc).unwrap().unwrap());
     if ctxt.is_null() {
         return -1;
     }
@@ -2502,7 +2503,8 @@ pub unsafe fn xml_xinclude_process_tree_flags(tree: *mut XmlNode, flags: i32) ->
     {
         return -1;
     }
-    let ctxt: XmlXincludeCtxtPtr = xml_xinclude_new_context((*tree).doc);
+    let ctxt: XmlXincludeCtxtPtr =
+        xml_xinclude_new_context(XmlDocPtr::from_raw((*tree).doc).unwrap().unwrap());
     if ctxt.is_null() {
         return -1;
     }
@@ -2526,21 +2528,18 @@ pub unsafe fn xml_xinclude_process_tree_flags(tree: *mut XmlNode, flags: i32) ->
 ///
 /// Returns the new set
 #[doc(alias = "xmlXIncludeNewContext")]
-pub unsafe fn xml_xinclude_new_context(doc: *mut XmlDoc) -> XmlXincludeCtxtPtr {
-    if doc.is_null() {
-        return null_mut();
-    }
+pub unsafe fn xml_xinclude_new_context(doc: XmlDocPtr) -> XmlXincludeCtxtPtr {
     let ret: XmlXincludeCtxtPtr = xml_malloc(size_of::<XmlXincludeCtxt>()) as XmlXincludeCtxtPtr;
     if ret.is_null() {
         xml_xinclude_err_memory(
             null_mut(),
-            doc as *mut XmlNode,
+            doc.as_ptr() as *mut XmlNode,
             Some("creating XInclude context"),
         );
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXincludeCtxt>());
-    (*ret).doc = doc;
+    (*ret).doc = doc.as_ptr();
     (*ret).inc_nr = 0;
     (*ret).inc_max = 0;
     (*ret).inc_tab = null_mut();

@@ -63,7 +63,7 @@ impl Default for XmlAttribute {
     fn default() -> Self {
         Self {
             _private: null_mut(),
-            typ: XmlElementType::default(),
+            typ: XmlElementType::XmlAttributeDecl,
             name: null_mut(),
             children: None,
             last: None,

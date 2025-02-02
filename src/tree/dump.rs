@@ -41,7 +41,7 @@ use crate::{
     tree::is_xhtml,
 };
 
-use super::{XmlDoc, XmlElementType, XmlNode};
+use super::{XmlDoc, XmlDocPtr, XmlElementType, XmlNode};
 
 impl XmlDoc {
     /// Dump the current DOM tree into memory using the character encoding specified by the caller.  
@@ -105,7 +105,7 @@ impl XmlDoc {
         ctxt.encoding = encoding;
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(self);
+        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
         out_buff.borrow_mut().flush();
         if let Some(conv) = out_buff.borrow().conv {
             *doc_txt_len = conv.len() as i32;
@@ -210,7 +210,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(self);
+        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
 
         let buf = ctxt.buf.clone();
         drop(ctxt);
@@ -279,7 +279,7 @@ impl XmlDoc {
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
 
-        ctxt.doc_content_dump_output(self);
+        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
 
         let buf = ctxt.buf.clone();
         drop(ctxt);
@@ -353,7 +353,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(self);
+        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
         let buf = ctxt.buf.clone();
         drop(ctxt);
         let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
@@ -388,7 +388,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(self);
+        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
         let buf = ctxt.buf.clone();
         drop(ctxt);
         let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();

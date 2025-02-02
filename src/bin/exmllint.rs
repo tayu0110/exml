@@ -96,9 +96,9 @@ use exml::{
     save::{XmlSaveCtxt, XmlSaveOption},
     tree::{
         xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc,
-        xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd,
-        XmlDtdPtr, XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType,
-        XmlEnumeration, XmlNode,
+        xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
+        XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityPtr,
+        XmlEntityType, XmlEnumeration, XmlNode,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
 };
@@ -3044,7 +3044,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 };
 
                 if let Some(mut ctxt) = ctxt {
-                    if ctxt.save_doc(doc) < 0 {
+                    if ctxt.save_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap()) < 0 {
                         let o = CMD_ARGS.output.as_deref().unwrap_or("-");
                         eprintln!("failed save to {o}");
                         PROGRESULT.store(ERR_OUT, Ordering::Relaxed);

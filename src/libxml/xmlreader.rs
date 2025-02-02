@@ -345,7 +345,7 @@ impl XmlTextReader {
     pub unsafe fn read(&mut self) -> i32 {
         use crate::{
             libxml::xinclude::{XINCLUDE_NS, XINCLUDE_OLD_NS},
-            tree::{NodeCommon, NodePtr},
+            tree::{NodeCommon, NodePtr, XmlDocPtr},
         };
 
         let mut val: i32;
@@ -628,7 +628,9 @@ impl XmlTextReader {
                     })
                 {
                     if self.xincctxt.is_null() {
-                        self.xincctxt = xml_xinclude_new_context((*self.ctxt).my_doc);
+                        self.xincctxt = xml_xinclude_new_context(
+                            XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap().unwrap(),
+                        );
                         xml_xinclude_set_flags(
                             self.xincctxt,
                             self.parser_flags & !(XmlParserOption::XmlParseNoXIncnode as i32),
@@ -748,7 +750,10 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadInnerXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_inner_xml(&mut self) -> *mut XmlChar {
-        use crate::{libxml::xmlstring::xml_strndup, tree::NodeCommon};
+        use crate::{
+            libxml::xmlstring::xml_strndup,
+            tree::{NodeCommon, XmlDocPtr},
+        };
 
         let mut node: *mut XmlNode;
         let mut cur_node: *mut XmlNode;
@@ -756,15 +761,17 @@ impl XmlTextReader {
         if self.expand().is_null() {
             return null_mut();
         }
-        let doc: *mut XmlDoc = (*self.node).doc;
+        let doc = XmlDocPtr::from_raw((*self.node).doc).unwrap();
         let mut buff = vec![];
         cur_node = (*self.node).children().map_or(null_mut(), |c| c.as_ptr());
         while !cur_node.is_null() {
             /* XXX: Why is the node copied? */
-            node = xml_doc_copy_node(cur_node, doc, 1);
+            node = xml_doc_copy_node(cur_node, doc.map_or(null_mut(), |doc| doc.as_ptr()), 1);
             /* XXX: Why do we need a second buffer? */
             let mut buff2 = vec![];
-            if (*node).dump_memory(&mut buff2, doc, 0, 0) == 0 {
+            if (*node).dump_memory(&mut buff2, doc.map_or(null_mut(), |doc| doc.as_ptr()), 0, 0)
+                == 0
+            {
                 xml_free_node(node);
                 return null_mut();
             }
@@ -784,7 +791,7 @@ impl XmlTextReader {
     pub unsafe fn read_outer_xml(&mut self) -> *mut XmlChar {
         use crate::{
             libxml::xmlstring::xml_strndup,
-            tree::{NodeCommon, XmlDtd, XmlDtdPtr},
+            tree::{NodeCommon, XmlDocPtr, XmlDtd, XmlDtdPtr},
         };
 
         let mut node: *mut XmlNode;
@@ -793,16 +800,16 @@ impl XmlTextReader {
             return null_mut();
         }
         node = self.node;
-        let doc: *mut XmlDoc = (*node).doc;
+        let doc = XmlDocPtr::from_raw((*node).doc).unwrap();
         // XXX: Why is the node copied?
         if (*node).element_type() == XmlElementType::XmlDTDNode {
             node = xml_copy_dtd(XmlDtdPtr::from_raw(node as *mut XmlDtd).unwrap().unwrap())
                 .map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNode;
         } else {
-            node = xml_doc_copy_node(node, doc, 1);
+            node = xml_doc_copy_node(node, doc.map_or(null_mut(), |doc| doc.as_ptr()), 1);
         }
         let mut buff = vec![];
-        if (*node).dump_memory(&mut buff, doc, 0, 0) == 0 {
+        if (*node).dump_memory(&mut buff, doc.map_or(null_mut(), |doc| doc.as_ptr()), 0, 0) == 0 {
             xml_free_node(node);
             return null_mut();
         }
@@ -2670,17 +2677,15 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderStandalone")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn standalone(&self) -> Option<bool> {
-        let mut doc: *mut XmlDoc = null_mut();
-        if !self.doc.is_null() {
-            doc = self.doc;
-        } else if !self.ctxt.is_null() {
-            doc = (*self.ctxt).my_doc;
-        }
-        if doc.is_null() {
-            return None;
-        }
+        use crate::tree::XmlDocPtr;
 
-        match (*doc).standalone {
+        let doc = XmlDocPtr::from_raw(self.doc).unwrap().or_else(|| {
+            (!self.ctxt.is_null())
+                .then(|| XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap())
+                .flatten()
+        })?;
+
+        match doc.standalone {
             1 => Some(true),
             0 => Some(false),
             _ => None,
@@ -4318,17 +4323,17 @@ pub unsafe fn xml_text_reader_lookup_namespace(
 pub unsafe fn xml_text_reader_const_encoding(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
-    let mut doc: *mut XmlDoc = null_mut();
-    if !reader.doc.is_null() {
-        doc = reader.doc;
-    } else if !reader.ctxt.is_null() {
-        doc = (*reader.ctxt).my_doc;
-    }
-    if doc.is_null() {
-        return null_mut();
-    }
+    use crate::tree::XmlDocPtr;
 
-    if let Some(encoding) = (*doc).encoding.as_deref() {
+    let Some(doc) = XmlDocPtr::from_raw(reader.doc).unwrap().or_else(|| {
+        (!reader.ctxt.is_null())
+            .then(|| XmlDocPtr::from_raw((*reader.ctxt).my_doc).unwrap())
+            .flatten()
+    }) else {
+        return null_mut();
+    };
+
+    if let Some(encoding) = doc.encoding.as_deref() {
         let encoding = CString::new(encoding).unwrap();
         CONSTSTR!(reader, encoding.as_ptr() as *const u8)
     } else {
@@ -4869,6 +4874,8 @@ unsafe fn xml_text_reader_locator(
     file: *mut Option<String>,
     line: *mut u64,
 ) -> i32 {
+    use crate::tree::XmlDocPtr;
+
     if ctx.is_null() || (file.is_null() && line.is_null()) {
         return -1;
     }
@@ -4903,9 +4910,12 @@ unsafe fn xml_text_reader_locator(
             }
         }
         if !file.is_null() {
-            let doc: *mut XmlDoc = (*(*reader).node).doc;
-            if !doc.is_null() && (*doc).url.is_some() {
-                *file = (*doc).url.clone();
+            if let Some(url) = XmlDocPtr::from_raw((*(*reader).node).doc)
+                .unwrap()
+                .as_deref()
+                .and_then(|doc| doc.url.as_deref())
+            {
+                *file = Some(url.to_owned());
             } else {
                 ret = -1;
             }
@@ -5170,23 +5180,20 @@ pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSc
 /// The string is deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstXmlVersion")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe fn xml_text_reader_const_xml_version(reader: XmlTextReaderPtr) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_xml_version(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
-    let mut doc: *mut XmlDoc = null_mut();
-    if reader.is_null() {
-        return null_mut();
-    }
-    if !(*reader).doc.is_null() {
-        doc = (*reader).doc;
-    } else if !(*reader).ctxt.is_null() {
-        doc = (*(*reader).ctxt).my_doc;
-    }
-    if doc.is_null() {
-        return null_mut();
-    }
+    use crate::tree::XmlDocPtr;
 
-    if let Some(version) = (*doc).version.as_deref() {
+    let Some(doc) = XmlDocPtr::from_raw(reader.doc).unwrap().or_else(|| {
+        (!reader.ctxt.is_null())
+            .then(|| XmlDocPtr::from_raw((*reader.ctxt).my_doc).unwrap())
+            .flatten()
+    }) else {
+        return null_mut();
+    };
+
+    if let Some(version) = doc.version.as_deref() {
         let version = CString::new(version).unwrap();
         CONSTSTR!(reader, version.as_ptr() as *const u8)
     } else {
@@ -5816,36 +5823,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlReaderWalker()");
                     eprintln!(" {}", n_doc);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_const_xml_version() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_const_xml_version(reader);
-                desret_const_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderConstXmlVersion",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderConstXmlVersion()"
-                    );
-                    eprintln!(" {}", n_reader);
                 }
             }
         }

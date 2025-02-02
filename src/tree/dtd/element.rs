@@ -69,7 +69,7 @@ impl Default for XmlElement {
     fn default() -> Self {
         Self {
             _private: null_mut(),
-            typ: XmlElementType::XmlInvalidNode,
+            typ: XmlElementType::XmlElementDecl,
             name: None,
             children: None,
             last: None,

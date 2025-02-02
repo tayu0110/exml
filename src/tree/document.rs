@@ -19,8 +19,15 @@
 // daniel@veillard.com
 
 use std::{
-    borrow::Cow, collections::HashMap, ffi::CStr, os::raw::c_void, ptr::null_mut,
-    slice::from_raw_parts, sync::atomic::Ordering,
+    any::type_name,
+    borrow::Cow,
+    collections::HashMap,
+    ffi::CStr,
+    ops::{Deref, DerefMut},
+    os::raw::c_void,
+    ptr::{null_mut, NonNull},
+    slice::from_raw_parts,
+    sync::atomic::Ordering,
 };
 
 use libc::memset;
@@ -39,9 +46,10 @@ use crate::{
 
 use super::{
     xml_free_node_list, xml_get_doc_entity, xml_new_doc_text, xml_new_reference, xml_tree_err,
-    xml_tree_err_memory, NodeCommon, NodePtr, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType,
-    XmlEntityType, XmlID, XmlNode, XmlNs, XmlNsPtr, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
-    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
+    xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDocProperties,
+    XmlDtd, XmlDtdPtr, XmlElementType, XmlEntityType, XmlGenericNodePtr, XmlID, XmlNode, XmlNs,
+    XmlNsPtr, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -747,7 +755,7 @@ impl Default for XmlDoc {
     fn default() -> Self {
         Self {
             _private: null_mut(),
-            typ: XmlElementType::default(),
+            typ: XmlElementType::XmlDocumentNode,
             name: null_mut(),
             children: None,
             last: None,
@@ -770,6 +778,128 @@ impl Default for XmlDoc {
             parse_flags: 0,
             properties: 0,
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct XmlDocPtr(NonNull<XmlDoc>);
+
+impl XmlDocPtr {
+    /// Allocate new memory and create new `XmlDocPtr` from an owned xml node.
+    ///
+    /// This method leaks allocated memory.  
+    /// Users can use `free` method for deallocating memory.
+    pub(crate) fn new(node: XmlDoc) -> Option<Self> {
+        let boxed = Box::new(node);
+        NonNull::new(Box::leak(boxed)).map(Self)
+    }
+
+    /// Create `XmlDocPtr` from a raw pointer.  
+    ///
+    /// If `ptr` is a NULL pointer, return `Ok(None)`.  
+    /// If `ptr` is a valid pointer of `XmlDoc`, return `Ok(Some(Self))`.  
+    /// Otherwise, return `Err`.
+    ///
+    /// # Safety
+    /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
+    ///
+    /// # TODO
+    /// - fix to private mathod
+    pub unsafe fn from_raw(ptr: *mut XmlDoc) -> Result<Option<Self>, InvalidNodePointerCastError> {
+        if ptr.is_null() {
+            return Ok(None);
+        }
+        match (*ptr).element_type() {
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                Ok(Some(Self(NonNull::new_unchecked(ptr))))
+            }
+            _ => Err(InvalidNodePointerCastError {
+                from: (*ptr).element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+
+    pub(crate) fn as_ptr(self) -> *mut XmlDoc {
+        self.0.as_ptr()
+    }
+
+    /// Deallocate memory.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn free(self) {
+        let _ = *Box::from_raw(self.0.as_ptr());
+    }
+
+    /// Acquire the ownership of the inner value.  
+    /// As a result, `self` will be invalid. `self` must not be used after performs this method.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn into_inner(self) -> Box<XmlDoc> {
+        Box::from_raw(self.0.as_ptr())
+    }
+}
+
+impl Clone for XmlDocPtr {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl Copy for XmlDocPtr {}
+
+impl Deref for XmlDocPtr {
+    type Target = XmlDoc;
+    fn deref(&self) -> &Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlDoc`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl DerefMut for XmlDocPtr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlDoc`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_mut() }
+    }
+}
+
+impl TryFrom<XmlGenericNodePtr> for XmlDocPtr {
+    type Error = InvalidNodePointerCastError;
+
+    fn try_from(value: XmlGenericNodePtr) -> Result<Self, Self::Error> {
+        match value.element_type() {
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                Ok(Self(value.0.cast()))
+            }
+            _ => Err(InvalidNodePointerCastError {
+                from: value.element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+}
+
+impl From<XmlDocPtr> for XmlGenericNodePtr {
+    fn from(value: XmlDocPtr) -> Self {
+        Self(value.0 as NonNull<dyn NodeCommon>)
+    }
+}
+
+impl From<XmlDocPtr> for *mut XmlDoc {
+    fn from(value: XmlDocPtr) -> Self {
+        value.0.as_ptr()
     }
 }
 
@@ -796,11 +926,9 @@ pub unsafe fn xml_new_doc(version: Option<&str>) -> *mut XmlDoc {
     (*cur).doc = cur;
     (*cur).parse_flags = 0;
     (*cur).properties = XmlDocProperties::XmlDocUserbuilt as i32;
-    /*
-     * The in memory encoding is always UTF8
-     * This field will never change and would
-     * be obsolete if not for binary compatibility.
-     */
+    // The in memory encoding is always UTF8
+    // This field will never change and would
+    // be obsolete if not for binary compatibility.
     (*cur).charset = XmlCharEncoding::UTF8;
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0

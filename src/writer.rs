@@ -54,7 +54,7 @@ use crate::{
     list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
     save::attr_serialize_text_content,
-    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDoc, XmlNode},
+    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDoc, XmlDocPtr, XmlNode},
     uri::canonic_path,
 };
 
@@ -113,7 +113,7 @@ pub struct XmlTextWriter<'a> {
     qchar: u8,
     ctxt: XmlParserCtxtPtr,
     no_doc_free: i32,
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
 }
 
 impl<'a> XmlTextWriter<'a> {
@@ -154,7 +154,7 @@ impl<'a> XmlTextWriter<'a> {
             out,
             ichar: Cow::Borrowed(" "),
             qchar: b'"',
-            doc: xml_new_doc(None),
+            doc: XmlDocPtr::from_raw(xml_new_doc(None)).unwrap(),
             no_doc_free: 0,
             nodes: VecDeque::new(),
             ..Default::default()
@@ -274,19 +274,10 @@ impl<'a> XmlTextWriter<'a> {
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterTree")]
     pub unsafe fn with_tree(
-        doc: *mut XmlDoc,
+        mut doc: XmlDocPtr,
         node: *mut XmlNode,
         compression: i32,
     ) -> Option<Self> {
-        if doc.is_null() {
-            xml_writer_err_msg(
-                None,
-                XmlParserErrors::XmlErrInternalError,
-                "xmlNewTextWriterTree : invalid document tree!\n",
-            );
-            return None;
-        }
-
         let mut sax_handler = XmlSAXHandler::default();
         xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
         sax_handler.start_document = Some(xml_text_writer_start_document_callback);
@@ -316,11 +307,11 @@ impl<'a> XmlTextWriter<'a> {
             return None;
         };
 
-        (*ctxt).my_doc = doc;
+        (*ctxt).my_doc = doc.as_ptr();
         (*ctxt).node = node;
         ret.no_doc_free = 1;
 
-        (*doc).set_compress_mode(compression);
+        doc.set_compress_mode(compression);
 
         Some(ret)
     }
@@ -560,9 +551,9 @@ impl<'a> XmlTextWriter<'a> {
                 self.out.conv = XmlBufRef::with_capacity(4000);
             }
             self.out.encode(true);
-            if !self.doc.is_null() && (*self.doc).encoding.is_none() {
+            if let Some(mut doc) = self.doc.filter(|doc| doc.encoding.is_none()) {
                 let encoder = self.out.encoder.as_ref().unwrap().borrow();
-                (*self.doc).encoding = Some(encoder.name().to_owned());
+                doc.encoding = Some(encoder.name().to_owned());
             }
         } else {
             self.out.conv = None;
@@ -1921,7 +1912,7 @@ impl Default for XmlTextWriter<'_> {
             qchar: b'"',
             ctxt: null_mut(),
             no_doc_free: 0,
-            doc: null_mut(),
+            doc: None,
         }
     }
 }
@@ -1941,8 +1932,8 @@ impl Drop for XmlTextWriter<'_> {
                 xml_free_parser_ctxt(self.ctxt);
             }
 
-            if !self.doc.is_null() {
-                xml_free_doc(self.doc);
+            if let Some(doc) = self.doc.take() {
+                xml_free_doc(doc.as_ptr());
             }
         }
     }
@@ -2108,7 +2099,6 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
-    let mut doc: *mut XmlDoc;
 
     if (*ctxt).html != 0 {
         #[cfg(feature = "html")]
@@ -2134,23 +2124,22 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
             xml_writer_err_msg(
                 None,
                 XmlParserErrors::XmlErrInternalError,
-                c"libxml2 built without HTML support\n".as_ptr() as _,
+                "libxml2 built without HTML support\n",
             );
-            (*ctxt).errNo = XmlParserErrors::XmlErrInternalError as i32;
+            (*ctxt).err_no = XmlParserErrors::XmlErrInternalError as i32;
             (*ctxt).instate = XmlParserInputState::XmlParserEOF;
-            (*ctxt).disableSAX = 1;
+            (*ctxt).disable_sax = 1;
             return;
         }
     } else {
-        doc = (*ctxt).my_doc;
-        if doc.is_null() {
-            doc = xml_new_doc((*ctxt).version.as_deref());
-            (*ctxt).my_doc = doc;
-        }
-        if !doc.is_null() {
-            if (*doc).children.is_none() {
-                (*doc).encoding = (*ctxt).encoding().map(|e| e.to_owned());
-                (*doc).standalone = (*ctxt).standalone;
+        let doc = XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().or_else(|| {
+            (*ctxt).my_doc = xml_new_doc((*ctxt).version.as_deref());
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap()
+        });
+        if let Some(mut doc) = doc {
+            if doc.children.is_none() {
+                doc.encoding = (*ctxt).encoding().map(|e| e.to_owned());
+                doc.standalone = (*ctxt).standalone;
             }
         } else {
             if let Some(error) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.error) {
