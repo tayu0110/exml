@@ -3713,8 +3713,8 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPt
         && !(*reader).ctxt.is_null()
         && (*(*reader).ctxt).free_attrs_nr < MAX_FREE_NODES
     {
-        cur.next = XmlAttrPtr::from_raw((*(*reader).ctxt).free_attrs).unwrap();
-        (*(*reader).ctxt).free_attrs = cur.as_ptr();
+        cur.next = (*(*reader).ctxt).free_attrs;
+        (*(*reader).ctxt).free_attrs = Some(cur);
         (*(*reader).ctxt).free_attrs_nr += 1;
     } else {
         cur.free();

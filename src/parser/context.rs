@@ -49,7 +49,7 @@ use crate::{
     },
     parser::{__xml_err_encoding, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int},
     tree::{
-        xml_free_doc, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlEntityType, XmlNode,
+        xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlEntityType, XmlNode,
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::build_uri,
@@ -234,7 +234,7 @@ pub struct XmlParserCtxt {
     // number of freed attributes nodes
     pub(crate) free_attrs_nr: i32,
     // List of freed attributes nodes
-    pub(crate) free_attrs: *mut XmlAttr,
+    pub(crate) free_attrs: Option<XmlAttrPtr>,
 
     // the complete error information for the last error.
     pub last_error: XmlError,
@@ -1638,7 +1638,7 @@ impl Default for XmlParserCtxt {
             free_elems_nr: 0,
             free_elems: null_mut(),
             free_attrs_nr: 0,
-            free_attrs: null_mut(),
+            free_attrs: None,
             last_error: XmlError::default(),
             parse_mode: XmlParserMode::default(),
             nbentities: 0,
@@ -1900,8 +1900,8 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
             cur = next;
         }
     }
-    if !(*ctxt).free_attrs.is_null() {
-        let mut cur = XmlAttrPtr::from_raw((*ctxt).free_attrs).unwrap();
+    if let Some(attrs) = (*ctxt).free_attrs.take() {
+        let mut cur = Some(attrs);
         while let Some(now) = cur {
             let next = now.next;
             now.free();

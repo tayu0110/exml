@@ -9144,9 +9144,8 @@ pub unsafe fn xml_xpath_next_ancestor(
             parent.as_ptr()
         }
         XmlElementType::XmlAttributeNode => {
-            let att: *mut XmlAttr = (*cur).as_attribute_node().unwrap().as_ptr();
-
-            (*att).parent.map_or(null_mut(), |p| p.as_ptr())
+            let att = XmlAttrPtr::from_raw(cur as *mut XmlAttr).unwrap().unwrap();
+            att.parent.map_or(null_mut(), |p| p.as_ptr())
         }
         XmlElementType::XmlNamespaceDecl => {
             let ns: *mut XmlNs = cur as *mut XmlNs;

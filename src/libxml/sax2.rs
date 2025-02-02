@@ -51,7 +51,7 @@ use crate::{
         xml_get_predefined_entity, xml_new_cdata_block, xml_new_char_ref, xml_new_doc,
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
-        NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
+        NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
         XmlEntityType, XmlEnumeration, XmlNode, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
@@ -2439,9 +2439,8 @@ unsafe fn xml_sax2_attribute_ns(
     }
 
     // allocate the node
-    let mut ret = if !(*ctxt).free_attrs.is_null() {
-        let mut ret = XmlAttrPtr::from_raw((*ctxt).free_attrs).unwrap().unwrap();
-        (*ctxt).free_attrs = ret.next.map_or(null_mut(), |next| next.as_ptr());
+    let mut ret = if let Some(mut ret) = (*ctxt).free_attrs {
+        (*ctxt).free_attrs = ret.next;
         (*ctxt).free_attrs_nr -= 1;
         std::ptr::write(&mut *ret, XmlAttr::default());
         ret.typ = XmlElementType::XmlAttributeNode;
