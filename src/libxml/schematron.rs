@@ -35,7 +35,7 @@ use crate::{
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     libxml::xmlstring::xml_str_equal,
     parser::{xml_read_file, xml_read_memory},
-    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlElementType, XmlNode},
+    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementType, XmlNode},
     xpath::{
         internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
         xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_comp_expr,
@@ -420,7 +420,7 @@ pub unsafe fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronParserCtxtPtr) 
         return;
     }
     if !(*ctxt).doc.is_null() && (*ctxt).preserve == 0 {
-        xml_free_doc((*ctxt).doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap());
     }
     if !(*ctxt).xctxt.is_null() {
         xml_xpath_free_context((*ctxt).xctxt);
@@ -1115,7 +1115,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
             "The schema has no document element.\n"
         );
         if preserve == 0 {
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         }
         return null_mut();
     }
@@ -1224,7 +1224,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
 
     // exit:
     if preserve == 0 {
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     }
     if !ret.is_null() {
         if (*ctxt).nberrors != 0 {
@@ -1326,7 +1326,7 @@ pub unsafe fn xml_schematron_free(schema: XmlSchematronPtr) {
     }
 
     if !(*schema).doc.is_null() && (*schema).preserve == 0 {
-        xml_free_doc((*schema).doc);
+        xml_free_doc(XmlDocPtr::from_raw((*schema).doc).unwrap().unwrap());
     }
 
     (*schema).namespaces = None;

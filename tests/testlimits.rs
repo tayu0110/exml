@@ -35,7 +35,7 @@ use exml::{
         XmlParserInputPtr,
     },
     tree::{
-        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc,
+        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration,
     },
@@ -956,7 +956,7 @@ unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -
 
     if !doc.is_null() {
         eprintln!("SAX parsing generated a document !");
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         res = 0;
     } else if (*ctxt).well_formed == 0 {
         if fail != 0 {

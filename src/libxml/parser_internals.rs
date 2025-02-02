@@ -72,7 +72,7 @@ use crate::{
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon,
-        NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
+        NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties, XmlDocPtr,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XML_ENT_CHECKED,
         XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
@@ -1955,7 +1955,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         (*ctxt).dict = null_mut();
         xml_free_parser_ctxt(ctxt);
         if !new_doc.is_null() {
-            xml_free_doc(new_doc);
+            xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
         }
         return XmlParserErrors::XmlErrInternalError;
     }
@@ -2052,7 +2052,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     (*ctxt).atts_special = None;
     xml_free_parser_ctxt(ctxt);
     if !new_doc.is_null() {
-        xml_free_doc(new_doc);
+        xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
     }
 
     ret

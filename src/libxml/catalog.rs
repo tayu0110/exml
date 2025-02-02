@@ -71,7 +71,7 @@ use crate::{
     parser::{xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt, XmlParserInputPtr},
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
-        NodeCommon, XmlDoc, XmlNode, XML_XML_NAMESPACE,
+        NodeCommon, XmlDoc, XmlDocPtr, XmlNode, XML_XML_NAMESPACE,
     },
     uri::{build_uri, canonic_path},
     SYSCONFDIR,
@@ -1935,7 +1935,10 @@ impl XmlCatalogEntry {
     #[doc(alias = "xmlDumpXMLCatalog")]
     #[cfg(feature = "libxml_output")]
     unsafe fn dump_xml_catalog<'a>(&self, out: impl Write + 'a) -> i32 {
-        use crate::{io::XmlOutputBuffer, tree::NodeCommon};
+        use crate::{
+            io::XmlOutputBuffer,
+            tree::{NodeCommon, XmlDocPtr},
+        };
 
         // Rebuild a catalog
         let doc: *mut XmlDoc = xml_new_doc(None);
@@ -1952,13 +1955,13 @@ impl XmlCatalogEntry {
         (*doc).add_child(dtd.map_or(null_mut(), |dtd| dtd.as_ptr()) as _);
 
         let Some(ns) = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, None) else {
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return -1;
         };
         let catalog: *mut XmlNode = xml_new_doc_node(doc, Some(ns), "catalog", null_mut());
         if catalog.is_null() {
             xml_free_ns(ns);
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return -1;
         }
         (*catalog).ns_def = Some(ns);
@@ -1968,13 +1971,13 @@ impl XmlCatalogEntry {
 
         // reserialize it
         let Some(buf) = XmlOutputBuffer::from_writer(out, None) else {
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return -1;
         };
         let ret: i32 = (*doc).save_format_file_to(buf, None, 1);
 
         // Free it
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
 
         ret
     }
@@ -2626,7 +2629,7 @@ unsafe fn xml_parse_xml_catalog_file(
         }
         cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
         xml_parse_xml_catalog_node_list(cur, prefer, Some(parent.clone()), None);
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         Some(parent.node)
     } else {
         xml_catalog_err!(
@@ -2636,7 +2639,7 @@ unsafe fn xml_parse_xml_catalog_file(
             "File {} is not an XML Catalog\n",
             filename,
         );
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         None
     }
 }
@@ -3131,7 +3134,7 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> *mut XmlDoc {
         ret = (*ctxt).my_doc;
     } else {
         ret = null_mut();
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
     }
     xml_free_parser_ctxt(ctxt);

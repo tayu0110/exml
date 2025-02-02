@@ -36,7 +36,7 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_parser_ctxt, XmlParserCtxtPtr,
         XmlParserInputPtr,
     },
-    tree::{xml_free_doc, xml_get_doc_entity, NodeCommon, XmlDoc, XmlElementType},
+    tree::{xml_free_doc, xml_get_doc_entity, NodeCommon, XmlDoc, XmlDocPtr, XmlElementType},
 };
 use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};
 
@@ -504,7 +504,7 @@ unsafe fn recursive_detect_test(
     if !doc.is_null() || (*ctxt).last_error.code() != XmlParserErrors::XmlErrEntityLoop {
         eprintln!("Failed to detect recursion in {filename}");
         xml_free_parser_ctxt(ctxt);
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return 1;
     }
     xml_free_parser_ctxt(ctxt);
@@ -542,7 +542,7 @@ unsafe fn not_recursive_detect_test(
         xml_free_parser_ctxt(ctxt);
         return 1;
     }
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     xml_free_parser_ctxt(ctxt);
 
     res
@@ -645,7 +645,7 @@ unsafe fn not_recursive_huge_test(
         }
     }
 
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     xml_free_parser_ctxt(ctxt);
 
     res
@@ -721,7 +721,7 @@ unsafe fn huge_dtd_test(
         }
     }
 
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     xml_free_parser_ctxt(ctxt);
 
     res

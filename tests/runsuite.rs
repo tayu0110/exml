@@ -45,7 +45,7 @@ use exml::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_init_types,
         xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
     },
-    tree::{xml_free_doc, XmlDoc, XmlNode},
+    tree::{xml_free_doc, XmlDoc, XmlDocPtr, XmlNode},
     uri::build_uri,
     xpath::{
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,
@@ -559,7 +559,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                     }
                     _ => {}
                 }
-                xml_free_doc(doc);
+                xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             }
             reset_last_error();
             if mem != xml_mem_used() && EXTRA_MEMORY_FROM_RESOLVER == 0 {
@@ -630,7 +630,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                     }
                     _ => {}
                 }
-                xml_free_doc(doc);
+                xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             }
             reset_last_error();
             if mem != xml_mem_used() && EXTRA_MEMORY_FROM_RESOLVER == 0 {
@@ -699,7 +699,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         }
         return ret;
     }
@@ -709,7 +709,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         }
         return ret;
     }
@@ -719,7 +719,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
     }
 
     if !doc.is_null() {
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     }
     ret
 }
@@ -766,7 +766,7 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         }
         return ret;
     }
@@ -776,7 +776,7 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         }
         return ret;
     }
@@ -786,7 +786,7 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
     }
 
     if !doc.is_null() {
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     }
     ret
 }
@@ -809,7 +809,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         }
         return ret;
     }
@@ -819,7 +819,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         }
         return ret;
     }
@@ -829,7 +829,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
     }
 
     if !doc.is_null() {
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     }
     ret
 }
@@ -968,7 +968,7 @@ unsafe fn xstc_test_instance(
         xml_schema_free_valid_ctxt(ctxt);
     }
     if !doc.is_null() {
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     }
     reset_last_error();
     if mem != xml_mem_used() {
@@ -1189,7 +1189,7 @@ unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const
     if cur.is_null() || !xml_str_equal((*cur).name, c"testGroup".as_ptr() as _) {
         eprintln!("Unexpected format {metadata}");
         ret = -1;
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return ret;
     }
     while !cur.is_null() {
@@ -1197,7 +1197,7 @@ unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const
         cur = get_next(cur, c"following-sibling::ts:testGroup[1]".as_ptr() as _);
     }
 
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     ret
 }
 

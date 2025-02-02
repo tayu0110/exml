@@ -637,7 +637,7 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> *m
     } else {
         ret = null_mut();
         if !(*pctxt).my_doc.is_null() {
-            xml_free_doc((*pctxt).my_doc);
+            xml_free_doc(XmlDocPtr::from_raw((*pctxt).my_doc).unwrap().unwrap());
         }
         (*pctxt).my_doc = null_mut();
     }
@@ -1468,7 +1468,7 @@ unsafe fn xml_xinclude_load_doc(
                     xml_realloc((*ctxt).url_tab as _, size_of::<XmlXincludeDoc>() * new_size) as _;
                 if tmp.is_null() {
                     xml_xinclude_err_memory(ctxt, (*refe).elem, Some("growing XInclude URL table"));
-                    xml_free_doc(doc);
+                    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
                     break 'error;
                 }
                 (*ctxt).url_max = new_size as _;
@@ -2567,7 +2567,10 @@ pub unsafe fn xml_xinclude_free_context(ctxt: XmlXincludeCtxtPtr) {
     }
     if !(*ctxt).url_tab.is_null() {
         for i in 0..(*ctxt).url_nr {
-            xml_free_doc((*(*ctxt).url_tab.add(i as usize)).doc);
+            let doc = (*(*ctxt).url_tab.add(i as usize)).doc;
+            if !doc.is_null() {
+                xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            }
             xml_free((*(*ctxt).url_tab.add(i as usize)).url as _);
         }
         xml_free((*ctxt).url_tab as _);

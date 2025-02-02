@@ -23,25 +23,23 @@
 use std::io::Write;
 use std::{
     ffi::{c_char, CStr, CString},
-    mem::size_of,
     ptr::{null, null_mut},
     sync::atomic::Ordering,
 };
-
-use libc::memset;
 
 use crate::{
     encoding::XmlCharEncoding,
     tree::{
         xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop, NodeCommon, XmlAttr,
-        XmlAttrPtr, XmlDoc, XmlDocProperties, XmlElementType, XmlNode, __XML_REGISTER_CALLBACKS,
+        XmlAttrPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNode,
+        __XML_REGISTER_CALLBACKS,
     },
 };
 #[cfg(feature = "libxml_output")]
 use crate::{error::XmlParserErrors, io::XmlOutputBuffer};
 
 use super::{
-    globals::{xml_malloc, xml_register_node_default_value},
+    globals::xml_register_node_default_value,
     htmlparser::{html_err_memory, HtmlDocPtr, HtmlNodePtr},
     xmlstring::{xml_str_equal, xml_strcasecmp, xml_strstr, XmlChar},
 };
@@ -83,34 +81,31 @@ pub unsafe fn html_new_doc(uri: *const XmlChar, external_id: *const XmlChar) -> 
 #[doc(alias = "htmlNewDocNoDtD")]
 pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlChar) -> HtmlDocPtr {
     // Allocate a new document and fill the fields.
-    let cur: *mut XmlDoc = xml_malloc(size_of::<XmlDoc>()) as *mut XmlDoc;
-    if cur.is_null() {
+    let Some(mut cur) = XmlDocPtr::new(XmlDoc {
+        typ: XmlElementType::XmlHTMLDocumentNode,
+        version: None,
+        int_subset: None,
+        name: null_mut(),
+        children: None,
+        ext_subset: None,
+        old_ns: None,
+        encoding: None,
+        standalone: 1,
+        compression: 0,
+        ids: None,
+        refs: None,
+        _private: null_mut(),
+        charset: XmlCharEncoding::UTF8,
+        properties: XmlDocProperties::XmlDocHTML as i32 | XmlDocProperties::XmlDocUserbuilt as i32,
+        ..Default::default()
+    }) else {
         html_err_memory(null_mut(), Some("HTML document creation failed\n"));
         return null_mut();
-    }
-    memset(cur as _, 0, size_of::<XmlDoc>());
-    std::ptr::write(&mut *cur, XmlDoc::default());
-
-    (*cur).typ = XmlElementType::XmlHTMLDocumentNode;
-    (*cur).version = None;
-    (*cur).int_subset = None;
-    (*cur).doc = cur;
-    (*cur).name = null_mut();
-    (*cur).children = None;
-    (*cur).ext_subset = None;
-    (*cur).old_ns = None;
-    (*cur).encoding = None;
-    (*cur).standalone = 1;
-    (*cur).compression = 0;
-    (*cur).ids = None;
-    (*cur).refs = None;
-    (*cur)._private = null_mut();
-    (*cur).charset = XmlCharEncoding::UTF8;
-    (*cur).properties =
-        XmlDocProperties::XmlDocHTML as i32 | XmlDocProperties::XmlDocUserbuilt as i32;
+    };
+    cur.doc = cur.as_ptr();
     if !external_id.is_null() || !uri.is_null() {
         xml_create_int_subset(
-            cur,
+            cur.as_ptr(),
             Some("html"),
             (!external_id.is_null())
                 .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
@@ -123,9 +118,9 @@ pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlCh
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     /* && xmlRegisterNodeDefaultValue() */
     {
-        xml_register_node_default_value(cur as *mut XmlNode);
+        xml_register_node_default_value(cur.as_ptr() as *mut XmlNode);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Encoding definition lookup in the Meta tags

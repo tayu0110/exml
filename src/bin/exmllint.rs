@@ -1947,7 +1947,7 @@ unsafe fn test_sax(filename: &str) {
 
         if !(*ctxt).my_doc.is_null() {
             eprintln!("SAX generated a doc !");
-            xml_free_doc((*ctxt).my_doc);
+            xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
             (*ctxt).my_doc = null_mut();
         }
         xml_free_parser_ctxt(ctxt);
@@ -2640,7 +2640,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     ret = (*ctxt).well_formed;
                     xml_free_parser_ctxt(ctxt);
                     if ret == 0 && !CMD_ARGS.recover {
-                        xml_free_doc(doc);
+                        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
                         doc = null_mut();
                     }
                 }
@@ -2825,14 +2825,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if CMD_ARGS.timing {
             start_timer();
         }
-        doc = xml_copy_doc(doc, 1);
+        doc = xml_copy_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap(), 1);
         if CMD_ARGS.timing {
             end_timer!("Copying");
         }
         if CMD_ARGS.timing {
             start_timer();
         }
-        xml_free_doc(tmp);
+        xml_free_doc(XmlDocPtr::from_raw(tmp).unwrap().unwrap());
         if CMD_ARGS.timing {
             end_timer!("Freeing original");
         }
@@ -3139,7 +3139,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if cvp.is_null() {
             generic_error!("Couldn't allocate validation context\n");
             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return;
         }
 
@@ -3176,7 +3176,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             xml_schematron_new_valid_ctxt(WXSCHEMATRON.load(Ordering::Relaxed), flag);
         if ctxt.is_null() {
             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return;
         }
         match xml_schematron_validate_doc(ctxt, doc).cmp(&0) {
@@ -3211,7 +3211,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         let ctxt = xml_relaxng_new_valid_ctxt(RELAXNGSCHEMAS.load(Ordering::Relaxed));
         if ctxt.is_null() {
             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return;
         }
         xml_relaxng_set_valid_errors(
@@ -3251,7 +3251,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
         if ctxt.is_null() {
             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return;
         }
         xml_schema_set_valid_errors(
@@ -3296,7 +3296,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
         start_timer();
     }
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
         end_timer!("Freeing");
     }

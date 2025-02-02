@@ -26,7 +26,7 @@ use exml::{
         xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt, xml_read_memory,
         XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{xml_free_doc, NodeCommon, XmlDoc},
+    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr},
 };
 use libc::{memset, strlen};
 
@@ -110,7 +110,7 @@ unsafe fn test_document_range_byte1(
             );
         }
         if !res.is_null() {
-            xml_free_doc(res);
+            xml_free_doc(XmlDocPtr::from_raw(res).unwrap().unwrap());
         }
     }
     0
@@ -170,7 +170,7 @@ unsafe fn test_document_range_byte2(
                 );
             }
             if !res.is_null() {
-                xml_free_doc(res);
+                xml_free_doc(XmlDocPtr::from_raw(res).unwrap().unwrap());
             }
         }
     }
@@ -682,7 +682,7 @@ unsafe fn test_user_encoding() -> c_int {
         let error = get_last_error();
         eprintln!("error: {error:?}");
         // goto error;
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         xml_free(buf as _);
         panic!("failed to parse document");
     }
@@ -695,14 +695,14 @@ unsafe fn test_user_encoding() -> c_int {
     for i in 0..text_size {
         if *text.add(i as usize) != b'x' {
             // goto error;
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             xml_free(buf as _);
             panic!("text node has wrong content at offset {i}");
         }
     }
 
     // error:
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     xml_free(buf as _);
 
     0

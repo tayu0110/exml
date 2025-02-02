@@ -49,7 +49,7 @@ use crate::{
     },
     parser::{__xml_err_encoding, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int},
     tree::{
-        xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlEntityType, XmlNode,
+        xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlEntityType, XmlNode,
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::build_uri,
@@ -491,7 +491,7 @@ impl XmlParserCtxt {
         self.ext_sub_uri = None;
         self.ext_sub_system = None;
         if !self.my_doc.is_null() {
-            xml_free_doc(self.my_doc);
+            xml_free_doc(XmlDocPtr::from_raw(self.my_doc).unwrap().unwrap());
         }
         self.my_doc = null_mut();
 
@@ -1360,7 +1360,7 @@ impl XmlParserCtxt {
         } else {
             ret = null_mut();
             if !self.my_doc.is_null() {
-                xml_free_doc(self.my_doc);
+                xml_free_doc(XmlDocPtr::from_raw(self.my_doc).unwrap().unwrap());
             }
         }
         self.my_doc = null_mut();

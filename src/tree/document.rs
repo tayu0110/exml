@@ -30,14 +30,12 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use libc::memset;
-
 use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
     hash::XmlHashTable,
     libxml::{
-        globals::{xml_free, xml_malloc, xml_register_node_default_value},
+        globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
         parser_internals::xml_copy_char_multi_byte,
         xmlstring::{xml_strdup, xml_strndup, XmlChar},
     },
@@ -45,11 +43,11 @@ use crate::{
 };
 
 use super::{
-    xml_free_node_list, xml_get_doc_entity, xml_new_doc_text, xml_new_reference, xml_tree_err,
-    xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDocProperties,
-    XmlDtd, XmlDtdPtr, XmlElementType, XmlEntityType, XmlGenericNodePtr, XmlID, XmlNode, XmlNs,
-    XmlNsPtr, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
-    __XML_REGISTER_CALLBACKS,
+    xml_free_dtd, xml_free_node_list, xml_free_ns_list, xml_get_doc_entity, xml_new_doc_text,
+    xml_new_reference, xml_tree_err, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
+    NodePtr, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlEntityType, XmlGenericNodePtr,
+    XmlID, XmlNode, XmlNs, XmlNsPtr, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
+    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -911,30 +909,132 @@ pub unsafe fn xml_new_doc(version: Option<&str>) -> *mut XmlDoc {
     let version = version.unwrap_or("1.0");
 
     // Allocate a new document and fill the fields.
-    let cur: *mut XmlDoc = xml_malloc(size_of::<XmlDoc>()) as _;
-    if cur.is_null() {
+    let Some(mut cur) = XmlDocPtr::new(XmlDoc {
+        typ: XmlElementType::XmlDocumentNode,
+        version: Some(version.to_owned()),
+        standalone: -1,
+        compression: -1, /* not initialized */
+        parse_flags: 0,
+        properties: XmlDocProperties::XmlDocUserbuilt as i32,
+        // The in memory encoding is always UTF8
+        // This field will never change and would
+        // be obsolete if not for binary compatibility.
+        charset: XmlCharEncoding::UTF8,
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building doc");
         return null_mut();
-    }
-    memset(cur as _, 0, size_of::<XmlDoc>());
-    std::ptr::write(&mut *cur, XmlDoc::default());
-    (*cur).typ = XmlElementType::XmlDocumentNode;
-
-    (*cur).version = Some(version.to_owned());
-    (*cur).standalone = -1;
-    (*cur).compression = -1; /* not initialized */
-    (*cur).doc = cur;
-    (*cur).parse_flags = 0;
-    (*cur).properties = XmlDocProperties::XmlDocUserbuilt as i32;
-    // The in memory encoding is always UTF8
-    // This field will never change and would
-    // be obsolete if not for binary compatibility.
-    (*cur).charset = XmlCharEncoding::UTF8;
-
+    };
+    cur.doc = cur.as_ptr();
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
+}
+
+/// Do a copy of the document info. If recursive, the content tree will
+/// be copied too as well as DTD, namespaces and entities.
+///
+/// Returns: a new #xmlDocPtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyDoc")]
+#[cfg(any(feature = "libxml_tree", feature = "schema"))]
+pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> *mut XmlDoc {
+    use crate::{
+        libxml::globals::xml_mem_strdup,
+        tree::{xml_copy_dtd, xml_copy_namespace_list, xml_static_copy_node_list},
+    };
+
+    let ret: *mut XmlDoc = xml_new_doc(doc.version.as_deref());
+    if ret.is_null() {
+        return null_mut();
+    }
+    (*ret).typ = doc.typ;
+    if !doc.name.is_null() {
+        (*ret).name = xml_mem_strdup(doc.name as _) as _;
+    }
+    (*ret).encoding = doc.encoding.clone();
+    if let Some(url) = doc.url.as_deref() {
+        (*ret).url = Some(url.to_owned());
+    }
+    (*ret).charset = doc.charset;
+    (*ret).compression = doc.compression;
+    (*ret).standalone = doc.standalone;
+    if recursive == 0 {
+        return ret;
+    }
+
+    (*ret).last = None;
+    (*ret).children = None;
+    #[cfg(feature = "libxml_tree")]
+    {
+        if let Some(doc_int_subset) = doc.int_subset {
+            (*ret).int_subset = xml_copy_dtd(doc_int_subset);
+            let Some(mut ret_int_subset) = (*ret).int_subset else {
+                xml_free_doc(XmlDocPtr::from_raw(ret).unwrap().unwrap());
+                return null_mut();
+            };
+            (*(ret_int_subset.as_ptr() as *mut XmlNode)).set_doc(ret);
+            ret_int_subset.parent = ret;
+        }
+    }
+    if doc.old_ns.is_some() {
+        (*ret).old_ns = xml_copy_namespace_list(doc.old_ns);
+    }
+    if let Some(children) = doc.children {
+        (*ret).children =
+            NodePtr::from_ptr(xml_static_copy_node_list(children.as_ptr(), ret, ret as _));
+        (*ret).last = None;
+        let mut tmp = (*ret).children;
+        while let Some(now) = tmp {
+            if now.next.is_none() {
+                (*ret).last = Some(now);
+            }
+            tmp = now.next;
+        }
+    }
+    ret
+}
+
+/// Free up all the structures used by a document, tree included.
+#[doc(alias = "xmlFreeDoc")]
+pub unsafe fn xml_free_doc(mut cur: XmlDocPtr) {
+    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+    // && xmlDeregisterNodeDefaultValue.is_some()
+    {
+        xml_deregister_node_default_value(cur.as_ptr() as _);
+    }
+
+    // Do this before freeing the children list to avoid ID lookups
+    cur.ids.take();
+    cur.refs.take();
+    let mut ext_subset = cur.ext_subset.take();
+    let int_subset = cur.int_subset.take();
+    if int_subset == ext_subset {
+        ext_subset = None;
+    }
+    if let Some(mut ext_subset) = ext_subset {
+        ext_subset.unlink();
+        xml_free_dtd(ext_subset);
+    }
+    if let Some(mut int_subset) = int_subset {
+        int_subset.unlink();
+        xml_free_dtd(int_subset);
+    }
+
+    if let Some(children) = cur.children() {
+        xml_free_node_list(children.as_ptr());
+    }
+    if let Some(old_ns) = cur.old_ns.take() {
+        xml_free_ns_list(old_ns);
+    }
+
+    cur.version = None;
+    if !cur.name.is_null() {
+        xml_free(cur.name as _);
+    }
+    cur.encoding = None;
+    cur.url = None;
+    cur.free();
 }

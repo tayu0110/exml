@@ -50,9 +50,9 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, NodeCommon, XmlAttr,
-        XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDOMWrapCtxtPtr, XmlDoc, XmlDtd,
-        XmlElement, XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
-        XmlEntitiesTablePtr, XmlEntity, XmlNode, XmlNs,
+        XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr,
+        XmlDtd, XmlElement, XmlElementContentPtr, XmlElementContentType, XmlElementType,
+        XmlElementTypeVal, XmlEntitiesTablePtr, XmlEntity, XmlNode, XmlNs,
     },
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
@@ -1108,8 +1108,8 @@ pub(crate) fn gen_const_xml_doc_ptr(_no: i32, _nr: i32) -> *const XmlDoc {
 
 pub(crate) fn des_const_xml_doc_ptr(_no: i32, _val: *const XmlDoc, _nr: i32) {}
 
-pub(crate) unsafe fn desret_xml_doc_ptr(val: *mut XmlDoc) {
-    if val != API_DOC.get() {
+pub(crate) unsafe fn desret_xml_doc_ptr(val: XmlDocPtr) {
+    if val.as_ptr() != API_DOC.get() {
         xml_free_doc(val);
     }
 }
@@ -1245,7 +1245,10 @@ unsafe fn get_api_doc() -> *mut XmlDoc {
 }
 
 unsafe fn free_api_doc() {
-    xml_free_doc(API_DOC.get());
+    let doc = API_DOC.get();
+    if !doc.is_null() {
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+    }
     API_DOC.set(null_mut());
     API_DTD.set(null_mut());
     API_ROOT.set(null_mut());
@@ -1330,7 +1333,7 @@ pub(crate) unsafe fn gen_html_doc_ptr(no: i32, _nr: i32) -> HtmlDocPtr {
 #[cfg(feature = "html")]
 pub(crate) unsafe fn desret_html_doc_ptr(val: HtmlDocPtr) {
     if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
-        xml_free_doc(val);
+        xml_free_doc(XmlDocPtr::from_raw(val).unwrap().unwrap());
     }
 }
 
@@ -1344,7 +1347,7 @@ pub(crate) unsafe fn des_html_node_ptr(_no: i32, _val: HtmlNodePtr, _nr: i32) {}
 #[cfg(feature = "html")]
 pub(crate) unsafe fn des_html_doc_ptr(_no: i32, val: HtmlDocPtr, _nr: i32) {
     if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
-        xml_free_doc(val);
+        xml_free_doc(XmlDocPtr::from_raw(val).unwrap().unwrap());
     }
 }
 
@@ -1500,7 +1503,7 @@ pub(crate) unsafe fn gen_xml_doc_ptr(no: i32, _nr: i32) -> *mut XmlDoc {
 
 pub(crate) unsafe fn des_xml_doc_ptr(_no: i32, val: *mut XmlDoc, _nr: i32) {
     if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
-        xml_free_doc(val);
+        xml_free_doc(XmlDocPtr::from_raw(val).unwrap().unwrap());
     }
 }
 

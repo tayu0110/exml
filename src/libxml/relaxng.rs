@@ -68,8 +68,8 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node, xml_new_doc_text,
-        xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDoc, XmlElementType, XmlNode,
-        XmlNs, XmlNsPtr,
+        xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDoc, XmlDocPtr, XmlElementType,
+        XmlNode, XmlNs, XmlNsPtr,
     },
     uri::{build_uri, escape_url_except, XmlURI},
 };
@@ -382,7 +382,7 @@ unsafe fn xml_relaxng_free_inner_schema(schema: XmlRelaxNGPtr) {
     }
 
     if !(*schema).doc.is_null() {
-        xml_free_doc((*schema).doc);
+        xml_free_doc(XmlDocPtr::from_raw((*schema).doc).unwrap().unwrap());
     }
     for def in (*schema).def_tab.drain(..) {
         xml_relaxng_free_define(def);
@@ -402,7 +402,7 @@ pub(crate) unsafe fn xml_relaxng_free_document(docu: XmlRelaxNGDocumentPtr) {
         xml_free((*docu).href as _);
     }
     if !(*docu).doc.is_null() {
-        xml_free_doc((*docu).doc);
+        xml_free_doc(XmlDocPtr::from_raw((*docu).doc).unwrap().unwrap());
     }
     if !(*docu).schema.is_null() {
         xml_relaxng_free_inner_schema((*docu).schema);
@@ -433,7 +433,7 @@ unsafe fn xml_relaxng_free_include(incl: XmlRelaxNGIncludePtr) {
         xml_free((*incl).href as _);
     }
     if !(*incl).doc.is_null() {
-        xml_free_doc((*incl).doc);
+        xml_free_doc(XmlDocPtr::from_raw((*incl).doc).unwrap().unwrap());
     }
     if !(*incl).schema.is_null() {
         xml_relaxng_free((*incl).schema);
@@ -1253,7 +1253,7 @@ unsafe fn xml_relaxng_load_external_ref(
             "xmlRelaxNG: allocate memory for doc {}\n",
             url
         );
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGDocument>());
@@ -1402,7 +1402,7 @@ unsafe fn xml_relaxng_load_include(
     let ret: XmlRelaxNGIncludePtr = xml_malloc(size_of::<XmlRelaxNGInclude>()) as _;
     if ret.is_null() {
         xml_rng_perr_memory(ctxt, Some("allocating include\n"));
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGInclude>());
@@ -5920,7 +5920,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
     // Some preprocessing of the document content
     doc = xml_relaxng_cleanup_doc(ctxt, doc);
     if doc.is_null() {
-        xml_free_doc((*ctxt).document);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).document).unwrap().unwrap());
         (*ctxt).document = null_mut();
         return null_mut();
     }
@@ -5936,13 +5936,13 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
             (*ctxt).url.as_deref().unwrap_or("schemas")
         );
 
-        xml_free_doc((*ctxt).document);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).document).unwrap().unwrap());
         (*ctxt).document = null_mut();
         return null_mut();
     }
     let ret: XmlRelaxNGPtr = xml_relaxng_parse_document(ctxt, root);
     if ret.is_null() {
-        xml_free_doc((*ctxt).document);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).document).unwrap().unwrap());
         (*ctxt).document = null_mut();
         return null_mut();
     }
@@ -5959,7 +5959,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
     if (*ctxt).nb_errors > 0 {
         xml_relaxng_free(ret);
         (*ctxt).document = null_mut();
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return null_mut();
     }
 
@@ -6026,7 +6026,7 @@ pub unsafe fn xml_relaxng_free(schema: XmlRelaxNGPtr) {
         xml_relaxng_free_grammar((*schema).topgrammar);
     }
     if !(*schema).doc.is_null() {
-        xml_free_doc((*schema).doc);
+        xml_free_doc(XmlDocPtr::from_raw((*schema).doc).unwrap().unwrap());
     }
     if !(*schema).documents.is_null() {
         xml_relaxng_free_document_list((*schema).documents);

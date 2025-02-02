@@ -30,7 +30,9 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_input_from_file, xml_new_parser_ctxt,
         xml_read_file, XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlDocProperties, XmlElementType, XmlNode},
+    tree::{
+        xml_free_doc, NodeCommon, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNode,
+    },
     xpath::{
         xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
     },
@@ -198,7 +200,7 @@ unsafe fn xmlconf_test_invalid(
             NB_ERRORS += 1;
             ret = 0;
         }
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     }
     xml_free_parser_ctxt(ctxt);
     ret
@@ -235,7 +237,7 @@ unsafe fn xmlconf_test_valid(
             NB_ERRORS += 1;
             ret = 0;
         }
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     }
     xml_free_parser_ctxt(ctxt);
     ret
@@ -268,7 +270,7 @@ unsafe fn xmlconf_test_not_nswf(
             NB_ERRORS += 1;
             ret = 0;
         }
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     }
     ret
 }
@@ -288,7 +290,7 @@ unsafe fn xmlconf_test_not_wf(
             "test {id} : {filename} failed to detect not well formedness\n",
         );
         NB_ERRORS += 1;
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         ret = 0;
     }
     ret
@@ -528,7 +530,7 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
     } else {
         xmlconf_test_suite(logfile, doc, cur)
     };
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     ret
 }
 

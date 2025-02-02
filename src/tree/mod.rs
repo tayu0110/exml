@@ -952,52 +952,6 @@ pub unsafe fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -> *const Xm
     name.add(l as usize + 1)
 }
 
-/// Free up all the structures used by a document, tree included.
-#[doc(alias = "xmlFreeDoc")]
-pub unsafe fn xml_free_doc(cur: *mut XmlDoc) {
-    if cur.is_null() {
-        return;
-    }
-
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    // && xmlDeregisterNodeDefaultValue.is_some()
-    {
-        xml_deregister_node_default_value(cur as _);
-    }
-
-    // Do this before freeing the children list to avoid ID lookups
-    (*cur).ids.take();
-    (*cur).refs.take();
-    let mut ext_subset = (*cur).ext_subset.take();
-    let int_subset = (*cur).int_subset.take();
-    if int_subset == ext_subset {
-        ext_subset = None;
-    }
-    if let Some(mut ext_subset) = ext_subset {
-        ext_subset.unlink();
-        xml_free_dtd(ext_subset);
-    }
-    if let Some(mut int_subset) = int_subset {
-        int_subset.unlink();
-        xml_free_dtd(int_subset);
-    }
-
-    if let Some(children) = (*cur).children() {
-        xml_free_node_list(children.as_ptr());
-    }
-    if let Some(old_ns) = (*cur).old_ns.take() {
-        xml_free_ns_list(old_ns);
-    }
-
-    (*cur).version = None;
-    if !(*cur).name.is_null() {
-        xml_free((*cur).name as _);
-    }
-    (*cur).encoding = None;
-    (*cur).url = None;
-    xml_free(cur as _);
-}
-
 /// This function tries to locate a namespace definition in a tree
 /// ancestors, or create a new namespace definition node similar to
 /// @ns trying to reuse the same prefix. However if the given prefix is
@@ -1097,7 +1051,8 @@ pub(crate) unsafe fn xml_static_copy_node(
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
             #[cfg(feature = "libxml_tree")]
             {
-                return xml_copy_doc(node as _, extended) as _;
+                return xml_copy_doc(XmlDocPtr::from_raw(node as _).unwrap().unwrap(), extended)
+                    as _;
             }
         }
         XmlElementType::XmlDocumentTypeNode
@@ -1452,69 +1407,6 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
     }
 
     Some(ret)
-}
-
-/// Do a copy of the document info. If recursive, the content tree will
-/// be copied too as well as DTD, namespaces and entities.
-///
-/// Returns: a new #xmlDocPtr, or null_mut() in case of error.
-#[doc(alias = "xmlCopyDoc")]
-#[cfg(any(feature = "libxml_tree", feature = "schema"))]
-pub unsafe fn xml_copy_doc(doc: *mut XmlDoc, recursive: i32) -> *mut XmlDoc {
-    use crate::libxml::globals::xml_mem_strdup;
-
-    if doc.is_null() {
-        return null_mut();
-    }
-    let ret: *mut XmlDoc = xml_new_doc((*doc).version.as_deref());
-    if ret.is_null() {
-        return null_mut();
-    }
-    (*ret).typ = (*doc).typ;
-    if !(*doc).name.is_null() {
-        (*ret).name = xml_mem_strdup((*doc).name as _) as _;
-    }
-    (*ret).encoding = (*doc).encoding.clone();
-    if let Some(url) = (*doc).url.as_deref() {
-        (*ret).url = Some(url.to_owned());
-    }
-    (*ret).charset = (*doc).charset;
-    (*ret).compression = (*doc).compression;
-    (*ret).standalone = (*doc).standalone;
-    if recursive == 0 {
-        return ret;
-    }
-
-    (*ret).last = None;
-    (*ret).children = None;
-    #[cfg(feature = "libxml_tree")]
-    {
-        if let Some(doc_int_subset) = (*doc).int_subset {
-            (*ret).int_subset = xml_copy_dtd(doc_int_subset);
-            let Some(mut ret_int_subset) = (*ret).int_subset else {
-                xml_free_doc(ret);
-                return null_mut();
-            };
-            (*(ret_int_subset.as_ptr() as *mut XmlNode)).set_doc(ret);
-            ret_int_subset.parent = ret;
-        }
-    }
-    if (*doc).old_ns.is_some() {
-        (*ret).old_ns = xml_copy_namespace_list((*doc).old_ns);
-    }
-    if let Some(children) = (*doc).children {
-        (*ret).children =
-            NodePtr::from_ptr(xml_static_copy_node_list(children.as_ptr(), ret, ret as _));
-        (*ret).last = None;
-        let mut tmp = (*ret).children;
-        while let Some(now) = tmp {
-            if now.next.is_none() {
-                (*ret).last = Some(now);
-            }
-            tmp = now.next;
-        }
-    }
-    ret
 }
 
 macro_rules! UPDATE_LAST_CHILD_AND_PARENT {
@@ -2310,7 +2202,7 @@ pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
         if matches!((*cur).element_type(), XmlElementType::XmlDocumentNode)
             || matches!((*cur).element_type(), XmlElementType::XmlHTMLDocumentNode)
         {
-            xml_free_doc(cur as _);
+            xml_free_doc(XmlDocPtr::from_raw(cur as _).unwrap().unwrap());
         } else if !matches!((*cur).element_type(), XmlElementType::XmlDTDNode) {
             if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
             // && xmlDeregisterNodeDefaultValue.is_some()
@@ -2838,38 +2730,6 @@ mod tests {
                                 eprintln!(" {}", n_len);
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_copy_doc() {
-        #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_recursive in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let recursive = gen_int(n_recursive, 1);
-
-                    let ret_val = xml_copy_doc(doc, recursive);
-                    desret_xml_doc_ptr(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_int(n_recursive, recursive, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCopyDoc",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlCopyDoc()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_recursive);
                     }
                 }
             }

@@ -12,7 +12,7 @@ use crate::{
         },
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
     },
-    tree::{xml_copy_doc, xml_free_doc, XmlDoc},
+    tree::{xml_copy_doc, xml_free_doc, XmlDoc, XmlDocPtr},
 };
 
 use super::{xml_relaxng_free_define, xml_rng_perr_memory, XmlRelaxNGDefinePtr};
@@ -272,7 +272,7 @@ pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: *mut XmlDoc) -> XmlRelaxNGPar
     if doc.is_null() {
         return null_mut();
     }
-    let copy: *mut XmlDoc = xml_copy_doc(doc, 1);
+    let copy: *mut XmlDoc = xml_copy_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap(), 1);
     if copy.is_null() {
         return null_mut();
     }
@@ -280,7 +280,7 @@ pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: *mut XmlDoc) -> XmlRelaxNGPar
     let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
     if ret.is_null() {
         xml_rng_perr_memory(null_mut(), Some("building parser\n"));
-        xml_free_doc(copy);
+        xml_free_doc(XmlDocPtr::from_raw(copy).unwrap().unwrap());
         return null_mut();
     }
     std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
@@ -315,7 +315,7 @@ pub unsafe fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
         xml_relaxng_free_define(def);
     }
     if !(*ctxt).document.is_null() && (*ctxt).freedoc != 0 {
-        xml_free_doc((*ctxt).document);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).document).unwrap().unwrap());
     }
     drop_in_place(ctxt);
     xml_free(ctxt as _);

@@ -19,7 +19,7 @@ use exml::{
         parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
         xmlmemory::xml_memory_dump,
     },
-    tree::{xml_free_doc, XmlDoc},
+    tree::{xml_free_doc, XmlDoc, XmlDocPtr},
 };
 use libc::{memset, pthread_create, pthread_join, pthread_t};
 
@@ -90,7 +90,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             myDoc = xmlReadFile(filename, NULL, XML_WITH_CATALOG);
         }
         if !my_doc.is_null() {
-            xml_free_doc(my_doc);
+            xml_free_doc(XmlDocPtr::from_raw(my_doc).unwrap().unwrap());
         } else {
             println!("parse failed");
             okay = 0;

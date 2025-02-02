@@ -61,7 +61,9 @@ use crate::{
         xml_free_input_stream, xml_free_parser_ctxt, xml_new_input_stream, XmlParserCtxt,
         XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
     },
-    tree::{xml_create_int_subset, xml_free_doc, NodeCommon, XmlDoc, XmlElementType, XmlNode},
+    tree::{
+        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementType, XmlNode,
+    },
     uri::canonic_path,
 };
 
@@ -10775,7 +10777,7 @@ pub unsafe fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).ext_sub_uri = None;
     (*ctxt).ext_sub_system = None;
     if !(*ctxt).my_doc.is_null() {
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
     }
     (*ctxt).my_doc = null_mut();
 
@@ -11708,7 +11710,11 @@ mod tests {
 
                             let ret_val = html_parse_chunk(ctxt, chunk, size, terminate);
                             if !ctxt.is_null() {
-                                xml_free_doc((*ctxt).my_doc);
+                                if !(*ctxt).my_doc.is_null() {
+                                    xml_free_doc(
+                                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+                                    );
+                                }
                                 (*ctxt).my_doc = null_mut();
                             }
                             desret_int(ret_val);
@@ -11748,7 +11754,9 @@ mod tests {
 
                 let ret_val = html_parse_document(ctxt);
                 if !ctxt.is_null() {
-                    xml_free_doc((*ctxt).my_doc);
+                    if !(*ctxt).my_doc.is_null() {
+                        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+                    }
                     (*ctxt).my_doc = null_mut();
                 }
                 desret_int(ret_val);

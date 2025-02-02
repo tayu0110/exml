@@ -121,9 +121,9 @@ use crate::{
         xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
         NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
-        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNsPtr,
-        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
+        XmlDocPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
+        XmlNsPtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::{canonic_path, XmlURI},
@@ -1283,7 +1283,7 @@ pub unsafe fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
 
     // Remove locally kept entity definitions if the tree was not built
     if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).version.as_deref() == Some(SAX_COMPAT_MODE) {
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
     }
 
@@ -1444,7 +1444,7 @@ pub unsafe fn xml_sax_user_parse_file(
     }
     (*ctxt).sax = None;
     if !(*ctxt).my_doc.is_null() {
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
     }
     xml_free_parser_ctxt(ctxt);
@@ -1488,7 +1488,7 @@ pub unsafe fn xml_sax_user_parse_memory(
     }
     (*ctxt).sax = None;
     if !(*ctxt).my_doc.is_null() {
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
     }
     xml_free_parser_ctxt(ctxt);
@@ -1533,7 +1533,7 @@ pub unsafe fn xml_sax_parse_doc(
         ret = (*ctxt).my_doc;
     } else {
         ret = null_mut();
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
     }
     if replaced {
@@ -1602,7 +1602,7 @@ pub unsafe fn xml_sax_parse_memory_with_data(
         ret = (*ctxt).my_doc;
     } else {
         ret = null_mut();
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
     }
     if replaced {
@@ -1690,7 +1690,7 @@ pub unsafe fn xml_sax_parse_file_with_data(
         }
     } else {
         ret = null_mut();
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
     }
     if replaced {
@@ -1736,7 +1736,7 @@ pub(crate) unsafe fn xml_sax_parse_entity(
         ret = (*ctxt).my_doc;
     } else {
         ret = null_mut();
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
     }
     if replaced {
@@ -1858,7 +1858,7 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
         } else {
             ret = None;
         }
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
     }
     xml_free_parser_ctxt(ctxt);
@@ -1971,7 +1971,7 @@ pub unsafe fn xml_io_parse_dtd(
         } else {
             ret = null_mut();
         }
-        xml_free_doc((*ctxt).my_doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
     }
     xml_free_parser_ctxt(ctxt);
@@ -2291,7 +2291,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         xml_free_parser_ctxt(ctxt);
         (*new_doc).int_subset = None;
         (*new_doc).ext_subset = None;
-        xml_free_doc(new_doc);
+        xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
         return -1;
     }
     (*new_doc).add_child(new_root);
@@ -2366,7 +2366,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     (*new_doc).ext_subset = None;
     // This leaks the namespace list if doc.is_null()
     (*new_doc).old_ns = None;
-    xml_free_doc(new_doc);
+    xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
 
     ret
 }
@@ -2443,7 +2443,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         let sax = (*ctxt).sax.take();
         (*new_doc).int_subset = None;
         (*new_doc).ext_subset = None;
-        xml_free_doc(new_doc);
+        xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
         return (sax, XmlParserErrors::XmlErrInternalError);
     }
     (*new_doc).add_child(new_root);
@@ -2585,7 +2585,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     xml_free_parser_ctxt(ctxt);
     (*new_doc).int_subset = None;
     (*new_doc).ext_subset = None;
-    xml_free_doc(new_doc);
+    xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
 
     (sax, ret)
 }
@@ -9224,7 +9224,11 @@ mod tests {
 
                             let ret_val = xml_parse_chunk(ctxt, chunk, size, terminate);
                             if !ctxt.is_null() {
-                                xml_free_doc((*ctxt).my_doc);
+                                if !(*ctxt).my_doc.is_null() {
+                                    xml_free_doc(
+                                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+                                    );
+                                }
                                 (*ctxt).my_doc = null_mut();
                             }
                             desret_int(ret_val);
@@ -9253,32 +9257,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_parse_doc() {
-        #[cfg(feature = "sax1")]
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let cur = gen_const_xml_char_ptr(n_cur, 0);
-
-                let ret_val = xml_parse_doc(cur as *const XmlChar);
-                desret_xml_doc_ptr(ret_val);
-                des_const_xml_char_ptr(n_cur, cur, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlParseDoc",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_cur);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlParseDoc()");
-        }
-    }
-
-    #[test]
     fn test_xml_parse_document() {
         unsafe {
             let mut leaks = 0;
@@ -9289,7 +9267,9 @@ mod tests {
 
                 let ret_val = xml_parse_document(ctxt);
                 if !ctxt.is_null() {
-                    xml_free_doc((*ctxt).my_doc);
+                    if !(*ctxt).my_doc.is_null() {
+                        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+                    }
                     (*ctxt).my_doc = null_mut();
                 }
                 desret_int(ret_val);
@@ -9318,7 +9298,9 @@ mod tests {
 
                 let ret_val = xml_parse_ext_parsed_ent(ctxt);
                 if !ctxt.is_null() {
-                    xml_free_doc((*ctxt).my_doc);
+                    if !(*ctxt).my_doc.is_null() {
+                        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+                    }
                     (*ctxt).my_doc = null_mut();
                 }
                 desret_int(ret_val);
@@ -9431,32 +9413,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlPedanticParserDefault()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_recover_doc() {
-        #[cfg(feature = "sax1")]
-        unsafe {
-            let mut leaks = 0;
-            for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let cur = gen_const_xml_char_ptr(n_cur, 0);
-
-                let ret_val = xml_recover_doc(cur as *const XmlChar);
-                desret_xml_doc_ptr(ret_val);
-                des_const_xml_char_ptr(n_cur, cur, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlRecoverDoc",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_cur);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlRecoverDoc()");
         }
     }
 

@@ -249,7 +249,7 @@ impl<'a> XmlTextWriter<'a> {
         }
 
         let Some(mut ret) = XmlTextWriter::from_push_parser(ctxt, compression) else {
-            xml_free_doc((*ctxt).my_doc);
+            xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
             xml_free_parser_ctxt(ctxt);
             xml_writer_err_msg(
                 None,
@@ -1926,14 +1926,14 @@ impl Drop for XmlTextWriter<'_> {
         unsafe {
             if !self.ctxt.is_null() {
                 if !(*self.ctxt).my_doc.is_null() && self.no_doc_free == 0 {
-                    xml_free_doc((*self.ctxt).my_doc);
+                    xml_free_doc(XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap().unwrap());
                     (*self.ctxt).my_doc = null_mut();
                 }
                 xml_free_parser_ctxt(self.ctxt);
             }
 
             if let Some(doc) = self.doc.take() {
-                xml_free_doc(doc.as_ptr());
+                xml_free_doc(doc);
             }
         }
     }

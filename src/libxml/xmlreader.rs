@@ -37,7 +37,7 @@ use libc::memset;
 #[cfg(feature = "schema")]
 use crate::relaxng::{xml_relaxng_new_parser_ctxt, XmlRelaxNGValidCtxtPtr};
 #[cfg(feature = "libxml_reader")]
-use crate::tree::{XmlAttr, XmlAttrPtr, XmlNs};
+use crate::tree::{XmlAttr, XmlAttrPtr, XmlDocPtr, XmlNs};
 use crate::{
     error::{
         parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
@@ -1857,7 +1857,10 @@ impl XmlTextReader {
             (*self.ctxt).stop();
             if !(*self.ctxt).my_doc.is_null() {
                 if self.preserve == 0 {
-                    xml_text_reader_free_doc(self, (*self.ctxt).my_doc);
+                    xml_text_reader_free_doc(
+                        self,
+                        XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap().unwrap(),
+                    );
                 }
                 (*self.ctxt).my_doc = null_mut();
             }
@@ -3601,7 +3604,7 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: *mut
         (*cur).element_type(),
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
     ) {
-        xml_free_doc((*cur).as_document_node().unwrap().as_ptr());
+        xml_free_doc(XmlDocPtr::from_raw(cur as *mut XmlDoc).unwrap().unwrap());
         return;
     }
     loop {
@@ -4198,25 +4201,21 @@ pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const 
 /// Free up all the structures used by a document, tree included.
 #[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: *mut XmlDoc) {
+unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, mut cur: XmlDocPtr) {
     use crate::tree::NodeCommon;
-
-    if cur.is_null() {
-        return;
-    }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
         // if let Some(f) = xmlDeregisterNodeDefaultValue {
         //     f(cur as _);
         // }
-        xml_deregister_node_default_value(cur as _);
+        xml_deregister_node_default_value(cur.as_ptr() as _);
     }
 
     // Do this before freeing the children list to avoid ID lookups
-    (*cur).ids.take();
-    (*cur).refs.take();
-    let mut ext_subset = (*cur).ext_subset.take();
-    let int_subset = (*cur).int_subset.take();
+    cur.ids.take();
+    cur.refs.take();
+    let mut ext_subset = cur.ext_subset.take();
+    let int_subset = cur.int_subset.take();
     if int_subset == ext_subset {
         ext_subset = None;
     }
@@ -4229,21 +4228,20 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: *mut XmlDoc)
         xml_free_dtd(int_subset);
     }
 
-    if let Some(children) = (*cur).children {
+    if let Some(children) = cur.children {
         xml_text_reader_free_node_list(reader, children.as_ptr());
     }
 
-    (*cur).version = None;
-    if !(*cur).name.is_null() {
-        xml_free((*cur).name as _);
+    cur.version = None;
+    if !cur.name.is_null() {
+        xml_free(cur.name as _);
     }
-    (*cur).encoding = None;
-    if let Some(old_ns) = (*cur).old_ns.take() {
+    cur.encoding = None;
+    if let Some(old_ns) = cur.old_ns.take() {
         xml_free_ns_list(old_ns);
     }
-    (*cur).url = None;
-
-    xml_free(cur as _);
+    cur.url = None;
+    cur.free();
 }
 
 /// This method releases any resources allocated by the current instance
@@ -4274,7 +4272,10 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
         (*reader.ctxt).stop();
         if !(*reader.ctxt).my_doc.is_null() {
             if reader.preserve == 0 {
-                xml_text_reader_free_doc(reader, (*reader.ctxt).my_doc);
+                xml_text_reader_free_doc(
+                    reader,
+                    XmlDocPtr::from_raw((*reader.ctxt).my_doc).unwrap().unwrap(),
+                );
             }
             (*reader.ctxt).my_doc = null_mut();
         }
@@ -5335,10 +5336,7 @@ pub unsafe fn xml_reader_for_io(
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewWalker")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: *mut XmlDoc) -> i32 {
-    if doc.is_null() {
-        return -1;
-    }
+pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) -> i32 {
     if reader.is_null() {
         return -1;
     }
@@ -5358,7 +5356,7 @@ pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: *mut XmlDoc) 
     (*reader).base = 0;
     (*reader).cur = 0;
     (*reader).allocs = XML_TEXTREADER_CTXT;
-    (*reader).doc = doc;
+    (*reader).doc = doc.as_ptr();
     (*reader).state = XmlTextReaderState::Start;
     if (*reader).dict.is_null() {
         if !(*reader).ctxt.is_null() && !(*(*reader).ctxt).dict.is_null() {
@@ -5765,41 +5763,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_reader_new_walker() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let reader = gen_xml_text_reader_ptr(n_reader, 0);
-                    let doc = gen_xml_doc_ptr(n_doc, 1);
-
-                    let ret_val = xml_reader_new_walker(reader, doc);
-                    desret_int(ret_val);
-                    des_xml_text_reader_ptr(n_reader, reader, 0);
-                    des_xml_doc_ptr(n_doc, doc, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlReaderNewWalker",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlReaderNewWalker()"
-                        );
-                        eprint!(" {}", n_reader);
-                        eprintln!(" {}", n_doc);
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_reader_walker() {

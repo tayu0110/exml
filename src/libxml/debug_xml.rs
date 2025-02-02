@@ -2121,6 +2121,7 @@ pub unsafe fn xml_shell_load(
     use crate::{
         libxml::{globals::xml_free, htmlparser::html_parse_file, xmlstring::xml_strdup},
         parser::xml_read_file,
+        tree::XmlDocPtr,
         uri::canonic_path,
         xpath::{xml_xpath_free_context, xml_xpath_new_context},
     };
@@ -2152,7 +2153,7 @@ pub unsafe fn xml_shell_load(
     }
     if !doc.is_null() {
         if (*ctxt).loaded == 1 {
-            xml_free_doc((*ctxt).doc);
+            xml_free_doc(XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap());
         }
         (*ctxt).loaded = 1;
         #[cfg(feature = "xpath")]
@@ -2872,7 +2873,7 @@ pub unsafe fn xml_shell<'a>(
             xmlmemory::xml_mem_show,
             xmlstring::xml_strdup,
         },
-        tree::xml_free_doc,
+        tree::{xml_free_doc, XmlDocPtr},
         xpath::{
             xml_xpath_debug_dump_object, xml_xpath_eval, xml_xpath_free_context,
             xml_xpath_free_object, xml_xpath_new_context,
@@ -3790,7 +3791,7 @@ pub unsafe fn xml_shell<'a>(
         xml_xpath_free_context((*ctxt).pctxt);
     }
     if (*ctxt).loaded != 0 {
-        xml_free_doc((*ctxt).doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap());
     }
     if !(*ctxt).filename.is_null() {
         xml_free((*ctxt).filename as _);

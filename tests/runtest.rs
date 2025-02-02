@@ -66,7 +66,7 @@ use exml::{
     },
     relaxng::xml_relaxng_init_types,
     tree::{
-        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc,
+        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlNode,
     },
@@ -1435,7 +1435,9 @@ unsafe fn sax_parse_test(
         } else {
             (*ctxt).err_no
         };
-        xml_free_doc((*ctxt).my_doc);
+        if !(*ctxt).my_doc.is_null() {
+            xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+        }
         xml_free_parser_ctxt(ctxt);
     }
 
@@ -1489,7 +1491,9 @@ unsafe fn sax_parse_test(
             } else {
                 (*ctxt).err_no
             };
-            xml_free_doc((*ctxt).my_doc);
+            if !(*ctxt).my_doc.is_null() {
+                xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+            }
             xml_free_parser_ctxt(ctxt);
         }
         #[cfg(not(feature = "html"))]
@@ -1516,7 +1520,7 @@ unsafe fn sax_parse_test(
             } else {
                 (*ctxt).err_no
             };
-            xml_free_doc((*ctxt).my_doc);
+            xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
             xml_free_parser_ctxt(ctxt);
         }
         if ret == XmlParserErrors::XmlWarUndeclaredEntity as i32 {
@@ -1583,7 +1587,7 @@ unsafe fn old_parse_test(
     if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
         res = 1;
     }
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
 
     // Parse the saved result to make sure the round trip is okay
     #[cfg(feature = "sax1")]
@@ -1601,7 +1605,7 @@ unsafe fn old_parse_test(
     if compare_files(temp.as_str(), result.unwrap()) != 0 {
         res = 1;
     }
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
 
     remove_file(temp).ok();
     res
@@ -1705,7 +1709,7 @@ unsafe fn push_parse_test(
     xml_free_parser_ctxt(ctxt);
     free(base as _);
     if res == 0 {
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         eprintln!("Failed to parse {filename}",);
         return -1;
     }
@@ -1727,7 +1731,7 @@ unsafe fn push_parse_test(
             addr_of_mut!(size),
         );
     }
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     res = compare_file_mem(
         result.as_deref().unwrap(),
         from_raw_parts(base as _, size as usize),
@@ -2093,7 +2097,7 @@ unsafe fn push_boundary_test(
     xml_free_parser_ctxt(ctxt);
     free(base as _);
     if num_callbacks > 1 {
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         eprintln!(
             "Failed push boundary callback test ({}@{}-{}): {filename}",
             num_callbacks, old_consumed, consumed,
@@ -2101,7 +2105,7 @@ unsafe fn push_boundary_test(
         return -1;
     }
     if avail > 0 {
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         eprintln!(
             "Failed push boundary buffer test ({}@{}): {filename}",
             avail, consumed,
@@ -2109,7 +2113,7 @@ unsafe fn push_boundary_test(
         return -1;
     }
     if res == 0 {
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         eprintln!("Failed to parse {filename}",);
         return -1;
     }
@@ -2131,7 +2135,7 @@ unsafe fn push_boundary_test(
             addr_of_mut!(size),
         );
     }
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     res = compare_file_mem(
         result.as_deref().unwrap(),
         from_raw_parts(base as _, size as usize),
@@ -2184,7 +2188,7 @@ unsafe fn mem_parse_test(
         return 1;
     }
     (*doc).dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     let res: i32 = compare_file_mem(
         result.as_deref().unwrap(),
         from_raw_parts(base as _, size as _),
@@ -2230,7 +2234,7 @@ unsafe fn noent_parse_test(
     if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
         res = 1;
     }
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
 
     // Parse the saved result to make sure the round trip is okay
     doc = xml_read_file(filename, None, options);
@@ -2241,7 +2245,7 @@ unsafe fn noent_parse_test(
     if compare_files(temp.as_str(), result.unwrap()) != 0 {
         res = 1;
     }
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
 
     remove_file(temp).ok();
     res
@@ -2275,7 +2279,7 @@ unsafe fn err_parse_test(
         {
             doc = xml_read_file(filename, None, options);
             if xml_xinclude_process_flags(doc, options) < 0 {
-                xml_free_doc(doc);
+                xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
                 doc = null_mut();
             }
         }
@@ -2315,7 +2319,7 @@ unsafe fn err_parse_test(
         if !base.is_null() {
             xml_free(base as _);
         }
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     }
     if res != 0 {
         eprintln!("Result for {filename} failed in {}", result.unwrap());
@@ -2507,7 +2511,7 @@ unsafe fn walker_parse_test(
     let reader: XmlTextReaderPtr = xml_reader_walker(doc);
     let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
     xml_free_text_reader(reader);
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     ret
 }
 
@@ -2822,7 +2826,7 @@ unsafe fn xpath_doc_test(
     }
     globfree(addr_of_mut!(globbuf));
 
-    xml_free_doc(XPATH_DOCUMENT.get());
+    xml_free_doc(XmlDocPtr::from_raw(XPATH_DOCUMENT.get()).unwrap().unwrap());
     ret
 }
 
@@ -2904,7 +2908,7 @@ unsafe fn xptr_doc_test(
     }
     globfree(addr_of_mut!(globbuf));
 
-    xml_free_doc(XPATH_DOCUMENT.get());
+    xml_free_doc(XmlDocPtr::from_raw(XPATH_DOCUMENT.get()).unwrap().unwrap());
     ret
 }
 
@@ -2948,7 +2952,7 @@ unsafe fn xmlid_doc_test(
         .open(temp.as_str())
     else {
         eprintln!("failed to open output file {temp}",);
-        xml_free_doc(XPATH_DOCUMENT.get());
+        xml_free_doc(XmlDocPtr::from_raw(XPATH_DOCUMENT.get()).unwrap().unwrap());
         return -1;
     };
     XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
@@ -2964,7 +2968,7 @@ unsafe fn xmlid_doc_test(
     }
 
     remove_file(temp).ok();
-    xml_free_doc(XPATH_DOCUMENT.get());
+    xml_free_doc(XmlDocPtr::from_raw(XPATH_DOCUMENT.get()).unwrap().unwrap());
 
     if let Some(err) = err {
         ret = TEST_ERRORS
@@ -3223,7 +3227,7 @@ unsafe fn urip_check_url(url: &str) -> i32 {
     if doc.is_null() {
         return -1;
     }
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     1
 }
 
@@ -3314,9 +3318,12 @@ unsafe fn schemas_one_test(
     options: i32,
     schemas: XmlSchemaPtr,
 ) -> i32 {
-    use exml::libxml::xmlschemas::{
-        xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt, xml_schema_set_valid_errors,
-        xml_schema_validate_doc,
+    use exml::{
+        libxml::xmlschemas::{
+            xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt, xml_schema_set_valid_errors,
+            xml_schema_validate_doc,
+        },
+        tree::XmlDocPtr,
     };
 
     let mut ret: i32 = 0;
@@ -3342,7 +3349,7 @@ unsafe fn schemas_one_test(
         .open(temp.as_str())
     else {
         eprintln!("failed to open output file {temp}",);
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return -1;
     };
 
@@ -3384,7 +3391,7 @@ unsafe fn schemas_one_test(
     remove_file(temp).ok();
 
     xml_schema_free_valid_ctxt(ctxt);
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     ret
 }
 
@@ -3547,6 +3554,7 @@ unsafe fn rng_one_test(
     use exml::{
         libxml::relaxng::{xml_relaxng_set_valid_errors, xml_relaxng_validate_doc},
         relaxng::{xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt},
+        tree::XmlDocPtr,
     };
 
     let mut ret: i32;
@@ -3572,7 +3580,7 @@ unsafe fn rng_one_test(
         .open(temp.as_str())
     else {
         eprintln!("failed to open output file {temp}",);
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return -1;
     };
 
@@ -3615,7 +3623,7 @@ unsafe fn rng_one_test(
     remove_file(temp).ok();
 
     xml_relaxng_free_valid_ctxt(ctxt);
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     ret
 }
 
@@ -4002,7 +4010,7 @@ unsafe fn pattern_test(
             },
             xmlreader::{xml_free_text_reader, xml_reader_walker},
         },
-        tree::XmlNsPtr,
+        tree::{XmlDocPtr, XmlNsPtr},
     };
 
     let mut patternc: XmlPatternPtr;
@@ -4101,7 +4109,7 @@ unsafe fn pattern_test(
                             None,
                             format!("Pattern {str} failed to compile\n").as_str(),
                         );
-                        xml_free_doc(doc);
+                        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
                         // ret = 1;
                         continue;
                     }
@@ -4126,7 +4134,7 @@ unsafe fn pattern_test(
                         writeln!(o, "{filename} : failed to parse",).ok();
                     }
                     xml_free_text_reader(reader);
-                    xml_free_doc(doc);
+                    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
                     xml_free_stream_ctxt(patstream);
                     // patstream = null_mut();
                     xml_free_pattern(patternc);
@@ -4157,7 +4165,7 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             xmlstring::xml_str_equal,
         },
-        tree::XmlNsPtr,
+        tree::{XmlDocPtr, XmlNsPtr},
         xpath::{
             internals::xml_xpath_register_ns, xml_xpath_eval_expression, xml_xpath_free_context,
             xml_xpath_new_context, XmlXPathContextPtr,
@@ -4183,7 +4191,7 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
     // Check the document is of the right kind
     if (*doc).get_root_element().is_null() {
         eprintln!("Error: empty document for file \"{filename}\"");
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return null_mut();
     }
 
@@ -4194,20 +4202,20 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
 
     if node.is_null() {
         eprintln!("Error: XPath element expected in the file  \"{filename}\"");
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return null_mut();
     }
 
     let Some(expr) = (*node).get_content() else {
         eprintln!("Error: XPath content element is NULL \"{filename}\"");
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return null_mut();
     };
 
     let ctx: XmlXPathContextPtr = xml_xpath_new_context(parent_doc);
     if ctx.is_null() {
         eprintln!("Error: unable to create new context");
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return null_mut();
     }
 
@@ -4221,7 +4229,7 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
                 CStr::from_ptr(now.href as _).to_string_lossy(),
             );
             xml_xpath_free_context(ctx);
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return null_mut();
         }
         ns = XmlNsPtr::from_raw(now.next).unwrap();
@@ -4233,14 +4241,14 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
     if xpath.is_null() {
         eprintln!("Error: unable to evaluate xpath expression");
         xml_xpath_free_context(ctx);
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return null_mut();
     }
 
     // print_xpath_nodes((*xpath).nodesetval);
 
     xml_xpath_free_context(ctx);
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
     xpath
 }
 
@@ -4273,6 +4281,7 @@ unsafe fn c14n_run_test(
             c14n::xml_c14n_doc_dump_memory,
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
         },
+        tree::XmlDocPtr,
         xpath::xml_xpath_free_object,
     };
 
@@ -4302,7 +4311,7 @@ unsafe fn c14n_run_test(
     // Check the document is of the right kind
     if (*doc).get_root_element().is_null() {
         eprintln!("Error: empty document for file \"{xml_filename}\"");
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         return -1;
     }
 
@@ -4311,7 +4320,7 @@ unsafe fn c14n_run_test(
         xpath = load_xpath_expr(doc, xpath_filename);
         if xpath.is_null() {
             eprintln!("Error: unable to evaluate xpath expression");
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return -1;
         }
     }
@@ -4327,7 +4336,7 @@ unsafe fn c14n_run_test(
             if !xpath.is_null() {
                 xml_xpath_free_object(xpath);
             }
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return -1;
         }
         inclusive_namespaces = parse_list(nslist as *mut XmlChar);
@@ -4373,7 +4382,7 @@ unsafe fn c14n_run_test(
     if !nslist.is_null() {
         free(nslist as _);
     }
-    xml_free_doc(doc);
+    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
 
     ret
 }
@@ -4585,8 +4594,9 @@ static NUM_THREADS: usize = unsafe { THREAD_PARAMS.len() };
 extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     use std::io::{stderr, stdout};
 
-    use exml::globals::{
-        get_do_validity_checking_default_value, set_do_validity_checking_default_value,
+    use exml::{
+        globals::{get_do_validity_checking_default_value, set_do_validity_checking_default_value},
+        tree::XmlDocPtr,
     };
 
     unsafe {
@@ -4613,7 +4623,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             my_doc = xml_read_file(filename, NULL, XML_WITH_CATALOG);
         }
         if !my_doc.is_null() {
-            xml_free_doc(my_doc);
+            xml_free_doc(XmlDocPtr::from_raw(my_doc).unwrap().unwrap());
         } else {
             println!("parse failed");
             okay = 0;

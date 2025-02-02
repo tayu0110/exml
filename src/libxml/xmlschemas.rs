@@ -144,7 +144,7 @@ use crate::{
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
-        XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlElementContentPtr,
+        XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementContentPtr,
         XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
         XmlNsPtr, XML_XML_NAMESPACE,
     },
@@ -4190,7 +4190,7 @@ pub unsafe fn xml_schema_free_parser_ctxt(ctxt: XmlSchemaParserCtxtPtr) {
         return;
     }
     if !(*ctxt).doc.is_null() && (*ctxt).preserve == 0 {
-        xml_free_doc((*ctxt).doc);
+        xml_free_doc(XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap());
     }
     if !(*ctxt).vctxt.is_null() {
         xml_schema_free_valid_ctxt((*ctxt).vctxt);
@@ -4936,7 +4936,7 @@ unsafe fn xml_schema_bucket_free(bucket: XmlSchemaBucketPtr) {
         } {}
     }
     if (*bucket).preserve_doc == 0 && !(*bucket).doc.is_null() {
-        xml_free_doc((*bucket).doc);
+        xml_free_doc(XmlDocPtr::from_raw((*bucket).doc).unwrap().unwrap());
     }
     if (*bucket).typ == XML_SCHEMA_SCHEMA_IMPORT && !(*WXS_IMPBUCKET!(bucket)).schema.is_null() {
         xml_schema_free((*WXS_IMPBUCKET!(bucket)).schema);
@@ -5570,7 +5570,7 @@ unsafe fn xml_schema_add_schema_doc(
 
         //  exit_error:
         if !doc.is_null() && preserve_doc == 0 {
-            xml_free_doc(doc);
+            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             if !bkt.is_null() {
                 (*bkt).doc = null_mut();
             }
@@ -5579,7 +5579,7 @@ unsafe fn xml_schema_add_schema_doc(
     }
     //  exit_failure:
     if !doc.is_null() && preserve_doc == 0 {
-        xml_free_doc(doc);
+        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         if !bkt.is_null() {
             (*bkt).doc = null_mut();
         }
