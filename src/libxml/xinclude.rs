@@ -156,7 +156,7 @@ pub struct XmlXincludeCtxt {
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcess")]
-pub unsafe fn xml_xinclude_process(doc: *mut XmlDoc) -> i32 {
+pub unsafe fn xml_xinclude_process(doc: XmlDocPtr) -> i32 {
     xml_xinclude_process_flags(doc, 0)
 }
 
@@ -165,7 +165,7 @@ pub unsafe fn xml_xinclude_process(doc: *mut XmlDoc) -> i32 {
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessFlags")]
-pub unsafe fn xml_xinclude_process_flags(doc: *mut XmlDoc, flags: i32) -> i32 {
+pub unsafe fn xml_xinclude_process_flags(doc: XmlDocPtr, flags: i32) -> i32 {
     xml_xinclude_process_flags_data(doc, flags, null_mut())
 }
 
@@ -175,14 +175,14 @@ pub unsafe fn xml_xinclude_process_flags(doc: *mut XmlDoc, flags: i32) -> i32 {
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessFlagsData")]
 pub unsafe fn xml_xinclude_process_flags_data(
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     flags: i32,
     data: *mut c_void,
 ) -> i32 {
-    if doc.is_null() {
-        return -1;
-    }
-    let tree: *mut XmlNode = (*doc).get_root_element();
+    // if doc.is_null() {
+    //     return -1;
+    // }
+    let tree: *mut XmlNode = doc.get_root_element();
     if tree.is_null() {
         return -1;
     }
@@ -581,8 +581,6 @@ unsafe fn xml_xinclude_add_node(ctxt: XmlXincludeCtxtPtr, cur: *mut XmlNode) -> 
 /// Parse a document for XInclude
 #[doc(alias = "xmlXIncludeParseFile")]
 unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> *mut XmlDoc {
-    let ret: *mut XmlDoc;
-
     xml_init_parser();
 
     let pctxt = xml_new_parser_ctxt();
@@ -632,15 +630,15 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> *m
 
     xml_parse_document(pctxt);
 
-    if (*pctxt).well_formed != 0 {
-        ret = (*pctxt).my_doc;
+    let ret = if (*pctxt).well_formed != 0 {
+        (*pctxt).my_doc
     } else {
-        ret = null_mut();
         if !(*pctxt).my_doc.is_null() {
             xml_free_doc(XmlDocPtr::from_raw((*pctxt).my_doc).unwrap().unwrap());
         }
         (*pctxt).my_doc = null_mut();
-    }
+        null_mut()
+    };
     xml_free_parser_ctxt(pctxt);
 
     ret
@@ -661,10 +659,12 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
         return;
     }
     let ctxt: XmlXincludeCtxtPtr = (*data).ctxt;
-    let doc: *mut XmlDoc = (*data).doc;
-    if ctxt.is_null() || doc.is_null() {
+    if ctxt.is_null() {
         return;
     }
+    let Some(doc) = XmlDocPtr::from_raw((*data).doc).unwrap() else {
+        return;
+    };
     match ent.etype {
         XmlEntityType::XmlInternalParameterEntity
         | XmlEntityType::XmlExternalParameterEntity
@@ -678,7 +678,7 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
     let system_id = ent.system_id.load(Ordering::Relaxed);
     let content = ent.content.load(Ordering::Relaxed);
     let ret = xml_add_doc_entity(
-        doc,
+        doc.as_ptr(),
         &ent.name().unwrap(),
         ent.etype,
         (!external_id.is_null())
@@ -699,7 +699,7 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
             );
         }
     } else {
-        let prev = xml_get_doc_entity(doc, &(*ent).name().unwrap());
+        let prev = xml_get_doc_entity(doc.as_ptr(), &(*ent).name().unwrap());
         if let Some(prev) = prev {
             let error = || {
                 match ent.etype {
@@ -780,49 +780,48 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
 #[doc(alias = "xmlXIncludeMergeEntities")]
 unsafe fn xml_xinclude_merge_entities(
     ctxt: XmlXincludeCtxtPtr,
-    doc: *mut XmlDoc,
-    from: *mut XmlDoc,
+    doc: XmlDocPtr,
+    from: XmlDocPtr,
 ) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
 
-    if from.is_null() || (*from).int_subset.is_none() {
+    // if from.is_null() {
+    //     return 0;
+    // }
+    if from.int_subset.is_none() {
         return 0;
     }
 
-    let Some(target) = (*doc).int_subset.or_else(|| {
-        let cur = if doc.is_null() {
-            null_mut()
-        } else {
-            (*doc).get_root_element()
-        };
+    let Some(target) = doc.int_subset.or_else(|| {
+        let cur = doc.get_root_element();
         if cur.is_null() {
             return None;
         }
-        xml_create_int_subset(doc, (*cur).name().as_deref(), None, None)
+        xml_create_int_subset(doc.as_ptr(), (*cur).name().as_deref(), None, None)
     }) else {
         return -1;
     };
 
-    let source = (*from).int_subset;
+    let source = from.int_subset;
     if let Some(source) = source {
         if let Some(entities) = source.entities {
             let mut data: XmlXIncludeMergeData = unsafe { zeroed() };
             data.ctxt = ctxt;
-            data.doc = doc;
+            data.doc = doc.as_ptr();
 
             entities.scan(|payload, _, _, _| {
                 xml_xinclude_merge_entity(*payload, &raw mut data as _);
             });
         }
     }
-    let source = (*from).ext_subset;
+    let source = from.ext_subset;
     if let Some(source) = source {
         if let Some(entities) = source.entities {
             let mut data: XmlXIncludeMergeData = unsafe { zeroed() };
             data.ctxt = ctxt;
-            data.doc = doc;
+            data.doc = doc.as_ptr();
 
             // don't duplicate existing stuff when external subsets are the same
             if target.external_id != source.external_id && target.system_id != source.system_id {
@@ -837,26 +836,19 @@ unsafe fn xml_xinclude_merge_entities(
 
 /// The XInclude recursive nature is handled at this point.
 #[doc(alias = "xmlXIncludeRecurseDoc")]
-unsafe fn xml_xinclude_recurse_doc(ctxt: XmlXincludeCtxtPtr, doc: *mut XmlDoc, _url: XmlURL) {
+unsafe fn xml_xinclude_recurse_doc(ctxt: XmlXincludeCtxtPtr, doc: XmlDocPtr, _url: XmlURL) {
     let old_doc: *mut XmlDoc = (*ctxt).doc;
     let old_inc_max: i32 = (*ctxt).inc_max;
     let old_inc_nr: i32 = (*ctxt).inc_nr;
     let old_inc_tab: *mut XmlXincludeRefPtr = (*ctxt).inc_tab;
     let old_is_stream: i32 = (*ctxt).is_stream;
-    (*ctxt).doc = doc;
+    (*ctxt).doc = doc.as_ptr();
     (*ctxt).inc_max = 0;
     (*ctxt).inc_nr = 0;
     (*ctxt).inc_tab = null_mut();
     (*ctxt).is_stream = 0;
 
-    xml_xinclude_do_process(
-        ctxt,
-        if doc.is_null() {
-            null_mut()
-        } else {
-            (*doc).get_root_element()
-        },
-    );
+    xml_xinclude_do_process(ctxt, doc.get_root_element());
 
     if !(*ctxt).inc_tab.is_null() {
         for i in 0..(*ctxt).inc_nr {
@@ -1363,7 +1355,6 @@ unsafe fn xml_xinclude_load_doc(
     refe: XmlXincludeRefPtr,
 ) -> i32 {
     let mut cache: XmlXincludeDocPtr;
-    let doc: *mut XmlDoc;
     let mut fragment: *mut XmlChar = null_mut();
     let mut ret: i32 = -1;
     let cache_nr: i32;
@@ -1416,15 +1407,14 @@ unsafe fn xml_xinclude_load_doc(
     'error: {
         // Handling of references to the local document are done
         // directly through (*ctxt).doc.
-        'load: {
+        let doc = 'load: {
             if *url.add(0) == 0
                 || *url.add(0) == b'#'
                 || (!(*ctxt).doc.is_null()
                     && (*(*ctxt).doc).url.as_deref()
                         == CStr::from_ptr(url as *const i8).to_str().ok())
             {
-                doc = (*ctxt).doc;
-                break 'load;
+                break 'load XmlDocPtr::from_raw((*ctxt).doc).unwrap();
             }
             // Prevent reloading the document twice.
             for i in 0..(*ctxt).url_nr {
@@ -1438,11 +1428,12 @@ unsafe fn xml_xinclude_load_doc(
                         );
                         break 'error;
                     }
-                    doc = (*(*ctxt).url_tab.add(i as usize)).doc;
-                    if doc.is_null() {
+                    let Some(doc) =
+                        XmlDocPtr::from_raw((*(*ctxt).url_tab.add(i as usize)).doc).unwrap()
+                    else {
                         break 'error;
-                    }
-                    break 'load;
+                    };
+                    break 'load Some(doc);
                 }
             }
 
@@ -1459,10 +1450,11 @@ unsafe fn xml_xinclude_load_doc(
                 }
             }
 
-            doc = xml_xinclude_parse_file(
+            let doc = XmlDocPtr::from_raw(xml_xinclude_parse_file(
                 ctxt,
                 CStr::from_ptr(url as *const i8).to_string_lossy().as_ref(),
-            );
+            ))
+            .unwrap();
             #[cfg(feature = "xpointer")]
             {
                 (*ctxt).parse_flags = save_flags;
@@ -1480,7 +1472,9 @@ unsafe fn xml_xinclude_load_doc(
                     xml_realloc((*ctxt).url_tab as _, size_of::<XmlXincludeDoc>() * new_size) as _;
                 if tmp.is_null() {
                     xml_xinclude_err_memory(ctxt, (*refe).elem, Some("growing XInclude URL table"));
-                    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+                    if let Some(doc) = doc {
+                        xml_free_doc(doc);
+                    }
                     break 'error;
                 }
                 (*ctxt).url_max = new_size as _;
@@ -1489,37 +1483,41 @@ unsafe fn xml_xinclude_load_doc(
             cache_nr = (*ctxt).url_nr;
             (*ctxt).url_nr += 1;
             cache = (*ctxt).url_tab.add(cache_nr as usize);
-            (*cache).doc = doc;
+            (*cache).doc = doc.map_or(null_mut(), |doc| doc.as_ptr());
             (*cache).url = xml_strdup(url);
             (*cache).expanding = 0;
 
-            if doc.is_null() {
+            let Some(doc) = doc else {
                 break 'error;
-            }
+            };
             // It's possible that the requested URL has been mapped to a
             // completely different location (e.g. through a catalog entry).
             // To check for this, we compare the URL with that of the doc
             // and change it if they disagree (bug 146988).
-            if (*doc).url.as_deref() != CStr::from_ptr(url as *const i8).to_str().ok() {
+            if doc.url.as_deref() != CStr::from_ptr(url as *const i8).to_str().ok() {
                 xml_free(url as _);
-                let new = CString::new((*doc).url.as_deref().unwrap()).unwrap();
+                let new = CString::new(doc.url.as_deref().unwrap()).unwrap();
                 url = xml_strdup(new.as_ptr() as *const u8);
             }
 
             // Make sure we have all entities fixed up
-            xml_xinclude_merge_entities(ctxt, (*ctxt).doc, doc);
+            xml_xinclude_merge_entities(
+                ctxt,
+                XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(),
+                doc,
+            );
 
             /*
              * We don't need the DTD anymore, free up space
             if ((*doc).intSubset != null_mut()) {
-            xmlUnlinkNode((xmlNodePtr) (*doc).intSubset);
-            xmlFreeNode((xmlNodePtr) (*doc).intSubset);
-            (*doc).intSubset = NULL;
+                xmlUnlinkNode((xmlNodePtr) (*doc).intSubset);
+                xmlFreeNode((xmlNodePtr) (*doc).intSubset);
+                (*doc).intSubset = NULL;
             }
             if ((*doc).extSubset != null_mut()) {
-            xmlUnlinkNode((xmlNodePtr) (*doc).extSubset);
-            xmlFreeNode((xmlNodePtr) (*doc).extSubset);
-            (*doc).extSubset = NULL;
+                xmlUnlinkNode((xmlNodePtr) (*doc).extSubset);
+                xmlFreeNode((xmlNodePtr) (*doc).extSubset);
+                (*doc).extSubset = NULL;
             }
              */
             (*cache).expanding = 1;
@@ -1527,19 +1525,24 @@ unsafe fn xml_xinclude_load_doc(
             /* urlTab might be reallocated. */
             cache = (*ctxt).url_tab.add(cache_nr as usize);
             (*cache).expanding = 0;
-        }
+            Some(doc)
+        };
 
         // loaded:
         if fragment.is_null() {
             // Add the top children list as the replacement copy.
-            (*refe).inc = xml_doc_copy_node((*doc).get_root_element(), (*ctxt).doc, 1);
+            (*refe).inc = doc.map_or(null_mut(), |doc| {
+                xml_doc_copy_node(doc.get_root_element(), (*ctxt).doc, 1)
+            });
         } else {
             #[cfg(feature = "xpointer")]
             {
                 // Computes the XPointer expression and make a copy used
                 // as the replacement copy.
 
-                if (*ctxt).is_stream != 0 && doc == (*ctxt).doc {
+                if (*ctxt).is_stream != 0
+                    && doc.map_or(null_mut(), |doc| doc.as_ptr()) == (*ctxt).doc
+                {
                     xml_xinclude_err!(
                         ctxt,
                         (*refe).elem,
@@ -1549,8 +1552,11 @@ unsafe fn xml_xinclude_load_doc(
                     break 'error;
                 }
 
-                let xptrctxt: XmlXPathContextPtr =
-                    xml_xptr_new_context(doc, null_mut(), null_mut());
+                let xptrctxt: XmlXPathContextPtr = xml_xptr_new_context(
+                    doc.map_or(null_mut(), |doc| doc.as_ptr()),
+                    null_mut(),
+                    null_mut(),
+                );
                 if xptrctxt.is_null() {
                     xml_xinclude_err!(
                         ctxt,
@@ -1691,10 +1697,10 @@ unsafe fn xml_xinclude_load_doc(
         }
 
         // Do the xml:base fixup if needed
-        if !doc.is_null()
-            && !url.is_null()
+        if doc.map_or(false, |doc| {
+            doc.parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
+        }) && !url.is_null()
             && (*ctxt).parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
-            && (*doc).parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
         {
             let mut node: *mut XmlNode;
 
@@ -2648,117 +2654,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_xinclude_new_context() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_xinclude_process() {
-        #[cfg(feature = "xinclude")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                let mem_base = xml_mem_blocks();
-                let doc = gen_xml_doc_ptr(n_doc, 0);
-
-                let ret_val = xml_xinclude_process(doc);
-                desret_int(ret_val);
-                des_xml_doc_ptr(n_doc, doc, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXIncludeProcess",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXIncludeProcess()"
-                    );
-                    eprintln!(" {}", n_doc);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xinclude_process_flags() {
-        #[cfg(feature = "xinclude")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_flags in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let flags = gen_int(n_flags, 1);
-
-                    let ret_val = xml_xinclude_process_flags(doc, flags);
-                    desret_int(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_int(n_flags, flags, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXIncludeProcessFlags",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXIncludeProcessFlags()"
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_flags);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xinclude_process_flags_data() {
-        #[cfg(feature = "xinclude")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_flags in 0..GEN_NB_INT {
-                    for n_data in 0..GEN_NB_USERDATA {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let flags = gen_int(n_flags, 1);
-                        let data = gen_userdata(n_data, 2);
-
-                        let ret_val = xml_xinclude_process_flags_data(doc, flags, data);
-                        desret_int(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_int(n_flags, flags, 1);
-                        des_userdata(n_data, data, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlXIncludeProcessFlagsData",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlXIncludeProcessFlagsData()"
-                            );
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_flags);
-                            eprintln!(" {}", n_data);
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_xinclude_process_node() {

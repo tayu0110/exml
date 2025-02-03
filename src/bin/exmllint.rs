@@ -2791,7 +2791,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
-        if xml_xinclude_process_flags(doc, OPTIONS.load(Ordering::Relaxed)) < 0 {
+        if xml_xinclude_process_flags(
+            XmlDocPtr::from_raw(doc).unwrap().unwrap(),
+            OPTIONS.load(Ordering::Relaxed),
+        ) < 0
+        {
             PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         }
         if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {

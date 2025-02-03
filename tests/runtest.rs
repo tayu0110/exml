@@ -2271,7 +2271,7 @@ unsafe fn err_parse_test(
         #[cfg(feature = "xinclude")]
         {
             doc = xml_read_file(filename, None, options);
-            if xml_xinclude_process_flags(doc, options) < 0 {
+            if xml_xinclude_process_flags(XmlDocPtr::from_raw(doc).unwrap().unwrap(), options) < 0 {
                 xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
                 doc = null_mut();
             }
