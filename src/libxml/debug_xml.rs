@@ -2379,7 +2379,7 @@ pub unsafe fn xml_shell_validate(
             parser::xml_parse_dtd,
             valid::{xml_validate_document, xml_validate_dtd},
         },
-        tree::xml_free_dtd,
+        tree::{xml_free_dtd, XmlDocPtr},
     };
 
     use super::valid::XmlValidCtxt;
@@ -2394,7 +2394,10 @@ pub unsafe fn xml_shell_validate(
     vctxt.warning = vctxt.error;
 
     if dtd.is_null() || *dtd.add(0) == 0 {
-        res = xml_validate_document(addr_of_mut!(vctxt), (*ctxt).doc);
+        res = xml_validate_document(
+            addr_of_mut!(vctxt),
+            XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(),
+        );
     } else {
         let subset = xml_parse_dtd(
             None,
@@ -2403,7 +2406,11 @@ pub unsafe fn xml_shell_validate(
                 .as_deref(),
         );
         if let Some(subset) = subset {
-            res = xml_validate_dtd(addr_of_mut!(vctxt), (*ctxt).doc, subset);
+            res = xml_validate_dtd(
+                addr_of_mut!(vctxt),
+                XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(),
+                subset,
+            );
             xml_free_dtd(subset);
         }
     }

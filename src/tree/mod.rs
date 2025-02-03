@@ -1713,13 +1713,13 @@ pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> *mut XmlNode {
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocTextLen")]
 pub unsafe fn xml_new_doc_text_len(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     content: *const XmlChar,
     len: i32,
 ) -> *mut XmlNode {
     let cur: *mut XmlNode = xml_new_text_len(content, len);
     if !cur.is_null() {
-        (*cur).doc = doc;
+        (*cur).doc = doc.map_or(null_mut(), |doc| doc.as_ptr());
     }
     cur
 }
@@ -2089,7 +2089,7 @@ pub unsafe fn xml_replace_node(old: *mut XmlNode, cur: *mut XmlNode) -> *mut Xml
         return old;
     }
     (*cur).unlink();
-    (*cur).set_doc((*old).doc);
+    (*cur).set_doc(XmlDocPtr::from_raw((*old).doc).unwrap());
     (*cur).set_parent((*old).parent());
     (*cur).next = (*old).next;
     if let Some(mut next) = (*cur).next {
@@ -3088,44 +3088,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDocText()");
                         eprint!(" {}", n_doc);
                         eprintln!(" {}", n_content);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_doc_text_len() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let content = gen_const_xml_char_ptr(n_content, 1);
-                        let mut len = gen_int(n_len, 2);
-                        if !content.is_null() && len > xml_strlen(content) {
-                            len = 0;
-                        }
-
-                        let ret_val = xml_new_doc_text_len(doc, content, len);
-                        desret_xml_node_ptr(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_const_xml_char_ptr(n_content, content, 1);
-                        des_int(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNewDocTextLen",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDocTextLen()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_content);
-                            eprintln!(" {}", n_len);
-                        }
                     }
                 }
             }

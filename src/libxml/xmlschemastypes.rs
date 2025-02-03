@@ -63,7 +63,7 @@ use crate::{
     tree::{
         xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
         xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttr, XmlAttrPtr,
-        XmlAttributeType, XmlElementType, XmlEntityType, XmlNode,
+        XmlAttributeType, XmlDocPtr, XmlElementType, XmlEntityType, XmlNode,
     },
     xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };
@@ -2800,7 +2800,7 @@ unsafe fn xml_schema_val_atomic_type(
                                         let res = if !strip.is_null() {
                                             let res = xml_add_id(
                                                 null_mut(),
-                                                (*node).doc,
+                                                XmlDocPtr::from_raw((*node).doc).unwrap().unwrap(),
                                                 CStr::from_ptr(strip as *const i8)
                                                     .to_string_lossy()
                                                     .as_ref(),
@@ -2811,7 +2811,7 @@ unsafe fn xml_schema_val_atomic_type(
                                         } else {
                                             xml_add_id(
                                                 null_mut(),
-                                                (*node).doc,
+                                                XmlDocPtr::from_raw((*node).doc).unwrap().unwrap(),
                                                 CStr::from_ptr(value as *const i8)
                                                     .to_string_lossy()
                                                     .as_ref(),
@@ -2849,7 +2849,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     if !strip.is_null() {
                                         xml_add_ref(
                                             null_mut(),
-                                            (*node).doc,
+                                            XmlDocPtr::from_raw((*node).doc).unwrap().unwrap(),
                                             CStr::from_ptr(strip as *const i8)
                                                 .to_string_lossy()
                                                 .as_ref(),
@@ -2859,7 +2859,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     } else {
                                         xml_add_ref(
                                             null_mut(),
-                                            (*node).doc,
+                                            XmlDocPtr::from_raw((*node).doc).unwrap().unwrap(),
                                             CStr::from_ptr(value as *const i8)
                                                 .to_string_lossy()
                                                 .as_ref(),
@@ -3006,7 +3006,7 @@ unsafe fn xml_schema_val_atomic_type(
                                 if ret == 0 {
                                     ret = xml_validate_notation_use(
                                         null_mut(),
-                                        (*node).doc,
+                                        XmlDocPtr::from_raw((*node).doc).unwrap().unwrap(),
                                         CStr::from_ptr(value as *const i8)
                                             .to_string_lossy()
                                             .as_ref(),

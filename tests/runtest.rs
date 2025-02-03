@@ -1549,18 +1549,11 @@ unsafe fn sax_parse_test(
     ret
 }
 
-/**
- * oldParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages: unused
- *
- * Parse a file using the old xmlParseFile API, then serialize back
- * reparse the result and serialize again, then check for deviation
- * in serialization.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file using the old xmlParseFile API, then serialize back
+/// reparse the result and serialize again, then check for deviation
+/// in serialization.
+///
+/// Returns 0 in case of success, an error code otherwise
 unsafe fn old_parse_test(
     filename: &str,
     result: Option<String>,

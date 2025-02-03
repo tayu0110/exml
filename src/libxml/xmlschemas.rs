@@ -5835,7 +5835,7 @@ unsafe fn xml_schema_pval_attr_node_id(
                 }
                 let res = xml_add_id(
                     null_mut(),
-                    attr.doc,
+                    XmlDocPtr::from_raw(attr.doc).unwrap().unwrap(),
                     CStr::from_ptr(value as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -27762,7 +27762,9 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         // Note that we give it the line number of the parent element.
                         let value = cur_attr
                             .children
-                            .and_then(|c| c.get_string(cur_attr.doc, 1))
+                            .and_then(|c| {
+                                c.get_string(XmlDocPtr::from_raw(cur_attr.doc).unwrap(), 1)
+                            })
                             .map(|c| CString::new(c).unwrap());
                         let value = xml_strdup(
                             value

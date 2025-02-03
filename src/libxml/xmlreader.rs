@@ -1246,7 +1246,7 @@ impl XmlTextReader {
                 qname = xml_strcat(qname, (*node).name);
                 (*self.ctxt).valid &= xml_validate_push_element(
                     addr_of_mut!((*self.ctxt).vctxt),
-                    (*self.ctxt).my_doc,
+                    XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap().unwrap(),
                     node,
                     qname,
                 );
@@ -1256,7 +1256,7 @@ impl XmlTextReader {
             } else {
                 (*self.ctxt).valid &= xml_validate_push_element(
                     addr_of_mut!((*self.ctxt).vctxt),
-                    (*self.ctxt).my_doc,
+                    XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap().unwrap(),
                     node,
                     (*node).name,
                 );
@@ -1309,7 +1309,7 @@ impl XmlTextReader {
                 qname = xml_strcat(qname, (*node).name);
                 (*self.ctxt).valid &= xml_validate_pop_element(
                     addr_of_mut!((*self.ctxt).vctxt),
-                    (*self.ctxt).my_doc,
+                    XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap(),
                     node,
                     qname,
                 );
@@ -1319,7 +1319,7 @@ impl XmlTextReader {
             } else {
                 (*self.ctxt).valid &= xml_validate_pop_element(
                     addr_of_mut!((*self.ctxt).vctxt),
-                    (*self.ctxt).my_doc,
+                    XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap(),
                     node,
                     (*node).name,
                 );
@@ -1777,7 +1777,7 @@ impl XmlTextReader {
         // TODO walk the DTD if present
 
         cur.children
-            .and_then(|c| c.get_string((*self.node).doc, 1))
+            .and_then(|c| c.get_string(XmlDocPtr::from_raw((*self.node).doc).unwrap(), 1))
             .or_else(|| Some("".to_owned()))
     }
 
@@ -2834,9 +2834,10 @@ impl XmlTextReader {
                 let attr = XmlAttrPtr::from_raw(node as *mut XmlAttr).unwrap().unwrap();
 
                 return if let Some(parent) = attr.parent {
-                    attr.children.and_then(|c| c.get_string(parent.doc, 1))
+                    attr.children
+                        .and_then(|c| c.get_string(XmlDocPtr::from_raw(parent.doc).unwrap(), 1))
                 } else {
-                    attr.children.and_then(|c| c.get_string(null_mut(), 1))
+                    attr.children.and_then(|c| c.get_string(None, 1))
                 };
             }
             XmlElementType::XmlTextNode
@@ -4263,7 +4264,7 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
         while !(*reader.ctxt).vctxt.vstate_tab.is_empty() {
             xml_validate_pop_element(
                 addr_of_mut!((*reader.ctxt).vctxt),
-                null_mut(),
+                None,
                 null_mut(),
                 null_mut(),
             );

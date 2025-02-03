@@ -3106,7 +3106,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
-            if xml_validate_dtd(cvp, doc, dtd) == 0 {
+            if xml_validate_dtd(cvp, XmlDocPtr::from_raw(doc).unwrap().unwrap(), dtd) == 0 {
                 let filename = filename.unwrap();
                 if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
                     generic_error!("Document {filename} does not validate against {dtd_valid}\n");
@@ -3148,7 +3148,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         }
         (*cvp).error = Some(generic_error_default);
         (*cvp).warning = Some(generic_error_default);
-        if xml_validate_document(cvp, doc) == 0 {
+        if xml_validate_document(cvp, XmlDocPtr::from_raw(doc).unwrap().unwrap()) == 0 {
             let filename = filename.unwrap();
             generic_error!("Document {filename} does not validate\n");
             PROGRESULT.store(ERR_VALID, Ordering::Relaxed);

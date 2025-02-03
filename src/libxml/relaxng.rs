@@ -1151,7 +1151,10 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
                     );
                 }
             } else if cur_attr.name().as_deref() == Some("datatypeLibrary") {
-                if let Some(val) = cur_attr.children.and_then(|c| c.get_string((*node).doc, 1)) {
+                if let Some(val) = cur_attr
+                    .children
+                    .and_then(|c| c.get_string(XmlDocPtr::from_raw((*node).doc).unwrap(), 1))
+                {
                     if !val.is_empty() {
                         if let Some(uri) = XmlURI::parse(&val) {
                             if uri.scheme.is_none() {
@@ -6899,7 +6902,7 @@ unsafe fn xml_relaxng_validate_attribute(
         {
             let value = prop
                 .children
-                .and_then(|c| c.get_string(prop.doc, 1))
+                .and_then(|c| c.get_string(XmlDocPtr::from_raw(prop.doc).unwrap(), 1))
                 .map(|c| CString::new(c).unwrap());
             let mut value = value
                 .as_ref()
@@ -6936,7 +6939,7 @@ unsafe fn xml_relaxng_validate_attribute(
     {
         let value = prop
             .children
-            .and_then(|c| c.get_string(prop.doc, 1))
+            .and_then(|c| c.get_string(XmlDocPtr::from_raw(prop.doc).unwrap(), 1))
             .map(|c| CString::new(c).unwrap());
         let mut value = value
             .as_ref()
@@ -8700,7 +8703,11 @@ unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: *mut 
         vctxt.warning = (*ctxt).warning;
         vctxt.user_data = (*ctxt).user_data.clone();
 
-        if xml_validate_document_final(addr_of_mut!(vctxt), doc) != 1 {
+        if xml_validate_document_final(
+            addr_of_mut!(vctxt),
+            XmlDocPtr::from_raw(doc).unwrap().unwrap(),
+        ) != 1
+        {
             ret = -1;
         }
     }

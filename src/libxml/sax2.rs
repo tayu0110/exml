@@ -52,8 +52,8 @@ use crate::{
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDoc,
-        XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlNode, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        XmlDocProperties, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlElementTypeVal,
+        XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -825,7 +825,7 @@ pub unsafe fn xml_sax2_attribute_decl(
             if let Some(attr) = attr {
                 (*ctxt).valid &= xml_validate_attribute_decl(
                     addr_of_mut!((*ctxt).vctxt) as _,
-                    (*ctxt).my_doc,
+                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                     attr,
                 );
             }
@@ -888,8 +888,11 @@ pub unsafe fn xml_sax2_element_decl(
             && !(*ctxt).my_doc.is_null()
             && (*(*ctxt).my_doc).int_subset.is_some()
         {
-            (*ctxt).valid &=
-                xml_validate_element_decl(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, elem);
+            (*ctxt).valid &= xml_validate_element_decl(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+                elem,
+            );
         }
     }
 }
@@ -956,8 +959,11 @@ pub unsafe fn xml_sax2_notation_decl(
             && (*ctxt).well_formed != 0
             && (*(*ctxt).my_doc).int_subset.is_some()
         {
-            (*ctxt).valid &=
-                xml_validate_notation_decl(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, nota);
+            (*ctxt).valid &= xml_validate_notation_decl(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+                nota,
+            );
         }
     }
 }
@@ -1147,8 +1153,10 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
             && !(*ctxt).my_doc.is_null()
             && (*(*ctxt).my_doc).int_subset.is_some()
         {
-            (*ctxt).valid &=
-                xml_validate_document_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            (*ctxt).valid &= xml_validate_document_final(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+            );
         }
     }
 
@@ -1381,7 +1389,7 @@ unsafe fn xml_sax2_attribute_internal(
             (*ctxt).vctxt.valid = 1;
             nval = xml_valid_ctxt_normalize_attribute_value(
                 addr_of_mut!((*ctxt).vctxt) as _,
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                 (*ctxt).node,
                 fullname,
                 value,
@@ -1462,7 +1470,7 @@ unsafe fn xml_sax2_attribute_internal(
             {
                 (*ctxt).valid &= xml_validate_one_namespace(
                     addr_of_mut!((*ctxt).vctxt) as _,
-                    (*ctxt).my_doc,
+                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                     (*ctxt).node,
                     prefix,
                     nsret.unwrap(),
@@ -1543,7 +1551,7 @@ unsafe fn xml_sax2_attribute_internal(
             {
                 (*ctxt).valid &= xml_validate_one_namespace(
                     addr_of_mut!((*ctxt).vctxt) as _,
-                    (*ctxt).my_doc,
+                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                     (*ctxt).node,
                     prefix,
                     nsret.unwrap(),
@@ -1655,7 +1663,7 @@ unsafe fn xml_sax2_attribute_internal(
             if val.is_null() {
                 (*ctxt).valid &= xml_validate_one_attribute(
                     addr_of_mut!((*ctxt).vctxt) as _,
-                    (*ctxt).my_doc,
+                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                     (*ctxt).node,
                     Some(ret),
                     value,
@@ -1665,7 +1673,7 @@ unsafe fn xml_sax2_attribute_internal(
                 // It need to be done twice ... it's an extra burden related
                 // to the ability to keep xmlSAX2References in attributes
                 let nvalnorm: *mut XmlChar = xml_valid_normalize_attribute_value(
-                    (*ctxt).my_doc,
+                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                     (*ctxt).node,
                     fullname,
                     val,
@@ -1677,7 +1685,7 @@ unsafe fn xml_sax2_attribute_internal(
 
                 (*ctxt).valid &= xml_validate_one_attribute(
                     addr_of_mut!((*ctxt).vctxt) as _,
-                    (*ctxt).my_doc,
+                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                     (*ctxt).node,
                     Some(ret),
                     val,
@@ -1687,7 +1695,7 @@ unsafe fn xml_sax2_attribute_internal(
         } else {
             (*ctxt).valid &= xml_validate_one_attribute(
                 addr_of_mut!((*ctxt).vctxt) as _,
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                 (*ctxt).node,
                 Some(ret),
                 value,
@@ -1720,25 +1728,35 @@ unsafe fn xml_sax2_attribute_internal(
             }
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
                 ret,
             );
-        } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
+        } else if xml_is_id(
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+            (*ctxt).node,
+            Some(ret),
+        ) != 0
+        {
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
                 ret,
             );
-        } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
+        } else if xml_is_ref(
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+            (*ctxt).node,
+            Some(ret),
+        ) != 0
+        {
             xml_add_ref(
                 addr_of_mut!((*ctxt).vctxt) as _,
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
@@ -2033,14 +2051,20 @@ pub unsafe fn xml_sax2_start_element(
         // If it's the Document root, finish the DTD validation and
         // check the document root element for validity
         if (*ctxt).validate != 0 && (*ctxt).vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
-            let chk: i32 = xml_validate_dtd_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            let chk: i32 = xml_validate_dtd_final(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+            );
             if chk <= 0 {
                 (*ctxt).valid = 0;
             }
             if chk < 0 {
                 (*ctxt).well_formed = 0;
             }
-            (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            (*ctxt).valid &= xml_validate_root(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+            );
             (*ctxt).vctxt.flags |= XML_VCTXT_DTD_VALIDATED as u32;
         }
     }
@@ -2069,8 +2093,11 @@ pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: &str
             && !(*ctxt).my_doc.is_null()
             && (*(*ctxt).my_doc).int_subset.is_some()
         {
-            (*ctxt).valid &=
-                xml_validate_one_element(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, cur);
+            (*ctxt).valid &= xml_validate_one_element(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+                cur,
+            );
         }
     }
 
@@ -2204,7 +2231,7 @@ pub unsafe fn xml_sax2_start_element_ns(
             {
                 (*ctxt).valid &= xml_validate_one_namespace(
                     addr_of_mut!((*ctxt).vctxt) as _,
-                    (*ctxt).my_doc,
+                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                     ret,
                     prefix,
                     ns,
@@ -2315,14 +2342,20 @@ pub unsafe fn xml_sax2_start_element_ns(
         // If it's the Document root, finish the DTD validation and
         // check the document root element for validity
         if (*ctxt).validate != 0 && (*ctxt).vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
-            let chk: i32 = xml_validate_dtd_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            let chk: i32 = xml_validate_dtd_final(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+            );
             if chk <= 0 {
                 (*ctxt).valid = 0;
             }
             if chk < 0 {
                 (*ctxt).well_formed = 0;
             }
-            (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+            (*ctxt).valid &= xml_validate_root(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+            );
             (*ctxt).vctxt.flags |= XML_VCTXT_DTD_VALIDATED as u32;
         }
     }
@@ -2532,7 +2565,7 @@ unsafe fn xml_sax2_attribute_ns(
                 if dup.is_null() {
                     (*ctxt).valid &= xml_validate_one_attribute(
                         addr_of_mut!((*ctxt).vctxt) as _,
-                        (*ctxt).my_doc,
+                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                         (*ctxt).node,
                         Some(ret),
                         value.as_ptr() as *const u8,
@@ -2553,7 +2586,7 @@ unsafe fn xml_sax2_attribute_ns(
                             (*ctxt).vctxt.valid = 1;
                             nvalnorm = xml_valid_ctxt_normalize_attribute_value(
                                 addr_of_mut!((*ctxt).vctxt) as _,
-                                (*ctxt).my_doc,
+                                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                                 (*ctxt).node,
                                 CStr::from_ptr(fullname as *const i8)
                                     .to_string_lossy()
@@ -2576,7 +2609,7 @@ unsafe fn xml_sax2_attribute_ns(
 
                     (*ctxt).valid &= xml_validate_one_attribute(
                         addr_of_mut!((*ctxt).vctxt) as _,
-                        (*ctxt).my_doc,
+                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                         (*ctxt).node,
                         Some(ret),
                         dup,
@@ -2589,7 +2622,7 @@ unsafe fn xml_sax2_attribute_ns(
 
                 (*ctxt).valid &= xml_validate_one_attribute(
                     addr_of_mut!((*ctxt).vctxt) as _,
-                    (*ctxt).my_doc,
+                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                     (*ctxt).node,
                     Some(ret),
                     dup,
@@ -2632,25 +2665,35 @@ unsafe fn xml_sax2_attribute_ns(
             }
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
                 ret,
             );
-        } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
+        } else if xml_is_id(
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+            (*ctxt).node,
+            Some(ret),
+        ) != 0
+        {
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
                 ret,
             );
-        } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
+        } else if xml_is_ref(
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+            (*ctxt).node,
+            Some(ret),
+        ) != 0
+        {
             xml_add_ref(
                 addr_of_mut!((*ctxt).vctxt) as _,
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                 CStr::from_ptr(content as *const i8)
                     .to_string_lossy()
                     .as_ref(),
@@ -2691,7 +2734,7 @@ pub unsafe fn xml_sax2_end_element_ns(
         {
             (*ctxt).valid &= xml_validate_one_element(
                 addr_of_mut!((*ctxt).vctxt) as _,
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                 (*ctxt).node,
             );
         }

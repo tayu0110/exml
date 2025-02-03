@@ -2351,7 +2351,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             .map_or(null_mut(), |c| c.as_ptr());
         *lst = cur;
         while !cur.is_null() {
-            (*cur).set_doc(doc);
+            (*cur).set_doc(XmlDocPtr::from_raw(doc).unwrap());
             (*cur).set_parent(None);
             cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
@@ -5464,7 +5464,10 @@ unsafe fn are_blanks(
         return 0;
     }
     if !(*ctxt).my_doc.is_null() {
-        ret = xml_is_mixed_element((*ctxt).my_doc, (*(*ctxt).node).name);
+        ret = xml_is_mixed_element(
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+            (*(*ctxt).node).name,
+        );
         if ret == 0 {
             return 1;
         }
@@ -6478,8 +6481,10 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                         && !(*ctxt).node.is_null()
                         && NodePtr::from_ptr((*ctxt).node) == (*(*ctxt).my_doc).children
                     {
-                        (*ctxt).valid &=
-                            xml_validate_root(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
+                        (*ctxt).valid &= xml_validate_root(
+                            addr_of_mut!((*ctxt).vctxt) as _,
+                            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+                        );
                     }
 
                     // Check for an Empty Element.
@@ -8387,7 +8392,7 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
             return null_mut();
         };
         cur = xml_new_doc_element_content(
-            (*ctxt).my_doc,
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
             Some(&elem),
             XmlElementContentType::XmlElementContentElement,
         );
@@ -8433,25 +8438,31 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
                     typ as i32
                 );
                 if !last.is_null() && last != ret {
-                    xml_free_doc_element_content((*ctxt).my_doc, last);
+                    xml_free_doc_element_content(
+                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                        last,
+                    );
                 }
                 if !ret.is_null() {
-                    xml_free_doc_element_content((*ctxt).my_doc, ret);
+                    xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
                 }
                 return null_mut();
             }
             (*ctxt).skip_char();
 
             op = xml_new_doc_element_content(
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
                 None,
                 XmlElementContentType::XmlElementContentSeq,
             );
             if op.is_null() {
                 if !last.is_null() && last != ret {
-                    xml_free_doc_element_content((*ctxt).my_doc, last);
+                    xml_free_doc_element_content(
+                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                        last,
+                    );
                 }
-                xml_free_doc_element_content((*ctxt).my_doc, ret);
+                xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
                 return null_mut();
             }
             if last.is_null() {
@@ -8490,26 +8501,32 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
                     typ as i32
                 );
                 if !last.is_null() && last != ret {
-                    xml_free_doc_element_content((*ctxt).my_doc, last);
+                    xml_free_doc_element_content(
+                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                        last,
+                    );
                 }
                 if !ret.is_null() {
-                    xml_free_doc_element_content((*ctxt).my_doc, ret);
+                    xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
                 }
                 return null_mut();
             }
             (*ctxt).skip_char();
 
             op = xml_new_doc_element_content(
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
                 None,
                 XmlElementContentType::XmlElementContentOr,
             );
             if op.is_null() {
                 if !last.is_null() && last != ret {
-                    xml_free_doc_element_content((*ctxt).my_doc, last);
+                    xml_free_doc_element_content(
+                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                        last,
+                    );
                 }
                 if !ret.is_null() {
-                    xml_free_doc_element_content((*ctxt).my_doc, ret);
+                    xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
                 }
                 return null_mut();
             }
@@ -8535,10 +8552,10 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
         } else {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrElemcontentNotFinished, None);
             if !last.is_null() && last != ret {
-                xml_free_doc_element_content((*ctxt).my_doc, last);
+                xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), last);
             }
             if !ret.is_null() {
-                xml_free_doc_element_content((*ctxt).my_doc, ret);
+                xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
             }
             return null_mut();
         }
@@ -8553,7 +8570,7 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
             last = xml_parse_element_children_content_decl_priv(ctxt, inputid, depth + 1);
             if last.is_null() {
                 if !ret.is_null() {
-                    xml_free_doc_element_content((*ctxt).my_doc, ret);
+                    xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
                 }
                 return null_mut();
             }
@@ -8562,18 +8579,18 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
             let Some(elem) = parse_name(&mut *ctxt) else {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrElemcontentNotStarted, None);
                 if !ret.is_null() {
-                    xml_free_doc_element_content((*ctxt).my_doc, ret);
+                    xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
                 }
                 return null_mut();
             };
             last = xml_new_doc_element_content(
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
                 Some(&elem),
                 XmlElementContentType::XmlElementContentElement,
             );
             if last.is_null() {
                 if !ret.is_null() {
-                    xml_free_doc_element_content((*ctxt).my_doc, ret);
+                    xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
                 }
                 return null_mut();
             }
@@ -8789,7 +8806,7 @@ pub(crate) unsafe fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> i32 {
         if (*ctxt).current_byte() != b'>' {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrGtRequired, None);
             if !content.is_null() {
-                xml_free_doc_element_content((*ctxt).my_doc, content);
+                xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), content);
             }
         } else {
             if inputid != (*(*ctxt).input).id {
@@ -8817,10 +8834,13 @@ pub(crate) unsafe fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> i32 {
                     // instead of copying the full tree it is plugged directly
                     // if called from the parser. Avoid duplicating the
                     // interfaces or change the API/ABI
-                    xml_free_doc_element_content((*ctxt).my_doc, content);
+                    xml_free_doc_element_content(
+                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                        content,
+                    );
                 }
             } else if !content.is_null() {
-                xml_free_doc_element_content((*ctxt).my_doc, content);
+                xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), content);
             }
         }
         return ret.map_or(-1, |ret| ret as i32);

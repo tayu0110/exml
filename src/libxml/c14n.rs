@@ -43,7 +43,7 @@ use crate::{
     io::{write_quoted, XmlOutputBuffer},
     list::XmlList,
     tree::{
-        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc,
+        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocPtr,
         XmlElementType, XmlNode, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
@@ -1133,7 +1133,7 @@ impl<T> XmlC14NCtx<'_, T> {
         // start from current value
         let Some(mut res) = xml_base_attr
             .children()
-            .and_then(|c| c.get_string(self.doc, 1))
+            .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1))
         else {
             xml_c14n_err_internal("processing xml:base attribute - can't get attr value");
             return None;
@@ -1150,8 +1150,12 @@ impl<T> XmlC14NCtx<'_, T> {
             if let Some(attr) = (*cur).has_ns_prop("base", XML_XML_NAMESPACE.to_str().ok()) {
                 // get attr value
                 let Some(mut tmp_str) = (match attr {
-                    Ok(attr) => attr.children.and_then(|c| c.get_string(self.doc, 1)),
-                    Err(attr) => attr.children.and_then(|c| c.get_string(self.doc, 1)),
+                    Ok(attr) => attr
+                        .children
+                        .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1)),
+                    Err(attr) => attr
+                        .children
+                        .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1)),
                 }) else {
                     xml_c14n_err_internal("processing xml:base attribute - can't get attr value");
                     return None;
@@ -1223,7 +1227,10 @@ impl<T> XmlC14NCtx<'_, T> {
         self.buf.borrow_mut().write_str("=\"");
 
         // todo: should we log an error if value==NULL ?
-        if let Some(value) = attr.children().and_then(|c| c.get_string(self.doc, 1)) {
+        if let Some(value) = attr
+            .children()
+            .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1))
+        {
             let value = CString::new(value).unwrap();
             buffer = xml_c11n_normalize_attr(value.as_ptr() as *const u8);
             if !buffer.is_null() {

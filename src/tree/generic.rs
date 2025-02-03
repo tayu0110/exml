@@ -13,8 +13,8 @@ use crate::{
 
 use super::{
     xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge, NodePtr, XmlAttr,
-    XmlAttrPtr, XmlAttribute, XmlDoc, XmlDtd, XmlDtdPtr, XmlElement, XmlElementType, XmlEntity,
-    XmlNode, XmlNs, XML_XML_NAMESPACE,
+    XmlAttrPtr, XmlAttribute, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement, XmlElementType,
+    XmlEntity, XmlNode, XmlNs, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -208,7 +208,9 @@ pub trait NodeCommon {
                             .to_string_lossy()
                             .into_owned()
                     });
-                } else if let Some(ret) = children.get_string(self.document(), 1) {
+                } else if let Some(ret) =
+                    children.get_string(XmlDocPtr::from_raw(self.document()).unwrap(), 1)
+                {
                     return Some(ret);
                 }
             }
@@ -266,7 +268,11 @@ pub trait NodeCommon {
         match self.element_type() {
             XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
                 let last = self.last();
-                let new_node: *mut XmlNode = xml_new_doc_text_len(self.document(), content, len);
+                let new_node: *mut XmlNode = xml_new_doc_text_len(
+                    XmlDocPtr::from_raw(self.document()).unwrap(),
+                    content,
+                    len,
+                );
                 if !new_node.is_null() {
                     let tmp = self.add_child(new_node);
                     if tmp != new_node {
@@ -355,7 +361,7 @@ pub trait NodeCommon {
         prev = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
         (*cur).set_parent(NodePtr::from_ptr(self as *mut Self as *mut XmlNode));
         if (*cur).doc != self.document() {
-            (*cur).set_doc(self.document());
+            (*cur).set_doc(XmlDocPtr::from_raw(self.document()).unwrap());
         }
         // this check prevents a loop on tree-traversions if a developer
         // tries to add a node to its parent multiple times

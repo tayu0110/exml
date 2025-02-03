@@ -67,8 +67,8 @@ use crate::{
         },
     },
     tree::{
-        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlDoc, XmlElementType, XmlNode,
-        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocPtr,
+        XmlElementType, XmlNode, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xpath::{
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
@@ -9306,7 +9306,7 @@ unsafe fn xml_xpath_get_elements_by_ids(
             // me and Aleksey Sanin, people blatantly violated that
             // constraint, like Visa3D spec.
             // if (xmlValidateNCName(ID, 1) == 0)
-            if let Some(attr) = xml_get_id(doc, id) {
+            if let Some(attr) = xml_get_id(XmlDocPtr::from_raw(doc).unwrap().unwrap(), id) {
                 if let Some(attr) = attr.as_ref().as_attribute_node() {
                     elem = attr.as_ref().parent.map_or(null_mut(), |p| p.as_ptr());
                 } else if matches!(attr.as_ref().element_type(), XmlElementType::XmlElementNode) {

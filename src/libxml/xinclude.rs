@@ -1101,7 +1101,11 @@ unsafe fn xml_xinclude_copy_range(
                 let mut len: i32;
 
                 if content.is_null() {
-                    tmp = xml_new_doc_text_len((*ctxt).doc, null_mut(), 0);
+                    tmp = xml_new_doc_text_len(
+                        XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
+                        null_mut(),
+                        0,
+                    );
                 } else {
                     len = index2;
                     if cur == start && index1 > 1 {
@@ -1110,7 +1114,11 @@ unsafe fn xml_xinclude_copy_range(
                     } else {
                         len = index2;
                     }
-                    tmp = xml_new_doc_text_len((*ctxt).doc, content, len);
+                    tmp = xml_new_doc_text_len(
+                        XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
+                        content,
+                        len,
+                    );
                 }
                 // single sub text node selection
                 if list.is_null() {
@@ -1164,7 +1172,11 @@ unsafe fn xml_xinclude_copy_range(
                 let mut content: *const XmlChar = (*cur).content;
 
                 if content.is_null() {
-                    tmp = xml_new_doc_text_len((*ctxt).doc, null_mut(), 0);
+                    tmp = xml_new_doc_text_len(
+                        XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
+                        null_mut(),
+                        0,
+                    );
                 } else {
                     if index1 > 1 {
                         content = content.add(index1 as usize - 1);

@@ -44,15 +44,11 @@ static mut VERBOSE: c_int = 0;
 const NB_EXPECTED_ERRORS: usize = 15;
 
 const SKIPPED_TESTS: &[&str] = &[
-    /* http://lists.w3.org/Archives/Public/public-xml-testsuite/2008Jul/0000.html */
+    // http://lists.w3.org/Archives/Public/public-xml-testsuite/2008Jul/0000.html
     "rmt-ns10-035",
 ];
 
-/************************************************************************
- *									*
- *		File name and path utilities				*
- *									*
- ************************************************************************/
+// File name and path utilities
 
 fn check_test_file(filename: &str) -> bool {
     match metadata(filename) {
@@ -132,7 +128,7 @@ fn test_error_handler(_user_data: Option<GenericErrorContext>, error: &XmlError)
             NB_ERROR += 1;
         }
         if TEST_ERRORS_SIZE + res as usize >= 32768 {
-            /* buffer is full */
+            // buffer is full
             TEST_ERRORS_SIZE = 32768;
             TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
         } else {
@@ -228,7 +224,7 @@ unsafe fn xmlconf_test_valid(
         NB_ERRORS += 1;
         ret = 0;
     } else {
-        /* validity should be reported both in the context and in the document */
+        // validity should be reported both in the context and in the document
         if (*ctxt).valid == 0 || (*doc).properties & XmlDocProperties::XmlDocDTDValid as i32 == 0 {
             test_log!(
                 logfile,
@@ -534,11 +530,6 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
     ret
 }
 
-/************************************************************************
- *									*
- *		The driver for the tests				*
- *									*
- ************************************************************************/
 #[test]
 fn main() {
     let mut ret: c_int;

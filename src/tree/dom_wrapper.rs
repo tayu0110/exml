@@ -32,8 +32,8 @@ use crate::libxml::{
 use super::{
     xml_free_ns, xml_get_doc_entity, xml_new_ns, xml_search_ns_by_namespace_strict,
     xml_search_ns_by_prefix_strict, xml_tree_err_memory, xml_tree_nslist_lookup_by_prefix,
-    NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlElementType, XmlNode,
-    XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE,
+    NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType,
+    XmlNode, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE,
 };
 
 /// A function called to acquire namespaces (xmlNs) from the wrapper.
@@ -615,15 +615,14 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
     let mut list_redund = vec![];
     let mut nb_redund: i32 = 0;
 
-    if elem.is_null()
-        || (*elem).doc.is_null()
-        || !matches!((*elem).element_type(), XmlElementType::XmlElementNode)
-    {
+    if elem.is_null() || !matches!((*elem).element_type(), XmlElementType::XmlElementNode) {
         return -1;
     }
 
+    let Some(doc) = XmlDocPtr::from_raw((*elem).doc).unwrap() else {
+        return -1;
+    };
     let ret;
-    let doc: *mut XmlDoc = (*elem).doc;
     cur = elem;
     'exit: {
         'internal_error: {
@@ -802,7 +801,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         // Acquire a normalized ns-decl and add it to the map.
                         let mut ns = None;
                         if xml_dom_wrap_ns_norm_acquire_normalized_ns(
-                            doc,
+                            doc.as_ptr(),
                             cur_elem,
                             (*cur).ns.unwrap(),
                             &mut ns,
@@ -879,7 +878,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         // Acquire a normalized ns-decl and add it to the map.
                         let mut ns = None;
                         if xml_dom_wrap_ns_norm_acquire_normalized_ns(
-                            doc,
+                            doc.as_ptr(),
                             cur_elem,
                             (*cur).ns.unwrap(),
                             &mut ns,
@@ -1343,7 +1342,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                 )
                             {
                                 xml_remove_id(
-                                    source_doc,
+                                    XmlDocPtr::from_raw(source_doc).unwrap().unwrap(),
                                     XmlAttrPtr::from_raw(cur as _).unwrap().unwrap(),
                                 );
                             }
@@ -1468,7 +1467,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
 #[doc(alias = "xmlDOMWrapAdoptAttr")]
 unsafe fn xml_dom_wrap_adopt_attr(
     ctxt: XmlDOMWrapCtxtPtr,
-    _source_doc: *mut XmlDoc,
+    _source_doc: Option<XmlDocPtr>,
     mut attr: XmlAttrPtr,
     dest_doc: *mut XmlDoc,
     dest_parent: *mut XmlNode,
@@ -1647,7 +1646,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
     } else if matches!((*node).element_type(), XmlElementType::XmlAttributeNode) {
         return xml_dom_wrap_adopt_attr(
             ctxt,
-            source_doc,
+            XmlDocPtr::from_raw(source_doc).unwrap(),
             XmlAttrPtr::from_raw(node as *mut XmlAttr).unwrap().unwrap(),
             dest_doc,
             dest_parent,
@@ -2350,16 +2349,18 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     if matches!((*clone).element_type(), XmlElementType::XmlAttributeNode)
                         && (*clone).parent().is_some()
                         && xml_is_id(
-                            dest_doc,
+                            XmlDocPtr::from_raw(dest_doc).unwrap(),
                             (*clone).parent().unwrap().as_ptr(),
                             XmlAttrPtr::from_raw(clone as _).unwrap(),
                         ) != 0
                     {
                         let children = (*cur).children();
-                        if let Some(id_val) = children.and_then(|c| c.get_string((*cur).doc, 1)) {
+                        if let Some(id_val) = children
+                            .and_then(|c| c.get_string(XmlDocPtr::from_raw((*cur).doc).unwrap(), 1))
+                        {
                             if xml_add_id(
                                 null_mut(),
-                                dest_doc,
+                                XmlDocPtr::from_raw(dest_doc).unwrap().unwrap(),
                                 &id_val,
                                 XmlAttrPtr::from_raw(cur as _).unwrap().unwrap(),
                             )

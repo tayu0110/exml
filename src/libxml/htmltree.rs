@@ -930,7 +930,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur
         .children
         .filter(|_| html_is_boolean_attr(cur.name as _) == 0)
     {
-        if let Some(value) = children.get_string(doc, 0) {
+        if let Some(value) = children.get_string(XmlDocPtr::from_raw(doc).unwrap(), 0) {
             buf.write_str("=");
             if cur.ns.is_none()
                 && cur

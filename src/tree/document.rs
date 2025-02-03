@@ -82,7 +82,7 @@ pub struct XmlDoc {
     // external initial encoding, if any
     pub(crate) encoding: Option<String>,
     // Hash table for ID attributes if any
-    pub(crate) ids: Option<Box<XmlHashTable<'static, Box<XmlID>>>>,
+    pub(crate) ids: Option<Box<XmlHashTable<'static, XmlID>>>,
     // Hash table for IDREFs attributes if any
     pub(crate) refs: Option<HashMap<String, XmlList<Box<XmlRef>>>>,
     // The URI for that document
@@ -647,7 +647,7 @@ impl XmlDoc {
             return null_mut();
         }
         (*root).unlink();
-        (*root).set_doc(self);
+        (*root).set_doc(XmlDocPtr::from_raw(self).unwrap());
         (*root).set_parent(NodePtr::from_ptr(self as *mut XmlDoc as *mut XmlNode));
         let mut old = self.children();
         while let Some(now) = old {
@@ -975,7 +975,7 @@ pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> *mut XmlDoc {
                 xml_free_doc(XmlDocPtr::from_raw(ret).unwrap().unwrap());
                 return null_mut();
             };
-            (*(ret_int_subset.as_ptr() as *mut XmlNode)).set_doc(ret);
+            (*(ret_int_subset.as_ptr() as *mut XmlNode)).set_doc(XmlDocPtr::from_raw(ret).unwrap());
             ret_int_subset.parent = ret;
         }
     }

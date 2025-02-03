@@ -39,8 +39,8 @@ use crate::{
 use super::{
     xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node, xml_free_prop,
     xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory, NodeCommon,
-    XmlAttr, XmlAttrPtr, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlElementType, XmlNs,
-    XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    XmlAttr, XmlAttrPtr, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType,
+    XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
@@ -907,7 +907,7 @@ impl XmlNode {
     ///
     /// Returns a pointer to the string copy, the caller must free it with `xml_free()`.
     #[doc(alias = "xmlNodeListGetString")]
-    pub unsafe fn get_string(&self, doc: *mut XmlDoc, in_line: i32) -> Option<String> {
+    pub unsafe fn get_string(&self, doc: Option<XmlDocPtr>, in_line: i32) -> Option<String> {
         let mut node: *const XmlNode = self;
         let mut ret: *mut XmlChar = null_mut();
 
@@ -925,9 +925,15 @@ impl XmlNode {
                     ret = xml_strcat(ret, (*node).content);
                 } else {
                     let buffer = if attr {
-                        xml_encode_attribute_entities(doc, (*node).content)
+                        xml_encode_attribute_entities(
+                            doc.map_or(null_mut(), |doc| doc.as_ptr()),
+                            (*node).content,
+                        )
                     } else {
-                        xml_encode_entities_reentrant(doc, (*node).content)
+                        xml_encode_entities_reentrant(
+                            doc.map_or(null_mut(), |doc| doc.as_ptr()),
+                            (*node).content,
+                        )
                     };
                     if !buffer.is_null() {
                         ret = xml_strcat(ret, buffer);
@@ -936,7 +942,10 @@ impl XmlNode {
                 }
             } else if matches!((*node).element_type(), XmlElementType::XmlEntityRefNode) {
                 if in_line != 0 {
-                    let ent = xml_get_doc_entity(doc, &(*node).name().unwrap());
+                    let ent = xml_get_doc_entity(
+                        doc.map_or(null_mut(), |doc| doc.as_ptr()),
+                        &(*node).name().unwrap(),
+                    );
                     if let Some(ent) = ent {
                         // an entity content can be any "well balanced chunk",
                         // i.e. the result of the content [43] production:
@@ -1153,7 +1162,10 @@ impl XmlNode {
 
         use crate::{
             libxml::valid::{xml_add_id, xml_remove_id},
-            tree::{xml_free_node_list, xml_new_doc_text, xml_new_prop_internal, XmlAttributeType},
+            tree::{
+                xml_free_node_list, xml_new_doc_text, xml_new_prop_internal, XmlAttributeType,
+                XmlDocPtr,
+            },
         };
 
         if ns.map_or(false, |ns| ns.href.is_null()) {
@@ -1167,7 +1179,7 @@ impl XmlNode {
         if let Some(Ok(mut prop)) = prop {
             // Modify the attribute's value.
             if matches!(prop.atype, Some(XmlAttributeType::XmlAttributeID)) {
-                xml_remove_id(self.document(), prop);
+                xml_remove_id(XmlDocPtr::from_raw(self.document()).unwrap().unwrap(), prop);
                 prop.atype = Some(XmlAttributeType::XmlAttributeID);
             }
             if let Some(children) = prop.children() {
@@ -1193,7 +1205,12 @@ impl XmlNode {
                 }
             }
             if matches!(prop.atype, Some(XmlAttributeType::XmlAttributeID)) {
-                xml_add_id(null_mut(), self.document(), value.unwrap(), prop);
+                xml_add_id(
+                    null_mut(),
+                    XmlDocPtr::from_raw(self.document()).unwrap().unwrap(),
+                    value.unwrap(),
+                    prop,
+                );
             }
             return Some(prop);
         }
@@ -1502,20 +1519,20 @@ impl XmlNode {
 
     /// update all nodes under the tree to point to the right document
     #[doc(alias = "xmlSetTreeDoc")]
-    pub unsafe fn set_doc(&mut self, doc: *mut XmlDoc) {
+    pub unsafe fn set_doc(&mut self, doc: Option<XmlDocPtr>) {
         if self.element_type() == XmlElementType::XmlNamespaceDecl {
             return;
         }
-        if self.document() != doc {
+        if self.document() != doc.map_or(null_mut(), |doc| doc.as_ptr()) {
             if matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 let mut prop = self.properties;
                 while let Some(mut now) = prop {
                     if matches!(now.atype, Some(XmlAttributeType::XmlAttributeID)) {
-                        xml_remove_id(self.document(), now);
+                        xml_remove_id(XmlDocPtr::from_raw(self.document()).unwrap().unwrap(), now);
                     }
 
-                    if now.document() != doc {
-                        now.set_document(doc);
+                    if now.document() != doc.map_or(null_mut(), |doc| doc.as_ptr()) {
+                        now.set_document(doc.map_or(null_mut(), |doc| doc.as_ptr()));
                     }
                     if let Some(mut children) = now.children() {
                         children.set_doc_all_sibling(doc);
@@ -1542,19 +1559,19 @@ impl XmlNode {
             }
 
             // FIXME: self.ns should be updated as in xmlStaticCopyNode().
-            self.set_document(doc);
+            self.set_document(doc.map_or(null_mut(), |doc| doc.as_ptr()));
         }
     }
 
     /// update all nodes in the list to point to the right document
     #[doc(alias = "xmlSetListDoc")]
-    pub unsafe fn set_doc_all_sibling(&mut self, doc: *mut XmlDoc) {
+    pub unsafe fn set_doc_all_sibling(&mut self, doc: Option<XmlDocPtr>) {
         if self.element_type() == XmlElementType::XmlNamespaceDecl {
             return;
         }
         let mut cur = NodePtr::from_ptr(self as *mut XmlNode);
         while let Some(mut now) = cur {
-            if now.document() != doc {
+            if now.document() != doc.map_or(null_mut(), |doc| doc.as_ptr()) {
                 now.set_doc(doc);
             }
             cur = now.next();
@@ -1676,7 +1693,7 @@ impl XmlNode {
         }
 
         if (*elem).document() != cur.document() {
-            (*elem).set_doc((*cur).document());
+            (*elem).set_doc(XmlDocPtr::from_raw((*cur).document()).unwrap());
         }
         let parent = cur.parent();
         (*elem).set_prev(Some(cur));
@@ -1749,7 +1766,7 @@ impl XmlNode {
         }
 
         if (*elem).document() != self.document() {
-            (*elem).set_doc(self.document());
+            (*elem).set_doc(XmlDocPtr::from_raw(self.document()).unwrap());
         }
         (*elem).set_parent(self.parent());
         (*elem).set_prev(self.prev());
@@ -1810,7 +1827,7 @@ impl XmlNode {
         }
 
         if (*elem).document() != self.document() {
-            (*elem).set_doc(self.document());
+            (*elem).set_doc(XmlDocPtr::from_raw(self.document()).unwrap());
         }
         (*elem).set_parent(self.parent());
         (*elem).set_prev(NodePtr::from_ptr(self as *mut XmlNode));
@@ -1875,14 +1892,14 @@ impl XmlNode {
         while let Some(next) = (*cur).next() {
             (*cur).set_parent(NodePtr::from_ptr(self as *mut XmlNode));
             if (*cur).document() != self.document() {
-                (*cur).set_doc(self.document());
+                (*cur).set_doc(XmlDocPtr::from_raw(self.document()).unwrap());
             }
             cur = next.as_ptr();
         }
         (*cur).set_parent(NodePtr::from_ptr(self as *mut XmlNode));
         // the parent may not be linked to a doc !
         if (*cur).document() != self.document() {
-            (*cur).set_doc(self.document());
+            (*cur).set_doc(XmlDocPtr::from_raw(self.document()).unwrap());
         }
         self.set_last(NodePtr::from_ptr(cur));
 
@@ -2367,7 +2384,7 @@ unsafe fn add_prop_sibling(
     };
 
     if (*prop).doc != (*cur).doc {
-        (*prop).set_doc((*cur).doc);
+        (*prop).set_doc(XmlDocPtr::from_raw((*cur).doc).unwrap());
     }
     (*prop).parent = (*cur).parent;
     (*prop).prev = NodePtr::from_ptr(prev);

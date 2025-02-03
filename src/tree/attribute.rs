@@ -37,8 +37,8 @@ use crate::libxml::{
 use super::{
     xml_free_node_list, xml_new_doc_text, xml_new_ns, xml_new_reconciled_ns,
     xml_static_copy_node_list, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
-    NodePtr, XmlAttributeType, XmlDoc, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNsPtr,
-    __XML_REGISTER_CALLBACKS,
+    NodePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode,
+    XmlNsPtr, __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -384,10 +384,13 @@ pub(super) unsafe fn xml_new_prop_internal(
         }
     }
 
-    if !value.is_null() && !node.is_null() && xml_is_id((*node).doc, node, Some(cur)) == 1 {
+    if !value.is_null()
+        && !node.is_null()
+        && xml_is_id(XmlDocPtr::from_raw((*node).doc).unwrap(), node, Some(cur)) == 1
+    {
         xml_add_id(
             null_mut(),
-            (*node).doc,
+            XmlDocPtr::from_raw((*node).doc).unwrap().unwrap(),
             CStr::from_ptr(value as *const i8)
                 .to_string_lossy()
                 .as_ref(),
@@ -532,12 +535,21 @@ pub(super) unsafe fn xml_copy_prop_internal(
         && (*cur.doc).ids.is_some()
         && cur
             .parent
-            .filter(|p| xml_is_id(cur.doc, p.as_ptr(), Some(cur)) != 0)
+            .filter(|p| {
+                xml_is_id(XmlDocPtr::from_raw(cur.doc).unwrap(), p.as_ptr(), Some(cur)) != 0
+            })
             .is_some()
     {
         let children = cur.children;
-        if let Some(id) = children.and_then(|c| c.get_string(cur.doc, 1)) {
-            xml_add_id(null_mut(), (*target).doc, &id, ret);
+        if let Some(id) =
+            children.and_then(|c| c.get_string(XmlDocPtr::from_raw(cur.doc).unwrap(), 1))
+        {
+            xml_add_id(
+                null_mut(),
+                XmlDocPtr::from_raw((*target).doc).unwrap().unwrap(),
+                &id,
+                ret,
+            );
         }
     }
     Some(ret)
@@ -593,7 +605,7 @@ pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
 
     // Check for ID removal -> leading to invalid references !
     if !cur.doc.is_null() && matches!(cur.atype, Some(XmlAttributeType::XmlAttributeID)) {
-        xml_remove_id(cur.doc, cur);
+        xml_remove_id(XmlDocPtr::from_raw(cur.doc).unwrap().unwrap(), cur);
     }
     if let Some(children) = cur.children() {
         xml_free_node_list(children.as_ptr());

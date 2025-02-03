@@ -255,11 +255,6 @@ unsafe fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 
     })
 }
 
-/************************************************************************
- *									*
- *		Crazy document generator				*
- *									*
- ************************************************************************/
 thread_local! {
     static CRAZY_INDX: Cell<usize> = const { Cell::new(0) };
 }
@@ -366,11 +361,6 @@ unsafe fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32
         len
     })
 }
-/************************************************************************
- *									*
- *		Libxml2 specific routines				*
- *									*
- ************************************************************************/
 
 thread_local! {
     static NB_TESTS: Cell<i32> = const { Cell::new(0) };
@@ -637,11 +627,6 @@ unsafe fn initialize_libxml2() {
     }
 }
 
-/************************************************************************
- *									*
- *		SAX empty callbacks                                     *
- *									*
- ************************************************************************/
 thread_local! {
     static CALLBACKS: AtomicU64 = const { AtomicU64::new(0) };
 }
@@ -1048,12 +1033,6 @@ unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32
     res
 }
 
-/************************************************************************
- *									*
- *			Tests descriptions				*
- *									*
- ************************************************************************/
-
 type Functest = unsafe fn(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32;
 
 struct LimitDesc<'a> {
@@ -1064,7 +1043,7 @@ struct LimitDesc<'a> {
 }
 
 static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
-    /* max length of a text node in content */
+    // max length of a text node in content
     LimitDesc {
         name: "huge:textNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
@@ -1083,7 +1062,7 @@ static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
         options: XmlParserOption::XmlParseHuge as i32,
         fail: 0,
     },
-    /* max length of a text node in content */
+    // max length of a text node in content
     LimitDesc {
         name: "huge:attrNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
@@ -1102,7 +1081,7 @@ static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
         options: XmlParserOption::XmlParseHuge as i32,
         fail: 0,
     },
-    /* max length of a comment node */
+    // max length of a comment node
     LimitDesc {
         name: "huge:commentNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
@@ -1121,7 +1100,7 @@ static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
         options: XmlParserOption::XmlParseHuge as i32,
         fail: 0,
     },
-    /* max length of a PI node */
+    // max length of a PI node
     LimitDesc {
         name: "huge:piNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
@@ -1153,7 +1132,7 @@ static TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: Some("Parsing of huge files with the sax parser"),
         func: Some(sax_test),
     },
-    /*    { "Parsing of huge files with the tree parser", treeTest}, */
+    // { "Parsing of huge files with the tree parser", treeTest},
     #[cfg(feature = "libxml_reader")]
     TestDesc {
         desc: Some("Parsing of huge files with the reader"),
@@ -1173,7 +1152,7 @@ struct TestException {
 }
 
 static TEST_EXCEPTIONS: &[TestException] = &[
-    /* the SAX parser doesn't hit a limit of XML_MAX_TEXT_LENGTH text nodes */
+    // the SAX parser doesn't hit a limit of XML_MAX_TEXT_LENGTH text nodes
     TestException {
         test: 0,
         limit: 1,

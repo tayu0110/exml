@@ -31,8 +31,8 @@ use crate::libxml::xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr};
 use crate::{
     libxml::valid::xml_free_doc_element_content,
     tree::{
-        InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDoc, XmlDtd, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlGenericNodePtr, XmlNode,
+        InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlDtd,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlGenericNodePtr, XmlNode,
     },
 };
 
@@ -281,7 +281,7 @@ pub(crate) unsafe fn xml_free_element(elem: Option<XmlElementPtr>) {
         return;
     };
     elem.unlink();
-    xml_free_doc_element_content(elem.doc, elem.content);
+    xml_free_doc_element_content(XmlDocPtr::from_raw(elem.doc).unwrap(), elem.content);
     elem.name = None;
     elem.prefix = None;
     #[cfg(feature = "libxml_regexp")]
