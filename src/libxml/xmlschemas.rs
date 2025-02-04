@@ -2382,7 +2382,7 @@ unsafe fn xml_schema_lookup_namespace(
             return null_mut();
         }
         let ns = (*(*(*vctxt).inode).node).search_ns(
-            (*(*(*vctxt).inode).node).doc,
+            XmlDocPtr::from_raw((*(*(*vctxt).inode).node).doc).unwrap(),
             (!prefix.is_null())
                 .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                 .as_deref(),
@@ -2470,7 +2470,7 @@ unsafe fn xml_schema_validate_notation(
                 ns_name = xml_schema_lookup_namespace(vctxt, prefix);
             } else if !node.is_null() {
                 let ns = (*node).search_ns(
-                    (*node).doc,
+                    XmlDocPtr::from_raw((*node).doc).unwrap(),
                     (!prefix.is_null())
                         .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                         .as_deref(),
@@ -7127,7 +7127,10 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
     }
 
     if strchr(value as *mut c_char, b':' as _).is_null() {
-        let ns = attr.parent.unwrap().search_ns(attr.doc, None);
+        let ns = attr
+            .parent
+            .unwrap()
+            .search_ns(XmlDocPtr::from_raw(attr.doc).unwrap(), None);
         if let Some(ns) = ns.filter(|ns| !ns.href.is_null() && *ns.href.add(0) != 0) {
             *uri = xml_dict_lookup((*ctxt).dict, ns.href, -1);
         } else if (*schema).flags & XML_SCHEMAS_INCLUDING_CONVERT_NS != 0 {
@@ -7144,7 +7147,7 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
     *local = xml_dict_lookup((*ctxt).dict, *local, -1);
     let pref: *const XmlChar = xml_dict_lookup((*ctxt).dict, value, len);
     let Some(ns) = attr.parent.unwrap().search_ns(
-        attr.doc,
+        XmlDocPtr::from_raw(attr.doc).unwrap(),
         Some(CStr::from_ptr(pref as *const i8).to_string_lossy()).as_deref(),
     ) else {
         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
@@ -25664,7 +25667,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             }
                         } else {
                             let mut ns = (*def_attr_owner_elem).search_ns_by_href(
-                                (*def_attr_owner_elem).doc,
+                                XmlDocPtr::from_raw((*def_attr_owner_elem).doc).unwrap(),
                                 CStr::from_ptr((*iattr).ns_name as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
@@ -25685,7 +25688,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                     prefix = format!("p{counter}");
                                     counter += 1;
                                     ns = (*def_attr_owner_elem).search_ns(
-                                        (*def_attr_owner_elem).doc,
+                                        XmlDocPtr::from_raw((*def_attr_owner_elem).doc).unwrap(),
                                         Some(prefix.as_str()),
                                     );
                                     if counter > 1000 {

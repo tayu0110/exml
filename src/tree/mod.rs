@@ -960,7 +960,7 @@ pub unsafe fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -> *const Xm
 /// Returns the (new) namespace definition or null_mut() in case of error
 #[doc(alias = "xmlNewReconciledNs")]
 unsafe fn xml_new_reconciled_ns(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     tree: *mut XmlNode,
     ns: XmlNsPtr,
 ) -> Option<XmlNsPtr> {
@@ -1140,14 +1140,16 @@ pub(crate) unsafe fn xml_static_copy_node(
 
     if let Some(node_ns) = (*node).ns {
         let prefix = node_ns.prefix();
-        if let Some(ns) = (*ret).search_ns(doc, prefix.as_deref()) {
+        if let Some(ns) = (*ret).search_ns(XmlDocPtr::from_raw(doc).unwrap(), prefix.as_deref()) {
             // reference the existing namespace definition in our own tree.
             (*ret).ns = Some(ns);
         } else {
             // Humm, we are copying an element whose namespace is defined
             // out of the new tree scope. Search it in the original tree
             // and add it at the top of the new tree
-            if let Some(ns) = (*node).search_ns((*node).doc, prefix.as_deref()) {
+            if let Some(ns) =
+                (*node).search_ns(XmlDocPtr::from_raw((*node).doc).unwrap(), prefix.as_deref())
+            {
                 let mut root: *mut XmlNode = ret;
 
                 while let Some(parent) = (*root).parent() {
@@ -1155,7 +1157,7 @@ pub(crate) unsafe fn xml_static_copy_node(
                 }
                 (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
             } else {
-                (*ret).ns = xml_new_reconciled_ns(doc, ret, node_ns);
+                (*ret).ns = xml_new_reconciled_ns(XmlDocPtr::from_raw(doc).unwrap(), ret, node_ns);
             }
         }
     }

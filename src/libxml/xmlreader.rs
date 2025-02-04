@@ -1674,7 +1674,9 @@ impl XmlTextReader {
                 }
                 ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
-        } else if let Some(ns) = (*self.node).search_ns((*self.node).doc, Some(prefix)) {
+        } else if let Some(ns) =
+            (*self.node).search_ns(XmlDocPtr::from_raw((*self.node).doc).unwrap(), Some(prefix))
+        {
             let href = ns.href;
             ret = (*self.node).get_ns_prop(
                 localname,
@@ -4306,7 +4308,7 @@ pub unsafe fn xml_text_reader_lookup_namespace(
     }
 
     let Some(ns) = (*reader.node).search_ns(
-        (*reader.node).doc,
+        XmlDocPtr::from_raw((*reader.node).doc).unwrap(),
         (!prefix.is_null())
             .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
             .as_deref(),

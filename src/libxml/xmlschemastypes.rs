@@ -2717,7 +2717,7 @@ unsafe fn xml_schema_val_atomic_type(
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
                                     let ns = (*node).search_ns(
-                                        (*node).doc,
+                                        XmlDocPtr::from_raw((*node).doc).unwrap(),
                                         (!prefix.is_null())
                                             .then(|| {
                                                 CStr::from_ptr(prefix as *const i8)
@@ -2979,7 +2979,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
                                     if !prefix.is_null() {
                                         if let Some(ns) = (*node).search_ns(
-                                            (*node).doc,
+                                            XmlDocPtr::from_raw((*node).doc).unwrap(),
                                             Some(
                                                 CStr::from_ptr(prefix as *const i8)
                                                     .to_string_lossy()

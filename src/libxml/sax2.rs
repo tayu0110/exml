@@ -1569,7 +1569,8 @@ unsafe fn xml_sax2_attribute_internal(
     }
 
     let namespace = if let Some(ns) = ns {
-        let namespace = (*(*ctxt).node).search_ns((*ctxt).my_doc, Some(ns));
+        let namespace =
+            (*(*ctxt).node).search_ns(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), Some(ns));
 
         if let Some(namespace) = namespace {
             let mut prop = (*(*ctxt).node).properties;
@@ -2007,11 +2008,15 @@ pub unsafe fn xml_sax2_start_element(
 
         // Search the namespace, note that since the attributes have been
         // processed, the local namespaces are available.
-        let mut ns = (*ret).search_ns((*ctxt).my_doc, prefix).or_else(|| {
-            (!parent.is_null())
-                .then(|| (*parent).search_ns((*ctxt).my_doc, prefix))
-                .flatten()
-        });
+        let mut ns = (*ret)
+            .search_ns(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), prefix)
+            .or_else(|| {
+                (!parent.is_null())
+                    .then(|| {
+                        (*parent).search_ns(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), prefix)
+                    })
+                    .flatten()
+            });
         if ns.is_none() {
             if let Some(prefix) = prefix {
                 ns = xml_new_ns(ret, null_mut(), Some(prefix));
@@ -2268,12 +2273,12 @@ pub unsafe fn xml_sax2_start_element_ns(
     // Note that, if prefix is NULL, this searches for the default Ns
     if orig_uri.is_some() && (*ret).ns.is_none() {
         (*ret).ns = if !parent.is_null() {
-            (*parent).search_ns((*ctxt).my_doc, prefix)
+            (*parent).search_ns(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), prefix)
         } else {
             None
         };
         if (*ret).ns.is_none() && prefix == Some("xml") {
-            (*ret).ns = (*ret).search_ns((*ctxt).my_doc, prefix);
+            (*ret).ns = (*ret).search_ns(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), prefix);
         }
         if (*ret).ns.is_none() {
             if xml_new_ns(ret, null_mut(), prefix).is_none() {
@@ -2462,7 +2467,7 @@ unsafe fn xml_sax2_attribute_ns(
     // Note: if prefix.is_null(), the attribute is not in the default namespace
     if !prefix.is_null() {
         namespace = (*(*ctxt).node).search_ns(
-            (*ctxt).my_doc,
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
             Some(
                 CStr::from_ptr(prefix as *const i8)
                     .to_string_lossy()

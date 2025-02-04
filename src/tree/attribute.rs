@@ -477,7 +477,10 @@ pub(super) unsafe fn xml_copy_prop_internal(
 
     if let Some(cur_ns) = cur.ns.filter(|_| !target.is_null()) {
         let prefix = cur_ns.prefix();
-        if let Some(ns) = (*target).search_ns((*target).doc, prefix.as_deref()) {
+        if let Some(ns) = (*target).search_ns(
+            XmlDocPtr::from_raw((*target).doc).unwrap(),
+            prefix.as_deref(),
+        ) {
             // we have to find something appropriate here since
             // we can't be sure, that the namespace we found is identified
             // by the prefix
@@ -487,13 +490,21 @@ pub(super) unsafe fn xml_copy_prop_internal(
             } else {
                 // we are in trouble: we need a new reconciled namespace.
                 // This is expensive
-                ret.ns = xml_new_reconciled_ns((*target).doc, target, cur_ns);
+                ret.ns = xml_new_reconciled_ns(
+                    XmlDocPtr::from_raw((*target).doc).unwrap(),
+                    target,
+                    cur_ns,
+                );
             }
         } else {
             // Humm, we are copying an element whose namespace is defined
             // out of the new tree scope. Search it in the original tree
             // and add it at the top of the new tree
-            if let Some(ns) = cur.parent.unwrap().search_ns(cur.doc, prefix.as_deref()) {
+            if let Some(ns) = cur
+                .parent
+                .unwrap()
+                .search_ns(XmlDocPtr::from_raw(cur.doc).unwrap(), prefix.as_deref())
+            {
                 let mut root: *mut XmlNode = target;
                 let mut pred: *mut XmlNode = null_mut();
 

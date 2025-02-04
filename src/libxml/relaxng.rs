@@ -1782,7 +1782,10 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                             // Simplification: 4.10. QNames
                             if let Some(name) = (*cur).get_content() {
                                 if let Some((prefix, local)) = split_qname2(&name) {
-                                    if let Some(ns) = (*cur).search_ns((*cur).doc, Some(prefix)) {
+                                    if let Some(ns) = (*cur).search_ns(
+                                        XmlDocPtr::from_raw((*cur).doc).unwrap(),
+                                        Some(prefix),
+                                    ) {
                                         (*cur).set_prop("ns", ns.href().as_deref());
                                         let local = CString::new(local).unwrap();
                                         (*cur).set_content(local.as_ptr() as *const u8);

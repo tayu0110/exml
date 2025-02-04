@@ -26,7 +26,7 @@ use std::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use crate::tree::{XmlDoc, XmlElementType, XmlNode};
+use crate::tree::{XmlDocPtr, XmlElementType, XmlNode};
 
 use super::xmlstring::{xml_str_equal, XmlChar};
 
@@ -169,16 +169,14 @@ const XHTML_NAMESPACE: &CStr = c"http://www.w3.org/1999/xhtml/";
 ///
 /// Returns the xlinkType of the node (XLINK_TYPE_NONE if there is no link detected.
 #[doc(alias = "xlinkIsLink")]
-pub unsafe fn xlink_is_link(mut doc: *mut XmlDoc, node: *mut XmlNode) -> XlinkType {
+pub unsafe fn xlink_is_link(doc: Option<XmlDocPtr>, node: *mut XmlNode) -> XlinkType {
     let mut ret: XlinkType = XlinkType::XlinkTypeNone;
 
     if node.is_null() {
         return XlinkType::XlinkTypeNone;
     }
-    if doc.is_null() {
-        doc = (*node).doc;
-    }
-    if !doc.is_null() && (*doc).typ == XmlElementType::XmlHTMLDocumentNode {
+    let doc = doc.or(XmlDocPtr::from_raw((*node).doc).unwrap());
+    if let Some(_doc) = doc.filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode) {
         // This is an HTML document.
     } else if (*node).ns.map_or(false, |ns| {
         xml_str_equal(ns.href, XHTML_NAMESPACE.as_ptr() as _)

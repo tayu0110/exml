@@ -653,9 +653,8 @@ impl XmlNode {
             }
             // Check if there is a default/fixed attribute declaration in
             // the internal or external subset.
-            if !self.doc.is_null() {
-                if let Some(int_subset) = (*self.doc).int_subset {
-                    let doc: *mut XmlDoc = self.doc;
+            if let Some(doc) = XmlDocPtr::from_raw(self.doc).unwrap() {
+                if let Some(int_subset) = doc.int_subset {
                     let elem_qname: *mut XmlChar;
                     let mut tmpstr: *mut XmlChar = null_mut();
 
@@ -683,7 +682,7 @@ impl XmlNode {
                                 Some("xml"),
                             );
                             if attr_decl.is_none() {
-                                if let Some(ext_subset) = (*doc).ext_subset {
+                                if let Some(ext_subset) = doc.ext_subset {
                                     attr_decl = ext_subset.get_qattr_desc(
                                         CStr::from_ptr(elem_qname as *const i8)
                                             .to_string_lossy()
@@ -716,7 +715,7 @@ impl XmlNode {
                                     if attr_decl.is_some() {
                                         break;
                                     }
-                                    if let Some(ext_subset) = (*doc).ext_subset {
+                                    if let Some(ext_subset) = doc.ext_subset {
                                         attr_decl = ext_subset.get_qattr_desc(
                                             CStr::from_ptr(elem_qname as *const i8)
                                                 .to_string_lossy()
@@ -741,7 +740,7 @@ impl XmlNode {
                             None,
                         );
                         if attr_decl.is_none() {
-                            if let Some(ext_subset) = (*doc).ext_subset {
+                            if let Some(ext_subset) = doc.ext_subset {
                                 attr_decl = ext_subset.get_qattr_desc(
                                     CStr::from_ptr(elem_qname as *const i8)
                                         .to_string_lossy()
@@ -1119,7 +1118,9 @@ impl XmlNode {
 
         // handle QNames
         if let Some((prefix, local)) = split_qname2(name) {
-            if let Some(ns) = self.search_ns(self.document(), Some(prefix)) {
+            if let Some(ns) =
+                self.search_ns(XmlDocPtr::from_raw(self.document()).unwrap(), Some(prefix))
+            {
                 return self.set_ns_prop(Some(ns), local, value);
             }
         }
@@ -1288,8 +1289,10 @@ impl XmlNode {
             _ => unreachable!(),
         }
 
-        let Some(ns) = self.search_ns_by_href(self.document(), XML_XML_NAMESPACE.to_str().unwrap())
-        else {
+        let Some(ns) = self.search_ns_by_href(
+            XmlDocPtr::from_raw(self.document()).unwrap(),
+            XML_XML_NAMESPACE.to_str().unwrap(),
+        ) else {
             return;
         };
         if let Some(uri) = uri {
@@ -1329,7 +1332,10 @@ impl XmlNode {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
             _ => unreachable!(),
         }
-        let Some(ns) = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap()) else {
+        let Some(ns) = self.search_ns_by_href(
+            XmlDocPtr::from_raw(self.doc).unwrap(),
+            XML_XML_NAMESPACE.to_str().unwrap(),
+        ) else {
             return;
         };
         self.set_ns_prop(Some(ns), "lang", lang);
@@ -1364,7 +1370,10 @@ impl XmlNode {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
             _ => unreachable!(),
         }
-        let Some(ns) = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap()) else {
+        let Some(ns) = self.search_ns_by_href(
+            XmlDocPtr::from_raw(self.doc).unwrap(),
+            XML_XML_NAMESPACE.to_str().unwrap(),
+        ) else {
             return;
         };
         match val {
@@ -1918,7 +1927,7 @@ impl XmlNode {
     #[doc(alias = "xmlSearchNs")]
     pub unsafe fn search_ns(
         &mut self,
-        mut doc: *mut XmlDoc,
+        doc: Option<XmlDocPtr>,
         namespace: Option<&str>,
     ) -> Option<XmlNsPtr> {
         let orig: *const XmlNode = self;
@@ -1927,7 +1936,7 @@ impl XmlNode {
             return None;
         }
         if namespace == Some("xml") {
-            if doc.is_null() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
+            if doc.is_none() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 // The XML-1.0 namespace is normally held on the root element.
                 // In this case exceptionally create it on the node element.
                 let Some(cur) = XmlNsPtr::new(XmlNs {
@@ -1943,17 +1952,12 @@ impl XmlNode {
                 self.ns_def = Some(cur);
                 return Some(cur);
             }
-            if doc.is_null() {
-                doc = self.document();
-                if doc.is_null() {
-                    return None;
-                }
-            }
+            let mut doc = doc.or(XmlDocPtr::from_raw(self.document()).unwrap())?;
             // Return the XML namespace declaration held by the doc.
-            if (*doc).old_ns.is_none() {
-                return (*doc).ensure_xmldecl();
+            if doc.old_ns.is_none() {
+                return doc.ensure_xmldecl();
             } else {
-                return (*doc).old_ns;
+                return doc.old_ns;
             }
         }
         let mut node = self as *mut XmlNode;
@@ -2007,7 +2011,7 @@ impl XmlNode {
     #[doc(alias = "xmlSearchNsByHref")]
     pub unsafe fn search_ns_by_href(
         &mut self,
-        mut doc: *mut XmlDoc,
+        doc: Option<XmlDocPtr>,
         href: &str,
     ) -> Option<XmlNsPtr> {
         let orig: *mut XmlNode = self;
@@ -2017,7 +2021,7 @@ impl XmlNode {
         }
         if href == XML_XML_NAMESPACE.to_str().unwrap() {
             // Only the document can hold the XML spec namespace.
-            if doc.is_null() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
+            if doc.is_none() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 // The XML-1.0 namespace is normally held on the root element.
                 // In this case exceptionally create it on the node element.
                 let Some(cur) = XmlNsPtr::new(XmlNs {
@@ -2033,17 +2037,12 @@ impl XmlNode {
                 self.ns_def = Some(cur);
                 return Some(cur);
             }
-            if doc.is_null() {
-                doc = self.document();
-                if doc.is_null() {
-                    return None;
-                }
-            }
+            let mut doc = doc.or(XmlDocPtr::from_raw(self.document()).unwrap())?;
             // Return the XML namespace declaration held by the doc.
-            if (*doc).old_ns.is_none() {
-                return (*doc).ensure_xmldecl();
+            if doc.old_ns.is_none() {
+                return doc.ensure_xmldecl();
             } else {
-                return (*doc).old_ns;
+                return doc.old_ns;
             }
         }
         let is_attr = matches!(self.element_type(), XmlElementType::XmlAttributeNode);
@@ -2064,12 +2063,7 @@ impl XmlNode {
                     if !now.href.is_null()
                         && xml_str_equal(now.href, href.as_ptr() as *const u8)
                         && (!is_attr || now.prefix().is_some())
-                        && xml_ns_in_scope(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            orig,
-                            node,
-                            now.prefix,
-                        ) == 1
+                        && xml_ns_in_scope(doc, orig, node, now.prefix) == 1
                     {
                         return Some(now);
                     }
@@ -2081,12 +2075,7 @@ impl XmlNode {
                         !cur.href.is_null()
                             && xml_str_equal(cur.href, href.as_ptr() as *const u8)
                             && (!is_attr || (*cur).prefix().is_some())
-                            && xml_ns_in_scope(
-                                XmlDocPtr::from_raw(doc).unwrap(),
-                                orig,
-                                node,
-                                cur.prefix,
-                            ) == 1
+                            && xml_ns_in_scope(doc, orig, node, cur.prefix) == 1
                     }) {
                         return Some(cur);
                     }
@@ -2108,7 +2097,7 @@ impl XmlNode {
     /// Returns the number of namespace declarations created or -1 in case of error.
     #[doc(alias = "xmlReconciliateNs")]
     #[cfg(feature = "libxml_tree")]
-    pub unsafe fn reconciliate_ns(&mut self, doc: *mut XmlDoc) -> i32 {
+    pub unsafe fn reconciliate_ns(&mut self, doc: XmlDocPtr) -> i32 {
         use super::xml_new_reconciled_ns;
 
         let mut old_ns = vec![];
@@ -2119,10 +2108,13 @@ impl XmlNode {
         if !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
             return -1;
         }
-        if doc.is_null() || !matches!((*doc).element_type(), XmlElementType::XmlDocumentNode) {
+        // if doc.is_null() {
+        //     return -1;
+        // }
+        if !matches!(doc.element_type(), XmlElementType::XmlDocumentNode) {
             return -1;
         }
-        if (*node).document() != doc {
+        if (*node).document() != doc.as_ptr() {
             return -1;
         }
         while !node.is_null() {
@@ -2139,7 +2131,7 @@ impl XmlNode {
                 }
                 if !f {
                     // OK we need to recreate a new namespace definition
-                    if let Some(n) = xml_new_reconciled_ns(doc, self, *node_ns) {
+                    if let Some(n) = xml_new_reconciled_ns(Some(doc), self, *node_ns) {
                         // :-( what if else ???
                         // check if we need to grow the cache buffers.
                         new_ns.push(n);
@@ -2165,7 +2157,7 @@ impl XmlNode {
                         }
                         if !f {
                             // OK we need to recreate a new namespace definition
-                            if let Some(n) = xml_new_reconciled_ns(doc, self, attr_ns) {
+                            if let Some(n) = xml_new_reconciled_ns(Some(doc), self, attr_ns) {
                                 // :-( what if else ???
                                 // check if we need to grow the cache buffers.
                                 new_ns.push(n);
