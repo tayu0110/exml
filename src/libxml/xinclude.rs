@@ -911,7 +911,11 @@ unsafe fn xml_xinclude_copy_node(
             }
             // TODO: Insert xmlElementType::XML_XINCLUDE_START and xmlElementType::XML_XINCLUDE_END nodes
             if !(*refe).inc.is_null() {
-                copy = xml_static_copy_node_list((*refe).inc, (*ctxt).doc, insert_parent);
+                copy = xml_static_copy_node_list(
+                    (*refe).inc,
+                    XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
+                    insert_parent,
+                );
                 if copy.is_null() {
                     // goto error;
                     xml_free_node_list(result);
@@ -919,7 +923,12 @@ unsafe fn xml_xinclude_copy_node(
                 }
             }
         } else {
-            copy = xml_static_copy_node(cur, (*ctxt).doc, insert_parent, 2);
+            copy = xml_static_copy_node(
+                cur,
+                XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
+                insert_parent,
+                2,
+            );
             if copy.is_null() {
                 // goto error;
                 xml_free_node_list(result);
@@ -1052,7 +1061,7 @@ unsafe fn xml_xinclude_copy_range(
     }
     end = (*range).user2 as _;
     if end.is_null() {
-        return xml_doc_copy_node(start, (*ctxt).doc, 1);
+        return xml_doc_copy_node(start, XmlDocPtr::from_raw((*ctxt).doc).unwrap(), 1);
     }
     if (*end).typ == XmlElementType::XmlNamespaceDecl {
         return null_mut();
@@ -1072,7 +1081,7 @@ unsafe fn xml_xinclude_copy_range(
         if level < 0 {
             while level < 0 {
                 // copy must include namespaces and properties
-                tmp2 = xml_doc_copy_node(list_parent, (*ctxt).doc, 2);
+                tmp2 = xml_doc_copy_node(list_parent, XmlDocPtr::from_raw((*ctxt).doc).unwrap(), 2);
                 (*tmp2).add_child(list);
                 list = tmp2;
                 list_parent = (*list_parent).parent().map_or(null_mut(), |n| n.as_ptr());
@@ -1128,7 +1137,7 @@ unsafe fn xml_xinclude_copy_range(
                 end_level = level; /* remember the level of the end node */
                 end_flag = 1;
                 // last node - need to take care of properties + namespaces
-                tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
+                tmp = xml_doc_copy_node(cur, XmlDocPtr::from_raw((*ctxt).doc).unwrap(), 2);
                 if list.is_null() {
                     list = tmp;
                     list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -1174,7 +1183,7 @@ unsafe fn xml_xinclude_copy_range(
                         content = content.add(index1 as usize - 1);
                         index1 = 0;
                     }
-                    tmp = xml_new_doc_text((*ctxt).doc, content);
+                    tmp = xml_new_doc_text(XmlDocPtr::from_raw((*ctxt).doc).unwrap(), content);
                 }
                 last = tmp;
                 list = tmp;
@@ -1184,7 +1193,7 @@ unsafe fn xml_xinclude_copy_range(
 
                 // start of the range - need to take care of
                 // properties and namespaces
-                tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
+                tmp = xml_doc_copy_node(cur, XmlDocPtr::from_raw((*ctxt).doc).unwrap(), 2);
                 list = tmp;
                 last = tmp;
                 list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -1213,7 +1222,7 @@ unsafe fn xml_xinclude_copy_range(
                 _ => {
                     // Middle of the range - need to take care of
                     // properties and namespaces
-                    tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
+                    tmp = xml_doc_copy_node(cur, XmlDocPtr::from_raw((*ctxt).doc).unwrap(), 2);
                 }
             }
             if !tmp.is_null() {
@@ -1532,7 +1541,11 @@ unsafe fn xml_xinclude_load_doc(
         if fragment.is_null() {
             // Add the top children list as the replacement copy.
             (*refe).inc = doc.map_or(null_mut(), |doc| {
-                xml_doc_copy_node(doc.get_root_element(), (*ctxt).doc, 1)
+                xml_doc_copy_node(
+                    doc.get_root_element(),
+                    XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
+                    1,
+                )
             });
         } else {
             #[cfg(feature = "xpointer")]
@@ -1893,7 +1906,10 @@ unsafe fn xml_xinclude_load_txt(
     // Prevent reloading the document twice.
     for i in 0..(*ctxt).txt_nr {
         if xml_str_equal(url, (*(*ctxt).txt_tab.add(i as usize)).url) {
-            node = xml_new_doc_text((*ctxt).doc, (*(*ctxt).txt_tab.add(i as usize)).text);
+            node = xml_new_doc_text(
+                XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
+                (*(*ctxt).txt_tab.add(i as usize)).text,
+            );
             // goto loaded;
             (*refe).inc = node;
             node = null_mut();
@@ -1963,7 +1979,7 @@ unsafe fn xml_xinclude_load_txt(
         return ret;
     };
     buf.borrow_mut().encoder = get_encoding_handler(enc);
-    node = xml_new_doc_text((*ctxt).doc, null_mut());
+    node = xml_new_doc_text(XmlDocPtr::from_raw((*ctxt).doc).unwrap(), null_mut());
     if node.is_null() {
         xml_xinclude_err_memory(ctxt, (*refe).elem, None);
         // goto error;
@@ -2333,7 +2349,12 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeR
             xml_free_node(now.as_ptr());
             child = next;
         }
-        end = xml_new_doc_node((*cur).doc, (*cur).ns, &(*cur).name().unwrap(), null_mut());
+        end = xml_new_doc_node(
+            XmlDocPtr::from_raw((*cur).doc).unwrap(),
+            (*cur).ns,
+            &(*cur).name().unwrap(),
+            null_mut(),
+        );
         if end.is_null() {
             xml_xinclude_err!(
                 ctxt,

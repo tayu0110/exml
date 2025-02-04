@@ -1717,12 +1717,18 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                         if let Some(name) = (*cur).get_prop("name") {
                             let cname = CString::new(name.as_str()).unwrap();
                             if let Some(mut children) = (*cur).children() {
-                                let node: *mut XmlNode =
-                                    xml_new_doc_node((*cur).doc, (*cur).ns, "name", null_mut());
+                                let node: *mut XmlNode = xml_new_doc_node(
+                                    XmlDocPtr::from_raw((*cur).doc).unwrap(),
+                                    (*cur).ns,
+                                    "name",
+                                    null_mut(),
+                                );
                                 if !node.is_null() {
                                     children.add_prev_sibling(node);
-                                    text =
-                                        xml_new_doc_text((*node).doc, cname.as_ptr() as *const u8);
+                                    text = xml_new_doc_text(
+                                        XmlDocPtr::from_raw((*node).doc).unwrap(),
+                                        cname.as_ptr() as *const u8,
+                                    );
                                     (*node).add_child(text);
                                     text = node;
                                 }

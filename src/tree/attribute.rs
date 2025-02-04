@@ -287,7 +287,7 @@ impl From<XmlAttrPtr> for *mut XmlAttr {
 /// xmlEncodeEntitiesReentrant(). Use xmlNewProp() if you don't need entities support.
 #[doc(alias = "xmlNewDocProp")]
 pub unsafe fn xml_new_doc_prop(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     name: *const XmlChar,
     value: *const XmlChar,
 ) -> Option<XmlAttrPtr> {
@@ -299,16 +299,14 @@ pub unsafe fn xml_new_doc_prop(
     let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
         typ: XmlElementType::XmlAttributeNode,
         name: xml_strdup(name),
-        doc,
+        doc: doc.map_or(null_mut(), |doc| doc.as_ptr()),
         ..Default::default()
     }) else {
         xml_tree_err_memory("building attribute");
         return None;
     };
     if !value.is_null() {
-        cur.children = (!doc.is_null())
-            .then(|| NodePtr::from_ptr((*doc).get_node_list(value)))
-            .flatten();
+        cur.children = doc.and_then(|doc| NodePtr::from_ptr(doc.get_node_list(value)));
         cur.last = None;
 
         let mut tmp = cur.children();
@@ -359,7 +357,8 @@ pub(super) unsafe fn xml_new_prop_internal(
     }
 
     if !value.is_null() {
-        cur.children = NodePtr::from_ptr(xml_new_doc_text(doc, value));
+        cur.children =
+            NodePtr::from_ptr(xml_new_doc_text(XmlDocPtr::from_raw(doc).unwrap(), value));
         cur.set_last(None);
         let mut tmp = cur.children;
         while let Some(mut now) = tmp {
@@ -455,7 +454,7 @@ pub unsafe fn xml_new_ns_prop_eat_name(
 }
 
 pub(super) unsafe fn xml_copy_prop_internal(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     target: *mut XmlNode,
     cur: XmlAttrPtr,
 ) -> Option<XmlAttrPtr> {
@@ -463,15 +462,27 @@ pub(super) unsafe fn xml_copy_prop_internal(
         return None;
     }
     let mut ret = if !target.is_null() {
-        xml_new_doc_prop((*target).doc, cur.name, null_mut())
-    } else if !doc.is_null() {
-        xml_new_doc_prop(doc, cur.name, null_mut())
+        xml_new_doc_prop(
+            XmlDocPtr::from_raw((*target).doc).unwrap(),
+            cur.name,
+            null_mut(),
+        )
+    } else if let Some(doc) = doc {
+        xml_new_doc_prop(Some(doc), cur.name, null_mut())
     } else if let Some(parent) = cur.parent() {
-        xml_new_doc_prop(parent.doc, cur.name, null_mut())
+        xml_new_doc_prop(
+            XmlDocPtr::from_raw(parent.doc).unwrap(),
+            cur.name,
+            null_mut(),
+        )
     } else if let Some(children) = cur.children() {
-        xml_new_doc_prop(children.doc, cur.name, null_mut())
+        xml_new_doc_prop(
+            XmlDocPtr::from_raw(children.doc).unwrap(),
+            cur.name,
+            null_mut(),
+        )
     } else {
-        xml_new_doc_prop(null_mut(), cur.name, null_mut())
+        xml_new_doc_prop(None, cur.name, null_mut())
     }?;
     ret.parent = NodePtr::from_ptr(target);
 
@@ -526,7 +537,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
     if let Some(children) = cur.children() {
         ret.children = NodePtr::from_ptr(xml_static_copy_node_list(
             children.as_ptr(),
-            ret.doc,
+            XmlDocPtr::from_raw(ret.doc).unwrap(),
             ret.as_ptr() as _,
         ));
         ret.last = None;
@@ -571,7 +582,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
 /// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyProp")]
 pub unsafe fn xml_copy_prop(target: *mut XmlNode, cur: XmlAttrPtr) -> Option<XmlAttrPtr> {
-    xml_copy_prop_internal(null_mut(), target, cur)
+    xml_copy_prop_internal(None, target, cur)
 }
 
 /// Do a copy of an attribute list.

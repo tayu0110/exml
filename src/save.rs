@@ -1199,7 +1199,10 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
             if let Some(children) = now.children {
                 xml_free_node(children.as_ptr());
             }
-            now.children = NodePtr::from_ptr(xml_new_doc_text(now.doc, now.name));
+            now.children = NodePtr::from_ptr(xml_new_doc_text(
+                XmlDocPtr::from_raw(now.doc).unwrap(),
+                now.name,
+            ));
             if let Some(mut children) = now.children {
                 children.set_parent(NodePtr::from_ptr(now.as_ptr() as *mut XmlNode));
             }

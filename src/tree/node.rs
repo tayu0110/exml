@@ -1192,7 +1192,7 @@ impl XmlNode {
             if let Some(value) = value {
                 let value = CString::new(value).unwrap();
                 prop.set_children(NodePtr::from_ptr(xml_new_doc_text(
-                    self.doc,
+                    XmlDocPtr::from_raw(self.doc).unwrap(),
                     value.as_ptr() as *const u8,
                 )));
                 prop.set_last(None);

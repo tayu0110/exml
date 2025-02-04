@@ -1948,7 +1948,12 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             .map_or(null_mut(), |c| c.as_ptr());
         last = (*(*ctxt).my_doc).last.map_or(null_mut(), |l| l.as_ptr());
     }
-    let new_root: *mut XmlNode = xml_new_doc_node((*ctxt).my_doc, None, "pseudoroot", null_mut());
+    let new_root: *mut XmlNode = xml_new_doc_node(
+        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+        None,
+        "pseudoroot",
+        null_mut(),
+    );
     if new_root.is_null() {
         (*oldctxt).sax = (*ctxt).sax.take();
         (*ctxt).sax = oldsax;
@@ -2449,7 +2454,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
                 cur = ent.children.load(Ordering::Relaxed) as _;
                 while !cur.is_null() {
-                    nw = xml_doc_copy_node(cur, (*ctxt).my_doc, 1);
+                    nw = xml_doc_copy_node(cur, XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), 1);
                     if !nw.is_null() {
                         if (*nw)._private.is_null() {
                             (*nw)._private = (*cur)._private;
@@ -2491,7 +2496,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 while !cur.is_null() {
                     next = (*cur).next.take().map_or(null_mut(), |n| n.as_ptr());
                     (*cur).set_parent(None);
-                    nw = xml_doc_copy_node(cur, (*ctxt).my_doc, 1);
+                    nw = xml_doc_copy_node(cur, XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), 1);
                     if !nw.is_null() {
                         if (*nw)._private.is_null() {
                             (*nw)._private = (*cur)._private;

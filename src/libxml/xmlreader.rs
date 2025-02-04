@@ -765,9 +765,9 @@ impl XmlTextReader {
         let mut buff = vec![];
         cur_node = (*self.node).children().map_or(null_mut(), |c| c.as_ptr());
         while !cur_node.is_null() {
-            /* XXX: Why is the node copied? */
-            node = xml_doc_copy_node(cur_node, doc.map_or(null_mut(), |doc| doc.as_ptr()), 1);
-            /* XXX: Why do we need a second buffer? */
+            // XXX: Why is the node copied?
+            node = xml_doc_copy_node(cur_node, doc, 1);
+            // XXX: Why do we need a second buffer?
             let mut buff2 = vec![];
             if (*node).dump_memory(&mut buff2, doc.map_or(null_mut(), |doc| doc.as_ptr()), 0, 0)
                 == 0
@@ -806,7 +806,7 @@ impl XmlTextReader {
             node = xml_copy_dtd(XmlDtdPtr::from_raw(node as *mut XmlDtd).unwrap().unwrap())
                 .map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNode;
         } else {
-            node = xml_doc_copy_node(node, doc.map_or(null_mut(), |doc| doc.as_ptr()), 1);
+            node = xml_doc_copy_node(node, doc, 1);
         }
         let mut buff = vec![];
         if (*node).dump_memory(&mut buff, doc.map_or(null_mut(), |doc| doc.as_ptr()), 0, 0) == 0 {
@@ -983,7 +983,8 @@ impl XmlTextReader {
                 .unwrap();
 
             if self.faketext.is_null() {
-                self.faketext = xml_new_doc_text((*self.node).doc, ns.href);
+                self.faketext =
+                    xml_new_doc_text(XmlDocPtr::from_raw((*self.node).doc).unwrap(), ns.href);
             } else {
                 if !(*self.faketext).content.is_null() {
                     xml_free((*self.faketext).content as _);

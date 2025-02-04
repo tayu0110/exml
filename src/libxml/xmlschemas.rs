@@ -27471,10 +27471,16 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     let norm_value =
                         xml_schema_normalize_value((*inode).type_def, (*(*inode).decl).value);
                     if !norm_value.is_null() {
-                        text_child = xml_new_doc_text((*(*inode).node).doc, norm_value);
+                        text_child = xml_new_doc_text(
+                            XmlDocPtr::from_raw((*(*inode).node).doc).unwrap(),
+                            norm_value,
+                        );
                         xml_free(norm_value as _);
                     } else {
-                        text_child = xml_new_doc_text((*(*inode).node).doc, (*(*inode).decl).value);
+                        text_child = xml_new_doc_text(
+                            XmlDocPtr::from_raw((*(*inode).node).doc).unwrap(),
+                            (*(*inode).decl).value,
+                        );
                     }
                     if text_child.is_null() {
                         VERROR_INT!(

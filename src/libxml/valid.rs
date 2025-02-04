@@ -6441,7 +6441,12 @@ pub unsafe fn xml_valid_get_valid_elements(
     let parent_last: *mut XmlNode = (*parent).last().map_or(null_mut(), |l| l.as_ptr());
 
     // Creates a dummy node and insert it into the tree
-    let test_node: *mut XmlNode = xml_new_doc_node((*ref_node).doc, None, "<!dummy?>", null_mut());
+    let test_node: *mut XmlNode = xml_new_doc_node(
+        XmlDocPtr::from_raw((*ref_node).doc).unwrap(),
+        None,
+        "<!dummy?>",
+        null_mut(),
+    );
     if test_node.is_null() {
         return -1;
     }

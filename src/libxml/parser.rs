@@ -2125,7 +2125,7 @@ pub unsafe fn xml_parse_in_node_context(
     (*ctxt).input_id = 2;
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
 
-    let fake: *mut XmlNode = xml_new_doc_comment((*node).doc, "");
+    let fake: *mut XmlNode = xml_new_doc_comment(XmlDocPtr::from_raw((*node).doc).unwrap(), "");
     if fake.is_null() {
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrNoMemory;
@@ -2283,7 +2283,12 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         (*new_doc).int_subset = (*doc).int_subset;
         (*new_doc).ext_subset = (*doc).ext_subset;
     }
-    let new_root: *mut XmlNode = xml_new_doc_node(new_doc, None, "pseudoroot", null());
+    let new_root: *mut XmlNode = xml_new_doc_node(
+        XmlDocPtr::from_raw(new_doc).unwrap(),
+        None,
+        "pseudoroot",
+        null(),
+    );
     if new_root.is_null() {
         if replaced {
             (*ctxt).sax = oldsax;
@@ -2441,7 +2446,12 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
             (*new_doc).url = (*doc).url.clone();
         }
     }
-    let new_root: *mut XmlNode = xml_new_doc_node(new_doc, None, "pseudoroot", null());
+    let new_root: *mut XmlNode = xml_new_doc_node(
+        XmlDocPtr::from_raw(new_doc).unwrap(),
+        None,
+        "pseudoroot",
+        null(),
+    );
     if new_root.is_null() {
         let sax = (*ctxt).sax.take();
         (*new_doc).int_subset = None;

@@ -424,8 +424,7 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
                     .parent()
                     .filter(|p| {
                         p.doc != p.as_ptr() as *mut XmlDoc
-                            && xml_search_ns_by_prefix_strict(doc.as_ptr(), p.as_ptr(), pref, None)
-                                == 1
+                            && xml_search_ns_by_prefix_strict(doc, p.as_ptr(), pref, None) == 1
                     })
                     .is_some()
             {

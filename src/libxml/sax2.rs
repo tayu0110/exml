@@ -1636,7 +1636,10 @@ unsafe fn xml_sax2_attribute_internal(
             tmp = now.next;
         }
     } else if !value.is_null() {
-        ret.children = NodePtr::from_ptr(xml_new_doc_text((*ctxt).my_doc, value));
+        ret.children = NodePtr::from_ptr(xml_new_doc_text(
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+            value,
+        ));
         ret.last = ret.children;
         if let Some(mut children) = ret.children {
             children.set_parent(NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode));
@@ -1956,7 +1959,12 @@ pub unsafe fn xml_sax2_start_element(
     // Note : the namespace resolution is deferred until the end of the
     //        attributes parsing, since local namespace can be defined as
     //        an attribute at this level.
-    let ret: *mut XmlNode = xml_new_doc_node((*ctxt).my_doc, None, name, null_mut());
+    let ret: *mut XmlNode = xml_new_doc_node(
+        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+        None,
+        name,
+        null_mut(),
+    );
     if ret.is_null() {
         xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
         return;
@@ -2186,9 +2194,19 @@ pub unsafe fn xml_sax2_start_element_ns(
         }
     } else {
         if let Some(lname) = lname {
-            ret = xml_new_doc_node((*ctxt).my_doc, None, &lname, null_mut());
+            ret = xml_new_doc_node(
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                None,
+                &lname,
+                null_mut(),
+            );
         } else {
-            ret = xml_new_doc_node((*ctxt).my_doc, None, localname, null_mut());
+            ret = xml_new_doc_node(
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                None,
+                localname,
+                null_mut(),
+            );
         }
         if ret.is_null() {
             xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");
@@ -2762,7 +2780,7 @@ pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: &str) {
     };
 
     let ret = if name.starts_with('#') {
-        xml_new_char_ref((*ctxt).my_doc, name)
+        xml_new_char_ref(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), name)
     } else {
         xml_new_reference((*ctxt).my_doc, name)
     };
@@ -2791,7 +2809,7 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
         if matches!(typ, XmlElementType::XmlTextNode) {
             last_child = xml_sax2_text_node(ctxt, ch);
         } else {
-            last_child = xml_new_cdata_block((*ctxt).my_doc, ch);
+            last_child = xml_new_cdata_block(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ch);
         }
         if !last_child.is_null() {
             (*(*ctxt).node).set_children(NodePtr::from_ptr(last_child));
@@ -2871,7 +2889,7 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
                     (*last_child).doc = (*ctxt).my_doc;
                 }
             } else {
-                last_child = xml_new_cdata_block((*ctxt).my_doc, ch);
+                last_child = xml_new_cdata_block(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ch);
             }
             if !last_child.is_null() {
                 (*(*ctxt).node).add_child(last_child);
@@ -2921,7 +2939,8 @@ pub unsafe fn xml_sax2_processing_instruction(
 
     let parent: *mut XmlNode = (*ctxt).node;
 
-    let ret: *mut XmlNode = xml_new_doc_pi((*ctxt).my_doc, target, data);
+    let ret: *mut XmlNode =
+        xml_new_doc_pi(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), target, data);
     if ret.is_null() {
         return;
     }
@@ -2963,7 +2982,8 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: &str) {
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
     let parent: *mut XmlNode = (*ctxt).node;
-    let ret: *mut XmlNode = xml_new_doc_comment((*ctxt).my_doc, value);
+    let ret: *mut XmlNode =
+        xml_new_doc_comment(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), value);
     if ret.is_null() {
         return;
     }

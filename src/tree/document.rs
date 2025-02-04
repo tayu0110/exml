@@ -263,7 +263,11 @@ impl XmlDoc {
                         } else {
                             // Flush buffer so far
                             if !buf.is_empty() {
-                                node = xml_new_doc_text(self, null_mut());
+                                node = xml_new_doc_text(
+                                    XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc)
+                                        .unwrap(),
+                                    null_mut(),
+                                );
                                 if node.is_null() {
                                     // goto out;
                                     if !val.is_null() {
@@ -351,7 +355,10 @@ impl XmlDoc {
         }
 
         if !buf.is_empty() {
-            node = xml_new_doc_text(self, null_mut());
+            node = xml_new_doc_text(
+                XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
+                null_mut(),
+            );
             if node.is_null() {
                 // goto out;
                 if !val.is_null() {
@@ -531,7 +538,11 @@ impl XmlDoc {
                         } else {
                             // Flush buffer so far
                             if !buf.is_empty() {
-                                node = xml_new_doc_text(self, null_mut());
+                                node = xml_new_doc_text(
+                                    XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc)
+                                        .unwrap(),
+                                    null_mut(),
+                                );
                                 if node.is_null() {
                                     if !val.is_null() {
                                         xml_free(val as _);
@@ -613,7 +624,10 @@ impl XmlDoc {
         }
 
         if !buf.is_empty() {
-            node = xml_new_doc_text(self, null_mut());
+            node = xml_new_doc_text(
+                XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
+                null_mut(),
+            );
             if node.is_null() {
                 // goto out;
                 return ret;
@@ -627,7 +641,10 @@ impl XmlDoc {
                 (*last).add_next_sibling(node);
             }
         } else if ret.is_null() {
-            ret = xml_new_doc_text(self, c"".as_ptr() as _);
+            ret = xml_new_doc_text(
+                XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
+                c"".as_ptr() as _,
+            );
         }
 
         // out:
@@ -647,7 +664,7 @@ impl XmlDoc {
             return null_mut();
         }
         (*root).unlink();
-        (*root).set_doc(XmlDocPtr::from_raw(self).unwrap());
+        (*root).set_doc(XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap());
         (*root).set_parent(NodePtr::from_ptr(self as *mut XmlDoc as *mut XmlNode));
         let mut old = self.children();
         while let Some(now) = old {
@@ -983,8 +1000,11 @@ pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> *mut XmlDoc {
         (*ret).old_ns = xml_copy_namespace_list(doc.old_ns);
     }
     if let Some(children) = doc.children {
-        (*ret).children =
-            NodePtr::from_ptr(xml_static_copy_node_list(children.as_ptr(), ret, ret as _));
+        (*ret).children = NodePtr::from_ptr(xml_static_copy_node_list(
+            children.as_ptr(),
+            XmlDocPtr::from_raw(ret).unwrap(),
+            ret as _,
+        ));
         (*ret).last = None;
         let mut tmp = (*ret).children;
         while let Some(now) = tmp {
