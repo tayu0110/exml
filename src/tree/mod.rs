@@ -2345,7 +2345,7 @@ pub unsafe fn xml_free_node(cur: *mut XmlNode) {
 /// Returns 1 if true, 0 if false and -1 in case of error.
 #[doc(alias = "xmlNsInScope")]
 unsafe fn xml_ns_in_scope(
-    _doc: *mut XmlDoc,
+    _doc: Option<XmlDocPtr>,
     mut node: *mut XmlNode,
     ancestor: *mut XmlNode,
     prefix: *const XmlChar,
@@ -2579,7 +2579,7 @@ unsafe fn xml_search_ns_by_prefix_strict(
 /// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
 #[doc(alias = "xmlSearchNsByNamespaceStrict")]
 unsafe fn xml_search_ns_by_namespace_strict(
-    doc: *mut XmlDoc,
+    mut doc: XmlDocPtr,
     node: *mut XmlNode,
     ns_name: *const XmlChar,
     ret_ns: &mut Option<XmlNsPtr>,
@@ -2589,7 +2589,10 @@ unsafe fn xml_search_ns_by_namespace_strict(
     let mut prev: *mut XmlNode = null_mut();
     let mut out: *mut XmlNode = null_mut();
 
-    if doc.is_null() || ns_name.is_null() {
+    // if doc.is_null() {
+    //     return -1;
+    // }
+    if ns_name.is_null() {
         return -1;
     }
     if node.is_null() || matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -2598,7 +2601,7 @@ unsafe fn xml_search_ns_by_namespace_strict(
 
     *ret_ns = None;
     if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) {
-        *ret_ns = (*doc).ensure_xmldecl();
+        *ret_ns = doc.ensure_xmldecl();
         if ret_ns.is_none() {
             return -1;
         }
@@ -2639,7 +2642,7 @@ unsafe fn xml_search_ns_by_namespace_strict(
                         // At this point the prefix can only be shadowed,
                         // if we are the the (at least) 3rd level of ns-decls.
                         if !out.is_null() {
-                            let ret: i32 = xml_ns_in_scope(doc, node, prev, now.prefix);
+                            let ret: i32 = xml_ns_in_scope(Some(doc), node, prev, now.prefix);
                             if ret < 0 {
                                 return -1;
                             }
@@ -2793,78 +2796,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_domwrap_clone_node() {
-        unsafe {
-            let mut leaks = 0;
-            for n_ctxt in 0..GEN_NB_XML_DOMWRAP_CTXT_PTR {
-                for n_source_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_node in 0..GEN_NB_XML_NODE_PTR {
-                        for n_res_node in 0..GEN_NB_XML_NODE_PTR_PTR {
-                            for n_dest_doc in 0..GEN_NB_XML_DOC_PTR {
-                                for n_dest_parent in 0..GEN_NB_XML_NODE_PTR {
-                                    for n_deep in 0..GEN_NB_INT {
-                                        for n_options in 0..GEN_NB_INT {
-                                            let mem_base = xml_mem_blocks();
-                                            let ctxt = gen_xml_domwrap_ctxt_ptr(n_ctxt, 0);
-                                            let source_doc = gen_xml_doc_ptr(n_source_doc, 1);
-                                            let node = gen_xml_node_ptr(n_node, 2);
-                                            let res_node = gen_xml_node_ptr_ptr(n_res_node, 3);
-                                            let dest_doc = gen_xml_doc_ptr(n_dest_doc, 4);
-                                            let dest_parent = gen_xml_node_ptr(n_dest_parent, 5);
-                                            let deep = gen_int(n_deep, 6);
-                                            let options = gen_int(n_options, 7);
-
-                                            let ret_val = xml_dom_wrap_clone_node(
-                                                ctxt,
-                                                source_doc,
-                                                node,
-                                                res_node,
-                                                dest_doc,
-                                                dest_parent,
-                                                deep,
-                                                options,
-                                            );
-                                            desret_int(ret_val);
-                                            des_xml_domwrap_ctxt_ptr(n_ctxt, ctxt, 0);
-                                            des_xml_doc_ptr(n_source_doc, source_doc, 1);
-                                            des_xml_node_ptr(n_node, node, 2);
-                                            des_xml_node_ptr_ptr(n_res_node, res_node, 3);
-                                            des_xml_doc_ptr(n_dest_doc, dest_doc, 4);
-                                            des_xml_node_ptr(n_dest_parent, dest_parent, 5);
-                                            des_int(n_deep, deep, 6);
-                                            des_int(n_options, options, 7);
-                                            reset_last_error();
-                                            if mem_base != xml_mem_blocks() {
-                                                leaks += 1;
-                                                eprint!("Leak of {} blocks found in xmlDOMWrapCloneNode", xml_mem_blocks() - mem_base);
-                                                assert!(leaks == 0, "{leaks} Leaks are found in xmlDOMWrapCloneNode()");
-                                                eprint!(" {}", n_ctxt);
-                                                eprint!(" {}", n_source_doc);
-                                                eprint!(" {}", n_node);
-                                                eprint!(" {}", n_res_node);
-                                                eprint!(" {}", n_dest_doc);
-                                                eprint!(" {}", n_dest_parent);
-                                                eprint!(" {}", n_deep);
-                                                eprintln!(" {}", n_options);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_domwrap_new_ctxt() {
-
-        /* missing type support */
-    }
-
-    #[test]
     fn test_xml_domwrap_reconcile_namespaces() {
         unsafe {
             let mut leaks = 0;
@@ -2895,49 +2826,6 @@ mod tests {
                             eprint!(" {}", n_ctxt);
                             eprint!(" {}", n_elem);
                             eprintln!(" {}", n_options);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_domwrap_remove_node() {
-        unsafe {
-            let mut leaks = 0;
-            for n_ctxt in 0..GEN_NB_XML_DOMWRAP_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_node in 0..GEN_NB_XML_NODE_PTR {
-                        for n_options in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let ctxt = gen_xml_domwrap_ctxt_ptr(n_ctxt, 0);
-                            let doc = gen_xml_doc_ptr(n_doc, 1);
-                            let node = gen_xml_node_ptr(n_node, 2);
-                            let options = gen_int(n_options, 3);
-
-                            let ret_val = xml_dom_wrap_remove_node(ctxt, doc, node, options);
-                            desret_int(ret_val);
-                            des_xml_domwrap_ctxt_ptr(n_ctxt, ctxt, 0);
-                            des_xml_doc_ptr(n_doc, doc, 1);
-                            des_xml_node_ptr(n_node, node, 2);
-                            des_int(n_options, options, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlDOMWrapRemoveNode",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlDOMWrapRemoveNode()"
-                                );
-                                eprint!(" {}", n_ctxt);
-                                eprint!(" {}", n_doc);
-                                eprint!(" {}", n_node);
-                                eprintln!(" {}", n_options);
-                            }
                         }
                     }
                 }

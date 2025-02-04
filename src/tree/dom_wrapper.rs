@@ -363,14 +363,14 @@ unsafe fn xml_dom_wrap_ns_norm_add_ns_map_item2(
 /// Returns the acquired ns struct or null_mut() in case of an API or internal error.
 #[doc(alias = "xmlDOMWrapStoreNs")]
 unsafe fn xml_dom_wrap_store_ns(
-    doc: *mut XmlDoc,
+    mut doc: XmlDocPtr,
     ns_name: *const XmlChar,
     prefix: Option<&str>,
 ) -> Option<XmlNsPtr> {
-    if doc.is_null() {
-        return None;
-    }
-    let mut ns = (*doc).ensure_xmldecl()?;
+    // if doc.is_null() {
+    //     return None;
+    // }
+    let mut ns = doc.ensure_xmldecl()?;
     if let Some(next) = XmlNsPtr::from_raw(ns.next).unwrap() {
         if next.prefix().as_deref() == prefix && xml_str_equal(next.href, ns_name) {
             return Some(next);
@@ -395,7 +395,7 @@ unsafe fn xml_dom_wrap_store_ns(
 /// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
 #[doc(alias = "xmlDOMWrapNSNormDeclareNsForced")]
 unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     elem: *mut XmlNode,
     ns_name: *const XmlChar,
     prefix: *const XmlChar,
@@ -405,10 +405,8 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
     let mut pref: *const XmlChar;
     let mut counter: i32 = 0;
 
-    if doc.is_null()
-        || elem.is_null()
-        || !matches!((*elem).element_type(), XmlElementType::XmlElementNode)
-    {
+    // let doc = doc?;
+    if elem.is_null() || !matches!((*elem).element_type(), XmlElementType::XmlElementNode) {
         return None;
     }
     // Create a ns-decl on @anchor.
@@ -426,7 +424,8 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
                     .parent()
                     .filter(|p| {
                         p.doc != p.as_ptr() as *mut XmlDoc
-                            && xml_search_ns_by_prefix_strict(doc, p.as_ptr(), pref, None) == 1
+                            && xml_search_ns_by_prefix_strict(doc.as_ptr(), p.as_ptr(), pref, None)
+                                == 1
                     })
                     .is_some()
             {
@@ -486,7 +485,7 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
 #[allow(clippy::too_many_arguments)]
 #[doc(alias = "xmlDOMWrapNSNormAcquireNormalizedNs")]
 unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
-    doc: *mut XmlDoc,
+    mut doc: XmlDocPtr,
     elem: *mut XmlNode,
     ns: XmlNsPtr,
     ret_ns: &mut Option<XmlNsPtr>,
@@ -497,7 +496,10 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
 ) -> i32 {
     let mut mi: XmlNsMapItemPtr;
 
-    if doc.is_null() || ns_map.is_null() {
+    // if doc.is_null() {
+    //     return -1;
+    // }
+    if ns_map.is_null() {
         return -1;
     }
 
@@ -505,7 +507,7 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
     // Handle XML namespace.
     if (*ns).prefix().as_deref() == Some("xml") {
         // Insert XML namespace mapping.
-        *ret_ns = (*doc).ensure_xmldecl();
+        *ret_ns = doc.ensure_xmldecl();
         if (*ret_ns).is_none() {
             return -1;
         }
@@ -801,7 +803,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         // Acquire a normalized ns-decl and add it to the map.
                         let mut ns = None;
                         if xml_dom_wrap_ns_norm_acquire_normalized_ns(
-                            doc.as_ptr(),
+                            doc,
                             cur_elem,
                             (*cur).ns.unwrap(),
                             &mut ns,
@@ -878,7 +880,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         // Acquire a normalized ns-decl and add it to the map.
                         let mut ns = None;
                         if xml_dom_wrap_ns_norm_acquire_normalized_ns(
-                            doc.as_ptr(),
+                            doc,
                             cur_elem,
                             (*cur).ns.unwrap(),
                             &mut ns,
@@ -1032,9 +1034,9 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
 #[doc(alias = "xmlDOMWrapAdoptBranch")]
 unsafe fn xml_dom_wrap_adopt_branch(
     ctxt: XmlDOMWrapCtxtPtr,
-    source_doc: *mut XmlDoc,
+    source_doc: Option<XmlDocPtr>,
     node: *mut XmlNode,
-    dest_doc: *mut XmlDoc,
+    dest_doc: XmlDocPtr,
     dest_parent: *mut XmlNode,
     _options: i32,
 ) -> i32 {
@@ -1074,7 +1076,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                 let mut leave_node = false;
 
                 // Paranoid source-doc sanity check.
-                if (*cur).doc != source_doc {
+                if XmlDocPtr::from_raw((*cur).doc).unwrap() != source_doc {
                     // We'll assume XIncluded nodes if the doc differs.
                     // TODO: Do we need to reconciliate XIncluded nodes?
                     // This here skips XIncluded nodes and tries to handle
@@ -1100,7 +1102,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                 }
 
                 if !leave_node {
-                    (*cur).doc = dest_doc;
+                    (*cur).doc = dest_doc.as_ptr();
                     match (*cur).element_type() {
                         XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
                             // TODO
@@ -1335,14 +1337,14 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             // Further node properties.
                             // TODO: Is this all?
                             // Attributes.
-                            if !source_doc.is_null()
-                                && matches!(
+                            if let Some(source_doc) = source_doc.filter(|_| {
+                                matches!(
                                     (*cur).as_attribute_node().unwrap().as_ref().atype,
                                     Some(XmlAttributeType::XmlAttributeID)
                                 )
-                            {
+                            }) {
                                 xml_remove_id(
-                                    XmlDocPtr::from_raw(source_doc).unwrap().unwrap(),
+                                    source_doc,
                                     XmlAttrPtr::from_raw(cur as _).unwrap().unwrap(),
                                 );
                             }
@@ -1358,10 +1360,10 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             (*cur).content = null_mut();
                             (*cur).set_children(None);
                             (*cur).set_last(None);
-                            if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some()
-                            {
+                            if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
                                 // Assign new entity-node if available.
-                                let ent = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
+                                let ent =
+                                    xml_get_doc_entity(dest_doc.as_ptr(), &(*cur).name().unwrap());
                                 if let Some(ent) = ent {
                                     (*cur).content = ent.content.load(Ordering::Relaxed);
                                     (*cur).set_children(NodePtr::from_ptr(
@@ -1469,24 +1471,24 @@ unsafe fn xml_dom_wrap_adopt_attr(
     ctxt: XmlDOMWrapCtxtPtr,
     _source_doc: Option<XmlDocPtr>,
     mut attr: XmlAttrPtr,
-    dest_doc: *mut XmlDoc,
+    mut dest_doc: XmlDocPtr,
     dest_parent: *mut XmlNode,
     _options: i32,
 ) -> i32 {
     let mut cur: *mut XmlNode;
 
-    if dest_doc.is_null() {
-        return -1;
-    }
+    // if dest_doc.is_null() {
+    //     return -1;
+    // }
 
-    attr.doc = dest_doc;
+    attr.doc = dest_doc.as_ptr();
     if let Some(attr_ns) = attr.ns {
         let mut ns = None;
 
         if !ctxt.is_null() { /* TODO: User defined. */ }
         // XML Namespace.
         if attr_ns.prefix().as_deref() == Some("xml") {
-            ns = (*dest_doc).ensure_xmldecl();
+            ns = dest_doc.ensure_xmldecl();
         } else if dest_parent.is_null() {
             // Store in @(*destDoc).oldNs.
             ns = xml_dom_wrap_store_ns(dest_doc, attr_ns.href, attr_ns.prefix().as_deref());
@@ -1527,7 +1529,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
         return -1;
     }
     while !cur.is_null() {
-        (*cur).doc = dest_doc;
+        (*cur).doc = dest_doc.as_ptr();
         match (*cur).element_type() {
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {}
             XmlElementType::XmlEntityRefNode => {
@@ -1535,9 +1537,9 @@ unsafe fn xml_dom_wrap_adopt_attr(
                 (*cur).content = null_mut();
                 (*cur).set_children(None);
                 (*cur).set_last(None);
-                if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some() {
+                if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
                     // Assign new entity-node if available.
-                    let ent = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
+                    let ent = xml_get_doc_entity(dest_doc.as_ptr(), &(*cur).name().unwrap());
                     if let Some(ent) = ent {
                         (*cur).content = ent.content.load(Ordering::Relaxed);
                         (*cur).set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
@@ -1592,28 +1594,29 @@ unsafe fn xml_dom_wrap_adopt_attr(
 #[doc(alias = "xmlDOMWrapAdoptNode")]
 pub unsafe fn xml_dom_wrap_adopt_node(
     ctxt: XmlDOMWrapCtxtPtr,
-    mut source_doc: *mut XmlDoc,
+    source_doc: Option<XmlDocPtr>,
     node: *mut XmlNode,
-    dest_doc: *mut XmlDoc,
+    dest_doc: XmlDocPtr,
     dest_parent: *mut XmlNode,
     options: i32,
 ) -> i32 {
     if node.is_null()
         || matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-        || dest_doc.is_null()
-        || (!dest_parent.is_null() && (*dest_parent).doc != dest_doc)
+        // || dest_doc.is_null()
+        || (!dest_parent.is_null() && (*dest_parent).doc != dest_doc.as_ptr())
     {
         return -1;
     }
     // Check (*node).doc sanity.
-    if !(*node).doc.is_null() && !source_doc.is_null() && (*node).doc != source_doc {
+    if !(*node).doc.is_null()
+        && source_doc.is_some()
+        && XmlDocPtr::from_raw((*node).doc).unwrap() != source_doc
+    {
         // Might be an XIncluded node.
         return -1;
     }
-    if source_doc.is_null() {
-        source_doc = (*node).doc;
-    }
-    if source_doc == dest_doc {
+    let source_doc = source_doc.or(XmlDocPtr::from_raw((*node).doc).unwrap());
+    if source_doc == Some(dest_doc) {
         return -1;
     }
     match (*node).element_type() {
@@ -1646,7 +1649,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
     } else if matches!((*node).element_type(), XmlElementType::XmlAttributeNode) {
         return xml_dom_wrap_adopt_attr(
             ctxt,
-            XmlDocPtr::from_raw(source_doc).unwrap(),
+            source_doc,
             XmlAttrPtr::from_raw(node as *mut XmlAttr).unwrap().unwrap(),
             dest_doc,
             dest_parent,
@@ -1655,7 +1658,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
     } else {
         let cur: *mut XmlNode = node;
 
-        (*cur).doc = dest_doc;
+        (*cur).doc = dest_doc.as_ptr();
         // Optimize string adoption.
         // if !source_doc.is_null() && (*source_doc).dict == (*dest_doc).dict {
         //     adopt_str = 0;
@@ -1667,9 +1670,9 @@ pub unsafe fn xml_dom_wrap_adopt_node(
                 (*node).content = null_mut();
                 (*node).set_children(None);
                 (*node).set_last(None);
-                if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some() {
+                if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
                     // Assign new entity-node if available.
-                    let ent = xml_get_doc_entity(dest_doc, &(*node).name().unwrap());
+                    let ent = xml_get_doc_entity(dest_doc.as_ptr(), &(*node).name().unwrap());
                     if let Some(ent) = ent {
                         (*node).content = ent.content.load(Ordering::Relaxed);
                         (*node).set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
@@ -1696,14 +1699,17 @@ pub unsafe fn xml_dom_wrap_adopt_node(
 #[doc(alias = "xmlDOMWrapRemoveNode")]
 pub unsafe fn xml_dom_wrap_remove_node(
     ctxt: XmlDOMWrapCtxtPtr,
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     mut node: *mut XmlNode,
     _options: i32,
 ) -> i32 {
     let mut list = vec![];
     let mut nb_list: i32 = 0;
 
-    if node.is_null() || doc.is_null() || (*node).doc != doc {
+    // if doc.is_null() {
+    //     return -1;
+    // }
+    if node.is_null() || (*node).doc != doc.as_ptr() {
         return -1;
     }
 
@@ -1970,10 +1976,10 @@ pub unsafe fn xml_dom_wrap_remove_node(
 #[allow(clippy::too_many_arguments)]
 pub unsafe fn xml_dom_wrap_clone_node(
     ctxt: XmlDOMWrapCtxtPtr,
-    mut source_doc: *mut XmlDoc,
+    source_doc: Option<XmlDocPtr>,
     node: *mut XmlNode,
     res_node: *mut *mut XmlNode,
-    dest_doc: *mut XmlDoc,
+    dest_doc: XmlDocPtr,
     dest_parent: *mut XmlNode,
     deep: i32,
     _options: i32,
@@ -1995,7 +2001,10 @@ pub unsafe fn xml_dom_wrap_clone_node(
     let mut parent_clone: *mut XmlNode = null_mut();
     let mut prev_clone: *mut XmlNode = null_mut();
 
-    if node.is_null() || res_node.is_null() || dest_doc.is_null() {
+    // if dest_doc.is_null() {
+    //     return -1;
+    // }
+    if node.is_null() || res_node.is_null() {
         return -1;
     }
     // TODO: Initially we support only element-nodes.
@@ -2003,16 +2012,16 @@ pub unsafe fn xml_dom_wrap_clone_node(
         return 1;
     }
     // Check (*node).doc sanity.
-    if !(*node).doc.is_null() && !source_doc.is_null() && (*node).doc != source_doc {
+    if !(*node).doc.is_null()
+        && source_doc.is_some()
+        && XmlDocPtr::from_raw((*node).doc).unwrap() != source_doc
+    {
         // Might be an XIncluded node.
         return -1;
     }
-    if source_doc.is_null() {
-        source_doc = (*node).doc;
-    }
-    if source_doc.is_null() {
+    let Some(source_doc) = source_doc.or(XmlDocPtr::from_raw((*node).doc).unwrap()) else {
         return -1;
-    }
+    };
 
     // Reuse the namespace map of the context.
     if !ctxt.is_null() {
@@ -2029,7 +2038,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
     'exit: {
         'internal_error: {
             'main: while !cur.is_null() {
-                if (*cur).doc != source_doc {
+                if (*cur).doc != source_doc.as_ptr() {
                     // We'll assume XIncluded nodes if the doc differs.
                     // TODO: Do we need to reconciliate XIncluded nodes?
                     // TODO: This here returns -1 in this case.
@@ -2099,7 +2108,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                 }
 
                 (*clone).typ = (*cur).element_type();
-                (*clone).doc = dest_doc;
+                (*clone).doc = dest_doc.as_ptr();
 
                 // Clone the name of the node if any.
                 if (*cur).name == XML_STRING_TEXT.as_ptr() as _ {
@@ -2220,10 +2229,10 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     }
                     XmlElementType::XmlEntityRefNode => {
                         if source_doc != dest_doc {
-                            if (*dest_doc).int_subset.is_some() || (*dest_doc).ext_subset.is_some()
-                            {
+                            if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
                                 // Different doc: Assign new entity-node if available.
-                                let ent = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
+                                let ent =
+                                    xml_get_doc_entity(dest_doc.as_ptr(), &(*cur).name().unwrap());
                                 if let Some(ent) = ent {
                                     (*clone).content = ent.content.load(Ordering::Relaxed);
                                     (*clone).set_children(NodePtr::from_ptr(
@@ -2349,7 +2358,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     if matches!((*clone).element_type(), XmlElementType::XmlAttributeNode)
                         && (*clone).parent().is_some()
                         && xml_is_id(
-                            XmlDocPtr::from_raw(dest_doc).unwrap(),
+                            Some(dest_doc),
                             (*clone).parent().unwrap().as_ptr(),
                             XmlAttrPtr::from_raw(clone as _).unwrap(),
                         ) != 0
@@ -2360,7 +2369,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         {
                             if xml_add_id(
                                 null_mut(),
-                                XmlDocPtr::from_raw(dest_doc).unwrap().unwrap(),
+                                dest_doc,
                                 &id_val,
                                 XmlAttrPtr::from_raw(cur as _).unwrap().unwrap(),
                             )
