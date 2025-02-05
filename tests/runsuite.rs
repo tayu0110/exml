@@ -330,7 +330,7 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: *mut XmlN
     EXTRA_MEMORY_FROM_RESOLVER = 0;
     // dump the schemas to a buffer, then reparse it and compile the schemas
     let mut buf = vec![];
-    (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+    (*test).dump_memory(&mut buf, XmlDocPtr::from_raw((*test).doc).unwrap(), 0, 0);
     let pctxt = xml_relaxng_new_mem_parser_ctxt(buf.as_ptr() as *const c_char, buf.len() as _);
     (*pctxt).set_parser_errors(
         Some(test_error_handler),
@@ -373,13 +373,13 @@ unsafe fn install_resources(mut tst: *mut XmlNode, base: *const XmlChar) {
     let mut res: *mut XmlChar;
 
     let mut buf = vec![];
-    (*tst).dump_memory(&mut buf, (*tst).doc, 0, 0);
+    (*tst).dump_memory(&mut buf, XmlDocPtr::from_raw((*tst).doc).unwrap(), 0, 0);
 
     while !tst.is_null() {
         test = get_next(tst, c"./*".as_ptr() as _);
         if !test.is_null() {
             buf.clear();
-            (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+            (*test).dump_memory(&mut buf, XmlDocPtr::from_raw((*test).doc).unwrap(), 0, 0);
             name = get_string(tst, c"string(@name)".as_ptr() as _);
             content = xml_strndup(buf.as_ptr(), buf.len() as i32);
             if !name.is_null() && !content.is_null() {
@@ -464,7 +464,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
     EXTRA_MEMORY_FROM_RESOLVER = 0;
     // dump the schemas to a buffer, then reparse it and compile the schemas
     let mut buf = vec![];
-    (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+    (*test).dump_memory(&mut buf, XmlDocPtr::from_raw((*test).doc).unwrap(), 0, 0);
     let pctxt = xml_relaxng_new_mem_parser_ctxt(buf.as_ptr() as *const c_char, buf.len() as _);
     (*pctxt).set_parser_errors(
         Some(test_error_handler),
@@ -515,7 +515,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
             if let Some(dtd) = dtd {
                 buf.extend(dtd.as_bytes());
             }
-            (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+            (*test).dump_memory(&mut buf, XmlDocPtr::from_raw((*test).doc).unwrap(), 0, 0);
 
             // We are ready to run the test
             mem = xml_mem_used();
@@ -586,7 +586,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
             );
         } else {
             buf.clear();
-            (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+            (*test).dump_memory(&mut buf, XmlDocPtr::from_raw((*test).doc).unwrap(), 0, 0);
 
             // We are ready to run the test
             mem = xml_mem_used();

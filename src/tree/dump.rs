@@ -410,7 +410,7 @@ impl XmlNode {
     pub unsafe fn dump_output(
         &mut self,
         buf: Rc<RefCell<XmlOutputBuffer>>,
-        doc: *mut XmlDoc,
+        doc: Option<XmlDocPtr>,
         level: i32,
         format: i32,
         mut encoding: Option<&str>,
@@ -436,11 +436,7 @@ impl XmlNode {
         #[cfg(feature = "html")]
         {
             let mut is_html = false;
-            let dtd = if doc.is_null() {
-                None
-            } else {
-                (*doc).get_int_subset()
-            };
+            let dtd = doc.and_then(|doc| doc.get_int_subset());
             if let Some(dtd) = dtd {
                 is_html = is_xhtml(dtd.system_id.as_deref(), dtd.external_id.as_deref());
             }
@@ -460,23 +456,24 @@ impl XmlNode {
 
     /// Dump an XML/HTML node, recursive behaviour, children are printed too.
     #[doc(alias = "xmlElemDump")]
-    pub unsafe fn dump_file<'a>(&mut self, f: &mut (impl Write + 'a), doc: *mut XmlDoc) {
+    pub unsafe fn dump_file<'a>(&mut self, f: &mut (impl Write + 'a), doc: Option<XmlDocPtr>) {
         xml_init_parser();
 
         let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
             return;
         };
-        if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
+        if let Some(doc) = doc.filter(|doc| matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode))
+        {
             #[cfg(feature = "html")]
             {
-                html_node_dump_output(&mut outbuf, doc, self, null_mut());
+                html_node_dump_output(&mut outbuf, doc.as_ptr(), self, null_mut());
             }
             #[cfg(not(feature = "html"))]
             {
-                xmlSaveErr(
+                xml_save_err(
                     XmlParserErrors::XmlErrInternalError,
                     cur,
-                    c"HTML support not compiled in\n".as_ptr() as _,
+                    "HTML support not compiled in\n",
                 );
             }
             outbuf.flush();
@@ -496,7 +493,7 @@ impl XmlNode {
     pub unsafe fn dump_memory(
         &mut self,
         buf: &mut Vec<u8>,
-        doc: *mut XmlDoc,
+        doc: Option<XmlDocPtr>,
         level: i32,
         format: i32,
     ) -> usize {

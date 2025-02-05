@@ -769,9 +769,7 @@ impl XmlTextReader {
             node = xml_doc_copy_node(cur_node, doc, 1);
             // XXX: Why do we need a second buffer?
             let mut buff2 = vec![];
-            if (*node).dump_memory(&mut buff2, doc.map_or(null_mut(), |doc| doc.as_ptr()), 0, 0)
-                == 0
-            {
+            if (*node).dump_memory(&mut buff2, doc, 0, 0) == 0 {
                 xml_free_node(node);
                 return null_mut();
             }
@@ -809,7 +807,7 @@ impl XmlTextReader {
             node = xml_doc_copy_node(node, doc, 1);
         }
         let mut buff = vec![];
-        if (*node).dump_memory(&mut buff, doc.map_or(null_mut(), |doc| doc.as_ptr()), 0, 0) == 0 {
+        if (*node).dump_memory(&mut buff, doc, 0, 0) == 0 {
             xml_free_node(node);
             return null_mut();
         }

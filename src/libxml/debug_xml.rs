@@ -1917,6 +1917,8 @@ pub fn xml_shell_print_xpath_error(error_type: XmlXPathObjectType, arg: Option<&
 #[doc(alias = "xmlShellPrintNodeCtxt")]
 #[cfg(feature = "libxml_output")]
 unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: *mut XmlNode) {
+    use crate::tree::XmlDocPtr;
+
     if node.is_null() {
         return;
     }
@@ -1941,7 +1943,7 @@ unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: *mut XmlNode) {
             0,
         );
     } else {
-        (*node).dump_file(&mut boxed, (*node).doc);
+        (*node).dump_file(&mut boxed, XmlDocPtr::from_raw((*node).doc).unwrap());
     }
 
     writeln!(boxed);
@@ -2195,7 +2197,10 @@ pub unsafe fn xml_shell_cat(
     node: *mut XmlNode,
     _node2: *mut XmlNode,
 ) -> i32 {
-    use crate::libxml::htmltree::{html_doc_dump, html_node_dump_file};
+    use crate::{
+        libxml::htmltree::{html_doc_dump, html_node_dump_file},
+        tree::XmlDocPtr,
+    };
 
     use super::htmlparser::HtmlDocPtr;
 
@@ -2230,7 +2235,10 @@ pub unsafe fn xml_shell_cat(
             .as_mut()
             .dump_file(&mut (*ctxt).output);
     } else {
-        (*node).dump_file(&mut (*ctxt).output, (*ctxt).doc);
+        (*node).dump_file(
+            &mut (*ctxt).output,
+            XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
+        );
     }
     writeln!((*ctxt).output);
     0
@@ -2251,7 +2259,7 @@ pub unsafe fn xml_shell_write(
 ) -> i32 {
     use std::fs::File;
 
-    use crate::libxml::htmltree::html_save_file;
+    use crate::{libxml::htmltree::html_save_file, tree::XmlDocPtr};
 
     if node.is_null() {
         return -1;
@@ -2290,7 +2298,7 @@ pub unsafe fn xml_shell_write(
                 .open(filename)
             {
                 Ok(mut f) => {
-                    (*node).dump_file(&mut f, (*ctxt).doc);
+                    (*node).dump_file(&mut f, XmlDocPtr::from_raw((*ctxt).doc).unwrap());
                 }
                 _ => {
                     generic_error!("Failed to write to {filename}\n");
