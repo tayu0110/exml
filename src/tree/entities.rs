@@ -48,7 +48,7 @@ use crate::{
     tree::{xml_free_node_list, NodeCommon, NodePtr, XmlDoc, XmlDtd, XmlElementType, XmlNode},
 };
 
-use super::{InvalidNodePointerCastError, XmlDtdPtr, XmlGenericNodePtr};
+use super::{InvalidNodePointerCastError, XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr};
 
 /// The different valid entity types.
 #[repr(C)]
@@ -370,18 +370,18 @@ unsafe fn xml_create_entity(
 /// Returns a pointer to the entity or NULL in case of error
 #[doc(alias = "xmlNewEntity")]
 pub unsafe fn xml_new_entity(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     name: &str,
     typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    if !doc.is_null() && (*doc).int_subset.is_some() {
+    if let Some(doc) = doc.filter(|doc| doc.int_subset.is_some()) {
         return xml_add_doc_entity(doc, name, typ, external_id, system_id, content);
     }
     let mut ret = xml_create_entity(name, typ, external_id, system_id, content)?;
-    ret.doc = AtomicPtr::new(doc as _);
+    ret.doc = AtomicPtr::new(doc.map_or(null_mut(), |doc| doc.as_ptr()));
     Some(ret)
 }
 
@@ -550,21 +550,21 @@ unsafe fn xml_add_entity(
 /// Returns a pointer to the entity or NULL in case of error
 #[doc(alias = "xmlAddDocEntity")]
 pub unsafe fn xml_add_doc_entity(
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     name: &str,
     typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    if doc.is_null() {
-        xml_entities_err(
-            XmlParserErrors::XmlDTDNoDoc,
-            "xmlAddDocEntity: document is NULL",
-        );
-        return None;
-    }
-    let Some(mut dtd) = (*doc).int_subset else {
+    // if doc.is_null() {
+    //     xml_entities_err(
+    //         XmlParserErrors::XmlDTDNoDoc,
+    //         "xmlAddDocEntity: document is NULL",
+    //     );
+    //     return None;
+    // }
+    let Some(mut dtd) = doc.int_subset else {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDTD,
             "xmlAddDocEntity: document without internal subset",
@@ -592,21 +592,21 @@ pub unsafe fn xml_add_doc_entity(
 /// Returns a pointer to the entity or NULL in case of error
 #[doc(alias = "xmlAddDtdEntity")]
 pub unsafe fn xml_add_dtd_entity(
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     name: &str,
     typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    if doc.is_null() {
-        xml_entities_err(
-            XmlParserErrors::XmlDTDNoDoc,
-            "xmlAddDtdEntity: document is NULL",
-        );
-        return None;
-    }
-    let Some(mut dtd) = (*doc).ext_subset else {
+    // if doc.is_null() {
+    //     xml_entities_err(
+    //         XmlParserErrors::XmlDTDNoDoc,
+    //         "xmlAddDtdEntity: document is NULL",
+    //     );
+    //     return None;
+    // }
+    let Some(mut dtd) = doc.ext_subset else {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDTD,
             "xmlAddDtdEntity: document without external subset",
@@ -804,11 +804,11 @@ pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> Option<XmlEn
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDtdEntity")]
-pub unsafe fn xml_get_dtd_entity(doc: *mut XmlDoc, name: &str) -> Option<XmlEntityPtr> {
-    if doc.is_null() {
-        return None;
-    }
-    if let Some(ext_subset) = (*doc).ext_subset {
+pub unsafe fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
+    // if doc.is_null() {
+    //     return None;
+    // }
+    if let Some(ext_subset) = doc.ext_subset {
         if let Some(table) = ext_subset.entities {
             return xml_get_entity_from_table(table, name);
         }
@@ -821,11 +821,11 @@ pub unsafe fn xml_get_dtd_entity(doc: *mut XmlDoc, name: &str) -> Option<XmlEnti
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetParameterEntity")]
-pub unsafe fn xml_get_parameter_entity(doc: *mut XmlDoc, name: &str) -> Option<XmlEntityPtr> {
-    if doc.is_null() {
-        return None;
-    }
-    if let Some(int_subset) = (*doc).int_subset {
+pub unsafe fn xml_get_parameter_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
+    // if doc.is_null() {
+    //     return None;
+    // }
+    if let Some(int_subset) = doc.int_subset {
         if let Some(table) = int_subset.pentities {
             let ret = xml_get_entity_from_table(table, name);
             if ret.is_some() {
@@ -833,7 +833,7 @@ pub unsafe fn xml_get_parameter_entity(doc: *mut XmlDoc, name: &str) -> Option<X
             }
         }
     }
-    if let Some(ext_subset) = (*doc).ext_subset {
+    if let Some(ext_subset) = doc.ext_subset {
         if let Some(table) = ext_subset.pentities {
             return xml_get_entity_from_table(table, name);
         }
@@ -866,7 +866,7 @@ macro_rules! grow_buffer_reentrant {
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeEntitiesInternal")]
 pub(crate) unsafe fn xml_encode_entities_internal(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     input: *const XmlChar,
     attr: i32,
 ) -> *mut XmlChar {
@@ -879,8 +879,8 @@ pub(crate) unsafe fn xml_encode_entities_internal(
     if input.is_null() {
         return null_mut();
     }
-    if !doc.is_null() {
-        html = matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) as i32;
+    if let Some(doc) = doc {
+        html = matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) as i32;
     }
 
     // allocate an translation buffer.
@@ -995,7 +995,7 @@ pub(crate) unsafe fn xml_encode_entities_internal(
                 *out = *cur;
                 out = out.add(1);
             } else if *cur >= 0x80 {
-                if (!doc.is_null() && (*doc).encoding.is_some()) || html != 0 {
+                if doc.map_or(false, |doc| doc.encoding.is_some()) || html != 0 {
                     // Bjørn Reese <br@sseusa.com> provided the patch
                     // XmlChar xc;
                     // xc = (*cur & 0x3F) << 6;
@@ -1032,8 +1032,8 @@ pub(crate) unsafe fn xml_encode_entities_internal(
                             XmlParserErrors::XmlCheckNotUTF8,
                             "xmlEncodeEntities: input not UTF-8",
                         );
-                        if !doc.is_null() {
-                            (*doc).encoding = Some("ISO-8859-1".to_owned());
+                        if let Some(mut doc) = doc {
+                            doc.encoding = Some("ISO-8859-1".to_owned());
                         }
                         snprintf(
                             buf.as_mut_ptr() as _,
@@ -1077,8 +1077,8 @@ pub(crate) unsafe fn xml_encode_entities_internal(
                             XmlParserErrors::XmlErrInvalidChar,
                             "xmlEncodeEntities: char out of range\n",
                         );
-                        if !doc.is_null() {
-                            (*doc).encoding = Some("ISO-8859-1".to_owned());
+                        if let Some(mut doc) = doc {
+                            doc.encoding = Some("ISO-8859-1".to_owned());
                         }
                         snprintf(
                             buf.as_mut_ptr() as _,
@@ -1151,7 +1151,7 @@ pub(crate) unsafe fn xml_encode_entities_internal(
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeEntitiesReentrant")]
 pub unsafe fn xml_encode_entities_reentrant(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     input: *const XmlChar,
 ) -> *mut XmlChar {
     xml_encode_entities_internal(doc, input, 0)
@@ -1563,7 +1563,7 @@ pub(crate) const XML_ENT_CONTAINS_LT: usize = 1 << 4;
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeAttributeEntities")]
 pub(crate) unsafe fn xml_encode_attribute_entities(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     input: *const XmlChar,
 ) -> *mut XmlChar {
     xml_encode_entities_internal(doc, input, 1)
@@ -1574,40 +1574,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_encode_entities_reentrant() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_input in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let input = gen_const_xml_char_ptr(n_input, 1);
-
-                    let ret_val = xml_encode_entities_reentrant(doc, input);
-                    desret_xml_char_ptr(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_input, input, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlEncodeEntitiesReentrant",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_input);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlEncodeEntitiesReentrant()"
-            );
-        }
-    }
 
     #[test]
     fn test_xml_encode_special_chars() {

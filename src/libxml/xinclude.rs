@@ -678,7 +678,7 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
     let system_id = ent.system_id.load(Ordering::Relaxed);
     let content = ent.content.load(Ordering::Relaxed);
     let ret = xml_add_doc_entity(
-        doc.as_ptr(),
+        doc,
         &ent.name().unwrap(),
         ent.etype,
         (!external_id.is_null())

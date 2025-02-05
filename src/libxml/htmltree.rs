@@ -1123,7 +1123,10 @@ pub unsafe fn html_node_dump_format_output(
                         || (xml_strcasecmp((*parent).name, c"script".as_ptr() as _) != 0
                             && xml_strcasecmp((*parent).name, c"style".as_ptr() as _) != 0))
                 {
-                    let buffer: *mut XmlChar = xml_encode_entities_reentrant(doc, (*cur).content);
+                    let buffer: *mut XmlChar = xml_encode_entities_reentrant(
+                        XmlDocPtr::from_raw(doc).unwrap(),
+                        (*cur).content,
+                    );
                     if !buffer.is_null() {
                         buf.write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
                         xml_free(buffer as _);

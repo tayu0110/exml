@@ -959,7 +959,7 @@ unsafe fn xml_htmlencode_send() {
     // an out-of-bounds read.
     memset(addr_of_mut!(BUFFER[BUFFER.len() - 4]) as _, 0, 4);
     let result: *mut c_char =
-        xml_encode_entities_reentrant(null_mut(), BUFFER.as_ptr() as _) as *mut c_char;
+        xml_encode_entities_reentrant(None, BUFFER.as_ptr() as _) as *mut c_char;
     if !result.is_null() {
         let s = CStr::from_ptr(result).to_string_lossy().into_owned();
         generic_error!("{s}");

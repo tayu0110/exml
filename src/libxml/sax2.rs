@@ -512,7 +512,7 @@ pub unsafe fn xml_sax2_get_parameter_entity(
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
 
-    xml_get_parameter_entity((*ctxt).my_doc, name)
+    xml_get_parameter_entity(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(), name)
 }
 
 /// The entity loader, to control the loading of external entities,
@@ -603,7 +603,14 @@ pub unsafe fn xml_sax2_entity_decl(
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
     if (*ctxt).in_subset == 1 {
-        let ent = xml_add_doc_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
+        let ent = xml_add_doc_entity(
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+            name,
+            typ,
+            public_id,
+            system_id,
+            content,
+        );
         if ent.is_none() && (*ctxt).pedantic != 0 {
             xml_warn_msg!(
                 ctxt,
@@ -634,7 +641,14 @@ pub unsafe fn xml_sax2_entity_decl(
             }
         }
     } else if (*ctxt).in_subset == 2 {
-        let ent = xml_add_dtd_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
+        let ent = xml_add_dtd_entity(
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+            name,
+            typ,
+            public_id,
+            system_id,
+            content,
+        );
         if ent.is_none() && (*ctxt).pedantic != 0 {
             if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
                 warning(
@@ -988,7 +1002,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
 
     if (*ctxt).in_subset == 1 {
         let ent = xml_add_doc_entity(
-            (*ctxt).my_doc,
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
             name,
             XmlEntityType::XmlExternalGeneralUnparsedEntity,
             public_id,
@@ -1026,7 +1040,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
         }
     } else if (*ctxt).in_subset == 2 {
         let ent = xml_add_dtd_entity(
-            (*ctxt).my_doc,
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
             name,
             XmlEntityType::XmlExternalGeneralUnparsedEntity,
             public_id,

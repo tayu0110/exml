@@ -924,15 +924,9 @@ impl XmlNode {
                     ret = xml_strcat(ret, (*node).content);
                 } else {
                     let buffer = if attr {
-                        xml_encode_attribute_entities(
-                            doc.map_or(null_mut(), |doc| doc.as_ptr()),
-                            (*node).content,
-                        )
+                        xml_encode_attribute_entities(doc, (*node).content)
                     } else {
-                        xml_encode_entities_reentrant(
-                            doc.map_or(null_mut(), |doc| doc.as_ptr()),
-                            (*node).content,
-                        )
+                        xml_encode_entities_reentrant(doc, (*node).content)
                     };
                     if !buffer.is_null() {
                         ret = xml_strcat(ret, buffer);
