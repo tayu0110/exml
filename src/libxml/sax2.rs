@@ -279,8 +279,12 @@ pub unsafe fn xml_sax2_internal_subset(
         xml_free_dtd(dtd);
         (*(*ctxt).my_doc).int_subset = None;
     }
-    (*(*ctxt).my_doc).int_subset =
-        xml_create_int_subset((*ctxt).my_doc, name, external_id, system_id);
+    (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
+        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+        name,
+        external_id,
+        system_id,
+    );
     if (*(*ctxt).my_doc).int_subset.is_none() {
         xml_sax2_err_memory(ctxt, "xmlSAX2InternalSubset");
     }
@@ -321,7 +325,12 @@ pub unsafe fn xml_sax2_external_subset(
             return;
         }
 
-        xml_new_dtd((*ctxt).my_doc, name, external_id, system_id);
+        xml_new_dtd(
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+            name,
+            external_id,
+            system_id,
+        );
 
         // make sure we won't destroy the main document context
 

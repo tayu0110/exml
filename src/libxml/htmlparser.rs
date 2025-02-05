@@ -9231,7 +9231,7 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         let dtd = (*(*ctxt).my_doc).get_int_subset();
         if dtd.is_none() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
                 Some("html"),
                 Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
                 Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
@@ -10605,7 +10605,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
         let dtd = (*(*ctxt).my_doc).get_int_subset();
         if dtd.is_none() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
                 Some("html"),
                 Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
                 Some("http://www.w3.org/TR/REC-html40/loose.dtd"),

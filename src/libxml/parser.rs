@@ -1839,8 +1839,12 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
         return None;
     }
     (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
-    (*(*ctxt).my_doc).ext_subset =
-        xml_new_dtd((*ctxt).my_doc, Some("none"), external_id, system_id);
+    (*(*ctxt).my_doc).ext_subset = xml_new_dtd(
+        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+        Some("none"),
+        external_id,
+        system_id,
+    );
     xml_parse_external_subset(ctxt, external_id, system_id);
 
     let mut ret = None;
@@ -1935,8 +1939,12 @@ pub unsafe fn xml_io_parse_dtd(
         return null_mut();
     }
     (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
-    (*(*ctxt).my_doc).ext_subset =
-        xml_new_dtd((*ctxt).my_doc, Some("none"), Some("none"), Some("none"));
+    (*(*ctxt).my_doc).ext_subset = xml_new_dtd(
+        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+        Some("none"),
+        Some("none"),
+        Some("none"),
+    );
 
     if matches!(enc, XmlCharEncoding::None) && (*(*ctxt).input).remainder_len() >= 4 {
         // Get the 4 first bytes and decode the charset
@@ -7965,8 +7973,12 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
                 }
                 if (*(*ctxt).my_doc).int_subset.is_none() {
-                    (*(*ctxt).my_doc).int_subset =
-                        xml_new_dtd((*ctxt).my_doc, Some("fake"), None, None);
+                    (*(*ctxt).my_doc).int_subset = xml_new_dtd(
+                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                        Some("fake"),
+                        None,
+                        None,
+                    );
                 }
 
                 xml_sax2_entity_decl(
@@ -8092,8 +8104,12 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     }
 
                     if (*(*ctxt).my_doc).int_subset.is_none() {
-                        (*(*ctxt).my_doc).int_subset =
-                            xml_new_dtd((*ctxt).my_doc, Some("fake"), None, None);
+                        (*(*ctxt).my_doc).int_subset = xml_new_dtd(
+                            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                            Some("fake"),
+                            None,
+                            None,
+                        );
                     }
                     xml_sax2_entity_decl(
                         Some(GenericErrorContext::new(ctxt)),

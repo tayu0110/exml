@@ -45,8 +45,8 @@ use crate::{
 
 use super::{
     xml_free_entities_table, xml_free_node, xml_tree_err_memory, InvalidNodePointerCastError,
-    NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlEntityPtr, XmlGenericNodePtr, XmlNode,
-    __XML_REGISTER_CALLBACKS,
+    NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr,
+    XmlNode, __XML_REGISTER_CALLBACKS,
 };
 
 pub use attribute::*;
@@ -197,12 +197,12 @@ impl NodeCommon for XmlDtd {
 /// Returns a pointer to the new DTD structure
 #[doc(alias = "xmlCreateIntSubset")]
 pub unsafe fn xml_create_int_subset(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<XmlDtdPtr> {
-    if !doc.is_null() && (*doc).get_int_subset().is_some() {
+    if doc.map_or(false, |doc| doc.get_int_subset().is_some()) {
         return None;
     }
 
@@ -225,16 +225,16 @@ pub unsafe fn xml_create_int_subset(
             return None;
         }
     }
-    if !doc.is_null() {
-        (*doc).int_subset = Some(cur);
-        cur.parent = doc;
-        cur.doc = doc;
-        if let Some(children) = (*doc).children {
-            if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
+    if let Some(mut doc) = doc {
+        doc.int_subset = Some(cur);
+        cur.parent = doc.as_ptr();
+        cur.doc = doc.as_ptr();
+        if let Some(children) = doc.children {
+            if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
                 let mut prev = children;
                 prev.prev = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
                 cur.next = Some(prev);
-                (*doc).children = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+                doc.children = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
             } else {
                 let mut next = Some(children);
                 while let Some(now) =
@@ -248,19 +248,19 @@ pub unsafe fn xml_create_int_subset(
                     if let Some(mut prev) = cur.prev {
                         prev.next = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
                     } else {
-                        (*doc).children = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+                        doc.children = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
                     }
                     next.prev = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
                 } else {
-                    cur.prev = (*doc).last;
+                    cur.prev = doc.last;
                     cur.prev.unwrap().next = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
                     cur.next = None;
-                    (*doc).last = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+                    doc.last = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
                 }
             }
         } else {
-            (*doc).children = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
-            (*doc).last = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+            doc.children = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+            doc.last = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
         }
     }
 
@@ -278,12 +278,12 @@ pub unsafe fn xml_create_int_subset(
 /// Returns a pointer to the new DTD structure
 #[doc(alias = "xmlNewDtd")]
 pub unsafe fn xml_new_dtd(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<XmlDtdPtr> {
-    if !doc.is_null() && (*doc).ext_subset.is_some() {
+    if doc.map_or(false, |doc| doc.ext_subset.is_some()) {
         return None;
     }
 
@@ -292,7 +292,7 @@ pub unsafe fn xml_new_dtd(
         typ: XmlElementType::XmlDTDNode,
         external_id: external_id.map(|e| e.to_owned()),
         system_id: system_id.map(|s| s.to_owned()),
-        doc,
+        doc: doc.map_or(null_mut(), |doc| doc.as_ptr()),
         ..Default::default()
     }) else {
         xml_tree_err_memory("building DTD");
@@ -302,8 +302,8 @@ pub unsafe fn xml_new_dtd(
     if let Some(name) = name {
         cur.name = xml_strndup(name.as_ptr(), name.len() as i32);
     }
-    if !doc.is_null() {
-        (*doc).ext_subset = Some(cur);
+    if let Some(mut doc) = doc {
+        doc.ext_subset = Some(cur);
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0

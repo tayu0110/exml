@@ -799,7 +799,7 @@ unsafe fn xml_xinclude_merge_entities(
         if cur.is_null() {
             return None;
         }
-        xml_create_int_subset(doc.as_ptr(), (*cur).name().as_deref(), None, None)
+        xml_create_int_subset(Some(doc), (*cur).name().as_deref(), None, None)
     }) else {
         return -1;
     };

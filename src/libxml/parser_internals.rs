@@ -3398,7 +3398,12 @@ pub unsafe fn xml_parse_external_subset(
         (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
     }
     if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).int_subset.is_none() {
-        xml_create_int_subset((*ctxt).my_doc, None, external_id, system_id);
+        xml_create_int_subset(
+            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+            None,
+            external_id,
+            system_id,
+        );
     }
 
     (*ctxt).instate = XmlParserInputState::XmlParserDTD;

@@ -1997,7 +1997,7 @@ impl XmlCatalogEntry {
             return -1;
         }
         let dtd = xml_new_dtd(
-            doc,
+            XmlDocPtr::from_raw(doc).unwrap(),
             Some("catalog"),
             Some("-//OASIS//DTD Entity Resolution XML Catalog V1.0//EN"),
             Some("http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd"),

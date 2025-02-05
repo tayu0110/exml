@@ -105,7 +105,7 @@ pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlCh
     cur.doc = cur.as_ptr();
     if !external_id.is_null() || !uri.is_null() {
         xml_create_int_subset(
-            cur.as_ptr(),
+            Some(cur),
             Some("html"),
             (!external_id.is_null())
                 .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())

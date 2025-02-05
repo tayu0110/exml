@@ -1320,7 +1320,7 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
     let mut q: *mut XmlNode;
 
     let mut ret = xml_new_dtd(
-        null_mut(),
+        None,
         dtd.name().as_deref(),
         dtd.external_id.as_deref(),
         dtd.system_id.as_deref(),
