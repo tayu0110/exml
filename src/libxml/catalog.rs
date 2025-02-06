@@ -71,7 +71,7 @@ use crate::{
     parser::{xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt, XmlParserInputPtr},
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
-        NodeCommon, XmlDoc, XmlDocPtr, XmlNode, XML_XML_NAMESPACE,
+        NodeCommon, XmlDocPtr, XmlNode, XML_XML_NAMESPACE,
     },
     uri::{build_uri, canonic_path},
     SYSCONFDIR,
@@ -1521,7 +1521,7 @@ impl CatalogEntryListNode {
     unsafe fn dump_xml_catalog_node(
         entry: &Arc<RwLock<Self>>,
         catalog: *mut XmlNode,
-        doc: *mut XmlDoc,
+        doc: Option<XmlDocPtr>,
         ns: Option<XmlNsPtr>,
         cgroup: Option<&Arc<RwLock<Self>>>,
     ) {
@@ -1548,29 +1548,18 @@ impl CatalogEntryListNode {
                         }
                     }
                     XmlCatalogEntryType::XmlCataNextCatalog => {
-                        node = xml_new_doc_node(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            ns,
-                            "nextCatalog",
-                            null_mut(),
-                        );
+                        node = xml_new_doc_node(doc, ns, "nextCatalog", null_mut());
                         (*node).set_prop("catalog", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataNone => {}
                     XmlCatalogEntryType::XmlCataGroup => {
-                        node = xml_new_doc_node(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            ns,
-                            "group",
-                            null_mut(),
-                        );
+                        node = xml_new_doc_node(doc, ns, "group", null_mut());
                         (*node).set_prop("id", n.name.as_deref());
                         if let Some(value) = n.value.as_deref() {
-                            if let Some(xns) = (*node).search_ns_by_href(
-                                XmlDocPtr::from_raw(doc).unwrap(),
-                                XML_XML_NAMESPACE.to_str().unwrap(),
-                            ) {
+                            if let Some(xns) =
+                                (*node).search_ns_by_href(doc, XML_XML_NAMESPACE.to_str().unwrap())
+                            {
                                 (*node).set_ns_prop(Some(xns), "base", Some(value));
                             }
                         }
@@ -1589,89 +1578,49 @@ impl CatalogEntryListNode {
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataPublic => {
-                        node = xml_new_doc_node(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            ns,
-                            "public",
-                            null_mut(),
-                        );
+                        node = xml_new_doc_node(doc, ns, "public", null_mut());
                         (*node).set_prop("publicId", n.name.as_deref());
                         (*node).set_prop("uri", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataSystem => {
-                        node = xml_new_doc_node(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            ns,
-                            "system",
-                            null_mut(),
-                        );
+                        node = xml_new_doc_node(doc, ns, "system", null_mut());
                         (*node).set_prop("systemId", n.name.as_deref());
                         (*node).set_prop("uri", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataRewriteSystem => {
-                        node = xml_new_doc_node(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            ns,
-                            "rewriteSystem",
-                            null_mut(),
-                        );
+                        node = xml_new_doc_node(doc, ns, "rewriteSystem", null_mut());
                         (*node).set_prop("systemIdStartString", n.name.as_deref());
                         (*node).set_prop("rewritePrefix", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataDelegatePublic => {
-                        node = xml_new_doc_node(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            ns,
-                            "delegatePublic",
-                            null_mut(),
-                        );
+                        node = xml_new_doc_node(doc, ns, "delegatePublic", null_mut());
                         (*node).set_prop("publicIdStartString", n.name.as_deref());
                         (*node).set_prop("catalog", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataDelegateSystem => {
-                        node = xml_new_doc_node(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            ns,
-                            "delegateSystem",
-                            null_mut(),
-                        );
+                        node = xml_new_doc_node(doc, ns, "delegateSystem", null_mut());
                         (*node).set_prop("systemIdStartString", n.name.as_deref());
                         (*node).set_prop("catalog", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataURI => {
-                        node = xml_new_doc_node(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            ns,
-                            "uri",
-                            null_mut(),
-                        );
+                        node = xml_new_doc_node(doc, ns, "uri", null_mut());
                         (*node).set_prop("name", n.name.as_deref());
                         (*node).set_prop("uri", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataRewriteURI => {
-                        node = xml_new_doc_node(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            ns,
-                            "rewriteURI",
-                            null_mut(),
-                        );
+                        node = xml_new_doc_node(doc, ns, "rewriteURI", null_mut());
                         (*node).set_prop("uriStartString", n.name.as_deref());
                         (*node).set_prop("rewritePrefix", n.value.as_deref());
                         (*catalog).add_child(node);
                     }
                     XmlCatalogEntryType::XmlCataDelegateURI => {
-                        node = xml_new_doc_node(
-                            XmlDocPtr::from_raw(doc).unwrap(),
-                            ns,
-                            "delegateURI",
-                            null_mut(),
-                        );
+                        node = xml_new_doc_node(doc, ns, "delegateURI", null_mut());
                         (*node).set_prop("uriStartString", n.name.as_deref());
                         (*node).set_prop("catalog", n.value.as_deref());
                         (*catalog).add_child(node);
@@ -1970,7 +1919,7 @@ impl XmlCatalogEntry {
     unsafe fn dump_xml_catalog_node(
         &self,
         catalog: *mut XmlNode,
-        doc: *mut XmlDoc,
+        doc: Option<XmlDocPtr>,
         ns: Option<XmlNsPtr>,
         cgroup: Option<&Self>,
     ) {
@@ -1992,12 +1941,11 @@ impl XmlCatalogEntry {
         };
 
         // Rebuild a catalog
-        let doc: *mut XmlDoc = xml_new_doc(None);
-        if doc.is_null() {
+        let Some(mut doc) = XmlDocPtr::from_raw(xml_new_doc(None)).unwrap() else {
             return -1;
-        }
+        };
         let dtd = xml_new_dtd(
-            XmlDocPtr::from_raw(doc).unwrap(),
+            Some(doc),
             Some("catalog"),
             Some("-//OASIS//DTD Entity Resolution XML Catalog V1.0//EN"),
             Some("http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd"),
@@ -2006,34 +1954,29 @@ impl XmlCatalogEntry {
         (*doc).add_child(dtd.map_or(null_mut(), |dtd| dtd.as_ptr()) as _);
 
         let Some(ns) = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, None) else {
-            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            xml_free_doc(doc);
             return -1;
         };
-        let catalog: *mut XmlNode = xml_new_doc_node(
-            XmlDocPtr::from_raw(doc).unwrap(),
-            Some(ns),
-            "catalog",
-            null_mut(),
-        );
+        let catalog: *mut XmlNode = xml_new_doc_node(Some(doc), Some(ns), "catalog", null_mut());
         if catalog.is_null() {
             xml_free_ns(ns);
-            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            xml_free_doc(doc);
             return -1;
         }
         (*catalog).ns_def = Some(ns);
         (*doc).add_child(catalog as _);
 
-        self.dump_xml_catalog_node(catalog, doc, Some(ns), None);
+        self.dump_xml_catalog_node(catalog, Some(doc), Some(ns), None);
 
         // reserialize it
         let Some(buf) = XmlOutputBuffer::from_writer(out, None) else {
-            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            xml_free_doc(doc);
             return -1;
         };
         let ret: i32 = (*doc).save_format_file_to(buf, None, 1);
 
         // Free it
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc);
 
         ret
     }
@@ -2640,13 +2583,12 @@ unsafe fn xml_parse_xml_catalog_file(
 ) -> Option<Arc<RwLock<CatalogEntryListNode>>> {
     let mut cur: *mut XmlNode;
 
-    let doc: *mut XmlDoc = xml_parse_catalog_file(filename);
-    if doc.is_null() {
+    let Some(doc) = xml_parse_catalog_file(filename) else {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             generic_error!("Failed to parse catalog {filename}\n");
         }
         return None;
-    }
+    };
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         generic_error!("{} Parsing catalog {filename}\n", xml_get_thread_id());
@@ -2685,17 +2627,17 @@ unsafe fn xml_parse_xml_catalog_file(
         }
         cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
         xml_parse_xml_catalog_node_list(cur, prefer, Some(parent.clone()), None);
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc);
         Some(parent.node)
     } else {
         xml_catalog_err!(
             null_mut(),
-            doc,
+            doc.as_ptr(),
             XmlParserErrors::XmlCatalogNotCatalog,
             "File {} is not an XML Catalog\n",
             filename,
         );
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc);
         None
     }
 }
@@ -3142,24 +3084,22 @@ pub unsafe fn xml_catalog_remove(value: &str) -> i32 {
 ///
 /// Returns the resulting document tree or null_mut() in case of error
 #[doc(alias = "xmlParseCatalogFile")]
-pub unsafe fn xml_parse_catalog_file(filename: &str) -> *mut XmlDoc {
-    let ret: *mut XmlDoc;
-
+pub unsafe fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
     let ctxt = xml_new_parser_ctxt();
     if ctxt.is_null() {
         xml_catalog_err_memory("allocating parser context");
-        return null_mut();
+        return None;
     }
 
     let Some(buf) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None) else {
         xml_free_parser_ctxt(ctxt);
-        return null_mut();
+        return None;
     };
 
     let input_stream: XmlParserInputPtr = xml_new_input_stream(Some(&mut *ctxt));
     if input_stream.is_null() {
         xml_free_parser_ctxt(ctxt);
-        return null_mut();
+        return None;
     }
 
     {
@@ -3186,16 +3126,16 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> *mut XmlDoc {
 
     xml_parse_document(ctxt);
 
-    if (*ctxt).well_formed != 0 {
-        ret = (*ctxt).my_doc;
+    let ret = if (*ctxt).well_formed != 0 {
+        (*ctxt).my_doc
     } else {
-        ret = null_mut();
         xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
-    }
+        null_mut()
+    };
     xml_free_parser_ctxt(ctxt);
 
-    ret
+    XmlDocPtr::from_raw(ret).unwrap()
 }
 
 /// Convert all the SGML catalog entries as XML ones
