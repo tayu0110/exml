@@ -1032,17 +1032,17 @@ pub fn build_uri(uri: &str, base: &str) -> Option<String> {
 /// use exml::uri::build_relative_uri;
 ///
 /// let base = Some("http://site1.com/docs/book1.html");
-/// assert_eq!(build_relative_uri("docs/pic1.gif", base), Some(Cow::Borrowed("pic1.gif")));
-/// assert_eq!(build_relative_uri("docs/img/pic1.gif", base), Some(Cow::Borrowed("img/pic1.gif")));
-/// assert_eq!(build_relative_uri("img/pic1.gif", base), Some(Cow::Borrowed("../img/pic1.gif")));
-/// assert_eq!(build_relative_uri("http://site1.com/docs/pic1.gif", base), Some(Cow::Borrowed("pic1.gif")));
-/// assert_eq!(build_relative_uri("http://site2.com/docs/pic1.gif", base), Some(Cow::Borrowed("http://site2.com/docs/pic1.gif")));
+/// assert_eq!(build_relative_uri("docs/pic1.gif", base), Some("pic1.gif".into()));
+/// assert_eq!(build_relative_uri("docs/img/pic1.gif", base), Some("img/pic1.gif".into()));
+/// assert_eq!(build_relative_uri("img/pic1.gif", base), Some("../img/pic1.gif".into()));
+/// assert_eq!(build_relative_uri("http://site1.com/docs/pic1.gif", base), Some("pic1.gif".into()));
+/// assert_eq!(build_relative_uri("http://site2.com/docs/pic1.gif", base), Some("http://site2.com/docs/pic1.gif".into()));
 ///
 /// let base = Some("docs/book1.html");
-/// assert_eq!(build_relative_uri("docs/pic1.gif", base), Some(Cow::Borrowed("pic1.gif")));
-/// assert_eq!(build_relative_uri("docs/img/pic1.gif", base), Some(Cow::Borrowed("img/pic1.gif")));
-/// assert_eq!(build_relative_uri("img/pic1.gif", base), Some(Cow::Borrowed("../img/pic1.gif")));
-/// assert_eq!(build_relative_uri("http://site1.com/docs/pic1.gif", base), Some(Cow::Borrowed("http://site1.com/docs/pic1.gif")));
+/// assert_eq!(build_relative_uri("docs/pic1.gif", base), Some("pic1.gif".into()));
+/// assert_eq!(build_relative_uri("docs/img/pic1.gif", base), Some("img/pic1.gif".into()));
+/// assert_eq!(build_relative_uri("img/pic1.gif", base), Some("../img/pic1.gif".into()));
+/// assert_eq!(build_relative_uri("http://site1.com/docs/pic1.gif", base), Some("http://site1.com/docs/pic1.gif".into()));
 /// ```
 ///
 /// # Note

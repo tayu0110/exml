@@ -36,7 +36,7 @@ use crate::{
     libxml::chvalid::xml_is_blank_char,
     tree::{
         xml_free_node_list, xml_get_doc_entity, xml_validate_name, NodeCommon, NodePtr, XmlAttr,
-        XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElement,
+        XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlElement,
         XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityType, XmlNode, XmlNs, XmlNsPtr,
     },
 };
@@ -82,7 +82,7 @@ pub struct XmlDebugCtxt<'a> {
     output: Box<dyn Write + 'a>, /* the output file */
     shift: String,               /* used for indenting */
     depth: i32,                  /* current depth */
-    doc: *mut XmlDoc,            /* current document */
+    doc: Option<XmlDocPtr>,      /* current document */
     node: *mut XmlNode,          /* current node */
     dict: XmlDictPtr,            /* the doc dictionary */
     check: i32,                  /* do just checkings */
@@ -201,11 +201,12 @@ impl XmlDebugCtxt<'_> {
             }
             if !self.dict.is_null()
                 && xml_dict_owns(self.dict, cname.as_ptr() as *const u8) == 0
-                && (self.doc.is_null()
-                    || (*self.doc).parse_flags
+                && self.doc.map_or(true, |doc| {
+                    doc.parse_flags
                         & (XmlParserOption::XmlParseSAX1 as i32
                             | XmlParserOption::XmlParseNoDict as i32)
-                        == 0)
+                        == 0
+                })
             {
                 xml_debug_err!(
                     self,
@@ -218,7 +219,7 @@ impl XmlDebugCtxt<'_> {
 
     #[doc(alias = "xmlCtxtGenericNodeCheck")]
     unsafe fn generic_node_check(&mut self, node: &impl NodeCommon) {
-        let doc: *mut XmlDoc = node.document();
+        let doc = XmlDocPtr::from_raw(node.document()).unwrap();
 
         if node.parent().is_none() {
             xml_debug_err!(
@@ -227,13 +228,13 @@ impl XmlDebugCtxt<'_> {
                 "Node has no parent\n",
             );
         }
-        if node.document().is_null() {
-            xml_debug_err!(self, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n",);
-        } else {
+        if let Some(doc) = doc {
             self.nodict = 1;
-            if self.doc.is_null() {
-                self.doc = doc;
+            if self.doc.is_none() {
+                self.doc = Some(doc);
             }
+        } else {
+            xml_debug_err!(self, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n",);
         }
         if node
             .parent()
@@ -1400,7 +1401,7 @@ impl Default for XmlDebugCtxt<'_> {
             check: 0,
             errors: 0,
             output: Box::new(stdout()),
-            doc: null_mut(),
+            doc: None,
             node: null_mut(),
             dict: null_mut(),
             nodict: 0,
@@ -1850,7 +1851,7 @@ pub type XmlShellCtxtPtr<'a> = *mut XmlShellCtxt<'a>;
 #[repr(C)]
 pub struct XmlShellCtxt<'a> {
     filename: *mut c_char,
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     node: *mut XmlNode,
     pctxt: XmlXPathContextPtr,
     loaded: i32,
@@ -2130,51 +2131,50 @@ pub unsafe fn xml_shell_load(
 
     use crate::tree::xml_free_doc;
 
-    let doc: *mut XmlDoc;
     let mut html: i32 = 0;
 
     if ctxt.is_null() {
         return -1;
     }
-    if !(*ctxt).doc.is_null() {
-        html = ((*(*ctxt).doc).typ == XmlElementType::XmlHTMLDocumentNode) as i32;
+    if let Some(doc) = (*ctxt).doc {
+        html = (doc.typ == XmlElementType::XmlHTMLDocumentNode) as i32;
     }
 
-    if html != 0 {
+    let Some(doc) = (if html != 0 {
         #[cfg(feature = "html")]
         {
-            doc = html_parse_file(filename, None);
+            XmlDocPtr::from_raw(html_parse_file(filename, None)).unwrap()
         }
         #[cfg(not(feature = "html"))]
         {
             write!((*ctxt).output, "HTML support not compiled in\n".as_ptr());
-            doc = null_mut();
+            None
         }
     } else {
-        doc = xml_read_file(filename, None, 0);
-    }
-    if !doc.is_null() {
-        if (*ctxt).loaded == 1 {
-            xml_free_doc(XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap());
-        }
-        (*ctxt).loaded = 1;
-        #[cfg(feature = "xpath")]
-        {
-            xml_xpath_free_context((*ctxt).pctxt);
-        }
-        xml_free((*ctxt).filename as _);
-        (*ctxt).doc = doc;
-        (*ctxt).node = doc as *mut XmlNode;
-        #[cfg(feature = "xpath")]
-        {
-            (*ctxt).pctxt = xml_xpath_new_context(doc);
-        }
-        let canonic = canonic_path(filename);
-        let canonic = CString::new(canonic.as_ref()).unwrap();
-        (*ctxt).filename = xml_strdup(canonic.as_ptr() as *const u8) as *mut i8;
-    } else {
+        XmlDocPtr::from_raw(xml_read_file(filename, None, 0)).unwrap()
+    }) else {
         return -1;
+    };
+    if (*ctxt).loaded == 1 {
+        if let Some(doc) = (*ctxt).doc {
+            xml_free_doc(doc);
+        }
     }
+    (*ctxt).loaded = 1;
+    #[cfg(feature = "xpath")]
+    {
+        xml_xpath_free_context((*ctxt).pctxt);
+    }
+    xml_free((*ctxt).filename as _);
+    (*ctxt).doc = Some(doc);
+    (*ctxt).node = doc.as_ptr() as *mut XmlNode;
+    #[cfg(feature = "xpath")]
+    {
+        (*ctxt).pctxt = xml_xpath_new_context(doc.as_ptr());
+    }
+    let canonic = canonic_path(filename);
+    let canonic = CString::new(canonic.as_ref()).unwrap();
+    (*ctxt).filename = xml_strdup(canonic.as_ptr() as *const u8) as *mut i8;
     0
 }
 
@@ -2197,10 +2197,7 @@ pub unsafe fn xml_shell_cat(
     node: *mut XmlNode,
     _node2: *mut XmlNode,
 ) -> i32 {
-    use crate::{
-        libxml::htmltree::{html_doc_dump, html_node_dump_file},
-        tree::XmlDocPtr,
-    };
+    use crate::libxml::htmltree::{html_doc_dump, html_node_dump_file};
 
     use super::htmlparser::HtmlDocPtr;
 
@@ -2211,12 +2208,15 @@ pub unsafe fn xml_shell_cat(
         writeln!((*ctxt).output, "NULL");
         return 0;
     }
-    if (*(*ctxt).doc).typ == XmlElementType::XmlHTMLDocumentNode {
+    if let Some(doc) = (*ctxt)
+        .doc
+        .filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode)
+    {
         #[cfg(feature = "html")]
         if (*node).element_type() == XmlElementType::XmlHTMLDocumentNode {
             html_doc_dump(&mut (*ctxt).output, node as HtmlDocPtr);
         } else {
-            html_node_dump_file(&mut (*ctxt).output, (*ctxt).doc, node);
+            html_node_dump_file(&mut (*ctxt).output, doc.as_ptr(), node);
         }
         #[cfg(not(feature = "html"))]
         if (*node).element_type() == XmlElementType::XmlDocumentNode {
@@ -2235,10 +2235,7 @@ pub unsafe fn xml_shell_cat(
             .as_mut()
             .dump_file(&mut (*ctxt).output);
     } else {
-        (*node).dump_file(
-            &mut (*ctxt).output,
-            XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
-        );
+        (*node).dump_file(&mut (*ctxt).output, (*ctxt).doc);
     }
     writeln!((*ctxt).output);
     0
@@ -2259,7 +2256,7 @@ pub unsafe fn xml_shell_write(
 ) -> i32 {
     use std::fs::File;
 
-    use crate::{libxml::htmltree::html_save_file, tree::XmlDocPtr};
+    use crate::libxml::htmltree::html_save_file;
 
     if node.is_null() {
         return -1;
@@ -2270,14 +2267,21 @@ pub unsafe fn xml_shell_write(
     let cfilename = CString::new(filename).unwrap();
     match (*node).element_type() {
         XmlElementType::XmlDocumentNode => {
-            if (*ctxt).doc.is_null() || (*(*ctxt).doc).save_file(filename) < -1 {
+            if (*ctxt)
+                .doc
+                .map_or(true, |mut doc| doc.save_file(filename) < -1)
+            {
                 generic_error!("Failed to write to {filename}\n");
                 return -1;
             }
         }
         XmlElementType::XmlHTMLDocumentNode => {
             #[cfg(feature = "html")]
-            if html_save_file(cfilename.as_ptr(), (*ctxt).doc) < 0 {
+            if html_save_file(
+                cfilename.as_ptr(),
+                (*ctxt).doc.map_or(null_mut(), |doc| doc.as_ptr()),
+            ) < 0
+            {
                 generic_error!("Failed to write to {filename}\n");
                 return -1;
             }
@@ -2298,7 +2302,7 @@ pub unsafe fn xml_shell_write(
                 .open(filename)
             {
                 Ok(mut f) => {
-                    (*node).dump_file(&mut f, XmlDocPtr::from_raw((*ctxt).doc).unwrap());
+                    (*node).dump_file(&mut f, (*ctxt).doc);
                 }
                 _ => {
                     generic_error!("Failed to write to {filename}\n");
@@ -2324,20 +2328,21 @@ pub unsafe fn xml_shell_save(
 ) -> i32 {
     use crate::libxml::htmltree::html_save_file;
 
-    if ctxt.is_null() || (*ctxt).doc.is_null() {
+    if ctxt.is_null() {
         return -1;
     }
+    let Some(mut doc) = (*ctxt).doc else {
+        return -1;
+    };
     if filename.is_null() || *filename.add(0) == 0 {
         filename = (*ctxt).filename;
     }
     if filename.is_null() {
         return -1;
     }
-    match (*(*ctxt).doc).typ {
+    match doc.typ {
         XmlElementType::XmlDocumentNode => {
-            if (*ctxt).doc.is_null()
-                || (*(*ctxt).doc).save_file(CStr::from_ptr(filename).to_string_lossy().as_ref()) < 0
-            {
+            if doc.save_file(CStr::from_ptr(filename).to_string_lossy().as_ref()) < 0 {
                 generic_error!(
                     "Failed to save to {}\n",
                     CStr::from_ptr(filename as *const i8).to_string_lossy()
@@ -2346,7 +2351,7 @@ pub unsafe fn xml_shell_save(
         }
         XmlElementType::XmlHTMLDocumentNode => {
             #[cfg(feature = "html")]
-            if html_save_file(filename as *mut c_char, (*ctxt).doc) < 0 {
+            if html_save_file(filename as *mut c_char, doc.as_ptr()) < 0 {
                 generic_error!(
                     "Failed to save to {}\n",
                     CStr::from_ptr(filename as *const i8).to_string_lossy()
@@ -2387,7 +2392,7 @@ pub unsafe fn xml_shell_validate(
             parser::xml_parse_dtd,
             valid::{xml_validate_document, xml_validate_dtd},
         },
-        tree::{xml_free_dtd, XmlDocPtr},
+        tree::xml_free_dtd,
     };
 
     use super::valid::XmlValidCtxt;
@@ -2395,17 +2400,17 @@ pub unsafe fn xml_shell_validate(
     let mut vctxt = XmlValidCtxt::default();
     let mut res: i32 = -1;
 
-    if ctxt.is_null() || (*ctxt).doc.is_null() {
+    if ctxt.is_null() {
         return -1;
     }
+    let Some(doc) = (*ctxt).doc else {
+        return -1;
+    };
     vctxt.error = Some(GLOBAL_STATE.with_borrow(|state| state.generic_error));
     vctxt.warning = vctxt.error;
 
     if dtd.is_null() || *dtd.add(0) == 0 {
-        res = xml_validate_document(
-            addr_of_mut!(vctxt),
-            XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(),
-        );
+        res = xml_validate_document(addr_of_mut!(vctxt), doc);
     } else {
         let subset = xml_parse_dtd(
             None,
@@ -2414,11 +2419,7 @@ pub unsafe fn xml_shell_validate(
                 .as_deref(),
         );
         if let Some(subset) = subset {
-            res = xml_validate_dtd(
-                addr_of_mut!(vctxt),
-                XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(),
-                subset,
-            );
+            res = xml_validate_dtd(addr_of_mut!(vctxt), doc, subset);
             xml_free_dtd(subset);
         }
     }
@@ -2589,7 +2590,8 @@ unsafe fn xml_shell_rng_validate(
     }
     let vctxt = xml_relaxng_new_valid_ctxt(relaxngschemas);
     xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), None);
-    let ret: i32 = xml_relaxng_validate_doc(vctxt, (*sctxt).doc);
+    let ret: i32 =
+        xml_relaxng_validate_doc(vctxt, (*sctxt).doc.map_or(null_mut(), |doc| doc.as_ptr()));
 
     match ret.cmp(&0) {
         std::cmp::Ordering::Equal => {
@@ -2873,7 +2875,7 @@ unsafe fn xml_shell_set_base(
 #[doc(alias = "xmlShell")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_shell<'a>(
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     filename: *mut c_char,
     input: Option<XmlShellReadlineFunc>,
     output: Option<impl Write + 'a>,
@@ -2888,7 +2890,7 @@ pub unsafe fn xml_shell<'a>(
             xmlmemory::xml_mem_show,
             xmlstring::xml_strdup,
         },
-        tree::{xml_free_doc, XmlDocPtr},
+        tree::xml_free_doc,
         xpath::{
             xml_xpath_debug_dump_object, xml_xpath_eval, xml_xpath_free_context,
             xml_xpath_free_object, xml_xpath_new_context,
@@ -2904,9 +2906,9 @@ pub unsafe fn xml_shell<'a>(
     let mut i: i32;
     let mut list: XmlXPathObjectPtr;
 
-    if doc.is_null() {
-        return;
-    }
+    // if doc.is_null() {
+    //     return;
+    // }
     if filename.is_null() {
         return;
     }
@@ -2919,22 +2921,22 @@ pub unsafe fn xml_shell<'a>(
         return;
     }
     (*ctxt).loaded = 0;
-    (*ctxt).doc = doc;
+    (*ctxt).doc = Some(doc);
     (*ctxt).input = input.unwrap();
     (*ctxt).output = output.map_or(Box::new(stdout()) as Box<dyn Write + 'a>, |o| Box::new(o));
     (*ctxt).filename = xml_strdup(filename as *mut XmlChar) as *mut c_char;
-    (*ctxt).node = (*ctxt).doc as *mut XmlNode;
+    (*ctxt).node = doc.as_ptr() as *mut XmlNode;
 
     #[cfg(feature = "xpath")]
     {
-        (*ctxt).pctxt = xml_xpath_new_context((*ctxt).doc);
+        (*ctxt).pctxt = xml_xpath_new_context(doc.as_ptr());
         if (*ctxt).pctxt.is_null() {
             xml_free(ctxt as _);
             return;
         }
     }
     loop {
-        if (*ctxt).node == (*ctxt).doc as *mut XmlNode {
+        if (*ctxt).node == doc.as_ptr() as *mut XmlNode {
             snprintf(
                 prompt.as_mut_ptr() as _,
                 prompt.len(),
@@ -3327,7 +3329,7 @@ pub unsafe fn xml_shell<'a>(
         } {
             #[cfg(feature = "xpath")]
             {
-                let root: *mut XmlNode = (*(*ctxt).doc).get_root_element();
+                let root: *mut XmlNode = doc.get_root_element();
                 xml_shell_register_root_namespaces(ctxt, null_mut(), root, null_mut());
             }
         } else if {
@@ -3573,7 +3575,7 @@ pub unsafe fn xml_shell<'a>(
             }
         } else if strcmp(command.as_ptr(), c"cd".as_ptr()) == 0 {
             if arg[0] == 0 {
-                (*ctxt).node = (*ctxt).doc as *mut XmlNode;
+                (*ctxt).node = doc.as_ptr() as *mut XmlNode;
             } else {
                 #[cfg(feature = "xpath")]
                 {
@@ -3806,7 +3808,7 @@ pub unsafe fn xml_shell<'a>(
         xml_xpath_free_context((*ctxt).pctxt);
     }
     if (*ctxt).loaded != 0 {
-        xml_free_doc(XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap());
+        xml_free_doc(doc);
     }
     if !(*ctxt).filename.is_null() {
         xml_free((*ctxt).filename as _);
