@@ -35,7 +35,7 @@ use crate::{
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     libxml::xmlstring::xml_str_equal,
     parser::{xml_read_file, xml_read_memory},
-    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementType, XmlNode},
+    tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlNode},
     xpath::{
         internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
         xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_comp_expr,
@@ -136,10 +136,10 @@ pub type XmlSchematronPtr = *mut XmlSchematron;
 #[doc(alias = "xmlSchematron")]
 #[repr(C)]
 pub struct XmlSchematron {
-    name: *const XmlChar, /* schema name */
-    preserve: i32,        /* was the document passed by the user */
-    doc: *mut XmlDoc,     /* pointer to the parsed document */
-    flags: i32,           /* specific to this schematron */
+    name: *const XmlChar,   /* schema name */
+    preserve: i32,          /* was the document passed by the user */
+    doc: Option<XmlDocPtr>, /* pointer to the parsed document */
+    flags: i32,             /* specific to this schematron */
 
     _private: *mut c_void, /* unused by the library */
     dict: XmlDictPtr,      /* the dictionary used internally */
@@ -159,7 +159,7 @@ impl Default for XmlSchematron {
         Self {
             name: null_mut(),
             preserve: 0,
-            doc: null_mut(),
+            doc: None,
             flags: 0,
             _private: null_mut(),
             dict: null_mut(),
@@ -232,7 +232,7 @@ pub type XmlSchematronParserCtxtPtr = *mut XmlSchematronParserCtxt;
 pub struct XmlSchematronParserCtxt {
     typ: i32,
     url: *const XmlChar,
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     preserve: i32, /* Whether the doc should be freed  */
     buffer: *const c_char,
     size: i32,
@@ -262,7 +262,7 @@ impl Default for XmlSchematronParserCtxt {
         Self {
             typ: 0,
             url: null_mut(),
-            doc: null_mut(),
+            doc: None,
             preserve: 0,
             buffer: null_mut(),
             size: 0,
@@ -383,10 +383,10 @@ pub unsafe fn xml_schematron_new_mem_parser_ctxt(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchematronNewDocParserCtxt")]
-pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: *mut XmlDoc) -> XmlSchematronParserCtxtPtr {
-    if doc.is_null() {
-        return null_mut();
-    }
+pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchematronParserCtxtPtr {
+    // if doc.is_null() {
+    //     return null_mut();
+    // }
 
     let ret: XmlSchematronParserCtxtPtr =
         xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
@@ -395,11 +395,11 @@ pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: *mut XmlDoc) -> XmlSchemat
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
-    (*ret).doc = doc;
+    (*ret).doc = Some(doc);
     (*ret).dict = xml_dict_create();
     // The application has responsibility for the document
     (*ret).preserve = 1;
-    (*ret).xctxt = xml_xpath_new_context(doc);
+    (*ret).xctxt = xml_xpath_new_context(doc.as_ptr());
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
             null_mut(),
@@ -419,8 +419,8 @@ pub unsafe fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronParserCtxtPtr) 
     if ctxt.is_null() {
         return;
     }
-    if !(*ctxt).doc.is_null() && (*ctxt).preserve == 0 {
-        xml_free_doc(XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap());
+    if let Some(doc) = (*ctxt).doc.filter(|_| (*ctxt).preserve == 0) {
+        xml_free_doc(doc);
     }
     if !(*ctxt).xctxt.is_null() {
         xml_xpath_free_context((*ctxt).xctxt);
@@ -1046,7 +1046,6 @@ unsafe fn xml_schematron_parse_pattern(ctxt: XmlSchematronParserCtxtPtr, pat: *m
 /// Returns the internal XML Schematron structure built from the resource or NULL in case of error
 #[doc(alias = "xmlSchematronParse")]
 pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchematronPtr {
-    let doc: *mut XmlDoc;
     let mut ret: XmlSchematronPtr = null_mut();
     let mut cur: *mut XmlNode;
     let mut preserve: i32 = 0;
@@ -1058,10 +1057,12 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
     (*ctxt).nberrors = 0;
 
     // First step is to parse the input document into an DOM/Infoset
-    if !(*ctxt).url.is_null() {
+    let doc = if !(*ctxt).url.is_null() {
         let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
-        doc = xml_read_file(&url, None, SCHEMATRON_PARSE_OPTIONS as i32);
-        if doc.is_null() {
+        let Some(doc) =
+            XmlDocPtr::from_raw(xml_read_file(&url, None, SCHEMATRON_PARSE_OPTIONS as i32))
+                .unwrap()
+        else {
             xml_schematron_perr!(
                 ctxt,
                 null_mut(),
@@ -1070,12 +1071,18 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 url
             );
             return null_mut();
-        }
+        };
         (*ctxt).preserve = 0;
+        doc
     } else if !(*ctxt).buffer.is_null() {
         let mem = from_raw_parts((*ctxt).buffer as *const u8, (*ctxt).size as usize).to_vec();
-        doc = xml_read_memory(mem, None, None, SCHEMATRON_PARSE_OPTIONS as i32);
-        if doc.is_null() {
+        let Some(mut doc) = XmlDocPtr::from_raw(xml_read_memory(
+            mem,
+            None,
+            None,
+            SCHEMATRON_PARSE_OPTIONS as i32,
+        ))
+        .unwrap() else {
             xml_schematron_perr!(
                 ctxt,
                 null_mut(),
@@ -1083,14 +1090,15 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 "xmlSchematronParse: could not parse.\n"
             );
             return null_mut();
-        }
-        (*doc).url = Some("in_memory_buffer".to_owned());
+        };
+        doc.url = Some("in_memory_buffer".to_owned());
         (*ctxt).url = xml_dict_lookup((*ctxt).dict, c"in_memory_buffer".as_ptr() as _, -1);
         (*ctxt).preserve = 0;
-    } else if !(*ctxt).doc.is_null() {
-        doc = (*ctxt).doc;
+        doc
+    } else if let Some(doc) = (*ctxt).doc {
         preserve = 1;
         (*ctxt).preserve = 1;
+        doc
     } else {
         xml_schematron_perr!(
             ctxt,
@@ -1099,23 +1107,19 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
             "xmlSchematronParse: could not parse.\n"
         );
         return null_mut();
-    }
+    };
 
     // Then extract the root and Schematron parse it
-    let root: *mut XmlNode = if doc.is_null() {
-        null_mut()
-    } else {
-        (*doc).get_root_element()
-    };
+    let root: *mut XmlNode = doc.get_root_element();
     if root.is_null() {
         xml_schematron_perr!(
             ctxt,
-            doc as *mut XmlNode,
+            doc.as_ptr() as *mut XmlNode,
             XmlParserErrors::XmlSchemapNoroot,
             "The schema has no document element.\n"
         );
         if preserve == 0 {
-            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            xml_free_doc(doc);
         }
         return null_mut();
     }
@@ -1213,7 +1217,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
             // goto exit;
             } else {
                 // the original document must be kept for reporting
-                (*ret).doc = doc;
+                (*ret).doc = Some(doc);
                 if preserve != 0 {
                     (*ret).preserve = 1;
                 }
@@ -1224,7 +1228,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
 
     // exit:
     if preserve == 0 {
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc);
     }
     if !ret.is_null() {
         if (*ctxt).nberrors != 0 {
@@ -1325,8 +1329,8 @@ pub unsafe fn xml_schematron_free(schema: XmlSchematronPtr) {
         return;
     }
 
-    if !(*schema).doc.is_null() && (*schema).preserve == 0 {
-        xml_free_doc(XmlDocPtr::from_raw((*schema).doc).unwrap().unwrap());
+    if let Some(doc) = (*schema).doc.filter(|_| (*schema).preserve == 0) {
+        xml_free_doc(doc);
     }
 
     (*schema).namespaces = None;
@@ -1428,12 +1432,12 @@ pub unsafe fn xml_schematron_free_valid_ctxt(ctxt: XmlSchematronValidCtxtPtr) {
 unsafe fn xml_schematron_register_variables(
     ctxt: XmlXPathContextPtr,
     mut letr: XmlSchematronLetPtr,
-    instance: *mut XmlDoc,
+    instance: XmlDocPtr,
     cur: *mut XmlNode,
 ) -> i32 {
     let mut let_eval: XmlXPathObjectPtr;
 
-    (*ctxt).doc = instance;
+    (*ctxt).doc = instance.as_ptr();
     (*ctxt).node = cur;
     while !letr.is_null() {
         let_eval = xml_xpath_compiled_eval((*letr).comp, ctxt);
@@ -1735,14 +1739,14 @@ unsafe fn xml_schematron_report_success(
 unsafe fn xml_schematron_run_test(
     ctxt: XmlSchematronValidCtxtPtr,
     test: XmlSchematronTestPtr,
-    instance: *mut XmlDoc,
+    instance: XmlDocPtr,
     cur: *mut XmlNode,
     pattern: XmlSchematronPatternPtr,
 ) -> i32 {
     let mut failed: i32;
 
     failed = 0;
-    (*(*ctxt).xctxt).doc = instance;
+    (*(*ctxt).xctxt).doc = instance.as_ptr();
     (*(*ctxt).xctxt).node = cur;
     let ret: XmlXPathObjectPtr = xml_xpath_compiled_eval((*test).comp, (*ctxt).xctxt);
     if ret.is_null() {
@@ -1888,17 +1892,15 @@ unsafe fn xml_schematron_report_pattern(
 #[doc(alias = "xmlSchematronValidateDoc")]
 pub unsafe fn xml_schematron_validate_doc(
     ctxt: XmlSchematronValidCtxtPtr,
-    instance: *mut XmlDoc,
+    instance: XmlDocPtr,
 ) -> i32 {
     let mut cur: *mut XmlNode;
     let mut pattern: XmlSchematronPatternPtr;
     let mut rule: XmlSchematronRulePtr;
     let mut test: XmlSchematronTestPtr;
 
-    if ctxt.is_null()
-        || (*ctxt).schema.is_null()
-        || (*(*ctxt).schema).rules.is_null()
-        || instance.is_null()
+    if ctxt.is_null() || (*ctxt).schema.is_null() || (*(*ctxt).schema).rules.is_null()
+    // || instance.is_null()
     {
         return -1;
     }
@@ -1987,46 +1989,4 @@ pub unsafe fn xml_schematron_validate_doc(
         }
     }
     (*ctxt).nberrors
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
-
-    use super::*;
-
-    #[test]
-    fn test_xml_schematron_validate_doc() {
-        #[cfg(feature = "schematron")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_SCHEMATRON_VALID_CTXT_PTR {
-                for n_instance in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_schematron_valid_ctxt_ptr(n_ctxt, 0);
-                    let instance = gen_xml_doc_ptr(n_instance, 1);
-
-                    let ret_val = xml_schematron_validate_doc(ctxt, instance);
-                    desret_int(ret_val);
-                    des_xml_schematron_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_doc_ptr(n_instance, instance, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSchematronValidateDoc",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlSchematronValidateDoc()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_instance);
-                    }
-                }
-            }
-        }
-    }
 }

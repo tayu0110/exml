@@ -3184,7 +3184,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
             return;
         }
-        match xml_schematron_validate_doc(ctxt, doc).cmp(&0) {
+        match xml_schematron_validate_doc(ctxt, XmlDocPtr::from_raw(doc).unwrap().unwrap()).cmp(&0)
+        {
             std::cmp::Ordering::Equal => {
                 if !CMD_ARGS.quiet {
                     eprintln!("{} validates", filename.unwrap());
