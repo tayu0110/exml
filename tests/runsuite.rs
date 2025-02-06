@@ -538,7 +538,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                     Some(test_error_handler),
                     Some(GenericErrorContext::new(ctxt)),
                 );
-                ret = xml_relaxng_validate_doc(ctxt, doc);
+                ret = xml_relaxng_validate_doc(ctxt, XmlDocPtr::from_raw(doc).unwrap().unwrap());
                 xml_relaxng_free_valid_ctxt(ctxt);
                 match ret.cmp(&0) {
                     std::cmp::Ordering::Greater => {
@@ -609,7 +609,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                     Some(test_error_handler),
                     Some(GenericErrorContext::new(ctxt)) as _,
                 );
-                ret = xml_relaxng_validate_doc(ctxt, doc);
+                ret = xml_relaxng_validate_doc(ctxt, XmlDocPtr::from_raw(doc).unwrap().unwrap());
                 xml_relaxng_free_valid_ctxt(ctxt);
                 match ret.cmp(&0) {
                     std::cmp::Ordering::Equal => {

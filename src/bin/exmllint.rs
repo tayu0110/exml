@@ -3225,7 +3225,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             Some(generic_error_default),
             None,
         );
-        match xml_relaxng_validate_doc(ctxt, doc).cmp(&0) {
+        match xml_relaxng_validate_doc(ctxt, XmlDocPtr::from_raw(doc).unwrap().unwrap()).cmp(&0) {
             std::cmp::Ordering::Equal => {
                 if !CMD_ARGS.quiet {
                     eprintln!("{} validates", filename.unwrap());

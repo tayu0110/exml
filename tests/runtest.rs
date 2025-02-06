@@ -3584,7 +3584,7 @@ unsafe fn rng_one_test(
         Some(test_error_handler),
         Some(GenericErrorContext::new(ctxt)),
     );
-    ret = xml_relaxng_validate_doc(ctxt, doc);
+    ret = xml_relaxng_validate_doc(ctxt, XmlDocPtr::from_raw(doc).unwrap().unwrap());
     match ret.cmp(&0) {
         std::cmp::Ordering::Equal => {
             test_error_handler(None, format!("{filename} validates\n").as_str());

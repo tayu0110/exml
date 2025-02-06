@@ -20,7 +20,7 @@ use crate::{
         },
     },
     relaxng::{VALID_ERR, VALID_ERR2},
-    tree::{NodeCommon, XmlAttrPtr, XmlDoc, XmlElementType, XmlNode},
+    tree::{NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode},
 };
 
 use super::{xml_rng_verr_memory, XmlRelaxNGDefinePtr};
@@ -80,12 +80,12 @@ pub struct XmlRelaxNGValidCtxt {
     pub(crate) serror: Option<StructuredError>,
     pub(crate) nb_errors: i32, // number of errors in validation
 
-    pub(crate) schema: XmlRelaxNGPtr, // The schema in use
-    pub(crate) doc: *mut XmlDoc,      // the document being validated
-    pub(crate) flags: i32,            // validation flags
-    pub(crate) depth: i32,            // validation depth
-    pub(crate) idref: i32,            // requires idref checking
-    pub(crate) err_no: i32,           // the first error found
+    pub(crate) schema: XmlRelaxNGPtr,  // The schema in use
+    pub(crate) doc: Option<XmlDocPtr>, // the document being validated
+    pub(crate) flags: i32,             // validation flags
+    pub(crate) depth: i32,             // validation depth
+    pub(crate) idref: i32,             // requires idref checking
+    pub(crate) err_no: i32,            // the first error found
 
     // Errors accumulated in branches may have to be stacked to be
     // provided back when it's sure they affect validation.
@@ -169,7 +169,7 @@ impl XmlRelaxNGValidCtxt {
     /// returns 1 if no validation problem was found or 0 if validating the
     /// element requires a full node, and -1 in case of error.
     #[doc(alias = "xmlRelaxNGValidatePushElement")]
-    pub unsafe fn push_element(&mut self, _doc: *mut XmlDoc, elem: *mut XmlNode) -> i32 {
+    pub unsafe fn push_element(&mut self, _doc: Option<XmlDocPtr>, elem: *mut XmlNode) -> i32 {
         let mut ret: i32;
 
         if elem.is_null() {
@@ -230,7 +230,7 @@ impl XmlRelaxNGValidCtxt {
     ///
     /// returns 1 if no validation problem was found or 0 otherwise
     #[doc(alias = "xmlRelaxNGValidatePopElement")]
-    pub unsafe fn pop_element(&mut self, _doc: *mut XmlDoc, elem: *mut XmlNode) -> i32 {
+    pub unsafe fn pop_element(&mut self, _doc: Option<XmlDocPtr>, elem: *mut XmlNode) -> i32 {
         let mut ret: i32;
 
         if self.elem.is_null() || elem.is_null() {
@@ -270,7 +270,7 @@ impl Default for XmlRelaxNGValidCtxt {
             serror: None,
             nb_errors: 0,
             schema: null_mut(),
-            doc: null_mut(),
+            doc: None,
             flags: 0,
             depth: 0,
             idref: 0,
@@ -459,11 +459,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     let mut root: *mut XmlNode = null_mut();
 
     if node.is_null() {
-        root = if (*ctxt).doc.is_null() {
-            null_mut()
-        } else {
-            (*(*ctxt).doc).get_root_element()
-        };
+        root = (*ctxt).doc.map_or(null_mut(), |doc| doc.get_root_element());
         if root.is_null() {
             return null_mut();
         }
@@ -501,7 +497,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     (*ret).value = null_mut();
     (*ret).endvalue = null_mut();
     if node.is_null() {
-        (*ret).node = (*ctxt).doc as _;
+        (*ret).node = (*ctxt).doc.map_or(null_mut(), |doc| doc.as_ptr()) as _;
         (*ret).seq = root;
     } else {
         (*ret).node = node;

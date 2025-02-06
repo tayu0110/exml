@@ -2590,8 +2590,11 @@ unsafe fn xml_shell_rng_validate(
     }
     let vctxt = xml_relaxng_new_valid_ctxt(relaxngschemas);
     xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), None);
-    let ret: i32 =
-        xml_relaxng_validate_doc(vctxt, (*sctxt).doc.map_or(null_mut(), |doc| doc.as_ptr()));
+    let ret = if let Some(doc) = (*sctxt).doc {
+        xml_relaxng_validate_doc(vctxt, doc)
+    } else {
+        -1
+    };
 
     match ret.cmp(&0) {
         std::cmp::Ordering::Equal => {

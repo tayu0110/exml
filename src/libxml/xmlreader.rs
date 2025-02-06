@@ -1268,7 +1268,8 @@ impl XmlTextReader {
             if !self.rng_full_node.is_null() {
                 return;
             }
-            ret = (*self.rng_valid_ctxt).push_element((*self.ctxt).my_doc, node);
+            ret = (*self.rng_valid_ctxt)
+                .push_element(XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap(), node);
             if ret == 0 {
                 // this element requires a full tree
                 node = self.expand();
@@ -1277,7 +1278,7 @@ impl XmlTextReader {
                 } else {
                     ret = xml_relaxng_validate_full_element(
                         self.rng_valid_ctxt,
-                        (*self.ctxt).my_doc,
+                        XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap(),
                         node,
                     );
                     self.rng_full_node = node;
@@ -1332,7 +1333,8 @@ impl XmlTextReader {
                 }
                 return;
             }
-            let ret: i32 = (*self.rng_valid_ctxt).pop_element((*self.ctxt).my_doc, node);
+            let ret: i32 = (*self.rng_valid_ctxt)
+                .pop_element(XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap(), node);
             if ret != 1 {
                 self.rng_valid_errors += 1;
             }
