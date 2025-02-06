@@ -2904,17 +2904,34 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     if let Some(encoding) = CMD_ARGS.encode.as_deref() {
                         let o = CMD_ARGS.output.as_deref().unwrap_or("-");
                         if CMD_ARGS.format {
-                            html_save_file_format(o, doc, Some(encoding), 1);
+                            html_save_file_format(
+                                o,
+                                XmlDocPtr::from_raw(doc).unwrap().unwrap(),
+                                Some(encoding),
+                                1,
+                            );
                         } else {
-                            html_save_file_format(o, doc, Some(encoding), 0);
+                            html_save_file_format(
+                                o,
+                                XmlDocPtr::from_raw(doc).unwrap().unwrap(),
+                                Some(encoding),
+                                0,
+                            );
                         }
                     } else if CMD_ARGS.format {
                         let o = CMD_ARGS.output.as_deref().unwrap_or("-");
-                        html_save_file_format(o, doc, None, 1);
+                        html_save_file_format(
+                            o,
+                            XmlDocPtr::from_raw(doc).unwrap().unwrap(),
+                            None,
+                            1,
+                        );
                     } else if let Some(filename) = CMD_ARGS.output.as_deref() {
                         match File::options().write(true).truncate(true).open(filename) {
                             Ok(mut f) => {
-                                if html_doc_dump(&mut f, doc) < 0 {
+                                if html_doc_dump(&mut f, XmlDocPtr::from_raw(doc).unwrap().unwrap())
+                                    < 0
+                                {
                                     PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                                 }
                             }
@@ -2923,7 +2940,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                                 PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                             }
                         }
-                    } else if html_doc_dump(&mut stdout(), doc) < 0 {
+                    } else if html_doc_dump(
+                        &mut stdout(),
+                        XmlDocPtr::from_raw(doc).unwrap().unwrap(),
+                    ) < 0
+                    {
                         PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                     }
                     if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {

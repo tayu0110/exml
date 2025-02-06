@@ -466,7 +466,7 @@ impl XmlNode {
         {
             #[cfg(feature = "html")]
             {
-                html_node_dump_output(&mut outbuf, doc.as_ptr(), self, null_mut());
+                html_node_dump_output(&mut outbuf, Some(doc), self, null_mut());
             }
             #[cfg(not(feature = "html"))]
             {

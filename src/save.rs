@@ -359,10 +359,10 @@ impl<'a> XmlSaveCtxt<'a> {
             #[cfg(feature = "html")]
             {
                 if let Some(enc) = encoding.as_deref() {
-                    html_set_meta_encoding(cur.as_ptr(), Some(enc));
+                    html_set_meta_encoding(cur, Some(enc));
                 }
                 if encoding.is_none() {
-                    encoding = html_get_meta_encoding(cur.as_ptr());
+                    encoding = html_get_meta_encoding(cur);
                 }
                 if encoding.is_none() {
                     encoding = Some("HTML".to_owned());
@@ -379,14 +379,14 @@ impl<'a> XmlSaveCtxt<'a> {
                 if self.options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
                     html_doc_content_dump_format_output(
                         &mut self.buf.borrow_mut(),
-                        cur.as_ptr(),
+                        Some(cur),
                         encoding.as_deref(),
                         1,
                     );
                 } else {
                     html_doc_content_dump_format_output(
                         &mut self.buf.borrow_mut(),
-                        cur.as_ptr(),
+                        Some(cur),
                         encoding.as_deref(),
                         0,
                     );
@@ -1707,9 +1707,9 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: *mut XmlNo
     }
 
     if let (Some(encoding), Some(doc)) = (encoding.as_deref(), doc) {
-        html_set_meta_encoding(doc.as_ptr(), Some(encoding));
+        html_set_meta_encoding(doc, Some(encoding));
     } else if let Some(doc) = doc {
-        encoding = html_get_meta_encoding(doc.as_ptr());
+        encoding = html_get_meta_encoding(doc);
     }
     if encoding.is_none() {
         encoding = Some("HTML".to_owned());
@@ -1729,21 +1729,9 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: *mut XmlNo
     }
     let mut buf = ctxt.buf.borrow_mut();
     if ctxt.options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
-        html_node_dump_format_output(
-            &mut buf,
-            doc.map_or(null_mut(), |doc| doc.as_ptr()),
-            cur,
-            encoding.as_deref(),
-            1,
-        );
+        html_node_dump_format_output(&mut buf, doc, cur, encoding.as_deref(), 1);
     } else {
-        html_node_dump_format_output(
-            &mut buf,
-            doc.map_or(null_mut(), |doc| doc.as_ptr()),
-            cur,
-            encoding.as_deref(),
-            0,
-        );
+        html_node_dump_format_output(&mut buf, doc, cur, encoding.as_deref(), 0);
     }
     drop(buf);
     // Restore the state of the saving context at the end of the document

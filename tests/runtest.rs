@@ -1709,7 +1709,7 @@ unsafe fn push_parse_test(
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
         html_doc_dump_memory(
-            doc,
+            XmlDocPtr::from_raw(doc).unwrap().unwrap(),
             addr_of_mut!(base) as *mut *mut XmlChar,
             addr_of_mut!(size),
         );
@@ -2113,7 +2113,7 @@ unsafe fn push_boundary_test(
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
         html_doc_dump_memory(
-            doc,
+            XmlDocPtr::from_raw(doc).unwrap().unwrap(),
             addr_of_mut!(base) as *mut *mut XmlChar,
             addr_of_mut!(size),
         );
@@ -2287,7 +2287,7 @@ unsafe fn err_parse_test(
             #[cfg(feature = "html")]
             if options & XML_PARSE_HTML != 0 {
                 html_doc_dump_memory(
-                    doc,
+                    XmlDocPtr::from_raw(doc).unwrap().unwrap(),
                     addr_of_mut!(base) as *mut *mut XmlChar,
                     addr_of_mut!(size),
                 );

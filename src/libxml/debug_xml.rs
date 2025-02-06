@@ -2214,9 +2214,12 @@ pub unsafe fn xml_shell_cat(
     {
         #[cfg(feature = "html")]
         if (*node).element_type() == XmlElementType::XmlHTMLDocumentNode {
-            html_doc_dump(&mut (*ctxt).output, node as HtmlDocPtr);
+            html_doc_dump(
+                &mut (*ctxt).output,
+                XmlDocPtr::from_raw(node as HtmlDocPtr).unwrap().unwrap(),
+            );
         } else {
-            html_node_dump_file(&mut (*ctxt).output, doc.as_ptr(), node);
+            html_node_dump_file(&mut (*ctxt).output, Some(doc), node);
         }
         #[cfg(not(feature = "html"))]
         if (*node).element_type() == XmlElementType::XmlDocumentNode {
@@ -2277,11 +2280,7 @@ pub unsafe fn xml_shell_write(
         }
         XmlElementType::XmlHTMLDocumentNode => {
             #[cfg(feature = "html")]
-            if html_save_file(
-                cfilename.as_ptr(),
-                (*ctxt).doc.map_or(null_mut(), |doc| doc.as_ptr()),
-            ) < 0
-            {
+            if html_save_file(cfilename.as_ptr(), (*ctxt).doc.unwrap()) < 0 {
                 generic_error!("Failed to write to {filename}\n");
                 return -1;
             }
@@ -2351,7 +2350,7 @@ pub unsafe fn xml_shell_save(
         }
         XmlElementType::XmlHTMLDocumentNode => {
             #[cfg(feature = "html")]
-            if html_save_file(filename as *mut c_char, doc.as_ptr()) < 0 {
+            if html_save_file(filename as *mut c_char, doc) < 0 {
                 generic_error!(
                     "Failed to save to {}\n",
                     CStr::from_ptr(filename as *const i8).to_string_lossy()

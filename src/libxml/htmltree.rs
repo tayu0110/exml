@@ -127,15 +127,15 @@ pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlCh
 ///
 /// Returns the current encoding as flagged in the HTML source
 #[doc(alias = "htmlGetMetaEncoding")]
-pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
+pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
     let mut cur: HtmlNodePtr;
     let mut content: *const XmlChar;
     let mut encoding: *const XmlChar;
 
-    if doc.is_null() {
-        return None;
-    }
-    cur = (*doc).children.map_or(null_mut(), |c| c.as_ptr());
+    // if doc.is_null() {
+    //     return None;
+    // }
+    cur = doc.children.map_or(null_mut(), |c| c.as_ptr());
 
     // Search the html
     'goto_found_meta: {
@@ -259,14 +259,14 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
 ///
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "htmlSetMetaEncoding")]
-pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) -> i32 {
+pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> i32 {
     let mut cur: HtmlNodePtr;
     let mut meta: HtmlNodePtr = null_mut();
     let mut head: HtmlNodePtr = null_mut();
 
-    if doc.is_null() {
-        return -1;
-    }
+    // if doc.is_null() {
+    //     return -1;
+    // }
 
     // html isn't a real encoding it's just libxml2 way to get entities
     if encoding.as_ref().map(|e| e.to_ascii_lowercase()).as_deref() == Some("html") {
@@ -279,7 +279,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
         String::new()
     };
 
-    cur = (*doc).children.map_or(null_mut(), |c| c.as_ptr());
+    cur = doc.children.map_or(null_mut(), |c| c.as_ptr());
 
     let mut found_head = false;
     let mut found_meta = false;
@@ -340,8 +340,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
         if meta.is_null() {
             if encoding.is_some() && !head.is_null() {
                 // Create a new Meta element with the right attributes
-                meta =
-                    xml_new_doc_node(XmlDocPtr::from_raw(doc).unwrap(), None, "meta", null_mut());
+                meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
                 if let Some(mut children) = (*head).children() {
                     children.add_prev_sibling(meta);
                 } else {
@@ -438,7 +437,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
 /// It's up to the caller to free the memory.
 #[doc(alias = "htmlDocDumpMemory")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_doc_dump_memory(cur: *mut XmlDoc, mem: *mut *mut XmlChar, size: *mut i32) {
+pub unsafe fn html_doc_dump_memory(cur: XmlDocPtr, mem: *mut *mut XmlChar, size: *mut i32) {
     html_doc_dump_memory_format(cur, mem, size, 1);
 }
 
@@ -467,7 +466,7 @@ unsafe fn html_save_err(code: XmlParserErrors, node: *mut XmlNode, extra: Option
 #[doc(alias = "htmlDocDumpMemoryFormat")]
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_doc_dump_memory_format(
-    cur: *mut XmlDoc,
+    cur: XmlDocPtr,
     mem: *mut *mut XmlChar,
     size: *mut i32,
     format: i32,
@@ -484,11 +483,11 @@ pub unsafe fn html_doc_dump_memory_format(
     if mem.is_null() || size.is_null() {
         return;
     }
-    if cur.is_null() {
-        *mem = null_mut();
-        *size = 0;
-        return;
-    }
+    // if cur.is_null() {
+    //     *mem = null_mut();
+    //     *size = 0;
+    //     return;
+    // }
 
     let handler = if let Some(enc) = html_get_meta_encoding(cur) {
         let e = enc.parse::<XmlCharEncoding>();
@@ -519,7 +518,7 @@ pub unsafe fn html_doc_dump_memory_format(
         return;
     };
 
-    html_doc_content_dump_format_output(&mut buf, cur, None, format);
+    html_doc_content_dump_format_output(&mut buf, Some(cur), None, format);
 
     buf.flush();
     if let Some(conv) = buf.conv {
@@ -553,7 +552,7 @@ pub unsafe fn html_doc_dump_memory_format(
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlDocDump")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: *mut XmlDoc) -> i32 {
+pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i32 {
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         libxml::parser::xml_init_parser,
@@ -561,9 +560,9 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: *mut XmlDoc) -> 
 
     xml_init_parser();
 
-    if cur.is_null() {
-        return -1;
-    }
+    // if cur.is_null() {
+    //     return -1;
+    // }
 
     let handler = if let Some(enc) = html_get_meta_encoding(cur) {
         let e = enc.parse::<XmlCharEncoding>();
@@ -589,7 +588,7 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: *mut XmlDoc) -> 
     let Some(mut buf) = XmlOutputBuffer::from_writer(f, handler) else {
         return -1;
     };
-    html_doc_content_dump_output(&mut buf, cur, null_mut());
+    html_doc_content_dump_output(&mut buf, Some(cur), null_mut());
 
     if buf.error.is_ok() {
         buf.flush();
@@ -604,7 +603,7 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: *mut XmlDoc) -> 
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlSaveFile")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_save_file(filename: *const c_char, cur: *mut XmlDoc) -> i32 {
+pub unsafe fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
     use std::{cell::RefCell, rc::Rc};
 
     use crate::{
@@ -612,7 +611,10 @@ pub unsafe fn html_save_file(filename: *const c_char, cur: *mut XmlDoc) -> i32 {
         libxml::parser::xml_init_parser,
     };
 
-    if cur.is_null() || filename.is_null() {
+    // if cur.is_null() {
+    //     return -1;
+    // }
+    if filename.is_null() {
         return -1;
     }
 
@@ -644,12 +646,12 @@ pub unsafe fn html_save_file(filename: *const c_char, cur: *mut XmlDoc) -> i32 {
     let Some(mut buf) = XmlOutputBuffer::from_uri(
         filename.as_ref(),
         handler.map(|e| Rc::new(RefCell::new(e))),
-        (*cur).compression,
+        cur.compression,
     ) else {
         return 0;
     };
 
-    html_doc_content_dump_output(&mut buf, cur, null_mut());
+    html_doc_content_dump_output(&mut buf, Some(cur), null_mut());
 
     if buf.error.is_ok() {
         buf.flush();
@@ -675,7 +677,7 @@ unsafe fn html_save_err_memory(extra: &str) {
 #[cfg(feature = "libxml_output")]
 unsafe fn html_buf_node_dump_format<'a>(
     buf: &mut (impl Write + 'a),
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     cur: *mut XmlNode,
     format: i32,
 ) -> usize {
@@ -700,7 +702,7 @@ unsafe fn html_buf_node_dump_format<'a>(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump<'a>(
     buf: &mut (impl Write + 'a),
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     cur: *mut XmlNode,
 ) -> i32 {
     use crate::libxml::parser::xml_init_parser;
@@ -719,7 +721,7 @@ pub unsafe fn html_node_dump<'a>(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump_file<'a>(
     out: &mut (impl Write + 'a),
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     cur: *mut XmlNode,
 ) {
     html_node_dump_file_format(out, doc, cur, null_mut(), 1);
@@ -734,7 +736,7 @@ pub unsafe fn html_node_dump_file<'a>(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump_file_format<'a>(
     out: &mut (impl Write + 'a),
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     cur: *mut XmlNode,
     encoding: *const c_char,
     format: i32,
@@ -790,7 +792,7 @@ pub unsafe fn html_node_dump_file_format<'a>(
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlSaveFileEnc")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_save_file_enc(filename: &str, cur: *mut XmlDoc, encoding: Option<&str>) -> i32 {
+pub unsafe fn html_save_file_enc(filename: &str, cur: XmlDocPtr, encoding: Option<&str>) -> i32 {
     html_save_file_format(filename, cur, encoding, 1)
 }
 
@@ -801,7 +803,7 @@ pub unsafe fn html_save_file_enc(filename: &str, cur: *mut XmlDoc, encoding: Opt
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_save_file_format(
     filename: &str,
-    cur: *mut XmlDoc,
+    cur: XmlDocPtr,
     encoding: Option<&str>,
     format: i32,
 ) -> i32 {
@@ -812,9 +814,9 @@ pub unsafe fn html_save_file_format(
         libxml::parser::xml_init_parser,
     };
 
-    if cur.is_null() {
-        return -1;
-    }
+    // if cur.is_null() {
+    //     return -1;
+    // }
 
     xml_init_parser();
 
@@ -851,7 +853,7 @@ pub unsafe fn html_save_file_format(
     else {
         return 0;
     };
-    html_doc_content_dump_format_output(&mut buf, cur, encoding, format);
+    html_doc_content_dump_format_output(&mut buf, Some(cur), encoding, format);
 
     if buf.error.is_ok() {
         buf.flush();
@@ -868,13 +870,13 @@ pub unsafe fn html_save_file_format(
 #[cfg(feature = "libxml_output")]
 unsafe fn html_dtd_dump_output(
     buf: &mut XmlOutputBuffer,
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     _encoding: *const c_char,
 ) {
     use std::ffi::CStr;
 
-    let Some(cur) = (*doc).int_subset else {
-        html_save_err(XmlParserErrors::XmlSaveNoDoctype, doc as _, None);
+    let Some(cur) = doc.int_subset else {
+        html_save_err(XmlParserErrors::XmlSaveNoDoctype, doc.as_ptr() as _, None);
         return;
     };
 
@@ -910,7 +912,7 @@ unsafe fn html_dtd_dump_output(
 /// Dump an HTML attribute
 #[doc(alias = "htmlAttrDumpOutput")]
 #[cfg(feature = "libxml_output")]
-unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur: &XmlAttr) {
+unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr>, cur: &XmlAttr) {
     use std::ffi::CStr;
 
     use crate::{libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
@@ -931,7 +933,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur
         .children
         .filter(|_| html_is_boolean_attr(cur.name as _) == 0)
     {
-        if let Some(value) = children.get_string(XmlDocPtr::from_raw(doc).unwrap(), 0) {
+        if let Some(value) = children.get_string(doc, 0) {
             buf.write_str("=");
             if cur.ns.is_none()
                 && cur
@@ -974,7 +976,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: *mut XmlDoc, cur
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump_format_output(
     buf: &mut XmlOutputBuffer,
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     mut cur: *mut XmlNode,
     _encoding: Option<&str>,
     format: i32,
@@ -1012,7 +1014,11 @@ pub unsafe fn html_node_dump_format_output(
                     .int_subset
                     .is_some()
                 {
-                    html_dtd_dump_output(buf, cur as _, null_mut());
+                    html_dtd_dump_output(
+                        buf,
+                        XmlDocPtr::from_raw(cur as _).unwrap().unwrap(),
+                        null_mut(),
+                    );
                 }
                 if let Some(children) = (*cur).children() {
                     // Always validate (*cur).parent when descending.
@@ -1123,10 +1129,7 @@ pub unsafe fn html_node_dump_format_output(
                         || (xml_strcasecmp((*parent).name, c"script".as_ptr() as _) != 0
                             && xml_strcasecmp((*parent).name, c"style".as_ptr() as _) != 0))
                 {
-                    let buffer: *mut XmlChar = xml_encode_entities_reentrant(
-                        XmlDocPtr::from_raw(doc).unwrap(),
-                        (*cur).content,
-                    );
+                    let buffer: *mut XmlChar = xml_encode_entities_reentrant(doc, (*cur).content);
                     if !buffer.is_null() {
                         buf.write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
                         xml_free(buffer as _);
@@ -1258,10 +1261,16 @@ pub unsafe fn html_node_dump_format_output(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_doc_content_dump_output(
     buf: &mut XmlOutputBuffer,
-    cur: *mut XmlDoc,
+    cur: Option<XmlDocPtr>,
     _encoding: *const c_char,
 ) {
-    html_node_dump_format_output(buf, cur, cur as _, None, 1);
+    html_node_dump_format_output(
+        buf,
+        cur,
+        cur.map_or(null_mut(), |cur| cur.as_ptr()) as _,
+        None,
+        1,
+    );
 }
 
 /// Dump an HTML document.
@@ -1269,18 +1278,23 @@ pub unsafe fn html_doc_content_dump_output(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_doc_content_dump_format_output(
     buf: &mut XmlOutputBuffer,
-    cur: *mut XmlDoc,
+    cur: Option<XmlDocPtr>,
     _encoding: Option<&str>,
     format: i32,
 ) {
-    let mut typ: i32 = 0;
-    if !cur.is_null() {
-        typ = (*cur).typ as i32;
-        (*cur).typ = XmlElementType::XmlHTMLDocumentNode;
-    }
-    html_node_dump_format_output(buf, cur, cur as _, None, format);
-    if !cur.is_null() {
-        (*cur).typ = typ.try_into().unwrap();
+    if let Some(mut cur) = cur {
+        let typ = cur.typ;
+        cur.typ = XmlElementType::XmlHTMLDocumentNode;
+        html_node_dump_format_output(buf, Some(cur), cur.as_ptr() as _, None, format);
+        cur.typ = typ;
+    } else {
+        html_node_dump_format_output(
+            buf,
+            cur,
+            cur.map_or(null_mut(), |cur| cur.as_ptr()) as _,
+            None,
+            format,
+        );
     }
 }
 
@@ -1290,7 +1304,7 @@ pub unsafe fn html_doc_content_dump_format_output(
 #[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump_output(
     buf: &mut XmlOutputBuffer,
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     cur: *mut XmlNode,
     _encoding: *const c_char,
 ) {
@@ -1338,117 +1352,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_html_doc_dump() {
-        #[cfg(all(feature = "html", feature = "libxml_output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_f in 0..GEN_NB_FILE_PTR {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let mut f = gen_file_ptr(n_f, 0).unwrap();
-                    let cur = gen_xml_doc_ptr(n_cur, 1);
-
-                    let ret_val = html_doc_dump(&mut f, cur);
-                    desret_int(ret_val);
-                    des_xml_doc_ptr(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlDocDump",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_f);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlDocDump()");
-        }
-    }
-
-    #[test]
-    fn test_html_doc_dump_memory() {
-        #[cfg(all(feature = "html", feature = "libxml_output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                for n_mem in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                    for n_size in 0..GEN_NB_INT_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let cur = gen_xml_doc_ptr(n_cur, 0);
-                        let mem = gen_xml_char_ptr_ptr(n_mem, 1);
-                        let size = gen_int_ptr(n_size, 2);
-
-                        html_doc_dump_memory(cur, mem, size);
-                        des_xml_doc_ptr(n_cur, cur, 0);
-                        des_xml_char_ptr_ptr(n_mem, mem, 1);
-                        des_int_ptr(n_size, size, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in htmlDocDumpMemory",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_cur);
-                            eprint!(" {}", n_mem);
-                            eprintln!(" {}", n_size);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlDocDumpMemory()");
-        }
-    }
-
-    #[test]
-    fn test_html_doc_dump_memory_format() {
-        #[cfg(all(feature = "html", feature = "libxml_output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                for n_mem in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                    for n_size in 0..GEN_NB_INT_PTR {
-                        for n_format in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let cur = gen_xml_doc_ptr(n_cur, 0);
-                            let mem = gen_xml_char_ptr_ptr(n_mem, 1);
-                            let size = gen_int_ptr(n_size, 2);
-                            let format = gen_int(n_format, 3);
-
-                            html_doc_dump_memory_format(cur, mem, size, format);
-                            des_xml_doc_ptr(n_cur, cur, 0);
-                            des_xml_char_ptr_ptr(n_mem, mem, 1);
-                            des_int_ptr(n_size, size, 2);
-                            des_int(n_format, format, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in htmlDocDumpMemoryFormat",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                eprint!(" {}", n_cur);
-                                eprint!(" {}", n_mem);
-                                eprint!(" {}", n_size);
-                                eprintln!(" {}", n_format);
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlDocDumpMemoryFormat()"
-            );
-        }
-    }
 
     #[test]
     fn test_html_is_boolean_attr() {
@@ -1538,124 +1441,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in htmlNewDocNoDtD()");
-        }
-    }
-
-    #[test]
-    fn test_html_node_dump_file() {
-        #[cfg(all(feature = "html", feature = "libxml_output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_out in 0..GEN_NB_FILE_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let mut out = gen_file_ptr(n_out, 0).unwrap();
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let cur = gen_xml_node_ptr(n_cur, 2);
-
-                        html_node_dump_file(&mut out, doc, cur);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_node_ptr(n_cur, cur, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in htmlNodeDumpFile",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_out);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_cur);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlNodeDumpFile()");
-        }
-    }
-
-    #[test]
-    fn test_html_node_dump_file_format() {
-        #[cfg(all(feature = "html", feature = "libxml_output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_out in 0..GEN_NB_FILE_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                        for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                            for n_format in 0..GEN_NB_INT {
-                                let mem_base = xml_mem_blocks();
-                                let mut out = gen_file_ptr(n_out, 0).unwrap();
-                                let doc = gen_xml_doc_ptr(n_doc, 1);
-                                let cur = gen_xml_node_ptr(n_cur, 2);
-                                let encoding = gen_const_char_ptr(n_encoding, 3);
-                                let format = gen_int(n_format, 4);
-
-                                let ret_val = html_node_dump_file_format(
-                                    &mut out, doc, cur, encoding, format,
-                                );
-                                desret_int(ret_val);
-                                des_xml_doc_ptr(n_doc, doc, 1);
-                                des_xml_node_ptr(n_cur, cur, 2);
-                                des_const_char_ptr(n_encoding, encoding, 3);
-                                des_int(n_format, format, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in htmlNodeDumpFileFormat",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    eprint!(" {}", n_out);
-                                    eprint!(" {}", n_doc);
-                                    eprint!(" {}", n_cur);
-                                    eprint!(" {}", n_encoding);
-                                    eprintln!(" {}", n_format);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlNodeDumpFileFormat()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_html_save_file() {
-        #[cfg(all(feature = "html", feature = "libxml_output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEOUTPUT {
-                for n_cur in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let filename = gen_fileoutput(n_filename, 0);
-                    let cur = gen_xml_doc_ptr(n_cur, 1);
-
-                    let ret_val = html_save_file(filename, cur);
-                    desret_int(ret_val);
-                    des_fileoutput(n_filename, filename, 0);
-                    des_xml_doc_ptr(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlSaveFile",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_filename);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlSaveFile()");
         }
     }
 }
