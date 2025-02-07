@@ -55,7 +55,7 @@ use crate::{
     tree::{
         xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
-        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc, XmlDocPtr,
+        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDocPtr,
         XmlElementType, XmlEntityPtr, XmlEntityType, XmlNode, XML_XML_NAMESPACE,
     },
     uri::{build_relative_uri, build_uri, escape_url, XmlURI},
@@ -107,9 +107,9 @@ pub struct XmlXincludeRef {
 pub type XmlXincludeDocPtr = *mut XmlXincludeDoc;
 #[repr(C)]
 pub struct XmlXincludeDoc {
-    doc: *mut XmlDoc,  /* the parsed document */
-    url: *mut XmlChar, /* the URL */
-    expanding: i32,    /* flag to detect inclusion loops */
+    doc: Option<XmlDocPtr>, /* the parsed document */
+    url: *mut XmlChar,      /* the URL */
+    expanding: i32,         /* flag to detect inclusion loops */
 }
 
 pub type XmlXincludeTxtPtr = *mut XmlXincludeTxt;
@@ -123,7 +123,7 @@ pub type XmlXincludeCtxtPtr = *mut XmlXincludeCtxt;
 /// An XInclude context
 #[repr(C)]
 pub struct XmlXincludeCtxt {
-    doc: *mut XmlDoc,                /* the source document */
+    doc: Option<XmlDocPtr>,          /* the source document */
     inc_nr: i32,                     /* number of includes */
     inc_max: i32,                    /* size of includes tab */
     inc_tab: *mut XmlXincludeRefPtr, /* array of included references */
@@ -487,15 +487,14 @@ unsafe fn xml_xinclude_add_node(ctxt: XmlXincludeCtxtPtr, cur: *mut XmlNode) -> 
 
     // compute the URI
     let mut base = None;
-    let mut uri = if let Some(b) = (*cur).get_base((*ctxt).doc) {
-        base = Some(b);
-        build_uri(&href, base.as_deref().unwrap())
-    } else {
-        (*(*ctxt).doc)
-            .url
-            .as_deref()
-            .and_then(|base| build_uri(&href, base))
-    };
+    let mut uri = (*ctxt).doc.and_then(|doc| {
+        if let Some(b) = (*cur).get_base(doc.as_ptr()) {
+            base = Some(b);
+            build_uri(&href, base.as_deref().unwrap())
+        } else {
+            doc.url.as_deref().and_then(|base| build_uri(&href, base))
+        }
+    });
     if uri.is_none() {
         if let Some(base) = base.as_deref() {
             // Some escaping may be needed
@@ -546,7 +545,7 @@ unsafe fn xml_xinclude_add_node(ctxt: XmlXincludeCtxtPtr, cur: *mut XmlNode) -> 
     }
     let url = parsed_uri.save();
 
-    if (*(*ctxt).doc).url.as_deref() == Some(url.as_str()) {
+    if (*ctxt).doc.as_deref().and_then(|doc| doc.url.as_deref()) == Some(url.as_str()) {
         local = 1;
     }
 
@@ -580,13 +579,13 @@ unsafe fn xml_xinclude_add_node(ctxt: XmlXincludeCtxtPtr, cur: *mut XmlNode) -> 
 
 /// Parse a document for XInclude
 #[doc(alias = "xmlXIncludeParseFile")]
-unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> *mut XmlDoc {
+unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> Option<XmlDocPtr> {
     xml_init_parser();
 
     let pctxt = xml_new_parser_ctxt();
     if pctxt.is_null() {
         xml_xinclude_err_memory(ctxt, null_mut(), Some("cannot allocate parser context"));
-        return null_mut();
+        return None;
     }
 
     // pass in the application data to the parser context.
@@ -615,7 +614,7 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> *m
     let input_stream: XmlParserInputPtr = xml_load_external_entity(Some(url), None, pctxt);
     if input_stream.is_null() {
         xml_free_parser_ctxt(pctxt);
-        return null_mut();
+        return None;
     }
 
     (*pctxt).input_push(input_stream);
@@ -641,12 +640,12 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> *m
     };
     xml_free_parser_ctxt(pctxt);
 
-    ret
+    XmlDocPtr::from_raw(ret).unwrap()
 }
 
 pub type XmlXIncludeMergeDataPtr = *mut XmlXIncludeMergeData;
 pub struct XmlXIncludeMergeData {
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     ctxt: XmlXincludeCtxtPtr,
 }
 
@@ -662,7 +661,7 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
     if ctxt.is_null() {
         return;
     }
-    let Some(doc) = XmlDocPtr::from_raw((*data).doc).unwrap() else {
+    let Some(doc) = (*data).doc else {
         return;
     };
     match ent.etype {
@@ -809,7 +808,7 @@ unsafe fn xml_xinclude_merge_entities(
         if let Some(entities) = source.entities {
             let mut data: XmlXIncludeMergeData = unsafe { zeroed() };
             data.ctxt = ctxt;
-            data.doc = doc.as_ptr();
+            data.doc = Some(doc);
 
             entities.scan(|payload, _, _, _| {
                 xml_xinclude_merge_entity(*payload, &raw mut data as _);
@@ -821,7 +820,7 @@ unsafe fn xml_xinclude_merge_entities(
         if let Some(entities) = source.entities {
             let mut data: XmlXIncludeMergeData = unsafe { zeroed() };
             data.ctxt = ctxt;
-            data.doc = doc.as_ptr();
+            data.doc = Some(doc);
 
             // don't duplicate existing stuff when external subsets are the same
             if target.external_id != source.external_id && target.system_id != source.system_id {
@@ -837,12 +836,12 @@ unsafe fn xml_xinclude_merge_entities(
 /// The XInclude recursive nature is handled at this point.
 #[doc(alias = "xmlXIncludeRecurseDoc")]
 unsafe fn xml_xinclude_recurse_doc(ctxt: XmlXincludeCtxtPtr, doc: XmlDocPtr, _url: XmlURL) {
-    let old_doc: *mut XmlDoc = (*ctxt).doc;
+    let old_doc = (*ctxt).doc;
     let old_inc_max: i32 = (*ctxt).inc_max;
     let old_inc_nr: i32 = (*ctxt).inc_nr;
     let old_inc_tab: *mut XmlXincludeRefPtr = (*ctxt).inc_tab;
     let old_is_stream: i32 = (*ctxt).is_stream;
-    (*ctxt).doc = doc.as_ptr();
+    (*ctxt).doc = Some(doc);
     (*ctxt).inc_max = 0;
     (*ctxt).inc_nr = 0;
     (*ctxt).inc_tab = null_mut();
@@ -911,11 +910,7 @@ unsafe fn xml_xinclude_copy_node(
             }
             // TODO: Insert xmlElementType::XML_XINCLUDE_START and xmlElementType::XML_XINCLUDE_END nodes
             if !(*refe).inc.is_null() {
-                copy = xml_static_copy_node_list(
-                    (*refe).inc,
-                    XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
-                    insert_parent,
-                );
+                copy = xml_static_copy_node_list((*refe).inc, (*ctxt).doc, insert_parent);
                 if copy.is_null() {
                     // goto error;
                     xml_free_node_list(result);
@@ -923,12 +918,7 @@ unsafe fn xml_xinclude_copy_node(
                 }
             }
         } else {
-            copy = xml_static_copy_node(
-                cur,
-                XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
-                insert_parent,
-                2,
-            );
+            copy = xml_static_copy_node(cur, (*ctxt).doc, insert_parent, 2);
             if copy.is_null() {
                 // goto error;
                 xml_free_node_list(result);
@@ -1061,7 +1051,7 @@ unsafe fn xml_xinclude_copy_range(
     }
     end = (*range).user2 as _;
     if end.is_null() {
-        return xml_doc_copy_node(start, XmlDocPtr::from_raw((*ctxt).doc).unwrap(), 1);
+        return xml_doc_copy_node(start, (*ctxt).doc, 1);
     }
     if (*end).typ == XmlElementType::XmlNamespaceDecl {
         return null_mut();
@@ -1081,7 +1071,7 @@ unsafe fn xml_xinclude_copy_range(
         if level < 0 {
             while level < 0 {
                 // copy must include namespaces and properties
-                tmp2 = xml_doc_copy_node(list_parent, XmlDocPtr::from_raw((*ctxt).doc).unwrap(), 2);
+                tmp2 = xml_doc_copy_node(list_parent, (*ctxt).doc, 2);
                 (*tmp2).add_child(list);
                 list = tmp2;
                 list_parent = (*list_parent).parent().map_or(null_mut(), |n| n.as_ptr());
@@ -1102,11 +1092,7 @@ unsafe fn xml_xinclude_copy_range(
                 let mut len: i32;
 
                 if content.is_null() {
-                    tmp = xml_new_doc_text_len(
-                        XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
-                        null_mut(),
-                        0,
-                    );
+                    tmp = xml_new_doc_text_len((*ctxt).doc, null_mut(), 0);
                 } else {
                     len = index2;
                     if cur == start && index1 > 1 {
@@ -1115,11 +1101,7 @@ unsafe fn xml_xinclude_copy_range(
                     } else {
                         len = index2;
                     }
-                    tmp = xml_new_doc_text_len(
-                        XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
-                        content,
-                        len,
-                    );
+                    tmp = xml_new_doc_text_len((*ctxt).doc, content, len);
                 }
                 // single sub text node selection
                 if list.is_null() {
@@ -1137,7 +1119,7 @@ unsafe fn xml_xinclude_copy_range(
                 end_level = level; /* remember the level of the end node */
                 end_flag = 1;
                 // last node - need to take care of properties + namespaces
-                tmp = xml_doc_copy_node(cur, XmlDocPtr::from_raw((*ctxt).doc).unwrap(), 2);
+                tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
                 if list.is_null() {
                     list = tmp;
                     list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -1173,17 +1155,13 @@ unsafe fn xml_xinclude_copy_range(
                 let mut content: *const XmlChar = (*cur).content;
 
                 if content.is_null() {
-                    tmp = xml_new_doc_text_len(
-                        XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
-                        null_mut(),
-                        0,
-                    );
+                    tmp = xml_new_doc_text_len((*ctxt).doc, null_mut(), 0);
                 } else {
                     if index1 > 1 {
                         content = content.add(index1 as usize - 1);
                         index1 = 0;
                     }
-                    tmp = xml_new_doc_text(XmlDocPtr::from_raw((*ctxt).doc).unwrap(), content);
+                    tmp = xml_new_doc_text((*ctxt).doc, content);
                 }
                 last = tmp;
                 list = tmp;
@@ -1193,7 +1171,7 @@ unsafe fn xml_xinclude_copy_range(
 
                 // start of the range - need to take care of
                 // properties and namespaces
-                tmp = xml_doc_copy_node(cur, XmlDocPtr::from_raw((*ctxt).doc).unwrap(), 2);
+                tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
                 list = tmp;
                 last = tmp;
                 list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -1222,7 +1200,7 @@ unsafe fn xml_xinclude_copy_range(
                 _ => {
                     // Middle of the range - need to take care of
                     // properties and namespaces
-                    tmp = xml_doc_copy_node(cur, XmlDocPtr::from_raw((*ctxt).doc).unwrap(), 2);
+                    tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
                 }
             }
             if !tmp.is_null() {
@@ -1419,11 +1397,11 @@ unsafe fn xml_xinclude_load_doc(
         let doc = 'load: {
             if *url.add(0) == 0
                 || *url.add(0) == b'#'
-                || (!(*ctxt).doc.is_null()
-                    && (*(*ctxt).doc).url.as_deref()
-                        == CStr::from_ptr(url as *const i8).to_str().ok())
+                || (*ctxt).doc.map_or(false, |doc| {
+                    doc.url.as_deref() == CStr::from_ptr(url as *const i8).to_str().ok()
+                })
             {
-                break 'load XmlDocPtr::from_raw((*ctxt).doc).unwrap();
+                break 'load (*ctxt).doc;
             }
             // Prevent reloading the document twice.
             for i in 0..(*ctxt).url_nr {
@@ -1437,9 +1415,7 @@ unsafe fn xml_xinclude_load_doc(
                         );
                         break 'error;
                     }
-                    let Some(doc) =
-                        XmlDocPtr::from_raw((*(*ctxt).url_tab.add(i as usize)).doc).unwrap()
-                    else {
+                    let Some(doc) = (*(*ctxt).url_tab.add(i as usize)).doc else {
                         break 'error;
                     };
                     break 'load Some(doc);
@@ -1459,17 +1435,16 @@ unsafe fn xml_xinclude_load_doc(
                 }
             }
 
-            let doc = XmlDocPtr::from_raw(xml_xinclude_parse_file(
+            let doc = xml_xinclude_parse_file(
                 ctxt,
                 CStr::from_ptr(url as *const i8).to_string_lossy().as_ref(),
-            ))
-            .unwrap();
+            );
             #[cfg(feature = "xpointer")]
             {
                 (*ctxt).parse_flags = save_flags;
             }
 
-            /* Also cache NULL docs */
+            // Also cache NULL docs
             if (*ctxt).url_nr >= (*ctxt).url_max {
                 let new_size: usize = if (*ctxt).url_max != 0 {
                     (*ctxt).url_max as usize * 2
@@ -1492,7 +1467,7 @@ unsafe fn xml_xinclude_load_doc(
             cache_nr = (*ctxt).url_nr;
             (*ctxt).url_nr += 1;
             cache = (*ctxt).url_tab.add(cache_nr as usize);
-            (*cache).doc = doc.map_or(null_mut(), |doc| doc.as_ptr());
+            (*cache).doc = doc;
             (*cache).url = xml_strdup(url);
             (*cache).expanding = 0;
 
@@ -1510,28 +1485,22 @@ unsafe fn xml_xinclude_load_doc(
             }
 
             // Make sure we have all entities fixed up
-            xml_xinclude_merge_entities(
-                ctxt,
-                XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(),
-                doc,
-            );
+            xml_xinclude_merge_entities(ctxt, (*ctxt).doc.unwrap(), doc);
 
-            /*
-             * We don't need the DTD anymore, free up space
-            if ((*doc).intSubset != null_mut()) {
-                xmlUnlinkNode((xmlNodePtr) (*doc).intSubset);
-                xmlFreeNode((xmlNodePtr) (*doc).intSubset);
-                (*doc).intSubset = NULL;
-            }
-            if ((*doc).extSubset != null_mut()) {
-                xmlUnlinkNode((xmlNodePtr) (*doc).extSubset);
-                xmlFreeNode((xmlNodePtr) (*doc).extSubset);
-                (*doc).extSubset = NULL;
-            }
-             */
+            // We don't need the DTD anymore, free up space
+            // if ((*doc).intSubset != null_mut()) {
+            //     xmlUnlinkNode((xmlNodePtr) (*doc).intSubset);
+            //     xmlFreeNode((xmlNodePtr) (*doc).intSubset);
+            //     (*doc).intSubset = NULL;
+            // }
+            // if ((*doc).extSubset != null_mut()) {
+            //     xmlUnlinkNode((xmlNodePtr) (*doc).extSubset);
+            //     xmlFreeNode((xmlNodePtr) (*doc).extSubset);
+            //     (*doc).extSubset = NULL;
+            // }
             (*cache).expanding = 1;
             xml_xinclude_recurse_doc(ctxt, doc, url);
-            /* urlTab might be reallocated. */
+            // urlTab might be reallocated.
             cache = (*ctxt).url_tab.add(cache_nr as usize);
             (*cache).expanding = 0;
             Some(doc)
@@ -1541,11 +1510,7 @@ unsafe fn xml_xinclude_load_doc(
         if fragment.is_null() {
             // Add the top children list as the replacement copy.
             (*refe).inc = doc.map_or(null_mut(), |doc| {
-                xml_doc_copy_node(
-                    doc.get_root_element(),
-                    XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
-                    1,
-                )
+                xml_doc_copy_node(doc.get_root_element(), (*ctxt).doc, 1)
             });
         } else {
             #[cfg(feature = "xpointer")]
@@ -1553,9 +1518,7 @@ unsafe fn xml_xinclude_load_doc(
                 // Computes the XPointer expression and make a copy used
                 // as the replacement copy.
 
-                if (*ctxt).is_stream != 0
-                    && doc.map_or(null_mut(), |doc| doc.as_ptr()) == (*ctxt).doc
-                {
+                if (*ctxt).is_stream != 0 && doc == (*ctxt).doc {
                     xml_xinclude_err!(
                         ctxt,
                         (*refe).elem,
@@ -1906,10 +1869,7 @@ unsafe fn xml_xinclude_load_txt(
     // Prevent reloading the document twice.
     for i in 0..(*ctxt).txt_nr {
         if xml_str_equal(url, (*(*ctxt).txt_tab.add(i as usize)).url) {
-            node = xml_new_doc_text(
-                XmlDocPtr::from_raw((*ctxt).doc).unwrap(),
-                (*(*ctxt).txt_tab.add(i as usize)).text,
-            );
+            node = xml_new_doc_text((*ctxt).doc, (*(*ctxt).txt_tab.add(i as usize)).text);
             // goto loaded;
             (*refe).inc = node;
             node = null_mut();
@@ -1979,7 +1939,7 @@ unsafe fn xml_xinclude_load_txt(
         return ret;
     };
     buf.borrow_mut().encoder = get_encoding_handler(enc);
-    node = xml_new_doc_text(XmlDocPtr::from_raw((*ctxt).doc).unwrap(), null_mut());
+    node = xml_new_doc_text((*ctxt).doc, null_mut());
     if node.is_null() {
         xml_xinclude_err_memory(ctxt, (*refe).elem, None);
         // goto error;
@@ -2149,15 +2109,14 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeRefP
 
     // compute the URI
     let mut base = None;
-    let mut uri = if let Some(b) = (*cur).get_base((*ctxt).doc) {
-        base = Some(b);
-        build_uri(&href, base.as_deref().unwrap())
-    } else {
-        (*(*ctxt).doc)
-            .url
-            .as_deref()
-            .and_then(|base| build_uri(&href, base))
-    };
+    let mut uri = (*ctxt).doc.and_then(|doc| {
+        if let Some(b) = (*cur).get_base(doc.as_ptr()) {
+            base = Some(b);
+            build_uri(&href, base.as_deref().unwrap())
+        } else {
+            doc.url.as_deref().and_then(|base| build_uri(&href, base))
+        }
+    });
     if uri.is_none() {
         if let Some(base) = base.as_deref() {
             // Some escaping may be needed
@@ -2578,7 +2537,7 @@ pub unsafe fn xml_xinclude_new_context(doc: XmlDocPtr) -> XmlXincludeCtxtPtr {
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXincludeCtxt>());
-    (*ret).doc = doc.as_ptr();
+    (*ret).doc = Some(doc);
     (*ret).inc_nr = 0;
     (*ret).inc_max = 0;
     (*ret).inc_tab = null_mut();
@@ -2606,9 +2565,8 @@ pub unsafe fn xml_xinclude_free_context(ctxt: XmlXincludeCtxtPtr) {
     }
     if !(*ctxt).url_tab.is_null() {
         for i in 0..(*ctxt).url_nr {
-            let doc = (*(*ctxt).url_tab.add(i as usize)).doc;
-            if !doc.is_null() {
-                xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            if let Some(doc) = (*(*ctxt).url_tab.add(i as usize)).doc {
+                xml_free_doc(doc);
             }
             xml_free((*(*ctxt).url_tab.add(i as usize)).url as _);
         }
