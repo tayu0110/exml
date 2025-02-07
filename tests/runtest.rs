@@ -2569,12 +2569,16 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     if cfg!(feature = "xpointer") && xptr != 0 {
         #[cfg(feature = "xpointer")]
         {
-            ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), null_mut(), null_mut());
+            ctxt = xml_xptr_new_context(
+                XmlDocPtr::from_raw(XPATH_DOCUMENT.get()).unwrap(),
+                null_mut(),
+                null_mut(),
+            );
             res = xml_xptr_eval(str as _, ctxt);
         }
     } else {
         let xpath_document = XPATH_DOCUMENT.get();
-        ctxt = xml_xpath_new_context(xpath_document);
+        ctxt = xml_xpath_new_context(XmlDocPtr::from_raw(xpath_document).unwrap());
         (*ctxt).node = if xpath_document.is_null() {
             null_mut()
         } else {
@@ -4190,7 +4194,7 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
         return null_mut();
     };
 
-    let ctx: XmlXPathContextPtr = xml_xpath_new_context(parent_doc);
+    let ctx: XmlXPathContextPtr = xml_xpath_new_context(XmlDocPtr::from_raw(parent_doc).unwrap());
     if ctx.is_null() {
         eprintln!("Error: unable to create new context");
         xml_free_doc(doc);

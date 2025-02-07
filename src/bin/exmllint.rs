@@ -2455,7 +2455,7 @@ unsafe fn do_xpath_query(doc: *mut XmlDoc, query: *const c_char) {
         XmlXPathContextPtr,
     };
 
-    let ctxt: XmlXPathContextPtr = xml_xpath_new_context(doc);
+    let ctxt: XmlXPathContextPtr = xml_xpath_new_context(XmlDocPtr::from_raw(doc).unwrap());
     if ctxt.is_null() {
         eprintln!("Out of memory for XPath");
         PROGRESULT.store(ERR_MEM, Ordering::Relaxed);

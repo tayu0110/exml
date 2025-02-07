@@ -328,7 +328,7 @@ pub unsafe fn xml_schematron_new_parser_ctxt(url: *const c_char) -> XmlSchematro
     (*ret).dict = xml_dict_create();
     (*ret).url = xml_dict_lookup((*ret).dict, url as _, -1);
     (*ret).includes = null_mut();
-    (*ret).xctxt = xml_xpath_new_context(null_mut());
+    (*ret).xctxt = xml_xpath_new_context(None);
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
             null_mut(),
@@ -365,7 +365,7 @@ pub unsafe fn xml_schematron_new_mem_parser_ctxt(
     (*ret).buffer = buffer;
     (*ret).size = size;
     (*ret).dict = xml_dict_create();
-    (*ret).xctxt = xml_xpath_new_context(null_mut());
+    (*ret).xctxt = xml_xpath_new_context(None);
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
             null_mut(),
@@ -399,7 +399,7 @@ pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchematro
     (*ret).dict = xml_dict_create();
     // The application has responsibility for the document
     (*ret).preserve = 1;
-    (*ret).xctxt = xml_xpath_new_context(doc.as_ptr());
+    (*ret).xctxt = xml_xpath_new_context(Some(doc));
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
             null_mut(),
@@ -1380,7 +1380,7 @@ pub unsafe fn xml_schematron_new_valid_ctxt(
     std::ptr::write(&mut *ret, XmlSchematronValidCtxt::default());
     (*ret).typ = XML_STRON_CTXT_VALIDATOR;
     (*ret).schema = schema;
-    (*ret).xctxt = xml_xpath_new_context(null_mut());
+    (*ret).xctxt = xml_xpath_new_context(None);
     (*ret).flags = options;
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
@@ -1429,7 +1429,7 @@ unsafe fn xml_schematron_register_variables(
 ) -> i32 {
     let mut let_eval: XmlXPathObjectPtr;
 
-    (*ctxt).doc = instance.as_ptr();
+    (*ctxt).doc = Some(instance);
     (*ctxt).node = cur;
     while !letr.is_null() {
         let_eval = xml_xpath_compiled_eval((*letr).comp, ctxt);
@@ -1457,7 +1457,7 @@ unsafe fn xml_schematron_get_node(
         return null_mut();
     }
 
-    (*(*ctxt).xctxt).doc = (*cur).doc;
+    (*(*ctxt).xctxt).doc = XmlDocPtr::from_raw((*cur).doc).unwrap();
     (*(*ctxt).xctxt).node = cur;
     let ret: XmlXPathObjectPtr = xml_xpath_eval(xpath, (*ctxt).xctxt);
     if ret.is_null() {
@@ -1738,7 +1738,7 @@ unsafe fn xml_schematron_run_test(
     let mut failed: i32;
 
     failed = 0;
-    (*(*ctxt).xctxt).doc = instance.as_ptr();
+    (*(*ctxt).xctxt).doc = Some(instance);
     (*(*ctxt).xctxt).node = cur;
     let ret: XmlXPathObjectPtr = xml_xpath_compiled_eval((*test).comp, (*ctxt).xctxt);
     if ret.is_null() {

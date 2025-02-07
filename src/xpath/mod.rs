@@ -63,7 +63,7 @@ use crate::{
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, XmlChar},
     },
-    tree::{NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlNode, XmlNsPtr},
+    tree::{NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNsPtr},
 };
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
@@ -236,8 +236,8 @@ pub type XmlXPathContextPtr = *mut XmlXPathContext;
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlXPathContext {
-    pub doc: *mut XmlDoc,   /* The current document */
-    pub node: *mut XmlNode, /* The current node */
+    pub doc: Option<XmlDocPtr>, /* The current document */
+    pub node: *mut XmlNode,     /* The current node */
 
     pub(crate) nb_variables_unused: i32, /* unused (hash table) */
     pub(crate) max_variables_unused: i32, /* unused (hash table) */
@@ -308,7 +308,7 @@ pub struct XmlXPathContext {
 impl Default for XmlXPathContext {
     fn default() -> Self {
         Self {
-            doc: null_mut(),
+            doc: None,
             node: null_mut(),
             nb_variables_unused: 0,
             max_variables_unused: 0,
@@ -849,7 +849,7 @@ pub unsafe fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> 
 /// Returns the xmlXPathContext just allocated. The caller will need to free it.
 #[doc(alias = "xmlXPathNewContext")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_new_context(doc: *mut XmlDoc) -> XmlXPathContextPtr {
+pub unsafe fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPtr {
     let ret: XmlXPathContextPtr = xml_malloc(size_of::<XmlXPathContext>()) as XmlXPathContextPtr;
     if ret.is_null() {
         xml_xpath_err_memory(null_mut(), Some("creating context\n"));
@@ -1083,15 +1083,12 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: *mut XmlDoc) -> i64 {
 /// Returns -1 in case of error or 0 if successful
 #[doc(alias = "xmlXPathSetContextNode")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_set_context_node(
-    node: *mut XmlNode,
-    ctx: XmlXPathContextPtr,
-) -> i32 {
+pub unsafe fn xml_xpath_set_context_node(node: *mut XmlNode, ctx: XmlXPathContextPtr) -> i32 {
     if node.is_null() || ctx.is_null() {
         return -1;
     }
 
-    if (*node).doc == (*ctx).doc {
+    if (*node).doc == (*ctx).doc.map_or(null_mut(), |doc| doc.as_ptr()) {
         (*ctx).node = node;
         return 0;
     }

@@ -150,7 +150,7 @@ unsafe fn initialize_libxml2() {
     );
     xml_init_parser();
     xml_set_external_entity_loader(test_external_entity_loader);
-    CTXT_XPATH.store(xml_xpath_new_context(null_mut()), Ordering::Relaxed);
+    CTXT_XPATH.store(xml_xpath_new_context(None), Ordering::Relaxed);
     // Deactivate the cache if created; otherwise we have to create/free it
     // for every test, since it will confuse the memory leak detection.
     // Note that normally this need not be done, since the cache is not

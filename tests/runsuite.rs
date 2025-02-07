@@ -216,7 +216,7 @@ unsafe fn initialize_libxml2() {
     );
     xml_init_parser();
     xml_set_external_entity_loader(test_external_entity_loader);
-    CTXT_XPATH.store(xml_xpath_new_context(null_mut()), Ordering::Relaxed);
+    CTXT_XPATH.store(xml_xpath_new_context(None), Ordering::Relaxed);
     // Deactivate the cache if created; otherwise we have to create/free it
     // for every test, since it will confuse the memory leak detection.
     // Note that normally this need not be done, since the cache is not
@@ -251,7 +251,7 @@ unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
     if cur.is_null() || (*cur).doc.is_null() || xpath.is_null() {
         return null_mut();
     }
-    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = (*cur).doc;
+    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = XmlDocPtr::from_raw((*cur).doc).unwrap();
     (*CTXT_XPATH.load(Ordering::Relaxed)).node = cur;
     let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath as _);
     if comp.is_null() {
@@ -283,7 +283,7 @@ unsafe fn get_string(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlChar {
     if cur.is_null() || (*cur).doc.is_null() || xpath.is_null() {
         return null_mut();
     }
-    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = (*cur).doc;
+    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = XmlDocPtr::from_raw((*cur).doc).unwrap();
     (*CTXT_XPATH.load(Ordering::Relaxed)).node = cur;
     let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath as _);
     if comp.is_null() {

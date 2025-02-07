@@ -2170,7 +2170,7 @@ pub unsafe fn xml_shell_load(
     (*ctxt).node = doc.as_ptr() as *mut XmlNode;
     #[cfg(feature = "xpath")]
     {
-        (*ctxt).pctxt = xml_xpath_new_context(doc.as_ptr());
+        (*ctxt).pctxt = xml_xpath_new_context(Some(doc));
     }
     let canonic = canonic_path(filename);
     let canonic = CString::new(canonic.as_ref()).unwrap();
@@ -2931,7 +2931,7 @@ pub unsafe fn xml_shell<'a>(
 
     #[cfg(feature = "xpath")]
     {
-        (*ctxt).pctxt = xml_xpath_new_context(doc.as_ptr());
+        (*ctxt).pctxt = xml_xpath_new_context(Some(doc));
         if (*ctxt).pctxt.is_null() {
             xml_free(ctxt as _);
             return;

@@ -1526,11 +1526,8 @@ unsafe fn xml_xinclude_load_doc(
                     break 'error;
                 }
 
-                let xptrctxt: XmlXPathContextPtr = xml_xptr_new_context(
-                    doc.map_or(null_mut(), |doc| doc.as_ptr()),
-                    null_mut(),
-                    null_mut(),
-                );
+                let xptrctxt: XmlXPathContextPtr =
+                    xml_xptr_new_context(doc, null_mut(), null_mut());
                 if xptrctxt.is_null() {
                     xml_xinclude_err!(
                         ctxt,
