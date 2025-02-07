@@ -127,9 +127,9 @@ pub struct XmlValidCtxt {
     pub(crate) node_max: i32,               /* Max depth of the parsing stack */
     pub(crate) node_tab: *mut *mut XmlNode, /* array of nodes */
 
-    pub(crate) flags: u32,       /* internal flags */
-    pub(crate) doc: *mut XmlDoc, /* the document */
-    pub(crate) valid: i32,       /* temporary validity check result */
+    pub(crate) flags: u32,             /* internal flags */
+    pub(crate) doc: Option<XmlDocPtr>, /* the document */
+    pub(crate) valid: i32,             /* temporary validity check result */
 
     // state state used for non-determinist content validation
     pub(crate) vstate_tab: Vec<XmlValidState>, /* array of validation states */
@@ -155,7 +155,7 @@ impl Default for XmlValidCtxt {
             node_max: 0,
             node_tab: null_mut(),
             flags: 0,
-            doc: null_mut(),
+            doc: None,
             valid: 0,
             vstate_tab: vec![],
             am: null_mut(),
@@ -3305,7 +3305,7 @@ unsafe fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCt
             if !cur.default_value.is_null() {
                 ret = xml_validate_attribute_value2(
                     ctxt,
-                    XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(),
+                    (*ctxt).doc.unwrap(),
                     cur.name,
                     cur.atype,
                     &CStr::from_ptr(cur.default_value as *const i8).to_string_lossy(),
@@ -3319,7 +3319,7 @@ unsafe fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCt
                 while let Some(now) = tree {
                     ret = xml_validate_attribute_value2(
                         ctxt,
-                        XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(),
+                        (*ctxt).doc.unwrap(),
                         cur.name,
                         cur.atype,
                         &now.name,
@@ -3433,7 +3433,7 @@ pub unsafe fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i
     if doc.int_subset.is_none() && doc.ext_subset.is_none() {
         return 0;
     }
-    (*ctxt).doc = doc.as_ptr();
+    (*ctxt).doc = Some(doc);
     (*ctxt).valid = 1;
     let dtd = doc.int_subset;
     if let Some(dtd) = dtd {
@@ -6031,7 +6031,7 @@ unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const Xm
     }
     if let Some(attr) = refe.attr {
         if matches!(attr.atype, Some(XmlAttributeType::XmlAttributeIDREF)) {
-            if xml_get_id(XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(), name).is_none() {
+            if xml_get_id((*ctxt).doc.unwrap(), name).is_none() {
                 let attr_name = attr.name().unwrap();
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
@@ -6065,7 +6065,7 @@ unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const Xm
                 }
                 save = *cur;
                 *cur = 0;
-                if xml_get_id(XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(), str).is_none() {
+                if xml_get_id((*ctxt).doc.unwrap(), str).is_none() {
                     let attr_name = attr.name().unwrap();
                     let str = CStr::from_ptr(str as *const i8).to_string_lossy();
                     xml_err_valid_node(
@@ -6110,7 +6110,7 @@ unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const Xm
             }
             save = *cur;
             *cur = 0;
-            if xml_get_id(XmlDocPtr::from_raw((*ctxt).doc).unwrap().unwrap(), str).is_none() {
+            if xml_get_id((*ctxt).doc.unwrap(), str).is_none() {
                 xml_err_valid_node_nr!(
                     ctxt,
                     null_mut(),
@@ -6164,7 +6164,7 @@ pub unsafe fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr)
     // Check all the NOTATION/NOTATIONS attributes
     // Check all the ENTITY/ENTITIES attributes definition for validity
     // Check all the IDREF/IDREFS attributes definition for validity
-    (*ctxt).doc = doc.as_ptr();
+    (*ctxt).doc = Some(doc);
     (*ctxt).valid = 1;
     if let Some(table) = doc.refs.as_ref() {
         for (name, ref_list) in table.iter() {
