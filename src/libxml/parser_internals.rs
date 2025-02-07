@@ -72,7 +72,7 @@ use crate::{
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon,
-        NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties, XmlDocPtr,
+        NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XML_ENT_CHECKED,
         XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
@@ -1467,7 +1467,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
             }
             (*ctxt).skip_char();
             ret = xml_new_doc_element_content(
-                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                (*ctxt).my_doc,
                 None,
                 XmlElementContentType::XmlElementContentPCDATA,
             );
@@ -1482,7 +1482,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
         }
         if (*ctxt).current_byte() == b'(' || (*ctxt).current_byte() == b'|' {
             ret = xml_new_doc_element_content(
-                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                (*ctxt).my_doc,
                 None,
                 XmlElementContentType::XmlElementContentPCDATA,
             );
@@ -1498,16 +1498,16 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
             (*ctxt).skip_char();
             if let Some(elem) = elem.as_deref() {
                 n = xml_new_doc_element_content(
-                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                    (*ctxt).my_doc,
                     None,
                     XmlElementContentType::XmlElementContentOr,
                 );
                 if n.is_null() {
-                    xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
+                    xml_free_doc_element_content((*ctxt).my_doc, ret);
                     return null_mut();
                 }
                 (*n).c1 = xml_new_doc_element_content(
-                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                    (*ctxt).my_doc,
                     Some(elem),
                     XmlElementContentType::XmlElementContentElement,
                 );
@@ -1521,12 +1521,12 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
                 cur = n;
             } else {
                 ret = xml_new_doc_element_content(
-                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                    (*ctxt).my_doc,
                     None,
                     XmlElementContentType::XmlElementContentOr,
                 );
                 if ret.is_null() {
-                    xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), cur);
+                    xml_free_doc_element_content((*ctxt).my_doc, cur);
                     return null_mut();
                 }
                 (*ret).c1 = cur;
@@ -1543,7 +1543,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
                     XmlParserErrors::XmlErrNameRequired,
                     "xmlParseElementMixedContentDecl : Name expected\n",
                 );
-                xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
+                xml_free_doc_element_content((*ctxt).my_doc, ret);
                 return null_mut();
             }
             (*ctxt).skip_blanks();
@@ -1552,7 +1552,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
         if (*ctxt).current_byte() == b')' && NXT!(ctxt, 1) == b'*' {
             if let Some(elem) = elem {
                 (*cur).c2 = xml_new_doc_element_content(
-                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
+                    (*ctxt).my_doc,
                     Some(&elem),
                     XmlElementContentType::XmlElementContentElement,
                 );
@@ -1572,7 +1572,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
             }
             (*ctxt).advance(2);
         } else {
-            xml_free_doc_element_content(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), ret);
+            xml_free_doc_element_content((*ctxt).my_doc, ret);
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrMixedNotStarted, None);
             return null_mut();
         }
@@ -1874,7 +1874,6 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     user_data: Option<GenericErrorContext>,
     lst: *mut *mut XmlNode,
 ) -> XmlParserErrors {
-    let mut new_doc: *mut XmlDoc = null_mut();
     let mut content: *mut XmlNode = null_mut();
     let mut last: *mut XmlNode = null_mut();
     let ret: XmlParserErrors;
@@ -1928,50 +1927,42 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     (*ctxt).detect_sax2();
     (*ctxt).replace_entities = (*oldctxt).replace_entities;
     (*ctxt).options = (*oldctxt).options;
-
     (*ctxt)._private = (*oldctxt)._private;
-    if (*oldctxt).my_doc.is_null() {
-        new_doc = xml_new_doc(Some("1.0"));
-        if new_doc.is_null() {
+
+    let mut new_doc = None;
+    let mut my_doc = if let Some(my_doc) = (*oldctxt).my_doc {
+        (*ctxt).my_doc = Some(my_doc);
+        content = my_doc.children.map_or(null_mut(), |c| c.as_ptr());
+        last = my_doc.last.map_or(null_mut(), |l| l.as_ptr());
+        my_doc
+    } else {
+        let Some(mut new) = XmlDocPtr::from_raw(xml_new_doc(Some("1.0"))).unwrap() else {
             (*oldctxt).sax = (*ctxt).sax.take();
             (*ctxt).sax = oldsax;
             (*ctxt).dict = null_mut();
             xml_free_parser_ctxt(ctxt);
             return XmlParserErrors::XmlErrInternalError;
-        }
-        (*new_doc).properties = XmlDocProperties::XmlDocInternal as i32;
-        (*ctxt).my_doc = new_doc;
-    } else {
-        (*ctxt).my_doc = (*oldctxt).my_doc;
-        content = (*(*ctxt).my_doc)
-            .children
-            .map_or(null_mut(), |c| c.as_ptr());
-        last = (*(*ctxt).my_doc).last.map_or(null_mut(), |l| l.as_ptr());
-    }
-    let new_root: *mut XmlNode = xml_new_doc_node(
-        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
-        None,
-        "pseudoroot",
-        null_mut(),
-    );
+        };
+        new_doc = Some(new);
+        new.properties = XmlDocProperties::XmlDocInternal as i32;
+        (*ctxt).my_doc = Some(new);
+        new
+    };
+    let new_root: *mut XmlNode = xml_new_doc_node((*ctxt).my_doc, None, "pseudoroot", null_mut());
     if new_root.is_null() {
         (*oldctxt).sax = (*ctxt).sax.take();
         (*ctxt).sax = oldsax;
         (*ctxt).dict = null_mut();
         xml_free_parser_ctxt(ctxt);
-        if !new_doc.is_null() {
-            xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
+        if let Some(new_doc) = new_doc {
+            xml_free_doc(new_doc);
         }
         return XmlParserErrors::XmlErrInternalError;
     }
-    (*(*ctxt).my_doc).children = None;
-    (*(*ctxt).my_doc).last = None;
-    (*(*ctxt).my_doc).add_child(new_root);
-    (*ctxt).node_push(
-        (*(*ctxt).my_doc)
-            .children
-            .map_or(null_mut(), |c| c.as_ptr()),
-    );
+    my_doc.children = None;
+    my_doc.last = None;
+    my_doc.add_child(new_root);
+    (*ctxt).node_push(my_doc.children.map_or(null_mut(), |c| c.as_ptr()));
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
     (*ctxt).depth = (*oldctxt).depth;
 
@@ -1991,7 +1982,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if NodePtr::from_ptr((*ctxt).node) != (*(*ctxt).my_doc).children {
+    if NodePtr::from_ptr((*ctxt).node) != my_doc.children {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
     }
 
@@ -2007,7 +1998,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     if !lst.is_null() && matches!(ret, XmlParserErrors::XmlErrOK) {
         // Return the newly created nodeset after unlinking it from
         // they pseudo parent.
-        let mut cur = (*(*ctxt).my_doc)
+        let mut cur = my_doc
             .children()
             .unwrap()
             .children()
@@ -2017,29 +2008,22 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             #[cfg(feature = "libxml_valid")]
             if (*oldctxt).validate != 0
                 && (*oldctxt).well_formed != 0
-                && !(*oldctxt).my_doc.is_null()
-                && (*(*oldctxt).my_doc).int_subset.is_some()
                 && (*cur).element_type() == XmlElementType::XmlElementNode
             {
-                (*oldctxt).valid &= xml_validate_element(
-                    addr_of_mut!((*oldctxt).vctxt),
-                    XmlDocPtr::from_raw((*oldctxt).my_doc).unwrap().unwrap(),
-                    cur,
-                );
+                if let Some(my_doc) = (*oldctxt).my_doc.filter(|doc| doc.int_subset.is_some()) {
+                    (*oldctxt).valid &=
+                        xml_validate_element(addr_of_mut!((*oldctxt).vctxt), my_doc, cur);
+                }
             }
             (*cur).set_parent(None);
             cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
-        (*(*ctxt).my_doc).children.unwrap().set_children(None);
+        my_doc.children.unwrap().set_children(None);
     }
-    if !(*ctxt).my_doc.is_null() {
-        xml_free_node(
-            (*(*ctxt).my_doc)
-                .children
-                .map_or(null_mut(), |c| c.as_ptr()),
-        );
-        (*(*ctxt).my_doc).children = NodePtr::from_ptr(content);
-        (*(*ctxt).my_doc).last = NodePtr::from_ptr(last);
+    if let Some(mut my_doc) = (*ctxt).my_doc {
+        xml_free_node(my_doc.children.map_or(null_mut(), |c| c.as_ptr()));
+        my_doc.children = NodePtr::from_ptr(content);
+        my_doc.last = NodePtr::from_ptr(last);
     }
 
     // Also record the size of the entity parsed
@@ -2059,8 +2043,8 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     (*ctxt).atts_default = None;
     (*ctxt).atts_special = None;
     xml_free_parser_ctxt(ctxt);
-    if !new_doc.is_null() {
-        xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
+    if let Some(new_doc) = new_doc {
+        xml_free_doc(new_doc);
     }
 
     ret
@@ -2228,7 +2212,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             let external_id = ent.external_id.load(Ordering::Relaxed);
             let has_sax = (*ctxt).sax.is_some();
             let (sax, error) = xml_parse_external_entity_private(
-                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+                (*ctxt).my_doc.unwrap(),
                 ctxt,
                 (*ctxt).sax.take(),
                 user_data,
@@ -2293,7 +2277,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 ent.owner = 0;
                 while !list.is_null() {
                     (*list).set_parent(NodePtr::from_ptr((*ctxt).node));
-                    (*list).doc = (*ctxt).my_doc;
+                    (*list).doc = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.as_ptr());
                     if (*list).next.is_none() {
                         ent.last.store(list, Ordering::Relaxed);
                     }
@@ -2364,7 +2348,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 let external_id = ent.external_id.load(Ordering::Relaxed);
                 let has_sax = (*ctxt).sax.is_some();
                 let (sax, error) = xml_parse_external_entity_private(
-                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
+                    (*ctxt).my_doc.unwrap(),
                     ctxt,
                     (*ctxt).sax.take(),
                     user_data,
@@ -2454,7 +2438,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
                 cur = ent.children.load(Ordering::Relaxed) as _;
                 while !cur.is_null() {
-                    nw = xml_doc_copy_node(cur, XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), 1);
+                    nw = xml_doc_copy_node(cur, (*ctxt).my_doc, 1);
                     if !nw.is_null() {
                         if (*nw)._private.is_null() {
                             (*nw)._private = (*cur)._private;
@@ -2496,7 +2480,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 while !cur.is_null() {
                     next = (*cur).next.take().map_or(null_mut(), |n| n.as_ptr());
                     (*cur).set_parent(None);
-                    nw = xml_doc_copy_node(cur, XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(), 1);
+                    nw = xml_doc_copy_node(cur, (*ctxt).my_doc, 1);
                     if !nw.is_null() {
                         if (*nw)._private.is_null() {
                             (*nw)._private = (*cur)._private;
@@ -3129,16 +3113,13 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
     // [ VC: Root Element Type ]
     // The Name in the document type declaration must match the element type of the root element.
     #[cfg(feature = "libxml_valid")]
-    if (*ctxt).validate != 0
-        && (*ctxt).well_formed != 0
-        && !(*ctxt).my_doc.is_null()
-        && !(*ctxt).node.is_null()
-        && NodePtr::from_ptr((*ctxt).node) == (*(*ctxt).my_doc).children
-    {
-        (*ctxt).valid &= xml_validate_root(
-            addr_of_mut!((*ctxt).vctxt),
-            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
-        );
+    if (*ctxt).validate != 0 && (*ctxt).well_formed != 0 && !(*ctxt).node.is_null() {
+        if let Some(my_doc) = (*ctxt)
+            .my_doc
+            .filter(|doc| NodePtr::from_ptr((*ctxt).node) == doc.children)
+        {
+            (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt), my_doc);
+        }
     }
 
     // Check for an Empty Element.
@@ -3389,21 +3370,19 @@ pub unsafe fn xml_parse_external_subset(
             return;
         }
     }
-    if (*ctxt).my_doc.is_null() {
-        (*ctxt).my_doc = xml_new_doc(Some("1.0"));
-        if (*ctxt).my_doc.is_null() {
+    let my_doc = if let Some(my_doc) = (*ctxt).my_doc {
+        my_doc
+    } else {
+        (*ctxt).my_doc = XmlDocPtr::from_raw(xml_new_doc(Some("1.0"))).unwrap();
+        let Some(mut my_doc) = (*ctxt).my_doc else {
             xml_err_memory(ctxt, Some("New Doc failed"));
             return;
-        }
-        (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
-    }
-    if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).int_subset.is_none() {
-        xml_create_int_subset(
-            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
-            None,
-            external_id,
-            system_id,
-        );
+        };
+        my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
+        my_doc
+    };
+    if my_doc.int_subset.is_none() {
+        xml_create_int_subset((*ctxt).my_doc, None, external_id, system_id);
     }
 
     (*ctxt).instate = XmlParserInputState::XmlParserDTD;

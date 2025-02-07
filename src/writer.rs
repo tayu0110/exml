@@ -237,8 +237,8 @@ impl<'a> XmlTextWriter<'a> {
         // For some reason this seems to completely break if node names are interned.
         (*ctxt).dict_names = 0;
 
-        (*ctxt).my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
-        if (*ctxt).my_doc.is_null() {
+        (*ctxt).my_doc = XmlDocPtr::from_raw(xml_new_doc(Some(XML_DEFAULT_VERSION))).unwrap();
+        let Some(mut my_doc) = (*ctxt).my_doc else {
             xml_free_parser_ctxt(ctxt);
             xml_writer_err_msg(
                 None,
@@ -246,10 +246,10 @@ impl<'a> XmlTextWriter<'a> {
                 "xmlNewTextWriterDoc : error at xmlNewDoc!\n",
             );
             return None;
-        }
+        };
 
         let Some(mut ret) = XmlTextWriter::from_push_parser(ctxt, compression) else {
-            xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+            xml_free_doc(my_doc);
             xml_free_parser_ctxt(ctxt);
             xml_writer_err_msg(
                 None,
@@ -259,10 +259,10 @@ impl<'a> XmlTextWriter<'a> {
             return None;
         };
 
-        (*(*ctxt).my_doc).set_compress_mode(compression);
+        my_doc.set_compress_mode(compression);
 
         if !doc.is_null() {
-            *doc = (*ctxt).my_doc;
+            *doc = my_doc.as_ptr();
             ret.no_doc_free = 1;
         }
 
@@ -307,7 +307,7 @@ impl<'a> XmlTextWriter<'a> {
             return None;
         };
 
-        (*ctxt).my_doc = doc.as_ptr();
+        (*ctxt).my_doc = Some(doc);
         (*ctxt).node = node;
         ret.no_doc_free = 1;
 
@@ -1925,9 +1925,8 @@ impl Drop for XmlTextWriter<'_> {
 
         unsafe {
             if !self.ctxt.is_null() {
-                if !(*self.ctxt).my_doc.is_null() && self.no_doc_free == 0 {
-                    xml_free_doc(XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap().unwrap());
-                    (*self.ctxt).my_doc = null_mut();
+                if let Some(my_doc) = (*self.ctxt).my_doc.take_if(|_| self.no_doc_free == 0) {
+                    xml_free_doc(my_doc);
                 }
                 xml_free_parser_ctxt(self.ctxt);
             }
@@ -2103,10 +2102,11 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
     if (*ctxt).html != 0 {
         #[cfg(feature = "html")]
         {
-            if (*ctxt).my_doc.is_null() {
-                (*ctxt).my_doc = html_new_doc_no_dtd(null_mut(), null_mut());
+            if (*ctxt).my_doc.is_none() {
+                (*ctxt).my_doc =
+                    XmlDocPtr::from_raw(html_new_doc_no_dtd(null_mut(), null_mut())).unwrap();
             }
-            if (*ctxt).my_doc.is_null() {
+            if (*ctxt).my_doc.is_none() {
                 if let Some(error) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.error) {
                     error(
                         (*ctxt).user_data.clone(),
@@ -2132,9 +2132,9 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
             return;
         }
     } else {
-        let doc = XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().or_else(|| {
-            (*ctxt).my_doc = xml_new_doc((*ctxt).version.as_deref());
-            XmlDocPtr::from_raw((*ctxt).my_doc).unwrap()
+        let doc = (*ctxt).my_doc.or_else(|| {
+            (*ctxt).my_doc = XmlDocPtr::from_raw(xml_new_doc((*ctxt).version.as_deref())).unwrap();
+            (*ctxt).my_doc
         });
         if let Some(mut doc) = doc {
             if doc.children.is_none() {
@@ -2154,15 +2154,13 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
             return;
         }
     }
-    if !(*ctxt).my_doc.is_null()
-        && (*(*ctxt).my_doc).url.is_none()
-        && !(*ctxt).input.is_null()
-        && (*(*ctxt).input).filename.is_some()
-    {
-        let url = canonic_path((*(*ctxt).input).filename.as_deref().unwrap());
-        (*(*ctxt).my_doc).url = Some(url.into_owned());
-        if (*(*ctxt).my_doc).url.is_none() {
-            (*(*ctxt).my_doc).url = (*(*ctxt).input).filename.clone()
+    if !(*ctxt).input.is_null() && (*(*ctxt).input).filename.is_some() {
+        if let Some(mut my_doc) = (*ctxt).my_doc.filter(|doc| doc.url.is_none()) {
+            let url = canonic_path((*(*ctxt).input).filename.as_deref().unwrap());
+            my_doc.url = Some(url.into_owned());
+            if my_doc.url.is_none() {
+                my_doc.url = (*(*ctxt).input).filename.clone()
+            }
         }
     }
 }

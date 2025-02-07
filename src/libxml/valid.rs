@@ -3090,7 +3090,7 @@ pub unsafe fn xml_validate_attribute_value(typ: XmlAttributeType, value: *const 
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_notation_decl(
     _ctxt: XmlValidCtxtPtr,
-    _doc: XmlDocPtr,
+    _doc: Option<XmlDocPtr>,
     _nota: Option<&XmlNotation>,
 ) -> i32 {
     1

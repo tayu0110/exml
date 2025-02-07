@@ -3129,13 +3129,14 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> Option<XmlDocPtr> {
     let ret = if (*ctxt).well_formed != 0 {
         (*ctxt).my_doc
     } else {
-        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
-        (*ctxt).my_doc = null_mut();
-        null_mut()
+        if let Some(my_doc) = (*ctxt).my_doc.take() {
+            xml_free_doc(my_doc);
+        }
+        None
     };
     xml_free_parser_ctxt(ctxt);
 
-    XmlDocPtr::from_raw(ret).unwrap()
+    ret
 }
 
 /// Convert all the SGML catalog entries as XML ones

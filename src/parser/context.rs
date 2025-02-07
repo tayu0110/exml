@@ -49,7 +49,7 @@ use crate::{
     },
     parser::{__xml_err_encoding, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int},
     tree::{
-        xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlEntityType, XmlNode,
+        xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlEntityType, XmlNode,
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::build_uri,
@@ -79,7 +79,7 @@ pub struct XmlParserCtxt {
     // For SAX interface only, used by DOM build
     pub(crate) user_data: Option<GenericErrorContext>,
     // the document being built
-    pub my_doc: *mut XmlDoc,
+    pub my_doc: Option<XmlDocPtr>,
     // is the document well formed
     pub well_formed: i32,
     // shall we replace entities ?
@@ -490,10 +490,9 @@ impl XmlParserCtxt {
         self.directory = None;
         self.ext_sub_uri = None;
         self.ext_sub_system = None;
-        if !self.my_doc.is_null() {
-            xml_free_doc(XmlDocPtr::from_raw(self.my_doc).unwrap().unwrap());
+        if let Some(doc) = self.my_doc.take() {
+            xml_free_doc(doc);
         }
-        self.my_doc = null_mut();
 
         self.standalone = -1;
         self.has_external_subset = 0;
@@ -1353,16 +1352,14 @@ impl XmlParserCtxt {
             (*self.input).filename = url.map(|u| u.to_owned());
         }
         xml_parse_document(self);
-        let ret = if self.well_formed != 0 || self.recovery != 0 {
-            XmlDocPtr::from_raw(self.my_doc).unwrap()
+        if self.well_formed != 0 || self.recovery != 0 {
+            self.my_doc.take()
         } else {
-            if !self.my_doc.is_null() {
-                xml_free_doc(XmlDocPtr::from_raw(self.my_doc).unwrap().unwrap());
+            if let Some(my_doc) = self.my_doc.take() {
+                xml_free_doc(my_doc);
             }
             None
-        };
-        self.my_doc = null_mut();
-        ret
+        }
     }
 
     /// change the input functions when discovering the character encoding of a given entity.
@@ -1570,7 +1567,7 @@ impl Default for XmlParserCtxt {
         Self {
             sax: None,
             user_data: None,
-            my_doc: null_mut(),
+            my_doc: None,
             well_formed: 0,
             replace_entities: 0,
             version: None,
@@ -1748,7 +1745,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).space_tab.shrink_to(10);
     (*ctxt).space_tab.push(-1);
 
-    (*ctxt).my_doc = null_mut();
+    (*ctxt).my_doc = None;
     (*ctxt).well_formed = 1;
     (*ctxt).ns_well_formed = 1;
     (*ctxt).valid = 1;

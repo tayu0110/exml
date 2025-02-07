@@ -632,15 +632,13 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> Op
     let ret = if (*pctxt).well_formed != 0 {
         (*pctxt).my_doc
     } else {
-        if !(*pctxt).my_doc.is_null() {
-            xml_free_doc(XmlDocPtr::from_raw((*pctxt).my_doc).unwrap().unwrap());
+        if let Some(my_doc) = (*pctxt).my_doc.take() {
+            xml_free_doc(my_doc);
         }
-        (*pctxt).my_doc = null_mut();
-        null_mut()
+        None
     };
     xml_free_parser_ctxt(pctxt);
-
-    XmlDocPtr::from_raw(ret).unwrap()
+    ret
 }
 
 pub type XmlXIncludeMergeDataPtr = *mut XmlXIncludeMergeData;

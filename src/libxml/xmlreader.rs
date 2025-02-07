@@ -345,7 +345,7 @@ impl XmlTextReader {
     pub unsafe fn read(&mut self) -> i32 {
         use crate::{
             libxml::xinclude::{XINCLUDE_NS, XINCLUDE_OLD_NS},
-            tree::{NodeCommon, NodePtr, XmlDocPtr},
+            tree::{NodeCommon, NodePtr},
         };
 
         let mut val: i32;
@@ -377,10 +377,8 @@ impl XmlTextReader {
                         && self.state != XmlTextReaderState::Done)
             } {}
             if (*self.ctxt).node.is_null() {
-                if !(*self.ctxt).my_doc.is_null() {
-                    self.node = (*(*self.ctxt).my_doc)
-                        .children
-                        .map_or(null_mut(), |c| c.as_ptr());
+                if let Some(my_doc) = (*self.ctxt).my_doc {
+                    self.node = my_doc.children.map_or(null_mut(), |c| c.as_ptr());
                 }
                 if self.node.is_null() {
                     self.mode = XmlTextReaderMode::XmlTextreaderModeError;
@@ -389,10 +387,8 @@ impl XmlTextReader {
                 }
                 self.state = XmlTextReaderState::Element;
             } else {
-                if !(*self.ctxt).my_doc.is_null() {
-                    self.node = (*(*self.ctxt).my_doc)
-                        .children
-                        .map_or(null_mut(), |c| c.as_ptr());
+                if let Some(my_doc) = (*self.ctxt).my_doc {
+                    self.node = my_doc.children.map_or(null_mut(), |c| c.as_ptr());
                 }
                 if self.node.is_null() {
                     self.node = (*self.ctxt).node_tab[0];
@@ -628,9 +624,7 @@ impl XmlTextReader {
                     })
                 {
                     if self.xincctxt.is_null() {
-                        self.xincctxt = xml_xinclude_new_context(
-                            XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap().unwrap(),
-                        );
+                        self.xincctxt = xml_xinclude_new_context((*self.ctxt).my_doc.unwrap());
                         xml_xinclude_set_flags(
                             self.xincctxt,
                             self.parser_flags & !(XmlParserOption::XmlParseNoXIncnode as i32),
@@ -1089,7 +1083,7 @@ impl XmlTextReader {
                     } else if val < 0 {
                         self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                         self.state = oldstate;
-                        if oldstate != XmlTextReaderState::Start || !(*self.ctxt).my_doc.is_null() {
+                        if oldstate != XmlTextReaderState::Start || (*self.ctxt).my_doc.is_some() {
                             return val;
                         }
                     } else if val == 0 {
@@ -1245,7 +1239,7 @@ impl XmlTextReader {
                 qname = xml_strcat(qname, (*node).name);
                 (*self.ctxt).valid &= xml_validate_push_element(
                     addr_of_mut!((*self.ctxt).vctxt),
-                    XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap().unwrap(),
+                    (*self.ctxt).my_doc.unwrap(),
                     node,
                     qname,
                 );
@@ -1255,7 +1249,7 @@ impl XmlTextReader {
             } else {
                 (*self.ctxt).valid &= xml_validate_push_element(
                     addr_of_mut!((*self.ctxt).vctxt),
-                    XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap().unwrap(),
+                    (*self.ctxt).my_doc.unwrap(),
                     node,
                     (*node).name,
                 );
@@ -1268,8 +1262,7 @@ impl XmlTextReader {
             if !self.rng_full_node.is_null() {
                 return;
             }
-            ret = (*self.rng_valid_ctxt)
-                .push_element(XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap(), node);
+            ret = (*self.rng_valid_ctxt).push_element((*self.ctxt).my_doc, node);
             if ret == 0 {
                 // this element requires a full tree
                 node = self.expand();
@@ -1278,7 +1271,7 @@ impl XmlTextReader {
                 } else {
                     ret = xml_relaxng_validate_full_element(
                         self.rng_valid_ctxt,
-                        XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap(),
+                        (*self.ctxt).my_doc,
                         node,
                     );
                     self.rng_full_node = node;
@@ -1309,7 +1302,7 @@ impl XmlTextReader {
                 qname = xml_strcat(qname, (*node).name);
                 (*self.ctxt).valid &= xml_validate_pop_element(
                     addr_of_mut!((*self.ctxt).vctxt),
-                    XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap(),
+                    (*self.ctxt).my_doc,
                     node,
                     qname,
                 );
@@ -1319,7 +1312,7 @@ impl XmlTextReader {
             } else {
                 (*self.ctxt).valid &= xml_validate_pop_element(
                     addr_of_mut!((*self.ctxt).vctxt),
-                    XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap(),
+                    (*self.ctxt).my_doc,
                     node,
                     (*node).name,
                 );
@@ -1333,8 +1326,7 @@ impl XmlTextReader {
                 }
                 return;
             }
-            let ret: i32 = (*self.rng_valid_ctxt)
-                .pop_element(XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap(), node);
+            let ret: i32 = (*self.rng_valid_ctxt).pop_element((*self.ctxt).my_doc, node);
             if ret != 1 {
                 self.rng_valid_errors += 1;
             }
@@ -1858,14 +1850,10 @@ impl XmlTextReader {
         self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
         if !self.ctxt.is_null() {
             (*self.ctxt).stop();
-            if !(*self.ctxt).my_doc.is_null() {
+            if let Some(my_doc) = (*self.ctxt).my_doc.take() {
                 if self.preserve == 0 {
-                    xml_text_reader_free_doc(
-                        self,
-                        XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap().unwrap(),
-                    );
+                    xml_text_reader_free_doc(self, my_doc);
                 }
-                (*self.ctxt).my_doc = null_mut();
             }
         }
         if self.allocs & XML_TEXTREADER_INPUT != 0 {
@@ -2213,12 +2201,13 @@ impl XmlTextReader {
         if self.doc.is_some() {
             return self.doc;
         }
-        if self.ctxt.is_null() || (*self.ctxt).my_doc.is_null() {
+        if self.ctxt.is_null() {
             return None;
         }
+        let my_doc = (*self.ctxt).my_doc?;
 
         self.preserve = 1;
-        XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap()
+        Some(my_doc)
     }
 
     /// Hacking interface allowing to get the xmlNodePtr corresponding to the
@@ -2683,11 +2672,9 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderStandalone")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn standalone(&self) -> Option<bool> {
-        use crate::tree::XmlDocPtr;
-
         let doc = self.doc.or_else(|| {
             (!self.ctxt.is_null())
-                .then(|| XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap())
+                .then(|| (*self.ctxt).my_doc)
                 .flatten()
         })?;
 
@@ -4274,18 +4261,13 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
         }
         (*reader.ctxt).vctxt.vstate_tab.clear();
         (*reader.ctxt).stop();
-        if !(*reader.ctxt).my_doc.is_null() {
+        if let Some(my_doc) = (*reader.ctxt).my_doc.take() {
             if reader.preserve == 0 {
-                xml_text_reader_free_doc(
-                    reader,
-                    XmlDocPtr::from_raw((*reader.ctxt).my_doc).unwrap().unwrap(),
-                );
+                xml_text_reader_free_doc(reader, my_doc);
             }
-            (*reader.ctxt).my_doc = null_mut();
         }
     }
     if reader.input.is_some() && reader.allocs & XML_TEXTREADER_INPUT != 0 {
-        // xml_free_parser_input_buffer((*reader).input);
         let _ = reader.input.take();
         reader.allocs -= XML_TEXTREADER_INPUT;
     }
@@ -4328,11 +4310,9 @@ pub unsafe fn xml_text_reader_lookup_namespace(
 pub unsafe fn xml_text_reader_const_encoding(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
-    use crate::tree::XmlDocPtr;
-
     let Some(doc) = reader.doc.or_else(|| {
         (!reader.ctxt.is_null())
-            .then(|| XmlDocPtr::from_raw((*reader.ctxt).my_doc).unwrap())
+            .then(|| (*reader.ctxt).my_doc)
             .flatten()
     }) else {
         return null_mut();
@@ -5188,11 +5168,9 @@ pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSc
 pub unsafe fn xml_text_reader_const_xml_version(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
-    use crate::tree::XmlDocPtr;
-
     let Some(doc) = reader.doc.or_else(|| {
         (!reader.ctxt.is_null())
-            .then(|| XmlDocPtr::from_raw((*reader.ctxt).my_doc).unwrap())
+            .then(|| (*reader.ctxt).my_doc)
             .flatten()
     }) else {
         return null_mut();

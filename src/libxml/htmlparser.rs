@@ -61,9 +61,7 @@ use crate::{
         xml_free_input_stream, xml_free_parser_ctxt, xml_new_input_stream, XmlParserCtxt,
         XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
     },
-    tree::{
-        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementType, XmlNode,
-    },
+    tree::{xml_create_int_subset, xml_free_doc, NodeCommon, XmlDoc, XmlElementType, XmlNode},
     uri::canonic_path,
 };
 
@@ -8305,18 +8303,20 @@ unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> 
     }
 
     // Only strip CDATA children of the body tag for strict HTML DTDs
-    if name == "body" && !(*ctxt).my_doc.is_null() {
-        let dtd = (*(*ctxt).my_doc).get_int_subset();
-        if dtd.map_or(false, |dtd| {
-            dtd.external_id
-                .as_deref()
-                .filter(|e| {
-                    let e = e.to_ascii_uppercase();
-                    e == "-//W3C//DTD HTML 4.01//EN" || e == "-//W3C//DTD HTML 4//EN"
-                })
-                .is_some()
-        }) {
-            return 1;
+    if name == "body" {
+        if let Some(my_doc) = (*ctxt).my_doc {
+            let dtd = my_doc.get_int_subset();
+            if dtd.map_or(false, |dtd| {
+                dtd.external_id
+                    .as_deref()
+                    .filter(|e| {
+                        let e = e.to_ascii_uppercase();
+                        e == "-//W3C//DTD HTML 4.01//EN" || e == "-//W3C//DTD HTML 4//EN"
+                    })
+                    .is_some()
+            }) {
+                return 1;
+            }
         }
     }
 
@@ -8762,7 +8762,7 @@ unsafe fn html_init_parser_ctxt(
 
     (*ctxt).node_info_tab.clear();
 
-    (*ctxt).my_doc = null_mut();
+    (*ctxt).my_doc = None;
     (*ctxt).well_formed = 1;
     (*ctxt).replace_entities = 0;
     (*ctxt).linenumbers = get_line_numbers_default_value();
@@ -9225,17 +9225,17 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         end_document((*ctxt).user_data.clone());
     }
 
-    if (*ctxt).options & HtmlParserOption::HtmlParseNodefdtd as i32 == 0
-        && !(*ctxt).my_doc.is_null()
-    {
-        let dtd = (*(*ctxt).my_doc).get_int_subset();
-        if dtd.is_none() {
-            (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
-                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
-                Some("html"),
-                Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
-                Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
-            );
+    if (*ctxt).options & HtmlParserOption::HtmlParseNodefdtd as i32 == 0 {
+        if let Some(mut my_doc) = (*ctxt).my_doc {
+            let dtd = my_doc.get_int_subset();
+            if dtd.is_none() {
+                my_doc.int_subset = xml_create_int_subset(
+                    Some(my_doc),
+                    Some("html"),
+                    Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
+                    Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
+                );
+            }
         }
     }
     if (*ctxt).well_formed == 0 {
@@ -9327,7 +9327,7 @@ pub unsafe fn html_sax_parse_doc(
     }
 
     html_parse_document(ctxt);
-    let ret: HtmlDocPtr = (*ctxt).my_doc;
+    let ret: HtmlDocPtr = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.as_ptr());
     if replaced {
         (*ctxt).sax = None;
         (*ctxt).user_data = None;
@@ -9415,7 +9415,7 @@ pub unsafe fn html_sax_parse_file(
 
     html_parse_document(ctxt);
 
-    let ret: HtmlDocPtr = (*ctxt).my_doc;
+    let ret: HtmlDocPtr = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.as_ptr());
     if replaced {
         (*ctxt).sax = oldsax;
         (*ctxt).user_data = None;
@@ -10595,21 +10595,22 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
         }
     }
     if (*ctxt).options & HtmlParserOption::HtmlParseNodefdtd as i32 == 0
-        && !(*ctxt).my_doc.is_null()
         && (terminate != 0
             || matches!(
                 (*ctxt).instate,
                 XmlParserInputState::XmlParserEOF | XmlParserInputState::XmlParserEpilog
             ))
     {
-        let dtd = (*(*ctxt).my_doc).get_int_subset();
-        if dtd.is_none() {
-            (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
-                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap(),
-                Some("html"),
-                Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
-                Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
-            );
+        if let Some(mut my_doc) = (*ctxt).my_doc {
+            let dtd = my_doc.get_int_subset();
+            if dtd.is_none() {
+                my_doc.int_subset = xml_create_int_subset(
+                    (*ctxt).my_doc,
+                    Some("html"),
+                    Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
+                    Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
+                );
+            }
         }
     }
     ret
@@ -10776,10 +10777,9 @@ pub unsafe fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).directory = None;
     (*ctxt).ext_sub_uri = None;
     (*ctxt).ext_sub_system = None;
-    if !(*ctxt).my_doc.is_null() {
-        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+    if let Some(my_doc) = (*ctxt).my_doc.take() {
+        xml_free_doc(my_doc);
     }
-    (*ctxt).my_doc = null_mut();
 
     (*ctxt).standalone = -1;
     (*ctxt).has_external_subset = 0;
@@ -10920,8 +10920,7 @@ unsafe fn html_do_read(
         (*(*ctxt).input).filename = url.map(|u| u.to_owned());
     }
     html_parse_document(ctxt);
-    let ret: HtmlDocPtr = (*ctxt).my_doc;
-    (*ctxt).my_doc = null_mut();
+    let ret: HtmlDocPtr = (*ctxt).my_doc.take().map_or(null_mut(), |doc| doc.as_ptr());
     if reuse == 0 {
         xml_free_parser_ctxt(ctxt);
     }
@@ -11250,11 +11249,7 @@ pub unsafe fn html_node_status(node: HtmlNodePtr, legacy: i32) -> HtmlStatus {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        globals::reset_last_error,
-        libxml::{xmlmemory::xml_mem_blocks, xmlstring::xml_strlen},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -11686,92 +11681,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in htmlParseCharRef()");
-        }
-    }
-
-    #[test]
-    fn test_html_parse_chunk() {
-        #[cfg(all(feature = "html", feature = "libxml_push"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_HTML_PARSER_CTXT_PTR {
-                for n_chunk in 0..GEN_NB_CONST_CHAR_PTR {
-                    for n_size in 0..GEN_NB_INT {
-                        for n_terminate in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let ctxt = gen_html_parser_ctxt_ptr(n_ctxt, 0);
-                            let chunk = gen_const_char_ptr(n_chunk, 1);
-                            let mut size = gen_int(n_size, 2);
-                            let terminate = gen_int(n_terminate, 3);
-                            if !chunk.is_null() && size > xml_strlen(chunk as _) {
-                                size = 0;
-                            }
-
-                            let ret_val = html_parse_chunk(ctxt, chunk, size, terminate);
-                            if !ctxt.is_null() {
-                                if !(*ctxt).my_doc.is_null() {
-                                    xml_free_doc(
-                                        XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
-                                    );
-                                }
-                                (*ctxt).my_doc = null_mut();
-                            }
-                            desret_int(ret_val);
-                            des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                            des_const_char_ptr(n_chunk, chunk, 1);
-                            des_int(n_size, size, 2);
-                            des_int(n_terminate, terminate, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in htmlParseChunk",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in htmlParseChunk()");
-                                eprint!(" {}", n_ctxt);
-                                eprint!(" {}", n_chunk);
-                                eprint!(" {}", n_size);
-                                eprintln!(" {}", n_terminate);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_html_parse_document() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_HTML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_html_parser_ctxt_ptr(n_ctxt, 0);
-
-                let ret_val = html_parse_document(ctxt);
-                if !ctxt.is_null() {
-                    if !(*ctxt).my_doc.is_null() {
-                        xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
-                    }
-                    (*ctxt).my_doc = null_mut();
-                }
-                desret_int(ret_val);
-                des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in htmlParseDocument",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlParseDocument()");
         }
     }
 

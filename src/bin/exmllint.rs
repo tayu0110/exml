@@ -1945,10 +1945,9 @@ unsafe fn test_sax(filename: &str) {
         };
         xml_ctxt_read_file(ctxt, filename, None, OPTIONS.load(Ordering::Relaxed));
 
-        if !(*ctxt).my_doc.is_null() {
+        if let Some(my_doc) = (*ctxt).my_doc.take() {
             eprintln!("SAX generated a doc !");
-            xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
-            (*ctxt).my_doc = null_mut();
+            xml_free_doc(my_doc);
         }
         xml_free_parser_ctxt(ctxt);
     }
@@ -2549,7 +2548,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         html_parse_chunk(ctxt, chars.as_ptr(), res, 0);
                     }
                     html_parse_chunk(ctxt, chars.as_ptr(), 0, 1);
-                    doc = (*ctxt).my_doc;
+                    doc = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.into());
                     html_free_parser_ctxt(ctxt);
                 }
                 if f != stdin {
@@ -2633,7 +2632,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         xml_parse_chunk(ctxt, chars.as_ptr(), res, 0);
                     }
                     xml_parse_chunk(ctxt, chars.as_ptr(), 0, 1);
-                    doc = (*ctxt).my_doc;
+                    doc = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.into());
                     ret = (*ctxt).well_formed;
                     xml_free_parser_ctxt(ctxt);
                     if ret == 0 && !CMD_ARGS.recover {

@@ -1435,8 +1435,8 @@ unsafe fn sax_parse_test(
         } else {
             (*ctxt).err_no
         };
-        if !(*ctxt).my_doc.is_null() {
-            xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+        if let Some(my_doc) = (*ctxt).my_doc {
+            xml_free_doc(my_doc);
         }
         xml_free_parser_ctxt(ctxt);
     }
@@ -1491,8 +1491,8 @@ unsafe fn sax_parse_test(
             } else {
                 (*ctxt).err_no
             };
-            if !(*ctxt).my_doc.is_null() {
-                xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+            if let Some(my_doc) = (*ctxt).my_doc {
+                xml_free_doc(my_doc);
             }
             xml_free_parser_ctxt(ctxt);
         }
@@ -1686,7 +1686,7 @@ unsafe fn push_parse_test(
         }
         cur < size
     } {}
-    let doc: *mut XmlDoc = (*ctxt).my_doc;
+    let doc = (*ctxt).my_doc;
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
         res = 1;
@@ -1700,19 +1700,22 @@ unsafe fn push_parse_test(
     xml_free_parser_ctxt(ctxt);
     free(base as _);
     if res == 0 {
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        if let Some(doc) = doc {
+            xml_free_doc(doc);
+        }
         eprintln!("Failed to parse {filename}",);
         return -1;
     }
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
         html_doc_dump_memory(
-            XmlDocPtr::from_raw(doc).unwrap().unwrap(),
+            doc.unwrap(),
             addr_of_mut!(base) as *mut *mut XmlChar,
             addr_of_mut!(size),
         );
     } else {
-        (*doc).dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+        doc.unwrap()
+            .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
     }
     #[cfg(not(feature = "html"))]
     {
@@ -1722,7 +1725,7 @@ unsafe fn push_parse_test(
             addr_of_mut!(size),
         );
     }
-    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+    xml_free_doc(doc.unwrap());
     res = compare_file_mem(
         result.as_deref().unwrap(),
         from_raw_parts(base as _, size as usize),
@@ -2074,7 +2077,7 @@ unsafe fn push_boundary_test(
             }
         }
     }
-    let doc: *mut XmlDoc = (*ctxt).my_doc;
+    let doc = (*ctxt).my_doc;
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
         res = 1;
@@ -2088,7 +2091,9 @@ unsafe fn push_boundary_test(
     xml_free_parser_ctxt(ctxt);
     free(base as _);
     if num_callbacks > 1 {
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        if let Some(doc) = doc {
+            xml_free_doc(doc);
+        }
         eprintln!(
             "Failed push boundary callback test ({}@{}-{}): {filename}",
             num_callbacks, old_consumed, consumed,
@@ -2096,7 +2101,7 @@ unsafe fn push_boundary_test(
         return -1;
     }
     if avail > 0 {
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc.unwrap());
         eprintln!(
             "Failed push boundary buffer test ({}@{}): {filename}",
             avail, consumed,
@@ -2104,19 +2109,20 @@ unsafe fn push_boundary_test(
         return -1;
     }
     if res == 0 {
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc.unwrap());
         eprintln!("Failed to parse {filename}",);
         return -1;
     }
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
         html_doc_dump_memory(
-            XmlDocPtr::from_raw(doc).unwrap().unwrap(),
+            doc.unwrap(),
             addr_of_mut!(base) as *mut *mut XmlChar,
             addr_of_mut!(size),
         );
     } else {
-        (*doc).dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+        doc.unwrap()
+            .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
     }
     #[cfg(not(feature = "html"))]
     {
@@ -2126,7 +2132,7 @@ unsafe fn push_boundary_test(
             addr_of_mut!(size),
         );
     }
-    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+    xml_free_doc(doc.unwrap());
     res = compare_file_mem(
         result.as_deref().unwrap(),
         from_raw_parts(base as _, size as usize),
