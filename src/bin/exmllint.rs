@@ -2275,7 +2275,7 @@ unsafe fn stream_file(filename: *mut c_char) {
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe fn walk_doc(doc: *mut XmlDoc) {
+unsafe fn walk_doc(doc: XmlDocPtr) {
     use std::{ptr::null, sync::atomic::Ordering};
 
     use exml::{
@@ -2295,11 +2295,7 @@ unsafe fn walk_doc(doc: *mut XmlDoc) {
     {
         let mut namespaces: [(*const u8, *const u8); 22] = [(null(), null()); 22];
 
-        let root: *mut XmlNode = if doc.is_null() {
-            null_mut()
-        } else {
-            (*doc).get_root_element()
-        };
+        let root: *mut XmlNode = doc.get_root_element();
         if root.is_null() {
             generic_error!("Document does not have a root element");
             PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
@@ -2889,7 +2885,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     } else if cfg!(feature = "libxml_reader") && CMD_ARGS.walker {
         #[cfg(feature = "libxml_reader")]
         {
-            walk_doc(doc);
+            walk_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         }
     }
     #[cfg(feature = "libxml_output")]

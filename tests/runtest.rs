@@ -2494,7 +2494,7 @@ unsafe fn walker_parse_test(
         eprintln!("Failed to parse {filename}",);
         return -1;
     };
-    let reader: XmlTextReaderPtr = xml_reader_walker(doc.into());
+    let reader: XmlTextReaderPtr = xml_reader_walker(doc);
     let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
     xml_free_text_reader(reader);
     xml_free_doc(doc);
@@ -3978,8 +3978,6 @@ unsafe fn pattern_test(
     _err: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::ops::DerefMut;
-
     use exml::{
         libxml::{
             pattern::{
@@ -4063,7 +4061,7 @@ unsafe fn pattern_test(
                     str[size] = 0;
                 }
                 let xml = CStr::from_ptr(xml.as_ptr()).to_string_lossy();
-                if let Some(mut doc) = xml_read_file(&xml, None, options) {
+                if let Some(doc) = xml_read_file(&xml, None, options) {
                     let mut namespaces: [(*const u8, *const u8); 20] = [(null(), null()); 20];
                     let root: *mut XmlNode = doc.get_root_element();
                     let mut ns = (*root).ns_def;
@@ -4096,7 +4094,7 @@ unsafe fn pattern_test(
                     }
                     NB_TESTS.set(NB_TESTS.get() + 1);
 
-                    reader = xml_reader_walker(doc.deref_mut());
+                    reader = xml_reader_walker(doc);
                     res = (*reader).read();
                     while res == 1 {
                         pattern_node(&mut o, reader, str.as_ptr() as _, patternc, patstream);

@@ -212,7 +212,7 @@ pub struct XmlTextReader {
     // the parsing mode
     mode: XmlTextReaderMode,
     // when walking an existing doc
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     // is there any validation
     validate: XmlTextReaderValidate,
     // what structure were deallocated
@@ -354,7 +354,7 @@ impl XmlTextReader {
         let mut oldnode: *mut XmlNode = null_mut();
 
         self.curnode = null_mut();
-        if !self.doc.is_null() {
+        if self.doc.is_some() {
             return self.read_tree();
         }
         if self.ctxt.is_null() {
@@ -832,7 +832,7 @@ impl XmlTextReader {
         // next_node:
         'next_node: loop {
             if self.node.is_null() {
-                let Some(children) = (*self.doc).children else {
+                let Some(children) = self.doc.unwrap().children else {
                     self.state = XmlTextReaderState::End;
                     return 0;
                 };
@@ -1047,7 +1047,7 @@ impl XmlTextReader {
         if self.node.is_null() {
             return null_mut();
         }
-        if !self.doc.is_null() {
+        if self.doc.is_some() {
             return self.node;
         }
         if self.ctxt.is_null() {
@@ -1531,7 +1531,7 @@ impl XmlTextReader {
         if self.state == XmlTextReaderState::End {
             return Some(false);
         }
-        if !self.doc.is_null() {
+        if self.doc.is_some() {
             return Some(true);
         }
         #[cfg(feature = "xinclude")]
@@ -2209,16 +2209,16 @@ impl XmlTextReader {
     /// Returns the xmlDocPtr or NULL in case of error.
     #[doc(alias = "xmlTextReaderCurrentDoc")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn current_doc(&mut self) -> *mut XmlDoc {
-        if !self.doc.is_null() {
+    pub unsafe fn current_doc(&mut self) -> Option<XmlDocPtr> {
+        if self.doc.is_some() {
             return self.doc;
         }
         if self.ctxt.is_null() || (*self.ctxt).my_doc.is_null() {
-            return null_mut();
+            return None;
         }
 
         self.preserve = 1;
-        (*self.ctxt).my_doc
+        XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap()
     }
 
     /// Hacking interface allowing to get the xmlNodePtr corresponding to the
@@ -2247,7 +2247,7 @@ impl XmlTextReader {
 
         let mut ret: i32;
 
-        if !self.doc.is_null() {
+        if self.doc.is_some() {
             return self.next_tree();
         }
         let cur: *mut XmlNode = self.node;
@@ -2282,7 +2282,7 @@ impl XmlTextReader {
         }
 
         if self.node.is_null() {
-            let Some(children) = (*self.doc).children else {
+            let Some(children) = self.doc.unwrap().children else {
                 self.state = XmlTextReaderState::End;
                 return 0;
             };
@@ -2341,7 +2341,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderNextSibling")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn next_sibling(&mut self) -> i32 {
-        if self.doc.is_null() {
+        if self.doc.is_none() {
             // TODO
             return -1;
         }
@@ -2685,7 +2685,7 @@ impl XmlTextReader {
     pub unsafe fn standalone(&self) -> Option<bool> {
         use crate::tree::XmlDocPtr;
 
-        let doc = XmlDocPtr::from_raw(self.doc).unwrap().or_else(|| {
+        let doc = self.doc.or_else(|| {
             (!self.ctxt.is_null())
                 .then(|| XmlDocPtr::from_raw((*self.ctxt).my_doc).unwrap())
                 .flatten()
@@ -2865,7 +2865,7 @@ impl Default for XmlTextReader {
     fn default() -> Self {
         Self {
             mode: XmlTextReaderMode::default(),
-            doc: null_mut(),
+            doc: None,
             validate: XmlTextReaderValidate::default(),
             allocs: 0,
             state: XmlTextReaderState::default(),
@@ -3120,7 +3120,7 @@ pub unsafe fn xml_new_text_reader(
         return null_mut();
     }
     std::ptr::write(ret, XmlTextReader::default());
-    (*ret).doc = null_mut();
+    (*ret).doc = None;
     (*ret).ent_tab = null_mut();
     (*ret).ent_max = 0;
     (*ret).ent_nr = 0;
@@ -3355,7 +3355,7 @@ pub unsafe fn xml_text_reader_setup(
     // since usr applications should never modify the tree
     options |= XmlParserOption::XmlParseCompact as i32;
 
-    (*reader).doc = null_mut();
+    (*reader).doc = None;
     (*reader).ent_nr = 0;
     (*reader).parser_flags = options;
     (*reader).validate = XmlTextReaderValidate::NotValidate;
@@ -3549,7 +3549,7 @@ pub unsafe fn xml_text_reader_setup(
         }
     }
 
-    (*reader).doc = null_mut();
+    (*reader).doc = None;
 
     0
 }
@@ -4330,7 +4330,7 @@ pub unsafe fn xml_text_reader_const_encoding(reader: &mut XmlTextReader) -> *con
 
     use crate::tree::XmlDocPtr;
 
-    let Some(doc) = XmlDocPtr::from_raw(reader.doc).unwrap().or_else(|| {
+    let Some(doc) = reader.doc.or_else(|| {
         (!reader.ctxt.is_null())
             .then(|| XmlDocPtr::from_raw((*reader.ctxt).my_doc).unwrap())
             .flatten()
@@ -5190,7 +5190,7 @@ pub unsafe fn xml_text_reader_const_xml_version(reader: &mut XmlTextReader) -> *
 
     use crate::tree::XmlDocPtr;
 
-    let Some(doc) = XmlDocPtr::from_raw(reader.doc).unwrap().or_else(|| {
+    let Some(doc) = reader.doc.or_else(|| {
         (!reader.ctxt.is_null())
             .then(|| XmlDocPtr::from_raw((*reader.ctxt).my_doc).unwrap())
             .flatten()
@@ -5211,12 +5211,12 @@ pub unsafe fn xml_text_reader_const_xml_version(reader: &mut XmlTextReader) -> *
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderWalker")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe fn xml_reader_walker(doc: *mut XmlDoc) -> XmlTextReaderPtr {
+pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
     use crate::generic_error;
 
-    if doc.is_null() {
-        return null_mut();
-    }
+    // if doc.is_null() {
+    //     return null_mut();
+    // }
 
     let ret: XmlTextReaderPtr = xml_malloc(size_of::<XmlTextReader>()) as _;
     if ret.is_null() {
@@ -5233,7 +5233,7 @@ pub unsafe fn xml_reader_walker(doc: *mut XmlDoc) -> XmlTextReaderPtr {
     (*ret).base = 0;
     (*ret).cur = 0;
     (*ret).allocs = XML_TEXTREADER_CTXT;
-    (*ret).doc = doc;
+    (*ret).doc = Some(doc);
     (*ret).state = XmlTextReaderState::Start;
     (*ret).dict = xml_dict_create();
     ret
@@ -5360,7 +5360,7 @@ pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) ->
     (*reader).base = 0;
     (*reader).cur = 0;
     (*reader).allocs = XML_TEXTREADER_CTXT;
-    (*reader).doc = doc.as_ptr();
+    (*reader).doc = Some(doc);
     (*reader).state = XmlTextReaderState::Start;
     if (*reader).dict.is_null() {
         if !(*reader).ctxt.is_null() && !(*(*reader).ctxt).dict.is_null() {
@@ -5767,33 +5767,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_reader_walker() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                let mem_base = xml_mem_blocks();
-                let doc = gen_xml_doc_ptr(n_doc, 0);
-
-                let ret_val = xml_reader_walker(doc);
-                desret_xml_text_reader_ptr(ret_val);
-                des_xml_doc_ptr(n_doc, doc, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlReaderWalker",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlReaderWalker()");
-                    eprintln!(" {}", n_doc);
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_text_reader_locator_base_uri() {
