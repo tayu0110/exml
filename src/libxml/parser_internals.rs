@@ -2228,7 +2228,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             let external_id = ent.external_id.load(Ordering::Relaxed);
             let has_sax = (*ctxt).sax.is_some();
             let (sax, error) = xml_parse_external_entity_private(
-                (*ctxt).my_doc,
+                XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                 ctxt,
                 (*ctxt).sax.take(),
                 user_data,
@@ -2364,7 +2364,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 let external_id = ent.external_id.load(Ordering::Relaxed);
                 let has_sax = (*ctxt).sax.is_some();
                 let (sax, error) = xml_parse_external_entity_private(
-                    (*ctxt).my_doc,
+                    XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap(),
                     ctxt,
                     (*ctxt).sax.take(),
                     user_data,

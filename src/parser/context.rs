@@ -1338,9 +1338,7 @@ impl XmlParserCtxt {
         url: Option<&str>,
         encoding: Option<&str>,
         options: i32,
-    ) -> *mut XmlDoc {
-        let ret: *mut XmlDoc;
-
+    ) -> Option<XmlDocPtr> {
         self.ctxt_use_options_internal(options, encoding);
         if let Some(encoding) = encoding {
             // TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
@@ -1355,14 +1353,14 @@ impl XmlParserCtxt {
             (*self.input).filename = url.map(|u| u.to_owned());
         }
         xml_parse_document(self);
-        if self.well_formed != 0 || self.recovery != 0 {
-            ret = self.my_doc;
+        let ret = if self.well_formed != 0 || self.recovery != 0 {
+            XmlDocPtr::from_raw(self.my_doc).unwrap()
         } else {
-            ret = null_mut();
             if !self.my_doc.is_null() {
                 xml_free_doc(XmlDocPtr::from_raw(self.my_doc).unwrap().unwrap());
             }
-        }
+            None
+        };
         self.my_doc = null_mut();
         ret
     }

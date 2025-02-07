@@ -1059,10 +1059,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
     // First step is to parse the input document into an DOM/Infoset
     let doc = if !(*ctxt).url.is_null() {
         let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
-        let Some(doc) =
-            XmlDocPtr::from_raw(xml_read_file(&url, None, SCHEMATRON_PARSE_OPTIONS as i32))
-                .unwrap()
-        else {
+        let Some(doc) = xml_read_file(&url, None, SCHEMATRON_PARSE_OPTIONS as i32) else {
             xml_schematron_perr!(
                 ctxt,
                 null_mut(),
@@ -1076,13 +1073,8 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
         doc
     } else if !(*ctxt).buffer.is_null() {
         let mem = from_raw_parts((*ctxt).buffer as *const u8, (*ctxt).size as usize).to_vec();
-        let Some(mut doc) = XmlDocPtr::from_raw(xml_read_memory(
-            mem,
-            None,
-            None,
-            SCHEMATRON_PARSE_OPTIONS as i32,
-        ))
-        .unwrap() else {
+        let Some(mut doc) = xml_read_memory(mem, None, None, SCHEMATRON_PARSE_OPTIONS as i32)
+        else {
             xml_schematron_perr!(
                 ctxt,
                 null_mut(),

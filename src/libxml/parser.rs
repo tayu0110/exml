@@ -727,7 +727,7 @@ pub(crate) unsafe fn xml_parser_input_grow(input: XmlParserInputPtr, len: i32) -
 #[doc(alias = "xmlParseDoc")]
 #[deprecated = "Use xmlReadDoc"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_parse_doc(cur: *const XmlChar) -> *mut XmlDoc {
+pub unsafe fn xml_parse_doc(cur: *const XmlChar) -> Option<XmlDocPtr> {
     xml_sax_parse_doc(None, cur, 0)
 }
 
@@ -739,7 +739,7 @@ pub unsafe fn xml_parse_doc(cur: *const XmlChar) -> *mut XmlDoc {
 #[doc(alias = "xmlParseFile")]
 #[deprecated = "Use xmlReadFile"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_parse_file(filename: Option<&str>) -> *mut XmlDoc {
+pub unsafe fn xml_parse_file(filename: Option<&str>) -> Option<XmlDocPtr> {
     xml_sax_parse_file(None, filename, 0)
 }
 
@@ -749,7 +749,7 @@ pub unsafe fn xml_parse_file(filename: Option<&str>) -> *mut XmlDoc {
 #[doc(alias = "xmlParseMemory")]
 #[deprecated = "Use xmlReadMemory"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_parse_memory(buffer: Vec<u8>) -> *mut XmlDoc {
+pub unsafe fn xml_parse_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
     xml_sax_parse_memory(None, buffer, 0)
 }
 
@@ -833,7 +833,7 @@ pub fn xml_line_numbers_default(val: i32) -> i32 {
 #[doc(alias = "xmlRecoverDoc")]
 #[deprecated = "Use xmlReadDoc with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_recover_doc(cur: *const XmlChar) -> *mut XmlDoc {
+pub unsafe fn xml_recover_doc(cur: *const XmlChar) -> Option<XmlDocPtr> {
     xml_sax_parse_doc(None, cur, 1)
 }
 
@@ -845,7 +845,7 @@ pub unsafe fn xml_recover_doc(cur: *const XmlChar) -> *mut XmlDoc {
 #[doc(alias = "xmlRecoverMemory")]
 #[deprecated = "Use xmlReadMemory with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_recover_memory(buffer: Vec<u8>) -> *mut XmlDoc {
+pub unsafe fn xml_recover_memory(buffer: Vec<u8>) -> Option<XmlDocPtr> {
     xml_sax_parse_memory(None, buffer, 1)
 }
 
@@ -858,7 +858,7 @@ pub unsafe fn xml_recover_memory(buffer: Vec<u8>) -> *mut XmlDoc {
 #[doc(alias = "xmlRecoverFile")]
 #[deprecated = "Use xmlReadFile with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_recover_file(filename: Option<&str>) -> *mut XmlDoc {
+pub unsafe fn xml_recover_file(filename: Option<&str>) -> Option<XmlDocPtr> {
     xml_sax_parse_file(None, filename, 1)
 }
 
@@ -1508,19 +1508,17 @@ pub unsafe fn xml_sax_parse_doc(
     sax: Option<Box<XmlSAXHandler>>,
     cur: *const XmlChar,
     recovery: i32,
-) -> *mut XmlDoc {
-    let ret: *mut XmlDoc;
-
+) -> Option<XmlDocPtr> {
     let replaced = sax.is_some();
     let mut oldsax = None;
 
     if cur.is_null() {
-        return null_mut();
+        return None;
     }
 
     let ctxt: XmlParserCtxtPtr = xml_create_doc_parser_ctxt(cur);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     if let Some(sax) = sax {
         oldsax = (*ctxt).sax.replace(sax);
@@ -1529,19 +1527,19 @@ pub unsafe fn xml_sax_parse_doc(
     (*ctxt).detect_sax2();
 
     xml_parse_document(ctxt);
-    if (*ctxt).well_formed != 0 || recovery != 0 {
-        ret = (*ctxt).my_doc;
+    let ret = if (*ctxt).well_formed != 0 || recovery != 0 {
+        (*ctxt).my_doc
     } else {
-        ret = null_mut();
         xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
-    }
+        null_mut()
+    };
     if replaced {
         (*ctxt).sax = oldsax;
     }
     xml_free_parser_ctxt(ctxt);
 
-    ret
+    XmlDocPtr::from_raw(ret).unwrap()
 }
 
 /// Parse an XML in-memory block and use the given SAX function block
@@ -1556,7 +1554,7 @@ pub unsafe fn xml_sax_parse_memory(
     sax: Option<Box<XmlSAXHandler>>,
     buffer: Vec<u8>,
     recovery: i32,
-) -> *mut XmlDoc {
+) -> Option<XmlDocPtr> {
     xml_sax_parse_memory_with_data(sax, buffer, recovery, null_mut())
 }
 
@@ -1576,15 +1574,14 @@ pub unsafe fn xml_sax_parse_memory_with_data(
     buffer: Vec<u8>,
     recovery: i32,
     data: *mut c_void,
-) -> *mut XmlDoc {
+) -> Option<XmlDocPtr> {
     let replaced = sax.is_some();
-    let ret: *mut XmlDoc;
 
     xml_init_parser();
 
     let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(buffer);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     if let Some(sax) = sax {
         (*ctxt).sax = Some(sax);
@@ -1598,19 +1595,19 @@ pub unsafe fn xml_sax_parse_memory_with_data(
 
     xml_parse_document(ctxt);
 
-    if (*ctxt).well_formed != 0 || recovery != 0 {
-        ret = (*ctxt).my_doc;
+    let ret = if (*ctxt).well_formed != 0 || recovery != 0 {
+        (*ctxt).my_doc
     } else {
-        ret = null_mut();
         xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
-    }
+        null_mut()
+    };
     if replaced {
         (*ctxt).sax = None;
     }
     xml_free_parser_ctxt(ctxt);
 
-    ret
+    XmlDocPtr::from_raw(ret).unwrap()
 }
 
 /// parse an XML file and build a tree. Automatic support for ZLIB/Compress
@@ -1626,7 +1623,7 @@ pub unsafe fn xml_sax_parse_file(
     sax: Option<Box<XmlSAXHandler>>,
     filename: Option<&str>,
     recovery: i32,
-) -> *mut XmlDoc {
+) -> Option<XmlDocPtr> {
     xml_sax_parse_file_with_data(sax, filename, recovery, null_mut())
 }
 
@@ -1647,17 +1644,16 @@ pub unsafe fn xml_sax_parse_file_with_data(
     filename: Option<&str>,
     recovery: i32,
     data: *mut c_void,
-) -> *mut XmlDoc {
+) -> Option<XmlDocPtr> {
     use crate::{io::xml_parser_get_directory, parser::xml_create_file_parser_ctxt};
 
     let replaced = sax.is_some();
-    let ret: *mut XmlDoc;
 
     xml_init_parser();
 
     let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     if let Some(sax) = sax {
         (*ctxt).sax = Some(sax);
@@ -1679,8 +1675,8 @@ pub unsafe fn xml_sax_parse_file_with_data(
 
     xml_parse_document(ctxt);
 
-    if (*ctxt).well_formed != 0 || recovery != 0 {
-        ret = (*ctxt).my_doc;
+    let ret = if (*ctxt).well_formed != 0 || recovery != 0 {
+        let ret = (*ctxt).my_doc;
         if !ret.is_null() && (*(*ctxt).input).buf.is_some() {
             if (*(*ctxt).input).buf.as_ref().unwrap().borrow().compressed > 0 {
                 (*ret).compression = 9;
@@ -1688,17 +1684,18 @@ pub unsafe fn xml_sax_parse_file_with_data(
                 (*ret).compression = (*(*ctxt).input).buf.as_ref().unwrap().borrow().compressed;
             }
         }
+        ret
     } else {
-        ret = null_mut();
         xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
-    }
+        null_mut()
+    };
     if replaced {
         (*ctxt).sax = None;
     }
     xml_free_parser_ctxt(ctxt);
 
-    ret
+    XmlDocPtr::from_raw(ret).unwrap()
 }
 
 /// Parse an XML external entity out of context and build a tree.
@@ -1715,15 +1712,14 @@ pub unsafe fn xml_sax_parse_file_with_data(
 pub(crate) unsafe fn xml_sax_parse_entity(
     sax: Option<Box<XmlSAXHandler>>,
     filename: Option<&str>,
-) -> *mut XmlDoc {
+) -> Option<XmlDocPtr> {
     use crate::parser::xml_create_file_parser_ctxt;
 
     let replaced = sax.is_some();
-    let ret: *mut XmlDoc;
 
     let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     if let Some(sax) = sax {
         (*ctxt).sax = Some(sax);
@@ -1732,19 +1728,19 @@ pub(crate) unsafe fn xml_sax_parse_entity(
 
     xml_parse_ext_parsed_ent(ctxt);
 
-    if (*ctxt).well_formed != 0 {
-        ret = (*ctxt).my_doc;
+    let ret = if (*ctxt).well_formed != 0 {
+        (*ctxt).my_doc
     } else {
-        ret = null_mut();
         xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
         (*ctxt).my_doc = null_mut();
-    }
+        null_mut()
+    };
     if replaced {
         (*ctxt).sax = None;
     }
     xml_free_parser_ctxt(ctxt);
 
-    ret
+    XmlDocPtr::from_raw(ret).unwrap()
 }
 
 /// Parse an XML external entity out of context and build a tree.
@@ -1757,7 +1753,7 @@ pub(crate) unsafe fn xml_sax_parse_entity(
 #[doc(alias = "xmlParseEntity")]
 #[deprecated]
 #[cfg(feature = "sax1")]
-pub unsafe fn xml_parse_entity(filename: Option<&str>) -> *mut XmlDoc {
+pub unsafe fn xml_parse_entity(filename: Option<&str>) -> Option<XmlDocPtr> {
     xml_sax_parse_entity(None, filename)
 }
 
@@ -1999,7 +1995,7 @@ pub unsafe fn xml_io_parse_dtd(
 #[doc(alias = "xmlParseBalancedChunkMemory")]
 #[cfg(feature = "sax1")]
 pub unsafe fn xml_parse_balanced_chunk_memory(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
     depth: i32,
@@ -2242,7 +2238,7 @@ pub unsafe fn xml_parse_in_node_context(
 #[doc(alias = "xmlParseBalancedChunkMemoryRecover")]
 #[cfg(feature = "sax1")]
 pub unsafe fn xml_parse_balanced_chunk_memory_recover(
-    doc: *mut XmlDoc,
+    doc: Option<XmlDocPtr>,
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
     depth: i32,
@@ -2287,9 +2283,9 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     (*new_doc).properties = XmlDocProperties::XmlDocInternal as i32;
     (*ctxt).ctxt_use_options_internal(XmlParserOption::XmlParseNoDict as i32, None);
     // doc.is_null() is only supported for historic reasons
-    if !doc.is_null() {
-        (*new_doc).int_subset = (*doc).int_subset;
-        (*new_doc).ext_subset = (*doc).ext_subset;
+    if let Some(doc) = doc {
+        (*new_doc).int_subset = doc.int_subset;
+        (*new_doc).ext_subset = doc.ext_subset;
     }
     let new_root: *mut XmlNode = xml_new_doc_node(
         XmlDocPtr::from_raw(new_doc).unwrap(),
@@ -2310,17 +2306,15 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     (*new_doc).add_child(new_root);
     (*ctxt).node_push(new_root);
     // doc.is_null() is only supported for historic reasons
-    if doc.is_null() {
+    if let Some(doc) = doc {
         (*ctxt).my_doc = new_doc;
+        (*new_doc).children.unwrap().doc = doc.as_ptr();
+        // Ensure that doc has XML spec namespace
+        (*(doc.as_ptr() as *mut XmlNode))
+            .search_ns_by_href(Some(doc), XML_XML_NAMESPACE.to_str().unwrap());
+        (*new_doc).old_ns = doc.old_ns;
     } else {
         (*ctxt).my_doc = new_doc;
-        (*new_doc).children.unwrap().doc = doc;
-        // Ensure that doc has XML spec namespace
-        (*(doc as *mut XmlNode)).search_ns_by_href(
-            XmlDocPtr::from_raw(doc).unwrap(),
-            XML_XML_NAMESPACE.to_str().unwrap(),
-        );
-        (*new_doc).old_ns = (*doc).old_ns;
     }
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
     (*ctxt).input_id = 2;
@@ -2331,10 +2325,10 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     (*ctxt).loadsubset = 0;
     (*ctxt).detect_sax2();
 
-    if !doc.is_null() {
-        content = (*doc).children.take().map_or(null_mut(), |c| c.as_ptr());
+    if let Some(mut doc) = doc {
+        content = doc.children.take().map_or(null_mut(), |c| c.as_ptr());
         xml_parse_content(ctxt);
-        (*doc).children = NodePtr::from_ptr(content);
+        doc.children = NodePtr::from_ptr(content);
     } else {
         xml_parse_content(ctxt);
     }
@@ -2367,7 +2361,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             .map_or(null_mut(), |c| c.as_ptr());
         *lst = cur;
         while !cur.is_null() {
-            (*cur).set_doc(XmlDocPtr::from_raw(doc).unwrap());
+            (*cur).set_doc(doc);
             (*cur).set_parent(None);
             cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
@@ -2394,7 +2388,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
 #[doc(alias = "xmlParseExternalEntityPrivate")]
 #[allow(clippy::too_many_arguments)]
 pub(crate) unsafe fn xml_parse_external_entity_private(
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     oldctxt: XmlParserCtxtPtr,
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
@@ -2424,9 +2418,9 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     if url.is_none() && id.is_none() {
         return (sax, XmlParserErrors::XmlErrInternalError);
     }
-    if doc.is_null() {
-        return (sax, XmlParserErrors::XmlErrInternalError);
-    }
+    // if doc.is_null() {
+    //     return (sax, XmlParserErrors::XmlErrInternalError);
+    // }
 
     let ctxt = match xml_create_entity_parser_ctxt_internal(sax, user_data, url, id, None, oldctxt)
     {
@@ -2447,12 +2441,10 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         return (sax, XmlParserErrors::XmlErrInternalError);
     }
     (*new_doc).properties = XmlDocProperties::XmlDocInternal as i32;
-    if !doc.is_null() {
-        (*new_doc).int_subset = (*doc).int_subset;
-        (*new_doc).ext_subset = (*doc).ext_subset;
-        if (*doc).url.is_some() {
-            (*new_doc).url = (*doc).url.clone();
-        }
+    (*new_doc).int_subset = doc.int_subset;
+    (*new_doc).ext_subset = doc.ext_subset;
+    if let Some(url) = doc.url.as_deref() {
+        (*new_doc).url = Some(url.to_owned());
     }
     let new_root: *mut XmlNode = xml_new_doc_node(
         XmlDocPtr::from_raw(new_doc).unwrap(),
@@ -2469,12 +2461,8 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     }
     (*new_doc).add_child(new_root);
     (*ctxt).node_push((*new_doc).children.map_or(null_mut(), |c| c.as_ptr()));
-    if doc.is_null() {
-        (*ctxt).my_doc = new_doc;
-    } else {
-        (*ctxt).my_doc = doc;
-        (*new_root).doc = doc;
-    }
+    (*ctxt).my_doc = doc.as_ptr();
+    (*new_root).doc = doc.as_ptr();
 
     // Get the 4 first bytes and decode the charset
     // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
@@ -2623,7 +2611,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
 #[deprecated]
 #[cfg(feature = "sax1")]
 pub(crate) unsafe fn xml_parse_external_entity(
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
     depth: i32,
@@ -2667,7 +2655,7 @@ pub unsafe fn xml_parse_ctxt_external_entity(
     };
     let has_sax = (*ctx).sax.is_some();
     let (sax, error) = xml_parse_external_entity_private(
-        (*ctx).my_doc,
+        XmlDocPtr::from_raw((*ctx).my_doc).unwrap().unwrap(),
         ctx,
         (*ctx).sax.take(),
         user_data,

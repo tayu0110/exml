@@ -5411,7 +5411,8 @@ unsafe fn xml_schema_add_schema_doc(
                                 .as_ref(),
                             None,
                             SCHEMAS_PARSE_OPTIONS,
-                        );
+                        )
+                        .map_or(null_mut(), |doc| doc.as_ptr());
                     } else if !schema_buffer.is_null() {
                         let mem =
                             from_raw_parts(schema_buffer as *const u8, schema_buffer_len as usize)
@@ -5423,7 +5424,8 @@ unsafe fn xml_schema_add_schema_doc(
                             None,
                             None,
                             SCHEMAS_PARSE_OPTIONS,
-                        );
+                        )
+                        .map_or(null_mut(), |doc| doc.as_ptr());
                         schema_location = c"in_memory_buffer".as_ptr() as _;
                         if !doc.is_null() {
                             (*doc).url = Some(

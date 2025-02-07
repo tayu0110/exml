@@ -2151,7 +2151,7 @@ pub unsafe fn xml_shell_load(
             None
         }
     } else {
-        XmlDocPtr::from_raw(xml_read_file(filename, None, 0)).unwrap()
+        xml_read_file(filename, None, 0)
     }) else {
         return -1;
     };

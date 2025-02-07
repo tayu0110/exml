@@ -2652,12 +2652,15 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         }
     } else if CMD_ARGS.test_io {
         if filename == Some("-") {
-            doc = xml_read_io(stdin(), None, None, OPTIONS.load(Ordering::Relaxed));
+            doc = xml_read_io(stdin(), None, None, OPTIONS.load(Ordering::Relaxed))
+                .map_or(null_mut(), |doc| doc.into());
         } else if let Some(Ok(f)) = filename.map(File::open) {
             if rectxt.is_null() {
-                doc = xml_read_io(f, filename, None, OPTIONS.load(Ordering::Relaxed));
+                doc = xml_read_io(f, filename, None, OPTIONS.load(Ordering::Relaxed))
+                    .map_or(null_mut(), |doc| doc.into());
             } else {
-                doc = xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS.load(Ordering::Relaxed));
+                doc = xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS.load(Ordering::Relaxed))
+                    .map_or(null_mut(), |doc| doc.into());
             }
         } else {
             doc = null_mut();
@@ -2687,7 +2690,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             filename.unwrap(),
             None,
             OPTIONS.load(Ordering::Relaxed),
-        );
+        )
+        .map_or(null_mut(), |doc| doc.into());
 
         if rectxt.is_null() {
             xml_free_parser_ctxt(ctxt);
@@ -2718,10 +2722,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
         let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
         if rectxt.is_null() {
-            doc = xml_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed));
+            doc = xml_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
+                .map_or(null_mut(), |doc| doc.into());
         } else {
             doc =
-                xml_ctxt_read_memory(rectxt, mem, filename, None, OPTIONS.load(Ordering::Relaxed));
+                xml_ctxt_read_memory(rectxt, mem, filename, None, OPTIONS.load(Ordering::Relaxed))
+                    .map_or(null_mut(), |doc| doc.into());
         }
 
         munmap(base as _, info.st_size as _);
@@ -2746,7 +2752,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 filename.unwrap(),
                 None,
                 OPTIONS.load(Ordering::Relaxed),
-            );
+            )
+            .map_or(null_mut(), |doc| doc.into());
 
             if (*ctxt).valid == 0 {
                 PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
@@ -2761,9 +2768,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             filename.unwrap(),
             None,
             OPTIONS.load(Ordering::Relaxed),
-        );
+        )
+        .map_or(null_mut(), |doc| doc.into());
     } else {
-        doc = xml_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed));
+        doc = xml_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed))
+            .map_or(null_mut(), |doc| doc.into());
     }
 
     // If we don't have a document we might as well give up.

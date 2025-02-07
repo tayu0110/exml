@@ -30,9 +30,7 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_input_from_file, xml_new_parser_ctxt,
         xml_read_file, XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{
-        xml_free_doc, NodeCommon, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNode,
-    },
+    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlDocProperties, XmlElementType, XmlNode},
     xpath::{
         xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
     },
@@ -180,15 +178,9 @@ unsafe fn xmlconf_test_invalid(
         test_log!(logfile, "test {id} : {filename} out of memory\n",);
         return 0;
     }
-    let doc: *mut XmlDoc = xml_ctxt_read_file(ctxt, filename, None, options);
-    if doc.is_null() {
-        test_log!(
-            logfile,
-            "test {id} : {filename} invalid document turned not well-formed too\n",
-        );
-    } else {
+    if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
         // invalidity should be reported both in the context and in the document
-        if (*ctxt).valid != 0 || (*doc).properties & XmlDocProperties::XmlDocDTDValid as i32 != 0 {
+        if (*ctxt).valid != 0 || doc.properties & XmlDocProperties::XmlDocDTDValid as i32 != 0 {
             test_log!(
                 logfile,
                 "test {id} : {filename} failed to detect invalid document\n",
@@ -196,7 +188,12 @@ unsafe fn xmlconf_test_invalid(
             NB_ERRORS += 1;
             ret = 0;
         }
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc);
+    } else {
+        test_log!(
+            logfile,
+            "test {id} : {filename} invalid document turned not well-formed too\n",
+        );
     }
     xml_free_parser_ctxt(ctxt);
     ret
@@ -215,17 +212,9 @@ unsafe fn xmlconf_test_valid(
         test_log!(logfile, "test {id} : {filename} out of memory\n",);
         return 0;
     }
-    let doc: *mut XmlDoc = xml_ctxt_read_file(ctxt, filename, None, options);
-    if doc.is_null() {
-        test_log!(
-            logfile,
-            "test {id} : {filename} failed to parse a valid document\n",
-        );
-        NB_ERRORS += 1;
-        ret = 0;
-    } else {
+    if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
         // validity should be reported both in the context and in the document
-        if (*ctxt).valid == 0 || (*doc).properties & XmlDocProperties::XmlDocDTDValid as i32 == 0 {
+        if (*ctxt).valid == 0 || doc.properties & XmlDocProperties::XmlDocDTDValid as i32 == 0 {
             test_log!(
                 logfile,
                 "test {id} : {filename} failed to validate a valid document\n",
@@ -233,7 +222,14 @@ unsafe fn xmlconf_test_valid(
             NB_ERRORS += 1;
             ret = 0;
         }
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc);
+    } else {
+        test_log!(
+            logfile,
+            "test {id} : {filename} failed to parse a valid document\n",
+        );
+        NB_ERRORS += 1;
+        ret = 0;
     }
     xml_free_parser_ctxt(ctxt);
     ret
@@ -249,12 +245,7 @@ unsafe fn xmlconf_test_not_nswf(
 
     // In case of Namespace errors, libxml2 will still parse the document
     // but log a Namespace error.
-    let doc: *mut XmlDoc = xml_read_file(filename, None, options);
-    if doc.is_null() {
-        test_log!(logfile, "test {id} : {filename} failed to parse the XML\n",);
-        NB_ERRORS += 1;
-        ret = 0;
-    } else {
+    if let Some(doc) = xml_read_file(filename, None, options) {
         let last_error = get_last_error();
         if last_error.code() == XmlParserErrors::XmlErrOK
             || last_error.domain() != XmlErrorDomain::XmlFromNamespace
@@ -266,7 +257,11 @@ unsafe fn xmlconf_test_not_nswf(
             NB_ERRORS += 1;
             ret = 0;
         }
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc);
+    } else {
+        test_log!(logfile, "test {id} : {filename} failed to parse the XML\n",);
+        NB_ERRORS += 1;
+        ret = 0;
     }
     ret
 }
@@ -279,14 +274,13 @@ unsafe fn xmlconf_test_not_wf(
 ) -> i32 {
     let mut ret: i32 = 1;
 
-    let doc: *mut XmlDoc = xml_read_file(filename, None, options);
-    if !doc.is_null() {
+    if let Some(doc) = xml_read_file(filename, None, options) {
         test_log!(
             logfile,
             "test {id} : {filename} failed to detect not well formedness\n",
         );
         NB_ERRORS += 1;
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc);
         ret = 0;
     }
     ret
@@ -511,12 +505,11 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         xmlconf_info();
         return -1;
     }
-    let doc: *mut XmlDoc = xml_read_file(confxml, None, XmlParserOption::XmlParseNoEnt as i32);
-    if doc.is_null() {
+    let Some(doc) = xml_read_file(confxml, None, XmlParserOption::XmlParseNoEnt as i32) else {
         eprintln!("{} is corrupted ", confxml);
         xmlconf_info();
         return -1;
-    }
+    };
 
     let cur: *mut XmlNode = (*doc).get_root_element();
     let ret = if cur.is_null() || !xml_str_equal((*cur).name, c"TESTSUITE".as_ptr() as _) {
@@ -524,9 +517,9 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         xmlconf_info();
         -1
     } else {
-        xmlconf_test_suite(logfile, doc, cur)
+        xmlconf_test_suite(logfile, doc.into(), cur)
     };
-    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+    xml_free_doc(doc);
     ret
 }
 

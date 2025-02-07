@@ -1233,7 +1233,7 @@ unsafe fn xml_relaxng_load_external_ref(
     }
 
     // load the document
-    let Some(doc) = XmlDocPtr::from_raw(xml_read_file(url, None, 0)).unwrap() else {
+    let Some(doc) = xml_read_file(url, None, 0) else {
         xml_rng_perr!(
             ctxt,
             null_mut(),
@@ -1383,7 +1383,7 @@ unsafe fn xml_relaxng_load_include(
     }
 
     // load the document
-    let Some(doc) = XmlDocPtr::from_raw(xml_read_file(url, None, 0)).unwrap() else {
+    let Some(doc) = xml_read_file(url, None, 0) else {
         xml_rng_perr!(
             ctxt,
             node,
@@ -5872,7 +5872,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
 
     // First step is to parse the input document into an DOM/Infoset
     let doc = if let Some(url) = (*ctxt).url.as_deref() {
-        let Some(doc) = XmlDocPtr::from_raw(xml_read_file(url, None, 0)).unwrap() else {
+        let Some(doc) = xml_read_file(url, None, 0) else {
             xml_rng_perr!(
                 ctxt,
                 null_mut(),
@@ -5885,8 +5885,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
         doc
     } else if !(*ctxt).buffer.is_null() {
         let mem = from_raw_parts((*ctxt).buffer as *const u8, (*ctxt).size as usize).to_vec();
-        let Some(mut doc) = XmlDocPtr::from_raw(xml_read_memory(mem, None, None, 0)).unwrap()
-        else {
+        let Some(mut doc) = xml_read_memory(mem, None, None, 0) else {
             xml_rng_perr!(
                 ctxt,
                 null_mut(),

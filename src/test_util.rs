@@ -1237,7 +1237,7 @@ unsafe fn get_api_root() -> *mut XmlNode {
 
 unsafe fn get_api_doc() -> *mut XmlDoc {
     if API_DOC.get().is_null() {
-        API_DOC.set(xml_read_memory("<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_bytes().to_vec(), Some("root_test"), None, 0));
+        API_DOC.set(xml_read_memory("<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_bytes().to_vec(), Some("root_test"), None, 0).map_or(null_mut(), |doc| doc.as_ptr()));
         API_ROOT.set(null_mut());
         API_ATTR.set(null_mut());
     }
@@ -1488,7 +1488,8 @@ pub(crate) unsafe fn gen_xml_doc_ptr(no: i32, _nr: i32) -> *mut XmlDoc {
         return xml_new_doc(Some("1.0"));
     }
     if no == 1 {
-        return xml_read_memory("<foo/>".as_bytes().to_vec(), Some("test"), None, 0);
+        return xml_read_memory("<foo/>".as_bytes().to_vec(), Some("test"), None, 0)
+            .map_or(null_mut(), |doc| doc.as_ptr());
     }
     if no == 2 {
         return xml_read_memory(
@@ -1496,7 +1497,8 @@ pub(crate) unsafe fn gen_xml_doc_ptr(no: i32, _nr: i32) -> *mut XmlDoc {
             Some("test"),
             None,
             0,
-        );
+        )
+        .map_or(null_mut(), |doc| doc.as_ptr());
     }
     null_mut()
 }

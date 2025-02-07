@@ -19,7 +19,7 @@ use exml::{
         parser::{xml_cleanup_parser, xml_init_parser, xml_parse_file},
         xmlmemory::xml_memory_dump,
     },
-    tree::{xml_free_doc, XmlDoc, XmlDocPtr},
+    tree::xml_free_doc,
 };
 use libc::{memset, pthread_create, pthread_join, pthread_t};
 
@@ -67,7 +67,6 @@ static NUM_THREADS: usize = unsafe { THREAD_PARAMS.len() };
 
 extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     unsafe {
-        let my_doc: *mut XmlDoc;
         let params: *mut XmlThreadParams = private_data as *mut XmlThreadParams;
         let filename = (*params).filename;
         let mut okay: c_int = 1;
@@ -82,15 +81,11 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             set_generic_error(None, Some(GenericErrorContext::new(stderr)));
         }
         #[cfg(feature = "sax1")]
-        {
-            my_doc = xml_parse_file(Some(filename));
-        }
+        let my_doc = xml_parse_file(Some(filename));
         #[cfg(not(feature = "sax1"))]
-        {
-            myDoc = xmlReadFile(filename, NULL, XML_WITH_CATALOG);
-        }
-        if !my_doc.is_null() {
-            xml_free_doc(XmlDocPtr::from_raw(my_doc).unwrap().unwrap());
+        let my_doc = xmlReadFile(filename, NULL, XML_WITH_CATALOG);
+        if let Some(my_doc) = my_doc {
+            xml_free_doc(my_doc);
         } else {
             println!("parse failed");
             okay = 0;

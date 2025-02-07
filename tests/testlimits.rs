@@ -35,9 +35,8 @@ use exml::{
         XmlParserInputPtr,
     },
     tree::{
-        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
-        XmlEnumeration,
+        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration,
     },
 };
 use libc::{memcpy, strlen, strncmp};
@@ -937,11 +936,9 @@ unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -
     };
     let filename = CStr::from_ptr(filename).to_string_lossy();
     let filename = filename.as_ref();
-    let doc: *mut XmlDoc = xml_ctxt_read_file(ctxt, filename, None, options);
-
-    if !doc.is_null() {
+    if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
         eprintln!("SAX parsing generated a document !");
-        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_free_doc(doc);
         res = 0;
     } else if (*ctxt).well_formed == 0 {
         if fail != 0 {
