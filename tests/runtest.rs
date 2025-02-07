@@ -3300,8 +3300,6 @@ unsafe fn schemas_one_test(
     options: i32,
     schemas: XmlSchemaPtr,
 ) -> i32 {
-    use std::ops::DerefMut;
-
     use exml::libxml::xmlschemas::{
         xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt, xml_schema_set_valid_errors,
         xml_schema_validate_doc,
@@ -3309,7 +3307,7 @@ unsafe fn schemas_one_test(
 
     let mut ret: i32 = 0;
 
-    let Some(mut doc) = xml_read_file(filename, None, options) else {
+    let Some(doc) = xml_read_file(filename, None, options) else {
         eprintln!(
             "failed to parse instance {filename} for {}",
             CStr::from_ptr(sch).to_string_lossy(),
@@ -3340,7 +3338,7 @@ unsafe fn schemas_one_test(
         Some(test_error_handler),
         Some(GenericErrorContext::new(ctxt)),
     );
-    let valid_result: i32 = xml_schema_validate_doc(ctxt, doc.deref_mut());
+    let valid_result: i32 = xml_schema_validate_doc(ctxt, doc);
     match valid_result.cmp(&0) {
         std::cmp::Ordering::Equal => {
             writeln!(schemas_output, "{filename} validates").ok();

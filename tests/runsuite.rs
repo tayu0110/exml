@@ -5,7 +5,6 @@ use std::{
     env::args,
     ffi::{c_char, c_int, CStr, CString},
     fs::{metadata, File},
-    ops::DerefMut,
     ptr::null_mut,
     sync::atomic::{AtomicPtr, Ordering},
 };
@@ -862,8 +861,7 @@ unsafe fn xstc_test_instance(
                 // goto done;
             } else {
                 NB_TESTS += 1;
-                if let Some(mut doc) =
-                    xml_read_file(&path, None, XmlParserOption::XmlParseNoEnt as i32)
+                if let Some(doc) = xml_read_file(&path, None, XmlParserOption::XmlParseNoEnt as i32)
                 {
                     ctxt = xml_schema_new_valid_ctxt(schemas);
                     xml_schema_set_valid_errors(
@@ -872,7 +870,7 @@ unsafe fn xstc_test_instance(
                         Some(test_error_handler),
                         Some(GenericErrorContext::new(ctxt)) as _,
                     );
-                    ret = xml_schema_validate_doc(ctxt, doc.deref_mut());
+                    ret = xml_schema_validate_doc(ctxt, doc);
 
                     if xml_str_equal(validity, c"valid".as_ptr() as _) {
                         match ret.cmp(&0) {
