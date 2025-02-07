@@ -67,8 +67,8 @@ use crate::{
         },
     },
     tree::{
-        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocPtr,
-        XmlElementType, XmlNode, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlDocPtr, XmlElementType,
+        XmlNode, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xpath::{
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
@@ -9317,7 +9317,7 @@ pub unsafe fn xml_xpath_count_function(ctxt: XmlXPathParserContextPtr, nargs: i3
 /// Returns a node-set of selected elements.
 #[doc(alias = "xmlXPathGetElementsByIds")]
 unsafe fn xml_xpath_get_elements_by_ids(
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     mut ids: *const XmlChar,
 ) -> Option<Box<XmlNodeSet>> {
     let mut cur: *const XmlChar = ids;
@@ -9345,7 +9345,7 @@ unsafe fn xml_xpath_get_elements_by_ids(
             // me and Aleksey Sanin, people blatantly violated that
             // constraint, like Visa3D spec.
             // if (xmlValidateNCName(ID, 1) == 0)
-            if let Some(attr) = xml_get_id(XmlDocPtr::from_raw(doc).unwrap().unwrap(), id) {
+            if let Some(attr) = xml_get_id(doc, id) {
                 if let Some(attr) = attr.as_ref().as_attribute_node() {
                     elem = attr.as_ref().parent.map_or(null_mut(), |p| p.as_ptr());
                 } else if matches!(attr.as_ref().element_type(), XmlElementType::XmlElementNode) {
@@ -9448,9 +9448,7 @@ pub unsafe fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, nargs: i32) 
                 let tokens = xml_xpath_cast_node_to_string(node);
                 let tokens = CString::new(tokens).unwrap();
                 let ns = xml_xpath_get_elements_by_ids(
-                    (*(*ctxt).context)
-                        .doc
-                        .map_or(null_mut(), |doc| doc.as_ptr()),
+                    (*(*ctxt).context).doc.unwrap(),
                     tokens.as_ptr() as *const u8,
                 );
                 // TODO: Check memory error.
@@ -9471,9 +9469,7 @@ pub unsafe fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, nargs: i32) 
         .as_deref()
         .map(|s| CString::new(s).unwrap());
     let ret = xml_xpath_get_elements_by_ids(
-        (*(*ctxt).context)
-            .doc
-            .map_or(null_mut(), |doc| doc.as_ptr()),
+        (*(*ctxt).context).doc.unwrap(),
         strval
             .as_deref()
             .map_or(null_mut(), |s| s.as_ptr() as *const u8),

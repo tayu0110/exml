@@ -2817,7 +2817,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     // shell interaction
     #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
     if CMD_ARGS.shell {
-        xml_xpath_order_doc_elems(doc);
+        xml_xpath_order_doc_elems(XmlDocPtr::from_raw(doc).unwrap().unwrap());
         let fname = filename.map(|f| CString::new(f).unwrap());
         xml_shell(
             XmlDocPtr::from_raw(doc).unwrap().unwrap(),

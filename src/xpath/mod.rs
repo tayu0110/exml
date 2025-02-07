@@ -63,7 +63,7 @@ use crate::{
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, XmlChar},
     },
-    tree::{NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNsPtr},
+    tree::{NodeCommon, NodePtr, XmlDocPtr, XmlElementType, XmlNode, XmlNsPtr},
 };
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
@@ -1033,15 +1033,15 @@ pub unsafe extern "C" fn xml_xpath_context_set_cache(
 /// Returns the number of elements found in the document or -1 in case of error.
 #[doc(alias = "xmlXPathOrderDocElems")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: *mut XmlDoc) -> i64 {
+pub unsafe fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
     use crate::tree::NodeCommon;
 
     let mut count: isize = 0;
 
-    if doc.is_null() {
-        return -1;
-    }
-    let mut cur = (*doc).children.map_or(null_mut(), |c| c.as_ptr());
+    // if doc.is_null() {
+    //     return -1;
+    // }
+    let mut cur = doc.children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
         if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
             count += 1;
@@ -1060,7 +1060,7 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: *mut XmlDoc) -> i64 {
             if cur.is_null() {
                 break;
             }
-            if cur == doc as *mut XmlNode {
+            if cur == doc.as_ptr() as *mut XmlNode {
                 cur = null_mut();
                 break;
             }
@@ -2767,36 +2767,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlXPathObjectCopy()"
                     );
                     eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_order_doc_elems() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                let mem_base = xml_mem_blocks();
-                let doc = gen_xml_doc_ptr(n_doc, 0);
-
-                let ret_val = xml_xpath_order_doc_elems(doc);
-                desret_long(ret_val);
-                des_xml_doc_ptr(n_doc, doc, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathOrderDocElems",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathOrderDocElems()"
-                    );
-                    eprintln!(" {}", n_doc);
                 }
             }
         }
