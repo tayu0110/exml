@@ -989,7 +989,7 @@ pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> Option<XmlDocPtr> 
             return None;
         };
         (*(ret_int_subset.as_ptr() as *mut XmlNode)).set_doc(Some(ret));
-        ret_int_subset.parent = ret.as_ptr();
+        ret_int_subset.parent = Some(ret);
     }
     if doc.old_ns.is_some() {
         ret.old_ns = xml_copy_namespace_list(doc.old_ns);

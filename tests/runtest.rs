@@ -2255,30 +2255,25 @@ unsafe fn err_parse_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    let mut doc;
     let mut base: *const c_char = null_mut();
     let mut size: i32 = 0;
     let mut res: i32 = 0;
     let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
 
     NB_TESTS.set(NB_TESTS.get() + 1);
-    if cfg!(feature = "html") && options & XML_PARSE_HTML != 0 {
+    let doc = match options {
         #[cfg(feature = "html")]
-        {
-            doc = XmlDocPtr::from_raw(html_read_file(filename, None, options)).unwrap();
-        }
-    } else if cfg!(feature = "xinclude") && options & XmlParserOption::XmlParseXInclude as i32 != 0
-    {
+        options if options & XML_PARSE_HTML != 0 => html_read_file(filename, None, options),
         #[cfg(feature = "xinclude")]
-        {
-            doc = xml_read_file(filename, None, options);
+        options if options & XmlParserOption::XmlParseXInclude as i32 != 0 => {
+            let mut doc = xml_read_file(filename, None, options);
             if let Some(doc) = doc.take_if(|doc| xml_xinclude_process_flags(*doc, options) < 0) {
                 xml_free_doc(doc);
             }
+            doc
         }
-    } else {
-        doc = xml_read_file(filename, None, options);
-    }
+        _ => xml_read_file(filename, None, options),
+    };
     if let Some(result) = cresult {
         if let Some(mut doc) = doc {
             #[cfg(feature = "html")]

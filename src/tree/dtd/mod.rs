@@ -61,7 +61,7 @@ pub struct XmlDtd {
     pub(crate) name: *const XmlChar,      /* Name of the DTD */
     pub(crate) children: Option<NodePtr>, /* the value of the property link */
     pub(crate) last: Option<NodePtr>,     /* last child link */
-    pub(crate) parent: *mut XmlDoc,       /* child->parent link */
+    pub(crate) parent: Option<XmlDocPtr>, /* child->parent link */
     pub(crate) next: Option<NodePtr>,     /* next sibling link  */
     pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
     pub(crate) doc: Option<XmlDocPtr>,    /* the containing document */
@@ -132,7 +132,7 @@ impl Default for XmlDtd {
             name: null_mut(),
             children: None,
             last: None,
-            parent: null_mut(),
+            parent: None,
             next: None,
             prev: None,
             doc: None,
@@ -186,10 +186,13 @@ impl NodeCommon for XmlDtd {
         self.prev = prev;
     }
     fn parent(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.parent as *mut XmlNode)
+        NodePtr::from_ptr(self.parent.map_or(null_mut(), |doc| doc.as_ptr()) as *mut XmlNode)
     }
     fn set_parent(&mut self, parent: Option<NodePtr>) {
-        self.parent = parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlDoc;
+        unsafe {
+            self.parent =
+                parent.and_then(|ptr| XmlDocPtr::from_raw(ptr.as_ptr() as *mut XmlDoc).unwrap());
+        }
     }
 }
 
@@ -227,7 +230,7 @@ pub unsafe fn xml_create_int_subset(
     }
     if let Some(mut doc) = doc {
         doc.int_subset = Some(cur);
-        cur.parent = doc.as_ptr();
+        cur.parent = Some(doc);
         cur.doc = Some(doc);
         if let Some(children) = doc.children {
             if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {

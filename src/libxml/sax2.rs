@@ -52,8 +52,8 @@ use crate::{
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
-        XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlNode, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
+        XmlEnumeration, XmlNode, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -1089,7 +1089,7 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
         #[cfg(feature = "html")]
         {
             if (*ctxt).my_doc.is_none() {
-                (*ctxt).my_doc = XmlDocPtr::from_raw(html_new_doc_no_dtd(null(), null())).unwrap();
+                (*ctxt).my_doc = html_new_doc_no_dtd(null(), null());
             }
             let Some(mut my_doc) = (*ctxt).my_doc else {
                 xml_sax2_err_memory(ctxt, "xmlSAX2StartDocument");

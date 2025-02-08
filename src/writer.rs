@@ -2103,8 +2103,7 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
         #[cfg(feature = "html")]
         {
             if (*ctxt).my_doc.is_none() {
-                (*ctxt).my_doc =
-                    XmlDocPtr::from_raw(html_new_doc_no_dtd(null_mut(), null_mut())).unwrap();
+                (*ctxt).my_doc = html_new_doc_no_dtd(null_mut(), null_mut());
             }
             if (*ctxt).my_doc.is_none() {
                 if let Some(error) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.error) {

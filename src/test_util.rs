@@ -1318,7 +1318,7 @@ pub(crate) unsafe fn desret_html_parser_ctxt_ptr(val: HtmlParserCtxtPtr) {
 }
 
 #[cfg(feature = "html")]
-pub(crate) unsafe fn gen_html_doc_ptr(no: i32, _nr: i32) -> HtmlDocPtr {
+pub(crate) unsafe fn gen_html_doc_ptr(no: i32, _nr: i32) -> Option<HtmlDocPtr> {
     use crate::libxml::{htmlparser::html_read_memory, htmltree::html_new_doc};
 
     if no == 0 {
@@ -1327,16 +1327,16 @@ pub(crate) unsafe fn gen_html_doc_ptr(no: i32, _nr: i32) -> HtmlDocPtr {
     if no == 1 {
         return html_read_memory("<html/>".as_bytes().to_vec(), Some("test"), None, 0);
     }
-    null_mut()
+    None
 }
 
 #[cfg(feature = "html")]
-pub(crate) unsafe fn desret_html_doc_ptr(val: HtmlDocPtr) {
-    if !val.is_null()
-        && val != API_DOC.get()
-        && (*val).doc.map_or(null_mut(), |doc| doc.as_ptr()) != API_DOC.get()
-    {
-        xml_free_doc(XmlDocPtr::from_raw(val).unwrap().unwrap());
+pub(crate) unsafe fn desret_html_doc_ptr(val: Option<HtmlDocPtr>) {
+    if let Some(val) = val.filter(|val| {
+        val.as_ptr() != API_DOC.get()
+            && val.doc.map_or(null_mut(), |doc| doc.as_ptr()) != API_DOC.get()
+    }) {
+        xml_free_doc(val);
     }
 }
 
@@ -1348,12 +1348,12 @@ pub(crate) unsafe fn gen_html_node_ptr(_no: i32, _nr: i32) -> HtmlNodePtr {
 pub(crate) unsafe fn des_html_node_ptr(_no: i32, _val: HtmlNodePtr, _nr: i32) {}
 
 #[cfg(feature = "html")]
-pub(crate) unsafe fn des_html_doc_ptr(_no: i32, val: HtmlDocPtr, _nr: i32) {
-    if !val.is_null()
-        && val != API_DOC.get()
-        && (*val).doc.map_or(null_mut(), |doc| doc.as_ptr()) != API_DOC.get()
-    {
-        xml_free_doc(XmlDocPtr::from_raw(val).unwrap().unwrap());
+pub(crate) unsafe fn des_html_doc_ptr(_no: i32, val: Option<HtmlDocPtr>, _nr: i32) {
+    if let Some(val) = val.filter(|val| {
+        val.as_ptr() != API_DOC.get()
+            && val.doc.map_or(null_mut(), |doc| doc.as_ptr()) != API_DOC.get()
+    }) {
+        xml_free_doc(val);
     }
 }
 

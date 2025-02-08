@@ -2122,7 +2122,6 @@ pub unsafe fn xml_shell_load(
     use crate::{
         libxml::{globals::xml_free, htmlparser::html_parse_file, xmlstring::xml_strdup},
         parser::xml_read_file,
-        tree::XmlDocPtr,
         uri::canonic_path,
         xpath::{xml_xpath_free_context, xml_xpath_new_context},
     };
@@ -2141,7 +2140,7 @@ pub unsafe fn xml_shell_load(
     let Some(doc) = (if html != 0 {
         #[cfg(feature = "html")]
         {
-            XmlDocPtr::from_raw(html_parse_file(filename, None)).unwrap()
+            html_parse_file(filename, None)
         }
         #[cfg(not(feature = "html"))]
         {
@@ -2197,8 +2196,6 @@ pub unsafe fn xml_shell_cat(
 ) -> i32 {
     use crate::libxml::htmltree::{html_doc_dump, html_node_dump_file};
 
-    use super::htmlparser::HtmlDocPtr;
-
     if ctxt.is_null() {
         return 0;
     }
@@ -2214,7 +2211,7 @@ pub unsafe fn xml_shell_cat(
         if (*node).element_type() == XmlElementType::XmlHTMLDocumentNode {
             html_doc_dump(
                 &mut (*ctxt).output,
-                XmlDocPtr::from_raw(node as HtmlDocPtr).unwrap().unwrap(),
+                XmlDocPtr::from_raw(node as *mut XmlDoc).unwrap().unwrap(),
             );
         } else {
             html_node_dump_file(&mut (*ctxt).output, Some(doc), node);

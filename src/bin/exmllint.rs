@@ -2578,7 +2578,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
 
             let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-            doc = html_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed));
+            doc = html_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
+                .map_or(null_mut(), |doc| doc.into());
 
             munmap(base as _, info.st_size as _);
             close(fd);
@@ -2586,7 +2587,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     } else if cfg!(feature = "html") && CMD_ARGS.html {
         #[cfg(feature = "html")]
         {
-            doc = html_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed));
+            doc = html_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed))
+                .map_or(null_mut(), |doc| doc.into());
         }
     } else if cfg!(feature = "libxml_push") && CMD_ARGS.push {
         // build an XML tree from a string;

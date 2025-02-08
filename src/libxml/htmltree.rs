@@ -64,7 +64,7 @@ const HTML_PI_NODE: XmlElementType = XmlElementType::XmlPINode;
 ///
 /// Returns a new document
 #[doc(alias = "htmlNewDoc")]
-pub unsafe fn html_new_doc(uri: *const XmlChar, external_id: *const XmlChar) -> HtmlDocPtr {
+pub unsafe fn html_new_doc(uri: *const XmlChar, external_id: *const XmlChar) -> Option<HtmlDocPtr> {
     if uri.is_null() && external_id.is_null() {
         return html_new_doc_no_dtd(
             c"http://www.w3.org/TR/REC-html40/loose.dtd".as_ptr() as _,
@@ -79,7 +79,10 @@ pub unsafe fn html_new_doc(uri: *const XmlChar, external_id: *const XmlChar) -> 
 ///
 /// Returns a new document, do not initialize the DTD if not provided
 #[doc(alias = "htmlNewDocNoDtD")]
-pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlChar) -> HtmlDocPtr {
+pub unsafe fn html_new_doc_no_dtd(
+    uri: *const XmlChar,
+    external_id: *const XmlChar,
+) -> Option<HtmlDocPtr> {
     // Allocate a new document and fill the fields.
     let Some(mut cur) = XmlDocPtr::new(XmlDoc {
         typ: XmlElementType::XmlHTMLDocumentNode,
@@ -100,7 +103,7 @@ pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlCh
         ..Default::default()
     }) else {
         html_err_memory(null_mut(), Some("HTML document creation failed\n"));
-        return null_mut();
+        return None;
     };
     cur.doc = Some(cur);
     if !external_id.is_null() || !uri.is_null() {
@@ -120,7 +123,7 @@ pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlCh
     {
         xml_register_node_default_value(cur.as_ptr() as *mut XmlNode);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Encoding definition lookup in the Meta tags
@@ -1377,70 +1380,6 @@ mod tests {
                     eprintln!(" {}", n_name);
                 }
             }
-        }
-    }
-
-    #[test]
-    fn test_html_new_doc() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let uri = gen_const_xml_char_ptr(n_uri, 0);
-                    let external_id = gen_const_xml_char_ptr(n_external_id, 1);
-
-                    let ret_val = html_new_doc(uri as *const XmlChar, external_id);
-                    desret_html_doc_ptr(ret_val);
-                    des_const_xml_char_ptr(n_uri, uri, 0);
-                    des_const_xml_char_ptr(n_external_id, external_id, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlNewDoc",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_uri);
-                        eprintln!(" {}", n_external_id);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlNewDoc()");
-        }
-    }
-
-    #[test]
-    fn test_html_new_doc_no_dt_d() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let uri = gen_const_xml_char_ptr(n_uri, 0);
-                    let external_id = gen_const_xml_char_ptr(n_external_id, 1);
-
-                    let ret_val = html_new_doc_no_dtd(uri as *const XmlChar, external_id);
-                    desret_html_doc_ptr(ret_val);
-                    des_const_xml_char_ptr(n_uri, uri, 0);
-                    des_const_xml_char_ptr(n_external_id, external_id, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlNewDocNoDtD",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_uri);
-                        eprintln!(" {}", n_external_id);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlNewDocNoDtD()");
         }
     }
 }

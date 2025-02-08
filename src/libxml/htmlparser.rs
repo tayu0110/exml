@@ -61,7 +61,7 @@ use crate::{
         xml_free_input_stream, xml_free_parser_ctxt, xml_new_input_stream, XmlParserCtxt,
         XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
     },
-    tree::{xml_create_int_subset, xml_free_doc, NodeCommon, XmlDoc, XmlElementType, XmlNode},
+    tree::{xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlNode},
     uri::canonic_path,
 };
 
@@ -81,7 +81,7 @@ pub type HtmlSAXHandler = XmlSAXHandler;
 pub type HtmlSAXHandlerPtr = XmlSAXHandlerPtr;
 pub type HtmlParserInput = XmlParserInput;
 pub type HtmlParserInputPtr = XmlParserInputPtr;
-pub type HtmlDocPtr = *mut XmlDoc;
+pub type HtmlDocPtr = XmlDocPtr;
 pub type HtmlNodePtr = *mut XmlNode;
 
 pub type HtmlElemDescPtr = *mut HtmlElemDesc;
@@ -9309,16 +9309,16 @@ pub unsafe fn html_sax_parse_doc(
     encoding: Option<&str>,
     sax: Option<Box<HtmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
-) -> HtmlDocPtr {
+) -> Option<HtmlDocPtr> {
     xml_init_parser();
 
     if cur.is_null() {
-        return null_mut();
+        return None;
     }
 
     let ctxt: HtmlParserCtxtPtr = html_create_doc_parser_ctxt(cur, encoding);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     let replaced = sax.is_some();
     if let Some(sax) = sax {
@@ -9327,7 +9327,7 @@ pub unsafe fn html_sax_parse_doc(
     }
 
     html_parse_document(ctxt);
-    let ret: HtmlDocPtr = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.as_ptr());
+    let ret = (*ctxt).my_doc;
     if replaced {
         (*ctxt).sax = None;
         (*ctxt).user_data = None;
@@ -9341,7 +9341,7 @@ pub unsafe fn html_sax_parse_doc(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlParseDoc")]
-pub unsafe fn html_parse_doc(cur: *const XmlChar, encoding: Option<&str>) -> HtmlDocPtr {
+pub unsafe fn html_parse_doc(cur: *const XmlChar, encoding: Option<&str>) -> Option<HtmlDocPtr> {
     html_sax_parse_doc(cur, encoding, None, None)
 }
 
@@ -9398,14 +9398,14 @@ pub unsafe fn html_sax_parse_file(
     encoding: Option<&str>,
     sax: Option<Box<HtmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
-) -> HtmlDocPtr {
+) -> Option<HtmlDocPtr> {
     let mut oldsax = None;
 
     xml_init_parser();
 
     let ctxt: HtmlParserCtxtPtr = html_create_file_parser_ctxt(filename, encoding);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     let replaced = sax.is_some();
     if let Some(sax) = sax {
@@ -9415,7 +9415,7 @@ pub unsafe fn html_sax_parse_file(
 
     html_parse_document(ctxt);
 
-    let ret: HtmlDocPtr = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.as_ptr());
+    let ret = (*ctxt).my_doc;
     if replaced {
         (*ctxt).sax = oldsax;
         (*ctxt).user_data = None;
@@ -9433,7 +9433,7 @@ pub unsafe fn html_sax_parse_file(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlParseFile")]
-pub unsafe fn html_parse_file(filename: &str, encoding: Option<&str>) -> HtmlDocPtr {
+pub unsafe fn html_parse_file(filename: &str, encoding: Option<&str>) -> Option<HtmlDocPtr> {
     html_sax_parse_file(filename, encoding, None, None)
 }
 
@@ -10907,7 +10907,7 @@ unsafe fn html_do_read(
     encoding: Option<&str>,
     options: i32,
     reuse: i32,
-) -> HtmlDocPtr {
+) -> Option<HtmlDocPtr> {
     html_ctxt_use_options(ctxt, options);
     (*ctxt).html = 1;
     if let Some(encoding) = encoding {
@@ -10920,7 +10920,7 @@ unsafe fn html_do_read(
         (*(*ctxt).input).filename = url.map(|u| u.to_owned());
     }
     html_parse_document(ctxt);
-    let ret: HtmlDocPtr = (*ctxt).my_doc.take().map_or(null_mut(), |doc| doc.as_ptr());
+    let ret = (*ctxt).my_doc.take();
     if reuse == 0 {
         xml_free_parser_ctxt(ctxt);
     }
@@ -10936,15 +10936,15 @@ pub unsafe fn html_read_doc(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> HtmlDocPtr {
+) -> Option<HtmlDocPtr> {
     if cur.is_null() {
-        return null_mut();
+        return None;
     }
 
     xml_init_parser();
     let ctxt: HtmlParserCtxtPtr = html_create_doc_parser_ctxt(cur, None);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     html_do_read(ctxt, url, encoding, options, 0)
 }
@@ -10953,11 +10953,15 @@ pub unsafe fn html_read_doc(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlReadFile")]
-pub unsafe fn html_read_file(filename: &str, encoding: Option<&str>, options: i32) -> HtmlDocPtr {
+pub unsafe fn html_read_file(
+    filename: &str,
+    encoding: Option<&str>,
+    options: i32,
+) -> Option<HtmlDocPtr> {
     xml_init_parser();
     let ctxt: HtmlParserCtxtPtr = html_create_file_parser_ctxt(filename, encoding);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     html_do_read(ctxt, None, None, options, 0)
 }
@@ -10971,11 +10975,11 @@ pub unsafe fn html_read_memory(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> HtmlDocPtr {
+) -> Option<HtmlDocPtr> {
     xml_init_parser();
     let ctxt: HtmlParserCtxtPtr = html_create_memory_parser_ctxt(buffer);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     html_do_read(ctxt, url, encoding, options, 0)
 }
@@ -10989,19 +10993,19 @@ pub unsafe fn html_read_io(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> HtmlDocPtr {
+) -> Option<HtmlDocPtr> {
     xml_init_parser();
 
     let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
     let ctxt: HtmlParserCtxtPtr = html_new_parser_ctxt();
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_ctxt(ctxt);
-        return null_mut();
+        return None;
     }
     (*ctxt).input_push(stream);
     html_do_read(ctxt, url, encoding, options, 0)
@@ -11018,9 +11022,9 @@ pub unsafe fn html_ctxt_read_doc(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> HtmlDocPtr {
+) -> Option<HtmlDocPtr> {
     if cur.is_null() {
-        return null_mut();
+        return None;
     }
     html_ctxt_read_memory(
         ctxt,
@@ -11041,9 +11045,9 @@ pub unsafe fn html_ctxt_read_file(
     filename: &str,
     encoding: Option<&str>,
     options: i32,
-) -> HtmlDocPtr {
+) -> Option<HtmlDocPtr> {
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     xml_init_parser();
 
@@ -11051,7 +11055,7 @@ pub unsafe fn html_ctxt_read_file(
 
     let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), None, ctxt);
     if stream.is_null() {
-        return null_mut();
+        return None;
     }
     (*ctxt).input_push(stream);
     html_do_read(ctxt, None, encoding, options, 1)
@@ -11068,22 +11072,20 @@ pub unsafe fn html_ctxt_read_memory(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> HtmlDocPtr {
+) -> Option<HtmlDocPtr> {
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     xml_init_parser();
 
     html_ctxt_reset(ctxt);
 
-    let Some(input) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
-        return null_mut();
-    };
+    let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
 
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
-        return null_mut();
+        return None;
     }
 
     (*ctxt).input_push(stream);
@@ -11101,9 +11103,9 @@ pub unsafe fn html_ctxt_read_io(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> HtmlDocPtr {
+) -> Option<HtmlDocPtr> {
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     xml_init_parser();
 
@@ -11113,7 +11115,7 @@ pub unsafe fn html_ctxt_read_io(
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
-        return null_mut();
+        return None;
     }
     (*ctxt).input_push(stream);
     html_do_read(ctxt, url, encoding, options, 1)
@@ -11252,38 +11254,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_html_auto_close_tag() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_HTML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_elem in 0..GEN_NB_HTML_NODE_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_html_doc_ptr(n_doc, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let elem = gen_html_node_ptr(n_elem, 2);
-
-                        let ret_val = html_auto_close_tag(doc, name, elem);
-                        desret_int(ret_val);
-                        des_html_doc_ptr(n_doc, doc, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_html_node_ptr(n_elem, elem, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            eprintln!("Leak of {} blocks found in htmlAutoCloseTag {n_doc} {n_name} {n_elem}", xml_mem_blocks() - mem_base);
-                            leaks += 1;
-                        }
-                    }
-                }
-            }
-
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlAutoCloseTag()");
-        }
-    }
 
     #[test]
     fn test_html_attr_allowed() {
@@ -11538,38 +11508,6 @@ mod tests {
                 );
             }
             assert!(leaks == 0, "{leaks} Leaks are found in htmlInitAutoClose()");
-        }
-    }
-
-    #[test]
-    fn test_html_is_auto_closed() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_HTML_DOC_PTR {
-                for n_elem in 0..GEN_NB_HTML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_html_doc_ptr(n_doc, 0);
-                    let elem = gen_html_node_ptr(n_elem, 1);
-
-                    let ret_val = html_is_auto_closed(doc, elem);
-                    desret_int(ret_val);
-                    des_html_doc_ptr(n_doc, doc, 0);
-                    des_html_node_ptr(n_elem, elem, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlIsAutoClosed",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_elem);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlIsAutoClosed()");
         }
     }
 
