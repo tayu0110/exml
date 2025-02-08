@@ -335,7 +335,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
         }
     }
 
-    let create = |mut meta: *mut crate::tree::XmlNode,
+    let create = |meta: *mut crate::tree::XmlNode,
                   encoding: Option<&str>,
                   head: *mut crate::tree::XmlNode,
                   newcontent: &str,
@@ -343,12 +343,11 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
         if meta.is_null() {
             if encoding.is_some() && !head.is_null() {
                 // Create a new Meta element with the right attributes
-                meta = xml_new_doc_node(Some(doc), None, "meta", null_mut())
-                    .map_or(null_mut(), |node| node.as_ptr());
+                let meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
                 if let Some(mut children) = (*head).children() {
-                    children.add_prev_sibling(meta);
+                    children.add_prev_sibling(meta.map_or(null_mut(), |node| node.as_ptr()));
                 } else {
-                    (*head).add_child(meta);
+                    (*head).add_child(meta.map_or(null_mut(), |node| node.as_ptr()));
                 }
                 xml_new_prop(
                     meta,

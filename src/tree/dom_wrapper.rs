@@ -2353,7 +2353,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         && (*clone).parent().is_some()
                         && xml_is_id(
                             Some(dest_doc),
-                            (*clone).parent().unwrap().as_ptr(),
+                            XmlNodePtr::from_raw((*clone).parent().unwrap().as_ptr()).unwrap(),
                             XmlAttrPtr::from_raw(clone as _).unwrap(),
                         ) != 0
                     {

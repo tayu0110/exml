@@ -1593,7 +1593,12 @@ unsafe fn xml_sax2_attribute_internal(
     };
 
     // !!!!!! <a toto:arg="" xmlns:toto="http://toto.com">
-    let Some(mut ret) = xml_new_ns_prop((*ctxt).node, namespace, name, null()) else {
+    let Some(mut ret) = xml_new_ns_prop(
+        XmlNodePtr::from_raw((*ctxt).node).unwrap(),
+        namespace,
+        name,
+        null(),
+    ) else {
         // goto error;
         if !nval.is_null() {
             xml_free(nval as _);
@@ -1712,7 +1717,12 @@ unsafe fn xml_sax2_attribute_internal(
                             .as_ref(),
                         ret,
                     );
-                } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
+                } else if xml_is_id(
+                    (*ctxt).my_doc,
+                    XmlNodePtr::from_raw((*ctxt).node).unwrap(),
+                    Some(ret),
+                ) != 0
+                {
                     xml_add_id(
                         addr_of_mut!((*ctxt).vctxt) as _,
                         (*ctxt).my_doc.unwrap(),
@@ -2458,7 +2468,7 @@ unsafe fn xml_sax2_attribute_ns(
         ret
     } else {
         let Some(ret) = xml_new_ns_prop(
-            (*ctxt).node,
+            XmlNodePtr::from_raw((*ctxt).node).unwrap(),
             namespace,
             &CStr::from_ptr(localname as *const i8).to_string_lossy(),
             null_mut(),
@@ -2625,7 +2635,12 @@ unsafe fn xml_sax2_attribute_ns(
                             .as_ref(),
                         ret,
                     );
-                } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, Some(ret)) != 0 {
+                } else if xml_is_id(
+                    (*ctxt).my_doc,
+                    XmlNodePtr::from_raw((*ctxt).node).unwrap(),
+                    Some(ret),
+                ) != 0
+                {
                     xml_add_id(
                         addr_of_mut!((*ctxt).vctxt) as _,
                         (*ctxt).my_doc.unwrap(),

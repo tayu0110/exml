@@ -146,7 +146,7 @@ use crate::{
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
         XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
-        XmlNsPtr, XML_XML_NAMESPACE,
+        XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
@@ -25646,8 +25646,12 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         }
 
                         if (*iattr).ns_name.is_null() {
-                            if xml_new_prop(def_attr_owner_elem, (*iattr).local_name, value)
-                                .is_none()
+                            if xml_new_prop(
+                                XmlNodePtr::from_raw(def_attr_owner_elem).unwrap(),
+                                (*iattr).local_name,
+                                value,
+                            )
+                            .is_none()
                             {
                                 VERROR_INT!(
                                     vctxt,
@@ -25710,7 +25714,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             // If we have QNames: do we need to ensure there's a
                             // prefix defined for the QName?
                             xml_new_ns_prop(
-                                def_attr_owner_elem,
+                                XmlNodePtr::from_raw(def_attr_owner_elem).unwrap(),
                                 ns,
                                 &CStr::from_ptr((*iattr).local_name as *const i8).to_string_lossy(),
                                 value,

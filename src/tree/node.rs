@@ -1201,7 +1201,7 @@ impl XmlNode {
         // No equal attr found; create a new one.
         let value = value.map(|v| CString::new(v).unwrap());
         xml_new_prop_internal(
-            self,
+            XmlNodePtr::from_raw(self as *mut XmlNode).unwrap(),
             ns,
             name,
             value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8),

@@ -37,8 +37,8 @@ use crate::libxml::{
 use super::{
     xml_free_node_list, xml_new_doc_text, xml_new_ns, xml_new_reconciled_ns,
     xml_static_copy_node_list, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
-    NodePtr, XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNsPtr,
-    __XML_REGISTER_CALLBACKS,
+    NodePtr, XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr,
+    XmlNsPtr, __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -328,19 +328,21 @@ pub unsafe fn xml_new_doc_prop(
 }
 
 pub(super) unsafe fn xml_new_prop_internal(
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
     ns: Option<XmlNsPtr>,
     name: &str,
     value: *const XmlChar,
 ) -> Option<XmlAttrPtr> {
-    if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
+    if node.map_or(false, |node| {
+        !matches!(node.element_type(), XmlElementType::XmlElementNode)
+    }) {
         return None;
     }
 
     // Allocate a new property and fill the fields.
     let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
         typ: XmlElementType::XmlAttributeNode,
-        parent: NodePtr::from_ptr(node),
+        parent: NodePtr::from_ptr(node.map_or(null_mut(), |node| node.as_ptr())),
         ns,
         name: xml_strndup(name.as_ptr(), name.len() as i32),
         ..Default::default()
@@ -350,8 +352,8 @@ pub(super) unsafe fn xml_new_prop_internal(
     };
 
     let mut doc = None;
-    if !node.is_null() {
-        doc = (*node).doc;
+    if let Some(node) = node {
+        doc = node.doc;
         cur.doc = doc;
     }
 
@@ -371,27 +373,31 @@ pub(super) unsafe fn xml_new_prop_internal(
     }
 
     // Add it at the end to preserve parsing order ...
-    if !node.is_null() {
-        if let Some(mut prev) = (*node).properties {
+    if let Some(mut node) = node {
+        if let Some(mut prev) = node.properties {
             while let Some(next) = prev.next {
                 prev = next;
             }
             prev.next = Some(cur);
             cur.prev = Some(prev);
         } else {
-            (*node).properties = Some(cur);
+            node.properties = Some(cur);
         }
     }
 
-    if !value.is_null() && !node.is_null() && xml_is_id((*node).doc, node, Some(cur)) == 1 {
-        xml_add_id(
-            null_mut(),
-            (*node).doc.unwrap(),
-            CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-            cur,
-        );
+    if !value.is_null() {
+        if let Some(node) = node {
+            if xml_is_id(node.doc, Some(node), Some(cur)) == 1 {
+                xml_add_id(
+                    null_mut(),
+                    node.doc.unwrap(),
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    cur,
+                );
+            }
+        }
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -407,7 +413,7 @@ pub(super) unsafe fn xml_new_prop_internal(
 #[doc(alias = "xmlNewProp")]
 #[cfg(any(feature = "libxml_tree", feature = "html", feature = "schema"))]
 pub unsafe fn xml_new_prop(
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
     name: *const XmlChar,
     value: *const XmlChar,
 ) -> Option<XmlAttrPtr> {
@@ -423,7 +429,7 @@ pub unsafe fn xml_new_prop(
 /// Returns a pointer to the attribute
 #[doc(alias = "xmlNewNsProp")]
 pub unsafe fn xml_new_ns_prop(
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
     ns: Option<XmlNsPtr>,
     name: &str,
     value: *const XmlChar,
@@ -435,7 +441,7 @@ pub unsafe fn xml_new_ns_prop(
 /// Returns a pointer to the attribute
 #[doc(alias = "xmlNewNsPropEatName")]
 pub unsafe fn xml_new_ns_prop_eat_name(
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
     ns: Option<XmlNsPtr>,
     name: *mut XmlChar,
     value: *const XmlChar,
@@ -530,7 +536,13 @@ pub(super) unsafe fn xml_copy_prop_internal(
         && cur.doc.map_or(false, |doc| doc.ids.is_some())
         && cur
             .parent
-            .filter(|p| xml_is_id(cur.doc, p.as_ptr(), Some(cur)) != 0)
+            .filter(|p| {
+                xml_is_id(
+                    cur.doc,
+                    XmlNodePtr::from_raw(p.as_ptr()).unwrap(),
+                    Some(cur),
+                ) != 0
+            })
             .is_some()
     {
         let children = cur.children;

@@ -71,7 +71,7 @@ use crate::{
         XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
         XmlDocProperties, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement, XmlElementContent,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID, XmlNode,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNodePtr,
         XmlNotation, XmlRef,
     },
 };
@@ -2034,7 +2034,7 @@ pub unsafe fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> Option<NonNull<d
 #[doc(alias = "xmlIsID")]
 pub unsafe fn xml_is_id(
     doc: Option<XmlDocPtr>,
-    elem: *mut XmlNode,
+    elem: Option<XmlNodePtr>,
     attr: Option<XmlAttrPtr>,
 ) -> i32 {
     let Some(attr) = attr.filter(|a| !a.name.is_null()) else {
@@ -2058,22 +2058,20 @@ pub unsafe fn xml_is_id(
     } else if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
         if xml_str_equal(c"id".as_ptr() as _, attr.name)
             || (xml_str_equal(c"name".as_ptr() as _, attr.name)
-                && (elem.is_null() || xml_str_equal((*elem).name, c"a".as_ptr() as _)))
+                && elem.map_or(true, |elem| xml_str_equal(elem.name, c"a".as_ptr() as _)))
         {
             return 1;
         }
         return 0;
-    } else if elem.is_null() {
-        return 0;
-    } else {
+    } else if let Some(elem) = elem {
         let felem: [XmlChar; 50] = [0; 50];
         let fattr: [XmlChar; 50] = [0; 50];
 
         let fullelemname: *mut XmlChar =
-            if let Some(prefix) = (*elem).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
-                xml_build_qname((*elem).name, prefix, felem.as_ptr() as _, 50)
+            if let Some(prefix) = elem.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                xml_build_qname(elem.name, prefix, felem.as_ptr() as _, 50)
             } else {
-                (*elem).name as *mut XmlChar
+                elem.name as *mut XmlChar
             };
 
         let fullattrname: *mut XmlChar =
@@ -2112,7 +2110,7 @@ pub unsafe fn xml_is_id(
         if fullattrname != fattr.as_ptr() as _ && fullattrname != attr.name as _ {
             xml_free(fullattrname as _);
         }
-        if fullelemname != felem.as_ptr() as _ && fullelemname != (*elem).name as _ {
+        if fullelemname != felem.as_ptr() as _ && fullelemname != elem.name as _ {
             xml_free(fullelemname as _);
         }
 
@@ -2121,6 +2119,8 @@ pub unsafe fn xml_is_id(
         }) {
             return 1;
         }
+    } else {
+        return 0;
     }
     0
 }
