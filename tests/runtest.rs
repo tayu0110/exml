@@ -66,7 +66,7 @@ use exml::{
     },
     relaxng::xml_relaxng_init_types,
     tree::{
-        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
+        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlNode,
     },
@@ -2536,7 +2536,7 @@ thread_local! {
     #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
     static XPATH_OUTPUT: RefCell<Option<File>> = const { RefCell::new(None) };
     #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-    static XPATH_DOCUMENT: Cell<*mut XmlDoc> = const { Cell::new(null_mut()) };
+    static XPATH_DOCUMENT: Cell<Option<XmlDocPtr>> = const { Cell::new(None) };
 }
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
@@ -2564,21 +2564,13 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     if cfg!(feature = "xpointer") && xptr != 0 {
         #[cfg(feature = "xpointer")]
         {
-            ctxt = xml_xptr_new_context(
-                XmlDocPtr::from_raw(XPATH_DOCUMENT.get()).unwrap(),
-                null_mut(),
-                null_mut(),
-            );
+            ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), null_mut(), null_mut());
             res = xml_xptr_eval(str as _, ctxt);
         }
     } else {
         let xpath_document = XPATH_DOCUMENT.get();
-        ctxt = xml_xpath_new_context(XmlDocPtr::from_raw(xpath_document).unwrap());
-        (*ctxt).node = if xpath_document.is_null() {
-            null_mut()
-        } else {
-            (*xpath_document).get_root_element()
-        };
+        ctxt = xml_xpath_new_context(xpath_document);
+        (*ctxt).node = xpath_document.map_or(null_mut(), |doc| doc.get_root_element());
         if expr != 0 {
             res = xml_xpath_eval_expression(str as _, ctxt);
         } else {
@@ -2816,7 +2808,9 @@ unsafe fn xpath_doc_test(
     }
     globfree(addr_of_mut!(globbuf));
 
-    xml_free_doc(XmlDocPtr::from_raw(XPATH_DOCUMENT.get()).unwrap().unwrap());
+    if let Some(doc) = XPATH_DOCUMENT.get() {
+        xml_free_doc(doc);
+    }
     ret
 }
 
@@ -2897,7 +2891,9 @@ unsafe fn xptr_doc_test(
     }
     globfree(addr_of_mut!(globbuf));
 
-    xml_free_doc(XmlDocPtr::from_raw(XPATH_DOCUMENT.get()).unwrap().unwrap());
+    if let Some(doc) = XPATH_DOCUMENT.get() {
+        xml_free_doc(doc);
+    }
     ret
 }
 
@@ -2940,7 +2936,9 @@ unsafe fn xmlid_doc_test(
         .open(temp.as_str())
     else {
         eprintln!("failed to open output file {temp}",);
-        xml_free_doc(XmlDocPtr::from_raw(XPATH_DOCUMENT.get()).unwrap().unwrap());
+        if let Some(doc) = XPATH_DOCUMENT.get() {
+            xml_free_doc(doc);
+        }
         return -1;
     };
     XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
@@ -2956,7 +2954,9 @@ unsafe fn xmlid_doc_test(
     }
 
     remove_file(temp).ok();
-    xml_free_doc(XmlDocPtr::from_raw(XPATH_DOCUMENT.get()).unwrap().unwrap());
+    if let Some(doc) = XPATH_DOCUMENT.get() {
+        xml_free_doc(doc);
+    }
 
     if let Some(err) = err {
         ret = TEST_ERRORS
@@ -4136,7 +4136,7 @@ unsafe fn pattern_test(
 }
 
 #[cfg(feature = "c14n")]
-unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathObjectPtr {
+unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObjectPtr {
     use exml::{
         globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
         libxml::{
@@ -4189,7 +4189,7 @@ unsafe fn load_xpath_expr(parent_doc: *mut XmlDoc, filename: &str) -> XmlXPathOb
         return null_mut();
     };
 
-    let ctx: XmlXPathContextPtr = xml_xpath_new_context(XmlDocPtr::from_raw(parent_doc).unwrap());
+    let ctx: XmlXPathContextPtr = xml_xpath_new_context(Some(parent_doc));
     if ctx.is_null() {
         eprintln!("Error: unable to create new context");
         xml_free_doc(doc);
@@ -4250,8 +4250,6 @@ unsafe fn c14n_run_test(
     ns_filename: *const c_char,
     result_file: *const c_char,
 ) -> i32 {
-    use std::ops::DerefMut;
-
     use exml::{
         globals::{
             get_last_error, set_load_ext_dtd_default_value, set_substitute_entities_default_value,
@@ -4294,7 +4292,7 @@ unsafe fn c14n_run_test(
 
     // load xpath file if specified
     if let Some(xpath_filename) = xpath_filename {
-        xpath = load_xpath_expr(doc.deref_mut(), xpath_filename);
+        xpath = load_xpath_expr(doc, xpath_filename);
         if xpath.is_null() {
             eprintln!("Error: unable to evaluate xpath expression");
             xml_free_doc(doc);

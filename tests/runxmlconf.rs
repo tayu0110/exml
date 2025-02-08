@@ -30,9 +30,7 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_input_from_file, xml_new_parser_ctxt,
         xml_read_file, XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{
-        xml_free_doc, NodeCommon, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNode,
-    },
+    tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNode},
     xpath::{
         xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
     },
@@ -288,9 +286,9 @@ unsafe fn xmlconf_test_not_wf(
     ret
 }
 
-unsafe extern "C" fn xmlconf_test_item(
+unsafe fn xmlconf_test_item(
     logfile: &mut Option<File>,
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     cur: *mut XmlNode,
 ) -> c_int {
     let mut ret: c_int = -1;
@@ -322,7 +320,7 @@ unsafe extern "C" fn xmlconf_test_item(
         test_log!(logfile, "test {id} missing URI\n",);
         return ret;
     };
-    let base = (*cur).get_base(XmlDocPtr::from_raw(doc).unwrap());
+    let base = (*cur).get_base(Some(doc));
     let filename = compose_dir(base.as_deref(), &uri);
     if !check_test_file(filename.as_str()) {
         test_log!(logfile, "test {id} missing file {filename} \n",);
@@ -419,9 +417,9 @@ unsafe extern "C" fn xmlconf_test_item(
     ret
 }
 
-unsafe extern "C" fn xmlconf_test_cases(
+unsafe fn xmlconf_test_cases(
     logfile: &mut Option<File>,
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     mut cur: *mut XmlNode,
     mut level: c_int,
 ) -> c_int {
@@ -462,9 +460,9 @@ unsafe extern "C" fn xmlconf_test_cases(
     ret
 }
 
-unsafe extern "C" fn xmlconf_test_suite(
+unsafe fn xmlconf_test_suite(
     logfile: &mut Option<File>,
-    doc: *mut XmlDoc,
+    doc: XmlDocPtr,
     mut cur: *mut XmlNode,
 ) -> c_int {
     let mut ret: c_int = 0;
@@ -519,7 +517,7 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         xmlconf_info();
         -1
     } else {
-        xmlconf_test_suite(logfile, doc.into(), cur)
+        xmlconf_test_suite(logfile, doc, cur)
     };
     xml_free_doc(doc);
     ret
