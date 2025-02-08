@@ -972,7 +972,8 @@ impl XmlTextReader {
                 .unwrap();
 
             if self.faketext.is_null() {
-                self.faketext = xml_new_doc_text((*self.node).doc, ns.href);
+                self.faketext = xml_new_doc_text((*self.node).doc, ns.href)
+                    .map_or(null_mut(), |node| node.as_ptr());
             } else {
                 if !(*self.faketext).content.is_null() {
                     xml_free((*self.faketext).content as _);

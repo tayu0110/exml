@@ -263,12 +263,11 @@ impl XmlDoc {
                         } else {
                             // Flush buffer so far
                             if !buf.is_empty() {
-                                node = xml_new_doc_text(
+                                let Some(mut node) = xml_new_doc_text(
                                     XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc)
                                         .unwrap(),
                                     null_mut(),
-                                );
-                                if node.is_null() {
+                                ) else {
                                     // goto out;
                                     if !val.is_null() {
                                         xml_free(val as _);
@@ -277,15 +276,15 @@ impl XmlDoc {
                                         xml_free_node_list(head);
                                     }
                                     return ret;
-                                }
-                                (*node).content = xml_strndup(buf.as_ptr(), buf.len() as i32);
+                                };
+                                node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
                                 buf.clear();
 
                                 if last.is_null() {
-                                    last = node;
-                                    head = node;
+                                    last = node.as_ptr();
+                                    head = node.as_ptr();
                                 } else {
-                                    last = (*last).add_next_sibling(node);
+                                    last = (*last).add_next_sibling(node.as_ptr());
                                 }
                             }
 
@@ -355,11 +354,10 @@ impl XmlDoc {
         }
 
         if !buf.is_empty() {
-            node = xml_new_doc_text(
+            let Some(mut node) = xml_new_doc_text(
                 XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
                 null_mut(),
-            );
-            if node.is_null() {
+            ) else {
                 // goto out;
                 if !val.is_null() {
                     xml_free(val as _);
@@ -368,14 +366,14 @@ impl XmlDoc {
                     xml_free_node_list(head);
                 }
                 return ret;
-            }
-            (*node).content = xml_strndup(buf.as_ptr(), buf.len() as i32);
+            };
+            node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
             buf.clear();
 
             if last.is_null() {
-                head = node;
+                head = node.as_ptr();
             } else {
-                (*last).add_next_sibling(node);
+                (*last).add_next_sibling(node.as_ptr());
             }
         }
 
@@ -538,26 +536,25 @@ impl XmlDoc {
                         } else {
                             // Flush buffer so far
                             if !buf.is_empty() {
-                                node = xml_new_doc_text(
+                                let Some(mut node) = xml_new_doc_text(
                                     XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc)
                                         .unwrap(),
                                     null_mut(),
-                                );
-                                if node.is_null() {
+                                ) else {
                                     if !val.is_null() {
                                         xml_free(val as _);
                                     }
                                     // goto out;
                                     return ret;
-                                }
-                                (*node).content = xml_strndup(buf.as_ptr(), buf.len() as i32);
+                                };
+                                node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
                                 buf.clear();
 
                                 if last.is_null() {
-                                    last = node;
-                                    ret = node;
+                                    last = node.as_ptr();
+                                    ret = node.as_ptr();
                                 } else {
-                                    last = (*last).add_next_sibling(node);
+                                    last = (*last).add_next_sibling(node.as_ptr());
                                 }
                             }
 
@@ -624,27 +621,27 @@ impl XmlDoc {
         }
 
         if !buf.is_empty() {
-            node = xml_new_doc_text(
+            let Some(mut node) = xml_new_doc_text(
                 XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
                 null_mut(),
-            );
-            if node.is_null() {
+            ) else {
                 // goto out;
                 return ret;
-            }
-            (*node).content = xml_strndup(buf.as_ptr(), buf.len() as i32);
+            };
+            node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
             buf.clear();
 
             if last.is_null() {
-                ret = node;
+                ret = node.as_ptr();
             } else {
-                (*last).add_next_sibling(node);
+                (*last).add_next_sibling(node.as_ptr());
             }
         } else if ret.is_null() {
             ret = xml_new_doc_text(
                 XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
                 c"".as_ptr() as _,
-            );
+            )
+            .map_or(null_mut(), |node| node.as_ptr());
         }
 
         // out:

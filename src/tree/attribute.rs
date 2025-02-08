@@ -356,7 +356,9 @@ pub(super) unsafe fn xml_new_prop_internal(
     }
 
     if !value.is_null() {
-        cur.children = NodePtr::from_ptr(xml_new_doc_text(doc, value));
+        cur.children = NodePtr::from_ptr(
+            xml_new_doc_text(doc, value).map_or(null_mut(), |node| node.as_ptr()),
+        );
         cur.set_last(None);
         let mut tmp = cur.children;
         while let Some(mut now) = tmp {

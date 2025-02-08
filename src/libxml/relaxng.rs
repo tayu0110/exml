@@ -1699,31 +1699,26 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                     } else if (*cur).name().as_deref() == Some("element")
                         || (*cur).name().as_deref() == Some("attribute")
                     {
-                        let mut text: *mut XmlNode = null_mut();
-
                         // Simplification 4.8. name attribute of element
                         // and attribute elements
                         if let Some(name) = (*cur).get_prop("name") {
                             let cname = CString::new(name.as_str()).unwrap();
-                            if let Some(mut children) = (*cur).children() {
-                                let node: *mut XmlNode =
-                                    xml_new_doc_node((*cur).doc, (*cur).ns, "name", null_mut());
-                                if !node.is_null() {
-                                    children.add_prev_sibling(node);
-                                    text =
-                                        xml_new_doc_text((*node).doc, cname.as_ptr() as *const u8);
-                                    (*node).add_child(text);
-                                    text = node;
-                                }
+                            let text = if let Some(mut children) = (*cur).children() {
+                                xml_new_doc_node((*cur).doc, (*cur).ns, "name", null_mut()).map(
+                                    |mut node| {
+                                        children.add_prev_sibling(node.as_ptr());
+                                        let text =
+                                            xml_new_doc_text(node.doc, cname.as_ptr() as *const u8);
+                                        node.add_child(
+                                            text.map_or(null_mut(), |node| node.as_ptr()),
+                                        );
+                                        node
+                                    },
+                                )
                             } else {
-                                text = xml_new_child(
-                                    cur,
-                                    (*cur).ns,
-                                    "name",
-                                    cname.as_ptr() as *const u8,
-                                );
-                            }
-                            if text.is_null() {
+                                xml_new_child(cur, (*cur).ns, "name", cname.as_ptr() as *const u8)
+                            };
+                            if text.is_none() {
                                 xml_rng_perr!(
                                     ctxt,
                                     cur,
@@ -1734,12 +1729,14 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                             }
                             (*cur).unset_prop("name");
                             if let Some(ns) = (*cur).get_prop("ns") {
-                                if !text.is_null() {
-                                    (*text).set_prop("ns", Some(ns.as_str()));
+                                if let Some(mut text) = text {
+                                    text.set_prop("ns", Some(ns.as_str()));
                                     // xmlUnsetProp(cur, c"ns".as_ptr() as _);
                                 }
                             } else if xml_str_equal((*cur).name, c"attribute".as_ptr() as _) {
-                                (*text).set_prop("ns", Some(""));
+                                if let Some(mut text) = text {
+                                    text.set_prop("ns", Some(""));
+                                }
                             }
                         }
                     } else if (*cur).name().as_deref() == Some("name")

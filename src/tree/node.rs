@@ -1179,10 +1179,10 @@ impl XmlNode {
             prop.ns = ns;
             if let Some(value) = value {
                 let value = CString::new(value).unwrap();
-                prop.set_children(NodePtr::from_ptr(xml_new_doc_text(
-                    self.doc,
-                    value.as_ptr() as *const u8,
-                )));
+                prop.set_children(NodePtr::from_ptr(
+                    xml_new_doc_text(self.doc, value.as_ptr() as *const u8)
+                        .map_or(null_mut(), |node| node.as_ptr()),
+                ));
                 prop.set_last(None);
                 let mut tmp = prop.children();
                 while let Some(mut now) = tmp {

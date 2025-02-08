@@ -343,7 +343,8 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
         if meta.is_null() {
             if encoding.is_some() && !head.is_null() {
                 // Create a new Meta element with the right attributes
-                meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
+                meta = xml_new_doc_node(Some(doc), None, "meta", null_mut())
+                    .map_or(null_mut(), |node| node.as_ptr());
                 if let Some(mut children) = (*head).children() {
                     children.add_prev_sibling(meta);
                 } else {

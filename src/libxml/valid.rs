@@ -6438,26 +6438,26 @@ pub unsafe fn xml_valid_get_valid_elements(
     let parent_last: *mut XmlNode = (*parent).last().map_or(null_mut(), |l| l.as_ptr());
 
     // Creates a dummy node and insert it into the tree
-    let test_node: *mut XmlNode = xml_new_doc_node((*ref_node).doc, None, "<!dummy?>", null_mut());
-    if test_node.is_null() {
+    let Some(mut test_node) = xml_new_doc_node((*ref_node).doc, None, "<!dummy?>", null_mut())
+    else {
         return -1;
-    }
+    };
 
-    (*test_node).set_parent(NodePtr::from_ptr(parent));
-    (*test_node).prev = NodePtr::from_ptr(prev);
-    (*test_node).next = NodePtr::from_ptr(next);
-    let name: *const XmlChar = (*test_node).name;
+    test_node.parent = NodePtr::from_ptr(parent);
+    test_node.prev = NodePtr::from_ptr(prev);
+    test_node.next = NodePtr::from_ptr(next);
+    let name: *const XmlChar = test_node.name;
 
     if !prev.is_null() {
-        (*prev).next = NodePtr::from_ptr(test_node);
+        (*prev).next = NodePtr::from_ptr(test_node.as_ptr());
     } else {
-        (*parent).set_children(NodePtr::from_ptr(test_node));
+        (*parent).set_children(NodePtr::from_ptr(test_node.as_ptr()));
     }
 
     if !next.is_null() {
-        (*next).prev = NodePtr::from_ptr(test_node);
+        (*next).prev = NodePtr::from_ptr(test_node.as_ptr());
     } else {
-        (*parent).set_last(NodePtr::from_ptr(test_node));
+        (*parent).set_last(NodePtr::from_ptr(test_node.as_ptr()));
     }
 
     // Insert each potential child node and check if the parent is still valid
@@ -6469,7 +6469,7 @@ pub unsafe fn xml_valid_get_valid_elements(
     );
 
     for i in 0..nb_elements {
-        (*test_node).name = elements[i as usize];
+        test_node.name = elements[i as usize];
         if xml_validate_one_element(addr_of_mut!(vctxt) as _, (*parent).doc.unwrap(), parent) != 0 {
             for j in 0..nb_valid_elements {
                 if xml_str_equal(elements[i as usize], *names.add(j as usize)) {
@@ -6495,8 +6495,8 @@ pub unsafe fn xml_valid_get_valid_elements(
     (*parent).set_last(NodePtr::from_ptr(parent_last));
 
     // Free up the dummy node
-    (*test_node).name = name;
-    xml_free_node(test_node);
+    test_node.name = name;
+    xml_free_node(test_node.as_ptr());
 
     nb_valid_elements
 }

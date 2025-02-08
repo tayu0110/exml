@@ -2487,9 +2487,9 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         None => {
             if CMD_ARGS.auto {
                 let mut doc = xml_new_doc(Some("1.0")).unwrap();
-                let n = xml_new_doc_node(Some(doc), None, "info", null_mut());
-                (*n).set_content(c"abc".as_ptr() as _);
-                doc.set_root_element(n);
+                let mut n = xml_new_doc_node(Some(doc), None, "info", null_mut()).unwrap();
+                n.set_content(c"abc".as_ptr() as _);
+                doc.set_root_element(n.into());
                 Some(doc)
             } else {
                 None

@@ -1948,8 +1948,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         (*ctxt).my_doc = Some(new);
         new
     };
-    let new_root: *mut XmlNode = xml_new_doc_node((*ctxt).my_doc, None, "pseudoroot", null_mut());
-    if new_root.is_null() {
+    let Some(new_root) = xml_new_doc_node((*ctxt).my_doc, None, "pseudoroot", null_mut()) else {
         (*oldctxt).sax = (*ctxt).sax.take();
         (*ctxt).sax = oldsax;
         (*ctxt).dict = null_mut();
@@ -1958,10 +1957,10 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             xml_free_doc(new_doc);
         }
         return XmlParserErrors::XmlErrInternalError;
-    }
+    };
     my_doc.children = None;
     my_doc.last = None;
-    my_doc.add_child(new_root);
+    my_doc.add_child(new_root.as_ptr());
     (*ctxt).node_push(my_doc.children.map_or(null_mut(), |c| c.as_ptr()));
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
     (*ctxt).depth = (*oldctxt).depth;

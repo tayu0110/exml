@@ -2705,7 +2705,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                     if index1 > 1 {
                         content = content.add(index1 as usize - 1);
                     }
-                    tmp = xml_new_text(content);
+                    tmp = xml_new_text(content).map_or(null_mut(), |node| node.as_ptr());
                 }
                 last = tmp;
                 list = tmp;

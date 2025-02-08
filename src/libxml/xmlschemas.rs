@@ -27459,26 +27459,25 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 if (*vctxt).options & XmlSchemaValidOption::XmlSchemaValVcICreate as i32 != 0
                     && !(*inode).node.is_null()
                 {
-                    let text_child: *mut XmlNode;
-
                     // VAL TODO: Normalize the value.
                     let norm_value =
                         xml_schema_normalize_value((*inode).type_def, (*(*inode).decl).value);
-                    if !norm_value.is_null() {
-                        text_child = xml_new_doc_text((*(*inode).node).doc, norm_value);
+                    let text_child = if !norm_value.is_null() {
+                        let text_child = xml_new_doc_text((*(*inode).node).doc, norm_value);
                         xml_free(norm_value as _);
+                        text_child
                     } else {
-                        text_child = xml_new_doc_text((*(*inode).node).doc, (*(*inode).decl).value);
-                    }
-                    if text_child.is_null() {
+                        xml_new_doc_text((*(*inode).node).doc, (*(*inode).decl).value)
+                    };
+                    if let Some(text_child) = text_child {
+                        (*(*inode).node).add_child(text_child.as_ptr());
+                    } else {
                         VERROR_INT!(
                             vctxt,
                             "xmlSchemaValidatorPopElem",
                             "calling xmlNewDocText()"
                         );
                         break 'internal_error;
-                    } else {
-                        (*(*inode).node).add_child(text_child);
                     }
                 }
             } else if !INODE_NILLED!(inode) {

@@ -2280,8 +2280,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         new_doc.int_subset = doc.int_subset;
         new_doc.ext_subset = doc.ext_subset;
     }
-    let new_root: *mut XmlNode = xml_new_doc_node(Some(new_doc), None, "pseudoroot", null());
-    if new_root.is_null() {
+    let Some(new_root) = xml_new_doc_node(Some(new_doc), None, "pseudoroot", null()) else {
         if replaced {
             (*ctxt).sax = oldsax;
         }
@@ -2290,9 +2289,9 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         new_doc.ext_subset = None;
         xml_free_doc(new_doc);
         return -1;
-    }
-    new_doc.add_child(new_root);
-    (*ctxt).node_push(new_root);
+    };
+    new_doc.add_child(new_root.as_ptr());
+    (*ctxt).node_push(new_root.as_ptr());
     // doc.is_null() is only supported for historic reasons
     if let Some(doc) = doc {
         (*ctxt).my_doc = Some(new_doc);
@@ -2433,18 +2432,17 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     if let Some(url) = doc.url.as_deref() {
         new_doc.url = Some(url.to_owned());
     }
-    let new_root: *mut XmlNode = xml_new_doc_node(Some(new_doc), None, "pseudoroot", null());
-    if new_root.is_null() {
+    let Some(mut new_root) = xml_new_doc_node(Some(new_doc), None, "pseudoroot", null()) else {
         let sax = (*ctxt).sax.take();
         new_doc.int_subset = None;
         new_doc.ext_subset = None;
         xml_free_doc(new_doc);
         return (sax, XmlParserErrors::XmlErrInternalError);
-    }
-    new_doc.add_child(new_root);
+    };
+    new_doc.add_child(new_root.as_ptr());
     (*ctxt).node_push(new_doc.children.map_or(null_mut(), |c| c.as_ptr()));
     (*ctxt).my_doc = Some(doc);
-    (*new_root).doc = Some(doc);
+    new_root.doc = Some(doc);
 
     // Get the 4 first bytes and decode the charset
     // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
