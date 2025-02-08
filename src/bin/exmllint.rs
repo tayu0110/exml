@@ -2449,18 +2449,19 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
 }
 
 #[cfg(feature = "xpath")]
-unsafe fn do_xpath_query(doc: *mut XmlDoc, query: *const c_char) {
+unsafe fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
     use exml::xpath::{
         xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object, xml_xpath_new_context,
         XmlXPathContextPtr,
     };
 
-    let ctxt: XmlXPathContextPtr = xml_xpath_new_context(XmlDocPtr::from_raw(doc).unwrap());
+    let ctxt: XmlXPathContextPtr = xml_xpath_new_context(Some(doc));
     if ctxt.is_null() {
         eprintln!("Out of memory for XPath");
         PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
         return;
     }
+    let doc: *mut XmlDoc = doc.into();
     (*ctxt).node = doc as *mut XmlNode;
     let res: XmlXPathObjectPtr = xml_xpath_eval(query as _, ctxt);
     xml_xpath_free_context(ctxt);
@@ -2477,32 +2478,25 @@ unsafe fn do_xpath_query(doc: *mut XmlDoc, query: *const c_char) {
 // Tree Test processing
 
 unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr) {
-    let mut doc: *mut XmlDoc = null_mut();
-    #[cfg(feature = "libxml_tree")]
-    let tmp: *mut XmlDoc;
-
     if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
         start_timer();
     }
 
-    if cfg!(feature = "libxml_tree") && filename.is_none() {
+    let doc = match filename {
         #[cfg(feature = "libxml_tree")]
-        {
+        None => {
             if CMD_ARGS.auto {
-                doc = xml_new_doc(Some("1.0")).map_or(null_mut(), |doc| doc.into());
-                let n =
-                    xml_new_doc_node(XmlDocPtr::from_raw(doc).unwrap(), None, "info", null_mut());
+                let mut doc = xml_new_doc(Some("1.0")).unwrap();
+                let n = xml_new_doc_node(Some(doc), None, "info", null_mut());
                 (*n).set_content(c"abc".as_ptr() as _);
-                (*doc).set_root_element(n);
+                doc.set_root_element(n);
+                Some(doc)
+            } else {
+                None
             }
         }
-    } else if cfg!(feature = "html")
-        && cfg!(feature = "libxml_push")
-        && CMD_ARGS.html
-        && CMD_ARGS.push
-    {
         #[cfg(all(feature = "html", feature = "libxml_push"))]
-        {
+        _ if CMD_ARGS.html && CMD_ARGS.push => {
             extern "C" {
                 static stdin: *mut FILE;
             }
@@ -2513,6 +2507,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 let f = CString::new(filename.unwrap()).unwrap();
                 fopen(f.as_ptr(), c"rb".as_ptr())
             };
+            let mut doc = None;
             if !f.is_null() {
                 let mut res: i32;
                 let mut chars: [c_char; 4096] = [0; 4096];
@@ -2548,17 +2543,17 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         html_parse_chunk(ctxt, chars.as_ptr(), res, 0);
                     }
                     html_parse_chunk(ctxt, chars.as_ptr(), 0, 1);
-                    doc = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.into());
+                    doc = (*ctxt).my_doc;
                     html_free_parser_ctxt(ctxt);
                 }
                 if f != stdin {
                     fclose(f);
                 }
             }
+            doc
         }
-    } else if cfg!(feature = "html") && CMD_ARGS.html && CMD_ARGS.memory {
         #[cfg(feature = "html")]
-        {
+        _ if CMD_ARGS.html && CMD_ARGS.memory => {
             let mut info: stat = unsafe { zeroed() };
             let fname = CString::new(filename.unwrap()).unwrap();
             if stat(fname.as_ptr(), addr_of_mut!(info)) < 0 {
@@ -2578,22 +2573,20 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
 
             let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-            doc = html_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
-                .map_or(null_mut(), |doc| doc.into());
+            let doc = html_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed));
 
             munmap(base as _, info.st_size as _);
             close(fd);
+            doc
         }
-    } else if cfg!(feature = "html") && CMD_ARGS.html {
         #[cfg(feature = "html")]
-        {
-            doc = html_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed))
-                .map_or(null_mut(), |doc| doc.into());
+        _ if CMD_ARGS.html => {
+            html_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed))
         }
-    } else if cfg!(feature = "libxml_push") && CMD_ARGS.push {
-        // build an XML tree from a string;
         #[cfg(feature = "libxml_push")]
-        {
+        _ if CMD_ARGS.push => {
+            // build an XML tree from a string;
+
             extern "C" {
                 static stdin: *mut FILE;
             }
@@ -2608,6 +2601,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     c"rb".as_ptr(),
                 )
             };
+            let mut doc = None;
             if !f.is_null() {
                 let ret: i32;
                 let mut res: i32;
@@ -2634,104 +2628,35 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         xml_parse_chunk(ctxt, chars.as_ptr(), res, 0);
                     }
                     xml_parse_chunk(ctxt, chars.as_ptr(), 0, 1);
-                    doc = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.into());
+                    doc = (*ctxt).my_doc;
                     ret = (*ctxt).well_formed;
                     xml_free_parser_ctxt(ctxt);
                     if ret == 0 && !CMD_ARGS.recover {
-                        xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
-                        doc = null_mut();
+                        if let Some(doc) = doc.take() {
+                            xml_free_doc(doc);
+                        }
                     }
                 }
                 if f != stdin {
                     fclose(f);
                 }
             }
+            doc
         }
-    } else if CMD_ARGS.test_io {
-        if filename == Some("-") {
-            doc = xml_read_io(stdin(), None, None, OPTIONS.load(Ordering::Relaxed))
-                .map_or(null_mut(), |doc| doc.into());
-        } else if let Some(Ok(f)) = filename.map(File::open) {
-            if rectxt.is_null() {
-                doc = xml_read_io(f, filename, None, OPTIONS.load(Ordering::Relaxed))
-                    .map_or(null_mut(), |doc| doc.into());
+        _ if CMD_ARGS.test_io => {
+            if filename == Some("-") {
+                xml_read_io(stdin(), None, None, OPTIONS.load(Ordering::Relaxed))
+            } else if let Some(Ok(f)) = filename.map(File::open) {
+                if rectxt.is_null() {
+                    xml_read_io(f, filename, None, OPTIONS.load(Ordering::Relaxed))
+                } else {
+                    xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS.load(Ordering::Relaxed))
+                }
             } else {
-                doc = xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS.load(Ordering::Relaxed))
-                    .map_or(null_mut(), |doc| doc.into());
+                None
             }
-        } else {
-            doc = null_mut();
         }
-    } else if CMD_ARGS.htmlout {
-        let ctxt: XmlParserCtxtPtr;
-
-        if rectxt.is_null() {
-            ctxt = xml_new_parser_ctxt();
-            if ctxt.is_null() {
-                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                return;
-            }
-        } else {
-            ctxt = rectxt;
-        }
-
-        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-            sax.error = Some(xml_html_error);
-            sax.warning = Some(xml_html_warning);
-        }
-        (*ctxt).vctxt.error = Some(xml_html_validity_error);
-        (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
-
-        doc = xml_ctxt_read_file(
-            ctxt,
-            filename.unwrap(),
-            None,
-            OPTIONS.load(Ordering::Relaxed),
-        )
-        .map_or(null_mut(), |doc| doc.into());
-
-        if rectxt.is_null() {
-            xml_free_parser_ctxt(ctxt);
-        }
-    } else if CMD_ARGS.memory {
-        let mut info: stat = unsafe { zeroed() };
-        let fname = filename.map(|f| CString::new(f).unwrap());
-
-        if stat(
-            fname.as_ref().map_or(null(), |f| f.as_ptr()),
-            addr_of_mut!(info),
-        ) < 0
-        {
-            return;
-        }
-        let fd: i32 = open(fname.map_or(null(), |f| f.as_ptr()), O_RDONLY);
-        if fd < 0 {
-            return;
-        }
-        let base: *const c_char =
-            mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
-        if base == MAP_FAILED as _ {
-            close(fd);
-            eprintln!("mmap failure for file {}", filename.unwrap());
-            PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
-            return;
-        }
-
-        let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-        if rectxt.is_null() {
-            doc = xml_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
-                .map_or(null_mut(), |doc| doc.into());
-        } else {
-            doc =
-                xml_ctxt_read_memory(rectxt, mem, filename, None, OPTIONS.load(Ordering::Relaxed))
-                    .map_or(null_mut(), |doc| doc.into());
-        }
-
-        munmap(base as _, info.st_size as _);
-        close(fd);
-    } else if cfg!(feature = "libxml_valid") && CMD_ARGS.valid {
-        #[cfg(feature = "libxml_valid")]
-        {
+        _ if CMD_ARGS.htmlout => {
             let ctxt: XmlParserCtxtPtr;
 
             if rectxt.is_null() {
@@ -2744,13 +2669,80 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 ctxt = rectxt;
             }
 
-            doc = xml_ctxt_read_file(
+            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                sax.error = Some(xml_html_error);
+                sax.warning = Some(xml_html_warning);
+            }
+            (*ctxt).vctxt.error = Some(xml_html_validity_error);
+            (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
+
+            let doc = xml_ctxt_read_file(
                 ctxt,
                 filename.unwrap(),
                 None,
                 OPTIONS.load(Ordering::Relaxed),
-            )
-            .map_or(null_mut(), |doc| doc.into());
+            );
+
+            if rectxt.is_null() {
+                xml_free_parser_ctxt(ctxt);
+            }
+            doc
+        }
+        _ if CMD_ARGS.memory => {
+            let mut info: stat = unsafe { zeroed() };
+            let fname = filename.map(|f| CString::new(f).unwrap());
+
+            if stat(
+                fname.as_ref().map_or(null(), |f| f.as_ptr()),
+                addr_of_mut!(info),
+            ) < 0
+            {
+                return;
+            }
+            let fd: i32 = open(fname.map_or(null(), |f| f.as_ptr()), O_RDONLY);
+            if fd < 0 {
+                return;
+            }
+            let base: *const c_char =
+                mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
+            if base == MAP_FAILED as _ {
+                close(fd);
+                eprintln!("mmap failure for file {}", filename.unwrap());
+                PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
+                return;
+            }
+
+            let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
+            let doc = if rectxt.is_null() {
+                xml_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
+            } else {
+                xml_ctxt_read_memory(rectxt, mem, filename, None, OPTIONS.load(Ordering::Relaxed))
+            };
+
+            munmap(base as _, info.st_size as _);
+            close(fd);
+            doc
+        }
+        #[cfg(feature = "libxml_valid")]
+        _ if CMD_ARGS.valid => {
+            let ctxt: XmlParserCtxtPtr;
+
+            if rectxt.is_null() {
+                ctxt = xml_new_parser_ctxt();
+                if ctxt.is_null() {
+                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                    return;
+                }
+            } else {
+                ctxt = rectxt;
+            }
+
+            let doc = xml_ctxt_read_file(
+                ctxt,
+                filename.unwrap(),
+                None,
+                OPTIONS.load(Ordering::Relaxed),
+            );
 
             if (*ctxt).valid == 0 {
                 PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
@@ -2758,26 +2750,28 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if rectxt.is_null() {
                 xml_free_parser_ctxt(ctxt);
             }
+            doc
         }
-    } else if !rectxt.is_null() {
-        doc = xml_ctxt_read_file(
-            rectxt,
-            filename.unwrap(),
-            None,
-            OPTIONS.load(Ordering::Relaxed),
-        )
-        .map_or(null_mut(), |doc| doc.into());
-    } else {
-        doc = xml_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed))
-            .map_or(null_mut(), |doc| doc.into());
-    }
+        _ => {
+            if !rectxt.is_null() {
+                xml_ctxt_read_file(
+                    rectxt,
+                    filename.unwrap(),
+                    None,
+                    OPTIONS.load(Ordering::Relaxed),
+                )
+            } else {
+                xml_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed))
+            }
+        }
+    };
 
     // If we don't have a document we might as well give up.
     // Do we want an error message here?  <sven@zen.org>
-    if doc.is_null() {
+    let Some(mut doc) = doc else {
         PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         return;
-    }
+    };
 
     if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
         end_timer!("Parsing");
@@ -2785,10 +2779,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
     // Remove DOCTYPE nodes
     if CMD_ARGS.dropdtd {
-        let dtd = (*doc).get_int_subset();
+        let dtd = doc.get_int_subset();
         if let Some(mut dtd) = dtd {
             (*dtd).unlink();
-            (*doc).int_subset = None;
+            doc.int_subset = None;
             xml_free_dtd(dtd);
         }
     }
@@ -2798,11 +2792,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
-        if xml_xinclude_process_flags(
-            XmlDocPtr::from_raw(doc).unwrap().unwrap(),
-            OPTIONS.load(Ordering::Relaxed),
-        ) < 0
-        {
+        if xml_xinclude_process_flags(doc, OPTIONS.load(Ordering::Relaxed)) < 0 {
             PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         }
         if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
@@ -2819,10 +2809,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     // shell interaction
     #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
     if CMD_ARGS.shell {
-        xml_xpath_order_doc_elems(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+        xml_xpath_order_doc_elems(doc);
         let fname = filename.map(|f| CString::new(f).unwrap());
         xml_shell(
-            XmlDocPtr::from_raw(doc).unwrap().unwrap(),
+            doc,
             fname.map_or(null_mut(), |f| f.as_ptr() as _),
             Some(xml_shell_readline),
             Some(stdout()),
@@ -2832,19 +2822,18 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     // test intermediate copy if needed.
     #[cfg(feature = "libxml_tree")]
     if CMD_ARGS.copy {
-        tmp = doc;
+        let tmp = doc;
         if CMD_ARGS.timing {
             start_timer();
         }
-        doc = xml_copy_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap(), 1)
-            .map_or(null_mut(), |doc| doc.into());
+        doc = xml_copy_doc(doc, 1).unwrap();
         if CMD_ARGS.timing {
             end_timer!("Copying");
         }
         if CMD_ARGS.timing {
             start_timer();
         }
-        xml_free_doc(XmlDocPtr::from_raw(tmp).unwrap().unwrap());
+        xml_free_doc(tmp);
         if CMD_ARGS.timing {
             end_timer!("Freeing original");
         }
@@ -2855,7 +2844,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         {
             let mut list: [*const XmlChar; 256] = [null(); 256];
 
-            if let Some(children) = (*doc).children {
+            if let Some(children) = doc.children {
                 let mut node = Some(children);
                 while let Some(now) = node.filter(|n| n.last().is_none()) {
                     node = now.next;
@@ -2887,7 +2876,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     } else if cfg!(feature = "libxml_reader") && CMD_ARGS.walker {
         #[cfg(feature = "libxml_reader")]
         {
-            walk_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            walk_doc(doc);
         }
     }
     #[cfg(feature = "libxml_output")]
@@ -2911,34 +2900,17 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     if let Some(encoding) = CMD_ARGS.encode.as_deref() {
                         let o = CMD_ARGS.output.as_deref().unwrap_or("-");
                         if CMD_ARGS.format {
-                            html_save_file_format(
-                                o,
-                                XmlDocPtr::from_raw(doc).unwrap().unwrap(),
-                                Some(encoding),
-                                1,
-                            );
+                            html_save_file_format(o, doc, Some(encoding), 1);
                         } else {
-                            html_save_file_format(
-                                o,
-                                XmlDocPtr::from_raw(doc).unwrap().unwrap(),
-                                Some(encoding),
-                                0,
-                            );
+                            html_save_file_format(o, doc, Some(encoding), 0);
                         }
                     } else if CMD_ARGS.format {
                         let o = CMD_ARGS.output.as_deref().unwrap_or("-");
-                        html_save_file_format(
-                            o,
-                            XmlDocPtr::from_raw(doc).unwrap().unwrap(),
-                            None,
-                            1,
-                        );
+                        html_save_file_format(o, doc, None, 1);
                     } else if let Some(filename) = CMD_ARGS.output.as_deref() {
                         match File::options().write(true).truncate(true).open(filename) {
                             Ok(mut f) => {
-                                if html_doc_dump(&mut f, XmlDocPtr::from_raw(doc).unwrap().unwrap())
-                                    < 0
-                                {
+                                if html_doc_dump(&mut f, doc) < 0 {
                                     PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                                 }
                             }
@@ -2947,11 +2919,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                                 PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                             }
                         }
-                    } else if html_doc_dump(
-                        &mut stdout(),
-                        XmlDocPtr::from_raw(doc).unwrap().unwrap(),
-                    ) < 0
-                    {
+                    } else if html_doc_dump(&mut stdout(), doc) < 0 {
                         PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                     }
                     if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
@@ -2964,7 +2932,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     let mut result = String::new();
 
                     let size = xml_c14n_doc_dump_memory(
-                        &mut *doc,
+                        &mut doc,
                         None,
                         XmlC14NMode::XmlC14N1_0,
                         None,
@@ -2984,7 +2952,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     let mut result = String::new();
 
                     let size: i32 = xml_c14n_doc_dump_memory(
-                        &mut *doc,
+                        &mut doc,
                         None,
                         XmlC14NMode::XmlC14N1_1,
                         None,
@@ -3004,7 +2972,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     let mut result = String::new();
 
                     let size: i32 = xml_c14n_doc_dump_memory(
-                        &mut *doc,
+                        &mut doc,
                         None,
                         XmlC14NMode::XmlC14NExclusive1_0,
                         None,
@@ -3077,7 +3045,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 };
 
                 if let Some(mut ctxt) = ctxt {
-                    if ctxt.save_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap()) < 0 {
+                    if ctxt.save_doc(doc) < 0 {
                         let o = CMD_ARGS.output.as_deref().unwrap_or("-");
                         eprintln!("failed save to {o}");
                         PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
@@ -3095,7 +3063,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 if let Some(filename) = CMD_ARGS.output.as_deref() {
                     match File::options().write(true).truncate(true).open(filename) {
                         Ok(f) => {
-                            xml_debug_dump_document(Some(f), (!doc.is_null()).then(|| &*doc));
+                            xml_debug_dump_document(Some(f), Some(&*doc));
                         }
                         _ => {
                             eprintln!("failed to open {filename}");
@@ -3103,7 +3071,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         }
                     }
                 } else {
-                    xml_debug_dump_document(Some(stdout()), (!doc.is_null()).then(|| &*doc));
+                    xml_debug_dump_document(Some(stdout()), Some(&*doc));
                 }
             }
         }
@@ -3139,7 +3107,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
-            if xml_validate_dtd(cvp, XmlDocPtr::from_raw(doc).unwrap().unwrap(), dtd) == 0 {
+            if xml_validate_dtd(cvp, doc, dtd) == 0 {
                 let filename = filename.unwrap();
                 if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
                     generic_error!("Document {filename} does not validate against {dtd_valid}\n");
@@ -3172,7 +3140,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if cvp.is_null() {
             generic_error!("Couldn't allocate validation context\n");
             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            xml_free_doc(doc);
             return;
         }
 
@@ -3181,7 +3149,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         }
         (*cvp).error = Some(generic_error_default);
         (*cvp).warning = Some(generic_error_default);
-        if xml_validate_document(cvp, XmlDocPtr::from_raw(doc).unwrap().unwrap()) == 0 {
+        if xml_validate_document(cvp, doc) == 0 {
             let filename = filename.unwrap();
             generic_error!("Document {filename} does not validate\n");
             PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
@@ -3209,11 +3177,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             xml_schematron_new_valid_ctxt(WXSCHEMATRON.load(Ordering::Relaxed), flag);
         if ctxt.is_null() {
             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            xml_free_doc(doc);
             return;
         }
-        match xml_schematron_validate_doc(ctxt, XmlDocPtr::from_raw(doc).unwrap().unwrap()).cmp(&0)
-        {
+        match xml_schematron_validate_doc(ctxt, doc).cmp(&0) {
             std::cmp::Ordering::Equal => {
                 if !CMD_ARGS.quiet {
                     eprintln!("{} validates", filename.unwrap());
@@ -3245,7 +3212,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         let ctxt = xml_relaxng_new_valid_ctxt(RELAXNGSCHEMAS.load(Ordering::Relaxed));
         if ctxt.is_null() {
             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            xml_free_doc(doc);
             return;
         }
         xml_relaxng_set_valid_errors(
@@ -3254,7 +3221,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             Some(generic_error_default),
             None,
         );
-        match xml_relaxng_validate_doc(ctxt, XmlDocPtr::from_raw(doc).unwrap().unwrap()).cmp(&0) {
+        match xml_relaxng_validate_doc(ctxt, doc).cmp(&0) {
             std::cmp::Ordering::Equal => {
                 if !CMD_ARGS.quiet {
                     eprintln!("{} validates", filename.unwrap());
@@ -3285,7 +3252,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
         if ctxt.is_null() {
             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+            xml_free_doc(doc);
             return;
         }
         xml_schema_set_valid_errors(
@@ -3294,7 +3261,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             Some(generic_error_default),
             None,
         );
-        match xml_schema_validate_doc(ctxt, XmlDocPtr::from_raw(doc).unwrap().unwrap()).cmp(&0) {
+        match xml_schema_validate_doc(ctxt, doc).cmp(&0) {
             std::cmp::Ordering::Equal => {
                 if !CMD_ARGS.quiet {
                     eprintln!("{} validates", filename.unwrap());
@@ -3323,14 +3290,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         any(feature = "html", feature = "libxml_valid")
     ))]
     if CMD_ARGS.debugent && !CMD_ARGS.html {
-        xml_debug_dump_entities(stderr(), (!doc.is_null()).then(|| &*doc));
+        xml_debug_dump_entities(stderr(), Some(&*doc));
     }
 
     // free it.
     if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
         start_timer();
     }
-    xml_free_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap());
+    xml_free_doc(doc);
     if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
         end_timer!("Freeing");
     }
