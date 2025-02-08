@@ -2797,7 +2797,7 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
             (*ctxt).nodelen = nodelen;
             *(*last_child).content.add((*ctxt).nodelen as usize) = 0;
         } else if coalesce_text != 0 {
-            if xml_text_concat(last_child, ch) != 0 {
+            if xml_text_concat(XmlNodePtr::from_raw(last_child).unwrap().unwrap(), ch) != 0 {
                 xml_sax2_err_memory(ctxt, "xmlSAX2Characters");
             }
             if (*(*ctxt).node).children().is_some() {

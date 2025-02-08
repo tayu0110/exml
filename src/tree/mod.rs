@@ -1475,13 +1475,22 @@ pub unsafe fn xml_new_doc_node_eat_name(
     ns: Option<XmlNsPtr>,
     name: *mut XmlChar,
     content: *const XmlChar,
-) -> *mut XmlNode {
-    let cur: *mut XmlNode = xml_new_node_eat_name(ns, name);
-    if !cur.is_null() {
-        (*cur).doc = doc;
+) -> Option<XmlNodePtr> {
+    let cur = xml_new_node_eat_name(ns, name);
+    if let Some(mut cur) = cur {
+        cur.doc = doc;
         if !content.is_null() {
-            (*cur).set_children(doc.and_then(|doc| NodePtr::from_ptr(doc.get_node_list(content))));
-            UPDATE_LAST_CHILD_AND_PARENT!(cur)
+            cur.set_children(doc.and_then(|doc| NodePtr::from_ptr(doc.get_node_list(content))));
+            if let Some(mut ulccur) = cur.children() {
+                while let Some(next) = ulccur.next {
+                    ulccur.set_parent(NodePtr::from_ptr(cur.as_ptr()));
+                    ulccur = next;
+                }
+                (*ulccur).set_parent(NodePtr::from_ptr(cur.as_ptr()));
+                cur.set_last(Some(ulccur));
+            } else {
+                cur.set_last(None);
+            }
         }
     } else {
         // if name don't come from the doc dictionary free it here
@@ -1530,9 +1539,12 @@ pub unsafe fn xml_new_node(ns: Option<XmlNsPtr>, name: *const XmlChar) -> Option
 /// new node's name. Use xmlNewNode() if a copy of @name string is
 /// is needed as new node's name.
 #[doc(alias = "xmlNewNodeEatName")]
-pub unsafe fn xml_new_node_eat_name(ns: Option<XmlNsPtr>, name: *mut XmlChar) -> *mut XmlNode {
+pub unsafe fn xml_new_node_eat_name(
+    ns: Option<XmlNsPtr>,
+    name: *mut XmlChar,
+) -> Option<XmlNodePtr> {
     if name.is_null() {
-        return null_mut();
+        return None;
     }
 
     // Allocate a new node and fill the fields.
@@ -1544,7 +1556,7 @@ pub unsafe fn xml_new_node_eat_name(ns: Option<XmlNsPtr>, name: *mut XmlChar) ->
     }) else {
         xml_tree_err_memory("building node");
         // we can't check here that name comes from the doc dictionary
-        return null_mut();
+        return None;
     };
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -1552,7 +1564,7 @@ pub unsafe fn xml_new_node_eat_name(ns: Option<XmlNsPtr>, name: *mut XmlChar) ->
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Creation of a new child element, added at the end of @parent children list.
@@ -2110,48 +2122,49 @@ pub unsafe fn xml_replace_node(old: *mut XmlNode, cur: *mut XmlNode) -> *mut Xml
 /// Merge two text nodes into one
 /// Returns the first text node augmented
 #[doc(alias = "xmlTextMerge")]
-pub unsafe fn xml_text_merge(first: *mut XmlNode, second: *mut XmlNode) -> *mut XmlNode {
-    if first.is_null() {
-        return second;
+pub unsafe fn xml_text_merge(
+    first: Option<XmlNodePtr>,
+    second: Option<XmlNodePtr>,
+) -> Option<XmlNodePtr> {
+    match (first, second) {
+        (Some(mut first), Some(mut second))
+            if first.element_type() == XmlElementType::XmlTextNode
+                && second.element_type() == XmlElementType::XmlTextNode =>
+        {
+            if first.name != second.name {
+                return Some(first);
+            }
+            first.add_content(second.content);
+            second.unlink();
+            xml_free_node(second.as_ptr());
+            Some(first)
+        }
+        (Some(first), Some(_)) => Some(first),
+        (Some(text), None) | (None, Some(text)) => Some(text),
+        (None, None) => None,
     }
-    if second.is_null() {
-        return first;
-    }
-    if !matches!((*first).element_type(), XmlElementType::XmlTextNode) {
-        return first;
-    }
-    if !matches!((*second).element_type(), XmlElementType::XmlTextNode) {
-        return first;
-    }
-    if (*second).name != (*first).name {
-        return first;
-    }
-    (*first).add_content((*second).content);
-    (*second).unlink();
-    xml_free_node(second);
-    first
 }
 
 /// Concat the given string at the end of the existing node content
 ///
 /// Returns -1 in case of error, 0 otherwise
 #[doc(alias = "xmlTextConcat")]
-pub unsafe fn xml_text_concat(node: *mut XmlNode, content: &str) -> i32 {
-    if node.is_null() {
-        return -1;
-    }
+pub unsafe fn xml_text_concat(mut node: XmlNodePtr, content: &str) -> i32 {
+    // if node.is_null() {
+    //     return -1;
+    // }
 
-    if !matches!((*node).element_type(), XmlElementType::XmlTextNode)
-        && !matches!((*node).element_type(), XmlElementType::XmlCDATASectionNode)
-        && !matches!((*node).element_type(), XmlElementType::XmlCommentNode)
-        && !matches!((*node).element_type(), XmlElementType::XmlPINode)
+    if !matches!(node.element_type(), XmlElementType::XmlTextNode)
+        && !matches!(node.element_type(), XmlElementType::XmlCDATASectionNode)
+        && !matches!(node.element_type(), XmlElementType::XmlCommentNode)
+        && !matches!(node.element_type(), XmlElementType::XmlPINode)
     {
         return -1;
     }
     // need to check if content is currently in the dictionary
-    (*node).content = xml_strncat((*node).content, content.as_ptr(), content.len() as i32);
-    (*node).properties = None;
-    if (*node).content.is_null() {
+    node.content = xml_strncat(node.content, content.as_ptr(), content.len() as i32);
+    node.properties = None;
+    if node.content.is_null() {
         return -1;
     }
     0

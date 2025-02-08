@@ -14,7 +14,7 @@ use crate::{
 use super::{
     xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge, NodePtr, XmlAttr,
     XmlAttrPtr, XmlAttribute, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement, XmlElementType,
-    XmlEntity, XmlNode, XmlNs, XML_XML_NAMESPACE,
+    XmlEntity, XmlNode, XmlNodePtr, XmlNs, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -273,7 +273,10 @@ pub trait NodeCommon {
                     if let Some(last) =
                         last.filter(|l| l.next() == NodePtr::from_ptr(new_node.as_ptr()))
                     {
-                        xml_text_merge(last.as_ptr(), new_node.as_ptr());
+                        xml_text_merge(
+                            XmlNodePtr::from_raw(last.as_ptr()).unwrap(),
+                            Some(new_node),
+                        );
                     }
                 }
             }
