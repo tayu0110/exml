@@ -2701,8 +2701,14 @@ pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: &str) {
     } else {
         xml_new_reference((*ctxt).my_doc, name)
     };
-    if (*ctxt).node.is_null() || (*(*ctxt).node).add_child(ret).is_null() {
-        xml_free_node(ret);
+    if (*ctxt).node.is_null()
+        || (*(*ctxt).node)
+            .add_child(ret.map_or(null_mut(), |node| node.as_ptr()))
+            .is_null()
+    {
+        if let Some(ret) = ret {
+            xml_free_node(ret.as_ptr());
+        }
     }
 }
 
@@ -2718,21 +2724,21 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
     if (*ctxt).node.is_null() {
         return;
     }
-    let mut last_child = (*(*ctxt).node).last().map_or(null_mut(), |l| l.as_ptr());
+    let last_child = (*(*ctxt).node).last().map_or(null_mut(), |l| l.as_ptr());
 
     // Here we needed an accelerator mechanism in case of very large elements.
     // Use an attribute in the structure !!!
     if last_child.is_null() {
-        if matches!(typ, XmlElementType::XmlTextNode) {
-            last_child = xml_sax2_text_node(ctxt, ch).map_or(null_mut(), |node| node.as_ptr());
+        let last_child = if matches!(typ, XmlElementType::XmlTextNode) {
+            xml_sax2_text_node(ctxt, ch)
         } else {
-            last_child = xml_new_cdata_block((*ctxt).my_doc, ch);
-        }
-        if !last_child.is_null() {
-            (*(*ctxt).node).set_children(NodePtr::from_ptr(last_child));
-            (*(*ctxt).node).set_last(NodePtr::from_ptr(last_child));
-            (*last_child).set_parent(NodePtr::from_ptr((*ctxt).node));
-            (*last_child).doc = (*(*ctxt).node).doc;
+            xml_new_cdata_block((*ctxt).my_doc, ch)
+        };
+        if let Some(mut last_child) = last_child {
+            (*(*ctxt).node).set_children(NodePtr::from_ptr(last_child.as_ptr()));
+            (*(*ctxt).node).set_last(NodePtr::from_ptr(last_child.as_ptr()));
+            last_child.parent = NodePtr::from_ptr((*ctxt).node);
+            last_child.doc = (*(*ctxt).node).doc;
             (*ctxt).nodelen = ch.len() as i32;
             (*ctxt).nodemem = ch.len() as i32 + 1;
         } else {
@@ -2800,16 +2806,20 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
             }
         } else {
             // Mixed content, first time
-            if matches!(typ, XmlElementType::XmlTextNode) {
-                last_child = xml_sax2_text_node(ctxt, ch).map_or(null_mut(), |node| node.as_ptr());
-                if !last_child.is_null() {
-                    (*last_child).doc = (*ctxt).my_doc;
+            let last_child = if matches!(typ, XmlElementType::XmlTextNode) {
+                let last_child = XmlNodePtr::from_raw(
+                    xml_sax2_text_node(ctxt, ch).map_or(null_mut(), |node| node.as_ptr()),
+                )
+                .unwrap();
+                if let Some(mut last_child) = last_child {
+                    last_child.doc = (*ctxt).my_doc;
                 }
+                last_child
             } else {
-                last_child = xml_new_cdata_block((*ctxt).my_doc, ch);
-            }
-            if !last_child.is_null() {
-                (*(*ctxt).node).add_child(last_child);
+                xml_new_cdata_block((*ctxt).my_doc, ch)
+            };
+            if let Some(last_child) = last_child {
+                (*(*ctxt).node).add_child(last_child.as_ptr());
                 if (*(*ctxt).node).children().is_some() {
                     (*ctxt).nodelen = ch.len() as i32;
                     (*ctxt).nodemem = ch.len() as i32 + 1;
@@ -2856,34 +2866,33 @@ pub unsafe fn xml_sax2_processing_instruction(
 
     let parent: *mut XmlNode = (*ctxt).node;
 
-    let ret: *mut XmlNode = xml_new_doc_pi((*ctxt).my_doc, target, data);
-    if ret.is_null() {
+    let Some(mut ret) = xml_new_doc_pi((*ctxt).my_doc, target, data) else {
         return;
-    }
+    };
 
     if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
         if ((*(*ctxt).input).line as u32) < u16::MAX as u32 {
-            (*ret).line = (*(*ctxt).input).line as _;
+            ret.line = (*(*ctxt).input).line as _;
         } else {
-            (*ret).line = u16::MAX;
+            ret.line = u16::MAX;
         }
     }
     let mut my_doc = (*ctxt).my_doc.unwrap();
     if (*ctxt).in_subset == 1 {
-        my_doc.int_subset.unwrap().add_child(ret);
+        my_doc.int_subset.unwrap().add_child(ret.as_ptr());
         return;
     } else if (*ctxt).in_subset == 2 {
-        my_doc.ext_subset.unwrap().add_child(ret);
+        my_doc.ext_subset.unwrap().add_child(ret.as_ptr());
         return;
     }
     if parent.is_null() {
-        my_doc.add_child(ret);
+        my_doc.add_child(ret.as_ptr());
         return;
     }
     if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
-        (*parent).add_child(ret);
+        (*parent).add_child(ret.as_ptr());
     } else {
-        (*parent).add_sibling(ret);
+        (*parent).add_sibling(ret.as_ptr());
     }
 }
 
@@ -2899,34 +2908,33 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: &str) {
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
     let parent: *mut XmlNode = (*ctxt).node;
-    let ret: *mut XmlNode = xml_new_doc_comment((*ctxt).my_doc, value);
-    if ret.is_null() {
+    let Some(mut ret) = xml_new_doc_comment((*ctxt).my_doc, value) else {
         return;
-    }
+    };
     if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
         if ((*(*ctxt).input).line as u32) < u16::MAX as u32 {
-            (*ret).line = (*(*ctxt).input).line as _;
+            ret.line = (*(*ctxt).input).line as _;
         } else {
-            (*ret).line = u16::MAX;
+            ret.line = u16::MAX;
         }
     }
 
     let mut my_doc = (*ctxt).my_doc.unwrap();
     if (*ctxt).in_subset == 1 {
-        my_doc.int_subset.unwrap().add_child(ret);
+        my_doc.int_subset.unwrap().add_child(ret.as_ptr());
         return;
     } else if (*ctxt).in_subset == 2 {
-        my_doc.ext_subset.unwrap().add_child(ret);
+        my_doc.ext_subset.unwrap().add_child(ret.as_ptr());
         return;
     }
     if parent.is_null() {
-        my_doc.add_child(ret);
+        my_doc.add_child(ret.as_ptr());
         return;
     }
     if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
-        (*parent).add_child(ret);
+        (*parent).add_child(ret.as_ptr());
     } else {
-        (*parent).add_sibling(ret);
+        (*parent).add_sibling(ret.as_ptr());
     }
 }
 

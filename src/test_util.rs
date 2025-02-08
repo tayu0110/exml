@@ -1258,7 +1258,7 @@ unsafe fn free_api_doc() {
 
 pub(crate) unsafe fn gen_xml_node_ptr(no: i32, _nr: i32) -> *mut XmlNode {
     if no == 0 {
-        return xml_new_pi("test", None);
+        return xml_new_pi("test", None).map_or(null_mut(), |node| node.as_ptr());
     }
     if no == 1 {
         return get_api_root();

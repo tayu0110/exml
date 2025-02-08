@@ -1017,7 +1017,7 @@ unsafe fn xml_xinclude_copy_range(
 ) -> *mut XmlNode {
     use crate::{
         libxml::xpointer::xml_xptr_advance_node,
-        tree::{xml_new_doc_text, xml_new_doc_text_len, XmlNodePtr},
+        tree::{xml_new_doc_text, xml_new_doc_text_len},
     };
 
     /* pointers to generated nodes */
@@ -1089,8 +1089,8 @@ unsafe fn xml_xinclude_copy_range(
                 let mut content: *const XmlChar = (*cur).content;
                 let mut len: i32;
 
-                if content.is_null() {
-                    tmp = xml_new_doc_text_len((*ctxt).doc, null_mut(), 0);
+                let tmp = if content.is_null() {
+                    xml_new_doc_text_len((*ctxt).doc, null_mut(), 0)
                 } else {
                     len = index2;
                     if cur == start && index1 > 1 {
@@ -1099,17 +1099,17 @@ unsafe fn xml_xinclude_copy_range(
                     } else {
                         len = index2;
                     }
-                    tmp = xml_new_doc_text_len((*ctxt).doc, content, len);
-                }
+                    xml_new_doc_text_len((*ctxt).doc, content, len)
+                };
                 // single sub text node selection
                 if list.is_null() {
-                    return tmp;
+                    return tmp.map_or(null_mut(), |node| node.as_ptr());
                 }
                 // prune and return full set
                 if level == last_level {
-                    (*last).add_next_sibling(tmp);
+                    (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
                 } else {
-                    (*last).add_child(tmp);
+                    (*last).add_child(tmp.map_or(null_mut(), |node| node.as_ptr()));
                 }
                 return list;
             } else {
@@ -1153,7 +1153,7 @@ unsafe fn xml_xinclude_copy_range(
                 let mut content: *const XmlChar = (*cur).content;
 
                 let tmp = if content.is_null() {
-                    XmlNodePtr::from_raw(xml_new_doc_text_len((*ctxt).doc, null_mut(), 0)).unwrap()
+                    xml_new_doc_text_len((*ctxt).doc, null_mut(), 0)
                 } else {
                     if index1 > 1 {
                         content = content.add(index1 as usize - 1);

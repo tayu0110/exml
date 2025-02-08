@@ -2642,8 +2642,8 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                 let mut content: *const XmlChar = (*cur).content;
                 let mut len: i32;
 
-                if content.is_null() {
-                    tmp = xml_new_text_len(null_mut(), 0);
+                let tmp = if content.is_null() {
+                    xml_new_text_len(null_mut(), 0)
                 } else {
                     len = index2;
                     if cur == start && index1 > 1 {
@@ -2653,17 +2653,17 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                     } else {
                         len = index2;
                     }
-                    tmp = xml_new_text_len(content, len);
-                }
+                    xml_new_text_len(content, len)
+                };
                 // single sub text node selection
                 if list.is_null() {
-                    return tmp;
+                    return tmp.map_or(null_mut(), |node| node.as_ptr());
                 }
                 // prune and return full set
                 if !last.is_null() {
-                    (*last).add_next_sibling(tmp);
+                    (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
                 } else {
-                    (*parent).add_child(tmp);
+                    (*parent).add_child(tmp.map_or(null_mut(), |node| node.as_ptr()));
                 }
                 return list;
             } else {
@@ -2699,16 +2699,16 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
             ) {
                 let mut content: *const XmlChar = (*cur).content;
 
-                if content.is_null() {
-                    tmp = xml_new_text_len(null_mut(), 0);
+                let tmp = if content.is_null() {
+                    xml_new_text_len(null_mut(), 0)
                 } else {
                     if index1 > 1 {
                         content = content.add(index1 as usize - 1);
                     }
-                    tmp = xml_new_text(content).map_or(null_mut(), |node| node.as_ptr());
-                }
-                last = tmp;
-                list = tmp;
+                    xml_new_text(content)
+                };
+                last = tmp.map_or(null_mut(), |node| node.as_ptr());
+                list = tmp.map_or(null_mut(), |node| node.as_ptr());
             } else {
                 if cur == start && index1 > 1 {
                     tmp = xml_copy_node(cur, 0);

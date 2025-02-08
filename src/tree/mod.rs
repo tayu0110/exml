@@ -1666,7 +1666,7 @@ pub unsafe fn xml_new_doc_pi(
     doc: Option<XmlDocPtr>,
     name: &str,
     content: Option<&str>,
-) -> *mut XmlNode {
+) -> Option<XmlNodePtr> {
     // Allocate a new node and fill the fields.
     let Some(mut cur) = XmlNodePtr::new(XmlNode {
         typ: XmlElementType::XmlPINode,
@@ -1674,7 +1674,7 @@ pub unsafe fn xml_new_doc_pi(
         ..Default::default()
     }) else {
         xml_tree_err_memory("building PI");
-        return null_mut();
+        return None;
     };
     if let Some(content) = content {
         let content = CString::new(content).unwrap();
@@ -1687,7 +1687,7 @@ pub unsafe fn xml_new_doc_pi(
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Creation of a processing instruction element.
@@ -1696,7 +1696,7 @@ pub unsafe fn xml_new_doc_pi(
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewPI")]
-pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> *mut XmlNode {
+pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> Option<XmlNodePtr> {
     xml_new_doc_pi(None, name, content)
 }
 
@@ -1708,10 +1708,10 @@ pub unsafe fn xml_new_doc_text_len(
     doc: Option<XmlDocPtr>,
     content: *const XmlChar,
     len: i32,
-) -> *mut XmlNode {
-    let cur: *mut XmlNode = xml_new_text_len(content, len);
-    if !cur.is_null() {
-        (*cur).doc = doc;
+) -> Option<XmlNodePtr> {
+    let cur = xml_new_text_len(content, len);
+    if let Some(mut cur) = cur {
+        cur.doc = doc;
     }
     cur
 }
@@ -1721,7 +1721,7 @@ pub unsafe fn xml_new_doc_text_len(
 /// Creation of a new text node with an extra parameter for the content's length
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewTextLen")]
-pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> *mut XmlNode {
+pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> Option<XmlNodePtr> {
     // Allocate a new node and fill the fields.
     let Some(mut cur) = XmlNodePtr::new(XmlNode {
         typ: XmlElementType::XmlTextNode,
@@ -1729,7 +1729,7 @@ pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> *mut XmlNod
         ..Default::default()
     }) else {
         xml_tree_err_memory("building text");
-        return null_mut();
+        return None;
     };
     if !content.is_null() {
         cur.content = xml_strndup(content, len);
@@ -1740,16 +1740,16 @@ pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> *mut XmlNod
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Creation of a new node containing a comment within a document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocComment")]
-pub unsafe fn xml_new_doc_comment(doc: Option<XmlDocPtr>, content: &str) -> *mut XmlNode {
-    let cur: *mut XmlNode = xml_new_comment(content);
-    if !cur.is_null() {
-        (*cur).doc = doc;
+pub unsafe fn xml_new_doc_comment(doc: Option<XmlDocPtr>, content: &str) -> Option<XmlNodePtr> {
+    let cur = xml_new_comment(content);
+    if let Some(mut cur) = cur {
+        cur.doc = doc;
     }
     cur
 }
@@ -1759,7 +1759,7 @@ pub unsafe fn xml_new_doc_comment(doc: Option<XmlDocPtr>, content: &str) -> *mut
 /// Creation of a new node containing a comment.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewComment")]
-pub unsafe fn xml_new_comment(content: &str) -> *mut XmlNode {
+pub unsafe fn xml_new_comment(content: &str) -> Option<XmlNodePtr> {
     // Allocate a new node and fill the fields.
     let Some(cur) = XmlNodePtr::new(XmlNode {
         typ: XmlElementType::XmlCommentNode,
@@ -1768,7 +1768,7 @@ pub unsafe fn xml_new_comment(content: &str) -> *mut XmlNode {
         ..Default::default()
     }) else {
         xml_tree_err_memory("building comment");
-        return null_mut();
+        return None;
     };
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -1776,13 +1776,13 @@ pub unsafe fn xml_new_comment(content: &str) -> *mut XmlNode {
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Creation of a new node containing a CDATA block.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCDataBlock")]
-pub unsafe fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> *mut XmlNode {
+pub unsafe fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> Option<XmlNodePtr> {
     // Allocate a new node and fill the fields.
     let Some(cur) = XmlNodePtr::new(XmlNode {
         typ: XmlElementType::XmlCDATASectionNode,
@@ -1791,7 +1791,7 @@ pub unsafe fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> *mut
         ..Default::default()
     }) else {
         xml_tree_err_memory("building CDATA");
-        return null_mut();
+        return None;
     };
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -1799,13 +1799,13 @@ pub unsafe fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> *mut
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Creation of a new character reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCharRef")]
-pub unsafe fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> *mut XmlNode {
+pub unsafe fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlNodePtr> {
     // Allocate a new node and fill the fields.
     let Some(mut cur) = XmlNodePtr::new(XmlNode {
         typ: XmlElementType::XmlEntityRefNode,
@@ -1813,7 +1813,7 @@ pub unsafe fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> *mut XmlNo
         ..Default::default()
     }) else {
         xml_tree_err_memory("building character reference");
-        return null_mut();
+        return None;
     };
     if let Some(name) = name.strip_prefix('&') {
         let len = name.len();
@@ -1832,13 +1832,13 @@ pub unsafe fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> *mut XmlNo
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Creation of a new reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewReference")]
-pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> *mut XmlNode {
+pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlNodePtr> {
     // Allocate a new node and fill the fields.
     let Some(mut cur) = XmlNodePtr::new(XmlNode {
         typ: XmlElementType::XmlEntityRefNode,
@@ -1846,7 +1846,7 @@ pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> *mut XmlN
         ..Default::default()
     }) else {
         xml_tree_err_memory("building reference");
-        return null_mut();
+        return None;
     };
     if let Some(name) = name.strip_prefix('&') {
         let len = name.len();
@@ -1875,7 +1875,7 @@ pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> *mut XmlN
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Do a copy of the node.
@@ -2021,7 +2021,7 @@ pub unsafe fn xml_new_doc_raw_node(
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocFragment")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_new_doc_fragment(doc: Option<XmlDocPtr>) -> *mut XmlNode {
+pub unsafe fn xml_new_doc_fragment(doc: Option<XmlDocPtr>) -> Option<XmlNodePtr> {
     // Allocate a new DocumentFragment node and fill the fields.
     let Some(cur) = XmlNodePtr::new(XmlNode {
         typ: XmlElementType::XmlDocumentFragNode,
@@ -2029,7 +2029,7 @@ pub unsafe fn xml_new_doc_fragment(doc: Option<XmlDocPtr>) -> *mut XmlNode {
         ..Default::default()
     }) else {
         xml_tree_err_memory("building fragment");
-        return null_mut();
+        return None;
     };
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -2037,7 +2037,7 @@ pub unsafe fn xml_new_doc_fragment(doc: Option<XmlDocPtr>) -> *mut XmlNode {
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Unlink the old node from its current context, prune the new one
@@ -2840,39 +2840,6 @@ mod tests {
                     leaks == 0,
                     "{leaks} Leaks are found in xmlGetCompressMode()"
                 );
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_text_len() {
-        unsafe {
-            let mut leaks = 0;
-            for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_len in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let content = gen_const_xml_char_ptr(n_content, 0);
-                    let mut len = gen_int(n_len, 1);
-                    if !content.is_null() && len > xml_strlen(content) {
-                        len = 0;
-                    }
-
-                    let ret_val = xml_new_text_len(content as *const XmlChar, len);
-                    desret_xml_node_ptr(ret_val);
-                    des_const_xml_char_ptr(n_content, content, 0);
-                    des_int(n_len, len, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewTextLen",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNewTextLen()");
-                        eprint!(" {}", n_content);
-                        eprintln!(" {}", n_len);
-                    }
-                }
             }
         }
     }

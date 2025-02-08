@@ -265,14 +265,15 @@ pub trait NodeCommon {
         match self.element_type() {
             XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
                 let last = self.last();
-                let new_node: *mut XmlNode = xml_new_doc_text_len(self.document(), content, len);
-                if !new_node.is_null() {
-                    let tmp = self.add_child(new_node);
-                    if tmp != new_node {
+                if let Some(new_node) = xml_new_doc_text_len(self.document(), content, len) {
+                    let tmp = self.add_child(new_node.as_ptr());
+                    if tmp != new_node.as_ptr() {
                         return;
                     }
-                    if let Some(last) = last.filter(|l| l.next() == NodePtr::from_ptr(new_node)) {
-                        xml_text_merge(last.as_ptr(), new_node);
+                    if let Some(last) =
+                        last.filter(|l| l.next() == NodePtr::from_ptr(new_node.as_ptr()))
+                    {
+                        xml_text_merge(last.as_ptr(), new_node.as_ptr());
                     }
                 }
             }

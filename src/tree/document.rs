@@ -148,7 +148,6 @@ impl XmlDoc {
         let mut ret: *mut XmlNode = null_mut();
         let mut head: *mut XmlNode = null_mut();
         let mut last: *mut XmlNode = null_mut();
-        let mut node: *mut XmlNode;
         let mut val: *mut XmlChar = null_mut();
         let mut cur: *const XmlChar = value;
         let mut q: *const XmlChar;
@@ -289,11 +288,10 @@ impl XmlDoc {
                             }
 
                             // Create a new REFERENCE_REF node
-                            node = xml_new_reference(
+                            let Some(node) = xml_new_reference(
                                 XmlDocPtr::from_raw(self as *const XmlDoc as _).unwrap(),
                                 &CStr::from_ptr(val as *const i8).to_string_lossy(),
-                            );
-                            if node.is_null() {
+                            ) else {
                                 // goto out;
                                 if !val.is_null() {
                                     xml_free(val as _);
@@ -302,7 +300,7 @@ impl XmlDoc {
                                     xml_free_node_list(head);
                                 }
                                 return ret;
-                            }
+                            };
                             if let Some(mut ent) = ent.filter(|ent| {
                                 ent.flags & XML_ENT_PARSED as i32 == 0
                                     && ent.flags & XML_ENT_EXPANDING as i32 == 0
@@ -311,7 +309,7 @@ impl XmlDoc {
                                 // but set the flag anyway to avoid recursion.
                                 ent.flags |= XML_ENT_EXPANDING as i32;
                                 ent.set_children(NodePtr::from_ptr(
-                                    self.get_node_list((*node).content),
+                                    self.get_node_list(node.content),
                                 ));
                                 ent.owner = 1;
                                 ent.flags &= !XML_ENT_EXPANDING as i32;
@@ -324,10 +322,10 @@ impl XmlDoc {
                                 }
                             }
                             if last.is_null() {
-                                last = node;
-                                head = node
+                                last = node.as_ptr();
+                                head = node.as_ptr();
                             } else {
-                                last = (*last).add_next_sibling(node);
+                                last = (*last).add_next_sibling(node.as_ptr());
                             }
                         }
                         xml_free(val as _);
@@ -402,7 +400,6 @@ impl XmlDoc {
     ) -> *mut XmlNode {
         let mut ret: *mut XmlNode = null_mut();
         let mut last: *mut XmlNode = null_mut();
-        let mut node: *mut XmlNode;
         let mut val: *mut XmlChar;
         let mut cur: *const XmlChar;
         let mut q: *const XmlChar;
@@ -559,17 +556,17 @@ impl XmlDoc {
                             }
 
                             // Create a new REFERENCE_REF node
-                            node = xml_new_reference(
+                            let Some(node) = xml_new_reference(
                                 XmlDocPtr::from_raw(self as *const XmlDoc as _).unwrap(),
                                 &CStr::from_ptr(val as *const i8).to_string_lossy(),
-                            );
-                            if node.is_null() {
+                            ) else {
                                 if !val.is_null() {
                                     xml_free(val as _);
                                 }
                                 // goto out;
                                 return ret;
-                            } else if let Some(mut ent) = ent.filter(|ent| {
+                            };
+                            if let Some(mut ent) = ent.filter(|ent| {
                                 ent.flags & XML_ENT_PARSED as i32 == 0
                                     && ent.flags & XML_ENT_EXPANDING as i32 == 0
                             }) {
@@ -577,7 +574,7 @@ impl XmlDoc {
                                 // but set the flag anyway to avoid recursion.
                                 ent.flags |= XML_ENT_EXPANDING as i32;
                                 ent.children.store(
-                                    self.get_node_list((*node).content as _),
+                                    self.get_node_list(node.content as _),
                                     Ordering::Relaxed,
                                 );
                                 ent.owner = 1;
@@ -591,10 +588,10 @@ impl XmlDoc {
                                 }
                             }
                             if last.is_null() {
-                                last = node;
-                                ret = node;
+                                last = node.as_ptr();
+                                ret = node.as_ptr();
                             } else {
-                                last = (*last).add_next_sibling(node);
+                                last = (*last).add_next_sibling(node.as_ptr());
                             }
                         }
                         xml_free(val as _);

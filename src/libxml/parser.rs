@@ -2123,12 +2123,11 @@ pub unsafe fn xml_parse_in_node_context(
     (*ctxt).input_id = 2;
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
 
-    let fake: *mut XmlNode = xml_new_doc_comment((*node).doc, "");
-    if fake.is_null() {
+    let Some(mut fake) = xml_new_doc_comment((*node).doc, "") else {
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrNoMemory;
-    }
-    (*node).add_child(fake);
+    };
+    (*node).add_child(fake.as_ptr());
 
     if (*node).element_type() == XmlElementType::XmlElementNode {
         (*ctxt).node_push(node);
@@ -2189,8 +2188,8 @@ pub unsafe fn xml_parse_in_node_context(
     // Return the newly created nodeset after unlinking it from
     // the pseudo sibling.
 
-    cur = (*fake).next.take().map_or(null_mut(), |n| n.as_ptr());
-    (*node).set_last(NodePtr::from_ptr(fake));
+    cur = fake.next.take().map_or(null_mut(), |n| n.as_ptr());
+    (*node).set_last(NodePtr::from_ptr(fake.as_ptr()));
 
     if !cur.is_null() {
         (*cur).prev = None;
@@ -2203,8 +2202,8 @@ pub unsafe fn xml_parse_in_node_context(
         cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
 
-    (*fake).unlink();
-    xml_free_node(fake);
+    fake.unlink();
+    xml_free_node(fake.as_ptr());
 
     if !matches!(ret, XmlParserErrors::XmlErrOK) {
         xml_free_node_list(*lst);
