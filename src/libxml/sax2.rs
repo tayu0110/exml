@@ -21,7 +21,7 @@
 
 use std::{
     ffi::{c_void, CStr, CString},
-    mem::{replace, size_of},
+    mem::replace,
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
     sync::atomic::Ordering,
@@ -53,14 +53,14 @@ use crate::{
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
-        XmlEnumeration, XmlNode, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
 
 use super::{
     dict::xml_dict_owns,
-    globals::{xml_free, xml_malloc, xml_realloc, xml_register_node_default_value},
+    globals::{xml_free, xml_realloc, xml_register_node_default_value},
     parser::{
         xml_load_external_entity, XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS,
         XML_SAX2_MAGIC, XML_SKIP_IDS,
@@ -2320,35 +2320,38 @@ pub unsafe fn xml_sax2_start_element_ns(
 #[doc(alias = "xmlSAX2TextNode")]
 unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> *mut XmlNode {
     // Allocate
-    let ret: *mut XmlNode = if !(*ctxt).free_elems.is_null() {
+    let ret = if !(*ctxt).free_elems.is_null() {
         let ret = (*ctxt).free_elems;
         (*ctxt).free_elems = (*ret).next.map_or(null_mut(), |n| n.as_ptr());
         (*ctxt).free_elems_nr -= 1;
-        ret
+        if !ret.is_null() {
+            std::ptr::write(&mut *ret, XmlNode::default());
+            (*ret).typ = XmlElementType::XmlTextNode;
+        }
+        XmlNodePtr::from_raw(ret).unwrap()
     } else {
-        xml_malloc(size_of::<XmlNode>()) as *mut XmlNode
+        XmlNodePtr::new(XmlNode::default())
     };
-    if ret.is_null() {
+    let Some(mut ret) = ret else {
         xml_err_memory(ctxt, Some("xmlSAX2Characters"));
         return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlNode::default());
-    (*ret).typ = XmlElementType::XmlTextNode;
-    (*ret).name = XML_STRING_TEXT.as_ptr() as _;
-    (*ret).content = xml_strndup(s.as_ptr(), s.len() as i32);
-    if (*ret).content.is_null() {
+    };
+    ret.typ = XmlElementType::XmlTextNode;
+    ret.name = XML_STRING_TEXT.as_ptr() as _;
+    ret.content = xml_strndup(s.as_ptr(), s.len() as i32);
+    if ret.content.is_null() {
         xml_sax2_err_memory(ctxt, "xmlSAX2TextNode");
-        xml_free(ret as _);
+        ret.free();
         return null_mut();
     }
 
     if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
         if ((*(*ctxt).input).line as u32) < u32::MAX {
-            (*ret).line = (*(*ctxt).input).line as _;
+            ret.line = (*(*ctxt).input).line as _;
         } else {
-            (*ret).line = u16::MAX;
+            ret.line = u16::MAX;
             if (*ctxt).options & XmlParserOption::XmlParseBigLines as i32 != 0 {
-                (*ret).psvi = (*(*ctxt).input).line as isize as *mut c_void;
+                ret.psvi = (*(*ctxt).input).line as isize as *mut c_void;
             }
         }
     }
@@ -2356,9 +2359,9 @@ unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> *mut XmlNode {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(ret);
+        xml_register_node_default_value(ret.as_ptr());
     }
-    ret
+    ret.as_ptr()
 }
 
 /// Remove the entities from an attribute value

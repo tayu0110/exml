@@ -40,7 +40,6 @@ use std::{
     borrow::Cow,
     ffi::{CStr, CString},
     fmt::Display,
-    mem::size_of,
     ptr::null_mut,
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
 };
@@ -52,7 +51,7 @@ use crate::{
     libxml::{
         chvalid::xml_is_blank_char,
         globals::{
-            xml_deregister_node_default_value, xml_free, xml_malloc, xml_malloc_atomic,
+            xml_deregister_node_default_value, xml_free, xml_malloc_atomic,
             xml_register_node_default_value,
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
@@ -1067,24 +1066,23 @@ pub(crate) unsafe fn xml_static_copy_node(
     }
 
     // Allocate a new node and fill the fields.
-    let ret: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if ret.is_null() {
+    let Some(mut ret) = XmlNodePtr::new(XmlNode {
+        typ: (*node).element_type(),
+        doc,
+        parent: NodePtr::from_ptr(parent),
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("copying node");
         return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlNode::default());
-    (*ret).typ = (*node).element_type();
-
-    (*ret).doc = doc;
-    (*ret).set_parent(NodePtr::from_ptr(parent));
+    };
     if (*node).name == XML_STRING_TEXT.as_ptr() as _ {
-        (*ret).name = XML_STRING_TEXT.as_ptr() as _;
+        ret.name = XML_STRING_TEXT.as_ptr() as _;
     } else if (*node).name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
-        (*ret).name = XML_STRING_TEXT_NOENC.as_ptr() as _;
+        ret.name = XML_STRING_TEXT_NOENC.as_ptr() as _;
     } else if (*node).name == XML_STRING_COMMENT.as_ptr() as _ {
-        (*ret).name = XML_STRING_COMMENT.as_ptr() as _;
+        ret.name = XML_STRING_COMMENT.as_ptr() as _;
     } else if !(*node).name.is_null() {
-        (*ret).name = xml_strdup((*node).name);
+        ret.name = xml_strdup((*node).name);
     }
     if !matches!((*node).element_type(), XmlElementType::XmlElementNode)
         && !(*node).content.is_null()
@@ -1092,9 +1090,9 @@ pub(crate) unsafe fn xml_static_copy_node(
         && !matches!((*node).element_type(), XmlElementType::XmlXIncludeEnd)
         && !matches!((*node).element_type(), XmlElementType::XmlXIncludeStart)
     {
-        (*ret).content = xml_strdup((*node).content);
+        ret.content = xml_strdup((*node).content);
     } else if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-        (*ret).line = (*node).line;
+        ret.line = (*node).line;
     }
     if !parent.is_null() {
         // this is a tricky part for the node register thing:
@@ -1103,7 +1101,7 @@ pub(crate) unsafe fn xml_static_copy_node(
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xml_register_node_default_value(ret as _);
+            xml_register_node_default_value(ret.as_ptr() as _);
         }
 
         // Note that since (*ret).parent is already set, xmlAddChild will
@@ -1112,9 +1110,9 @@ pub(crate) unsafe fn xml_static_copy_node(
         // Assuming that the subtree to be copied always has its text
         // nodes coalesced, the somewhat confusing call to xmlAddChild
         // could be removed.
-        let tmp: *mut XmlNode = (*parent).add_child(ret);
+        let tmp: *mut XmlNode = (*parent).add_child(ret.as_ptr());
         /* node could have coalesced */
-        if tmp != ret {
+        if tmp != ret.as_ptr() {
             return tmp;
         }
     }
@@ -1125,37 +1123,37 @@ pub(crate) unsafe fn xml_static_copy_node(
         if parent.is_null() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xml_register_node_default_value(ret as _);
+            xml_register_node_default_value(ret.as_ptr() as _);
         }
 
-        return ret;
+        return ret.as_ptr();
     }
     if matches!(
         (*node).element_type(),
         XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
     ) && (*node).ns_def.is_some()
     {
-        (*ret).ns_def = xml_copy_namespace_list((*node).ns_def);
+        ret.ns_def = xml_copy_namespace_list((*node).ns_def);
     }
 
     if let Some(node_ns) = (*node).ns {
         let prefix = node_ns.prefix();
-        if let Some(ns) = (*ret).search_ns(doc, prefix.as_deref()) {
+        if let Some(ns) = ret.search_ns(doc, prefix.as_deref()) {
             // reference the existing namespace definition in our own tree.
-            (*ret).ns = Some(ns);
+            ret.ns = Some(ns);
         } else {
             // Humm, we are copying an element whose namespace is defined
             // out of the new tree scope. Search it in the original tree
             // and add it at the top of the new tree
             if let Some(ns) = (*node).search_ns((*node).doc, prefix.as_deref()) {
-                let mut root: *mut XmlNode = ret;
+                let mut root: *mut XmlNode = ret.as_ptr();
 
                 while let Some(parent) = (*root).parent() {
                     root = parent.as_ptr();
                 }
-                (*ret).ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
+                ret.ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
             } else {
-                (*ret).ns = xml_new_reconciled_ns(doc, ret, node_ns);
+                ret.ns = xml_new_reconciled_ns(doc, ret.as_ptr(), node_ns);
             }
         }
     }
@@ -1163,7 +1161,7 @@ pub(crate) unsafe fn xml_static_copy_node(
         || matches!((*node).element_type(), XmlElementType::XmlXIncludeStart))
         && (*node).properties.is_some()
     {
-        (*ret).properties = xml_copy_prop_list(ret, (*node).properties);
+        ret.properties = xml_copy_prop_list(ret.as_ptr(), (*node).properties);
     }
     if matches!((*node).element_type(), XmlElementType::XmlEntityRefNode) {
         if doc.map_or(true, |doc| (*node).doc != Some(doc)) {
@@ -1171,21 +1169,21 @@ pub(crate) unsafe fn xml_static_copy_node(
             // to avoid dangling references to the ENTITY_DECL node
             // we cannot keep the reference. Try to find it in the
             // target document.
-            (*ret).set_children(NodePtr::from_ptr(
-                xml_get_doc_entity(doc, &(*ret).name().unwrap()).map_or(null_mut(), |e| e.as_ptr())
-                    as *mut XmlNode,
-            ));
+            let children = xml_get_doc_entity(doc, &ret.name().unwrap())
+                .map_or(null_mut(), |e| e.as_ptr()) as *mut XmlNode;
+            ret.set_children(NodePtr::from_ptr(children));
         } else {
-            (*ret).set_children((*node).children());
+            ret.set_children((*node).children());
         }
-        (*ret).set_last((*ret).children());
+        let children = ret.children();
+        ret.set_last(children);
     } else if let Some(children) = (*node).children().filter(|_| extended != 2) {
         let mut cur = children.as_ptr();
-        let mut insert = ret;
+        let mut insert = ret.as_ptr();
         while !cur.is_null() {
             let copy: *mut XmlNode = xml_static_copy_node(cur, doc, insert, 2);
             if copy.is_null() {
-                xml_free_node(ret);
+                xml_free_node(ret.as_ptr());
                 return null_mut();
             }
 
@@ -1230,10 +1228,10 @@ pub(crate) unsafe fn xml_static_copy_node(
     if parent.is_null() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(ret as _);
+        xml_register_node_default_value(ret.as_ptr() as _);
     }
 
-    ret
+    ret.as_ptr()
 }
 
 pub(crate) unsafe fn xml_static_copy_node_list(
@@ -1497,23 +1495,22 @@ pub unsafe fn xml_new_node(ns: Option<XmlNsPtr>, name: *const XmlChar) -> *mut X
     }
 
     // Allocate a new node and fill the fields.
-    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if cur.is_null() {
+    let Some(cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlElementNode,
+        name: xml_strdup(name),
+        ns,
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building node");
         return null_mut();
-    }
-    std::ptr::write(&mut *cur, XmlNode::default());
-    (*cur).typ = XmlElementType::XmlElementNode;
-
-    (*cur).name = xml_strdup(name);
-    (*cur).ns = ns;
+    };
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Creation of a new node element. @ns is optional (null_mut()).
@@ -1530,24 +1527,23 @@ pub unsafe fn xml_new_node_eat_name(ns: Option<XmlNsPtr>, name: *mut XmlChar) ->
     }
 
     // Allocate a new node and fill the fields.
-    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if cur.is_null() {
+    let Some(cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlElementNode,
+        name,
+        ns,
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building node");
         // we can't check here that name comes from the doc dictionary
         return null_mut();
-    }
-    std::ptr::write(&mut *cur, XmlNode::default());
-    (*cur).typ = XmlElementType::XmlElementNode;
-
-    (*cur).name = name;
-    (*cur).ns = ns;
+    };
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Creation of a new child element, added at the end of @parent children list.
@@ -1635,25 +1631,24 @@ pub unsafe fn xml_new_doc_text(doc: Option<XmlDocPtr>, content: *const XmlChar) 
 #[doc(alias = "xmlNewText")]
 pub unsafe fn xml_new_text(content: *const XmlChar) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if cur.is_null() {
+    let Some(mut cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlTextNode,
+        name: XML_STRING_TEXT.as_ptr() as _,
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building text");
         return null_mut();
-    }
-    std::ptr::write(&mut *cur, XmlNode::default());
-    (*cur).typ = XmlElementType::XmlTextNode;
-
-    (*cur).name = XML_STRING_TEXT.as_ptr() as _;
+    };
     if !content.is_null() {
-        (*cur).content = xml_strdup(content);
+        cur.content = xml_strdup(content);
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Creation of a processing instruction element.
@@ -1665,28 +1660,26 @@ pub unsafe fn xml_new_doc_pi(
     content: Option<&str>,
 ) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if cur.is_null() {
+    let Some(mut cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlPINode,
+        name: xml_strndup(name.as_ptr(), name.len() as i32),
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building PI");
         return null_mut();
-    }
-    std::ptr::write(&mut *cur, XmlNode::default());
-    (*cur).typ = XmlElementType::XmlPINode;
-
-    let name = CString::new(name).unwrap();
-    (*cur).name = xml_strdup(name.as_ptr() as *const u8);
+    };
     if let Some(content) = content {
         let content = CString::new(content).unwrap();
-        (*cur).content = xml_strdup(content.as_ptr() as *const u8);
+        cur.content = xml_strdup(content.as_ptr() as *const u8);
     }
-    (*cur).doc = doc;
+    cur.doc = doc;
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Creation of a processing instruction element.
@@ -1722,25 +1715,24 @@ pub unsafe fn xml_new_doc_text_len(
 #[doc(alias = "xmlNewTextLen")]
 pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if cur.is_null() {
+    let Some(mut cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlTextNode,
+        name: XML_STRING_TEXT.as_ptr() as _,
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building text");
         return null_mut();
-    }
-    std::ptr::write(&mut *cur, XmlNode::default());
-    (*cur).typ = XmlElementType::XmlTextNode;
-
-    (*cur).name = XML_STRING_TEXT.as_ptr() as _;
+    };
     if !content.is_null() {
-        (*cur).content = xml_strndup(content, len);
+        cur.content = xml_strndup(content, len);
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Creation of a new node containing a comment within a document.
@@ -1761,24 +1753,22 @@ pub unsafe fn xml_new_doc_comment(doc: Option<XmlDocPtr>, content: &str) -> *mut
 #[doc(alias = "xmlNewComment")]
 pub unsafe fn xml_new_comment(content: &str) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if cur.is_null() {
+    let Some(cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlCommentNode,
+        name: XML_STRING_COMMENT.as_ptr() as _,
+        content: xml_strndup(content.as_ptr(), content.len() as i32),
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building comment");
         return null_mut();
-    }
-    std::ptr::write(&mut *cur, XmlNode::default());
-    (*cur).typ = XmlElementType::XmlCommentNode;
-
-    (*cur).name = XML_STRING_COMMENT.as_ptr() as _;
-    let content = CString::new(content).unwrap();
-    (*cur).content = xml_strdup(content.as_ptr() as *const u8);
+    };
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Creation of a new node containing a CDATA block.
@@ -1786,22 +1776,22 @@ pub unsafe fn xml_new_comment(content: &str) -> *mut XmlNode {
 #[doc(alias = "xmlNewCDataBlock")]
 pub unsafe fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if cur.is_null() {
+    let Some(cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlCDATASectionNode,
+        doc,
+        content: xml_strndup(content.as_ptr(), content.len() as i32),
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building CDATA");
         return null_mut();
-    }
-    std::ptr::write(&mut *cur, XmlNode::default());
-    (*cur).typ = XmlElementType::XmlCDATASectionNode;
-    (*cur).doc = doc;
-    (*cur).content = xml_strndup(content.as_ptr(), content.len() as i32);
+    };
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Creation of a new character reference node.
@@ -1809,33 +1799,32 @@ pub unsafe fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> *mut
 #[doc(alias = "xmlNewCharRef")]
 pub unsafe fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if cur.is_null() {
+    let Some(mut cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlEntityRefNode,
+        doc,
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building character reference");
         return null_mut();
-    }
-    std::ptr::write(&mut *cur, XmlNode::default());
-    (*cur).typ = XmlElementType::XmlEntityRefNode;
-
-    (*cur).doc = doc;
+    };
     if let Some(name) = name.strip_prefix('&') {
         let len = name.len();
         if let Some(name) = name.strip_suffix(';') {
-            (*cur).name = xml_strndup(name.as_ptr(), len as i32 - 1);
+            cur.name = xml_strndup(name.as_ptr(), len as i32 - 1);
         } else {
-            (*cur).name = xml_strndup(name.as_ptr(), len as i32);
+            cur.name = xml_strndup(name.as_ptr(), len as i32);
         }
     } else {
         let name = CString::new(name).unwrap();
-        (*cur).name = xml_strdup(name.as_ptr() as *const u8);
+        cur.name = xml_strdup(name.as_ptr() as *const u8);
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Creation of a new reference node.
@@ -1843,42 +1832,42 @@ pub unsafe fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> *mut XmlNo
 #[doc(alias = "xmlNewReference")]
 pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> *mut XmlNode {
     // Allocate a new node and fill the fields.
-    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if cur.is_null() {
+    let Some(mut cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlEntityRefNode,
+        doc,
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building reference");
         return null_mut();
-    }
-    std::ptr::write(&mut *cur, XmlNode::default());
-    (*cur).typ = XmlElementType::XmlEntityRefNode;
-    (*cur).doc = doc as _;
+    };
     if let Some(name) = name.strip_prefix('&') {
         let len = name.len();
         if let Some(name) = name.strip_suffix(';') {
-            (*cur).name = xml_strndup(name.as_ptr(), len as i32 - 1);
+            cur.name = xml_strndup(name.as_ptr(), len as i32 - 1);
         } else {
-            (*cur).name = xml_strndup(name.as_ptr(), len as i32);
+            cur.name = xml_strndup(name.as_ptr(), len as i32);
         }
     } else {
         let name = CString::new(name).unwrap();
-        (*cur).name = xml_strdup(name.as_ptr() as *const u8);
+        cur.name = xml_strdup(name.as_ptr() as *const u8);
     }
 
-    let ent = xml_get_doc_entity(doc, &(*cur).name().unwrap());
+    let ent = xml_get_doc_entity(doc, &cur.name().unwrap());
     if let Some(ent) = ent {
-        (*cur).content = ent.content.load(Ordering::Acquire);
+        cur.content = ent.content.load(Ordering::Acquire);
         // The parent pointer in entity is a DTD pointer and thus is NOT
         // updated.  Not sure if this is 100% correct.
         //  -George
-        (*cur).set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
-        (*cur).set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+        cur.set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+        cur.set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Do a copy of the node.
@@ -2019,21 +2008,21 @@ pub unsafe fn xml_new_doc_raw_node(
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_new_doc_fragment(doc: Option<XmlDocPtr>) -> *mut XmlNode {
     // Allocate a new DocumentFragment node and fill the fields.
-    let cur: *mut XmlNode = xml_malloc(size_of::<XmlNode>()) as _;
-    if cur.is_null() {
+    let Some(cur) = XmlNodePtr::new(XmlNode {
+        typ: XmlElementType::XmlDocumentFragNode,
+        doc,
+        ..Default::default()
+    }) else {
         xml_tree_err_memory("building fragment");
         return null_mut();
-    }
-    std::ptr::write(&mut *cur, XmlNode::default());
-    (*cur).typ = XmlElementType::XmlDocumentFragNode;
-    (*cur).doc = doc;
+    };
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur as _);
+        xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur
+    cur.as_ptr()
 }
 
 /// Unlink the old node from its current context, prune the new one
@@ -2228,7 +2217,7 @@ pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
             {
                 xml_free((*cur).name as _);
             }
-            xml_free(cur as _);
+            XmlNodePtr::from_raw(cur).unwrap().unwrap().free();
         }
 
         if !next.is_null() {
@@ -2321,7 +2310,7 @@ pub unsafe fn xml_free_node(cur: *mut XmlNode) {
         xml_free((*cur).name as _);
     }
 
-    xml_free(cur as _);
+    XmlNodePtr::from_raw(cur).unwrap().unwrap().free();
 }
 
 /// Verify that the given namespace held on @ancestor is still in scope on node.

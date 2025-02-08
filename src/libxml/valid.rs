@@ -45,7 +45,7 @@ use crate::libxml::xmlregexp::{
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlstring::xml_strncmp;
 #[cfg(not(feature = "libxml_regexp"))]
-use crate::tree::xml_free_node_list;
+use crate::tree::{xml_free_node_list, XmlNodePtr};
 #[cfg(feature = "libxml_valid")]
 use crate::tree::{XmlElementPtr, XmlNsPtr};
 use crate::{
@@ -4578,18 +4578,19 @@ unsafe fn xml_validate_element_content(
                             } else {
                                 // Allocate a new node and minimally fills in
                                 // what's required
-                                tmp = xml_malloc(size_of::<XmlNode>()) as *mut XmlNode;
-                                if tmp.is_null() {
+                                let Some(tmp) = XmlNodePtr::new(XmlNode {
+                                    typ: (*cur).typ,
+                                    name: (*cur).name,
+                                    ns: (*cur).ns,
+                                    next: null_mut(),
+                                    content: null_mut(),
+                                    ..Default::default()
+                                }) else {
                                     xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
                                     xmlFreeNodeList(repl);
                                     ret = -1;
                                     break 'done;
-                                }
-                                (*tmp).typ = (*cur).typ;
-                                (*tmp).name = (*cur).name;
-                                (*tmp).ns = (*cur).ns;
-                                (*tmp).next = null_mut();
-                                (*tmp).content = null_mut();
+                                };
                                 if repl.is_null() {
                                     repl = tmp;
                                     last = tmp;

@@ -3566,7 +3566,7 @@ unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: Op
 #[doc(alias = "xmlTextReaderFreeNodeList")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: *mut XmlNode) {
-    use crate::tree::{NodeCommon, NodePtr, XmlNsPtr};
+    use crate::tree::{NodeCommon, NodePtr, XmlNodePtr, XmlNsPtr};
 
     let mut next: *mut XmlNode;
     let mut parent: *mut XmlNode;
@@ -3662,7 +3662,7 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: *mut
                 (*(*reader).ctxt).free_elems = cur;
                 (*(*reader).ctxt).free_elems_nr += 1;
             } else {
-                xml_free(cur as _);
+                XmlNodePtr::from_raw(cur).unwrap().unwrap().free();
             }
         }
 
@@ -3718,7 +3718,7 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPt
 #[doc(alias = "xmlTextReaderFreeNode")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: *mut XmlNode) {
-    use crate::tree::{NodeCommon, NodePtr, XmlDtd, XmlDtdPtr, XmlNsPtr};
+    use crate::tree::{NodeCommon, NodePtr, XmlDtd, XmlDtdPtr, XmlNodePtr, XmlNsPtr};
 
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
         (*(*reader).ctxt).dict
@@ -3806,7 +3806,7 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: *mut XmlNode)
         (*(*reader).ctxt).free_elems = cur;
         (*(*reader).ctxt).free_elems_nr += 1;
     } else {
-        xml_free(cur as _);
+        XmlNodePtr::from_raw(cur).unwrap().unwrap().free();
     }
 }
 

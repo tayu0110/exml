@@ -19,6 +19,7 @@
 // daniel@veillard.com
 
 use std::{
+    any::type_name,
     borrow::Cow,
     ffi::{CStr, CString},
     ops::{Deref, DerefMut},
@@ -38,22 +39,23 @@ use crate::{
 
 use super::{
     xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node, xml_free_prop,
-    xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory, NodeCommon,
-    XmlAttr, XmlAttrPtr, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlElementType, XmlNs,
-    XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory,
+    InvalidNodePointerCastError, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributePtr,
+    XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNs, XmlNsPtr, XML_CHECK_DTD,
+    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
 pub struct XmlNode {
-    pub _private: *mut c_void,        /* application data */
-    pub(crate) typ: XmlElementType,   /* type number, must be second ! */
-    pub name: *const XmlChar,         /* the name of the node, or the entity */
-    children: Option<NodePtr>,        /* parent->childs link */
-    last: Option<NodePtr>,            /* last child link */
-    parent: Option<NodePtr>,          /* child->parent link */
-    pub next: Option<NodePtr>,        /* next sibling link  */
-    pub(crate) prev: Option<NodePtr>, /* previous sibling link  */
-    pub doc: Option<XmlDocPtr>,       /* the containing document */
+    pub _private: *mut c_void,            /* application data */
+    pub(crate) typ: XmlElementType,       /* type number, must be second ! */
+    pub name: *const XmlChar,             /* the name of the node, or the entity */
+    pub(crate) children: Option<NodePtr>, /* parent->childs link */
+    pub(crate) last: Option<NodePtr>,     /* last child link */
+    pub(crate) parent: Option<NodePtr>,   /* child->parent link */
+    pub next: Option<NodePtr>,            /* next sibling link  */
+    pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
+    pub doc: Option<XmlDocPtr>,           /* the containing document */
 
     /* End of common part */
     pub(crate) ns: Option<XmlNsPtr>, /* pointer to the associated namespace */
@@ -2241,6 +2243,144 @@ impl NodeCommon for XmlNode {
     }
     fn set_parent(&mut self, parent: Option<NodePtr>) {
         self.parent = parent;
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct XmlNodePtr(NonNull<XmlNode>);
+
+impl XmlNodePtr {
+    /// Allocate new memory and create new `XmlNodePtr` from an owned xml node.
+    ///
+    /// This method leaks allocated memory.  
+    /// Users can use `free` method for deallocating memory.
+    pub(crate) fn new(node: XmlNode) -> Option<Self> {
+        let boxed = Box::new(node);
+        NonNull::new(Box::leak(boxed)).map(Self)
+    }
+
+    /// Create `XmlNodePtr` from a raw pointer.  
+    ///
+    /// If `ptr` is a NULL pointer, return `Ok(None)`.  
+    /// If `ptr` is a valid pointer of `XmlNode`, return `Ok(Some(Self))`.  
+    /// Otherwise, return `Err`.
+    ///
+    /// # Safety
+    /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
+    ///
+    /// # TODO
+    /// - fix to private mathod
+    pub unsafe fn from_raw(ptr: *mut XmlNode) -> Result<Option<Self>, InvalidNodePointerCastError> {
+        if ptr.is_null() {
+            return Ok(None);
+        }
+        match (*ptr).element_type() {
+            XmlElementType::XmlElementNode
+            | XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+            _ => Err(InvalidNodePointerCastError {
+                from: (*ptr).element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+
+    pub(crate) fn as_ptr(self) -> *mut XmlNode {
+        self.0.as_ptr()
+    }
+
+    /// Deallocate memory.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn free(self) {
+        let _ = *Box::from_raw(self.0.as_ptr());
+    }
+
+    /// Acquire the ownership of the inner value.  
+    /// As a result, `self` will be invalid. `self` must not be used after performs this method.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn into_inner(self) -> Box<XmlNode> {
+        Box::from_raw(self.0.as_ptr())
+    }
+}
+
+impl Clone for XmlNodePtr {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl Copy for XmlNodePtr {}
+
+impl Deref for XmlNodePtr {
+    type Target = XmlNode;
+    fn deref(&self) -> &Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlNode`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl DerefMut for XmlNodePtr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlNode`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_mut() }
+    }
+}
+
+impl TryFrom<XmlGenericNodePtr> for XmlNodePtr {
+    type Error = InvalidNodePointerCastError;
+
+    fn try_from(value: XmlGenericNodePtr) -> Result<Self, Self::Error> {
+        match value.element_type() {
+            XmlElementType::XmlElementNode
+            | XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => Ok(Self(value.0.cast())),
+            _ => Err(InvalidNodePointerCastError {
+                from: value.element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+}
+
+impl From<XmlNodePtr> for XmlGenericNodePtr {
+    fn from(value: XmlNodePtr) -> Self {
+        Self(value.0 as NonNull<dyn NodeCommon>)
+    }
+}
+
+impl From<XmlNodePtr> for *mut XmlNode {
+    fn from(value: XmlNodePtr) -> Self {
+        value.0.as_ptr()
     }
 }
 

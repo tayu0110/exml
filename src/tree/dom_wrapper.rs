@@ -33,7 +33,7 @@ use super::{
     xml_free_ns, xml_get_doc_entity, xml_new_ns, xml_search_ns_by_namespace_strict,
     xml_search_ns_by_prefix_strict, xml_tree_err_memory, xml_tree_nslist_lookup_by_prefix,
     NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType,
-    XmlNode, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE,
+    XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE,
 };
 
 /// A function called to acquire namespaces (xmlNs) from the wrapper.
@@ -2054,12 +2054,11 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     | XmlElementType::XmlEntityRefNode
                     | XmlElementType::XmlEntityNode => {
                         // Nodes of xmlNode structure.
-                        clone = xml_malloc(size_of::<XmlNode>()) as _;
-                        if clone.is_null() {
+                        let Some(new) = XmlNodePtr::new(XmlNode::default()) else {
                             xml_tree_err_memory("xmlDOMWrapCloneNode(): allocating a node");
                             break 'internal_error;
-                        }
-                        std::ptr::write(&mut *clone, XmlNode::default());
+                        };
+                        clone = new.as_ptr();
                         // Set hierarchical links.
                         if !result_clone.is_null() {
                             (*clone).set_parent(NodePtr::from_ptr(parent_clone));
