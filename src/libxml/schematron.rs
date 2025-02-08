@@ -1457,7 +1457,7 @@ unsafe fn xml_schematron_get_node(
         return null_mut();
     }
 
-    (*(*ctxt).xctxt).doc = XmlDocPtr::from_raw((*cur).doc).unwrap();
+    (*(*ctxt).xctxt).doc = (*cur).doc;
     (*(*ctxt).xctxt).node = cur;
     let ret: XmlXPathObjectPtr = xml_xpath_eval(xpath, (*ctxt).xctxt);
     if ret.is_null() {

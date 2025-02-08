@@ -434,7 +434,7 @@ impl<'a> XmlTextWriter<'a> {
             match lk.state.get() {
                 XmlTextWriterState::XmlTextwriterName | XmlTextWriterState::XmlTextwriterText => {
                     let content = xml_strndup(content.as_ptr(), content.len() as i32);
-                    let buf = xml_encode_special_chars(null_mut(), content);
+                    let buf = xml_encode_special_chars(None, content);
                     if !buf.is_null() {
                         sum += self.write_bytes(CStr::from_ptr(buf as *const i8).to_bytes())?;
                         if buf != content {

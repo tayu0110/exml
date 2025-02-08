@@ -219,7 +219,7 @@ impl XmlDebugCtxt<'_> {
 
     #[doc(alias = "xmlCtxtGenericNodeCheck")]
     unsafe fn generic_node_check(&mut self, node: &impl NodeCommon) {
-        let doc = XmlDocPtr::from_raw(node.document()).unwrap();
+        let doc = node.document();
 
         if node.parent().is_none() {
             xml_debug_err!(
@@ -1052,7 +1052,7 @@ impl XmlDebugCtxt<'_> {
                 return;
             }
         }
-        if node.document().is_null() {
+        if node.document().is_none() {
             if self.check == 0 {
                 self.dump_spaces();
             }
@@ -1918,8 +1918,6 @@ pub fn xml_shell_print_xpath_error(error_type: XmlXPathObjectType, arg: Option<&
 #[doc(alias = "xmlShellPrintNodeCtxt")]
 #[cfg(feature = "libxml_output")]
 unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: *mut XmlNode) {
-    use crate::tree::XmlDocPtr;
-
     if node.is_null() {
         return;
     }
@@ -1944,7 +1942,7 @@ unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: *mut XmlNode) {
             0,
         );
     } else {
-        (*node).dump_file(&mut boxed, XmlDocPtr::from_raw((*node).doc).unwrap());
+        (*node).dump_file(&mut boxed, (*node).doc);
     }
 
     writeln!(boxed);

@@ -102,7 +102,7 @@ pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlCh
         html_err_memory(null_mut(), Some("HTML document creation failed\n"));
         return null_mut();
     };
-    cur.doc = cur.as_ptr();
+    cur.doc = Some(cur);
     if !external_id.is_null() || !uri.is_null() {
         xml_create_int_subset(
             Some(cur),

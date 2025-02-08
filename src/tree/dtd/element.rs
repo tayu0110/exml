@@ -31,8 +31,8 @@ use crate::libxml::xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr};
 use crate::{
     libxml::valid::xml_free_doc_element_content,
     tree::{
-        InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlDtd,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlGenericNodePtr, XmlNode,
+        InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDocPtr, XmlDtd, XmlElementContentPtr,
+        XmlElementType, XmlElementTypeVal, XmlGenericNodePtr, XmlNode,
     },
 };
 
@@ -53,7 +53,7 @@ pub struct XmlElement {
     pub(crate) parent: Option<XmlDtdPtr>, /* -> DTD */
     pub(crate) next: Option<NodePtr>,     /* next sibling link  */
     pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,          /* the containing document */
+    pub(crate) doc: Option<XmlDocPtr>,    /* the containing document */
 
     pub(crate) etype: XmlElementTypeVal,            /* The type */
     pub(crate) content: XmlElementContentPtr,       /* the allowed element content */
@@ -76,7 +76,7 @@ impl Default for XmlElement {
             parent: None,
             next: None,
             prev: None,
-            doc: null_mut(),
+            doc: None,
             etype: XmlElementTypeVal::XmlElementTypeUndefined,
             content: null_mut(),
             attributes: None,
@@ -87,10 +87,10 @@ impl Default for XmlElement {
 }
 
 impl NodeCommon for XmlElement {
-    fn document(&self) -> *mut XmlDoc {
+    fn document(&self) -> Option<XmlDocPtr> {
         self.doc
     }
-    fn set_document(&mut self, doc: *mut XmlDoc) {
+    fn set_document(&mut self, doc: Option<XmlDocPtr>) {
         self.doc = doc;
     }
     fn element_type(&self) -> XmlElementType {
@@ -281,7 +281,7 @@ pub(crate) unsafe fn xml_free_element(elem: Option<XmlElementPtr>) {
         return;
     };
     elem.unlink();
-    xml_free_doc_element_content(XmlDocPtr::from_raw(elem.doc).unwrap(), elem.content);
+    xml_free_doc_element_content(elem.doc, elem.content);
     elem.name = None;
     elem.prefix = None;
     #[cfg(feature = "libxml_regexp")]

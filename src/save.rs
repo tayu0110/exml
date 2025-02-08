@@ -294,8 +294,9 @@ impl<'a> XmlSaveCtxt<'a> {
                 return ret;
             }
             if (!matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-                && !(*node).doc.is_null()
-                && matches!((*(*node).doc).typ, XmlElementType::XmlHTMLDocumentNode)
+                && (*node).doc.map_or(false, |doc| {
+                    matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode)
+                })
                 && self.options & XmlSaveOption::XmlSaveAsXML as i32 == 0)
                 || self.options & XmlSaveOption::XmlSaveAsHTML as i32 != 0
             {
@@ -717,7 +718,7 @@ unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: &XmlAttr) 
                 let mut out = vec![];
                 attr_serialize_text_content(
                     &mut out,
-                    XmlDocPtr::from_raw(attr.doc).unwrap(),
+                    attr.doc,
                     Some(attr),
                     CStr::from_ptr(now.content as *const i8)
                         .to_string_lossy()
@@ -1133,7 +1134,7 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
     ctxt.buf.borrow_mut().write_bytes(b" [\n");
     // Dump the notations first they are not in the DTD children list
     // Do this only on a standalone DTD or on the internal subset though.
-    if dtd.doc.is_null() || (*dtd.doc).int_subset == Some(dtd) {
+    if dtd.doc.map_or(true, |doc| doc.int_subset == Some(dtd)) {
         if let Some(table) = dtd.notations.as_deref() {
             xml_buf_dump_notation_table(&mut *ctxt.buf.borrow_mut(), table);
         }
@@ -1199,10 +1200,7 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
             if let Some(children) = now.children {
                 xml_free_node(children.as_ptr());
             }
-            now.children = NodePtr::from_ptr(xml_new_doc_text(
-                XmlDocPtr::from_raw(now.doc).unwrap(),
-                now.name,
-            ));
+            now.children = NodePtr::from_ptr(xml_new_doc_text(now.doc, now.name));
             if let Some(mut children) = now.children {
                 children.set_parent(NodePtr::from_ptr(now.as_ptr() as *mut XmlNode));
             }
@@ -1405,7 +1403,10 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
                 }
 
                 if !parent.is_null()
-                    && ((*parent).parent() == NodePtr::from_ptr((*cur).doc as *mut XmlNode))
+                    && ((*parent).parent()
+                        == NodePtr::from_ptr(
+                            (*cur).doc.map_or(null_mut(), |doc| doc.as_ptr()) as *mut XmlNode
+                        ))
                     && (*cur).name().as_deref() == Some("head")
                     && (*parent).name().as_deref() == Some("html")
                 {
@@ -1696,7 +1697,7 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: *mut XmlNo
 
     xml_init_parser();
 
-    let doc = XmlDocPtr::from_raw((*cur).doc).unwrap();
+    let doc = (*cur).doc;
     if let Some(mut doc) = doc {
         oldenc = doc.encoding.clone();
         if let Some(encoding) = ctxt.encoding.as_deref() {

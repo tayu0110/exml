@@ -30,7 +30,9 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_input_from_file, xml_new_parser_ctxt,
         xml_read_file, XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{xml_free_doc, NodeCommon, XmlDoc, XmlDocProperties, XmlElementType, XmlNode},
+    tree::{
+        xml_free_doc, NodeCommon, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNode,
+    },
     xpath::{
         xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
     },
@@ -320,7 +322,7 @@ unsafe extern "C" fn xmlconf_test_item(
         test_log!(logfile, "test {id} missing URI\n",);
         return ret;
     };
-    let base = (*cur).get_base(doc);
+    let base = (*cur).get_base(XmlDocPtr::from_raw(doc).unwrap());
     let filename = compose_dir(base.as_deref(), &uri);
     if !check_test_file(filename.as_str()) {
         test_log!(logfile, "test {id} missing file {filename} \n",);

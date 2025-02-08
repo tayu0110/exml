@@ -2370,7 +2370,7 @@ unsafe fn xml_schema_lookup_namespace(
             }
         }
     } else {
-        if (*(*vctxt).inode).node.is_null() || (*(*(*vctxt).inode).node).doc.is_null() {
+        if (*(*vctxt).inode).node.is_null() || (*(*(*vctxt).inode).node).doc.is_none() {
             VERROR_INT!(
                 vctxt,
                 "xmlSchemaLookupNamespace",
@@ -2379,7 +2379,7 @@ unsafe fn xml_schema_lookup_namespace(
             return null_mut();
         }
         let ns = (*(*(*vctxt).inode).node).search_ns(
-            XmlDocPtr::from_raw((*(*(*vctxt).inode).node).doc).unwrap(),
+            (*(*(*vctxt).inode).node).doc,
             (!prefix.is_null())
                 .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                 .as_deref(),
@@ -2467,7 +2467,7 @@ unsafe fn xml_schema_validate_notation(
                 ns_name = xml_schema_lookup_namespace(vctxt, prefix);
             } else if !node.is_null() {
                 let ns = (*node).search_ns(
-                    XmlDocPtr::from_raw((*node).doc).unwrap(),
+                    (*node).doc,
                     (!prefix.is_null())
                         .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                         .as_deref(),
@@ -5832,7 +5832,7 @@ unsafe fn xml_schema_pval_attr_node_id(
                 }
                 let res = xml_add_id(
                     null_mut(),
-                    XmlDocPtr::from_raw(attr.doc).unwrap().unwrap(),
+                    attr.doc.unwrap(),
                     CStr::from_ptr(value as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -6741,10 +6741,11 @@ unsafe fn xml_schema_build_absolute_uri(
             let uri = if let Some(base) = (*ctxt_node).get_base((*ctxt_node).doc) {
                 build_uri(&location, &base)
             } else {
-                (*(*ctxt_node).doc)
-                    .url
-                    .as_deref()
-                    .and_then(|base| build_uri(&location, base))
+                (*ctxt_node).doc.as_deref().and_then(|doc| {
+                    doc.url
+                        .as_deref()
+                        .and_then(|base| build_uri(&location, base))
+                })
             };
             if let Some(uri) = uri {
                 let uri = CString::new(uri).unwrap();
@@ -6938,10 +6939,11 @@ unsafe fn xml_schema_parse_include_or_redefine_attrs(
                 .then(|| {
                     let schema_location =
                         CStr::from_ptr(*schema_location as *const i8).to_string_lossy();
-                    (*(*node).doc)
-                        .url
-                        .as_deref()
-                        .and_then(|base| build_uri(&schema_location, base))
+                    (*node).doc.as_deref().and_then(|doc| {
+                        doc.url
+                            .as_deref()
+                            .and_then(|base| build_uri(&schema_location, base))
+                    })
                 })
                 .flatten()
         };
@@ -7124,10 +7126,7 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
     }
 
     if strchr(value as *mut c_char, b':' as _).is_null() {
-        let ns = attr
-            .parent
-            .unwrap()
-            .search_ns(XmlDocPtr::from_raw(attr.doc).unwrap(), None);
+        let ns = attr.parent.unwrap().search_ns(attr.doc, None);
         if let Some(ns) = ns.filter(|ns| !ns.href.is_null() && *ns.href.add(0) != 0) {
             *uri = xml_dict_lookup((*ctxt).dict, ns.href, -1);
         } else if (*schema).flags & XML_SCHEMAS_INCLUDING_CONVERT_NS != 0 {
@@ -7144,7 +7143,7 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
     *local = xml_dict_lookup((*ctxt).dict, *local, -1);
     let pref: *const XmlChar = xml_dict_lookup((*ctxt).dict, value, len);
     let Some(ns) = attr.parent.unwrap().search_ns(
-        XmlDocPtr::from_raw(attr.doc).unwrap(),
+        attr.doc,
         Some(CStr::from_ptr(pref as *const i8).to_string_lossy()).as_deref(),
     ) else {
         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
@@ -25559,7 +25558,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     // This fixes bug #341337, reported by David Grohmann.
     if (*vctxt).options & XmlSchemaValidOption::XmlSchemaValVcICreate as i32 != 0 {
         let ielem: XmlSchemaNodeInfoPtr = *(*vctxt).elem_infos.add((*vctxt).depth as usize);
-        if !ielem.is_null() && !(*ielem).node.is_null() && !(*(*ielem).node).doc.is_null() {
+        if !ielem.is_null() && !(*ielem).node.is_null() && (*(*ielem).node).doc.is_some() {
             def_attr_owner_elem = (*ielem).node;
         }
     }
@@ -25662,7 +25661,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             }
                         } else {
                             let mut ns = (*def_attr_owner_elem).search_ns_by_href(
-                                XmlDocPtr::from_raw((*def_attr_owner_elem).doc).unwrap(),
+                                (*def_attr_owner_elem).doc,
                                 CStr::from_ptr((*iattr).ns_name as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
@@ -25683,7 +25682,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                     prefix = format!("p{counter}");
                                     counter += 1;
                                     ns = (*def_attr_owner_elem).search_ns(
-                                        XmlDocPtr::from_raw((*def_attr_owner_elem).doc).unwrap(),
+                                        (*def_attr_owner_elem).doc,
                                         Some(prefix.as_str()),
                                     );
                                     if counter > 1000 {
@@ -27466,16 +27465,10 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     let norm_value =
                         xml_schema_normalize_value((*inode).type_def, (*(*inode).decl).value);
                     if !norm_value.is_null() {
-                        text_child = xml_new_doc_text(
-                            XmlDocPtr::from_raw((*(*inode).node).doc).unwrap(),
-                            norm_value,
-                        );
+                        text_child = xml_new_doc_text((*(*inode).node).doc, norm_value);
                         xml_free(norm_value as _);
                     } else {
-                        text_child = xml_new_doc_text(
-                            XmlDocPtr::from_raw((*(*inode).node).doc).unwrap(),
-                            (*(*inode).decl).value,
-                        );
+                        text_child = xml_new_doc_text((*(*inode).node).doc, (*(*inode).decl).value);
                     }
                     if text_child.is_null() {
                         VERROR_INT!(
@@ -27766,9 +27759,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         // Note that we give it the line number of the parent element.
                         let value = cur_attr
                             .children
-                            .and_then(|c| {
-                                c.get_string(XmlDocPtr::from_raw(cur_attr.doc).unwrap(), 1)
-                            })
+                            .and_then(|c| c.get_string(cur_attr.doc, 1))
                             .map(|c| CString::new(c).unwrap());
                         let value = xml_strdup(
                             value
@@ -28143,7 +28134,7 @@ pub unsafe fn xml_schema_validate_one_element(
         return -1;
     }
 
-    (*ctxt).doc = XmlDocPtr::from_raw((*elem).doc).unwrap();
+    (*ctxt).doc = (*elem).doc;
     (*ctxt).node = elem;
     (*ctxt).validation_root = elem;
     xml_schema_vstart(ctxt)

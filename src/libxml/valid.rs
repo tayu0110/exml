@@ -834,23 +834,21 @@ pub unsafe fn xml_add_element_decl(
 
     let mut old_attributes = None;
     // lookup old attributes inserted on an undefined element in the internal subset.
-    if !dtd.doc.is_null() {
-        if let Some(mut dtd) = (*dtd.doc).int_subset {
-            let ret = dtd
-                .elements
-                .as_ref()
-                .and_then(|table| table.lookup2(name, ns))
-                .cloned();
-            if let Some(mut ret) =
-                ret.filter(|ret| ret.etype == XmlElementTypeVal::XmlElementTypeUndefined)
-            {
-                old_attributes = ret.attributes.take();
-                dtd.elements
-                    .as_mut()
-                    .unwrap()
-                    .remove_entry2(name, ns, |_, _| {});
-                xml_free_element(Some(ret));
-            }
+    if let Some(mut dtd) = dtd.doc.and_then(|doc| doc.int_subset) {
+        let ret = dtd
+            .elements
+            .as_ref()
+            .and_then(|table| table.lookup2(name, ns))
+            .cloned();
+        if let Some(mut ret) =
+            ret.filter(|ret| ret.etype == XmlElementTypeVal::XmlElementTypeUndefined)
+        {
+            old_attributes = ret.attributes.take();
+            dtd.elements
+                .as_mut()
+                .unwrap()
+                .remove_entry2(name, ns, |_, _| {});
+            xml_free_element(Some(ret));
         }
     }
 
@@ -924,7 +922,7 @@ pub unsafe fn xml_add_element_decl(
             (*content).parent = 1 as XmlElementContentPtr;
         }
     } else {
-        ret.content = xml_copy_doc_element_content(XmlDocPtr::from_raw(dtd.doc).unwrap(), content);
+        ret.content = xml_copy_doc_element_content(dtd.doc, content);
     }
 
     // Link it to the DTD
@@ -1677,11 +1675,8 @@ pub unsafe fn xml_add_attribute_decl(
         }
         if let Some(def) = default_value.filter(|&default_value| {
             let default_value = CString::new(default_value).unwrap();
-            xml_validate_attribute_value_internal(
-                XmlDocPtr::from_raw(dtd.doc).unwrap(),
-                typ,
-                default_value.as_ptr() as *const u8,
-            ) == 0
+            xml_validate_attribute_value_internal(dtd.doc, typ, default_value.as_ptr() as *const u8)
+                == 0
         }) {
             xml_err_valid_node(
                 ctxt,
@@ -1701,8 +1696,8 @@ pub unsafe fn xml_add_attribute_decl(
 
     // Check first that an attribute defined in the external subset wasn't
     // already defined in the internal subset
-    if !dtd.doc.is_null() && (*dtd.doc).ext_subset == Some(dtd) {
-        if let Some(int_subset) = (*dtd.doc).int_subset {
+    if let Some(doc) = dtd.doc.filter(|doc| doc.ext_subset == Some(dtd)) {
+        if let Some(int_subset) = doc.int_subset {
             if let Some(attributes) = int_subset.attributes {
                 let ret = attributes.lookup3(name, ns, Some(elem)).copied();
                 if ret.is_some() {
@@ -2255,7 +2250,7 @@ pub(crate) unsafe fn xml_is_ref(
     let Some(attr) = attr else {
         return 0;
     };
-    let Some(doc) = doc.or(XmlDocPtr::from_raw(attr.doc).unwrap()) else {
+    let Some(doc) = doc.or(attr.doc) else {
         return 0;
     };
 
@@ -3164,11 +3159,11 @@ unsafe fn xml_validate_attribute_value2(
         | XmlAttributeType::XmlAttributeNmtoken
         | XmlAttributeType::XmlAttributeCDATA => {}
         XmlAttributeType::XmlAttributeEntity => {
-            let mut ent = xml_get_doc_entity(doc.as_ptr(), value);
+            let mut ent = xml_get_doc_entity(Some(doc), value);
             // yeah it's a bit messy...
             if ent.is_none() && doc.standalone == 1 {
                 doc.standalone = 0;
-                ent = xml_get_doc_entity(doc.as_ptr(), value);
+                ent = xml_get_doc_entity(Some(doc), value);
             }
             if let Some(ent) = ent {
                 if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
@@ -3221,7 +3216,7 @@ unsafe fn xml_validate_attribute_value2(
                 save = *cur;
                 *cur = 0;
                 let nam = CStr::from_ptr(nam as *const i8).to_string_lossy();
-                if let Some(ent) = xml_get_doc_entity(doc.as_ptr(), &nam) {
+                if let Some(ent) = xml_get_doc_entity(Some(doc), &nam) {
                     if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
                         let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                         xml_err_valid_node(
@@ -3333,7 +3328,7 @@ unsafe fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCt
         }
     }
     if matches!(cur.atype, XmlAttributeType::XmlAttributeNotation) {
-        let doc = XmlDocPtr::from_raw(cur.doc).unwrap();
+        let doc = cur.doc;
         let Some(cur_elem) = cur.elem.as_deref().map(|e| CString::new(e).unwrap()) else {
             xml_err_valid!(
                 ctxt,
@@ -6418,9 +6413,10 @@ pub unsafe fn xml_valid_get_valid_elements(
     let parent: *mut XmlNode = (*ref_node).parent().map_or(null_mut(), |p| p.as_ptr());
 
     // Retrieves the parent element declaration
-    let mut element_desc = xml_get_dtd_element_desc((*(*parent).doc).int_subset, (*parent).name);
-    if element_desc.is_none() && (*(*parent).doc).ext_subset.is_some() {
-        element_desc = xml_get_dtd_element_desc((*(*parent).doc).ext_subset, (*parent).name);
+    let mut element_desc =
+        xml_get_dtd_element_desc((*parent).doc.unwrap().int_subset, (*parent).name);
+    if element_desc.is_none() && (*parent).doc.unwrap().ext_subset.is_some() {
+        element_desc = xml_get_dtd_element_desc((*parent).doc.unwrap().ext_subset, (*parent).name);
     }
     let Some(element_desc) = element_desc else {
         return -1;
@@ -6441,12 +6437,7 @@ pub unsafe fn xml_valid_get_valid_elements(
     let parent_last: *mut XmlNode = (*parent).last().map_or(null_mut(), |l| l.as_ptr());
 
     // Creates a dummy node and insert it into the tree
-    let test_node: *mut XmlNode = xml_new_doc_node(
-        XmlDocPtr::from_raw((*ref_node).doc).unwrap(),
-        None,
-        "<!dummy?>",
-        null_mut(),
-    );
+    let test_node: *mut XmlNode = xml_new_doc_node((*ref_node).doc, None, "<!dummy?>", null_mut());
     if test_node.is_null() {
         return -1;
     }
@@ -6478,12 +6469,7 @@ pub unsafe fn xml_valid_get_valid_elements(
 
     for i in 0..nb_elements {
         (*test_node).name = elements[i as usize];
-        if xml_validate_one_element(
-            addr_of_mut!(vctxt) as _,
-            XmlDocPtr::from_raw((*parent).doc).unwrap().unwrap(),
-            parent,
-        ) != 0
-        {
+        if xml_validate_one_element(addr_of_mut!(vctxt) as _, (*parent).doc.unwrap(), parent) != 0 {
             for j in 0..nb_valid_elements {
                 if xml_str_equal(elements[i as usize], *names.add(j as usize)) {
                     break;

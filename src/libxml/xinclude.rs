@@ -488,7 +488,7 @@ unsafe fn xml_xinclude_add_node(ctxt: XmlXincludeCtxtPtr, cur: *mut XmlNode) -> 
     // compute the URI
     let mut base = None;
     let mut uri = (*ctxt).doc.and_then(|doc| {
-        if let Some(b) = (*cur).get_base(doc.as_ptr()) {
+        if let Some(b) = (*cur).get_base(Some(doc)) {
             base = Some(b);
             build_uri(&href, base.as_deref().unwrap())
         } else {
@@ -696,7 +696,7 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
             );
         }
     } else {
-        let prev = xml_get_doc_entity(doc.as_ptr(), &(*ent).name().unwrap());
+        let prev = xml_get_doc_entity(Some(doc), &(*ent).name().unwrap());
         if let Some(prev) = prev {
             let error = || {
                 match ent.etype {
@@ -1716,7 +1716,9 @@ unsafe fn xml_xinclude_load_doc(
                             // If the current base is the same as the
                             // URL of the document, then reset it to be
                             // the specified xml:base or the relative URI
-                            if (*(*node).doc).url.as_deref() == Some(cur_base.as_str()) {
+                            if (*node).doc.as_deref().and_then(|doc| doc.url.as_deref())
+                                == Some(cur_base.as_str())
+                            {
                                 (*node).set_base(Some(
                                     CStr::from_ptr(cbase as *const i8)
                                         .to_string_lossy()
@@ -2105,7 +2107,7 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeRefP
     // compute the URI
     let mut base = None;
     let mut uri = (*ctxt).doc.and_then(|doc| {
-        if let Some(b) = (*cur).get_base(doc.as_ptr()) {
+        if let Some(b) = (*cur).get_base(Some(doc)) {
             base = Some(b);
             build_uri(&href, base.as_deref().unwrap())
         } else {
@@ -2303,12 +2305,7 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeR
             xml_free_node(now.as_ptr());
             child = next;
         }
-        end = xml_new_doc_node(
-            XmlDocPtr::from_raw((*cur).doc).unwrap(),
-            (*cur).ns,
-            &(*cur).name().unwrap(),
-            null_mut(),
-        );
+        end = xml_new_doc_node((*cur).doc, (*cur).ns, &(*cur).name().unwrap(), null_mut());
         if end.is_null() {
             xml_xinclude_err!(
                 ctxt,
@@ -2445,23 +2442,19 @@ pub unsafe fn xml_xinclude_process_tree_flags_data(
 ) -> i32 {
     let mut ret: i32;
 
-    if tree.is_null()
-        || (*tree).element_type() == XmlElementType::XmlNamespaceDecl
-        || (*tree).doc.is_null()
-    {
+    if tree.is_null() || (*tree).element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
+    let Some(doc) = (*tree).doc else {
+        return -1;
+    };
 
-    let ctxt: XmlXincludeCtxtPtr =
-        xml_xinclude_new_context(XmlDocPtr::from_raw((*tree).doc).unwrap().unwrap());
+    let ctxt: XmlXincludeCtxtPtr = xml_xinclude_new_context(doc);
     if ctxt.is_null() {
         return -1;
     }
     (*ctxt)._private = data;
-    let url = (*(*tree).doc)
-        .url
-        .as_deref()
-        .map(|u| CString::new(u).unwrap());
+    let url = doc.url.as_deref().map(|u| CString::new(u).unwrap());
     (*ctxt).base = xml_strdup(url.as_ref().map_or(null(), |u| u.as_ptr() as *const u8));
     xml_xinclude_set_flags(ctxt, flags);
     ret = xml_xinclude_do_process(ctxt, tree);
@@ -2490,19 +2483,18 @@ pub unsafe fn xml_xinclude_process_tree(tree: *mut XmlNode) -> i32 {
 pub unsafe fn xml_xinclude_process_tree_flags(tree: *mut XmlNode, flags: i32) -> i32 {
     let mut ret: i32;
 
-    if tree.is_null()
-        || (*tree).element_type() == XmlElementType::XmlNamespaceDecl
-        || (*tree).doc.is_null()
-    {
+    if tree.is_null() || (*tree).element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
-    let ctxt: XmlXincludeCtxtPtr =
-        xml_xinclude_new_context(XmlDocPtr::from_raw((*tree).doc).unwrap().unwrap());
+    let Some(doc) = (*tree).doc else {
+        return -1;
+    };
+    let ctxt: XmlXincludeCtxtPtr = xml_xinclude_new_context(doc);
     if ctxt.is_null() {
         return -1;
     }
     let tmp = (*tree)
-        .get_base((*tree).doc)
+        .get_base(Some(doc))
         .map(|c| CString::new(c).unwrap());
     (*ctxt).base = tmp
         .as_ref()
@@ -2599,7 +2591,7 @@ pub unsafe fn xml_xinclude_process_node(ctxt: XmlXincludeCtxtPtr, node: *mut Xml
 
     if node.is_null()
         || (*node).element_type() == XmlElementType::XmlNamespaceDecl
-        || (*node).doc.is_null()
+        || (*node).doc.is_none()
         || ctxt.is_null()
     {
         return -1;

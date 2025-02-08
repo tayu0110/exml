@@ -4438,9 +4438,9 @@ unsafe fn xml_xpath_node_set_filter(
         //
         // TODO: Get real doc for namespace nodes.
         if !matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-            && !(*node).doc.is_null()
+            && (*node).doc.is_some()
         {
-            (*xpctxt).doc = XmlDocPtr::from_raw((*node).doc).unwrap();
+            (*xpctxt).doc = (*node).doc;
         }
 
         let res: i32 = xml_xpath_comp_op_eval_to_boolean(ctxt, filter_op, 1);
@@ -5353,9 +5353,9 @@ unsafe extern "C" fn xml_xpath_location_set_filter(
         //
         // TODO: Get real doc for namespace nodes.
         if !matches!((*context_node).typ, XmlElementType::XmlNamespaceDecl)
-            && !(*context_node).doc.is_null()
+            && (*context_node).doc.is_some()
         {
-            (*xpctxt).doc = XmlDocPtr::from_raw((*context_node).doc).unwrap();
+            (*xpctxt).doc = (*context_node).doc;
         }
 
         let res: i32 = xml_xpath_comp_op_eval_to_boolean(ctxt, filter_op, 1);
@@ -8882,7 +8882,7 @@ thread_local! {
         href: XML_XML_NAMESPACE.as_ptr() as *const u8,
         prefix: c"xml".as_ptr() as *const u8,
         _private: null_mut(),
-        context: null_mut(),
+        context: None,
     } };
 }
 
@@ -8909,11 +8909,8 @@ pub unsafe fn xml_xpath_next_namespace(
         return null_mut();
     }
     if cur.is_null() {
-        (*(*ctxt).context).tmp_ns_list = (*(*(*ctxt).context).node).get_ns_list(
-            (*(*ctxt).context)
-                .doc
-                .map_or(null_mut(), |doc| doc.as_ptr()),
-        );
+        (*(*ctxt).context).tmp_ns_list =
+            (*(*(*ctxt).context).node).get_ns_list((*(*ctxt).context).doc);
         (*(*ctxt).context).tmp_ns_nr = 0;
         if let Some(list) = (*(*ctxt).context).tmp_ns_list.as_deref() {
             (*(*ctxt).context).tmp_ns_nr = list.len() as i32;
@@ -8987,10 +8984,10 @@ unsafe extern "C" fn xml_xpath_is_ancestor(ancestor: *mut XmlNode, mut node: *mu
         return 0;
     }
     /* avoid searching if ancestor or node is the root node */
-    if ancestor == (*node).doc as *mut XmlNode {
+    if ancestor == (*node).doc.map_or(null_mut(), |doc| doc.as_ptr()) as *mut XmlNode {
         return 1;
     }
-    if node == (*ancestor).doc as *mut XmlNode {
+    if node == (*ancestor).doc.map_or(null_mut(), |doc| doc.as_ptr()) as *mut XmlNode {
         return 0;
     }
     while let Some(parent) = (*node).parent() {

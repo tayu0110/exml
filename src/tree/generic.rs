@@ -30,8 +30,8 @@ pub trait NodeCommon {
     fn set_next(&mut self, next: Option<NodePtr>);
     fn prev(&self) -> Option<NodePtr>;
     fn set_prev(&mut self, prev: Option<NodePtr>);
-    fn document(&self) -> *mut XmlDoc;
-    fn set_document(&mut self, doc: *mut XmlDoc);
+    fn document(&self) -> Option<XmlDocPtr>;
+    fn set_document(&mut self, doc: Option<XmlDocPtr>);
 
     fn as_node(&self) -> Option<NonNull<XmlNode>> {
         // TODO: Remove unneeded types
@@ -114,16 +114,16 @@ pub trait NodeCommon {
     /// Returns a pointer to the base URL, or NULL if not found.  
     /// It's up to the caller to free the memory with `xml_free()`.
     #[doc(alias = "xmlNodeGetBase")]
-    unsafe fn get_base(&self, mut doc: *const XmlDoc) -> Option<String> {
+    unsafe fn get_base(&self, doc: Option<XmlDocPtr>) -> Option<String> {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return None;
         }
-        if doc.is_null() {
-            doc = self.document();
-        }
+        let doc = doc.or(self.document());
         let mut cur = NodePtr::from_ptr(self as *const Self as *mut XmlNode);
-        if !doc.is_null() && matches!((*doc).element_type(), XmlElementType::XmlHTMLDocumentNode) {
-            cur = (*doc).children();
+        if let Some(doc) =
+            doc.filter(|doc| matches!(doc.element_type(), XmlElementType::XmlHTMLDocumentNode))
+        {
+            cur = doc.children;
             while let Some(now) = cur.filter(|cur| cur.name().is_some()) {
                 if !matches!(now.element_type(), XmlElementType::XmlElementNode) {
                     cur = now.next();
@@ -172,8 +172,7 @@ pub trait NodeCommon {
             }
             cur = now.parent();
         }
-        if !doc.is_null() && (*doc).url.is_some() {
-            let url = (*doc).url.as_deref().unwrap();
+        if let Some(url) = doc.as_deref().and_then(|doc| doc.url.as_deref()) {
             if bases.is_empty() {
                 return Some(url.to_owned());
             }
@@ -208,9 +207,7 @@ pub trait NodeCommon {
                             .to_string_lossy()
                             .into_owned()
                     });
-                } else if let Some(ret) =
-                    children.get_string(XmlDocPtr::from_raw(self.document()).unwrap(), 1)
-                {
+                } else if let Some(ret) = children.get_string(self.document(), 1) {
                     return Some(ret);
                 }
             }
@@ -268,11 +265,7 @@ pub trait NodeCommon {
         match self.element_type() {
             XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
                 let last = self.last();
-                let new_node: *mut XmlNode = xml_new_doc_text_len(
-                    XmlDocPtr::from_raw(self.document()).unwrap(),
-                    content,
-                    len,
-                );
+                let new_node: *mut XmlNode = xml_new_doc_text_len(self.document(), content, len);
                 if !new_node.is_null() {
                     let tmp = self.add_child(new_node);
                     if tmp != new_node {
@@ -361,7 +354,7 @@ pub trait NodeCommon {
         prev = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
         (*cur).set_parent(NodePtr::from_ptr(self as *mut Self as *mut XmlNode));
         if (*cur).doc != self.document() {
-            (*cur).set_doc(XmlDocPtr::from_raw(self.document()).unwrap());
+            (*cur).set_doc(self.document());
         }
         // this check prevents a loop on tree-traversions if a developer
         // tries to add a node to its parent multiple times
@@ -607,21 +600,19 @@ pub trait NodeCommon {
 
         if matches!(self.element_type(), XmlElementType::XmlDTDNode) {
             let dtd = XmlDtdPtr::from_raw(self as *mut Self as *mut XmlDtd).unwrap();
-            let doc = self.document();
-            if !doc.is_null() {
-                if (*doc).int_subset == dtd {
-                    (*doc).int_subset = None;
+            if let Some(mut doc) = self.document() {
+                if doc.int_subset == dtd {
+                    doc.int_subset = None;
                 }
-                if (*doc).ext_subset == dtd {
-                    (*doc).ext_subset = None;
+                if doc.ext_subset == dtd {
+                    doc.ext_subset = None;
                 }
             }
         }
         if matches!(self.element_type(), XmlElementType::XmlEntityDecl) {
-            let doc = self.document();
             let name = self.name().map(|n| n.into_owned());
-            if !doc.is_null() {
-                if let Some(int_subset) = (*doc).int_subset {
+            if let Some(doc) = self.document() {
+                if let Some(int_subset) = doc.int_subset {
                     if let (Some(mut table), Some(name)) = (int_subset.entities, name.as_deref()) {
                         if table.lookup(name).copied().map(|e| e.as_ptr())
                             == Some(self as *mut Self as *mut XmlEntity)
@@ -637,7 +628,7 @@ pub trait NodeCommon {
                         }
                     }
                 }
-                if let Some(ext_subset) = (*doc).ext_subset {
+                if let Some(ext_subset) = doc.ext_subset {
                     if let (Some(mut table), Some(name)) = (ext_subset.entities, name.as_deref()) {
                         if table.lookup(name).copied().map(|e| e.as_ptr())
                             == Some(self as *mut Self as *mut XmlEntity)

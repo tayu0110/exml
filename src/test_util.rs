@@ -1332,7 +1332,10 @@ pub(crate) unsafe fn gen_html_doc_ptr(no: i32, _nr: i32) -> HtmlDocPtr {
 
 #[cfg(feature = "html")]
 pub(crate) unsafe fn desret_html_doc_ptr(val: HtmlDocPtr) {
-    if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
+    if !val.is_null()
+        && val != API_DOC.get()
+        && (*val).doc.map_or(null_mut(), |doc| doc.as_ptr()) != API_DOC.get()
+    {
         xml_free_doc(XmlDocPtr::from_raw(val).unwrap().unwrap());
     }
 }
@@ -1346,7 +1349,10 @@ pub(crate) unsafe fn des_html_node_ptr(_no: i32, _val: HtmlNodePtr, _nr: i32) {}
 
 #[cfg(feature = "html")]
 pub(crate) unsafe fn des_html_doc_ptr(_no: i32, val: HtmlDocPtr, _nr: i32) {
-    if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
+    if !val.is_null()
+        && val != API_DOC.get()
+        && (*val).doc.map_or(null_mut(), |doc| doc.as_ptr()) != API_DOC.get()
+    {
         xml_free_doc(XmlDocPtr::from_raw(val).unwrap().unwrap());
     }
 }
@@ -1504,7 +1510,10 @@ pub(crate) unsafe fn gen_xml_doc_ptr(no: i32, _nr: i32) -> *mut XmlDoc {
 }
 
 pub(crate) unsafe fn des_xml_doc_ptr(_no: i32, val: *mut XmlDoc, _nr: i32) {
-    if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
+    if !val.is_null()
+        && val != API_DOC.get()
+        && (*val).doc.map_or(null_mut(), |doc| doc.as_ptr()) != API_DOC.get()
+    {
         xml_free_doc(XmlDocPtr::from_raw(val).unwrap().unwrap());
     }
 }

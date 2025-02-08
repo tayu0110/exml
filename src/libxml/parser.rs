@@ -120,10 +120,10 @@ use crate::{
     tree::{
         xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
-        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
-        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNsPtr,
-        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
+        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
+        XmlDocPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
+        XmlNsPtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::{canonic_path, XmlURI},
@@ -1852,10 +1852,10 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
         if (*ctxt).well_formed != 0 {
             ret = my_doc.ext_subset.take();
             if let Some(mut ret) = ret {
-                ret.doc = null_mut();
+                ret.doc = None;
                 let mut tmp = ret.children;
                 while let Some(mut now) = tmp {
-                    now.doc = null_mut();
+                    now.doc = None;
                     tmp = now.next;
                 }
             }
@@ -1960,10 +1960,10 @@ pub unsafe fn xml_io_parse_dtd(
         if (*ctxt).well_formed != 0 {
             ret = my_doc.ext_subset.take().map_or(null_mut(), |p| p.as_ptr());
             if !ret.is_null() {
-                (*ret).doc = null_mut();
+                (*ret).doc = None;
                 let mut tmp = (*ret).children;
                 while let Some(mut now) = tmp {
-                    now.doc = null_mut();
+                    now.doc = None;
                     tmp = now.next;
                 }
             }
@@ -2075,17 +2075,17 @@ pub unsafe fn xml_parse_in_node_context(
     let doc = if (*node).element_type() == XmlElementType::XmlElementNode {
         (*node).doc
     } else {
-        (*node).as_document_node().unwrap().as_ptr()
+        XmlDocPtr::from_raw(node as *mut XmlDoc).unwrap()
     };
-    if doc.is_null() {
+    let Some(doc) = doc else {
         return XmlParserErrors::XmlErrInternalError;
-    }
+    };
 
     // allocate a context and set-up everything not related to the
     // node position in the tree
-    if (*doc).typ == XmlElementType::XmlDocumentNode {
+    if doc.typ == XmlElementType::XmlDocumentNode {
         ctxt = xml_create_memory_parser_ctxt(data);
-    } else if cfg!(feature = "html") && (*doc).typ == XmlElementType::XmlHTMLDocumentNode {
+    } else if cfg!(feature = "html") && doc.typ == XmlElementType::XmlHTMLDocumentNode {
         #[cfg(feature = "html")]
         {
             ctxt = html_create_memory_parser_ctxt(data);
@@ -2106,7 +2106,7 @@ pub unsafe fn xml_parse_in_node_context(
     // we must wait until the last moment to free the original one.
     options |= XmlParserOption::XmlParseNoDict as i32;
 
-    if let Some(encoding) = (*doc).encoding.as_deref() {
+    if let Some(encoding) = doc.encoding.as_deref() {
         (*ctxt).encoding = Some(encoding.to_owned());
 
         if let Some(handler) = find_encoding_handler(encoding) {
@@ -2118,12 +2118,12 @@ pub unsafe fn xml_parse_in_node_context(
 
     (*ctxt).ctxt_use_options_internal(options, None);
     (*ctxt).detect_sax2();
-    (*ctxt).my_doc = XmlDocPtr::from_raw(doc).unwrap();
+    (*ctxt).my_doc = Some(doc);
     // parsing in context, i.e. as within existing content
     (*ctxt).input_id = 2;
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
 
-    let fake: *mut XmlNode = xml_new_doc_comment(XmlDocPtr::from_raw((*node).doc).unwrap(), "");
+    let fake: *mut XmlNode = xml_new_doc_comment((*node).doc, "");
     if fake.is_null() {
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrNoMemory;
@@ -2154,7 +2154,7 @@ pub unsafe fn xml_parse_in_node_context(
 
     #[cfg(feature = "html")]
     {
-        if (*doc).typ == XmlElementType::XmlHTMLDocumentNode {
+        if doc.typ == XmlElementType::XmlHTMLDocumentNode {
             __html_parse_content(ctxt as _);
         } else {
             xml_parse_content(ctxt);
@@ -2296,7 +2296,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     // doc.is_null() is only supported for historic reasons
     if let Some(doc) = doc {
         (*ctxt).my_doc = Some(new_doc);
-        new_doc.children.unwrap().doc = doc.as_ptr();
+        new_doc.children.unwrap().doc = Some(doc);
         // Ensure that doc has XML spec namespace
         (*(doc.as_ptr() as *mut XmlNode))
             .search_ns_by_href(Some(doc), XML_XML_NAMESPACE.to_str().unwrap());
@@ -2444,7 +2444,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     new_doc.add_child(new_root);
     (*ctxt).node_push(new_doc.children.map_or(null_mut(), |c| c.as_ptr()));
     (*ctxt).my_doc = Some(doc);
-    (*new_root).doc = doc.as_ptr();
+    (*new_root).doc = Some(doc);
 
     // Get the 4 first bytes and decode the charset
     // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE

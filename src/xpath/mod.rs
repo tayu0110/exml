@@ -1088,7 +1088,7 @@ pub unsafe fn xml_xpath_set_context_node(node: *mut XmlNode, ctx: XmlXPathContex
         return -1;
     }
 
-    if (*node).doc == (*ctx).doc.map_or(null_mut(), |doc| doc.as_ptr()) {
+    if (*node).doc == (*ctx).doc {
         (*ctx).node = node;
         return 0;
     }

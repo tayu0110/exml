@@ -45,7 +45,7 @@ use exml::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_init_types,
         xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
     },
-    tree::{xml_free_doc, XmlDocPtr, XmlNode},
+    tree::{xml_free_doc, XmlNode},
     uri::build_uri,
     xpath::{
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,
@@ -248,10 +248,13 @@ unsafe fn initialize_libxml2() {
 unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
     let mut ret: *mut XmlNode = null_mut();
 
-    if cur.is_null() || (*cur).doc.is_null() || xpath.is_null() {
+    if cur.is_null() || xpath.is_null() {
         return null_mut();
     }
-    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = XmlDocPtr::from_raw((*cur).doc).unwrap();
+    let Some(cur_doc) = (*cur).doc else {
+        return null_mut();
+    };
+    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
     (*CTXT_XPATH.load(Ordering::Relaxed)).node = cur;
     let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath as _);
     if comp.is_null() {
@@ -280,10 +283,13 @@ unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
 unsafe fn get_string(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlChar {
     let mut ret: *mut XmlChar = null_mut();
 
-    if cur.is_null() || (*cur).doc.is_null() || xpath.is_null() {
+    if cur.is_null() || xpath.is_null() {
         return null_mut();
     }
-    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = XmlDocPtr::from_raw((*cur).doc).unwrap();
+    let Some(cur_doc) = (*cur).doc else {
+        return null_mut();
+    };
+    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
     (*CTXT_XPATH.load(Ordering::Relaxed)).node = cur;
     let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath as _);
     if comp.is_null() {
@@ -330,7 +336,7 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: *mut XmlN
     EXTRA_MEMORY_FROM_RESOLVER = 0;
     // dump the schemas to a buffer, then reparse it and compile the schemas
     let mut buf = vec![];
-    (*test).dump_memory(&mut buf, XmlDocPtr::from_raw((*test).doc).unwrap(), 0, 0);
+    (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
     let pctxt = xml_relaxng_new_mem_parser_ctxt(buf.as_ptr() as *const c_char, buf.len() as _);
     (*pctxt).set_parser_errors(
         Some(test_error_handler),
@@ -373,13 +379,13 @@ unsafe fn install_resources(mut tst: *mut XmlNode, base: *const XmlChar) {
     let mut res: *mut XmlChar;
 
     let mut buf = vec![];
-    (*tst).dump_memory(&mut buf, XmlDocPtr::from_raw((*tst).doc).unwrap(), 0, 0);
+    (*tst).dump_memory(&mut buf, (*tst).doc, 0, 0);
 
     while !tst.is_null() {
         test = get_next(tst, c"./*".as_ptr() as _);
         if !test.is_null() {
             buf.clear();
-            (*test).dump_memory(&mut buf, XmlDocPtr::from_raw((*test).doc).unwrap(), 0, 0);
+            (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
             name = get_string(tst, c"string(@name)".as_ptr() as _);
             content = xml_strndup(buf.as_ptr(), buf.len() as i32);
             if !name.is_null() && !content.is_null() {
@@ -463,7 +469,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
     EXTRA_MEMORY_FROM_RESOLVER = 0;
     // dump the schemas to a buffer, then reparse it and compile the schemas
     let mut buf = vec![];
-    (*test).dump_memory(&mut buf, XmlDocPtr::from_raw((*test).doc).unwrap(), 0, 0);
+    (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
     let pctxt = xml_relaxng_new_mem_parser_ctxt(buf.as_ptr() as *const c_char, buf.len() as _);
     (*pctxt).set_parser_errors(
         Some(test_error_handler),
@@ -514,7 +520,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
             if let Some(dtd) = dtd {
                 buf.extend(dtd.as_bytes());
             }
-            (*test).dump_memory(&mut buf, XmlDocPtr::from_raw((*test).doc).unwrap(), 0, 0);
+            (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
 
             // We are ready to run the test
             mem = xml_mem_used();
@@ -584,7 +590,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
             );
         } else {
             buf.clear();
-            (*test).dump_memory(&mut buf, XmlDocPtr::from_raw((*test).doc).unwrap(), 0, 0);
+            (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
 
             // We are ready to run the test
             mem = xml_mem_used();

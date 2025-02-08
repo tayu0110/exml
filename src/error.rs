@@ -1517,7 +1517,7 @@ macro_rules! __xml_raise_error {
                         }
                         to = &mut (*ctxt).last_error;
                     } else if !node.is_null() && file.is_none() {
-                        if !(*node).doc.is_null() && !(*(*node).doc).url.is_none() {
+                        if (*node).doc.map_or(false, |doc| !doc.url.is_none()) {
                             baseptr = node;
                         // file = (const c_char *) (*(*node).doc).URL;
                         }
@@ -1527,7 +1527,7 @@ macro_rules! __xml_raise_error {
                             }
                             node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
                         }
-                        if baseptr.is_null() && !node.is_null() && !(*node).doc.is_null() && !(*(*node).doc).url.is_none() {
+                        if baseptr.is_null() && !node.is_null() && (*node).doc.map_or(false, |doc| !doc.url.is_none()) {
                             baseptr = node;
                         }
 
@@ -1578,7 +1578,7 @@ macro_rules! __xml_raise_error {
                             if !href.is_none() {
                                 to.file = href.map(|h| h.into());
                             } else {
-                                to.file = (*(*baseptr).doc).url.as_deref().map(|u| Cow::Owned(u.to_owned()));
+                                to.file = (*baseptr).doc.as_deref().and_then(|doc| doc.url.as_deref().map(|u| Cow::Owned(u.to_owned())));
                             }
                         }
                         #[cfg(not(feature = "xinclude"))] {
@@ -1588,8 +1588,10 @@ macro_rules! __xml_raise_error {
                                     .into()
                             });
                         }
-                        if to.file.is_none() && !node.is_null() && !(*node).doc.is_null() {
-                            to.file = (*(*node).doc).url.as_deref().map(|u| Cow::Owned(u.to_owned()));
+                        if to.file.is_none() && !node.is_null() {
+                            if let Some(doc) = (*node).doc {
+                                to.file = doc.url.as_deref().map(|u| Cow::Owned(u.to_owned()));
+                            }
                         }
                     }
                     to.line = line as usize;

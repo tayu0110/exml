@@ -472,14 +472,14 @@ pub unsafe fn xml_sax2_get_entity(
     if let Some(mut my_doc) = (*ctxt).my_doc.filter(|doc| doc.standalone == 1) {
         if (*ctxt).in_subset == 2 {
             my_doc.standalone = 0;
-            let ret = xml_get_doc_entity(my_doc.as_ptr(), name);
+            let ret = xml_get_doc_entity(Some(my_doc), name);
             my_doc.standalone = 1;
             ret
         } else {
-            let mut ret = xml_get_doc_entity(my_doc.as_ptr(), name);
+            let mut ret = xml_get_doc_entity(Some(my_doc), name);
             if ret.is_none() {
                 my_doc.standalone = 0;
-                ret = xml_get_doc_entity(my_doc.as_ptr(), name);
+                ret = xml_get_doc_entity(Some(my_doc), name);
                 if ret.is_some() {
                     xml_fatal_err_msg!(
                         ctxt,
@@ -493,7 +493,7 @@ pub unsafe fn xml_sax2_get_entity(
             ret
         }
     } else {
-        xml_get_doc_entity((*ctxt).my_doc.map_or(null_mut(), |doc| doc.as_ptr()), name)
+        xml_get_doc_entity((*ctxt).my_doc, name)
     }
 }
 
@@ -2119,7 +2119,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         (*ctxt).free_elems = (*ret).next().map_or(null_mut(), |n| n.as_ptr());
         (*ctxt).free_elems_nr -= 1;
         std::ptr::write(&mut *ret, XmlNode::default());
-        (*ret).doc = my_doc.as_ptr();
+        (*ret).doc = Some(my_doc);
         (*ret).typ = XmlElementType::XmlElementNode;
 
         if let Some(lname) = lname {
@@ -2431,7 +2431,7 @@ unsafe fn xml_sax2_attribute_ns(
         std::ptr::write(&mut *ret, XmlAttr::default());
         ret.typ = XmlElementType::XmlAttributeNode;
         ret.parent = NodePtr::from_ptr((*ctxt).node);
-        ret.doc = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.as_ptr());
+        ret.doc = (*ctxt).my_doc;
         ret.ns = namespace;
         ret.name = xml_strdup(localname);
 
@@ -2695,7 +2695,7 @@ pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: &str) {
     let ret = if name.starts_with('#') {
         xml_new_char_ref((*ctxt).my_doc, name)
     } else {
-        xml_new_reference((*ctxt).my_doc.map_or(null_mut(), |doc| doc.as_ptr()), name)
+        xml_new_reference((*ctxt).my_doc, name)
     };
     if (*ctxt).node.is_null() || (*(*ctxt).node).add_child(ret).is_null() {
         xml_free_node(ret);
@@ -2799,7 +2799,7 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
             if matches!(typ, XmlElementType::XmlTextNode) {
                 last_child = xml_sax2_text_node(ctxt, ch);
                 if !last_child.is_null() {
-                    (*last_child).doc = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.as_ptr());
+                    (*last_child).doc = (*ctxt).my_doc;
                 }
             } else {
                 last_child = xml_new_cdata_block((*ctxt).my_doc, ch);

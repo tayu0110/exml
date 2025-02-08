@@ -1151,10 +1151,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: *m
                     );
                 }
             } else if cur_attr.name().as_deref() == Some("datatypeLibrary") {
-                if let Some(val) = cur_attr
-                    .children
-                    .and_then(|c| c.get_string(XmlDocPtr::from_raw((*node).doc).unwrap(), 1))
-                {
+                if let Some(val) = cur_attr.children.and_then(|c| c.get_string((*node).doc, 1)) {
                     if !val.is_empty() {
                         if let Some(uri) = XmlURI::parse(&val) {
                             if uri.scheme.is_none() {
@@ -1709,18 +1706,12 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                         if let Some(name) = (*cur).get_prop("name") {
                             let cname = CString::new(name.as_str()).unwrap();
                             if let Some(mut children) = (*cur).children() {
-                                let node: *mut XmlNode = xml_new_doc_node(
-                                    XmlDocPtr::from_raw((*cur).doc).unwrap(),
-                                    (*cur).ns,
-                                    "name",
-                                    null_mut(),
-                                );
+                                let node: *mut XmlNode =
+                                    xml_new_doc_node((*cur).doc, (*cur).ns, "name", null_mut());
                                 if !node.is_null() {
                                     children.add_prev_sibling(node);
-                                    text = xml_new_doc_text(
-                                        XmlDocPtr::from_raw((*node).doc).unwrap(),
-                                        cname.as_ptr() as *const u8,
-                                    );
+                                    text =
+                                        xml_new_doc_text((*node).doc, cname.as_ptr() as *const u8);
                                     (*node).add_child(text);
                                     text = node;
                                 }
@@ -1780,10 +1771,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                             // Simplification: 4.10. QNames
                             if let Some(name) = (*cur).get_content() {
                                 if let Some((prefix, local)) = split_qname2(&name) {
-                                    if let Some(ns) = (*cur).search_ns(
-                                        XmlDocPtr::from_raw((*cur).doc).unwrap(),
-                                        Some(prefix),
-                                    ) {
+                                    if let Some(ns) = (*cur).search_ns((*cur).doc, Some(prefix)) {
                                         (*cur).set_prop("ns", ns.href().as_deref());
                                         let local = CString::new(local).unwrap();
                                         (*cur).set_content(local.as_ptr() as *const u8);
@@ -6896,7 +6884,7 @@ unsafe fn xml_relaxng_validate_attribute(
         {
             let value = prop
                 .children
-                .and_then(|c| c.get_string(XmlDocPtr::from_raw(prop.doc).unwrap(), 1))
+                .and_then(|c| c.get_string(prop.doc, 1))
                 .map(|c| CString::new(c).unwrap());
             let mut value = value
                 .as_ref()
@@ -6933,7 +6921,7 @@ unsafe fn xml_relaxng_validate_attribute(
     {
         let value = prop
             .children
-            .and_then(|c| c.get_string(XmlDocPtr::from_raw(prop.doc).unwrap(), 1))
+            .and_then(|c| c.get_string(prop.doc, 1))
             .map(|c| CString::new(c).unwrap());
         let mut value = value
             .as_ref()

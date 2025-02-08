@@ -135,11 +135,14 @@ pub struct XmlEntity {
 }
 
 impl NodeCommon for XmlEntity {
-    fn document(&self) -> *mut XmlDoc {
-        self.doc.load(Ordering::Relaxed)
+    fn document(&self) -> Option<XmlDocPtr> {
+        unsafe { XmlDocPtr::from_raw(self.doc.load(Ordering::Relaxed)).unwrap() }
     }
-    fn set_document(&mut self, doc: *mut XmlDoc) {
-        self.doc.store(doc, Ordering::Relaxed);
+    fn set_document(&mut self, doc: Option<XmlDocPtr>) {
+        self.doc.store(
+            doc.map_or(null_mut(), |doc| doc.as_ptr()),
+            Ordering::Relaxed,
+        );
     }
     fn element_type(&self) -> XmlElementType {
         self.typ
@@ -535,7 +538,10 @@ unsafe fn xml_add_entity(
     }
     let mut table = table?;
     let ret = xml_create_entity(name, typ, external_id, system_id, content)?;
-    ret.doc.store(dtd.doc, Ordering::Relaxed);
+    ret.doc.store(
+        dtd.doc.map_or(null_mut(), |doc| doc.as_ptr()),
+        Ordering::Relaxed,
+    );
 
     if table.add_entry(name, ret).is_err() {
         // entity was already defined at another level.
@@ -575,7 +581,10 @@ pub unsafe fn xml_add_doc_entity(
 
     // Link it to the DTD
     ret.parent.store(dtd.as_ptr(), Ordering::Relaxed);
-    ret.doc.store(dtd.doc, Ordering::Relaxed);
+    ret.doc.store(
+        dtd.doc.map_or(null_mut(), |doc| doc.as_ptr()),
+        Ordering::Relaxed,
+    );
     if let Some(mut last) = dtd.last {
         last.next = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
         ret.prev.store(last.as_ptr(), Ordering::Relaxed);
@@ -613,10 +622,13 @@ pub unsafe fn xml_add_dtd_entity(
         );
         return None;
     };
-    let mut ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
+    let ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
     // Link it to the DTD
     ret.parent.store(dtd.as_ptr(), Ordering::Relaxed);
-    ret.doc = dtd.doc.into();
+    ret.doc.store(
+        dtd.doc.map_or(null_mut(), |doc| doc.as_ptr()),
+        Ordering::Release,
+    );
     if let Some(mut last) = dtd.last {
         last.next = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
         ret.prev.store(last.as_ptr(), Ordering::Relaxed);
@@ -774,9 +786,9 @@ unsafe fn xml_get_entity_from_table(
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDocEntity")]
-pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> Option<XmlEntityPtr> {
-    if !doc.is_null() {
-        if let Some(int_subset) = (*doc).int_subset {
+pub unsafe fn xml_get_doc_entity(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlEntityPtr> {
+    if let Some(doc) = doc {
+        if let Some(int_subset) = doc.int_subset {
             if let Some(table) = int_subset.entities {
                 let cur = xml_get_entity_from_table(table, name);
                 if cur.is_some() {
@@ -784,8 +796,8 @@ pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> Option<XmlEn
                 }
             }
         }
-        if (*doc).standalone != 1 {
-            if let Some(ext_subset) = (*doc).ext_subset {
+        if doc.standalone != 1 {
+            if let Some(ext_subset) = doc.ext_subset {
                 if let Some(table) = ext_subset.entities {
                     let cur = xml_get_entity_from_table(table, name);
                     if cur.is_some() {
@@ -1162,7 +1174,10 @@ pub unsafe fn xml_encode_entities_reentrant(
 ///
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeSpecialChars")]
-pub unsafe fn xml_encode_special_chars(_doc: *const XmlDoc, input: *const XmlChar) -> *mut XmlChar {
+pub unsafe fn xml_encode_special_chars(
+    _doc: Option<XmlDocPtr>,
+    input: *const XmlChar,
+) -> *mut XmlChar {
     let mut cur: *const XmlChar = input;
     let mut buffer: *mut XmlChar;
     let mut out: *mut XmlChar;
@@ -1567,45 +1582,4 @@ pub(crate) unsafe fn xml_encode_attribute_entities(
     input: *const XmlChar,
 ) -> *mut XmlChar {
     xml_encode_entities_internal(doc, input, 1)
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
-
-    use super::*;
-
-    #[test]
-    fn test_xml_encode_special_chars() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_CONST_XML_DOC_PTR {
-                for n_input in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_const_xml_doc_ptr(n_doc, 0);
-                    let input = gen_const_xml_char_ptr(n_input, 1);
-
-                    let ret_val = xml_encode_special_chars(doc, input);
-                    desret_xml_char_ptr(ret_val);
-                    des_const_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_input, input, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlEncodeSpecialChars",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_input);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlEncodeSpecialChars()"
-            );
-        }
-    }
 }

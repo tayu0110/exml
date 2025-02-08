@@ -175,7 +175,7 @@ pub unsafe fn xlink_is_link(doc: Option<XmlDocPtr>, node: *mut XmlNode) -> Xlink
     if node.is_null() {
         return XlinkType::XlinkTypeNone;
     }
-    let doc = doc.or(XmlDocPtr::from_raw((*node).doc).unwrap());
+    let doc = doc.or((*node).doc);
     if let Some(_doc) = doc.filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode) {
         // This is an HTML document.
     } else if (*node).ns.map_or(false, |ns| {

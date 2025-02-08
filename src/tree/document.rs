@@ -60,7 +60,7 @@ pub struct XmlDoc {
     pub(crate) parent: Option<NodePtr>, /* child->parent link */
     pub(crate) next: Option<NodePtr>,   /* next sibling link  */
     pub(crate) prev: Option<NodePtr>,   /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,        /* autoreference to itself */
+    pub(crate) doc: Option<XmlDocPtr>,  /* autoreference to itself */
 
     /* End of common part */
     pub(crate) compression: i32, /* level of zlib compression */
@@ -250,7 +250,7 @@ impl XmlDoc {
                         // Predefined entities don't generate nodes
                         val = xml_strndup(q, cur.offset_from(q) as _);
                         let ent = xml_get_doc_entity(
-                            self,
+                            XmlDocPtr::from_raw(self as *const XmlDoc as _).unwrap(),
                             CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
                         );
                         if let Some(ent) = ent.filter(|ent| {
@@ -291,7 +291,7 @@ impl XmlDoc {
 
                             // Create a new REFERENCE_REF node
                             node = xml_new_reference(
-                                self,
+                                XmlDocPtr::from_raw(self as *const XmlDoc as _).unwrap(),
                                 &CStr::from_ptr(val as *const i8).to_string_lossy(),
                             );
                             if node.is_null() {
@@ -525,7 +525,7 @@ impl XmlDoc {
                         // Predefined entities don't generate nodes
                         val = xml_strndup(q, cur.offset_from(q) as _);
                         let ent = xml_get_doc_entity(
-                            self,
+                            XmlDocPtr::from_raw(self as *const XmlDoc as _).unwrap(),
                             CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
                         );
                         if let Some(ent) = ent.filter(|ent| {
@@ -563,7 +563,7 @@ impl XmlDoc {
 
                             // Create a new REFERENCE_REF node
                             node = xml_new_reference(
-                                self,
+                                XmlDocPtr::from_raw(self as *const XmlDoc as _).unwrap(),
                                 &CStr::from_ptr(val as *const i8).to_string_lossy(),
                             );
                             if node.is_null() {
@@ -721,10 +721,10 @@ impl XmlDoc {
 }
 
 impl NodeCommon for XmlDoc {
-    fn document(&self) -> *mut XmlDoc {
+    fn document(&self) -> Option<XmlDocPtr> {
         self.doc
     }
-    fn set_document(&mut self, doc: *mut XmlDoc) {
+    fn set_document(&mut self, doc: Option<XmlDocPtr>) {
         self.doc = doc;
     }
     fn element_type(&self) -> XmlElementType {
@@ -777,7 +777,7 @@ impl Default for XmlDoc {
             parent: None,
             next: None,
             prev: None,
-            doc: null_mut(),
+            doc: None,
             compression: 0,
             standalone: 0,
             int_subset: None,
@@ -942,7 +942,7 @@ pub unsafe fn xml_new_doc(version: Option<&str>) -> Option<XmlDocPtr> {
         xml_tree_err_memory("building doc");
         return None;
     };
-    cur.doc = cur.as_ptr();
+    cur.doc = Some(cur);
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {

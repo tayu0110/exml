@@ -37,8 +37,8 @@ use crate::libxml::{
 use super::{
     xml_free_node_list, xml_new_doc_text, xml_new_ns, xml_new_reconciled_ns,
     xml_static_copy_node_list, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
-    NodePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode,
-    XmlNsPtr, __XML_REGISTER_CALLBACKS,
+    NodePtr, XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNsPtr,
+    __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -51,7 +51,7 @@ pub struct XmlAttr {
     pub(crate) parent: Option<NodePtr>,         /* child->parent link */
     pub(crate) next: Option<XmlAttrPtr>,        /* next sibling link  */
     pub(crate) prev: Option<XmlAttrPtr>,        /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,                /* the containing document */
+    pub(crate) doc: Option<XmlDocPtr>,          /* the containing document */
     pub(crate) ns: Option<XmlNsPtr>,            /* pointer to the associated namespace */
     pub(crate) atype: Option<XmlAttributeType>, /* the attribute type if validating */
     pub(crate) psvi: *mut c_void,               /* for type/PSVI information */
@@ -68,7 +68,7 @@ impl Default for XmlAttr {
             parent: None,
             next: None,
             prev: None,
-            doc: null_mut(),
+            doc: None,
             ns: None,
             atype: None,
             psvi: null_mut(),
@@ -77,10 +77,10 @@ impl Default for XmlAttr {
 }
 
 impl NodeCommon for XmlAttr {
-    fn document(&self) -> *mut XmlDoc {
+    fn document(&self) -> Option<XmlDocPtr> {
         self.doc
     }
-    fn set_document(&mut self, doc: *mut XmlDoc) {
+    fn set_document(&mut self, doc: Option<XmlDocPtr>) {
         self.doc = doc;
     }
     fn element_type(&self) -> XmlElementType {
@@ -299,7 +299,7 @@ pub unsafe fn xml_new_doc_prop(
     let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
         typ: XmlElementType::XmlAttributeNode,
         name: xml_strdup(name),
-        doc: doc.map_or(null_mut(), |doc| doc.as_ptr()),
+        doc,
         ..Default::default()
     }) else {
         xml_tree_err_memory("building attribute");
@@ -333,8 +333,6 @@ pub(super) unsafe fn xml_new_prop_internal(
     name: &str,
     value: *const XmlChar,
 ) -> Option<XmlAttrPtr> {
-    let mut doc: *mut XmlDoc = null_mut();
-
     if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
         return None;
     }
@@ -351,14 +349,14 @@ pub(super) unsafe fn xml_new_prop_internal(
         return None;
     };
 
+    let mut doc = None;
     if !node.is_null() {
         doc = (*node).doc;
         cur.doc = doc;
     }
 
     if !value.is_null() {
-        cur.children =
-            NodePtr::from_ptr(xml_new_doc_text(XmlDocPtr::from_raw(doc).unwrap(), value));
+        cur.children = NodePtr::from_ptr(xml_new_doc_text(doc, value));
         cur.set_last(None);
         let mut tmp = cur.children;
         while let Some(mut now) = tmp {
@@ -383,13 +381,10 @@ pub(super) unsafe fn xml_new_prop_internal(
         }
     }
 
-    if !value.is_null()
-        && !node.is_null()
-        && xml_is_id(XmlDocPtr::from_raw((*node).doc).unwrap(), node, Some(cur)) == 1
-    {
+    if !value.is_null() && !node.is_null() && xml_is_id((*node).doc, node, Some(cur)) == 1 {
         xml_add_id(
             null_mut(),
-            XmlDocPtr::from_raw((*node).doc).unwrap().unwrap(),
+            (*node).doc.unwrap(),
             CStr::from_ptr(value as *const i8)
                 .to_string_lossy()
                 .as_ref(),
@@ -462,25 +457,13 @@ pub(super) unsafe fn xml_copy_prop_internal(
         return None;
     }
     let mut ret = if !target.is_null() {
-        xml_new_doc_prop(
-            XmlDocPtr::from_raw((*target).doc).unwrap(),
-            cur.name,
-            null_mut(),
-        )
+        xml_new_doc_prop((*target).doc, cur.name, null_mut())
     } else if let Some(doc) = doc {
         xml_new_doc_prop(Some(doc), cur.name, null_mut())
     } else if let Some(parent) = cur.parent() {
-        xml_new_doc_prop(
-            XmlDocPtr::from_raw(parent.doc).unwrap(),
-            cur.name,
-            null_mut(),
-        )
+        xml_new_doc_prop(parent.doc, cur.name, null_mut())
     } else if let Some(children) = cur.children() {
-        xml_new_doc_prop(
-            XmlDocPtr::from_raw(children.doc).unwrap(),
-            cur.name,
-            null_mut(),
-        )
+        xml_new_doc_prop(children.doc, cur.name, null_mut())
     } else {
         xml_new_doc_prop(None, cur.name, null_mut())
     }?;
@@ -488,10 +471,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
 
     if let Some(cur_ns) = cur.ns.filter(|_| !target.is_null()) {
         let prefix = cur_ns.prefix();
-        if let Some(ns) = (*target).search_ns(
-            XmlDocPtr::from_raw((*target).doc).unwrap(),
-            prefix.as_deref(),
-        ) {
+        if let Some(ns) = (*target).search_ns((*target).doc, prefix.as_deref()) {
             // we have to find something appropriate here since
             // we can't be sure, that the namespace we found is identified
             // by the prefix
@@ -501,21 +481,13 @@ pub(super) unsafe fn xml_copy_prop_internal(
             } else {
                 // we are in trouble: we need a new reconciled namespace.
                 // This is expensive
-                ret.ns = xml_new_reconciled_ns(
-                    XmlDocPtr::from_raw((*target).doc).unwrap(),
-                    target,
-                    cur_ns,
-                );
+                ret.ns = xml_new_reconciled_ns((*target).doc, target, cur_ns);
             }
         } else {
             // Humm, we are copying an element whose namespace is defined
             // out of the new tree scope. Search it in the original tree
             // and add it at the top of the new tree
-            if let Some(ns) = cur
-                .parent
-                .unwrap()
-                .search_ns(XmlDocPtr::from_raw(cur.doc).unwrap(), prefix.as_deref())
-            {
+            if let Some(ns) = cur.parent.unwrap().search_ns(cur.doc, prefix.as_deref()) {
                 let mut root: *mut XmlNode = target;
                 let mut pred: *mut XmlNode = null_mut();
 
@@ -523,7 +495,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
                     pred = root;
                     root = parent.as_ptr();
                 }
-                if root == (*target).doc as _ {
+                if root == (*target).doc.map_or(null_mut(), |doc| doc.as_ptr()) as _ {
                     // correct possibly cycling above the document elt
                     root = pred;
                 }
@@ -537,7 +509,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
     if let Some(children) = cur.children() {
         ret.children = NodePtr::from_ptr(xml_static_copy_node_list(
             children.as_ptr(),
-            XmlDocPtr::from_raw(ret.doc).unwrap(),
+            ret.doc,
             ret.as_ptr() as _,
         ));
         ret.last = None;
@@ -552,26 +524,16 @@ pub(super) unsafe fn xml_copy_prop_internal(
     }
     // Try to handle IDs
     if !target.is_null()
-        && !(*target).doc.is_null()
-        && !cur.doc.is_null()
-        && (*cur.doc).ids.is_some()
+        && (*target).doc.is_some()
+        && cur.doc.map_or(false, |doc| doc.ids.is_some())
         && cur
             .parent
-            .filter(|p| {
-                xml_is_id(XmlDocPtr::from_raw(cur.doc).unwrap(), p.as_ptr(), Some(cur)) != 0
-            })
+            .filter(|p| xml_is_id(cur.doc, p.as_ptr(), Some(cur)) != 0)
             .is_some()
     {
         let children = cur.children;
-        if let Some(id) =
-            children.and_then(|c| c.get_string(XmlDocPtr::from_raw(cur.doc).unwrap(), 1))
-        {
-            xml_add_id(
-                null_mut(),
-                XmlDocPtr::from_raw((*target).doc).unwrap().unwrap(),
-                &id,
-                ret,
-            );
+        if let Some(id) = children.and_then(|c| c.get_string(cur.doc, 1)) {
+            xml_add_id(null_mut(), (*target).doc.unwrap(), &id, ret);
         }
     }
     Some(ret)
@@ -626,8 +588,11 @@ pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
     }
 
     // Check for ID removal -> leading to invalid references !
-    if !cur.doc.is_null() && matches!(cur.atype, Some(XmlAttributeType::XmlAttributeID)) {
-        xml_remove_id(XmlDocPtr::from_raw(cur.doc).unwrap().unwrap(), cur);
+    if let Some(doc) = cur
+        .doc
+        .filter(|_| matches!(cur.atype, Some(XmlAttributeType::XmlAttributeID)))
+    {
+        xml_remove_id(doc, cur);
     }
     if let Some(children) = cur.children() {
         xml_free_node_list(children.as_ptr());

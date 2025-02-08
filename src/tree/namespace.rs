@@ -33,8 +33,8 @@ use crate::libxml::{
 };
 
 use super::{
-    xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDoc, XmlElementType,
-    XmlGenericNodePtr, XmlNode, XmlNsType, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDocPtr,
+    XmlElementType, XmlGenericNodePtr, XmlNode, XmlNsType, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
@@ -43,12 +43,12 @@ pub struct XmlNs {
     //       `next` can be treated as `Option<XmlNsPtr>` in most cases,
     //       but must be `Option<XmlGenericNodePtr>`
     //       because different types of node pointers may be stored for XPath.
-    pub next: *mut XmlNs,             /* next Ns link for this node  */
-    pub(crate) typ: XmlNsType,        /* global or local */
-    pub href: *const XmlChar,         /* URL for the namespace */
-    pub prefix: *const XmlChar,       /* prefix for the namespace */
-    pub(crate) _private: *mut c_void, /* application data */
-    pub(crate) context: *mut XmlDoc,  /* normally an xmlDoc */
+    pub next: *mut XmlNs,                  /* next Ns link for this node  */
+    pub(crate) typ: XmlNsType,             /* global or local */
+    pub href: *const XmlChar,              /* URL for the namespace */
+    pub prefix: *const XmlChar,            /* prefix for the namespace */
+    pub(crate) _private: *mut c_void,      /* application data */
+    pub(crate) context: Option<XmlDocPtr>, /* normally an xmlDoc */
 }
 
 impl XmlNs {
@@ -71,16 +71,16 @@ impl Default for XmlNs {
             href: null_mut(),
             prefix: null_mut(),
             _private: null_mut(),
-            context: null_mut(),
+            context: None,
         }
     }
 }
 
 impl NodeCommon for XmlNs {
-    fn document(&self) -> *mut XmlDoc {
+    fn document(&self) -> Option<XmlDocPtr> {
         self.context
     }
-    fn set_document(&mut self, doc: *mut XmlDoc) {
+    fn set_document(&mut self, doc: Option<XmlDocPtr>) {
         self.context = doc;
     }
     fn element_type(&self) -> XmlElementType {

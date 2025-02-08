@@ -2263,7 +2263,9 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 ent.owner = 1;
                 while !list.is_null() {
                     (*list).set_parent(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
-                    if (*list).doc != ent.doc.load(Ordering::Relaxed) as _ {
+                    if (*list).doc.map_or(null_mut(), |doc| doc.as_ptr())
+                        != ent.doc.load(Ordering::Relaxed) as _
+                    {
                         (*list)
                             .set_doc(XmlDocPtr::from_raw(ent.doc.load(Ordering::Relaxed)).unwrap());
                     }
@@ -2277,7 +2279,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 ent.owner = 0;
                 while !list.is_null() {
                     (*list).set_parent(NodePtr::from_ptr((*ctxt).node));
-                    (*list).doc = (*ctxt).my_doc.map_or(null_mut(), |doc| doc.as_ptr());
+                    (*list).doc = (*ctxt).my_doc;
                     if (*list).next.is_none() {
                         ent.last.store(list, Ordering::Relaxed);
                     }

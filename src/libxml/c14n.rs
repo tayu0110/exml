@@ -320,8 +320,7 @@ impl<T> XmlC14NCtx<'_, T> {
             let mut ns = (*n).ns_def;
             while let Some(now) = ns {
                 let prefix = now.prefix();
-                let tmp =
-                    (*cur).search_ns(XmlDocPtr::from_raw(cur.doc).unwrap(), prefix.as_deref());
+                let tmp = (*cur).search_ns(cur.doc, prefix.as_deref());
 
                 if tmp == Some(now)
                     && !xml_c14n_is_xml_ns(now)
@@ -964,7 +963,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     Some(prefix.as_str())
                 };
 
-                let ns = cur.search_ns(XmlDocPtr::from_raw(cur.doc).unwrap(), prefix);
+                let ns = cur.search_ns(cur.doc, prefix);
                 if let Some(ns) = ns
                     .filter(|&ns| !xml_c14n_is_xml_ns(ns) && self.is_visible(Some(&*ns), Some(cur)))
                 {
@@ -988,7 +987,7 @@ impl<T> XmlC14NCtx<'_, T> {
             cur.ns
         } else {
             has_visibly_utilized_empty_ns = true;
-            cur.search_ns(XmlDocPtr::from_raw(cur.doc).unwrap(), None)
+            cur.search_ns(cur.doc, None)
         };
         if let Some(ns) = ns.filter(|&ns| !xml_c14n_is_xml_ns(ns)) {
             if visible

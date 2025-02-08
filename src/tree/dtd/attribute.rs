@@ -31,7 +31,7 @@ use crate::{
     libxml::{globals::xml_free, xmlstring::XmlChar},
     tree::{
         InvalidNodePointerCastError, NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType,
-        XmlDoc, XmlDtd, XmlElementType, XmlGenericNodePtr, XmlNode,
+        XmlDocPtr, XmlDtd, XmlElementType, XmlGenericNodePtr, XmlNode,
     },
 };
 
@@ -48,7 +48,7 @@ pub struct XmlAttribute {
     pub(crate) parent: Option<XmlDtdPtr>, /* -> DTD */
     pub(crate) next: Option<NodePtr>,     /* next sibling link  */
     pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,          /* the containing document */
+    pub(crate) doc: Option<XmlDocPtr>,    /* the containing document */
 
     pub(crate) nexth: Option<XmlAttributePtr>, /* next in hash table */
     pub(crate) atype: XmlAttributeType,        /* The attribute type */
@@ -70,7 +70,7 @@ impl Default for XmlAttribute {
             parent: None,
             next: None,
             prev: None,
-            doc: null_mut(),
+            doc: None,
             nexth: None,
             atype: XmlAttributeType::XmlAttributeCDATA,
             def: XmlAttributeDefault::XmlAttributeNone,
@@ -83,10 +83,10 @@ impl Default for XmlAttribute {
 }
 
 impl NodeCommon for XmlAttribute {
-    fn document(&self) -> *mut XmlDoc {
+    fn document(&self) -> Option<XmlDocPtr> {
         self.doc
     }
-    fn set_document(&mut self, doc: *mut XmlDoc) {
+    fn set_document(&mut self, doc: Option<XmlDocPtr>) {
         self.doc = doc;
     }
     fn element_type(&self) -> XmlElementType {

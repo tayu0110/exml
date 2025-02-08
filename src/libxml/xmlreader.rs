@@ -744,10 +744,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadInnerXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_inner_xml(&mut self) -> *mut XmlChar {
-        use crate::{
-            libxml::xmlstring::xml_strndup,
-            tree::{NodeCommon, XmlDocPtr},
-        };
+        use crate::{libxml::xmlstring::xml_strndup, tree::NodeCommon};
 
         let mut node: *mut XmlNode;
         let mut cur_node: *mut XmlNode;
@@ -755,7 +752,7 @@ impl XmlTextReader {
         if self.expand().is_null() {
             return null_mut();
         }
-        let doc = XmlDocPtr::from_raw((*self.node).doc).unwrap();
+        let doc = (*self.node).doc;
         let mut buff = vec![];
         cur_node = (*self.node).children().map_or(null_mut(), |c| c.as_ptr());
         while !cur_node.is_null() {
@@ -783,7 +780,7 @@ impl XmlTextReader {
     pub unsafe fn read_outer_xml(&mut self) -> *mut XmlChar {
         use crate::{
             libxml::xmlstring::xml_strndup,
-            tree::{NodeCommon, XmlDocPtr, XmlDtd, XmlDtdPtr},
+            tree::{NodeCommon, XmlDtd, XmlDtdPtr},
         };
 
         let mut node: *mut XmlNode;
@@ -792,7 +789,7 @@ impl XmlTextReader {
             return null_mut();
         }
         node = self.node;
-        let doc = XmlDocPtr::from_raw((*node).doc).unwrap();
+        let doc = (*node).doc;
         // XXX: Why is the node copied?
         if (*node).element_type() == XmlElementType::XmlDTDNode {
             node = xml_copy_dtd(XmlDtdPtr::from_raw(node as *mut XmlDtd).unwrap().unwrap())
@@ -975,8 +972,7 @@ impl XmlTextReader {
                 .unwrap();
 
             if self.faketext.is_null() {
-                self.faketext =
-                    xml_new_doc_text(XmlDocPtr::from_raw((*self.node).doc).unwrap(), ns.href);
+                self.faketext = xml_new_doc_text((*self.node).doc, ns.href);
             } else {
                 if !(*self.faketext).content.is_null() {
                     xml_free((*self.faketext).content as _);
@@ -1667,9 +1663,7 @@ impl XmlTextReader {
                 }
                 ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
-        } else if let Some(ns) =
-            (*self.node).search_ns(XmlDocPtr::from_raw((*self.node).doc).unwrap(), Some(prefix))
-        {
+        } else if let Some(ns) = (*self.node).search_ns((*self.node).doc, Some(prefix)) {
             let href = ns.href;
             ret = (*self.node).get_ns_prop(
                 localname,
@@ -1772,7 +1766,7 @@ impl XmlTextReader {
         // TODO walk the DTD if present
 
         cur.children
-            .and_then(|c| c.get_string(XmlDocPtr::from_raw((*self.node).doc).unwrap(), 1))
+            .and_then(|c| c.get_string((*self.node).doc, 1))
             .or_else(|| Some("".to_owned()))
     }
 
@@ -2467,7 +2461,7 @@ impl XmlTextReader {
         if self.node.is_null() {
             return None;
         }
-        (*self.node).get_base(null_mut())
+        (*self.node).get_base(None)
     }
 
     /// The local name of the node.
@@ -2824,8 +2818,7 @@ impl XmlTextReader {
                 let attr = XmlAttrPtr::from_raw(node as *mut XmlAttr).unwrap().unwrap();
 
                 return if let Some(parent) = attr.parent {
-                    attr.children
-                        .and_then(|c| c.get_string(XmlDocPtr::from_raw(parent.doc).unwrap(), 1))
+                    attr.children.and_then(|c| c.get_string(parent.doc, 1))
                 } else {
                     attr.children.and_then(|c| c.get_string(None, 1))
                 };
@@ -3938,7 +3931,7 @@ pub unsafe fn xml_text_reader_const_base_uri(reader: &mut XmlTextReader) -> *con
     if reader.node.is_null() {
         return null_mut();
     }
-    let Some(tmp) = (*reader.node).get_base(null_mut()) else {
+    let Some(tmp) = (*reader.node).get_base(None) else {
         return null_mut();
     };
     let tmp = CString::new(tmp).unwrap();
@@ -4291,7 +4284,7 @@ pub unsafe fn xml_text_reader_lookup_namespace(
     }
 
     let Some(ns) = (*reader.node).search_ns(
-        XmlDocPtr::from_raw((*reader.node).doc).unwrap(),
+        (*reader.node).doc,
         (!prefix.is_null())
             .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
             .as_deref(),
@@ -4859,8 +4852,6 @@ unsafe fn xml_text_reader_locator(
     file: *mut Option<String>,
     line: *mut u64,
 ) -> i32 {
-    use crate::tree::XmlDocPtr;
-
     if ctx.is_null() || (file.is_null() && line.is_null()) {
         return -1;
     }
@@ -4895,8 +4886,8 @@ unsafe fn xml_text_reader_locator(
             }
         }
         if !file.is_null() {
-            if let Some(url) = XmlDocPtr::from_raw((*(*reader).node).doc)
-                .unwrap()
+            if let Some(url) = (*(*reader).node)
+                .doc
                 .as_deref()
                 .and_then(|doc| doc.url.as_deref())
             {
@@ -5524,7 +5515,7 @@ pub unsafe fn xml_text_reader_locator_base_uri(locator: XmlTextReaderLocatorPtr)
     }
     if !(*ctx).node.is_null() {
         let tmp = (*(*ctx).node)
-            .get_base(null_mut())
+            .get_base(None)
             .map(|c| CString::new(c).unwrap());
         ret = xml_strdup(tmp.as_ref().map_or(null_mut(), |t| t.as_ptr() as *const u8));
     } else {
