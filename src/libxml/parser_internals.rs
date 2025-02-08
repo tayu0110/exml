@@ -1936,7 +1936,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         last = my_doc.last.map_or(null_mut(), |l| l.as_ptr());
         my_doc
     } else {
-        let Some(mut new) = XmlDocPtr::from_raw(xml_new_doc(Some("1.0"))).unwrap() else {
+        let Some(mut new) = xml_new_doc(Some("1.0")) else {
             (*oldctxt).sax = (*ctxt).sax.take();
             (*ctxt).sax = oldsax;
             (*ctxt).dict = null_mut();
@@ -3373,7 +3373,7 @@ pub unsafe fn xml_parse_external_subset(
     let my_doc = if let Some(my_doc) = (*ctxt).my_doc {
         my_doc
     } else {
-        (*ctxt).my_doc = XmlDocPtr::from_raw(xml_new_doc(Some("1.0"))).unwrap();
+        (*ctxt).my_doc = xml_new_doc(Some("1.0"));
         let Some(mut my_doc) = (*ctxt).my_doc else {
             xml_err_memory(ctxt, Some("New Doc failed"));
             return;

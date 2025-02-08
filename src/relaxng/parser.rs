@@ -272,7 +272,7 @@ pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlRelaxNGParse
     // if doc.is_null() {
     //     return null_mut();
     // }
-    let Some(copy) = XmlDocPtr::from_raw(xml_copy_doc(doc, 1)).unwrap() else {
+    let Some(copy) = xml_copy_doc(doc, 1) else {
         return null_mut();
     };
 

@@ -154,7 +154,7 @@ impl<'a> XmlTextWriter<'a> {
             out,
             ichar: Cow::Borrowed(" "),
             qchar: b'"',
-            doc: XmlDocPtr::from_raw(xml_new_doc(None)).unwrap(),
+            doc: xml_new_doc(None),
             no_doc_free: 0,
             nodes: VecDeque::new(),
             ..Default::default()
@@ -237,7 +237,7 @@ impl<'a> XmlTextWriter<'a> {
         // For some reason this seems to completely break if node names are interned.
         (*ctxt).dict_names = 0;
 
-        (*ctxt).my_doc = XmlDocPtr::from_raw(xml_new_doc(Some(XML_DEFAULT_VERSION))).unwrap();
+        (*ctxt).my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
         let Some(mut my_doc) = (*ctxt).my_doc else {
             xml_free_parser_ctxt(ctxt);
             xml_writer_err_msg(
@@ -2133,7 +2133,7 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
         }
     } else {
         let doc = (*ctxt).my_doc.or_else(|| {
-            (*ctxt).my_doc = XmlDocPtr::from_raw(xml_new_doc((*ctxt).version.as_deref())).unwrap();
+            (*ctxt).my_doc = xml_new_doc((*ctxt).version.as_deref());
             (*ctxt).my_doc
         });
         if let Some(mut doc) = doc {

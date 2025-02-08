@@ -1110,7 +1110,7 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
             return;
         }
     } else {
-        let doc = XmlDocPtr::from_raw(xml_new_doc((*ctxt).version.as_deref())).unwrap();
+        let doc = xml_new_doc((*ctxt).version.as_deref());
         (*ctxt).my_doc = doc;
         if let Some(mut doc) = doc {
             doc.properties = 0;

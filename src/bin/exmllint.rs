@@ -2489,7 +2489,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         #[cfg(feature = "libxml_tree")]
         {
             if CMD_ARGS.auto {
-                doc = xml_new_doc(Some("1.0"));
+                doc = xml_new_doc(Some("1.0")).map_or(null_mut(), |doc| doc.into());
                 let n =
                     xml_new_doc_node(XmlDocPtr::from_raw(doc).unwrap(), None, "info", null_mut());
                 (*n).set_content(c"abc".as_ptr() as _);
@@ -2834,7 +2834,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if CMD_ARGS.timing {
             start_timer();
         }
-        doc = xml_copy_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap(), 1);
+        doc = xml_copy_doc(XmlDocPtr::from_raw(doc).unwrap().unwrap(), 1)
+            .map_or(null_mut(), |doc| doc.into());
         if CMD_ARGS.timing {
             end_timer!("Copying");
         }

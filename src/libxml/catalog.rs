@@ -1935,13 +1935,10 @@ impl XmlCatalogEntry {
     #[doc(alias = "xmlDumpXMLCatalog")]
     #[cfg(feature = "libxml_output")]
     unsafe fn dump_xml_catalog<'a>(&self, out: impl Write + 'a) -> i32 {
-        use crate::{
-            io::XmlOutputBuffer,
-            tree::{NodeCommon, XmlDocPtr},
-        };
+        use crate::{io::XmlOutputBuffer, tree::NodeCommon};
 
         // Rebuild a catalog
-        let Some(mut doc) = XmlDocPtr::from_raw(xml_new_doc(None)).unwrap() else {
+        let Some(mut doc) = xml_new_doc(None) else {
             return -1;
         };
         let dtd = xml_new_dtd(

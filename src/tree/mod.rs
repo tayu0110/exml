@@ -1052,7 +1052,7 @@ pub(crate) unsafe fn xml_static_copy_node(
             #[cfg(feature = "libxml_tree")]
             {
                 return xml_copy_doc(XmlDocPtr::from_raw(node as _).unwrap().unwrap(), extended)
-                    as _;
+                    .map_or(null_mut(), |doc| doc.as_ptr()) as _;
             }
         }
         XmlElementType::XmlDocumentTypeNode

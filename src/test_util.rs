@@ -1485,7 +1485,7 @@ pub(crate) fn des_xml_output_buffer_ptr(_no: i32, _val: XmlOutputBuffer, _nr: i3
 
 pub(crate) unsafe fn gen_xml_doc_ptr(no: i32, _nr: i32) -> *mut XmlDoc {
     if no == 0 {
-        return xml_new_doc(Some("1.0"));
+        return xml_new_doc(Some("1.0")).map_or(null_mut(), |doc| doc.as_ptr());
     }
     if no == 1 {
         return xml_read_memory("<foo/>".as_bytes().to_vec(), Some("test"), None, 0)

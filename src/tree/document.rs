@@ -922,7 +922,7 @@ impl From<XmlDocPtr> for *mut XmlDoc {
 ///
 /// Returns a new document
 #[doc(alias = "xmlNewDoc")]
-pub unsafe fn xml_new_doc(version: Option<&str>) -> *mut XmlDoc {
+pub unsafe fn xml_new_doc(version: Option<&str>) -> Option<XmlDocPtr> {
     let version = version.unwrap_or("1.0");
 
     // Allocate a new document and fill the fields.
@@ -940,7 +940,7 @@ pub unsafe fn xml_new_doc(version: Option<&str>) -> *mut XmlDoc {
         ..Default::default()
     }) else {
         xml_tree_err_memory("building doc");
-        return null_mut();
+        return None;
     };
     cur.doc = cur.as_ptr();
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -948,7 +948,7 @@ pub unsafe fn xml_new_doc(version: Option<&str>) -> *mut XmlDoc {
     {
         xml_register_node_default_value(cur.as_ptr() as _);
     }
-    cur.as_ptr()
+    Some(cur)
 }
 
 /// Do a copy of the document info. If recursive, the content tree will
@@ -957,64 +957,59 @@ pub unsafe fn xml_new_doc(version: Option<&str>) -> *mut XmlDoc {
 /// Returns: a new #xmlDocPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyDoc")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> *mut XmlDoc {
+pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> Option<XmlDocPtr> {
     use crate::{
         libxml::globals::xml_mem_strdup,
         tree::{xml_copy_dtd, xml_copy_namespace_list, xml_static_copy_node_list},
     };
 
-    let ret: *mut XmlDoc = xml_new_doc(doc.version.as_deref());
-    if ret.is_null() {
-        return null_mut();
-    }
-    (*ret).typ = doc.typ;
+    let mut ret = xml_new_doc(doc.version.as_deref())?;
+    ret.typ = doc.typ;
     if !doc.name.is_null() {
-        (*ret).name = xml_mem_strdup(doc.name as _) as _;
+        ret.name = xml_mem_strdup(doc.name as _) as _;
     }
-    (*ret).encoding = doc.encoding.clone();
+    ret.encoding = doc.encoding.clone();
     if let Some(url) = doc.url.as_deref() {
-        (*ret).url = Some(url.to_owned());
+        ret.url = Some(url.to_owned());
     }
-    (*ret).charset = doc.charset;
-    (*ret).compression = doc.compression;
-    (*ret).standalone = doc.standalone;
+    ret.charset = doc.charset;
+    ret.compression = doc.compression;
+    ret.standalone = doc.standalone;
     if recursive == 0 {
-        return ret;
+        return Some(ret);
     }
 
-    (*ret).last = None;
-    (*ret).children = None;
+    ret.last = None;
+    ret.children = None;
     #[cfg(feature = "libxml_tree")]
-    {
-        if let Some(doc_int_subset) = doc.int_subset {
-            (*ret).int_subset = xml_copy_dtd(doc_int_subset);
-            let Some(mut ret_int_subset) = (*ret).int_subset else {
-                xml_free_doc(XmlDocPtr::from_raw(ret).unwrap().unwrap());
-                return null_mut();
-            };
-            (*(ret_int_subset.as_ptr() as *mut XmlNode)).set_doc(XmlDocPtr::from_raw(ret).unwrap());
-            ret_int_subset.parent = ret;
-        }
+    if let Some(doc_int_subset) = doc.int_subset {
+        ret.int_subset = xml_copy_dtd(doc_int_subset);
+        let Some(mut ret_int_subset) = ret.int_subset else {
+            xml_free_doc(ret);
+            return None;
+        };
+        (*(ret_int_subset.as_ptr() as *mut XmlNode)).set_doc(Some(ret));
+        ret_int_subset.parent = ret.as_ptr();
     }
     if doc.old_ns.is_some() {
-        (*ret).old_ns = xml_copy_namespace_list(doc.old_ns);
+        ret.old_ns = xml_copy_namespace_list(doc.old_ns);
     }
     if let Some(children) = doc.children {
-        (*ret).children = NodePtr::from_ptr(xml_static_copy_node_list(
+        ret.children = NodePtr::from_ptr(xml_static_copy_node_list(
             children.as_ptr(),
-            XmlDocPtr::from_raw(ret).unwrap(),
-            ret as _,
+            Some(ret),
+            ret.as_ptr() as _,
         ));
-        (*ret).last = None;
-        let mut tmp = (*ret).children;
+        ret.last = None;
+        let mut tmp = ret.children;
         while let Some(now) = tmp {
             if now.next.is_none() {
-                (*ret).last = Some(now);
+                ret.last = Some(now);
             }
             tmp = now.next;
         }
     }
-    ret
+    Some(ret)
 }
 
 /// Free up all the structures used by a document, tree included.

@@ -120,10 +120,10 @@ use crate::{
     tree::{
         xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
-        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
-        XmlDocPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
-        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
-        XmlNsPtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
+        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
+        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNsPtr,
+        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::{canonic_path, XmlURI},
@@ -1837,7 +1837,7 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
 
     // let's parse that entity knowing it's an external subset.
     (*ctxt).in_subset = 2;
-    (*ctxt).my_doc = XmlDocPtr::from_raw(xml_new_doc(Some("1.0"))).unwrap();
+    (*ctxt).my_doc = xml_new_doc(Some("1.0"));
     let Some(mut my_doc) = (*ctxt).my_doc else {
         xml_err_memory(ctxt, Some("New Doc failed"));
         xml_free_parser_ctxt(ctxt);
@@ -1932,7 +1932,7 @@ pub unsafe fn xml_io_parse_dtd(
 
     // let's parse that entity knowing it's an external subset.
     (*ctxt).in_subset = 2;
-    (*ctxt).my_doc = XmlDocPtr::from_raw(xml_new_doc(Some("1.0"))).unwrap();
+    (*ctxt).my_doc = xml_new_doc(Some("1.0"));
     let Some(mut my_doc) = (*ctxt).my_doc else {
         xml_err_memory(ctxt, Some("New Doc failed"));
         return null_mut();
@@ -2269,46 +2269,40 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             (*ctxt).user_data = user_data;
         }
     }
-    let new_doc: *mut XmlDoc = xml_new_doc(Some("1.0"));
-    if new_doc.is_null() {
+    let Some(mut new_doc) = xml_new_doc(Some("1.0")) else {
         xml_free_parser_ctxt(ctxt);
         return -1;
-    }
-    (*new_doc).properties = XmlDocProperties::XmlDocInternal as i32;
+    };
+    new_doc.properties = XmlDocProperties::XmlDocInternal as i32;
     (*ctxt).ctxt_use_options_internal(XmlParserOption::XmlParseNoDict as i32, None);
     // doc.is_null() is only supported for historic reasons
     if let Some(doc) = doc {
-        (*new_doc).int_subset = doc.int_subset;
-        (*new_doc).ext_subset = doc.ext_subset;
+        new_doc.int_subset = doc.int_subset;
+        new_doc.ext_subset = doc.ext_subset;
     }
-    let new_root: *mut XmlNode = xml_new_doc_node(
-        XmlDocPtr::from_raw(new_doc).unwrap(),
-        None,
-        "pseudoroot",
-        null(),
-    );
+    let new_root: *mut XmlNode = xml_new_doc_node(Some(new_doc), None, "pseudoroot", null());
     if new_root.is_null() {
         if replaced {
             (*ctxt).sax = oldsax;
         }
         xml_free_parser_ctxt(ctxt);
-        (*new_doc).int_subset = None;
-        (*new_doc).ext_subset = None;
-        xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
+        new_doc.int_subset = None;
+        new_doc.ext_subset = None;
+        xml_free_doc(new_doc);
         return -1;
     }
-    (*new_doc).add_child(new_root);
+    new_doc.add_child(new_root);
     (*ctxt).node_push(new_root);
     // doc.is_null() is only supported for historic reasons
     if let Some(doc) = doc {
-        (*ctxt).my_doc = XmlDocPtr::from_raw(new_doc).unwrap();
-        (*new_doc).children.unwrap().doc = doc.as_ptr();
+        (*ctxt).my_doc = Some(new_doc);
+        new_doc.children.unwrap().doc = doc.as_ptr();
         // Ensure that doc has XML spec namespace
         (*(doc.as_ptr() as *mut XmlNode))
             .search_ns_by_href(Some(doc), XML_XML_NAMESPACE.to_str().unwrap());
-        (*new_doc).old_ns = doc.old_ns;
+        new_doc.old_ns = doc.old_ns;
     } else {
-        (*ctxt).my_doc = XmlDocPtr::from_raw(new_doc).unwrap();
+        (*ctxt).my_doc = Some(new_doc);
     }
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
     (*ctxt).input_id = 2;
@@ -2331,7 +2325,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if NodePtr::from_ptr((*ctxt).node) != (*new_doc).children {
+    if NodePtr::from_ptr((*ctxt).node) != new_doc.children {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
     }
 
@@ -2348,7 +2342,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     if !lst.is_null() && (ret == 0 || recover == 1) {
         // Return the newly created nodeset after unlinking it from
         // they pseudo parent.
-        let mut cur = (*new_doc)
+        let mut cur = new_doc
             .children
             .unwrap()
             .children()
@@ -2359,18 +2353,18 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             (*cur).set_parent(None);
             cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
-        (*new_doc).children.unwrap().set_children(None);
+        new_doc.children.unwrap().set_children(None);
     }
 
     if replaced {
         (*ctxt).sax = oldsax;
     }
     xml_free_parser_ctxt(ctxt);
-    (*new_doc).int_subset = None;
-    (*new_doc).ext_subset = None;
+    new_doc.int_subset = None;
+    new_doc.ext_subset = None;
     // This leaks the namespace list if doc.is_null()
-    (*new_doc).old_ns = None;
-    xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
+    new_doc.old_ns = None;
+    xml_free_doc(new_doc);
 
     ret
 }
@@ -2428,33 +2422,27 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     }
     (*ctxt).detect_sax2();
 
-    let new_doc: *mut XmlDoc = xml_new_doc(Some("1.0"));
-    if new_doc.is_null() {
+    let Some(mut new_doc) = xml_new_doc(Some("1.0")) else {
         let sax = (*ctxt).sax.take();
         xml_free_parser_ctxt(ctxt);
         return (sax, XmlParserErrors::XmlErrInternalError);
-    }
-    (*new_doc).properties = XmlDocProperties::XmlDocInternal as i32;
-    (*new_doc).int_subset = doc.int_subset;
-    (*new_doc).ext_subset = doc.ext_subset;
+    };
+    new_doc.properties = XmlDocProperties::XmlDocInternal as i32;
+    new_doc.int_subset = doc.int_subset;
+    new_doc.ext_subset = doc.ext_subset;
     if let Some(url) = doc.url.as_deref() {
-        (*new_doc).url = Some(url.to_owned());
+        new_doc.url = Some(url.to_owned());
     }
-    let new_root: *mut XmlNode = xml_new_doc_node(
-        XmlDocPtr::from_raw(new_doc).unwrap(),
-        None,
-        "pseudoroot",
-        null(),
-    );
+    let new_root: *mut XmlNode = xml_new_doc_node(Some(new_doc), None, "pseudoroot", null());
     if new_root.is_null() {
         let sax = (*ctxt).sax.take();
-        (*new_doc).int_subset = None;
-        (*new_doc).ext_subset = None;
-        xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
+        new_doc.int_subset = None;
+        new_doc.ext_subset = None;
+        xml_free_doc(new_doc);
         return (sax, XmlParserErrors::XmlErrInternalError);
     }
-    (*new_doc).add_child(new_root);
-    (*ctxt).node_push((*new_doc).children.map_or(null_mut(), |c| c.as_ptr()));
+    new_doc.add_child(new_root);
+    (*ctxt).node_push(new_doc.children.map_or(null_mut(), |c| c.as_ptr()));
     (*ctxt).my_doc = Some(doc);
     (*new_root).doc = doc.as_ptr();
 
@@ -2533,7 +2521,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if NodePtr::from_ptr((*ctxt).node) != (*new_doc).children {
+    if NodePtr::from_ptr((*ctxt).node) != new_doc.children {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
     }
 
@@ -2547,7 +2535,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     } else {
         if !list.is_null() {
             // Return the newly created nodeset after unlinking it from they pseudo parent.
-            let mut cur = (*new_doc)
+            let mut cur = new_doc
                 .children()
                 .unwrap()
                 .children()
@@ -2557,7 +2545,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
                 (*cur).set_parent(None);
                 cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
             }
-            (*new_doc).children.unwrap().set_children(None);
+            new_doc.children.unwrap().set_children(None);
         }
         ret = XmlParserErrors::XmlErrOK;
     }
@@ -2586,9 +2574,9 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     }
     let sax = (*ctxt).sax.take();
     xml_free_parser_ctxt(ctxt);
-    (*new_doc).int_subset = None;
-    (*new_doc).ext_subset = None;
-    xml_free_doc(XmlDocPtr::from_raw(new_doc).unwrap().unwrap());
+    new_doc.int_subset = None;
+    new_doc.ext_subset = None;
+    xml_free_doc(new_doc);
 
     (sax, ret)
 }
@@ -7933,8 +7921,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 let mut my_doc = if let Some(my_doc) = (*ctxt).my_doc {
                     my_doc
                 } else {
-                    (*ctxt).my_doc =
-                        XmlDocPtr::from_raw(xml_new_doc(Some(SAX_COMPAT_MODE))).unwrap();
+                    (*ctxt).my_doc = xml_new_doc(Some(SAX_COMPAT_MODE));
                     let Some(mut my_doc) = (*ctxt).my_doc else {
                         xml_err_memory(ctxt, Some("New Doc failed"));
                         // goto done;
@@ -8063,8 +8050,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     let mut my_doc = if let Some(my_doc) = (*ctxt).my_doc {
                         my_doc
                     } else {
-                        (*ctxt).my_doc =
-                            XmlDocPtr::from_raw(xml_new_doc(Some(SAX_COMPAT_MODE))).unwrap();
+                        (*ctxt).my_doc = xml_new_doc(Some(SAX_COMPAT_MODE));
                         let Some(mut my_doc) = (*ctxt).my_doc else {
                             xml_err_memory(ctxt, Some("New Doc failed"));
                             // goto done;
