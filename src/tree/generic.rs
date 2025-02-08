@@ -445,7 +445,7 @@ pub trait NodeCommon {
     /// Returns the first element child or NULL if not available.
     #[doc(alias = "xmlFirstElementChild")]
     #[cfg(feature = "libxml_tree")]
-    fn first_element_child(&self) -> *mut XmlNode {
+    fn first_element_child(&self) -> Option<XmlNodePtr> {
         let mut next = match self.element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlEntityNode
@@ -453,16 +453,18 @@ pub trait NodeCommon {
             | XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlHTMLDocumentNode => self.children(),
             _ => {
-                return null_mut();
+                return None;
             }
         };
         while let Some(cur) = next {
             if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
-                return cur.as_ptr();
+                unsafe {
+                    return XmlNodePtr::from_raw(cur.as_ptr()).unwrap();
+                }
             }
             next = cur.next();
         }
-        null_mut()
+        None
     }
 
     /// Finds the last child node of that element which is a Element node.
@@ -474,7 +476,7 @@ pub trait NodeCommon {
     /// Returns the last element child or NULL if not available.
     #[doc(alias = "xmlLastElementChild")]
     #[cfg(feature = "libxml_tree")]
-    fn last_element_child(&self) -> *mut XmlNode {
+    fn last_element_child(&self) -> Option<XmlNodePtr> {
         let mut cur = match self.element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlEntityNode
@@ -482,16 +484,18 @@ pub trait NodeCommon {
             | XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlHTMLDocumentNode => self.last(),
             _ => {
-                return null_mut();
+                return None;
             }
         };
         while let Some(now) = cur {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                return now.as_ptr();
+                unsafe {
+                    return XmlNodePtr::from_raw(now.as_ptr()).unwrap();
+                }
             }
             cur = now.prev();
         }
-        null_mut()
+        None
     }
 
     /// Finds the current number of child nodes of that element which are element nodes.
@@ -534,7 +538,7 @@ pub trait NodeCommon {
     /// Returns the next element sibling or NULL if not available
     #[doc(alias = "xmlNextElementSibling")]
     #[cfg(feature = "libxml_tree")]
-    fn next_element_sibling(&self) -> *mut XmlNode {
+    fn next_element_sibling(&self) -> Option<XmlNodePtr> {
         let mut cur = match self.element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlTextNode
@@ -547,16 +551,18 @@ pub trait NodeCommon {
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd => self.next(),
             _ => {
-                return null_mut();
+                return None;
             }
         };
         while let Some(now) = cur {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                return now.as_ptr();
+                unsafe {
+                    return XmlNodePtr::from_raw(now.as_ptr()).unwrap();
+                }
             }
             cur = now.next();
         }
-        null_mut()
+        None
     }
 
     /// Finds the first closest previous sibling of the node which is an element node.
@@ -568,7 +574,7 @@ pub trait NodeCommon {
     /// Returns the previous element sibling or null_mut() if not available
     #[doc(alias = "xmlPreviousElementSibling")]
     #[cfg(feature = "libxml_tree")]
-    fn previous_element_sibling(&self) -> *mut XmlNode {
+    fn previous_element_sibling(&self) -> Option<XmlNodePtr> {
         let mut node = match self.element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlTextNode
@@ -580,16 +586,18 @@ pub trait NodeCommon {
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd => self.prev(),
             _ => {
-                return null_mut();
+                return None;
             }
         };
         while let Some(now) = node {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                return now.as_ptr();
+                unsafe {
+                    return XmlNodePtr::from_raw(now.as_ptr()).unwrap();
+                }
             }
             node = now.prev();
         }
-        null_mut()
+        None
     }
 
     /// Unlink a node from it's current context, the node is not freed.  
