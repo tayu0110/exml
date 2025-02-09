@@ -686,6 +686,7 @@ pub trait NodeCommon {
     }
 }
 
+#[derive(PartialEq, Eq)]
 pub struct XmlGenericNodePtr(pub(super) NonNull<dyn NodeCommon>);
 
 impl XmlGenericNodePtr {

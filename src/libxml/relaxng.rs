@@ -68,8 +68,8 @@ use crate::{
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node, xml_new_doc_text,
-        xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode,
-        XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr, XmlElementType,
+        XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
     uri::{build_uri, escape_url_except, XmlURI},
 };
@@ -1533,13 +1533,12 @@ unsafe fn xml_relaxng_load_include(
 /// Cleanup the subtree from unwanted nodes for parsing, resolve
 /// Include and externalRef lookups.
 #[doc(alias = "xmlRelaxNGCleanupTree")]
-unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut XmlNode) {
-    let mut cur: *mut XmlNode;
+unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodePtr) {
     let mut delete: *mut XmlNode;
 
     delete = null_mut();
-    cur = root;
-    'main: while !cur.is_null() {
+    let mut cur: Option<XmlGenericNodePtr> = Some(root.into());
+    'main: while let Some(now) = cur {
         if !delete.is_null() {
             (*delete).unlink();
             xml_free_node(delete);
@@ -1547,371 +1546,391 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
         }
 
         'skip_children: {
-            if (*cur).element_type() == XmlElementType::XmlElementNode {
-                // Simplification 4.1. Annotations
-                if (*cur)
-                    .ns
-                    .map_or(true, |ns| ns.href().as_deref() != Some(XML_RELAXNG_NS))
-                {
-                    if let Some(parent) = (*cur).parent().filter(|p| {
-                        p.element_type() == XmlElementType::XmlElementNode
-                            && (p.name().as_deref() == Some("name")
-                                || p.name().as_deref() == Some("value")
-                                || p.name().as_deref() == Some("param"))
-                    }) {
-                        xml_rng_perr!(
-                            ctxt,
-                            cur,
-                            XmlParserErrors::XmlRngpForeignElement,
-                            "element {} doesn't allow foreign elements\n",
-                            parent.name().unwrap().into_owned()
-                        );
-                    }
-                    delete = cur;
-                    break 'skip_children;
-                } else {
-                    xml_relaxng_cleanup_attributes(ctxt, cur);
-                    if (*cur).name().as_deref() == Some("externalRef") {
-                        let mut tmp: *mut XmlNode;
-
-                        let mut ns = (*cur).get_prop("ns");
-                        if ns.is_none() {
-                            tmp = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-                            while !tmp.is_null()
-                                && (*tmp).element_type() == XmlElementType::XmlElementNode
-                            {
-                                ns = (*tmp).get_prop("ns");
-                                if ns.is_some() {
-                                    break;
-                                }
-                                tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
-                            }
-                        }
-                        let Some(href) = (*cur).get_prop("href") else {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpMissingHref,
-                                "xmlRelaxNGParse: externalRef has no href attribute\n"
-                            );
-                            delete = cur;
-                            break 'skip_children;
-                        };
-                        let Some(uri) = XmlURI::parse(&href) else {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpHrefError,
-                                "Incorrect URI for externalRef {}\n",
-                                href
-                            );
-                            delete = cur;
-                            break 'skip_children;
-                        };
-                        if uri.fragment.is_some() {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpHrefError,
-                                "Fragment forbidden in URI for externalRef {}\n",
-                                href
-                            );
-                            delete = cur;
-                            break 'skip_children;
-                        }
-                        let Some(url) = (*cur)
-                            .get_base((*cur).doc)
-                            .and_then(|base| build_uri(&href, &base))
-                        else {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpHrefError,
-                                "Failed to compute URL for externalRef {}\n",
-                                href
-                            );
-                            delete = cur;
-                            break 'skip_children;
-                        };
-                        let docu: XmlRelaxNGDocumentPtr =
-                            xml_relaxng_load_external_ref(ctxt, &url, ns.as_deref());
-                        if docu.is_null() {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpExternalRefFailure,
-                                "Failed to load externalRef {}\n",
-                                url
-                            );
-                            delete = cur;
-                            break 'skip_children;
-                        }
-                        (*cur).psvi = docu as _;
-                    } else if (*cur).name().as_deref() == Some("include") {
-                        let mut tmp: *mut XmlNode;
-
-                        let Some(href) = (*cur).get_prop("href") else {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpMissingHref,
-                                "xmlRelaxNGParse: include has no href attribute\n"
-                            );
-                            delete = cur;
-                            break 'skip_children;
-                        };
-
-                        let Some(url) = (*cur)
-                            .get_base((*cur).doc)
-                            .and_then(|base| build_uri(&href, &base))
-                        else {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpHrefError,
-                                "Failed to compute URL for include {}\n",
-                                href
-                            );
-                            delete = cur;
-                            break 'skip_children;
-                        };
-                        let mut ns = (*cur).get_prop("ns");
-                        if ns.is_none() {
-                            tmp = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-                            while !tmp.is_null()
-                                && (*tmp).element_type() == XmlElementType::XmlElementNode
-                            {
-                                ns = (*tmp).get_prop("ns");
-                                if ns.is_some() {
-                                    break;
-                                }
-                                tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
-                            }
-                        }
-                        let incl: XmlRelaxNGIncludePtr =
-                            xml_relaxng_load_include(ctxt, &url, cur, ns.as_deref());
-                        if incl.is_null() {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpIncludeFailure,
-                                "Failed to load include {}\n",
-                                url
-                            );
-                            delete = cur;
-                            break 'skip_children;
-                        }
-                        (*cur).psvi = incl as _;
-                    } else if (*cur).name().as_deref() == Some("element")
-                        || (*cur).name().as_deref() == Some("attribute")
+            match XmlNodePtr::try_from(now) {
+                Ok(mut now) if now.element_type() == XmlElementType::XmlElementNode => {
+                    // Simplification 4.1. Annotations
+                    if now
+                        .ns
+                        .map_or(true, |ns| ns.href().as_deref() != Some(XML_RELAXNG_NS))
                     {
-                        // Simplification 4.8. name attribute of element
-                        // and attribute elements
-                        if let Some(name) = (*cur).get_prop("name") {
-                            let cname = CString::new(name.as_str()).unwrap();
-                            let text = if let Some(mut children) = (*cur).children() {
-                                xml_new_doc_node((*cur).doc, (*cur).ns, "name", null_mut()).map(
-                                    |mut node| {
-                                        children.add_prev_sibling(node.as_ptr());
-                                        let text =
-                                            xml_new_doc_text(node.doc, cname.as_ptr() as *const u8);
-                                        node.add_child(
-                                            text.map_or(null_mut(), |node| node.as_ptr()),
-                                        );
-                                        node
-                                    },
-                                )
-                            } else {
-                                xml_new_child(cur, (*cur).ns, "name", cname.as_ptr() as *const u8)
-                            };
-                            if text.is_none() {
+                        if let Some(parent) = now.parent().filter(|p| {
+                            p.element_type() == XmlElementType::XmlElementNode
+                                && (p.name().as_deref() == Some("name")
+                                    || p.name().as_deref() == Some("value")
+                                    || p.name().as_deref() == Some("param"))
+                        }) {
+                            xml_rng_perr!(
+                                ctxt,
+                                now.as_ptr(),
+                                XmlParserErrors::XmlRngpForeignElement,
+                                "element {} doesn't allow foreign elements\n",
+                                parent.name().unwrap().into_owned()
+                            );
+                        }
+                        delete = now.as_ptr();
+                        break 'skip_children;
+                    } else {
+                        xml_relaxng_cleanup_attributes(ctxt, now.as_ptr());
+                        if now.name().as_deref() == Some("externalRef") {
+                            let mut tmp: *mut XmlNode;
+
+                            let mut ns = now.get_prop("ns");
+                            if ns.is_none() {
+                                tmp = now.parent().map_or(null_mut(), |p| p.as_ptr());
+                                while !tmp.is_null()
+                                    && (*tmp).element_type() == XmlElementType::XmlElementNode
+                                {
+                                    ns = (*tmp).get_prop("ns");
+                                    if ns.is_some() {
+                                        break;
+                                    }
+                                    tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
+                                }
+                            }
+                            let Some(href) = now.get_prop("href") else {
                                 xml_rng_perr!(
                                     ctxt,
-                                    cur,
-                                    XmlParserErrors::XmlRngpCreateFailure,
-                                    "Failed to create a name {} element\n",
-                                    name
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpMissingHref,
+                                    "xmlRelaxNGParse: externalRef has no href attribute\n"
+                                );
+                                delete = now.as_ptr();
+                                break 'skip_children;
+                            };
+                            let Some(uri) = XmlURI::parse(&href) else {
+                                xml_rng_perr!(
+                                    ctxt,
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpHrefError,
+                                    "Incorrect URI for externalRef {}\n",
+                                    href
+                                );
+                                delete = now.as_ptr();
+                                break 'skip_children;
+                            };
+                            if uri.fragment.is_some() {
+                                xml_rng_perr!(
+                                    ctxt,
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpHrefError,
+                                    "Fragment forbidden in URI for externalRef {}\n",
+                                    href
+                                );
+                                delete = now.as_ptr();
+                                break 'skip_children;
+                            }
+                            let Some(url) = now
+                                .get_base(now.doc)
+                                .and_then(|base| build_uri(&href, &base))
+                            else {
+                                xml_rng_perr!(
+                                    ctxt,
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpHrefError,
+                                    "Failed to compute URL for externalRef {}\n",
+                                    href
+                                );
+                                delete = now.as_ptr();
+                                break 'skip_children;
+                            };
+                            let docu: XmlRelaxNGDocumentPtr =
+                                xml_relaxng_load_external_ref(ctxt, &url, ns.as_deref());
+                            if docu.is_null() {
+                                xml_rng_perr!(
+                                    ctxt,
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpExternalRefFailure,
+                                    "Failed to load externalRef {}\n",
+                                    url
+                                );
+                                delete = now.as_ptr();
+                                break 'skip_children;
+                            }
+                            now.psvi = docu as _;
+                        } else if now.name().as_deref() == Some("include") {
+                            let mut tmp: *mut XmlNode;
+
+                            let Some(href) = now.get_prop("href") else {
+                                xml_rng_perr!(
+                                    ctxt,
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpMissingHref,
+                                    "xmlRelaxNGParse: include has no href attribute\n"
+                                );
+                                delete = now.as_ptr();
+                                break 'skip_children;
+                            };
+
+                            let Some(url) = now
+                                .get_base(now.doc)
+                                .and_then(|base| build_uri(&href, &base))
+                            else {
+                                xml_rng_perr!(
+                                    ctxt,
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpHrefError,
+                                    "Failed to compute URL for include {}\n",
+                                    href
+                                );
+                                delete = now.as_ptr();
+                                break 'skip_children;
+                            };
+                            let mut ns = now.get_prop("ns");
+                            if ns.is_none() {
+                                tmp = now.parent().map_or(null_mut(), |p| p.as_ptr());
+                                while !tmp.is_null()
+                                    && (*tmp).element_type() == XmlElementType::XmlElementNode
+                                {
+                                    ns = (*tmp).get_prop("ns");
+                                    if ns.is_some() {
+                                        break;
+                                    }
+                                    tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
+                                }
+                            }
+                            let incl: XmlRelaxNGIncludePtr =
+                                xml_relaxng_load_include(ctxt, &url, now.as_ptr(), ns.as_deref());
+                            if incl.is_null() {
+                                xml_rng_perr!(
+                                    ctxt,
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpIncludeFailure,
+                                    "Failed to load include {}\n",
+                                    url
+                                );
+                                delete = now.as_ptr();
+                                break 'skip_children;
+                            }
+                            now.psvi = incl as _;
+                        } else if now.name().as_deref() == Some("element")
+                            || now.name().as_deref() == Some("attribute")
+                        {
+                            // Simplification 4.8. name attribute of element
+                            // and attribute elements
+                            if let Some(name) = now.get_prop("name") {
+                                let cname = CString::new(name.as_str()).unwrap();
+                                let text = if let Some(mut children) = now.children() {
+                                    xml_new_doc_node(now.doc, now.ns, "name", null_mut()).map(
+                                        |mut node| {
+                                            children.add_prev_sibling(node.as_ptr());
+                                            let text = xml_new_doc_text(
+                                                node.doc,
+                                                cname.as_ptr() as *const u8,
+                                            );
+                                            node.add_child(
+                                                text.map_or(null_mut(), |node| node.as_ptr()),
+                                            );
+                                            node
+                                        },
+                                    )
+                                } else {
+                                    xml_new_child(
+                                        now.as_ptr(),
+                                        now.ns,
+                                        "name",
+                                        cname.as_ptr() as *const u8,
+                                    )
+                                };
+                                if text.is_none() {
+                                    xml_rng_perr!(
+                                        ctxt,
+                                        now.as_ptr(),
+                                        XmlParserErrors::XmlRngpCreateFailure,
+                                        "Failed to create a name {} element\n",
+                                        name
+                                    );
+                                }
+                                now.unset_prop("name");
+                                if let Some(ns) = now.get_prop("ns") {
+                                    if let Some(mut text) = text {
+                                        text.set_prop("ns", Some(ns.as_str()));
+                                        // xmlUnsetProp(cur, c"ns".as_ptr() as _);
+                                    }
+                                } else if xml_str_equal(now.name, c"attribute".as_ptr() as _) {
+                                    if let Some(mut text) = text {
+                                        text.set_prop("ns", Some(""));
+                                    }
+                                }
+                            }
+                        } else if now.name().as_deref() == Some("name")
+                            || now.name().as_deref() == Some("nsName")
+                            || now.name().as_deref() == Some("value")
+                        {
+                            // Simplification 4.8. name attribute of element
+                            // and attribute elements
+                            if now.has_prop("ns").is_none() {
+                                let mut ns = None;
+
+                                let mut node = now.parent().map_or(null_mut(), |p| p.as_ptr());
+                                while !node.is_null()
+                                    && (*node).element_type() == XmlElementType::XmlElementNode
+                                {
+                                    ns = (*node).get_prop("ns");
+                                    if ns.is_some() {
+                                        break;
+                                    }
+                                    node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                                }
+                                if let Some(ns) = ns {
+                                    now.set_prop("ns", Some(ns.as_str()));
+                                } else {
+                                    now.set_prop("ns", Some(""));
+                                }
+                            }
+                            if now.name().as_deref() == Some("name") {
+                                // Simplification: 4.10. QNames
+                                if let Some(name) = now.get_content() {
+                                    if let Some((prefix, local)) = split_qname2(&name) {
+                                        let doc = now.doc;
+                                        if let Some(ns) = now.search_ns(doc, Some(prefix)) {
+                                            now.set_prop("ns", ns.href().as_deref());
+                                            let local = CString::new(local).unwrap();
+                                            now.set_content(local.as_ptr() as *const u8);
+                                        } else {
+                                            xml_rng_perr!(
+                                                ctxt,
+                                                now.as_ptr(),
+                                                XmlParserErrors::XmlRngpPrefixUndefined,
+                                                "xmlRelaxNGParse: no namespace for prefix {}\n",
+                                                prefix
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            // 4.16
+                            if now.name().as_deref() == Some("nsName")
+                                && (*ctxt).flags & XML_RELAXNG_IN_NSEXCEPT != 0
+                            {
+                                xml_rng_perr!(
+                                    ctxt,
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpPatNsNameExceptNsName,
+                                    "Found nsName/except//nsName forbidden construct\n"
                                 );
                             }
-                            (*cur).unset_prop("name");
-                            if let Some(ns) = (*cur).get_prop("ns") {
-                                if let Some(mut text) = text {
-                                    text.set_prop("ns", Some(ns.as_str()));
-                                    // xmlUnsetProp(cur, c"ns".as_ptr() as _);
-                                }
-                            } else if xml_str_equal((*cur).name, c"attribute".as_ptr() as _) {
-                                if let Some(mut text) = text {
-                                    text.set_prop("ns", Some(""));
-                                }
-                            }
-                        }
-                    } else if (*cur).name().as_deref() == Some("name")
-                        || (*cur).name().as_deref() == Some("nsName")
-                        || (*cur).name().as_deref() == Some("value")
-                    {
-                        // Simplification 4.8. name attribute of element
-                        // and attribute elements
-                        if (*cur).has_prop("ns").is_none() {
-                            let mut ns = None;
+                        } else if now.name().as_deref() == Some("except") && now != root {
+                            let oldflags: i32 = (*ctxt).flags;
 
-                            let mut node = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-                            while !node.is_null()
-                                && (*node).element_type() == XmlElementType::XmlElementNode
+                            // 4.16
+                            if now
+                                .parent()
+                                .filter(|p| p.name().as_deref() == Some("anyName"))
+                                .is_some()
                             {
-                                ns = (*node).get_prop("ns");
-                                if ns.is_some() {
-                                    break;
-                                }
-                                node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                                (*ctxt).flags |= XML_RELAXNG_IN_ANYEXCEPT;
+                                xml_relaxng_cleanup_tree(ctxt, now);
+                                (*ctxt).flags = oldflags;
+                                break 'skip_children;
+                            } else if now
+                                .parent()
+                                .filter(|p| p.name().as_deref() == Some("nsName"))
+                                .is_some()
+                            {
+                                (*ctxt).flags |= XML_RELAXNG_IN_NSEXCEPT;
+                                xml_relaxng_cleanup_tree(ctxt, now);
+                                (*ctxt).flags = oldflags;
+                                break 'skip_children;
                             }
-                            if let Some(ns) = ns {
-                                (*cur).set_prop("ns", Some(ns.as_str()));
-                            } else {
-                                (*cur).set_prop("ns", Some(""));
+                        } else if now.name().as_deref() == Some("anyName") {
+                            // 4.16
+                            if (*ctxt).flags & XML_RELAXNG_IN_ANYEXCEPT != 0 {
+                                xml_rng_perr!(
+                                    ctxt,
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpPatAnynameExceptAnyname,
+                                    "Found anyName/except//anyName forbidden construct\n"
+                                );
+                            } else if (*ctxt).flags & XML_RELAXNG_IN_NSEXCEPT != 0 {
+                                xml_rng_perr!(
+                                    ctxt,
+                                    now.as_ptr(),
+                                    XmlParserErrors::XmlRngpPatNsNameExceptAnyName,
+                                    "Found nsName/except//anyName forbidden construct\n"
+                                );
                             }
                         }
-                        if (*cur).name().as_deref() == Some("name") {
-                            // Simplification: 4.10. QNames
-                            if let Some(name) = (*cur).get_content() {
-                                if let Some((prefix, local)) = split_qname2(&name) {
-                                    if let Some(ns) = (*cur).search_ns((*cur).doc, Some(prefix)) {
-                                        (*cur).set_prop("ns", ns.href().as_deref());
-                                        let local = CString::new(local).unwrap();
-                                        (*cur).set_content(local.as_ptr() as *const u8);
+                        // This is not an else since "include" is transformed into a div
+                        if now.name().as_deref() == Some("div") {
+                            let mut tmp: *mut XmlNode;
+
+                            // implements rule 4.11
+                            let ns = now.get_prop("ns");
+                            let mut child = now.children().map_or(null_mut(), |c| c.as_ptr());
+                            let mut ins = now;
+                            while !child.is_null() {
+                                if let Some(ns) =
+                                    ns.as_deref().filter(|_| (*child).has_prop("ns").is_none())
+                                {
+                                    (*child).set_prop("ns", Some(ns));
+                                }
+                                tmp = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+                                (*child).unlink();
+                                ins = XmlNodePtr::from_raw(ins.add_next_sibling(child))
+                                    .unwrap()
+                                    .unwrap();
+                                child = tmp;
+                            }
+                            // Since we are about to delete cur, if its nsDef is non-NULL we
+                            // need to preserve it (it contains the ns definitions for the
+                            // children we just moved).  We'll just stick it on to the end
+                            // of now.parent's list, since it's never going to be re-serialized
+                            // (bug 143738).
+                            if let Some(mut parent) = now.parent() {
+                                if let Some(ns_def) = now.ns_def.take() {
+                                    if let Some(par_def) = parent.ns_def {
+                                        let mut last = par_def;
+                                        while let Some(next) =
+                                            XmlNsPtr::from_raw(last.next).unwrap()
+                                        {
+                                            last = next;
+                                        }
+                                        last.next = ns_def.as_ptr();
                                     } else {
-                                        xml_rng_perr!(
-                                            ctxt,
-                                            cur,
-                                            XmlParserErrors::XmlRngpPrefixUndefined,
-                                            "xmlRelaxNGParse: no namespace for prefix {}\n",
-                                            prefix
-                                        );
+                                        parent.ns_def = Some(ns_def);
                                     }
                                 }
                             }
-                        }
-                        // 4.16
-                        if (*cur).name().as_deref() == Some("nsName")
-                            && (*ctxt).flags & XML_RELAXNG_IN_NSEXCEPT != 0
-                        {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpPatNsNameExceptNsName,
-                                "Found nsName/except//nsName forbidden construct\n"
-                            );
-                        }
-                    } else if (*cur).name().as_deref() == Some("except") && cur != root {
-                        let oldflags: i32 = (*ctxt).flags;
-
-                        // 4.16
-                        if (*cur)
-                            .parent()
-                            .filter(|p| p.name().as_deref() == Some("anyName"))
-                            .is_some()
-                        {
-                            (*ctxt).flags |= XML_RELAXNG_IN_ANYEXCEPT;
-                            xml_relaxng_cleanup_tree(ctxt, cur);
-                            (*ctxt).flags = oldflags;
+                            delete = now.as_ptr();
                             break 'skip_children;
-                        } else if (*cur)
-                            .parent()
-                            .filter(|p| p.name().as_deref() == Some("nsName"))
-                            .is_some()
-                        {
-                            (*ctxt).flags |= XML_RELAXNG_IN_NSEXCEPT;
-                            xml_relaxng_cleanup_tree(ctxt, cur);
-                            (*ctxt).flags = oldflags;
-                            break 'skip_children;
-                        }
-                    } else if (*cur).name().as_deref() == Some("anyName") {
-                        // 4.16
-                        if (*ctxt).flags & XML_RELAXNG_IN_ANYEXCEPT != 0 {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpPatAnynameExceptAnyname,
-                                "Found anyName/except//anyName forbidden construct\n"
-                            );
-                        } else if (*ctxt).flags & XML_RELAXNG_IN_NSEXCEPT != 0 {
-                            xml_rng_perr!(
-                                ctxt,
-                                cur,
-                                XmlParserErrors::XmlRngpPatNsNameExceptAnyName,
-                                "Found nsName/except//anyName forbidden construct\n"
-                            );
                         }
                     }
-                    // This is not an else since "include" is transformed into a div
-                    if (*cur).name().as_deref() == Some("div") {
-                        let mut ins: *mut XmlNode;
-                        let mut tmp: *mut XmlNode;
-
-                        // implements rule 4.11
-                        let ns = (*cur).get_prop("ns");
-                        let mut child = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-                        ins = cur;
-                        while !child.is_null() {
-                            if let Some(ns) =
-                                ns.as_deref().filter(|_| (*child).has_prop("ns").is_none())
+                }
+                Ok(now)
+                    if matches!(
+                        now.element_type(),
+                        XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+                    ) =>
+                {
+                    // Simplification 4.2 whitespaces
+                    if IS_BLANK_NODE!(now) {
+                        if let Some(parent) = now
+                            .parent()
+                            .filter(|p| p.element_type() == XmlElementType::XmlElementNode)
+                        {
+                            if parent.name().as_deref() != Some("value")
+                                && parent.name().as_deref() != Some("param")
                             {
-                                (*child).set_prop("ns", Some(ns));
+                                delete = now.as_ptr();
                             }
-                            tmp = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-                            (*child).unlink();
-                            ins = (*ins).add_next_sibling(child);
-                            child = tmp;
+                        } else {
+                            delete = now.as_ptr();
+                            break 'skip_children;
                         }
-                        // Since we are about to delete cur, if its nsDef is non-NULL we
-                        // need to preserve it (it contains the ns definitions for the
-                        // children we just moved).  We'll just stick it on to the end
-                        // of (*cur).parent's list, since it's never going to be re-serialized
-                        // (bug 143738).
-                        if let Some(mut parent) = (*cur).parent() {
-                            if let Some(ns_def) = (*cur).ns_def.take() {
-                                if let Some(par_def) = parent.ns_def {
-                                    let mut last = par_def;
-                                    while let Some(next) = XmlNsPtr::from_raw(last.next).unwrap() {
-                                        last = next;
-                                    }
-                                    last.next = ns_def.as_ptr();
-                                } else {
-                                    parent.ns_def = Some(ns_def);
-                                }
-                            }
-                        }
-                        delete = cur;
-                        break 'skip_children;
                     }
                 }
-            }
-            // Simplification 4.2 whitespaces
-            else if matches!(
-                (*cur).element_type(),
-                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
-            ) {
-                if IS_BLANK_NODE!(cur) {
-                    if let Some(parent) = (*cur)
-                        .parent()
-                        .filter(|p| p.element_type() == XmlElementType::XmlElementNode)
-                    {
-                        if parent.name().as_deref() != Some("value")
-                            && parent.name().as_deref() != Some("param")
-                        {
-                            delete = cur;
-                        }
-                    } else {
-                        delete = cur;
-                        break 'skip_children;
-                    }
+                Ok(now) => {
+                    delete = now.as_ptr();
+                    break 'skip_children;
                 }
-            } else {
-                delete = cur;
-                break 'skip_children;
+                _ => {
+                    delete = XmlDocPtr::try_from(now).unwrap().as_ptr() as *mut XmlNode;
+                    break 'skip_children;
+                }
             }
 
             // Skip to next node
-            if let Some(children) = (*cur).children().filter(|children| {
+            if let Some(children) = now.children().filter(|children| {
                 !matches!(
                     children.element_type(),
                     XmlElementType::XmlEntityDecl
@@ -1919,33 +1938,34 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: *mut Xml
                         | XmlElementType::XmlEntityNode
                 )
             }) {
-                cur = children.as_ptr();
+                cur = XmlNodePtr::from_raw(children.as_ptr())
+                    .unwrap()
+                    .map(|c| c.into());
                 continue 'main;
             }
         }
         // skip_children:
-        if let Some(next) = (*cur).next {
-            cur = next.as_ptr();
+        if let Some(next) = now.next() {
+            cur = XmlNodePtr::from_raw(next.as_ptr())
+                .unwrap()
+                .map(|n| n.into());
             continue;
         }
 
-        loop {
-            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-            if cur.is_null() {
-                break;
-            }
-            if cur == root {
-                cur = null_mut();
-                break;
-            }
-            if let Some(next) = (*cur).next {
-                cur = next.as_ptr();
+        cur = XmlGenericNodePtr::from_raw(now.parent().map_or(null_mut(), |p| p.as_ptr()));
+        while let Some(parent) = cur {
+            if parent == root.into() {
+                cur = None;
                 break;
             }
 
-            if cur.is_null() {
+            if let Some(next) = parent.next() {
+                cur = XmlGenericNodePtr::from_raw(next.as_ptr());
                 break;
             }
+            cur = parent
+                .parent()
+                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
         }
     }
     if !delete.is_null() {
@@ -1975,7 +1995,7 @@ unsafe fn xml_relaxng_cleanup_doc(
         );
         return None;
     };
-    xml_relaxng_cleanup_tree(ctxt, root.as_ptr());
+    xml_relaxng_cleanup_tree(ctxt, root);
     Some(doc)
 }
 
