@@ -1225,6 +1225,8 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderValidatePush")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
     unsafe fn validate_push(&mut self) {
+        use crate::tree::XmlNodePtr;
+
         let mut node: *mut XmlNode = self.node;
 
         #[cfg(feature = "libxml_valid")]
@@ -1272,7 +1274,7 @@ impl XmlTextReader {
                     ret = xml_relaxng_validate_full_element(
                         self.rng_valid_ctxt,
                         (*self.ctxt).my_doc,
-                        node,
+                        XmlNodePtr::from_raw(node).unwrap().unwrap(),
                     );
                     self.rng_full_node = node;
                 }

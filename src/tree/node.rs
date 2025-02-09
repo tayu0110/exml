@@ -2181,7 +2181,7 @@ impl Default for XmlNode {
     fn default() -> Self {
         Self {
             _private: null_mut(),
-            typ: XmlElementType::default(),
+            typ: XmlElementType::XmlElementNode,
             name: null(),
             children: None,
             last: None,
