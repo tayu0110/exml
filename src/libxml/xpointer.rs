@@ -2603,7 +2603,7 @@ pub(crate) unsafe fn xml_xptr_range_to_function(ctxt: XmlXPathParserContextPtr, 
 unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNode {
     /* pointers to generated nodes */
 
-    use crate::tree::{xml_copy_node, xml_new_text, xml_new_text_len};
+    use crate::tree::{xml_copy_node, xml_new_text, xml_new_text_len, XmlGenericNodePtr};
     let mut list: *mut XmlNode = null_mut();
     let mut last: *mut XmlNode = null_mut();
     let mut parent: *mut XmlNode = null_mut();
@@ -2627,7 +2627,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
     }
     end = (*range).user2 as _;
     if end.is_null() {
-        return xml_copy_node(start, 1);
+        return xml_copy_node(XmlGenericNodePtr::from_raw(start).unwrap(), 1);
     }
     if (*end).typ == XmlElementType::XmlNamespaceDecl {
         return null_mut();
@@ -2667,7 +2667,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                 }
                 return list;
             } else {
-                tmp = xml_copy_node(cur, 0);
+                tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 0);
                 if list.is_null() {
                     list = tmp;
                     parent = tmp;
@@ -2711,7 +2711,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                 list = tmp.map_or(null_mut(), |node| node.as_ptr());
             } else {
                 if cur == start && index1 > 1 {
-                    tmp = xml_copy_node(cur, 0);
+                    tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 0);
                     list = tmp;
                     parent = tmp;
                     last = null_mut();
@@ -2720,7 +2720,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                     // Now gather the remaining nodes from cur to end
                     continue; /* while */
                 }
-                tmp = xml_copy_node(cur, 1);
+                tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 1);
                 list = tmp;
                 parent = null_mut();
                 last = tmp;
@@ -2743,7 +2743,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                     STRANGE!();
                 }
                 _ => {
-                    tmp = xml_copy_node(cur, 1);
+                    tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 1);
                 }
             }
             if !tmp.is_null() {
@@ -2775,7 +2775,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
 #[doc(alias = "xmlXPtrBuildNodeList")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut XmlNode {
-    use crate::tree::xml_copy_node;
+    use crate::tree::{xml_copy_node, XmlGenericNodePtr};
 
     let mut list: *mut XmlNode = null_mut();
     let mut last: *mut XmlNode = null_mut();
@@ -2816,10 +2816,13 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut Xm
                     _ => unreachable!(),
                 }
                 if last.is_null() {
-                    list = xml_copy_node(node, 1);
+                    list = xml_copy_node(XmlGenericNodePtr::from_raw(node).unwrap(), 1);
                     last = list;
                 } else {
-                    (*last).add_next_sibling(xml_copy_node(node, 1));
+                    (*last).add_next_sibling(xml_copy_node(
+                        XmlGenericNodePtr::from_raw(node).unwrap(),
+                        1,
+                    ));
                     if let Some(next) = (*last).next() {
                         last = next.as_ptr();
                     }
@@ -2848,7 +2851,12 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut Xm
             }
         }
         XmlXPathObjectType::XPathRange => return xml_xptr_build_range_node_list(obj),
-        XmlXPathObjectType::XPathPoint => return xml_copy_node((*obj).user as _, 0),
+        XmlXPathObjectType::XPathPoint => {
+            return xml_copy_node(
+                XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode).unwrap(),
+                0,
+            )
+        }
         _ => {}
     }
     list

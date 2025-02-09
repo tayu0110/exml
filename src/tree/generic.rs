@@ -686,7 +686,7 @@ pub trait NodeCommon {
     }
 }
 
-pub(crate) struct XmlGenericNodePtr(pub(super) NonNull<dyn NodeCommon>);
+pub struct XmlGenericNodePtr(pub(super) NonNull<dyn NodeCommon>);
 
 impl XmlGenericNodePtr {
     /// Allocate new memory and create new `XmlGenericNodePtr` from an owned xml node.
@@ -696,6 +696,10 @@ impl XmlGenericNodePtr {
     pub(crate) fn new<T: NodeCommon + 'static>(node: T) -> Option<Self> {
         let boxed: Box<dyn NodeCommon> = Box::new(node);
         NonNull::new(Box::leak(boxed)).map(Self)
+    }
+
+    pub(crate) fn from_raw<T: NodeCommon>(ptr: *mut T) -> Option<Self> {
+        NonNull::new(ptr as *mut dyn NodeCommon).map(Self)
     }
 
     /// Deallocate memory.

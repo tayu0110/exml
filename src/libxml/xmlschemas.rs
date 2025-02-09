@@ -5486,8 +5486,7 @@ unsafe fn xml_schema_add_schema_doc(
                 // Preprocess the document.
                 if let Some(doc) = doc {
                     located = 1;
-                    let doc_elem: *mut XmlNode = doc.get_root_element();
-                    if doc_elem.is_null() {
+                    let Some(doc_elem) = doc.get_root_element() else {
                         let schema_location =
                             CStr::from_ptr(schema_location as *const i8).to_string_lossy();
                         xml_schema_custom_err(
@@ -5501,11 +5500,11 @@ unsafe fn xml_schema_add_schema_doc(
                             None,
                         );
                         break 'exit_error;
-                    }
+                    };
                     // Remove all the blank text nodes.
-                    xml_schema_cleanup_doc(pctxt, doc_elem);
+                    xml_schema_cleanup_doc(pctxt, doc_elem.as_ptr());
                     // Check the schema's top level element.
-                    if !IS_SCHEMA!(doc_elem, c"schema".as_ptr()) {
+                    if !IS_SCHEMA!(doc_elem.as_ptr(), c"schema".as_ptr()) {
                         let schema_location =
                             CStr::from_ptr(schema_location as *const i8).to_string_lossy();
                         xml_schema_custom_err(
@@ -5524,8 +5523,11 @@ unsafe fn xml_schema_add_schema_doc(
                     }
                     // Note that we don't apply a type check for the
                     // target_namespace value here.
-                    target_namespace =
-                        xml_schema_get_prop(pctxt, doc_elem, c"targetNamespace".as_ptr() as _);
+                    target_namespace = xml_schema_get_prop(
+                        pctxt,
+                        doc_elem.as_ptr(),
+                        c"targetNamespace".as_ptr() as _,
+                    );
                 }
 
                 // after_doc_loading:
@@ -13375,17 +13377,16 @@ unsafe fn xml_schema_parse_new_doc_with_context(
     // Mark it as parsed, even if parsing fails.
     (*bucket).parsed += 1;
     // Compile the schema doc.
-    let node: *mut XmlNode = if let Some(doc) = (*bucket).doc {
-        doc.get_root_element()
-    } else {
-        null_mut()
-    };
-    ret = xml_schema_parse_schema_element(pctxt, schema, node);
+    let node = (*bucket)
+        .doc
+        .and_then(|doc| doc.get_root_element())
+        .unwrap();
+    ret = xml_schema_parse_schema_element(pctxt, schema, node.as_ptr());
     if ret != 0 {
         // goto exit;
     } else {
         // An empty schema; just get out.
-        if let Some(children) = (*node).children() {
+        if let Some(children) = node.children {
             old_errs = (*pctxt).nberrors;
             ret = xml_schema_parse_schema_top_level(pctxt, schema, children.as_ptr());
             if ret != 0 {
@@ -27705,6 +27706,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
         (*vctxt).validation_root
     } else if let Some(doc) = (*vctxt).doc {
         doc.get_root_element()
+            .map_or(null_mut(), |node| node.as_ptr())
     } else {
         null_mut()
     };
@@ -28102,7 +28104,9 @@ pub unsafe fn xml_schema_validate_doc(ctxt: XmlSchemaValidCtxtPtr, doc: XmlDocPt
     }
 
     (*ctxt).doc = Some(doc);
-    (*ctxt).node = (*doc).get_root_element();
+    (*ctxt).node = doc
+        .get_root_element()
+        .map_or(null_mut(), |node| node.as_ptr());
     if (*ctxt).node.is_null() {
         xml_schema_custom_err(
             ctxt as XmlSchemaAbstractCtxtPtr,

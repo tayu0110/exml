@@ -2581,8 +2581,6 @@ unsafe fn xml_parse_xml_catalog_file(
     mut prefer: XmlCatalogPrefer,
     filename: &str,
 ) -> Option<Arc<RwLock<CatalogEntryListNode>>> {
-    let mut cur: *mut XmlNode;
-
     let Some(doc) = xml_parse_catalog_file(filename) else {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             generic_error!("Failed to parse catalog {filename}\n");
@@ -2594,13 +2592,12 @@ unsafe fn xml_parse_xml_catalog_file(
         generic_error!("{} Parsing catalog {filename}\n", xml_get_thread_id());
     }
 
-    cur = (*doc).get_root_element();
-    if !cur.is_null()
-        && xml_str_equal((*cur).name, c"catalog".as_ptr() as _)
-        && (*cur).ns.map_or(false, |ns| {
-            !ns.href.is_null() && xml_str_equal(ns.href, XML_CATALOGS_NAMESPACE.as_ptr() as _)
-        })
-    {
+    if let Some(cur) = doc.get_root_element().filter(|cur| {
+        xml_str_equal(cur.name, c"catalog".as_ptr() as _)
+            && cur.ns.map_or(false, |ns| {
+                !ns.href.is_null() && xml_str_equal(ns.href, XML_CATALOGS_NAMESPACE.as_ptr() as _)
+            })
+    }) {
         let parent = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,
             None,
@@ -2618,14 +2615,14 @@ unsafe fn xml_parse_xml_catalog_file(
             } else {
                 xml_catalog_err!(
                     null_mut(),
-                    cur,
+                    cur.as_ptr(),
                     XmlParserErrors::XmlCatalogPreferValue,
                     "Invalid value for prefer: '{}'\n",
                     prop,
                 );
             }
         }
-        cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+        let cur = cur.children.map_or(null_mut(), |c| c.as_ptr());
         xml_parse_xml_catalog_node_list(cur, prefer, Some(parent.clone()), None);
         xml_free_doc(doc);
         Some(parent.node)

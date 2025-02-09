@@ -456,11 +456,11 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     let ret: XmlRelaxNGValidStatePtr;
     let mut attrs: [Option<XmlAttrPtr>; MAX_ATTR] = [None; MAX_ATTR];
     let mut nb_attrs: usize = 0;
-    let mut root: *mut XmlNode = null_mut();
+    let mut root = None;
 
     if node.is_null() {
-        root = (*ctxt).doc.map_or(null_mut(), |doc| doc.get_root_element());
-        if root.is_null() {
+        root = (*ctxt).doc.and_then(|doc| doc.get_root_element());
+        if root.is_none() {
             return null_mut();
         }
     } else if (*node).element_type() != XmlElementType::XmlDocumentNode {
@@ -498,7 +498,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     (*ret).endvalue = null_mut();
     if node.is_null() {
         (*ret).node = (*ctxt).doc.map_or(null_mut(), |doc| doc.as_ptr()) as _;
-        (*ret).seq = root;
+        (*ret).seq = root.map_or(null_mut(), |root| root.as_ptr());
     } else {
         (*ret).node = node;
         (*ret).seq = (*node).children().map_or(null_mut(), |c| c.as_ptr());

@@ -511,14 +511,16 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         return -1;
     };
 
-    let cur: *mut XmlNode = (*doc).get_root_element();
-    let ret = if cur.is_null() || !xml_str_equal((*cur).name, c"TESTSUITE".as_ptr() as _) {
+    let Some(cur) = (*doc)
+        .get_root_element()
+        .filter(|cur| xml_str_equal(cur.name, c"TESTSUITE".as_ptr() as _))
+    else {
         eprintln!("Unexpected format {}", confxml);
         xmlconf_info();
-        -1
-    } else {
-        xmlconf_test_suite(logfile, doc, cur)
+        xml_free_doc(doc);
+        return -1;
     };
+    let ret = xmlconf_test_suite(logfile, doc, cur.into());
     xml_free_doc(doc);
     ret
 }

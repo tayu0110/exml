@@ -744,7 +744,10 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadInnerXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_inner_xml(&mut self) -> *mut XmlChar {
-        use crate::{libxml::xmlstring::xml_strndup, tree::NodeCommon};
+        use crate::{
+            libxml::xmlstring::xml_strndup,
+            tree::{NodeCommon, XmlGenericNodePtr},
+        };
 
         let mut node: *mut XmlNode;
         let mut cur_node: *mut XmlNode;
@@ -757,7 +760,7 @@ impl XmlTextReader {
         cur_node = (*self.node).children().map_or(null_mut(), |c| c.as_ptr());
         while !cur_node.is_null() {
             // XXX: Why is the node copied?
-            node = xml_doc_copy_node(cur_node, doc, 1);
+            node = xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur_node).unwrap(), doc, 1);
             // XXX: Why do we need a second buffer?
             let mut buff2 = vec![];
             if (*node).dump_memory(&mut buff2, doc, 0, 0) == 0 {
@@ -780,7 +783,7 @@ impl XmlTextReader {
     pub unsafe fn read_outer_xml(&mut self) -> *mut XmlChar {
         use crate::{
             libxml::xmlstring::xml_strndup,
-            tree::{NodeCommon, XmlDtd, XmlDtdPtr},
+            tree::{NodeCommon, XmlDtd, XmlDtdPtr, XmlGenericNodePtr},
         };
 
         let mut node: *mut XmlNode;
@@ -795,7 +798,7 @@ impl XmlTextReader {
             node = xml_copy_dtd(XmlDtdPtr::from_raw(node as *mut XmlDtd).unwrap().unwrap())
                 .map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNode;
         } else {
-            node = xml_doc_copy_node(node, doc, 1);
+            node = xml_doc_copy_node(XmlGenericNodePtr::from_raw(node).unwrap(), doc, 1);
         }
         let mut buff = vec![];
         if (*node).dump_memory(&mut buff, doc, 0, 0) == 0 {

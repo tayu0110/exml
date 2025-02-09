@@ -685,7 +685,6 @@ unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c
 }
 
 unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
-    let mut cur: *mut XmlNode;
     let filename = "test/xsdtest/xsdtestsuite.xml";
     let mut ret: c_int = 0;
 
@@ -696,15 +695,17 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
     println!("## XML Schemas datatypes test suite from James Clark");
     test_log!(logfile, "filename: {}\n", filename);
 
-    cur = doc.get_root_element();
-    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
+    let Some(cur) = doc
+        .get_root_element()
+        .filter(|cur| xml_str_equal(cur.name, c"testSuite".as_ptr() as _))
+    else {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
         xml_free_doc(doc);
         return ret;
-    }
+    };
 
-    cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
+    let mut cur = get_next(cur.into(), c"./testSuite[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
@@ -745,7 +746,6 @@ unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c
 }
 
 unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
-    let mut cur: *mut XmlNode;
     let filename = "test/relaxng/OASIS/spectest.xml";
     let mut ret: c_int = 0;
 
@@ -756,15 +756,17 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
     println!("## Relax NG test suite from James Clark");
     test_log!(logfile, "filename: {}\n", filename);
 
-    cur = (*doc).get_root_element();
-    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
+    let Some(cur) = doc
+        .get_root_element()
+        .filter(|cur| xml_str_equal(cur.name, c"testSuite".as_ptr() as _))
+    else {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
         xml_free_doc(doc);
         return ret;
-    }
+    };
 
-    cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
+    let mut cur = get_next(cur.into(), c"./testSuite[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
@@ -781,7 +783,6 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
 }
 
 unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
-    let mut cur: *mut XmlNode;
     let filename = "test/relaxng/testsuite.xml";
     let mut ret: c_int = 0;
 
@@ -792,15 +793,17 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
     println!("## Relax NG test suite for libxml2");
     test_log!(logfile, "filename: {}\n", filename);
 
-    cur = (*doc).get_root_element();
-    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
+    let Some(cur) = doc
+        .get_root_element()
+        .filter(|cur| xml_str_equal(cur.name, c"testSuite".as_ptr() as _))
+    else {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
         xml_free_doc(doc);
         return ret;
-    }
+    };
 
-    cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
+    let mut cur = get_next(cur.into(), c"./testSuite[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
@@ -1144,7 +1147,6 @@ unsafe fn xstc_test_group(
 }
 
 unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const c_char) -> c_int {
-    let mut cur: *mut XmlNode;
     let mut ret: c_int = 0;
 
     let Some(doc) = xml_read_file(metadata, None, XmlParserOption::XmlParseNoEnt as _) else {
@@ -1152,18 +1154,18 @@ unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const
         return -1;
     };
 
-    cur = (*doc).get_root_element();
-    if cur.is_null() || !xml_str_equal((*cur).name, c"testSet".as_ptr() as _) {
+    let Some(cur) = doc
+        .get_root_element()
+        .filter(|cur| xml_str_equal(cur.name, c"testSet".as_ptr() as _))
+    else {
         eprintln!("Unexpected format {metadata}");
         return -1;
-    }
-    let contributor = (*cur)
-        .get_prop("contributor")
-        .unwrap_or("Unknown".to_owned());
+    };
+    let contributor = cur.get_prop("contributor").unwrap_or("Unknown".to_owned());
     let name = (*cur).get_prop("name").unwrap_or("Unknown".to_owned());
     println!("## {contributor} test suite for Schemas version {name}");
 
-    cur = get_next(cur, c"./ts:testGroup[1]".as_ptr() as _);
+    let mut cur = get_next(cur.into(), c"./ts:testGroup[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testGroup".as_ptr() as _) {
         eprintln!("Unexpected format {metadata}");
         ret = -1;

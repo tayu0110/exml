@@ -2570,7 +2570,9 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     } else {
         let xpath_document = XPATH_DOCUMENT.get();
         ctxt = xml_xpath_new_context(xpath_document);
-        (*ctxt).node = xpath_document.map_or(null_mut(), |doc| doc.get_root_element());
+        (*ctxt).node = xpath_document
+            .and_then(|doc| doc.get_root_element())
+            .map_or(null_mut(), |root| root.into());
         if expr != 0 {
             res = xml_xpath_eval_expression(str as _, ctxt);
         } else {
@@ -4068,8 +4070,8 @@ unsafe fn pattern_test(
                 let xml = CStr::from_ptr(xml.as_ptr()).to_string_lossy();
                 if let Some(doc) = xml_read_file(&xml, None, options) {
                     let mut namespaces: [(*const u8, *const u8); 20] = [(null(), null()); 20];
-                    let root: *mut XmlNode = doc.get_root_element();
-                    let mut ns = (*root).ns_def;
+                    let root = doc.get_root_element().unwrap();
+                    let mut ns = root.ns_def;
                     let mut j = 0;
                     while let Some(now) = ns.filter(|_| j < 10) {
                         namespaces[j] = (now.href, now.prefix);
@@ -4166,7 +4168,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
     };
 
     // Check the document is of the right kind
-    if (*doc).get_root_element().is_null() {
+    if doc.get_root_element().is_none() {
         eprintln!("Error: empty document for file \"{filename}\"");
         xml_free_doc(doc);
         return null_mut();
@@ -4284,7 +4286,7 @@ unsafe fn c14n_run_test(
     };
 
     // Check the document is of the right kind
-    if doc.get_root_element().is_null() {
+    if doc.get_root_element().is_none() {
         eprintln!("Error: empty document for file \"{xml_filename}\"");
         xml_free_doc(doc);
         return -1;

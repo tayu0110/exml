@@ -2294,14 +2294,13 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
     {
         let mut namespaces: [(*const u8, *const u8); 22] = [(null(), null()); 22];
 
-        let root: *mut XmlNode = doc.get_root_element();
-        if root.is_null() {
+        let Some(root) = doc.get_root_element() else {
             generic_error!("Document does not have a root element");
             PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
             return;
-        }
+        };
         let mut i = 0;
-        let mut ns = (*root).ns_def;
+        let mut ns = root.ns_def;
         while let Some(now) = ns.filter(|_| i < 10) {
             namespaces[i] = (now.href, now.prefix);
             i += 1;

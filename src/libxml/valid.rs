@@ -2388,28 +2388,27 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     //     return 0;
     // }
 
-    let root: *mut XmlNode = doc.get_root_element();
-    if root.is_null() || (*root).name.is_null() {
+    let Some(root) = doc.get_root_element().filter(|root| !root.name.is_null()) else {
         xml_err_valid!(ctxt, XmlParserErrors::XmlDTDNoRoot, "no root element\n");
         return 0;
-    }
+    };
 
     // When doing post validation against a separate DTD, those may
     // no internal subset has been generated
     if let Some(int_subset) = doc.int_subset.filter(|dtd| !dtd.name.is_null()) {
         // Check first the document root against the NQName
-        if !xml_str_equal(int_subset.name, (*root).name) {
-            if let Some(prefix) = (*root).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+        if !xml_str_equal(int_subset.name, root.name) {
+            if let Some(prefix) = root.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
                 let mut fname: [XmlChar; 50] = [0; 50];
 
                 let fullname: *mut XmlChar =
-                    xml_build_qname((*root).name, prefix, fname.as_mut_ptr(), 50);
+                    xml_build_qname(root.name, prefix, fname.as_mut_ptr(), 50);
                 if fullname.is_null() {
                     xml_verr_memory(ctxt, None);
                     return 0;
                 }
                 ret = xml_str_equal(int_subset.name, fullname) as i32;
-                if fullname != fname.as_ptr() as _ && fullname != (*root).name as _ {
+                if fullname != fname.as_ptr() as _ && fullname != root.name as _ {
                     xml_free(fullname as _);
                 }
                 if ret == 1 {
@@ -2418,17 +2417,17 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
                 }
             }
             if xml_str_equal(int_subset.name, c"HTML".as_ptr() as _)
-                && xml_str_equal((*root).name, c"html".as_ptr() as _)
+                && xml_str_equal(root.name, c"html".as_ptr() as _)
             {
                 // goto name_ok;
                 return 1;
             }
 
-            let root_name = (*root).name().unwrap();
+            let root_name = root.name().unwrap();
             let subset_name = int_subset.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                root,
+                root.as_ptr(),
                 XmlParserErrors::XmlDTDRootName,
                 format!("root and DTD name do not match '{root_name}' and '{subset_name}'\n")
                     .as_str(),
@@ -3116,8 +3115,8 @@ pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr, dtd: X
     }
     doc.ids.take();
     doc.refs.take();
-    let root: *mut XmlNode = doc.get_root_element();
-    ret = xml_validate_element(ctxt, doc, root);
+    let root = doc.get_root_element();
+    ret = xml_validate_element(ctxt, doc, root.map_or(null_mut(), |root| root.as_ptr()));
     ret &= xml_validate_document_final(ctxt, doc);
     doc.ext_subset = old_ext;
     doc.int_subset = old_int;
@@ -3530,8 +3529,8 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr) -
         return 0;
     }
 
-    let root: *mut XmlNode = doc.get_root_element();
-    ret &= xml_validate_element(ctxt, doc, root);
+    let root = doc.get_root_element();
+    ret &= xml_validate_element(ctxt, doc, root.map_or(null_mut(), |root| root.as_ptr()));
     ret &= xml_validate_document_final(ctxt, doc);
     ret
 }

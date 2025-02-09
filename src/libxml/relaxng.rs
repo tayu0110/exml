@@ -1212,8 +1212,6 @@ unsafe fn xml_relaxng_load_external_ref(
     url: &str,
     ns: Option<&str>,
 ) -> XmlRelaxNGDocumentPtr {
-    let root: *mut XmlNode;
-
     // check against recursion in the stack
     for &doc in &(*ctxt).doc_tab {
         let curl = CString::new(url).unwrap();
@@ -1264,9 +1262,11 @@ unsafe fn xml_relaxng_load_external_ref(
 
     // transmit the ns if needed
     if let Some(ns) = ns {
-        root = (*doc).get_root_element();
-        if !root.is_null() && (*root).has_prop("ns").is_none() {
-            (*root).set_prop("ns", Some(ns));
+        if let Some(mut root) = doc
+            .get_root_element()
+            .filter(|root| root.has_prop("ns").is_none())
+        {
+            root.set_prop("ns", Some(ns));
         }
     }
 
@@ -1325,8 +1325,9 @@ unsafe fn xml_relaxng_remove_redefine(
                         && xml_relaxng_remove_redefine(
                             _ctxt,
                             href,
-                            (*doc.get_root_element())
-                                .children()
+                            doc.get_root_element()
+                                .unwrap()
+                                .children
                                 .map_or(null_mut(), |c| c.as_ptr()),
                             name,
                         ) == 1
@@ -1361,7 +1362,6 @@ unsafe fn xml_relaxng_load_include(
     node: *mut XmlNode,
     ns: Option<&str>,
 ) -> XmlRelaxNGIncludePtr {
-    let mut root: *mut XmlNode;
     let mut cur: *mut XmlNode;
 
     // check against recursion in the stack
@@ -1407,9 +1407,11 @@ unsafe fn xml_relaxng_load_include(
 
     // transmit the ns if needed
     if let Some(ns) = ns {
-        root = doc.get_root_element();
-        if !root.is_null() && (*root).has_prop("ns").is_none() {
-            (*root).set_prop("ns", Some(ns));
+        if let Some(mut root) = doc
+            .get_root_element()
+            .filter(|root| root.has_prop("ns").is_none())
+        {
+            root.set_prop("ns", Some(ns));
         }
     }
 
@@ -1428,8 +1430,7 @@ unsafe fn xml_relaxng_load_include(
     (*ctxt).include_pop();
 
     // Check that the top element is a grammar
-    root = doc.get_root_element();
-    if root.is_null() {
+    let Some(root) = doc.get_root_element() else {
         xml_rng_perr!(
             ctxt,
             node,
@@ -1438,8 +1439,8 @@ unsafe fn xml_relaxng_load_include(
             url
         );
         return null_mut();
-    }
-    if !is_relaxng(root, "grammar") {
+    };
+    if !is_relaxng(root.as_ptr(), "grammar") {
         xml_rng_perr!(
             ctxt,
             node,
@@ -1959,8 +1960,7 @@ unsafe fn xml_relaxng_cleanup_doc(
     doc: XmlDocPtr,
 ) -> Option<XmlDocPtr> {
     // Extract the root
-    let root: *mut XmlNode = (*doc).get_root_element();
-    if root.is_null() {
+    let Some(root) = (*doc).get_root_element() else {
         xml_rng_perr!(
             ctxt,
             doc.as_ptr(),
@@ -1969,8 +1969,8 @@ unsafe fn xml_relaxng_cleanup_doc(
             (*ctxt).url.as_deref().unwrap()
         );
         return None;
-    }
-    xml_relaxng_cleanup_tree(ctxt, root);
+    };
+    xml_relaxng_cleanup_tree(ctxt, root.as_ptr());
     Some(doc)
 }
 
@@ -3181,7 +3181,6 @@ unsafe fn xml_relaxng_process_external_ref(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: *mut XmlNode,
 ) -> XmlRelaxNGDefinePtr {
-    let root: *mut XmlNode;
     let mut tmp: *mut XmlNode;
     let mut new_ns: i32 = 0;
     let oldflags: i32;
@@ -3197,8 +3196,7 @@ unsafe fn xml_relaxng_process_external_ref(
 
         if (*docu).content.is_null() {
             // Then do the parsing for good
-            root = (*docu).doc.map_or(null_mut(), |doc| doc.get_root_element());
-            if root.is_null() {
+            let Some(mut root) = (*docu).doc.and_then(|doc| doc.get_root_element()) else {
                 let url = (*ctxt).url.as_deref().unwrap();
                 xml_rng_perr!(
                     ctxt,
@@ -3208,9 +3206,9 @@ unsafe fn xml_relaxng_process_external_ref(
                     url
                 );
                 return null_mut();
-            }
+            };
             // ns transmission rules
-            let mut ns = (*root).get_prop("ns");
+            let mut ns = root.get_prop("ns");
             if ns.is_none() {
                 tmp = node;
                 while !tmp.is_null() && (*tmp).element_type() == XmlElementType::XmlElementNode {
@@ -3221,7 +3219,7 @@ unsafe fn xml_relaxng_process_external_ref(
                     tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
                 }
                 if let Some(ns) = ns {
-                    (*root).set_prop("ns", Some(ns.as_str()));
+                    root.set_prop("ns", Some(ns.as_str()));
                     new_ns = 1;
                 }
             }
@@ -3229,7 +3227,7 @@ unsafe fn xml_relaxng_process_external_ref(
             // Parsing to get a precompiled schemas.
             oldflags = (*ctxt).flags;
             (*ctxt).flags |= XML_RELAXNG_IN_EXTERNALREF;
-            (*docu).schema = xml_relaxng_parse_document(ctxt, root);
+            (*docu).schema = xml_relaxng_parse_document(ctxt, root.as_ptr());
             (*ctxt).flags = oldflags;
             if !(*docu).schema.is_null() && !(*(*docu).schema).topgrammar.is_null() {
                 (*docu).content = (*(*(*docu).schema).topgrammar).start;
@@ -3240,7 +3238,7 @@ unsafe fn xml_relaxng_process_external_ref(
 
             // the externalRef may be reused in a different ns context
             if new_ns == 1 {
-                (*root).unset_prop("ns");
+                root.unset_prop("ns");
             }
         }
         (*def).content = (*docu).content;
@@ -4020,8 +4018,7 @@ unsafe fn xml_relaxng_parse_include(ctxt: XmlRelaxNGParserCtxtPtr, node: *mut Xm
         );
         return -1;
     }
-    let root: *mut XmlNode = (*incl).doc.map_or(null_mut(), |doc| doc.get_root_element());
-    if root.is_null() {
+    let Some(root) = (*incl).doc.and_then(|doc| doc.get_root_element()) else {
         xml_rng_perr!(
             ctxt,
             node,
@@ -4029,8 +4026,8 @@ unsafe fn xml_relaxng_parse_include(ctxt: XmlRelaxNGParserCtxtPtr, node: *mut Xm
             "Include document is empty\n"
         );
         return -1;
-    }
-    if !xml_str_equal((*root).name, c"grammar".as_ptr() as _) {
+    };
+    if !xml_str_equal(root.name, c"grammar".as_ptr() as _) {
         xml_rng_perr!(
             ctxt,
             node,
@@ -4041,7 +4038,7 @@ unsafe fn xml_relaxng_parse_include(ctxt: XmlRelaxNGParserCtxtPtr, node: *mut Xm
     }
 
     // Merge the definition from both the include and the internal list
-    if let Some(children) = (*root).children() {
+    if let Some(children) = root.children() {
         tmp = xml_relaxng_parse_grammar_content(ctxt, children.as_ptr());
         if tmp != 0 {
             ret = -1;
@@ -5904,8 +5901,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
     };
 
     // Then do the parsing for good
-    let root: *mut XmlNode = doc.get_root_element();
-    if root.is_null() {
+    let Some(root) = doc.get_root_element() else {
         xml_rng_perr!(
             ctxt,
             doc.as_ptr(),
@@ -5918,8 +5914,8 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
             xml_free_doc(document);
         }
         return null_mut();
-    }
-    let ret: XmlRelaxNGPtr = xml_relaxng_parse_document(ctxt, root);
+    };
+    let ret: XmlRelaxNGPtr = xml_relaxng_parse_document(ctxt, root.as_ptr());
     if ret.is_null() {
         if let Some(document) = (*ctxt).document.take() {
             xml_free_doc(document);

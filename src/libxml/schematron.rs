@@ -1102,8 +1102,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
     };
 
     // Then extract the root and Schematron parse it
-    let root: *mut XmlNode = doc.get_root_element();
-    if root.is_null() {
+    let Some(root) = doc.get_root_element() else {
         xml_schematron_perr!(
             ctxt,
             doc.as_ptr() as *mut XmlNode,
@@ -1114,13 +1113,13 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
             xml_free_doc(doc);
         }
         return null_mut();
-    }
+    };
 
-    if !IS_SCHEMATRON!(root, c"schema".as_ptr() as _) {
+    if !IS_SCHEMATRON!(root.as_ptr(), c"schema".as_ptr() as _) {
         let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
         xml_schematron_perr!(
             ctxt,
-            root,
+            root.as_ptr(),
             XmlParserErrors::XmlSchemapNoroot,
             "The XML document '{}' is not a XML schematron document",
             url
@@ -1201,7 +1200,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
                 xml_schematron_perr!(
                     ctxt,
-                    root,
+                    root.as_ptr(),
                     XmlParserErrors::XmlSchemapNoroot,
                     "The schematron document '{}' has no pattern",
                     url
@@ -1897,18 +1896,17 @@ pub unsafe fn xml_schematron_validate_doc(
         return -1;
     }
     (*ctxt).nberrors = 0;
-    let root: *mut XmlNode = (*instance).get_root_element();
-    if root.is_null() {
+    let Some(root) = (*instance).get_root_element() else {
         // TODO
         (*ctxt).nberrors += 1;
         return 1;
-    }
+    };
     if (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutQuiet as i32 != 0
         || (*ctxt).flags == 0
     {
         // we are just trying to assert the validity of the document,
         // speed primes over the output, run in a single pass
-        cur = root;
+        cur = root.as_ptr();
         while !cur.is_null() {
             rule = (*(*ctxt).schema).rules;
             while !rule.is_null() {
@@ -1952,7 +1950,7 @@ pub unsafe fn xml_schematron_validate_doc(
             // compute directly instead of using the pattern matching
             // over the full document...
             // Check the exact semantic
-            cur = root;
+            cur = root.as_ptr();
             while !cur.is_null() {
                 rule = (*pattern).rules;
                 while !rule.is_null() {

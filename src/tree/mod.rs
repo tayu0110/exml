@@ -1015,15 +1015,15 @@ unsafe fn xml_new_reconciled_ns(
 // however, we allow a value of 2 to indicate copy properties and
 // namespace info, but don't recurse on children.
 pub(crate) unsafe fn xml_static_copy_node(
-    node: *mut XmlNode,
+    node: XmlGenericNodePtr,
     doc: Option<XmlDocPtr>,
     parent: *mut XmlNode,
     extended: i32,
 ) -> *mut XmlNode {
-    if node.is_null() {
-        return null_mut();
-    }
-    match (*node).element_type() {
+    // if node.is_null() {
+    //     return null_mut();
+    // }
+    match node.element_type() {
         XmlElementType::XmlTextNode
         | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlElementNode
@@ -1035,24 +1035,23 @@ pub(crate) unsafe fn xml_static_copy_node(
         | XmlElementType::XmlXIncludeStart
         | XmlElementType::XmlXIncludeEnd => {}
         XmlElementType::XmlAttributeNode => {
-            return xml_copy_prop_internal(
-                doc,
-                XmlNodePtr::from_raw(parent).unwrap(),
-                XmlAttrPtr::from_raw(node as _).unwrap().unwrap(),
-            )
-            .map_or(null_mut(), |prop| prop.as_ptr()) as _;
+            let attr = XmlAttrPtr::try_from(node).unwrap();
+            return xml_copy_prop_internal(doc, XmlNodePtr::from_raw(parent).unwrap(), attr)
+                .map_or(null_mut(), |prop| prop.as_ptr()) as _;
         }
         XmlElementType::XmlNamespaceDecl => {
-            return xml_copy_namespace_list(XmlNsPtr::from_raw(node as _).unwrap())
-                .map_or(null_mut(), |ns| ns.as_ptr()) as _;
+            let ns = XmlNsPtr::try_from(node).unwrap();
+            return xml_copy_namespace_list(Some(ns)).map_or(null_mut(), |ns| ns.as_ptr()) as _;
         }
 
+        #[cfg(feature = "libxml_tree")]
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-            #[cfg(feature = "libxml_tree")]
-            {
-                return xml_copy_doc(XmlDocPtr::from_raw(node as _).unwrap().unwrap(), extended)
-                    .map_or(null_mut(), |doc| doc.as_ptr()) as _;
-            }
+            let doc = XmlDocPtr::try_from(node).unwrap();
+            return xml_copy_doc(doc, extended).map_or(null_mut(), |doc| doc.as_ptr()) as _;
+        }
+        #[cfg(not(feature = "libxml_tree"))]
+        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+            return null_mut();
         }
         XmlElementType::XmlDocumentTypeNode
         | XmlElementType::XmlNotationNode
@@ -1065,9 +1064,11 @@ pub(crate) unsafe fn xml_static_copy_node(
         _ => unreachable!(),
     }
 
+    let mut node = XmlNodePtr::try_from(node).unwrap();
+
     // Allocate a new node and fill the fields.
     let Some(mut ret) = XmlNodePtr::new(XmlNode {
-        typ: (*node).element_type(),
+        typ: node.element_type(),
         doc,
         parent: NodePtr::from_ptr(parent),
         ..Default::default()
@@ -1075,24 +1076,24 @@ pub(crate) unsafe fn xml_static_copy_node(
         xml_tree_err_memory("copying node");
         return null_mut();
     };
-    if (*node).name == XML_STRING_TEXT.as_ptr() as _ {
+    if node.name == XML_STRING_TEXT.as_ptr() as _ {
         ret.name = XML_STRING_TEXT.as_ptr() as _;
-    } else if (*node).name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
+    } else if node.name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
         ret.name = XML_STRING_TEXT_NOENC.as_ptr() as _;
-    } else if (*node).name == XML_STRING_COMMENT.as_ptr() as _ {
+    } else if node.name == XML_STRING_COMMENT.as_ptr() as _ {
         ret.name = XML_STRING_COMMENT.as_ptr() as _;
-    } else if !(*node).name.is_null() {
-        ret.name = xml_strdup((*node).name);
+    } else if !node.name.is_null() {
+        ret.name = xml_strdup(node.name);
     }
-    if !matches!((*node).element_type(), XmlElementType::XmlElementNode)
-        && !(*node).content.is_null()
-        && !matches!((*node).element_type(), XmlElementType::XmlEntityRefNode)
-        && !matches!((*node).element_type(), XmlElementType::XmlXIncludeEnd)
-        && !matches!((*node).element_type(), XmlElementType::XmlXIncludeStart)
+    if !matches!(node.element_type(), XmlElementType::XmlElementNode)
+        && !node.content.is_null()
+        && !matches!(node.element_type(), XmlElementType::XmlEntityRefNode)
+        && !matches!(node.element_type(), XmlElementType::XmlXIncludeEnd)
+        && !matches!(node.element_type(), XmlElementType::XmlXIncludeStart)
     {
-        ret.content = xml_strdup((*node).content);
-    } else if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-        ret.line = (*node).line;
+        ret.content = xml_strdup(node.content);
+    } else if matches!(node.element_type(), XmlElementType::XmlElementNode) {
+        ret.line = node.line;
     }
     if !parent.is_null() {
         // this is a tricky part for the node register thing:
@@ -1129,14 +1130,14 @@ pub(crate) unsafe fn xml_static_copy_node(
         return ret.as_ptr();
     }
     if matches!(
-        (*node).element_type(),
+        node.element_type(),
         XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
-    ) && (*node).ns_def.is_some()
+    ) && node.ns_def.is_some()
     {
-        ret.ns_def = xml_copy_namespace_list((*node).ns_def);
+        ret.ns_def = xml_copy_namespace_list(node.ns_def);
     }
 
-    if let Some(node_ns) = (*node).ns {
+    if let Some(node_ns) = node.ns {
         let prefix = node_ns.prefix();
         if let Some(ns) = ret.search_ns(doc, prefix.as_deref()) {
             // reference the existing namespace definition in our own tree.
@@ -1145,7 +1146,8 @@ pub(crate) unsafe fn xml_static_copy_node(
             // Humm, we are copying an element whose namespace is defined
             // out of the new tree scope. Search it in the original tree
             // and add it at the top of the new tree
-            if let Some(ns) = (*node).search_ns((*node).doc, prefix.as_deref()) {
+            let node_doc = node.doc;
+            if let Some(ns) = node.search_ns(node_doc, prefix.as_deref()) {
                 let mut root: *mut XmlNode = ret.as_ptr();
 
                 while let Some(parent) = (*root).parent() {
@@ -1157,14 +1159,14 @@ pub(crate) unsafe fn xml_static_copy_node(
             }
         }
     }
-    if (matches!((*node).element_type(), XmlElementType::XmlElementNode)
-        || matches!((*node).element_type(), XmlElementType::XmlXIncludeStart))
-        && (*node).properties.is_some()
+    if (matches!(node.element_type(), XmlElementType::XmlElementNode)
+        || matches!(node.element_type(), XmlElementType::XmlXIncludeStart))
+        && node.properties.is_some()
     {
-        ret.properties = xml_copy_prop_list(Some(ret), (*node).properties);
+        ret.properties = xml_copy_prop_list(Some(ret), node.properties);
     }
-    if matches!((*node).element_type(), XmlElementType::XmlEntityRefNode) {
-        if doc.map_or(true, |doc| (*node).doc != Some(doc)) {
+    if matches!(node.element_type(), XmlElementType::XmlEntityRefNode) {
+        if doc.map_or(true, |doc| node.doc != Some(doc)) {
             // The copied node will go into a separate document, so
             // to avoid dangling references to the ENTITY_DECL node
             // we cannot keep the reference. Try to find it in the
@@ -1173,15 +1175,16 @@ pub(crate) unsafe fn xml_static_copy_node(
                 .map_or(null_mut(), |e| e.as_ptr()) as *mut XmlNode;
             ret.set_children(NodePtr::from_ptr(children));
         } else {
-            ret.set_children((*node).children());
+            ret.set_children(node.children());
         }
         let children = ret.children();
         ret.set_last(children);
-    } else if let Some(children) = (*node).children().filter(|_| extended != 2) {
+    } else if let Some(children) = node.children().filter(|_| extended != 2) {
         let mut cur = children.as_ptr();
         let mut insert = ret.as_ptr();
         while !cur.is_null() {
-            let copy: *mut XmlNode = xml_static_copy_node(cur, doc, insert, 2);
+            let copy: *mut XmlNode =
+                xml_static_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), doc, insert, 2);
             if copy.is_null() {
                 xml_free_node(ret.as_ptr());
                 return null_mut();
@@ -1215,7 +1218,7 @@ pub(crate) unsafe fn xml_static_copy_node(
 
                 cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
                 insert = (*insert).parent().map_or(null_mut(), |p| p.as_ptr());
-                if cur == node {
+                if cur == node.as_ptr() {
                     cur = null_mut();
                     break;
                 }
@@ -1269,7 +1272,12 @@ pub(crate) unsafe fn xml_static_copy_node_list(
                     q = new.as_ptr() as *mut XmlNode;
                 }
             } else {
-                q = xml_static_copy_node(node, doc, parent, 1);
+                q = xml_static_copy_node(
+                    XmlGenericNodePtr::from_raw(node).unwrap(),
+                    doc,
+                    parent,
+                    1,
+                );
             }
         }
         #[cfg(not(feature = "libxml_tree"))]
@@ -1382,7 +1390,7 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
                 )
                 .map_or(null_mut(), |desc| desc.as_ptr()) as _;
         } else if matches!((*cur).element_type(), XmlElementType::XmlCommentNode) {
-            q = xml_copy_node(cur, 0);
+            q = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 0);
         }
 
         if q.is_null() {
@@ -1894,7 +1902,7 @@ pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<Xm
 ///
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNode")]
-pub unsafe fn xml_copy_node(node: *mut XmlNode, extended: i32) -> *mut XmlNode {
+pub unsafe fn xml_copy_node(node: XmlGenericNodePtr, extended: i32) -> *mut XmlNode {
     let ret: *mut XmlNode = xml_static_copy_node(node, None, null_mut(), extended);
     ret
 }
@@ -1904,7 +1912,7 @@ pub unsafe fn xml_copy_node(node: *mut XmlNode, extended: i32) -> *mut XmlNode {
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlDocCopyNode")]
 pub unsafe fn xml_doc_copy_node(
-    node: *mut XmlNode,
+    node: XmlGenericNodePtr,
     doc: Option<XmlDocPtr>,
     extended: i32,
 ) -> *mut XmlNode {
@@ -2734,36 +2742,6 @@ mod tests {
                                 eprintln!(" {}", n_len);
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_copy_node() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_extended in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let node = gen_xml_node_ptr(n_node, 0);
-                    let extended = gen_int(n_extended, 1);
-
-                    let ret_val = xml_copy_node(node, extended);
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_node_ptr(n_node, node, 0);
-                    des_int(n_extended, extended, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCopyNode",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlCopyNode()");
-                        eprint!(" {}", n_node);
-                        eprintln!(" {}", n_extended);
                     }
                 }
             }

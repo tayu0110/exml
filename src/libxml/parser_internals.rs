@@ -74,9 +74,9 @@ use crate::{
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon,
         NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XML_ENT_CHECKED,
-        XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
-        XML_XML_NAMESPACE,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
+        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
+        XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
 };
 use crate::{
@@ -2439,7 +2439,11 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
                 cur = ent.children.load(Ordering::Relaxed) as _;
                 while !cur.is_null() {
-                    nw = xml_doc_copy_node(cur, (*ctxt).my_doc, 1);
+                    nw = xml_doc_copy_node(
+                        XmlGenericNodePtr::from_raw(cur).unwrap(),
+                        (*ctxt).my_doc,
+                        1,
+                    );
                     if !nw.is_null() {
                         if (*nw)._private.is_null() {
                             (*nw)._private = (*cur)._private;
@@ -2481,7 +2485,11 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 while !cur.is_null() {
                     next = (*cur).next.take().map_or(null_mut(), |n| n.as_ptr());
                     (*cur).set_parent(None);
-                    nw = xml_doc_copy_node(cur, (*ctxt).my_doc, 1);
+                    nw = xml_doc_copy_node(
+                        XmlGenericNodePtr::from_raw(cur).unwrap(),
+                        (*ctxt).my_doc,
+                        1,
+                    );
                     if !nw.is_null() {
                         if (*nw)._private.is_null() {
                             (*nw)._private = (*cur)._private;

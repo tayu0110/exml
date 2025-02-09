@@ -3326,8 +3326,13 @@ pub unsafe fn xml_shell<'a>(
         } {
             #[cfg(feature = "xpath")]
             {
-                let root: *mut XmlNode = doc.get_root_element();
-                xml_shell_register_root_namespaces(ctxt, null_mut(), root, null_mut());
+                let root = doc.get_root_element();
+                xml_shell_register_root_namespaces(
+                    ctxt,
+                    null_mut(),
+                    root.map_or(null_mut(), |node| node.as_ptr()),
+                    null_mut(),
+                );
             }
         } else if {
             #[cfg(feature = "xpath")]

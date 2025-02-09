@@ -46,7 +46,7 @@ use super::{
     xml_free_dtd, xml_free_node_list, xml_free_ns_list, xml_get_doc_entity, xml_new_doc_text,
     xml_new_reference, xml_tree_err, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
     NodePtr, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlEntityType, XmlGenericNodePtr,
-    XmlID, XmlNode, XmlNs, XmlNsPtr, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
+    XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
@@ -120,15 +120,15 @@ impl XmlDoc {
     ///
     /// Returns the `XmlNodePtr` for the root or NULL
     #[doc(alias = "xmlDocGetRootElement")]
-    pub unsafe fn get_root_element(&self) -> *mut XmlNode {
+    pub unsafe fn get_root_element(&self) -> Option<XmlNodePtr> {
         let mut ret = self.children();
         while let Some(now) = ret {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                return now.as_ptr();
+                return XmlNodePtr::from_raw(now.as_ptr()).unwrap();
             }
             ret = now.next();
         }
-        ret.map_or(null_mut(), |r| r.as_ptr())
+        None
     }
 
     /// Get the compression ratio for a document, ZLIB based.

@@ -67,8 +67,8 @@ use crate::{
         },
     },
     tree::{
-        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlDocPtr, XmlElementType,
-        XmlNode, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocPtr,
+        XmlElementType, XmlNode, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xpath::{
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
@@ -4234,7 +4234,7 @@ unsafe fn xml_xpath_next_child_element(
                 return null_mut();
             }
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                return (*cur).as_document_node().unwrap().as_ref().get_root_element();
+                return XmlDocPtr::from_raw(cur as *mut XmlDoc).unwrap().unwrap().get_root_element().map_or(null_mut(), |root| root.as_ptr());
             }
             _ => {
                 return null_mut();
@@ -7230,7 +7230,7 @@ pub unsafe extern "C" fn xml_xpath_register_all_functions(ctxt: XmlXPathContextP
 ///
 /// Returns an int usable as a hash
 #[doc(alias = "xmlXPathNodeValHash")]
-unsafe extern "C" fn xml_xpath_node_val_hash(mut node: *mut XmlNode) -> u32 {
+unsafe fn xml_xpath_node_val_hash(mut node: *mut XmlNode) -> u32 {
     let mut len: i32 = 2;
     let mut string: *const XmlChar;
     let mut tmp: *mut XmlNode;
@@ -7241,11 +7241,11 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: *mut XmlNode) -> u32 {
     }
 
     if matches!((*node).element_type(), XmlElementType::XmlDocumentNode) {
-        tmp = (*node)
-            .as_document_node()
+        tmp = XmlDocPtr::from_raw(node as *mut XmlDoc)
             .unwrap()
-            .as_ref()
-            .get_root_element();
+            .unwrap()
+            .get_root_element()
+            .map_or(null_mut(), |root| root.as_ptr());
         if tmp.is_null() {
             node = (*node).children().map_or(null_mut(), |c| c.as_ptr());
         } else {
