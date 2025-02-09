@@ -1037,7 +1037,7 @@ pub(crate) unsafe fn xml_static_copy_node(
         XmlElementType::XmlAttributeNode => {
             return xml_copy_prop_internal(
                 doc,
-                parent,
+                XmlNodePtr::from_raw(parent).unwrap(),
                 XmlAttrPtr::from_raw(node as _).unwrap().unwrap(),
             )
             .map_or(null_mut(), |prop| prop.as_ptr()) as _;
@@ -1161,7 +1161,7 @@ pub(crate) unsafe fn xml_static_copy_node(
         || matches!((*node).element_type(), XmlElementType::XmlXIncludeStart))
         && (*node).properties.is_some()
     {
-        ret.properties = xml_copy_prop_list(ret.as_ptr(), (*node).properties);
+        ret.properties = xml_copy_prop_list(Some(ret), (*node).properties);
     }
     if matches!((*node).element_type(), XmlElementType::XmlEntityRefNode) {
         if doc.map_or(true, |doc| (*node).doc != Some(doc)) {
