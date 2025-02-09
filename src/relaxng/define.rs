@@ -7,7 +7,7 @@ use crate::{
         relaxng::{xml_relaxng_free_partition, XmlRelaxNGPartitionPtr, XmlRelaxNGType},
         xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr},
     },
-    tree::XmlNode,
+    tree::{XmlNode, XmlNodePtr},
 };
 
 use super::{xml_rng_perr_memory, XmlRelaxNGParserCtxtPtr, XmlRelaxNGTypeLibraryPtr};
@@ -92,7 +92,7 @@ impl Default for XmlRelaxNGDefine {
 #[doc(alias = "xmlRelaxNGNewDefine")]
 pub(crate) unsafe fn xml_relaxng_new_define(
     ctxt: XmlRelaxNGParserCtxtPtr,
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
 ) -> XmlRelaxNGDefinePtr {
     let ret: XmlRelaxNGDefinePtr = xml_malloc(size_of::<XmlRelaxNGDefine>()) as _;
     if ret.is_null() {
@@ -101,7 +101,7 @@ pub(crate) unsafe fn xml_relaxng_new_define(
     }
     std::ptr::write(&mut *ret, XmlRelaxNGDefine::default());
     (*ctxt).def_tab.push(ret);
-    (*ret).node = node;
+    (*ret).node = node.map_or(null_mut(), |node| node.as_ptr());
     (*ret).depth = -1;
     ret
 }

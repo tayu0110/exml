@@ -12,17 +12,16 @@ pub use valid::*;
 
 use crate::{
     libxml::chvalid::xml_is_blank_char,
-    tree::{NodeCommon, XmlElementType, XmlNode},
+    tree::{NodeCommon, XmlElementType, XmlNodePtr},
 };
 
 // The Relax-NG namespace
 pub(crate) const XML_RELAXNG_NS: &str = "http://relaxng.org/ns/structure/1.0";
 
-pub(crate) unsafe fn is_relaxng(node: *mut XmlNode, typ: &str) -> bool {
-    !node.is_null()
-        && (*node).element_type() == XmlElementType::XmlElementNode
-        && (*node).name().as_deref() == Some(typ)
-        && (*node)
+pub(crate) unsafe fn is_relaxng(node: XmlNodePtr, typ: &str) -> bool {
+    node.element_type() == XmlElementType::XmlElementNode
+        && node.name().as_deref() == Some(typ)
+        && node
             .ns
             .map_or(false, |ns| ns.href().as_deref() == Some(XML_RELAXNG_NS))
 }
