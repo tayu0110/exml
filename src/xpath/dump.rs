@@ -7,7 +7,7 @@ use crate::{
         debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node},
         xmlstring::XmlChar,
     },
-    tree::{NodeCommon, XmlElementType},
+    tree::{NodeCommon, XmlAttrPtr, XmlElementType, XmlGenericNodePtr},
     xpath::{
         xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathAxisVal, XmlXPathObjectType, XmlXPathOp,
         XmlXPathTestVal, XmlXPathTypeVal,
@@ -18,7 +18,7 @@ use super::{XmlNodeSet, XmlXPathCompExprPtr, XmlXPathObjectPtr, XmlXPathStepOpPt
 
 unsafe fn xml_xpath_debug_dump_node<'a>(
     output: &mut (impl Write + 'a),
-    cur: Option<&impl NodeCommon>,
+    cur: Option<XmlGenericNodePtr>,
     depth: i32,
 ) {
     let shift = "  ".repeat(depth.clamp(0, 25) as usize);
@@ -35,7 +35,7 @@ unsafe fn xml_xpath_debug_dump_node<'a>(
         write!(output, "{}", shift);
         writeln!(output, " /");
     } else if cur.element_type() == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr(output, cur.as_attribute_node().map(|n| n.as_ref()), depth);
+        xml_debug_dump_attr(output, XmlAttrPtr::try_from(cur).ok(), depth);
     } else {
         xml_debug_dump_one_node(output, Some(cur), depth);
     }
@@ -43,21 +43,21 @@ unsafe fn xml_xpath_debug_dump_node<'a>(
 
 unsafe fn xml_xpath_debug_dump_node_list<'a>(
     output: &mut (impl Write + 'a),
-    cur: Option<&impl NodeCommon>,
+    cur: Option<XmlGenericNodePtr>,
     depth: i32,
 ) {
     let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
-    let Some(cur) = cur else {
+    let Some(mut cur) = cur else {
         write!(output, "{}", shift);
         writeln!(output, "Node is NULL !");
         return;
     };
     xml_debug_dump_one_node(output, Some(cur), depth);
-    let mut cur = cur as &dyn NodeCommon;
     while let Some(next) = cur.next() {
-        xml_debug_dump_one_node(output, Some(&*next.as_ptr()), depth);
-        cur = &*next.as_ptr() as &dyn NodeCommon;
+        let next = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+        xml_debug_dump_one_node(output, Some(next), depth);
+        cur = next;
     }
 }
 
@@ -78,7 +78,7 @@ unsafe fn xml_xpath_debug_dump_node_set<'a>(
     for (i, &node) in cur.node_tab.iter().enumerate() {
         write!(output, "{}", shift);
         write!(output, "{}", i + 1);
-        xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
+        xml_xpath_debug_dump_node(output, XmlGenericNodePtr::from_raw(node), depth + 1);
     }
 }
 
@@ -99,7 +99,9 @@ unsafe fn xml_xpath_debug_dump_value_tree<'a>(
     write!(output, "{}", depth.clamp(0, 25) + 1);
     xml_xpath_debug_dump_node_list(
         output,
-        (*cur.node_tab[0]).children().map(|c| &*c.as_ptr()),
+        (*cur.node_tab[0])
+            .children()
+            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr())),
         depth + 1,
     );
 }
@@ -191,7 +193,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
         XmlXPathObjectType::XPathPoint => {
             write!(output, "Object is a point : index {} in node", (*cur).index,);
             let node = (*cur).user as *mut XmlNode;
-            xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
+            xml_xpath_debug_dump_node(output, XmlGenericNodePtr::from_raw(node), depth + 1);
             writeln!(output);
         }
         #[cfg(feature = "libxml_xptr_locs")]
@@ -206,7 +208,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
                 }
                 writeln!(output, "node");
                 let node = (*cur).user as *mut XmlNode;
-                xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
+                xml_xpath_debug_dump_node(output, XmlGenericNodePtr::from_raw(node), depth + 1);
             } else {
                 writeln!(output, "Object is a range :");
                 write!(output, "{}", shift);
@@ -216,7 +218,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
                 }
                 writeln!(output, "node");
                 let node = (*cur).user as *mut XmlNode;
-                xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
+                xml_xpath_debug_dump_node(output, XmlGenericNodePtr::from_raw(node), depth + 1);
                 write!(output, "{}", shift);
                 write!(output, "To ");
                 if (*cur).index2 >= 0 {
@@ -224,7 +226,7 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
                 }
                 writeln!(output, "node");
                 let node = (*cur).user2 as *mut XmlNode;
-                xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
+                xml_xpath_debug_dump_node(output, XmlGenericNodePtr::from_raw(node), depth + 1);
                 writeln!(output);
             }
         }
