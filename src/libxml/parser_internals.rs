@@ -2010,8 +2010,11 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
                 && (*cur).element_type() == XmlElementType::XmlElementNode
             {
                 if let Some(my_doc) = (*oldctxt).my_doc.filter(|doc| doc.int_subset.is_some()) {
-                    (*oldctxt).valid &=
-                        xml_validate_element(addr_of_mut!((*oldctxt).vctxt), my_doc, cur);
+                    (*oldctxt).valid &= xml_validate_element(
+                        addr_of_mut!((*oldctxt).vctxt),
+                        my_doc,
+                        XmlGenericNodePtr::from_raw(cur),
+                    );
                 }
             }
             (*cur).set_parent(None);

@@ -47,7 +47,7 @@ use crate::libxml::xmlstring::xml_strncmp;
 #[cfg(not(feature = "libxml_regexp"))]
 use crate::tree::{xml_free_node_list, XmlNodePtr};
 #[cfg(feature = "libxml_valid")]
-use crate::tree::{XmlElementPtr, XmlNsPtr};
+use crate::tree::{XmlElementPtr, XmlGenericNodePtr, XmlNsPtr};
 use crate::{
     error::{XmlParserErrors, __xml_raise_error},
     globals::{GenericError, GenericErrorContext, StructuredError},
@@ -3116,7 +3116,7 @@ pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr, dtd: X
     doc.ids.take();
     doc.refs.take();
     let root = doc.get_root_element();
-    ret = xml_validate_element(ctxt, doc, root.map_or(null_mut(), |root| root.as_ptr()));
+    ret = xml_validate_element(ctxt, doc, root.map(|root| root.into()));
     ret &= xml_validate_document_final(ctxt, doc);
     doc.ext_subset = old_ext;
     doc.int_subset = old_int;
@@ -3530,7 +3530,7 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr) -
     }
 
     let root = doc.get_root_element();
-    ret &= xml_validate_element(ctxt, doc, root.map_or(null_mut(), |root| root.as_ptr()));
+    ret &= xml_validate_element(ctxt, doc, root.map(|root| root.into()));
     ret &= xml_validate_document_final(ctxt, doc);
     ret
 }
@@ -3543,16 +3543,15 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr) -
 pub unsafe fn xml_validate_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    root: *mut XmlNode,
+    root: Option<XmlGenericNodePtr>,
 ) -> i32 {
     use crate::tree::XmlNsPtr;
 
-    let mut elem: *mut XmlNode;
     let mut ret: i32 = 1;
 
-    if root.is_null() {
+    let Some(root) = root else {
         return 0;
-    }
+    };
 
     // if doc.is_null() {
     //     return 0;
@@ -3561,12 +3560,15 @@ pub unsafe fn xml_validate_element(
         return 0;
     };
 
-    elem = root;
+    let mut elem = root;
     loop {
-        ret &= xml_validate_one_element(ctxt, doc, elem);
+        ret &= xml_validate_one_element(ctxt, doc, Some(elem));
 
-        if matches!((*elem).element_type(), XmlElementType::XmlElementNode) {
-            let mut attr = (*elem).properties;
+        if let Some(node) = XmlNodePtr::try_from(elem)
+            .ok()
+            .filter(|elem| elem.element_type() == XmlElementType::XmlElementNode)
+        {
+            let mut attr = node.properties;
             while let Some(now) = attr {
                 let value = now
                     .children
@@ -3575,7 +3577,7 @@ pub unsafe fn xml_validate_element(
                 ret &= xml_validate_one_attribute(
                     ctxt,
                     doc,
-                    elem,
+                    node,
                     Some(now),
                     value
                         .as_ref()
@@ -3584,25 +3586,25 @@ pub unsafe fn xml_validate_element(
                 attr = now.next;
             }
 
-            let mut ns = (*elem).ns_def;
+            let mut ns = node.ns_def;
             while let Some(now) = ns {
-                if let Some(elem_ns) = (*elem).ns {
+                if let Some(elem_ns) = node.ns {
                     ret &= xml_validate_one_namespace(
                         ctxt,
                         doc,
-                        elem,
+                        node,
                         elem_ns.prefix().as_deref(),
                         now,
                         now.href,
                     );
                 } else {
-                    ret &= xml_validate_one_namespace(ctxt, doc, elem, None, now, now.href);
+                    ret &= xml_validate_one_namespace(ctxt, doc, node, None, now, now.href);
                 }
                 ns = XmlNsPtr::from_raw(now.next).unwrap();
             }
 
-            if let Some(children) = (*elem).children() {
-                elem = children.as_ptr();
+            if let Some(children) = elem.children() {
+                elem = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
                 continue;
             }
         }
@@ -3612,12 +3614,18 @@ pub unsafe fn xml_validate_element(
                 // goto done;
                 return ret;
             }
-            if (*elem).next.is_some() {
+            if elem.next().is_some() {
                 break;
             }
-            elem = (*elem).parent().map_or(null_mut(), |p| p.as_ptr());
+            elem = elem
+                .parent()
+                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                .unwrap();
         }
-        elem = (*elem).next.map_or(null_mut(), |n| n.as_ptr());
+        elem = elem
+            .next()
+            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()))
+            .unwrap();
     }
 
     // done:
@@ -3631,10 +3639,13 @@ pub unsafe fn xml_validate_element(
 unsafe fn xml_valid_get_elem_decl(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    elem: *mut XmlNode,
+    elem: XmlNodePtr,
     extsubset: *mut i32,
 ) -> Option<XmlElementPtr> {
-    if ctxt.is_null() || elem.is_null() || (*elem).name.is_null() {
+    // if elem.is_null() {
+    //     return None;
+    // }
+    if ctxt.is_null() || elem.name.is_null() {
         return None;
     }
     if !extsubset.is_null() {
@@ -3642,14 +3653,13 @@ unsafe fn xml_valid_get_elem_decl(
     }
 
     // Fetch the declaration for the qualified name
-    let prefix = (*elem).ns.as_deref().and_then(|ns| ns.prefix());
+    let prefix = elem.ns.as_deref().and_then(|ns| ns.prefix());
     let mut elem_decl = None;
     if let Some(prefix) = prefix {
-        elem_decl =
-            xml_get_dtd_qelement_desc(doc.int_subset, &(*elem).name().unwrap(), Some(&prefix));
+        elem_decl = xml_get_dtd_qelement_desc(doc.int_subset, &elem.name().unwrap(), Some(&prefix));
         if elem_decl.is_none() && doc.ext_subset.is_some() {
             elem_decl =
-                xml_get_dtd_qelement_desc(doc.ext_subset, &(*elem).name().unwrap(), Some(&prefix));
+                xml_get_dtd_qelement_desc(doc.ext_subset, &elem.name().unwrap(), Some(&prefix));
             if elem_decl.is_some() && !extsubset.is_null() {
                 *extsubset = 1;
             }
@@ -3660,19 +3670,19 @@ unsafe fn xml_valid_get_elem_decl(
     // This is "non-strict" validation should be done on the
     // full QName but in that case being flexible makes sense.
     if elem_decl.is_none() {
-        elem_decl = xml_get_dtd_element_desc(doc.int_subset, (*elem).name);
+        elem_decl = xml_get_dtd_element_desc(doc.int_subset, elem.name);
         if elem_decl.is_none() && doc.ext_subset.is_some() {
-            elem_decl = xml_get_dtd_element_desc(doc.ext_subset, (*elem).name);
+            elem_decl = xml_get_dtd_element_desc(doc.ext_subset, elem.name);
             if elem_decl.is_some() && !extsubset.is_null() {
                 *extsubset = 1;
             }
         }
     }
     if elem_decl.is_none() {
-        let name = (*elem).name().unwrap();
+        let name = elem.name().unwrap();
         xml_err_valid_node(
             ctxt,
-            elem,
+            elem.as_ptr(),
             XmlParserErrors::XmlDTDUnknownElem,
             format!("No declaration for element {name}\n").as_str(),
             Some(&name),
@@ -3736,19 +3746,19 @@ unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> *mut XmlNode {
 unsafe fn xml_validate_one_cdata_element(
     ctxt: XmlValidCtxtPtr,
     _doc: XmlDocPtr,
-    elem: *mut XmlNode,
+    elem: XmlNodePtr,
 ) -> i32 {
     let mut ret: i32 = 1;
 
     if ctxt.is_null()
         // || doc.is_null()
-        || elem.is_null()
-        || !matches!((*elem).element_type(), XmlElementType::XmlElementNode)
+        // || elem.is_null()
+        || !matches!(elem.element_type(), XmlElementType::XmlElementNode)
     {
         return 0;
     }
 
-    let child = (*elem).children();
+    let child = elem.children();
 
     let mut cur = child;
     'done: while let Some(now) = cur {
@@ -4747,7 +4757,7 @@ unsafe fn xml_validate_element_content(
 pub unsafe fn xml_validate_one_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    elem: *mut XmlNode,
+    elem: Option<XmlGenericNodePtr>,
 ) -> i32 {
     use crate::tree::XmlNsPtr;
 
@@ -4765,14 +4775,14 @@ pub unsafe fn xml_validate_one_element(
         return 0;
     };
 
-    if elem.is_null() {
+    let Some(elem) = elem else {
         return 0;
-    }
-    match (*elem).element_type() {
+    };
+    match elem.element_type() {
         XmlElementType::XmlAttributeNode => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlErrInternalError,
                 "Attribute element not expected\n",
                 None,
@@ -4782,10 +4792,11 @@ pub unsafe fn xml_validate_one_element(
             return 0;
         }
         XmlElementType::XmlTextNode => {
-            if (*elem).children().is_some() {
+            let elem = XmlNodePtr::try_from(elem).unwrap();
+            if elem.children().is_some() {
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    elem.as_ptr(),
                     XmlParserErrors::XmlErrInternalError,
                     "Text element has children !\n",
                     None,
@@ -4794,10 +4805,10 @@ pub unsafe fn xml_validate_one_element(
                 );
                 return 0;
             }
-            if (*elem).ns.is_some() {
+            if elem.ns.is_some() {
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    elem.as_ptr(),
                     XmlParserErrors::XmlErrInternalError,
                     "Text element has namespace !\n",
                     None,
@@ -4806,10 +4817,10 @@ pub unsafe fn xml_validate_one_element(
                 );
                 return 0;
             }
-            if (*elem).content.is_null() {
+            if elem.content.is_null() {
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    elem.as_ptr(),
                     XmlParserErrors::XmlErrInternalError,
                     "Text element has no content !\n",
                     None,
@@ -4832,7 +4843,7 @@ pub unsafe fn xml_validate_one_element(
         XmlElementType::XmlEntityNode => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlErrInternalError,
                 "Entity element not expected\n",
                 None,
@@ -4844,7 +4855,7 @@ pub unsafe fn xml_validate_one_element(
         XmlElementType::XmlNotationNode => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlErrInternalError,
                 "Notation element not expected\n",
                 None,
@@ -4858,7 +4869,7 @@ pub unsafe fn xml_validate_one_element(
         | XmlElementType::XmlDocumentFragNode => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlErrInternalError,
                 "Document element not expected\n",
                 None,
@@ -4870,7 +4881,7 @@ pub unsafe fn xml_validate_one_element(
         XmlElementType::XmlHTMLDocumentNode => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlErrInternalError,
                 "HTML Document not expected\n",
                 None,
@@ -4883,7 +4894,7 @@ pub unsafe fn xml_validate_one_element(
         _ => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlErrInternalError,
                 "unknown element type\n",
                 None,
@@ -4893,6 +4904,9 @@ pub unsafe fn xml_validate_one_element(
             return 0;
         }
     }
+
+    // At this point, `elem` is just `XmlElementNode`.
+    let elem = XmlNodePtr::try_from(elem).unwrap();
 
     // Fetch the declaration
     let Some(elem_decl) = xml_valid_get_elem_decl(ctxt, doc, elem, addr_of_mut!(extsubset)) else {
@@ -4905,10 +4919,10 @@ pub unsafe fn xml_validate_one_element(
         // Check that the element content matches the definition
         match elem_decl.etype {
             XmlElementTypeVal::XmlElementTypeUndefined => {
-                let name = (*elem).name().unwrap();
+                let name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    elem.as_ptr(),
                     XmlParserErrors::XmlDTDUnknownElem,
                     format!("No declaration for element {name}\n").as_str(),
                     Some(&name),
@@ -4918,11 +4932,11 @@ pub unsafe fn xml_validate_one_element(
                 return 0;
             }
             XmlElementTypeVal::XmlElementTypeEmpty => {
-                if (*elem).children().is_some() {
-                    let name = (*elem).name().unwrap();
+                if elem.children().is_some() {
+                    let name = elem.name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        elem,
+                        elem.as_ptr(),
                         XmlParserErrors::XmlDTDNotEmpty,
                         format!("Element {name} was declared EMPTY this one has content\n")
                             .as_str(),
@@ -4943,10 +4957,10 @@ pub unsafe fn xml_validate_one_element(
                 {
                     ret = xml_validate_one_cdata_element(ctxt, doc, elem);
                     if ret == 0 {
-                        let name = (*elem).name().unwrap();
+                        let name = elem.name().unwrap();
                         xml_err_valid_node(
                             ctxt,
-                            elem,
+                            elem.as_ptr(),
                             XmlParserErrors::XmlDTDNotPCDATA,
                             format!(
                                 "Element {name} was declared #PCDATA but contains non text nodes\n"
@@ -4958,7 +4972,7 @@ pub unsafe fn xml_validate_one_element(
                         );
                     }
                 } else {
-                    child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
+                    child = elem.children().map_or(null_mut(), |c| c.as_ptr());
                     // Hum, this start to get messy
                     while !child.is_null() {
                         'child_ok: {
@@ -5066,10 +5080,10 @@ pub unsafe fn xml_validate_one_element(
                                 }
                                 if cont.is_null() {
                                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                                    let elem_name = (*elem).name().unwrap();
+                                    let elem_name = elem.name().unwrap();
                                     xml_err_valid_node(
                                         ctxt,
-                                        elem,
+                                        elem.as_ptr(),
                                         XmlParserErrors::XmlDTDInvalidChild,
                                         format!("Element {name} is not declared in {elem_name} list of possible children\n").as_str(),
                                         Some(&name),
@@ -5090,7 +5104,7 @@ pub unsafe fn xml_validate_one_element(
                     // VC: Standalone Document Declaration
                     //     - element types with element content, if white space
                     //       occurs directly within any instance of those types.
-                    child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
+                    child = elem.children().map_or(null_mut(), |c| c.as_ptr());
                     while !child.is_null() {
                         if matches!((*child).element_type(), XmlElementType::XmlTextNode) {
                             let mut content: *const XmlChar = (*child).content;
@@ -5099,10 +5113,10 @@ pub unsafe fn xml_validate_one_element(
                                 content = content.add(1);
                             }
                             if *content == 0 {
-                                let name = (*elem).name().unwrap();
+                                let name = elem.name().unwrap();
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem,
+                                    elem.as_ptr(),
                                     XmlParserErrors::XmlDTDStandaloneWhiteSpace,
                                     format!("standalone: {name} declared in the external subset contains white spaces nodes\n").as_str(),
                                     Some(&name),
@@ -5116,9 +5130,9 @@ pub unsafe fn xml_validate_one_element(
                         child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
                     }
                 }
-                child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
+                child = elem.children().map_or(null_mut(), |c| c.as_ptr());
                 // cont = (*elem_decl).content;
-                tmp = xml_validate_element_content(ctxt, child, elem_decl, 1, elem);
+                tmp = xml_validate_element_content(ctxt, child, elem_decl, 1, elem.as_ptr());
                 if tmp <= 0 {
                     ret = tmp;
                 }
@@ -5135,7 +5149,7 @@ pub unsafe fn xml_validate_one_element(
 
                 if cur_attr.prefix.is_none() && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
                 {
-                    let mut ns = (*elem).ns_def;
+                    let mut ns = elem.ns_def;
                     while let Some(now) = ns {
                         if now.prefix().is_none() {
                             break 'found;
@@ -5143,7 +5157,7 @@ pub unsafe fn xml_validate_one_element(
                         ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 } else if cur_attr.prefix.as_deref() == Some("xmlns") {
-                    let mut ns = (*elem).ns_def;
+                    let mut ns = elem.ns_def;
                     while let Some(now) = ns {
                         if cur_attr.name() == now.prefix() {
                             break 'found;
@@ -5151,11 +5165,11 @@ pub unsafe fn xml_validate_one_element(
                         ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 } else {
-                    let mut attrib = (*elem).properties;
+                    let mut attrib = elem.properties;
                     while let Some(attr) = attrib {
                         if xml_str_equal(attr.name, cur_attr.name) {
                             if let Some(prefix) = cur_attr.prefix.as_deref() {
-                                let name_space = attr.ns.or((*elem).ns);
+                                let name_space = attr.ns.or(elem.ns);
 
                                 // qualified names handling is problematic, having a
                                 // different prefix should be possible but DTDs don't
@@ -5183,11 +5197,11 @@ pub unsafe fn xml_validate_one_element(
                 }
                 if qualified == -1 {
                     if cur_attr.prefix.is_none() {
-                        let elem_name = (*elem).name().unwrap();
+                        let elem_name = elem.name().unwrap();
                         let attr_name = cur_attr.name().unwrap();
                         xml_err_valid_node(
                             ctxt,
-                            elem,
+                            elem.as_ptr(),
                             XmlParserErrors::XmlDTDMissingAttribute,
                             format!("Element {elem_name} does not carry attribute {attr_name}\n")
                                 .as_str(),
@@ -5197,12 +5211,12 @@ pub unsafe fn xml_validate_one_element(
                         );
                         ret = 0;
                     } else {
-                        let elem_name = (*elem).name().unwrap();
+                        let elem_name = elem.name().unwrap();
                         let prefix = cur_attr.prefix.as_deref().unwrap();
                         let attr_name = cur_attr.name().unwrap();
                         xml_err_valid_node(
                             ctxt,
-                            elem,
+                            elem.as_ptr(),
                             XmlParserErrors::XmlDTDMissingAttribute,
                             format!("Element {elem_name} does not carry attribute {prefix}:{attr_name}\n").as_str(),
                             Some(&elem_name),
@@ -5214,20 +5228,20 @@ pub unsafe fn xml_validate_one_element(
                 } else if qualified == 0 {
                     xml_err_valid_warning!(
                         ctxt,
-                        elem,
+                        elem.as_ptr(),
                         XmlParserErrors::XmlDTDNoPrefix,
                         "Element {} required attribute {}:{} has no prefix\n",
-                        (*elem).name().unwrap(),
+                        elem.name().unwrap().into_owned(),
                         cur_attr.prefix.as_deref().unwrap(),
                         cur_attr.name().unwrap().into_owned()
                     );
                 } else if qualified == 1 {
                     xml_err_valid_warning!(
                         ctxt,
-                        elem,
+                        elem.as_ptr(),
                         XmlParserErrors::XmlDTDDifferentPrefix,
                         "Element {} required attribute {}:{} has different prefix\n",
-                        (*elem).name().unwrap(),
+                        elem.name().unwrap().into_owned(),
                         cur_attr.prefix.as_deref().unwrap(),
                         cur_attr.name().unwrap().into_owned()
                     );
@@ -5238,14 +5252,14 @@ pub unsafe fn xml_validate_one_element(
                 // attribute checking
                 if cur_attr.prefix.is_none() && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
                 {
-                    let mut ns = (*elem).ns_def;
+                    let mut ns = elem.ns_def;
                     while let Some(now) = ns {
                         if now.prefix().is_none() {
                             if !xml_str_equal(cur_attr.default_value, now.href) {
-                                let elem_name = (*elem).name().unwrap();
+                                let elem_name = elem.name().unwrap();
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem,
+                                    elem.as_ptr(),
                                     XmlParserErrors::XmlDTDElemDefaultNamespace,
                                     format!("Element {elem_name} namespace name for default namespace does not match the DTD\n").as_str(),
                                     Some(&elem_name),
@@ -5259,15 +5273,15 @@ pub unsafe fn xml_validate_one_element(
                         ns = XmlNsPtr::from_raw(now.next).unwrap();
                     }
                 } else if cur_attr.prefix.as_deref() == Some("xmlns") {
-                    let mut ns = (*elem).ns_def;
+                    let mut ns = elem.ns_def;
                     while let Some(now) = ns {
                         if cur_attr.name() == now.prefix() {
                             if !xml_str_equal(cur_attr.default_value, now.href) {
-                                let elem_name = (*elem).name().unwrap();
+                                let elem_name = elem.name().unwrap();
                                 let prefix = now.prefix().unwrap();
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem,
+                                    elem.as_ptr(),
                                     XmlParserErrors::XmlDTDElemNamespace,
                                     format!(
                                         "Element {elem_name} namespace name for {prefix} does not match the DTD\n"
@@ -5312,7 +5326,7 @@ pub unsafe fn xml_validate_one_element(
 pub unsafe fn xml_validate_one_attribute(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    elem: *mut XmlNode,
+    elem: XmlNodePtr,
     attr: Option<XmlAttrPtr>,
     value: *const XmlChar,
 ) -> i32 {
@@ -5324,7 +5338,10 @@ pub unsafe fn xml_validate_one_attribute(
     if doc.int_subset.is_none() && doc.ext_subset.is_none() {
         return 0;
     };
-    if elem.is_null() || (*elem).name.is_null() {
+    // if elem.is_null() {
+    //     return 0;
+    // }
+    if elem.name.is_null() {
         return 0;
     }
     let Some(mut attr) = attr.filter(|a| !a.name.is_null()) else {
@@ -5332,11 +5349,11 @@ pub unsafe fn xml_validate_one_attribute(
     };
 
     let mut attr_decl = None;
-    if let Some(prefix) = (*elem).ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+    if let Some(prefix) = elem.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
         let mut fname: [XmlChar; 50] = [0; 50];
 
         let fullname: *mut XmlChar =
-            xml_build_qname((*elem).name, prefix as _, fname.as_mut_ptr(), 50);
+            xml_build_qname(elem.name, prefix as _, fname.as_mut_ptr(), 50);
         if fullname.is_null() {
             return 0;
         }
@@ -5381,7 +5398,7 @@ pub unsafe fn xml_validate_one_attribute(
                 });
             }
         }
-        if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
+        if fullname != fname.as_ptr() as _ && fullname != elem.name as _ {
             xml_free(fullname as _);
         }
     }
@@ -5389,7 +5406,7 @@ pub unsafe fn xml_validate_one_attribute(
         if let Some(attr_ns) = attr.ns {
             attr_decl = doc.int_subset.and_then(|dtd| {
                 dtd.get_qattr_desc(
-                    (*elem).name().unwrap().as_ref(),
+                    elem.name().unwrap().as_ref(),
                     attr.name().as_deref().unwrap(),
                     attr_ns.prefix().as_deref(),
                 )
@@ -5397,7 +5414,7 @@ pub unsafe fn xml_validate_one_attribute(
             if attr_decl.is_none() && doc.ext_subset.is_some() {
                 attr_decl = doc.ext_subset.and_then(|dtd| {
                     dtd.get_qattr_desc(
-                        (*elem).name().unwrap().as_ref(),
+                        elem.name().unwrap().as_ref(),
                         attr.name().as_deref().unwrap(),
                         attr_ns.prefix().as_deref(),
                     )
@@ -5406,14 +5423,14 @@ pub unsafe fn xml_validate_one_attribute(
         } else {
             attr_decl = doc.int_subset.and_then(|dtd| {
                 dtd.get_attr_desc(
-                    (*elem).name().as_deref().unwrap(),
+                    elem.name().as_deref().unwrap(),
                     attr.name().as_deref().unwrap(),
                 )
             });
             if attr_decl.is_none() && doc.ext_subset.is_some() {
                 attr_decl = doc.ext_subset.and_then(|dtd| {
                     dtd.get_attr_desc(
-                        (*elem).name().as_deref().unwrap(),
+                        elem.name().as_deref().unwrap(),
                         attr.name().as_deref().unwrap(),
                     )
                 });
@@ -5424,10 +5441,10 @@ pub unsafe fn xml_validate_one_attribute(
     // Validity Constraint: Attribute Value Type
     let Some(attr_decl) = attr_decl else {
         let attr_name = attr.name().unwrap();
-        let elem_name = (*elem).name().unwrap();
+        let elem_name = elem.name().unwrap();
         xml_err_valid_node(
             ctxt,
-            elem,
+            elem.as_ptr(),
             XmlParserErrors::XmlDTDUnknownAttribute,
             format!("No declaration for attribute {attr_name} of element {elem_name}\n").as_str(),
             Some(&attr_name),
@@ -5441,10 +5458,10 @@ pub unsafe fn xml_validate_one_attribute(
     let val: i32 = xml_validate_attribute_value_internal(Some(doc), attr_decl.atype, value);
     if val == 0 {
         let attr_name = attr.name().unwrap();
-        let elem_name = (*elem).name().unwrap();
+        let elem_name = elem.name().unwrap();
         xml_err_valid_node(
             ctxt,
-            elem,
+            elem.as_ptr(),
             XmlParserErrors::XmlDTDAttributeValue,
             format!("Syntax of value for attribute {attr_name} of {elem_name} is not valid\n")
                 .as_str(),
@@ -5460,11 +5477,11 @@ pub unsafe fn xml_validate_one_attribute(
         && !xml_str_equal(value, attr_decl.default_value)
     {
         let attr_name = attr.name().unwrap();
-        let elem_name = (*elem).name().unwrap();
+        let elem_name = elem.name().unwrap();
         let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem,
+            elem.as_ptr(),
             XmlParserErrors::XmlDTDAttributeDefault,
             format!(
                 "Value for attribute {attr_name} of {elem_name} is different from default \"{def_value}\"\n"
@@ -5519,10 +5536,10 @@ pub unsafe fn xml_validate_one_attribute(
 
         if nota.is_none() {
             let attr_name = attr.name().unwrap();
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDUnknownNotation,
                 format!("Value \"{value}\" for attribute {attr_name} of {elem_name} is not a declared Notation\n").as_str(),
                 Some(&value),
@@ -5541,10 +5558,10 @@ pub unsafe fn xml_validate_one_attribute(
         }
         if tree.is_none() {
             let attr_name = attr.name().unwrap();
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDNotationValue,
                 format!("Value \"{value}\" for attribute {attr_name} of {elem_name} is not among the enumerated notations\n").as_str(),
                 Some(&value),
@@ -5567,10 +5584,10 @@ pub unsafe fn xml_validate_one_attribute(
         if tree.is_none() {
             let value = CStr::from_ptr(value as *const i8).to_string_lossy();
             let attr_name = attr.name().unwrap();
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDAttributeValue,
                 format!("Value \"{value}\" for attribute {attr_name} of {elem_name} is not among the enumerated set\n")
                     .as_str(),
@@ -5587,11 +5604,11 @@ pub unsafe fn xml_validate_one_attribute(
         && !xml_str_equal(attr_decl.default_value, value)
     {
         let attr_name = attr.name().unwrap();
-        let elem_name = (*elem).name().unwrap();
+        let elem_name = elem.name().unwrap();
         let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem,
+            elem.as_ptr(),
             XmlParserErrors::XmlDTDAttributeValue,
             format!("Value for attribute {attr_name} of {elem_name} must be \"{def_value}\"\n")
                 .as_str(),
@@ -5634,7 +5651,7 @@ pub unsafe fn xml_validate_one_attribute(
 pub unsafe fn xml_validate_one_namespace(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    elem: *mut XmlNode,
+    elem: XmlNodePtr,
     prefix: Option<&str>,
     ns: XmlNsPtr,
     value: *const XmlChar,
@@ -5649,7 +5666,10 @@ pub unsafe fn xml_validate_one_namespace(
     if doc.int_subset.is_none() && doc.ext_subset.is_none() {
         return 0;
     };
-    if elem.is_null() || (*elem).name.is_null() {
+    // if elem.is_null() {
+    //     return 0;
+    // }
+    if elem.name.is_null() {
         return 0;
     }
     if ns.href.is_null() {
@@ -5662,7 +5682,7 @@ pub unsafe fn xml_validate_one_namespace(
         let prefix = CString::new(prefix).unwrap();
 
         let fullname: *mut XmlChar = xml_build_qname(
-            (*elem).name,
+            elem.name,
             prefix.as_ptr() as *const u8,
             fname.as_mut_ptr(),
             50,
@@ -5712,28 +5732,28 @@ pub unsafe fn xml_validate_one_namespace(
                 });
             }
         }
-        if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
+        if fullname != fname.as_ptr() as _ && fullname != elem.name as _ {
             xml_free(fullname as _);
         }
     }
     if attr_decl.is_none() {
         if let Some(prefix) = (*ns).prefix() {
             attr_decl = doc.int_subset.and_then(|dtd| {
-                dtd.get_qattr_desc((*elem).name().unwrap().as_ref(), &prefix, Some("xmlns"))
+                dtd.get_qattr_desc(elem.name().unwrap().as_ref(), &prefix, Some("xmlns"))
             });
             if attr_decl.is_none() && doc.ext_subset.is_some() {
                 attr_decl = doc.ext_subset.and_then(|dtd| {
-                    dtd.get_qattr_desc((*elem).name().unwrap().as_ref(), &prefix, Some("xmlns"))
+                    dtd.get_qattr_desc(elem.name().unwrap().as_ref(), &prefix, Some("xmlns"))
                 });
             }
         } else {
             attr_decl = doc
                 .int_subset
-                .and_then(|dtd| dtd.get_attr_desc((*elem).name().as_deref().unwrap(), "xmlns"));
+                .and_then(|dtd| dtd.get_attr_desc(elem.name().as_deref().unwrap(), "xmlns"));
             if attr_decl.is_none() && doc.ext_subset.is_some() {
                 attr_decl = doc
                     .ext_subset
-                    .and_then(|dtd| dtd.get_attr_desc((*elem).name().as_deref().unwrap(), "xmlns"));
+                    .and_then(|dtd| dtd.get_attr_desc(elem.name().as_deref().unwrap(), "xmlns"));
             }
         }
     }
@@ -5741,10 +5761,10 @@ pub unsafe fn xml_validate_one_namespace(
     // Validity Constraint: Attribute Value Type
     let Some(attr_decl) = attr_decl else {
         if let Some(prefix) = (*ns).prefix() {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDUnknownAttribute,
                 format!("No declaration for attribute xmlns:{prefix} of element {elem_name}\n")
                     .as_str(),
@@ -5753,10 +5773,10 @@ pub unsafe fn xml_validate_one_namespace(
                 None,
             );
         } else {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDUnknownAttribute,
                 format!("No declaration for attribute xmlns of element {elem_name}\n").as_str(),
                 Some(&elem_name),
@@ -5770,10 +5790,10 @@ pub unsafe fn xml_validate_one_namespace(
     let val: i32 = xml_validate_attribute_value_internal(Some(doc), attr_decl.atype, value);
     if val == 0 {
         if let Some(prefix) = (*ns).prefix() {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDInvalidDefault,
                 format!(
                     "Syntax of value for attribute xmlns:{prefix} of {elem_name} is not valid\n"
@@ -5784,10 +5804,10 @@ pub unsafe fn xml_validate_one_namespace(
                 None,
             );
         } else {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDInvalidDefault,
                 format!("Syntax of value for attribute xmlns of {elem_name} is not valid\n")
                     .as_str(),
@@ -5804,11 +5824,11 @@ pub unsafe fn xml_validate_one_namespace(
         && !xml_str_equal(value, attr_decl.default_value)
     {
         if let Some(prefix) = (*ns).prefix() {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDAttributeDefault,
                 format!("Value for attribute xmlns:{prefix} of {elem_name} is different from default \"{def_value}\"\n").as_str(),
                 Some(&prefix),
@@ -5816,11 +5836,11 @@ pub unsafe fn xml_validate_one_namespace(
                 Some(&def_value),
             );
         } else {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDAttributeDefault,
                 format!("Value for attribute xmlns of {elem_name} is different from default \"{def_value}\"\n")
                     .as_str(),
@@ -5858,10 +5878,10 @@ pub unsafe fn xml_validate_one_namespace(
 
         if nota.is_none() {
             if let Some(prefix) = (*ns).prefix() {
-                let elem_name = (*elem).name().unwrap();
+                let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    elem.as_ptr(),
                     XmlParserErrors::XmlDTDUnknownNotation,
                     format!("Value \"{value}\" for attribute xmlns:{prefix} of {elem_name} is not a declared Notation\n").as_str(),
                     Some(&value),
@@ -5869,10 +5889,10 @@ pub unsafe fn xml_validate_one_namespace(
                     Some(&elem_name),
                 );
             } else {
-                let elem_name = (*elem).name().unwrap();
+                let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    elem.as_ptr(),
                     XmlParserErrors::XmlDTDUnknownNotation,
                     format!("Value \"{value}\" for attribute xmlns of {elem_name} is not a declared Notation\n").as_str(),
                     Some(&value),
@@ -5891,11 +5911,11 @@ pub unsafe fn xml_validate_one_namespace(
             tree = now.next.as_deref();
         }
         if tree.is_none() {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             if let Some(prefix) = (*ns).prefix() {
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    elem.as_ptr(),
                     XmlParserErrors::XmlDTDNotationValue,
                     format!("Value \"{value}\" for attribute xmlns:{prefix} of {elem_name} is not among the enumerated notations\n").as_str(),
                     Some(&value),
@@ -5905,7 +5925,7 @@ pub unsafe fn xml_validate_one_namespace(
             } else {
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    elem.as_ptr(),
                     XmlParserErrors::XmlDTDNotationValue,
                     format!("Value \"{value}\" for attribute xmlns of {elem_name} is not among the enumerated notations\n").as_str(),
                     Some(&value),
@@ -5929,10 +5949,10 @@ pub unsafe fn xml_validate_one_namespace(
         if tree.is_none() {
             if let Some(prefix) = (*ns).prefix() {
                 let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                let elem_name = (*elem).name().unwrap();
+                let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    elem.as_ptr(),
                     XmlParserErrors::XmlDTDAttributeValue,
                     format!("Value \"{value}\" for attribute xmlns:{prefix} of {elem_name} is not among the enumerated set\n").as_str(),
                     Some(&value),
@@ -5941,10 +5961,10 @@ pub unsafe fn xml_validate_one_namespace(
                 );
             } else {
                 let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                let elem_name = (*elem).name().unwrap();
+                let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    elem.as_ptr(),
                     XmlParserErrors::XmlDTDAttributeValue,
                     format!(
                         "Value \"{value}\" for attribute xmlns of {elem_name} is not among the enumerated set\n"
@@ -5964,11 +5984,11 @@ pub unsafe fn xml_validate_one_namespace(
         && !xml_str_equal(attr_decl.default_value, value)
     {
         if let Some(prefix) = (*ns).prefix() {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDElemNamespace,
                 format!(
                     "Value for attribute xmlns:{prefix} of {elem_name} must be \"{def_value}\"\n"
@@ -5979,11 +5999,11 @@ pub unsafe fn xml_validate_one_namespace(
                 Some(&def_value),
             );
         } else {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                elem.as_ptr(),
                 XmlParserErrors::XmlDTDElemNamespace,
                 format!("Value for attribute xmlns of {elem_name} must be \"{def_value}\"\n")
                     .as_str(),
@@ -6469,7 +6489,12 @@ pub unsafe fn xml_valid_get_valid_elements(
 
     for i in 0..nb_elements {
         test_node.name = elements[i as usize];
-        if xml_validate_one_element(addr_of_mut!(vctxt) as _, (*parent).doc.unwrap(), parent) != 0 {
+        if xml_validate_one_element(
+            addr_of_mut!(vctxt) as _,
+            (*parent).doc.unwrap(),
+            XmlGenericNodePtr::from_raw(parent),
+        ) != 0
+        {
             for j in 0..nb_valid_elements {
                 if xml_str_equal(elements[i as usize], *names.add(j as usize)) {
                     break;
@@ -7016,7 +7041,7 @@ unsafe fn vstate_vpush(
 pub unsafe fn xml_validate_push_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    elem: *mut XmlNode,
+    elem: XmlNodePtr,
     qname: *const XmlChar,
 ) -> i32 {
     let mut ret: i32 = 1;
@@ -7116,7 +7141,7 @@ pub unsafe fn xml_validate_push_element(
         }
     }
     let e_decl = xml_valid_get_elem_decl(ctxt, doc, elem, addr_of_mut!(extsubset));
-    vstate_vpush(ctxt, e_decl, elem);
+    vstate_vpush(ctxt, e_decl, elem.as_ptr());
     ret
 }
 
@@ -7230,7 +7255,7 @@ unsafe fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
 pub unsafe fn xml_validate_pop_element(
     ctxt: XmlValidCtxtPtr,
     _doc: Option<XmlDocPtr>,
-    _elem: *mut XmlNode,
+    _elem: Option<XmlNodePtr>,
     _qname: *const XmlChar,
 ) -> i32 {
     let mut ret: i32 = 1;

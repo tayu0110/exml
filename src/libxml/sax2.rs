@@ -53,7 +53,7 @@ use crate::{
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
         NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
-        XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        XmlEnumeration, XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -1456,7 +1456,7 @@ unsafe fn xml_sax2_attribute_internal(
                     (*ctxt).valid &= xml_validate_one_namespace(
                         addr_of_mut!((*ctxt).vctxt) as _,
                         my_doc,
-                        (*ctxt).node,
+                        XmlNodePtr::from_raw((*ctxt).node).unwrap().unwrap(),
                         prefix,
                         nsret.unwrap(),
                         val,
@@ -1533,7 +1533,7 @@ unsafe fn xml_sax2_attribute_internal(
                 (*ctxt).valid &= xml_validate_one_namespace(
                     addr_of_mut!((*ctxt).vctxt) as _,
                     my_doc,
-                    (*ctxt).node,
+                    XmlNodePtr::from_raw((*ctxt).node).unwrap().unwrap(),
                     prefix,
                     nsret.unwrap(),
                     value,
@@ -1649,7 +1649,7 @@ unsafe fn xml_sax2_attribute_internal(
                     (*ctxt).valid &= xml_validate_one_attribute(
                         addr_of_mut!((*ctxt).vctxt) as _,
                         my_doc,
-                        (*ctxt).node,
+                        XmlNodePtr::from_raw((*ctxt).node).unwrap().unwrap(),
                         Some(ret),
                         value,
                     );
@@ -1667,7 +1667,7 @@ unsafe fn xml_sax2_attribute_internal(
                     (*ctxt).valid &= xml_validate_one_attribute(
                         addr_of_mut!((*ctxt).vctxt) as _,
                         my_doc,
-                        (*ctxt).node,
+                        XmlNodePtr::from_raw((*ctxt).node).unwrap().unwrap(),
                         Some(ret),
                         val,
                     );
@@ -1677,7 +1677,7 @@ unsafe fn xml_sax2_attribute_internal(
                 (*ctxt).valid &= xml_validate_one_attribute(
                     addr_of_mut!((*ctxt).vctxt) as _,
                     my_doc,
-                    (*ctxt).node,
+                    XmlNodePtr::from_raw((*ctxt).node).unwrap().unwrap(),
                     Some(ret),
                     value,
                 );
@@ -2047,6 +2047,8 @@ pub unsafe fn xml_sax2_start_element(
 #[doc(alias = "xmlSAX2EndElement")]
 #[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
 pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: &str) {
+    use crate::tree::XmlGenericNodePtr;
+
     if ctx.is_none() {
         return;
     }
@@ -2060,12 +2062,13 @@ pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: &str
     (*ctxt).nodemem = -1;
 
     #[cfg(feature = "libxml_valid")]
-    {
-        if (*ctxt).validate != 0 && (*ctxt).well_formed != 0 {
-            if let Some(my_doc) = (*ctxt).my_doc.filter(|doc| doc.int_subset.is_some()) {
-                (*ctxt).valid &=
-                    xml_validate_one_element(addr_of_mut!((*ctxt).vctxt) as _, my_doc, cur);
-            }
+    if (*ctxt).validate != 0 && (*ctxt).well_formed != 0 {
+        if let Some(my_doc) = (*ctxt).my_doc.filter(|doc| doc.int_subset.is_some()) {
+            (*ctxt).valid &= xml_validate_one_element(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                my_doc,
+                XmlGenericNodePtr::from_raw(cur),
+            );
         }
     }
 
@@ -2200,7 +2203,7 @@ pub unsafe fn xml_sax2_start_element_ns(
                 (*ctxt).valid &= xml_validate_one_namespace(
                     addr_of_mut!((*ctxt).vctxt) as _,
                     my_doc,
-                    ret.as_ptr(),
+                    ret,
                     prefix,
                     ns,
                     uri.as_ptr() as *const u8,
@@ -2528,7 +2531,7 @@ unsafe fn xml_sax2_attribute_ns(
                     (*ctxt).valid &= xml_validate_one_attribute(
                         addr_of_mut!((*ctxt).vctxt) as _,
                         (*ctxt).my_doc.unwrap(),
-                        (*ctxt).node,
+                        XmlNodePtr::from_raw((*ctxt).node).unwrap().unwrap(),
                         Some(ret),
                         value.as_ptr() as *const u8,
                     );
@@ -2572,7 +2575,7 @@ unsafe fn xml_sax2_attribute_ns(
                     (*ctxt).valid &= xml_validate_one_attribute(
                         addr_of_mut!((*ctxt).vctxt) as _,
                         (*ctxt).my_doc.unwrap(),
-                        (*ctxt).node,
+                        XmlNodePtr::from_raw((*ctxt).node).unwrap().unwrap(),
                         Some(ret),
                         dup,
                     );
@@ -2585,7 +2588,7 @@ unsafe fn xml_sax2_attribute_ns(
                 (*ctxt).valid &= xml_validate_one_attribute(
                     addr_of_mut!((*ctxt).vctxt) as _,
                     (*ctxt).my_doc.unwrap(),
-                    (*ctxt).node,
+                    XmlNodePtr::from_raw((*ctxt).node).unwrap().unwrap(),
                     Some(ret),
                     dup,
                 );
@@ -2690,8 +2693,11 @@ pub unsafe fn xml_sax2_end_element_ns(
     #[cfg(feature = "libxml_valid")]
     if (*ctxt).validate != 0 && (*ctxt).well_formed != 0 {
         if let Some(my_doc) = (*ctxt).my_doc.filter(|doc| doc.int_subset.is_some()) {
-            (*ctxt).valid &=
-                xml_validate_one_element(addr_of_mut!((*ctxt).vctxt) as _, my_doc, (*ctxt).node);
+            (*ctxt).valid &= xml_validate_one_element(
+                addr_of_mut!((*ctxt).vctxt) as _,
+                my_doc,
+                XmlGenericNodePtr::from_raw((*ctxt).node),
+            );
         }
     }
 

@@ -1242,7 +1242,7 @@ impl XmlTextReader {
                 (*self.ctxt).valid &= xml_validate_push_element(
                     addr_of_mut!((*self.ctxt).vctxt),
                     (*self.ctxt).my_doc.unwrap(),
-                    node,
+                    XmlNodePtr::from_raw(node).unwrap().unwrap(),
                     qname,
                 );
                 if !qname.is_null() {
@@ -1252,7 +1252,7 @@ impl XmlTextReader {
                 (*self.ctxt).valid &= xml_validate_push_element(
                     addr_of_mut!((*self.ctxt).vctxt),
                     (*self.ctxt).my_doc.unwrap(),
-                    node,
+                    XmlNodePtr::from_raw(node).unwrap().unwrap(),
                     (*node).name,
                 );
             }
@@ -1289,6 +1289,8 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderValidatePop")]
     #[cfg(feature = "libxml_reader")]
     unsafe fn validate_pop(&mut self) {
+        use crate::tree::XmlNodePtr;
+
         let node: *mut XmlNode = self.node;
 
         #[cfg(feature = "libxml_valid")]
@@ -1305,7 +1307,7 @@ impl XmlTextReader {
                 (*self.ctxt).valid &= xml_validate_pop_element(
                     addr_of_mut!((*self.ctxt).vctxt),
                     (*self.ctxt).my_doc,
-                    node,
+                    XmlNodePtr::from_raw(node).unwrap(),
                     qname,
                 );
                 if !qname.is_null() {
@@ -1315,7 +1317,7 @@ impl XmlTextReader {
                 (*self.ctxt).valid &= xml_validate_pop_element(
                     addr_of_mut!((*self.ctxt).vctxt),
                     (*self.ctxt).my_doc,
-                    node,
+                    XmlNodePtr::from_raw(node).unwrap(),
                     (*node).name,
                 );
             }
@@ -4251,12 +4253,7 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
     if !reader.ctxt.is_null() {
         #[cfg(all(feature = "libxml_regexp", feature = "libxml_valid"))]
         while !(*reader.ctxt).vctxt.vstate_tab.is_empty() {
-            xml_validate_pop_element(
-                addr_of_mut!((*reader.ctxt).vctxt),
-                None,
-                null_mut(),
-                null_mut(),
-            );
+            xml_validate_pop_element(addr_of_mut!((*reader.ctxt).vctxt), None, None, null_mut());
         }
         (*reader.ctxt).vctxt.vstate_tab.clear();
         (*reader.ctxt).stop();
