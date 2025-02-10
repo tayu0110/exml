@@ -1689,7 +1689,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: *mu
 #[doc(alias = "htmlNodeDumpOutputInternal")]
 #[cfg(feature = "html")]
 unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: *mut XmlNode) -> i32 {
-    use crate::libxml::htmltree::html_node_dump_format_output;
+    use crate::{libxml::htmltree::html_node_dump_format_output, tree::XmlGenericNodePtr};
 
     let mut oldenc = None;
     let oldctxtenc = ctxt.encoding.clone();
@@ -1732,9 +1732,21 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: *mut XmlNo
     }
     let mut buf = ctxt.buf.borrow_mut();
     if ctxt.options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
-        html_node_dump_format_output(&mut buf, doc, cur, encoding.as_deref(), 1);
+        html_node_dump_format_output(
+            &mut buf,
+            doc,
+            XmlGenericNodePtr::from_raw(cur),
+            encoding.as_deref(),
+            1,
+        );
     } else {
-        html_node_dump_format_output(&mut buf, doc, cur, encoding.as_deref(), 0);
+        html_node_dump_format_output(
+            &mut buf,
+            doc,
+            XmlGenericNodePtr::from_raw(cur),
+            encoding.as_deref(),
+            0,
+        );
     }
     drop(buf);
     // Restore the state of the saving context at the end of the document

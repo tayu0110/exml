@@ -686,7 +686,6 @@ pub trait NodeCommon {
     }
 }
 
-#[derive(PartialEq, Eq)]
 pub struct XmlGenericNodePtr(pub(super) NonNull<dyn NodeCommon>);
 
 impl XmlGenericNodePtr {
@@ -701,6 +700,11 @@ impl XmlGenericNodePtr {
 
     pub(crate) fn from_raw<T: NodeCommon>(ptr: *mut T) -> Option<Self> {
         NonNull::new(ptr as *mut dyn NodeCommon).map(Self)
+    }
+
+    // Temporary workaround
+    pub(crate) fn as_ptr(self) -> *mut XmlNode {
+        self.0.as_ptr() as *mut XmlNode
     }
 
     /// Deallocate memory.
@@ -730,6 +734,14 @@ impl Clone for XmlGenericNodePtr {
 }
 
 impl Copy for XmlGenericNodePtr {}
+
+impl PartialEq for XmlGenericNodePtr {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ptr() == other.as_ptr()
+    }
+}
+
+impl Eq for XmlGenericNodePtr {}
 
 impl Deref for XmlGenericNodePtr {
     type Target = dyn NodeCommon;

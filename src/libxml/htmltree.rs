@@ -36,7 +36,7 @@ use crate::{
     },
 };
 #[cfg(feature = "libxml_output")]
-use crate::{error::XmlParserErrors, io::XmlOutputBuffer};
+use crate::{error::XmlParserErrors, io::XmlOutputBuffer, tree::XmlGenericNodePtr};
 
 use super::{
     globals::xml_register_node_default_value,
@@ -693,7 +693,13 @@ unsafe fn html_buf_node_dump_format<'a>(
         return usize::MAX;
     };
 
-    html_node_dump_format_output(&mut outbuf, doc, cur, None, format);
+    html_node_dump_format_output(
+        &mut outbuf,
+        doc,
+        XmlGenericNodePtr::from_raw(cur),
+        None,
+        format,
+    );
     // Is this correct ????
     outbuf.written as usize
 }
@@ -725,7 +731,7 @@ pub unsafe fn html_node_dump<'a>(
 pub unsafe fn html_node_dump_file<'a>(
     out: &mut (impl Write + 'a),
     doc: Option<XmlDocPtr>,
-    cur: *mut XmlNode,
+    cur: Option<XmlGenericNodePtr>,
 ) {
     html_node_dump_file_format(out, doc, cur, null_mut(), 1);
 }
@@ -740,7 +746,7 @@ pub unsafe fn html_node_dump_file<'a>(
 pub unsafe fn html_node_dump_file_format<'a>(
     out: &mut (impl Write + 'a),
     doc: Option<XmlDocPtr>,
-    cur: *mut XmlNode,
+    cur: Option<XmlGenericNodePtr>,
     encoding: *const c_char,
     format: i32,
 ) -> i32 {
@@ -980,7 +986,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr
 pub unsafe fn html_node_dump_format_output(
     buf: &mut XmlOutputBuffer,
     doc: Option<XmlDocPtr>,
-    mut cur: *mut XmlNode,
+    cur: Option<XmlGenericNodePtr>,
     _encoding: Option<&str>,
     format: i32,
 ) {
@@ -994,40 +1000,31 @@ pub unsafe fn html_node_dump_format_output(
             parser_internals::{XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
         },
         save::xml_ns_list_dump_output,
-        tree::{xml_encode_entities_reentrant, NodePtr},
+        tree::{xml_encode_entities_reentrant, NodePtr, XmlNodePtr},
     };
 
     let mut parent: *mut XmlNode;
 
     xml_init_parser();
 
-    if cur.is_null() {
+    let Some(mut cur) = cur else {
         return;
-    }
+    };
 
-    let root: *mut XmlNode = cur;
-    parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+    let root = cur;
+    parent = cur.parent().map_or(null_mut(), |p| p.as_ptr());
     'main: loop {
-        match (*cur).element_type() {
+        match cur.element_type() {
             XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode => {
-                if (*cur)
-                    .as_document_node()
-                    .unwrap()
-                    .as_ref()
-                    .int_subset
-                    .is_some()
-                {
-                    html_dtd_dump_output(
-                        buf,
-                        XmlDocPtr::from_raw(cur as _).unwrap().unwrap(),
-                        null_mut(),
-                    );
+                let doc = XmlDocPtr::try_from(cur).unwrap();
+                if doc.int_subset.is_some() {
+                    html_dtd_dump_output(buf, doc, null_mut());
                 }
-                if let Some(children) = (*cur).children() {
-                    // Always validate (*cur).parent when descending.
-                    if (*cur).parent() == NodePtr::from_ptr(parent) {
-                        parent = cur;
-                        cur = children.as_ptr();
+                if let Some(children) = cur.children() {
+                    // Always validate cur.parent when descending.
+                    if cur.parent() == NodePtr::from_ptr(parent) {
+                        parent = doc.as_ptr() as *mut XmlNode;
+                        cur = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
                         continue;
                     }
                 } else {
@@ -1036,31 +1033,32 @@ pub unsafe fn html_node_dump_format_output(
             }
 
             XmlElementType::XmlElementNode => 'to_break: {
+                let node = XmlNodePtr::try_from(cur).unwrap();
                 // Some users like lxml are known to pass nodes with a corrupted
                 // tree structure. Fall back to a recursive call to handle this case.
-                if (*cur).parent() != NodePtr::from_ptr(parent) && (*cur).children().is_some() {
-                    html_node_dump_format_output(buf, doc, cur, _encoding, format);
+                if node.parent() != NodePtr::from_ptr(parent) && node.children().is_some() {
+                    html_node_dump_format_output(buf, doc, Some(cur), _encoding, format);
                     break 'to_break;
                 }
 
                 // Get specific HTML info for that node.
-                let info = if (*cur).ns.is_none() {
-                    html_tag_lookup((*cur).name().as_deref().unwrap())
+                let info = if node.ns.is_none() {
+                    html_tag_lookup(node.name().as_deref().unwrap())
                 } else {
                     None
                 };
 
                 buf.write_str("<");
-                if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
                     buf.write_str(&prefix);
                     buf.write_str(":");
                 }
 
-                buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-                if let Some(ns_def) = (*cur).ns_def {
+                buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
+                if let Some(ns_def) = node.ns_def {
                     xml_ns_list_dump_output(buf, Some(ns_def));
                 }
-                let mut attr = (*cur).properties;
+                let mut attr = node.properties;
                 while let Some(now) = attr {
                     html_attr_dump_output(buf, doc, &now);
                     attr = now.next;
@@ -1068,7 +1066,7 @@ pub unsafe fn html_node_dump_format_output(
 
                 if info.map_or(false, |info| info.empty != 0) {
                     buf.write_str(">");
-                } else if let Some(children) = (*cur).children() {
+                } else if let Some(children) = node.children() {
                     buf.write_str(">");
                     if format != 0
                         && info.map_or(false, |info| info.isinline == 0)
@@ -1076,15 +1074,15 @@ pub unsafe fn html_node_dump_format_output(
                             children.element_type(),
                             HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                         )
-                        && (*cur).children() != (*cur).last()
-                        && !(*cur).name.is_null()
-                        && *(*cur).name.add(0) != b'p'
+                        && node.children() != node.last()
+                        && !node.name.is_null()
+                        && *node.name.add(0) != b'p'
                     {
                         // p, pre, param
                         buf.write_str("\n");
                     }
-                    parent = cur;
-                    cur = children.as_ptr();
+                    parent = node.as_ptr();
+                    cur = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
                     continue 'main;
                 } else if info.map_or(false, |info| {
                     info.save_end_tag != 0 && info.name != "html" && info.name != "body"
@@ -1092,20 +1090,20 @@ pub unsafe fn html_node_dump_format_output(
                     buf.write_str(">");
                 } else {
                     buf.write_str("></");
-                    if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                    if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
                         buf.write_str(&prefix);
                         buf.write_str(":");
                     }
 
-                    buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
                     buf.write_str(">");
                 }
 
                 if (format != 0
-                    && (*cur).next.is_some()
+                    && node.next.is_some()
                     && info.map_or(false, |info| info.isinline == 0))
                     && (!matches!(
-                        (*cur).next.unwrap().element_type(),
+                        node.next.unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                     ) && !parent.is_null()
                         && !(*parent).name.is_null()
@@ -1115,80 +1113,66 @@ pub unsafe fn html_node_dump_format_output(
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                html_attr_dump_output(
-                    buf,
-                    doc,
-                    &XmlAttrPtr::from_raw(cur as *mut XmlAttr).unwrap().unwrap(),
-                );
+                let attr = XmlAttrPtr::try_from(cur).unwrap();
+                html_attr_dump_output(buf, doc, &attr);
             }
 
             HTML_TEXT_NODE => 'to_break: {
-                if (*cur).content.is_null() {
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                if node.content.is_null() {
                     break 'to_break;
                 }
-                if ((*cur).name == XML_STRING_TEXT.as_ptr() as _
-                    || (*cur).name != XML_STRING_TEXT_NOENC.as_ptr() as _)
+                if (node.name == XML_STRING_TEXT.as_ptr() as _
+                    || node.name != XML_STRING_TEXT_NOENC.as_ptr() as _)
                     && (parent.is_null()
                         || (xml_strcasecmp((*parent).name, c"script".as_ptr() as _) != 0
                             && xml_strcasecmp((*parent).name, c"style".as_ptr() as _) != 0))
                 {
-                    let buffer: *mut XmlChar = xml_encode_entities_reentrant(doc, (*cur).content);
+                    let buffer: *mut XmlChar = xml_encode_entities_reentrant(doc, node.content);
                     if !buffer.is_null() {
                         buf.write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
                         xml_free(buffer as _);
                     }
                 } else {
-                    buf.write_str(
-                        CStr::from_ptr((*cur).content as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+                    buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref());
                 }
             }
 
             HTML_COMMENT_NODE => {
-                if !(*cur).content.is_null() {
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                if !node.content.is_null() {
                     buf.write_str("<!--");
 
-                    buf.write_str(
-                        CStr::from_ptr((*cur).content as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+                    buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref());
                     buf.write_str("-->");
                 }
             }
 
             HTML_PI_NODE => {
-                if !(*cur).name.is_null() {
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                if !node.name.is_null() {
                     buf.write_str("<?");
 
-                    buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-                    if !(*cur).content.is_null() {
+                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
+                    if !node.content.is_null() {
                         buf.write_str(" ");
 
-                        buf.write_str(
-                            CStr::from_ptr((*cur).content as _)
-                                .to_string_lossy()
-                                .as_ref(),
-                        );
+                        buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref());
                     }
                     buf.write_str(">");
                 }
             }
             HTML_ENTITY_REF_NODE => {
+                let node = XmlNodePtr::try_from(cur).unwrap();
                 buf.write_str("&");
 
-                buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
                 buf.write_str(";");
             }
             HTML_PRESERVE_NODE => {
-                if !(*cur).content.is_null() {
-                    buf.write_str(
-                        CStr::from_ptr((*cur).content as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                if !node.content.is_null() {
+                    buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref());
                 }
             }
             _ => {}
@@ -1198,23 +1182,25 @@ pub unsafe fn html_node_dump_format_output(
             if cur == root {
                 return;
             }
-            if let Some(next) = (*cur).next {
-                cur = next.as_ptr();
+            if let Some(next) = cur.next() {
+                cur = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
                 break;
             }
 
-            cur = parent;
-            // (*cur).parent was validated when descending.
-            parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+            cur = XmlGenericNodePtr::from_raw(parent).unwrap();
+            // cur.parent was validated when descending.
+            parent = cur.parent().map_or(null_mut(), |p| p.as_ptr());
 
             if matches!(
-                (*cur).element_type(),
+                cur.element_type(),
                 XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode
             ) {
                 buf.write_str("\n");
             } else {
-                let info = if format != 0 && (*cur).ns.is_none() {
-                    html_tag_lookup((*cur).name().as_deref().unwrap())
+                // Is this convertion OK ?????
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                let info = if format != 0 && node.ns.is_none() {
+                    html_tag_lookup(node.name().as_deref().unwrap())
                 } else {
                     None
                 };
@@ -1222,31 +1208,31 @@ pub unsafe fn html_node_dump_format_output(
                 if format != 0
                     && info.map_or(false, |info| info.isinline == 0)
                     && !matches!(
-                        (*cur).last().unwrap().element_type(),
+                        node.last().unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                     )
-                    && (*cur).children() != (*cur).last()
-                    && !(*cur).name.is_null()
-                    && *(*cur).name.add(0) != b'p'
+                    && node.children() != node.last()
+                    && !node.name.is_null()
+                    && *node.name.add(0) != b'p'
                 {
                     /* p, pre, param */
                     buf.write_str("\n");
                 }
 
                 buf.write_str("</");
-                if let Some(prefix) = (*cur).ns.as_deref().and_then(|ns| ns.prefix()) {
+                if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
                     buf.write_str(&prefix);
                     buf.write_str(":");
                 }
 
-                buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
                 buf.write_str(">");
 
                 if (format != 0
                     && info.map_or(false, |info| info.isinline == 0)
-                    && (*cur).next.is_some())
+                    && node.next.is_some())
                     && (!matches!(
-                        (*cur).next.unwrap().element_type(),
+                        node.next.unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                     ) && !parent.is_null()
                         && !(*parent).name.is_null()
@@ -1267,13 +1253,7 @@ pub unsafe fn html_doc_content_dump_output(
     cur: Option<XmlDocPtr>,
     _encoding: *const c_char,
 ) {
-    html_node_dump_format_output(
-        buf,
-        cur,
-        cur.map_or(null_mut(), |cur| cur.as_ptr()) as _,
-        None,
-        1,
-    );
+    html_node_dump_format_output(buf, cur, cur.map(|cur| cur.into()), None, 1);
 }
 
 /// Dump an HTML document.
@@ -1288,16 +1268,10 @@ pub unsafe fn html_doc_content_dump_format_output(
     if let Some(mut cur) = cur {
         let typ = cur.typ;
         cur.typ = XmlElementType::XmlHTMLDocumentNode;
-        html_node_dump_format_output(buf, Some(cur), cur.as_ptr() as _, None, format);
+        html_node_dump_format_output(buf, Some(cur), Some(cur.into()), None, format);
         cur.typ = typ;
     } else {
-        html_node_dump_format_output(
-            buf,
-            cur,
-            cur.map_or(null_mut(), |cur| cur.as_ptr()) as _,
-            None,
-            format,
-        );
+        html_node_dump_format_output(buf, cur, cur.map(|cur| cur.into()), None, format);
     }
 }
 
@@ -1311,7 +1285,7 @@ pub unsafe fn html_node_dump_output(
     cur: *mut XmlNode,
     _encoding: *const c_char,
 ) {
-    html_node_dump_format_output(buf, doc, cur, None, 1);
+    html_node_dump_format_output(buf, doc, XmlGenericNodePtr::from_raw(cur), None, 1);
 }
 
 /// These are the HTML attributes which will be output
