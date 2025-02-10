@@ -120,11 +120,11 @@ use crate::{
     tree::{
         xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
-        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocProperties,
-        XmlDocPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
-        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
-        XmlNsPtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
-        XML_ENT_PARSED, XML_XML_NAMESPACE,
+        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
+        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
+        XmlNodePtr, XmlNsPtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT,
+        XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::{canonic_path, XmlURI},
     xpath::xml_init_xpath_internal,
@@ -2031,7 +2031,7 @@ unsafe fn xml_get_namespace(ctxt: XmlParserCtxtPtr, prefix: Option<&str>) -> Opt
 /// error code otherwise
 #[doc(alias = "xmlParseInNodeContext")]
 pub unsafe fn xml_parse_in_node_context(
-    mut node: *mut XmlNode,
+    node: XmlGenericNodePtr,
     data: Vec<u8>,
     mut options: i32,
     lst: *mut *mut XmlNode,
@@ -2042,10 +2042,13 @@ pub unsafe fn xml_parse_in_node_context(
     let ret: XmlParserErrors;
 
     // check all input parameters, grab the document
-    if lst.is_null() || node.is_null() {
+    // if node.is_null() {
+    //     return XmlParserErrors::XmlErrInternalError;
+    // }
+    if lst.is_null() {
         return XmlParserErrors::XmlErrInternalError;
     }
-    match (*node).element_type() {
+    match node.element_type() {
         XmlElementType::XmlElementNode
         | XmlElementType::XmlAttributeNode
         | XmlElementType::XmlTextNode
@@ -2059,23 +2062,26 @@ pub unsafe fn xml_parse_in_node_context(
             return XmlParserErrors::XmlErrInternalError;
         }
     }
-    while !node.is_null()
-        && !matches!(
-            (*node).element_type(),
+    let mut node = Some(node);
+    while let Some(now) = node.filter(|node| {
+        !matches!(
+            node.element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlHTMLDocumentNode
         )
-    {
-        node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+    }) {
+        node = now
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
     }
-    if node.is_null() {
+    let Some(mut node) = node else {
         return XmlParserErrors::XmlErrInternalError;
-    }
-    let doc = if (*node).element_type() == XmlElementType::XmlElementNode {
-        (*node).doc
+    };
+    let doc = if let Ok(doc) = XmlDocPtr::try_from(node) {
+        Some(doc)
     } else {
-        XmlDocPtr::from_raw(node as *mut XmlDoc).unwrap()
+        node.document()
     };
     let Some(doc) = doc else {
         return XmlParserErrors::XmlErrInternalError;
@@ -2123,26 +2129,30 @@ pub unsafe fn xml_parse_in_node_context(
     (*ctxt).input_id = 2;
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
 
-    let Some(mut fake) = xml_new_doc_comment((*node).doc, "") else {
+    let Some(mut fake) = xml_new_doc_comment(node.document(), "") else {
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrNoMemory;
     };
-    (*node).add_child(fake.as_ptr());
+    node.add_child(fake.as_ptr());
 
-    if (*node).element_type() == XmlElementType::XmlElementNode {
-        (*ctxt).node_push(node);
+    // At this point, `node.element_type()` is ElementNode, DocumentNode or HTMLDocumentNode.
+    if let Ok(node) = XmlNodePtr::try_from(node) {
+        (*ctxt).node_push(node.as_ptr());
         // initialize the SAX2 namespaces stack
-        cur = node;
-        while !cur.is_null() && (*cur).element_type() == XmlElementType::XmlElementNode {
-            let mut ns = (*cur).ns_def;
-            while let Some(now) = ns {
-                if xml_get_namespace(ctxt, now.prefix().as_deref()).is_none() {
-                    (*ctxt).ns_push(now.prefix().as_deref(), &now.href().unwrap());
+        let mut cur = Some(node);
+        while let Some(now) = cur.filter(|cur| cur.element_type() == XmlElementType::XmlElementNode)
+        {
+            let mut ns = now.ns_def;
+            while let Some(cur_ns) = ns {
+                if xml_get_namespace(ctxt, cur_ns.prefix().as_deref()).is_none() {
+                    (*ctxt).ns_push(cur_ns.prefix().as_deref(), &cur_ns.href().unwrap());
                     nsnr += 1;
                 }
-                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                ns = XmlNsPtr::from_raw(cur_ns.next).unwrap();
             }
-            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+            cur = now
+                .parent()
+                .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).ok().flatten());
         }
     }
 
@@ -2170,7 +2180,7 @@ pub unsafe fn xml_parse_in_node_context(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if !(*ctxt).node.is_null() && (*ctxt).node != node {
+    if !(*ctxt).node.is_null() && XmlGenericNodePtr::from_raw((*ctxt).node) != Some(node) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         (*ctxt).well_formed = 0;
     }
@@ -2189,7 +2199,7 @@ pub unsafe fn xml_parse_in_node_context(
     // the pseudo sibling.
 
     cur = fake.next.take().map_or(null_mut(), |n| n.as_ptr());
-    (*node).set_last(NodePtr::from_ptr(fake.as_ptr()));
+    node.set_last(NodePtr::from_ptr(fake.as_ptr()));
 
     if !cur.is_null() {
         (*cur).prev = None;

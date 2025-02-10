@@ -1262,11 +1262,16 @@ impl XmlNode {
             | XmlElementType::XmlXIncludeEnd => {
                 return;
             }
-            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
+            XmlElementType::XmlAttributeNode => {
+                let mut attr =
+                    XmlAttrPtr::try_from(XmlGenericNodePtr::from_raw(self).unwrap()).unwrap();
+                attr.set_base(uri);
+                return;
+            }
+            XmlElementType::XmlElementNode => {}
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 let doc = self.as_document_node().unwrap().as_mut();
-                let url = uri.map(path_to_uri);
-                doc.url = url.map(|url| url.into_owned());
+                doc.set_base(uri);
                 return;
             }
             _ => unreachable!(),

@@ -7,14 +7,17 @@ use std::{
 };
 
 use crate::{
-    libxml::xmlstring::{xml_strlen, xml_strncat, XmlChar},
+    libxml::{
+        valid::xml_remove_id,
+        xmlstring::{xml_strlen, xml_strncat, XmlChar},
+    },
     uri::build_uri,
 };
 
 use super::{
     xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge, NodePtr, XmlAttr,
-    XmlAttrPtr, XmlAttribute, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement, XmlElementType,
-    XmlEntity, XmlNode, XmlNodePtr, XmlNs, XML_XML_NAMESPACE,
+    XmlAttrPtr, XmlAttribute, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
+    XmlElementType, XmlEntity, XmlNode, XmlNodePtr, XmlNs, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -724,6 +727,133 @@ impl XmlGenericNodePtr {
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn into_inner(self) -> Box<dyn NodeCommon> {
         Box::from_raw(self.0.as_ptr())
+    }
+
+    /// update all nodes under the tree to point to the right document
+    #[doc(alias = "xmlSetTreeDoc")]
+    pub unsafe fn set_doc(mut self, doc: Option<XmlDocPtr>) {
+        if self.element_type() == XmlElementType::XmlNamespaceDecl {
+            return;
+        }
+        if self.document() != doc {
+            if let Some(node) = XmlNodePtr::try_from(self)
+                .ok()
+                .filter(|node| matches!(node.element_type(), XmlElementType::XmlElementNode))
+            {
+                let mut prop = node.properties;
+                while let Some(mut now) = prop {
+                    if matches!(now.atype, Some(XmlAttributeType::XmlAttributeID)) {
+                        xml_remove_id(self.document().unwrap(), now);
+                    }
+
+                    if now.document() != doc {
+                        now.set_document(doc);
+                    }
+                    if let Some(mut children) = now.children() {
+                        children.set_doc_all_sibling(doc);
+                    }
+
+                    // TODO: ID attributes should be also added to the new
+                    //       document, but this breaks things like xmlReplaceNode.
+                    //       The underlying problem is that xmlRemoveID is only called
+                    //       if a node is destroyed, not if it's unlinked.
+                    // if (xmlIsID(doc, tree, prop)) {
+                    //     XmlChar *idVal = xmlNodeListGetString(doc, now.children, 1);
+                    //     xmlAddID(null_mut(), doc, idVal, prop);
+                    // }
+
+                    prop = now.next;
+                }
+            }
+            if matches!(self.element_type(), XmlElementType::XmlEntityRefNode) {
+                // Clear 'children' which points to the entity declaration
+                // from the original document.
+                self.set_children(None);
+            } else if let Some(mut children) = self.children() {
+                children.set_doc_all_sibling(doc);
+            }
+
+            // FIXME: self.ns should be updated as in xmlStaticCopyNode().
+            self.set_document(doc);
+        }
+    }
+
+    /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
+    #[doc(alias = "xmlNodeSetBase")]
+    #[cfg(any(feature = "libxml_tree", feature = "xinclude"))]
+    pub unsafe fn set_base(self, uri: Option<&str>) {
+        if let Ok(mut node) = XmlNodePtr::try_from(self) {
+            node.set_base(uri);
+        } else if let Ok(mut attr) = XmlAttrPtr::try_from(self) {
+            attr.set_base(uri);
+        } else if let Ok(mut doc) = XmlDocPtr::try_from(self) {
+            doc.set_base(uri);
+        }
+    }
+
+    /// Add a list of node at the end of the child list of the parent
+    /// merging adjacent TEXT nodes (`cur` may be freed)
+    ///
+    /// See the note regarding namespaces in xmlAddChild.
+    ///
+    /// Returns the last child or NULL in case of error.
+    #[doc(alias = "xmlAddChildList")]
+    pub unsafe fn add_child_list(
+        mut self,
+        mut cur: XmlGenericNodePtr,
+    ) -> Option<XmlGenericNodePtr> {
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
+
+        if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
+
+        // add the first element at the end of the children list.
+        if self.children().is_none() {
+            self.set_children(NodePtr::from_ptr(cur.as_ptr()));
+        } else {
+            // If cur and self.last both are TEXT nodes, then merge them.
+            if let Some(node) = XmlNodePtr::try_from(cur).ok().filter(|cur| {
+                cur.element_type() == XmlElementType::XmlTextNode
+                    && matches!(
+                        self.last().unwrap().element_type(),
+                        XmlElementType::XmlTextNode
+                    )
+                    && cur.name() == self.last().unwrap().name()
+            }) {
+                self.last().unwrap().add_content(node.content);
+                // if it's the only child, nothing more to be done.
+                let Some(next) = node.next() else {
+                    xml_free_node(node.as_ptr());
+                    return self
+                        .last()
+                        .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
+                };
+                let prev = node;
+                cur = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                xml_free_node(prev.as_ptr());
+            }
+            let prev: *mut XmlNode = self.last().map_or(null_mut(), |l| l.as_ptr());
+            (*prev).set_next(NodePtr::from_ptr(cur.as_ptr()));
+            cur.set_prev(NodePtr::from_ptr(prev));
+        }
+        while let Some(next) = cur.next() {
+            cur.set_parent(NodePtr::from_ptr(self.as_ptr()));
+            if cur.document() != self.document() {
+                cur.set_doc(self.document());
+            }
+            cur = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+        }
+        cur.set_parent(NodePtr::from_ptr(self.as_ptr()));
+        // the parent may not be linked to a doc !
+        if cur.document() != self.document() {
+            cur.set_doc(self.document());
+        }
+        self.set_last(NodePtr::from_ptr(cur.as_ptr()));
+
+        Some(cur)
     }
 }
 

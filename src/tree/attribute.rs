@@ -35,10 +35,10 @@ use crate::libxml::{
 };
 
 use super::{
-    xml_free_node_list, xml_new_doc_text, xml_new_ns, xml_new_reconciled_ns,
+    xml_free_node_list, xml_new_doc_text, xml_new_ns, xml_new_reconciled_ns, xml_ns_in_scope,
     xml_static_copy_node_list, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
     NodePtr, XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr,
-    XmlNsPtr, __XML_REGISTER_CALLBACKS,
+    XmlNsPtr, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -55,6 +55,83 @@ pub struct XmlAttr {
     pub(crate) ns: Option<XmlNsPtr>,            /* pointer to the associated namespace */
     pub(crate) atype: Option<XmlAttributeType>, /* the attribute type if validating */
     pub(crate) psvi: *mut c_void,               /* for type/PSVI information */
+}
+
+impl XmlAttr {
+    /// Search a Ns aliasing a given URI.
+    /// Recurse on the parents until it finds the defined namespace or return NULL otherwise.
+    ///
+    /// Returns the namespace pointer or NULL.
+    #[doc(alias = "xmlSearchNsByHref")]
+    pub unsafe fn search_ns_by_href(
+        &mut self,
+        doc: Option<XmlDocPtr>,
+        href: &str,
+    ) -> Option<XmlNsPtr> {
+        if href == XML_XML_NAMESPACE.to_str().unwrap() {
+            let mut doc = doc.or(self.document())?;
+            // Return the XML namespace declaration held by the doc.
+            if doc.old_ns.is_none() {
+                return doc.ensure_xmldecl();
+            } else {
+                return doc.old_ns;
+            }
+        }
+        let mut node = self
+            .parent
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        while let Some(now) = node {
+            if matches!(
+                now.element_type(),
+                XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlEntityDecl
+            ) {
+                return None;
+            }
+            if let Some(now) = XmlNodePtr::try_from(now)
+                .ok()
+                .filter(|now| now.element_type() == XmlElementType::XmlElementNode)
+            {
+                // let href = CString::new(href).unwrap();
+                let mut cur = now.ns_def;
+                while let Some(cur_ns) = cur {
+                    if !cur_ns.href.is_null()
+                        && cur_ns.href().as_deref() == Some(href)
+                        && cur_ns.prefix().is_some()
+                        && xml_ns_in_scope(doc, self as *mut Self as _, now.as_ptr(), cur_ns.prefix)
+                            == 1
+                    {
+                        return Some(cur_ns);
+                    }
+                    cur = XmlNsPtr::from_raw(cur_ns.next).unwrap();
+                }
+                let cur = now.ns;
+                if let Some(cur) = cur.filter(|cur| {
+                    !cur.href.is_null()
+                        && cur.href().as_deref() == Some(href)
+                        && cur.prefix().is_some()
+                        && xml_ns_in_scope(doc, self as *mut Self as _, now.as_ptr(), cur.prefix)
+                            == 1
+                }) {
+                    return Some(cur);
+                }
+            }
+            node = now
+                .parent()
+                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        }
+        None
+    }
+
+    /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
+    #[doc(alias = "xmlNodeSetBase")]
+    #[cfg(any(feature = "libxml_tree", feature = "xinclude"))]
+    pub unsafe fn set_base(&mut self, _uri: Option<&str>) {
+        use crate::tree::XML_XML_NAMESPACE;
+
+        self.search_ns_by_href(self.document(), XML_XML_NAMESPACE.to_str().unwrap());
+    }
 }
 
 impl Default for XmlAttr {

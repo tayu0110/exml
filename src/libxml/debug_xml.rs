@@ -1865,7 +1865,7 @@ pub type XmlShellCtxtPtr<'a> = *mut XmlShellCtxt<'a>;
 pub struct XmlShellCtxt<'a> {
     filename: *mut c_char,
     doc: Option<XmlDocPtr>,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     pctxt: XmlXPathContextPtr,
     loaded: i32,
     output: Box<dyn Write + 'a>,
@@ -2163,7 +2163,7 @@ pub unsafe fn xml_shell_load(
     }
     xml_free((*ctxt).filename as _);
     (*ctxt).doc = Some(doc);
-    (*ctxt).node = doc.as_ptr() as *mut XmlNode;
+    (*ctxt).node = Some(doc.into());
     #[cfg(feature = "xpath")]
     {
         (*ctxt).pctxt = xml_xpath_new_context(Some(doc));
@@ -2431,82 +2431,79 @@ pub unsafe fn xml_shell_validate(
 pub unsafe fn xml_shell_du(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
-    tree: *mut XmlNode,
+    tree: XmlGenericNodePtr,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    let mut node: *mut XmlNode;
     let mut indent: i32 = 0;
 
     if ctxt.is_null() {
         return -1;
     }
 
-    if tree.is_null() {
-        return -1;
-    }
-    node = tree;
-    while !node.is_null() {
-        if (*node).element_type() == XmlElementType::XmlDocumentNode
-            || (*node).element_type() == XmlElementType::XmlHTMLDocumentNode
+    // if tree.is_null() {
+    //     return -1;
+    // }
+    let mut node = Some(tree);
+    while let Some(now) = node {
+        if now.element_type() == XmlElementType::XmlDocumentNode
+            || now.element_type() == XmlElementType::XmlHTMLDocumentNode
         {
             writeln!((*ctxt).output, "/");
-        } else if (*node).element_type() == XmlElementType::XmlElementNode {
+        } else if let Some(node) = XmlNodePtr::try_from(now)
+            .ok()
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        {
             for _ in 0..indent {
                 write!((*ctxt).output, "  ");
             }
-            if let Some(prefix) = (*node).ns.as_deref().and_then(|ns| ns.prefix()) {
+            if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
                 write!((*ctxt).output, "{prefix}:");
             }
-            let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
+            let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
             writeln!((*ctxt).output, "{name}");
         }
 
         // Browse the full subtree, deep first
-        if (*node).element_type() == XmlElementType::XmlDocumentNode
-            || (*node).element_type() == XmlElementType::XmlHTMLDocumentNode
-        {
-            node = (*node)
-                .as_document_node()
-                .unwrap()
-                .as_ref()
+        if let Ok(doc) = XmlDocPtr::try_from(now) {
+            node = doc
                 .children
-                .map_or(null_mut(), |c| c.as_ptr());
-        } else if let Some(children) = (*node)
+                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        } else if let Some(children) = now
             .children()
-            .filter(|_| (*node).element_type() != XmlElementType::XmlEntityRefNode)
+            .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
         {
             // deep first
-            node = children.as_ptr();
+            node = XmlGenericNodePtr::from_raw(children.as_ptr());
             indent += 1;
-        } else if let Some(next) = (*node).next.filter(|_| node != tree) {
+        } else if let Some(next) = now.next().filter(|_| node != Some(tree)) {
             // then siblings
-            node = next.as_ptr();
-        } else if node != tree {
+            node = XmlGenericNodePtr::from_raw(next.as_ptr());
+        } else if node != Some(tree) {
             // go up to parents->next if needed
-            while node != tree {
-                if let Some(parent) = (*node).parent() {
-                    node = parent.as_ptr();
+            while node != Some(tree) {
+                if let Some(parent) = now.parent() {
+                    node = XmlGenericNodePtr::from_raw(parent.as_ptr());
                     indent -= 1;
                 }
-                if let Some(next) = (*node).next.filter(|_| node != tree) {
-                    node = next.as_ptr();
+                if let Some(next) = now.next().filter(|_| node != Some(tree)) {
+                    node = XmlGenericNodePtr::from_raw(next.as_ptr());
                     break;
                 }
-                if (*node).parent().is_none() {
-                    node = null_mut();
+                if now.parent().is_none() {
+                    node = None;
                     break;
                 }
-                if node == tree {
-                    node = null_mut();
+                if node == Some(tree) {
+                    node = None;
                     break;
                 }
             }
-            /* exit condition */
-            if node == tree {
-                node = null_mut();
+            // exit condition
+            if node == Some(tree) {
+                node = None;
             }
         } else {
-            node = null_mut();
+            node = None;
         }
     }
     0
@@ -2620,13 +2617,13 @@ unsafe fn xml_shell_rng_validate(
 unsafe fn xml_shell_grep(
     ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
-    mut node: *mut XmlNode,
+    mut node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
     if ctxt.is_null() {
         return 0;
     }
-    if node.is_null() {
+    if node.is_none() {
         return 0;
     }
     if arg.is_null() {
@@ -2639,59 +2636,55 @@ unsafe fn xml_shell_grep(
     //     || !xmlStrchr(arg as *mut xmlChar, b'.').is_null()
     //     || !xmlStrchr(arg as *mut xmlChar, b'[').is_null()
     // {}
-    while !node.is_null() {
-        if (*node).element_type() == XmlElementType::XmlCommentNode {
-            if !xml_strstr((*node).content, arg as *mut XmlChar).is_null() {
-                let path = (*node).get_node_path().unwrap();
+    while let Some(now) = node {
+        if let Ok(now) = XmlNodePtr::try_from(now) {
+            if now.element_type() == XmlElementType::XmlCommentNode {
+                if !xml_strstr(now.content, arg as *mut XmlChar).is_null() {
+                    let path = now.get_node_path().unwrap();
+                    write!((*ctxt).output, "{path} : ");
+                    xml_shell_list(ctxt, null_mut(), Some(now.into()), None);
+                }
+            } else if now.element_type() == XmlElementType::XmlTextNode
+                && !xml_strstr(now.content, arg as *mut XmlChar).is_null()
+            {
+                let path = now.parent().unwrap().get_node_path().unwrap();
                 write!((*ctxt).output, "{path} : ");
-                xml_shell_list(ctxt, null_mut(), XmlGenericNodePtr::from_raw(node), None);
+                xml_shell_list(
+                    ctxt,
+                    null_mut(),
+                    now.parent
+                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
+                    None,
+                );
             }
-        } else if (*node).element_type() == XmlElementType::XmlTextNode
-            && !xml_strstr((*node).content, arg as *mut XmlChar).is_null()
-        {
-            let path = (*node).parent().unwrap().get_node_path().unwrap();
-            write!((*ctxt).output, "{path} : ");
-            xml_shell_list(
-                ctxt,
-                null_mut(),
-                (*node)
-                    .parent
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
-                None,
-            );
         }
 
         // Browse the full subtree, deep first
-        if (*node).element_type() == XmlElementType::XmlDocumentNode
-            || (*node).element_type() == XmlElementType::XmlHTMLDocumentNode
-        {
-            node = (*node)
-                .as_document_node()
-                .unwrap()
-                .as_ref()
+        if let Ok(doc) = XmlDocPtr::try_from(now) {
+            node = doc
                 .children
-                .map_or(null_mut(), |c| c.as_ptr());
-        } else if let Some(children) = (*node)
+                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        } else if let Some(children) = now
             .children()
-            .filter(|_| (*node).element_type() != XmlElementType::XmlEntityRefNode)
+            .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
         {
             // deep first
-            node = children.as_ptr();
-        } else if let Some(next) = (*node).next {
+            node = XmlGenericNodePtr::from_raw(children.as_ptr());
+        } else if let Some(next) = now.next() {
             // then siblings
-            node = next.as_ptr();
+            node = XmlGenericNodePtr::from_raw(next.as_ptr());
         } else {
             // go up to parents->next if needed
-            while !node.is_null() {
-                if let Some(parent) = (*node).parent() {
-                    node = parent.as_ptr();
+            while let Some(now) = node {
+                if let Some(parent) = now.parent() {
+                    node = XmlGenericNodePtr::from_raw(parent.as_ptr());
                 }
-                if let Some(next) = (*node).next {
-                    node = next.as_ptr();
+                if let Some(next) = now.next() {
+                    node = XmlGenericNodePtr::from_raw(next.as_ptr());
                     break;
                 }
-                if (*node).parent().is_none() {
-                    node = null_mut();
+                if now.parent().is_none() {
+                    node = None;
                     break;
                 }
             }
@@ -2708,7 +2701,7 @@ unsafe fn xml_shell_grep(
 unsafe fn xml_shell_set_content(
     ctxt: XmlShellCtxtPtr,
     value: *mut c_char,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
     let mut results: *mut XmlNode = null_mut();
@@ -2716,10 +2709,10 @@ unsafe fn xml_shell_set_content(
     if ctxt.is_null() {
         return 0;
     }
-    if node.is_null() {
+    let Some(mut node) = node else {
         writeln!((*ctxt).output, "NULL");
         return 0;
-    }
+    };
     if value.is_null() {
         writeln!((*ctxt).output, "NULL");
         return 0;
@@ -2737,7 +2730,7 @@ unsafe fn xml_shell_set_content(
             (*node).set_children(None);
             (*node).set_last(None);
         }
-        (*node).add_child_list(results);
+        node.add_child_list(XmlGenericNodePtr::from_raw(results).unwrap());
     } else {
         writeln!((*ctxt).output, "failed to parse content");
     }
@@ -2818,20 +2811,22 @@ unsafe fn xml_shell_register_namespace(
 unsafe fn xml_shell_register_root_namespaces(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
-    root: *mut XmlNode,
+    root: XmlNodePtr,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
     use crate::xpath::internals::xml_xpath_register_ns;
 
-    if root.is_null()
-        || (*root).element_type() != XmlElementType::XmlElementNode
-        || (*root).ns_def.is_none()
+    // if root.is_null() {
+    //     return -1;
+    // }
+    if root.element_type() != XmlElementType::XmlElementNode
+        || root.ns_def.is_none()
         || ctxt.is_null()
         || (*ctxt).pctxt.is_null()
     {
         return -1;
     }
-    let mut ns = (*root).ns_def;
+    let mut ns = root.ns_def;
     while let Some(now) = ns {
         if let Some(prefix) = now.prefix() {
             let prefix = CString::new(prefix.as_ref()).unwrap();
@@ -2852,20 +2847,14 @@ unsafe fn xml_shell_register_root_namespaces(
 #[cfg(feature = "libxml_tree")]
 unsafe fn xml_shell_set_base(
     _ctxt: XmlShellCtxtPtr,
-    arg: *mut c_char,
-    node: *mut XmlNode,
+    arg: Option<&str>,
+    node: XmlGenericNodePtr,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    if node.is_null() {
-        return 0;
-    }
-    if arg.is_null() {
-        (*node).set_base(None);
-    } else {
-        (*node).set_base(Some(
-            CStr::from_ptr(arg as *const i8).to_string_lossy().as_ref(),
-        ));
-    }
+    // if node.is_null() {
+    //     return 0;
+    // }
+    node.set_base(arg);
     0
 }
 
@@ -2925,7 +2914,7 @@ pub unsafe fn xml_shell<'a>(
     (*ctxt).input = input.unwrap();
     (*ctxt).output = output.map_or(Box::new(stdout()) as Box<dyn Write + 'a>, |o| Box::new(o));
     (*ctxt).filename = xml_strdup(filename as *mut XmlChar) as *mut c_char;
-    (*ctxt).node = doc.as_ptr() as *mut XmlNode;
+    (*ctxt).node = Some(doc.into());
 
     #[cfg(feature = "xpath")]
     {
@@ -2936,31 +2925,31 @@ pub unsafe fn xml_shell<'a>(
         }
     }
     loop {
-        if (*ctxt).node == doc.as_ptr() as *mut XmlNode {
+        if (*ctxt).node == Some(doc.into()) {
             snprintf(
                 prompt.as_mut_ptr() as _,
                 prompt.len(),
                 c"%s > ".as_ptr(),
                 c"/".as_ptr(),
             );
-        } else if let Some(prefix) = (*(*ctxt).node)
-            .ns
-            .map(|ns| ns.prefix)
-            .filter(|p| !p.is_null() && !(*ctxt).node.is_null() && !(*(*ctxt).node).name.is_null())
+        } else if let Some(node) = (*ctxt)
+            .node
+            .and_then(|node| XmlNodePtr::try_from(node).ok())
+            .filter(|node| !node.name.is_null() && node.ns.map_or(false, |ns| !ns.prefix.is_null()))
         {
             snprintf(
                 prompt.as_mut_ptr() as _,
                 prompt.len(),
                 c"%s:%s > ".as_ptr(),
-                prefix,
-                (*(*ctxt).node).name,
+                node.ns.unwrap().prefix,
+                node.name,
             );
-        } else if !(*ctxt).node.is_null() && !(*(*ctxt).node).name.is_null() {
+        } else if (*ctxt).node.map_or(false, |node| node.name().is_some()) {
             snprintf(
                 prompt.as_mut_ptr() as _,
                 prompt.len(),
                 c"%s > ".as_ptr(),
-                (*(*ctxt).node).name,
+                (*ctxt).node.unwrap().name().unwrap().as_ptr(),
             );
         } else {
             snprintf(prompt.as_mut_ptr() as _, prompt.len(), c"? > ".as_ptr());
@@ -3182,7 +3171,7 @@ pub unsafe fn xml_shell<'a>(
                 xml_shell_write(
                     ctxt,
                     CStr::from_ptr(arg.as_ptr()).to_string_lossy().as_ref(),
-                    XmlGenericNodePtr::from_raw((*ctxt).node).unwrap(),
+                    (*ctxt).node.unwrap(),
                     None,
                 );
             }
@@ -3200,18 +3189,24 @@ pub unsafe fn xml_shell<'a>(
         } else if strcmp(command.as_ptr(), c"pwd".as_ptr()) == 0 {
             let mut dir: [c_char; 500] = [0; 500];
 
-            if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, None) == 0 {
+            if xml_shell_pwd(
+                ctxt,
+                dir.as_mut_ptr(),
+                (*ctxt).node.map_or(null_mut(), |node| node.as_ptr()),
+                None,
+            ) == 0
+            {
                 let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
                 writeln!((*ctxt).output, "{dir}");
             }
         } else if strcmp(command.as_ptr(), c"du".as_ptr()) == 0 {
             if arg[0] == 0 {
-                xml_shell_du(ctxt, null_mut(), (*ctxt).node, None);
+                xml_shell_du(ctxt, null_mut(), (*ctxt).node.unwrap(), None);
             } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node;
+                (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
                 #[cfg(feature = "xpath")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node;
+                    (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
                     list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
                 }
                 #[cfg(not(feature = "xpath"))]
@@ -3229,7 +3224,12 @@ pub unsafe fn xml_shell<'a>(
                         XmlXPathObjectType::XPathNodeset => {
                             if let Some(nodeset) = (*list).nodesetval.as_deref() {
                                 for &node in &nodeset.node_tab {
-                                    xml_shell_du(ctxt, null_mut(), node, None);
+                                    xml_shell_du(
+                                        ctxt,
+                                        null_mut(),
+                                        XmlGenericNodePtr::from_raw(node).unwrap(),
+                                        None,
+                                    );
                                 }
                             }
                         }
@@ -3298,12 +3298,7 @@ pub unsafe fn xml_shell<'a>(
                 (*(*ctxt).pctxt).node = null_mut();
             }
         } else if strcmp(command.as_ptr(), c"base".as_ptr()) == 0 {
-            xml_shell_base(
-                ctxt,
-                null_mut(),
-                XmlGenericNodePtr::from_raw((*ctxt).node),
-                None,
-            );
+            xml_shell_base(ctxt, null_mut(), (*ctxt).node, None);
         } else if strcmp(command.as_ptr(), c"set".as_ptr()) == 0 {
             xml_shell_set_content(ctxt, arg.as_mut_ptr(), (*ctxt).node, None);
         } else if {
@@ -3335,12 +3330,7 @@ pub unsafe fn xml_shell<'a>(
             #[cfg(feature = "xpath")]
             {
                 let root = doc.get_root_element();
-                xml_shell_register_root_namespaces(
-                    ctxt,
-                    null_mut(),
-                    root.map_or(null_mut(), |node| node.as_ptr()),
-                    None,
-                );
+                xml_shell_register_root_namespaces(ctxt, null_mut(), root.unwrap(), None);
             }
         } else if {
             #[cfg(feature = "xpath")]
@@ -3356,7 +3346,7 @@ pub unsafe fn xml_shell<'a>(
             if arg[0] == 0 {
                 generic_error!("xpath: expression required\n");
             } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node;
+                (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
                 list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
                 xml_xpath_debug_dump_object(&mut (*ctxt).output, list, 0);
                 xml_xpath_free_object(list);
@@ -3373,7 +3363,12 @@ pub unsafe fn xml_shell<'a>(
         } {
             #[cfg(feature = "libxml_tree")]
             {
-                xml_shell_set_base(ctxt, arg.as_mut_ptr(), (*ctxt).node, None);
+                xml_shell_set_base(
+                    ctxt,
+                    Some(CStr::from_ptr(arg.as_mut_ptr()).to_string_lossy().as_ref()),
+                    (*ctxt).node.unwrap(),
+                    None,
+                );
             }
         } else if strcmp(command.as_ptr(), c"ls".as_ptr()) == 0
             || strcmp(command.as_ptr(), c"dir".as_ptr()) == 0
@@ -3382,25 +3377,15 @@ pub unsafe fn xml_shell<'a>(
 
             if arg[0] == 0 {
                 if dir != 0 {
-                    xml_shell_dir(
-                        ctxt,
-                        null_mut(),
-                        XmlGenericNodePtr::from_raw((*ctxt).node),
-                        None,
-                    );
+                    xml_shell_dir(ctxt, null_mut(), (*ctxt).node, None);
                 } else {
-                    xml_shell_list(
-                        ctxt,
-                        null_mut(),
-                        XmlGenericNodePtr::from_raw((*ctxt).node),
-                        None,
-                    );
+                    xml_shell_list(ctxt, null_mut(), (*ctxt).node, None);
                 }
             } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node;
+                (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
                 #[cfg(feature = "xpath")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node;
+                    (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
                     list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
                 }
                 #[cfg(not(feature = "xpath"))]
@@ -3506,12 +3491,18 @@ pub unsafe fn xml_shell<'a>(
             let mut dir: [c_char; 500] = [0; 500];
 
             if arg[0] == 0 {
-                if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, None) == 0 {
+                if xml_shell_pwd(
+                    ctxt,
+                    dir.as_mut_ptr(),
+                    (*ctxt).node.map_or(null_mut(), |node| node.as_ptr()),
+                    None,
+                ) == 0
+                {
                     let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
                     writeln!((*ctxt).output, "{dir}");
                 }
             } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node;
+                (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
                 #[cfg(feature = "xpath")]
                 {
                     list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
@@ -3604,11 +3595,11 @@ pub unsafe fn xml_shell<'a>(
             }
         } else if strcmp(command.as_ptr(), c"cd".as_ptr()) == 0 {
             if arg[0] == 0 {
-                (*ctxt).node = doc.as_ptr() as *mut XmlNode;
+                (*ctxt).node = Some(doc.into());
             } else {
                 #[cfg(feature = "xpath")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node;
+                    (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
                     let l = strlen(arg.as_ptr());
                     if l >= 2 && arg[l - 1] == b'/' as _ {
                         arg[l - 1] = 0;
@@ -3630,13 +3621,15 @@ pub unsafe fn xml_shell<'a>(
                         XmlXPathObjectType::XPathNodeset => {
                             if let Some(nodeset) = (*list).nodesetval.as_deref() {
                                 if nodeset.node_tab.len() == 1 {
-                                    (*ctxt).node = nodeset.node_tab[0];
-                                    if !(*ctxt).node.is_null()
-                                        && ((*(*ctxt).node).element_type()
-                                            == XmlElementType::XmlNamespaceDecl)
+                                    (*ctxt).node = XmlGenericNodePtr::from_raw(nodeset.node_tab[0]);
+                                    if (*ctxt)
+                                        .node
+                                        .take_if(|node| {
+                                            node.element_type() == XmlElementType::XmlNamespaceDecl
+                                        })
+                                        .is_some()
                                     {
                                         generic_error!("cannot cd to namespace\n");
-                                        (*ctxt).node = null_mut();
                                     }
                                 } else {
                                     generic_error!(
@@ -3729,17 +3722,12 @@ pub unsafe fn xml_shell<'a>(
         } {
             #[cfg(feature = "libxml_output")]
             if arg[0] == 0 {
-                xml_shell_cat(
-                    ctxt,
-                    null_mut(),
-                    XmlGenericNodePtr::from_raw((*ctxt).node),
-                    None,
-                );
+                xml_shell_cat(ctxt, null_mut(), (*ctxt).node, None);
             } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node;
+                (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
                 #[cfg(feature = "xpath")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node;
+                    (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
                     list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
                 }
                 #[cfg(not(feature = "xpath"))]
