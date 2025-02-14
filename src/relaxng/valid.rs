@@ -28,11 +28,12 @@ const MAX_ATTR: usize = 20;
 pub type XmlRelaxNGStatesPtr = *mut XmlRelaxNGStates;
 /// A RelaxNGs container for validation state
 #[doc(alias = "xmlRelaxNGStates")]
+#[derive(Default)]
 #[repr(C)]
 pub struct XmlRelaxNGStates {
-    pub(crate) nb_state: i32,  // the number of states
-    pub(crate) max_state: i32, // the size of the array
-    pub(crate) tab_state: *mut XmlRelaxNGValidStatePtr,
+    // pub(crate) nb_state: i32,  // the number of states
+    // pub(crate) max_state: i32, // the size of the array
+    pub(crate) tab_state: Vec<XmlRelaxNGValidStatePtr>,
 }
 
 pub type XmlRelaxNGValidStatePtr = *mut XmlRelaxNGValidState;
@@ -302,11 +303,8 @@ pub unsafe fn xml_relaxng_free_valid_ctxt(ctxt: XmlRelaxNGValidCtxtPtr) {
         xml_relaxng_free_states(null_mut(), (*ctxt).states);
     }
     if !(*ctxt).free_state.is_null() {
-        for k in 0..(*(*ctxt).free_state).nb_state {
-            xml_relaxng_free_valid_state(
-                null_mut(),
-                *(*(*ctxt).free_state).tab_state.add(k as usize),
-            );
+        for state in (*(*ctxt).free_state).tab_state.drain(..) {
+            xml_relaxng_free_valid_state(null_mut(), state);
         }
         xml_relaxng_free_states(null_mut(), (*ctxt).free_state);
     }
@@ -335,7 +333,7 @@ pub(crate) unsafe fn xml_relaxng_new_states(
 ) -> XmlRelaxNGStatesPtr {
     if !ctxt.is_null() {
         if let Some(ret) = (*ctxt).free_states.pop() {
-            (*ret).nb_state = 0;
+            (*ret).tab_state.clear();
             return ret;
         }
     }
@@ -350,14 +348,8 @@ pub(crate) unsafe fn xml_relaxng_new_states(
         xml_rng_verr_memory(ctxt, "allocating states\n");
         return null_mut();
     }
-    (*ret).nb_state = 0;
-    (*ret).max_state = size;
-    (*ret).tab_state = xml_malloc(size as usize * size_of::<XmlRelaxNGValidStatePtr>()) as _;
-    if (*ret).tab_state.is_null() {
-        xml_rng_verr_memory(ctxt, "allocating states\n");
-        xml_free(ret as _);
-        return null_mut();
-    }
+    std::ptr::write(&mut *ret, XmlRelaxNGStates::default());
+    (*ret).tab_state.reserve(size as usize);
     ret
 }
 
@@ -372,7 +364,7 @@ pub(crate) unsafe fn xml_relaxng_free_states(
     }
 
     if ctxt.is_null() {
-        xml_free((*states).tab_state as _);
+        drop_in_place(states);
         xml_free(states as _);
     } else {
         (*ctxt).free_states.push(states);
@@ -415,11 +407,8 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
             attr = now.next;
         }
     }
-    if !(*ctxt).free_state.is_null() && (*(*ctxt).free_state).nb_state > 0 {
-        (*(*ctxt).free_state).nb_state -= 1;
-        ret = *(*(*ctxt).free_state)
-            .tab_state
-            .add((*(*ctxt).free_state).nb_state as usize);
+    if !(*ctxt).free_state.is_null() && !(*(*ctxt).free_state).tab_state.is_empty() {
+        ret = (*(*ctxt).free_state).tab_state.pop().unwrap();
     } else {
         ret = xml_malloc(size_of::<XmlRelaxNGValidState>()) as _;
         if ret.is_null() {

@@ -6383,28 +6383,14 @@ pub unsafe fn xml_relaxng_set_valid_structured_errors(
 /// Return 1 in case of success and 0 if this is a duplicate and -1 on error
 #[doc(alias = "xmlRelaxNGAddStateUniq")]
 pub(crate) unsafe fn xml_relaxng_add_states_uniq(
-    ctxt: XmlRelaxNGValidCtxtPtr,
+    _ctxt: XmlRelaxNGValidCtxtPtr,
     states: XmlRelaxNGStatesPtr,
     state: XmlRelaxNGValidStatePtr,
 ) -> i32 {
     if state.is_null() {
         return -1;
     }
-    if (*states).nb_state >= (*states).max_state {
-        let size: i32 = (*states).max_state * 2;
-        let tmp: *mut XmlRelaxNGValidStatePtr = xml_realloc(
-            (*states).tab_state as _,
-            size as usize * size_of::<XmlRelaxNGValidStatePtr>(),
-        ) as _;
-        if tmp.is_null() {
-            xml_rng_verr_memory(ctxt, "adding states\n");
-            return -1;
-        }
-        (*states).tab_state = tmp;
-        (*states).max_state = size;
-    }
-    *(*states).tab_state.add((*states).nb_state as usize) = state;
-    (*states).nb_state += 1;
+    (*states).tab_state.push(state);
     1
 }
 
@@ -7256,31 +7242,27 @@ unsafe fn xml_relaxng_validate_element_end(ctxt: XmlRelaxNGValidCtxtPtr, dolog: 
 /// Returns the index of the "best" state or -1 in case of error
 #[doc(alias = "xmlRelaxNGBestState")]
 unsafe fn xml_relaxng_best_state(ctxt: XmlRelaxNGValidCtxtPtr) -> i32 {
-    let mut state: XmlRelaxNGValidStatePtr;
-
-    let mut tmp: i32;
     let mut best: i32 = -1;
     let mut value: i32 = 1000000;
 
-    if ctxt.is_null() || (*ctxt).states.is_null() || (*(*ctxt).states).nb_state <= 0 {
+    if ctxt.is_null() || (*ctxt).states.is_null() || (*(*ctxt).states).tab_state.is_empty() {
         return -1;
     }
 
-    for i in 0..(*(*ctxt).states).nb_state {
-        state = *(*(*ctxt).states).tab_state.add(i as usize);
+    for (i, &state) in (*(*ctxt).states).tab_state.iter().enumerate() {
         if state.is_null() {
             continue;
         }
         if !(*state).seq.is_null() {
             if best == -1 || value > 100000 {
                 value = 100000;
-                best = i;
+                best = i as i32;
             }
         } else {
-            tmp = (*state).nb_attr_left;
+            let tmp = (*state).nb_attr_left;
             if best == -1 || value > tmp {
                 value = tmp;
-                best = i;
+                best = i as i32;
             }
         }
     }
@@ -7291,13 +7273,13 @@ unsafe fn xml_relaxng_best_state(ctxt: XmlRelaxNGValidCtxtPtr) -> i32 {
 /// errors about and log it.
 #[doc(alias = "xmlRelaxNGLogBestError")]
 unsafe fn xml_relaxng_log_best_error(ctxt: XmlRelaxNGValidCtxtPtr) {
-    if ctxt.is_null() || (*ctxt).states.is_null() || (*(*ctxt).states).nb_state <= 0 {
+    if ctxt.is_null() || (*ctxt).states.is_null() || (*(*ctxt).states).tab_state.is_empty() {
         return;
     }
 
     let best: i32 = xml_relaxng_best_state(ctxt);
-    if best >= 0 && best < (*(*ctxt).states).nb_state {
-        (*ctxt).state = *(*(*ctxt).states).tab_state.add(best as usize);
+    if best >= 0 && best < (*(*ctxt).states).tab_state.len() as i32 {
+        (*ctxt).state = (*(*ctxt).states).tab_state[best as usize];
 
         xml_relaxng_validate_element_end(ctxt, 1);
     }
@@ -7355,11 +7337,8 @@ unsafe fn xml_relaxng_copy_valid_state(
     if state.is_null() {
         return null_mut();
     }
-    if !(*ctxt).free_state.is_null() && (*(*ctxt).free_state).nb_state > 0 {
-        (*(*ctxt).free_state).nb_state -= 1;
-        ret = *(*(*ctxt).free_state)
-            .tab_state
-            .add((*(*ctxt).free_state).nb_state as usize);
+    if !(*ctxt).free_state.is_null() && !(*(*ctxt).free_state).tab_state.is_empty() {
+        ret = (*(*ctxt).free_state).tab_state.pop().unwrap();
     } else {
         ret = xml_malloc(size_of::<XmlRelaxNGValidState>()) as _;
         if ret.is_null() {
@@ -7428,27 +7407,13 @@ unsafe fn xml_relaxng_add_states(
     if state.is_null() || states.is_null() {
         return -1;
     }
-    if (*states).nb_state >= (*states).max_state {
-        let size: i32 = (*states).max_state * 2;
-        let tmp: *mut XmlRelaxNGValidStatePtr = xml_realloc(
-            (*states).tab_state as _,
-            size as usize * size_of::<XmlRelaxNGValidStatePtr>(),
-        ) as _;
-        if tmp.is_null() {
-            xml_rng_verr_memory(ctxt, "adding states\n");
-            return -1;
-        }
-        (*states).tab_state = tmp;
-        (*states).max_state = size;
-    }
-    for i in 0..(*states).nb_state {
-        if xml_relaxng_equal_valid_state(ctxt, state, *(*states).tab_state.add(i as usize)) != 0 {
+    for &state2 in &(*states).tab_state {
+        if xml_relaxng_equal_valid_state(ctxt, state, state2) != 0 {
             xml_relaxng_free_valid_state(ctxt, state);
             return 0;
         }
     }
-    *(*states).tab_state.add((*states).nb_state as usize) = state;
-    (*states).nb_state += 1;
+    (*states).tab_state.push(state);
     1
 }
 
@@ -7461,9 +7426,6 @@ unsafe fn xml_relaxng_node_matches_list(node: XmlNodePtr, list: *mut XmlRelaxNGD
     let mut i: i32 = 0;
     let mut tmp: i32;
 
-    // if node.is_null() {
-    //     return 0;
-    // }
     if list.is_null() {
         return 0;
     }
@@ -7714,26 +7676,23 @@ unsafe fn xml_relaxng_validate_interleave(
                 }
             } else if !(*ctxt).states.is_null() {
                 let mut found: i32 = 0;
-                let mut best: i32 = -1;
+                let mut best = usize::MAX;
                 let mut lowattr: i32 = -1;
 
                 // PBM: what happen if there is attributes checks in the interleaves
-                for j in 0..(*(*ctxt).states).nb_state {
-                    cur = (*(*(*(*ctxt).states).tab_state.add(j as usize))).seq;
+                for (j, &state) in (*(*ctxt).states).tab_state.iter().enumerate() {
+                    cur = (*state).seq;
                     cur = xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw(cur).unwrap())
                         .map_or(null_mut(), |node| node.as_ptr());
                     if cur.is_null() {
                         if found == 0 {
-                            lowattr =
-                                (*(*(*(*ctxt).states).tab_state.add(j as usize))).nb_attr_left;
+                            lowattr = (*state).nb_attr_left;
                             best = j;
                         }
                         found = 1;
-                        if (*(*(*(*ctxt).states).tab_state.add(j as usize))).nb_attr_left <= lowattr
-                        {
+                        if (*state).nb_attr_left <= lowattr {
                             // try to keep the latest one to mach old heuristic
-                            lowattr =
-                                (*(*(*(*ctxt).states).tab_state.add(j as usize))).nb_attr_left;
+                            lowattr = (*state).nb_attr_left;
                             best = j;
                         }
                         if lowattr == 0 {
@@ -7741,40 +7700,27 @@ unsafe fn xml_relaxng_validate_interleave(
                         }
                     } else if found == 0 {
                         if lowattr == -1 {
-                            lowattr =
-                                (*(*(*(*ctxt).states).tab_state.add(j as usize))).nb_attr_left;
+                            lowattr = (*state).nb_attr_left;
                             best = j;
-                        } else if (*(*(*(*ctxt).states).tab_state.add(j as usize))).nb_attr_left
-                            <= lowattr
-                        {
+                        } else if (*state).nb_attr_left <= lowattr {
                             // try to keep the latest one to mach old heuristic
-                            lowattr =
-                                (*(*(*(*ctxt).states).tab_state.add(j as usize))).nb_attr_left;
+                            lowattr = (*state).nb_attr_left;
                             best = j;
                         }
                     }
                 }
                 // BIG PBM: here we pick only one restarting point :-(
-                if (*(*ctxt).states).nb_state > 0 {
+                if !(*(*ctxt).states).tab_state.is_empty() {
                     xml_relaxng_free_valid_state(ctxt, oldstate);
-                    if best != -1 {
-                        oldstate = *(*(*ctxt).states).tab_state.add(best as usize);
-                        *(*(*ctxt).states).tab_state.add(best as usize) = null_mut();
+                    if best != usize::MAX {
+                        oldstate = (*(*ctxt).states).tab_state[best];
+                        (*(*ctxt).states).tab_state[best] = null_mut();
                     } else {
-                        oldstate = *(*(*ctxt).states)
-                            .tab_state
-                            .add((*(*ctxt).states).nb_state as usize - 1);
-                        *(*(*ctxt).states)
-                            .tab_state
-                            .add((*(*ctxt).states).nb_state as usize - 1) = null_mut();
-                        (*(*ctxt).states).nb_state -= 1;
+                        oldstate = (*(*ctxt).states).tab_state.pop().unwrap();
                     }
                 }
-                for j in 0..(*(*ctxt).states).nb_state {
-                    xml_relaxng_free_valid_state(
-                        ctxt,
-                        *(*(*ctxt).states).tab_state.add(j as usize),
-                    );
+                for &state in &(*(*ctxt).states).tab_state {
+                    xml_relaxng_free_valid_state(ctxt, state);
                 }
                 xml_relaxng_free_states(ctxt, (*ctxt).states);
                 (*ctxt).states = null_mut();
@@ -8018,8 +7964,7 @@ unsafe fn xml_relaxng_validate_state(
                 if !(*ctxt).states.is_null() {
                     tmp = -1;
 
-                    for i in 0..(*(*ctxt).states).nb_state {
-                        state = *(*(*ctxt).states).tab_state.add(i as usize);
+                    for &state in &(*(*ctxt).states).tab_state {
                         (*ctxt).state = state;
                         (*(*ctxt).state).seq = nseq;
 
@@ -8033,11 +7978,8 @@ unsafe fn xml_relaxng_validate_state(
                         (*ctxt).flags |= FLAGS_IGNORABLE;
                         xml_relaxng_log_best_error(ctxt);
                     }
-                    for i in 0..(*(*ctxt).states).nb_state {
-                        xml_relaxng_free_valid_state(
-                            ctxt,
-                            *(*(*ctxt).states).tab_state.add(i as usize),
-                        );
+                    for &state in &(*(*ctxt).states).tab_state {
+                        xml_relaxng_free_valid_state(ctxt, state);
                     }
                     xml_relaxng_free_states(ctxt, (*ctxt).states);
                     (*ctxt).flags = oldflags;
@@ -8080,8 +8022,7 @@ unsafe fn xml_relaxng_validate_state(
                 if !(*ctxt).states.is_null() {
                     tmp = -1;
 
-                    for i in 0..(*(*ctxt).states).nb_state {
-                        state = *(*(*ctxt).states).tab_state.add(i as usize);
+                    for &state in &(*(*ctxt).states).tab_state {
                         (*ctxt).state = state;
 
                         if xml_relaxng_validate_element_end(ctxt, 0) == 0 {
@@ -8094,12 +8035,9 @@ unsafe fn xml_relaxng_validate_state(
                         (*ctxt).flags |= FLAGS_IGNORABLE;
                         xml_relaxng_log_best_error(ctxt);
                     }
-                    for i in 0..(*(*ctxt).states).nb_state {
-                        xml_relaxng_free_valid_state(
-                            ctxt,
-                            *(*(*ctxt).states).tab_state.add(i as usize),
-                        );
-                        *(*(*ctxt).states).tab_state.add(i as usize) = null_mut();
+                    for state in (*(*ctxt).states).tab_state.iter_mut() {
+                        xml_relaxng_free_valid_state(ctxt, *state);
+                        *state = null_mut();
                     }
                     xml_relaxng_free_states(ctxt, (*ctxt).states);
                     (*ctxt).flags = oldflags;
@@ -8193,7 +8131,6 @@ unsafe fn xml_relaxng_validate_state(
 
             let mut progress: i32;
             let mut states: XmlRelaxNGStatesPtr = null_mut();
-            let mut base: i32;
 
             // err_nr = (*ctxt).err_nr;
             let res: XmlRelaxNGStatesPtr = xml_relaxng_new_states(ctxt, 1);
@@ -8209,27 +8146,20 @@ unsafe fn xml_relaxng_validate_state(
                     xml_relaxng_copy_valid_state(ctxt, (*ctxt).state),
                 );
             } else {
-                for j in 0..(*(*ctxt).states).nb_state {
-                    xml_relaxng_add_states(
-                        ctxt,
-                        res,
-                        xml_relaxng_copy_valid_state(
-                            ctxt,
-                            *(*(*ctxt).states).tab_state.add(j as usize),
-                        ),
-                    );
+                for &state in &(*(*ctxt).states).tab_state {
+                    xml_relaxng_add_states(ctxt, res, xml_relaxng_copy_valid_state(ctxt, state));
                 }
             }
             oldflags = (*ctxt).flags;
             (*ctxt).flags |= FLAGS_IGNORABLE;
             'lp: while {
                 progress = 0;
-                base = (*res).nb_state;
+                let mut base = (*res).tab_state.len();
 
                 if !(*ctxt).states.is_null() {
                     states = (*ctxt).states;
-                    for i in 0..(*states).nb_state {
-                        (*ctxt).state = *(*states).tab_state.add(i as usize);
+                    for &state in &(*states).tab_state {
+                        (*ctxt).state = state;
                         (*ctxt).states = null_mut();
                         ret = xml_relaxng_validate_definition_list(ctxt, (*define).content);
                         if ret == 0 {
@@ -8240,12 +8170,8 @@ unsafe fn xml_relaxng_validate_state(
                                     progress = 1;
                                 }
                             } else if !(*ctxt).states.is_null() {
-                                for j in 0..(*(*ctxt).states).nb_state {
-                                    tmp = xml_relaxng_add_states(
-                                        ctxt,
-                                        res,
-                                        *(*(*ctxt).states).tab_state.add(j as usize),
-                                    );
+                                for &in_state in &(*(*ctxt).states).tab_state {
+                                    tmp = xml_relaxng_add_states(ctxt, res, in_state);
                                     if tmp == 1 {
                                         progress = 1;
                                     }
@@ -8264,7 +8190,7 @@ unsafe fn xml_relaxng_validate_state(
                         xml_relaxng_free_valid_state(ctxt, (*ctxt).state);
                         (*ctxt).state = null_mut();
                     } else {
-                        base = (*res).nb_state;
+                        base = (*res).tab_state.len();
                         if !(*ctxt).state.is_null() {
                             tmp = xml_relaxng_add_states(ctxt, res, (*ctxt).state);
                             (*ctxt).state = null_mut();
@@ -8272,12 +8198,8 @@ unsafe fn xml_relaxng_validate_state(
                                 progress = 1;
                             }
                         } else if !(*ctxt).states.is_null() {
-                            for j in 0..(*(*ctxt).states).nb_state {
-                                tmp = xml_relaxng_add_states(
-                                    ctxt,
-                                    res,
-                                    *(*(*ctxt).states).tab_state.add(j as usize),
-                                );
+                            for &state in &(*(*ctxt).states).tab_state {
+                                tmp = xml_relaxng_add_states(ctxt, res, state);
                                 if tmp == 1 {
                                     progress = 1;
                                 }
@@ -8294,29 +8216,26 @@ unsafe fn xml_relaxng_validate_state(
                 if progress != 0 {
                     // Collect all the new nodes added at that step
                     // and make them the new node set
-                    if (*res).nb_state - base == 1 {
-                        (*ctxt).state = xml_relaxng_copy_valid_state(
-                            ctxt,
-                            *(*res).tab_state.add(base as usize),
-                        );
+                    if (*res).tab_state.len() - base == 1 {
+                        (*ctxt).state = xml_relaxng_copy_valid_state(ctxt, (*res).tab_state[base]);
                     } else {
                         if states.is_null() {
-                            xml_relaxng_new_states(ctxt, (*res).nb_state - base);
+                            xml_relaxng_new_states(
+                                ctxt,
+                                (*res).tab_state.len() as i32 - base as i32,
+                            );
                             states = (*ctxt).states;
                             if states.is_null() {
                                 // progress = 0;
                                 break 'lp;
                             }
                         }
-                        (*states).nb_state = 0;
-                        for i in base..(*res).nb_state {
+                        (*states).tab_state.clear();
+                        for &state in &(*res).tab_state[base..] {
                             xml_relaxng_add_states(
                                 ctxt,
                                 states,
-                                xml_relaxng_copy_valid_state(
-                                    ctxt,
-                                    *(*res).tab_state.add(i as usize),
-                                ),
+                                xml_relaxng_copy_valid_state(ctxt, state),
                             );
                         }
                         (*ctxt).states = states;
@@ -8404,12 +8323,8 @@ unsafe fn xml_relaxng_validate_state(
                     if !(*ctxt).state.is_null() {
                         xml_relaxng_add_states(ctxt, states, (*ctxt).state);
                     } else if !(*ctxt).states.is_null() {
-                        for i in 0..(*(*ctxt).states).nb_state {
-                            xml_relaxng_add_states(
-                                ctxt,
-                                states,
-                                *(*(*ctxt).states).tab_state.add(i as usize),
-                            );
+                        for &state in &(*(*ctxt).states).tab_state {
+                            xml_relaxng_add_states(ctxt, states, state);
                         }
                         xml_relaxng_free_states(ctxt, (*ctxt).states);
                         (*ctxt).states = null_mut();
@@ -8630,7 +8545,6 @@ unsafe fn xml_relaxng_validate_definition(
 ) -> i32 {
     let mut res: XmlRelaxNGStatesPtr;
     let mut ret: i32;
-    let mut j: i32;
 
     // We should NOT have both (*ctxt).state and (*ctxt).states
     if !(*ctxt).state.is_null() && !(*ctxt).states.is_null() {
@@ -8639,20 +8553,20 @@ unsafe fn xml_relaxng_validate_definition(
         (*ctxt).state = null_mut();
     }
 
-    if (*ctxt).states.is_null() || (*(*ctxt).states).nb_state == 1 {
+    if (*ctxt).states.is_null() || (*(*ctxt).states).tab_state.len() == 1 {
         if !(*ctxt).states.is_null() {
-            (*ctxt).state = *(*(*ctxt).states).tab_state.add(0);
+            (*ctxt).state = (*(*ctxt).states).tab_state[0];
             xml_relaxng_free_states(ctxt, (*ctxt).states);
             (*ctxt).states = null_mut();
         }
-        ret = xml_relaxng_validate_state(ctxt, define);
+        let ret = xml_relaxng_validate_state(ctxt, define);
         if !(*ctxt).state.is_null() && !(*ctxt).states.is_null() {
             // TODO
             xml_relaxng_free_valid_state(ctxt, (*ctxt).state);
             (*ctxt).state = null_mut();
         }
-        if !(*ctxt).states.is_null() && (*(*ctxt).states).nb_state == 1 {
-            (*ctxt).state = *(*(*ctxt).states).tab_state.add(0);
+        if !(*ctxt).states.is_null() && (*(*ctxt).states).tab_state.len() == 1 {
+            (*ctxt).state = (*(*ctxt).states).tab_state[0];
             xml_relaxng_free_states(ctxt, (*ctxt).states);
             (*ctxt).states = null_mut();
         }
@@ -8662,11 +8576,11 @@ unsafe fn xml_relaxng_validate_definition(
     let states: XmlRelaxNGStatesPtr = (*ctxt).states;
     (*ctxt).states = null_mut();
     res = null_mut();
-    j = 0;
+    let mut j = 0;
     let oldflags: i32 = (*ctxt).flags;
     (*ctxt).flags |= FLAGS_IGNORABLE;
-    for i in 0..(*states).nb_state {
-        (*ctxt).state = *(*states).tab_state.add(i as usize);
+    for i in 0..(*states).tab_state.len() {
+        (*ctxt).state = (*states).tab_state[i];
         (*ctxt).states = null_mut();
         ret = xml_relaxng_validate_state(ctxt, define);
         // We should NOT have both (*ctxt).state and (*ctxt).states
@@ -8683,7 +8597,7 @@ unsafe fn xml_relaxng_validate_definition(
                     (*ctxt).state = null_mut();
                 } else {
                     // add the state directly in states
-                    *(*states).tab_state.add(j as usize) = (*ctxt).state;
+                    (*states).tab_state[j] = (*ctxt).state;
                     j += 1;
                     (*ctxt).state = null_mut();
                 }
@@ -8692,12 +8606,12 @@ unsafe fn xml_relaxng_validate_definition(
                 res = (*ctxt).states;
                 (*ctxt).states = null_mut();
                 for k in 0..j {
-                    xml_relaxng_add_states(ctxt, res, *(*states).tab_state.add(k as usize));
+                    xml_relaxng_add_states(ctxt, res, (*states).tab_state[k]);
                 }
             } else {
                 // add all the new results to res and reff the container
-                for k in 0..(*(*ctxt).states).nb_state {
-                    xml_relaxng_add_states(ctxt, res, *(*(*ctxt).states).tab_state.add(k as usize));
+                for k in 0..(*(*ctxt).states).tab_state.len() {
+                    xml_relaxng_add_states(ctxt, res, (*(*ctxt).states).tab_state[k]);
                 }
                 xml_relaxng_free_states(ctxt, (*ctxt).states);
                 (*ctxt).states = null_mut();
@@ -8706,8 +8620,8 @@ unsafe fn xml_relaxng_validate_definition(
             xml_relaxng_free_valid_state(ctxt, (*ctxt).state);
             (*ctxt).state = null_mut();
         } else if !(*ctxt).states.is_null() {
-            for k in 0..(*(*ctxt).states).nb_state {
-                xml_relaxng_free_valid_state(ctxt, *(*(*ctxt).states).tab_state.add(k as usize));
+            for k in 0..(*(*ctxt).states).tab_state.len() {
+                xml_relaxng_free_valid_state(ctxt, (*(*ctxt).states).tab_state[k]);
             }
             xml_relaxng_free_states(ctxt, (*ctxt).states);
             (*ctxt).states = null_mut();
@@ -8719,11 +8633,11 @@ unsafe fn xml_relaxng_validate_definition(
         (*ctxt).states = res;
         ret = 0;
     } else if j > 1 {
-        (*states).nb_state = j;
+        (*states).tab_state.truncate(j);
         (*ctxt).states = states;
         ret = 0;
     } else if j == 1 {
-        (*ctxt).state = *(*states).tab_state.add(0);
+        (*ctxt).state = (*states).tab_state[0];
         xml_relaxng_free_states(ctxt, states);
         ret = 0;
     } else {
@@ -8751,9 +8665,6 @@ unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDo
     let mut state: XmlRelaxNGValidStatePtr;
     let mut node: *mut XmlNode;
 
-    // if doc.is_null() {
-    //     return -1;
-    // }
     if ctxt.is_null() || (*ctxt).schema.is_null() {
         return -1;
     }
@@ -8780,8 +8691,7 @@ unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDo
     } else if !(*ctxt).states.is_null() {
         let mut tmp: i32 = -1;
 
-        for i in 0..(*(*ctxt).states).nb_state {
-            state = *(*(*ctxt).states).tab_state.add(i as usize);
+        for &state in &(*(*ctxt).states).tab_state {
             node = (*state).seq;
             node = xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw(node).unwrap())
                 .map_or(null_mut(), |node| node.as_ptr());
@@ -8924,7 +8834,6 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
 ) {
     let ctxt: XmlRelaxNGValidCtxtPtr = inputdata as _;
     let define: XmlRelaxNGDefinePtr = transdata as _;
-    let mut state: XmlRelaxNGValidStatePtr;
     let mut ret: i32 = 0;
     let oldflags: i32;
 
@@ -8986,7 +8895,7 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
     (*ctxt).elem_push(exec);
 
     // Validate the attributes part of the content.
-    state = xml_relaxng_new_valid_state(ctxt, node);
+    let state = xml_relaxng_new_valid_state(ctxt, node);
     if state.is_null() {
         (*ctxt).pstate = -1;
         return;
@@ -9016,8 +8925,7 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
 
         oldflags = (*ctxt).flags;
 
-        for i in 0..(*(*ctxt).states).nb_state {
-            state = *(*(*ctxt).states).tab_state.add(i as usize);
+        for &state in &(*(*ctxt).states).tab_state {
             (*ctxt).state = state;
             (*(*ctxt).state).seq = null_mut();
 
@@ -9031,8 +8939,8 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
             (*ctxt).flags |= FLAGS_IGNORABLE;
             xml_relaxng_log_best_error(ctxt);
         }
-        for i in 0..(*(*ctxt).states).nb_state {
-            xml_relaxng_free_valid_state(ctxt, *(*(*ctxt).states).tab_state.add(i as usize));
+        for &state in &(*(*ctxt).states).tab_state {
+            xml_relaxng_free_valid_state(ctxt, state);
         }
         xml_relaxng_free_states(ctxt, (*ctxt).states);
         (*ctxt).states = null_mut();
