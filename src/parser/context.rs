@@ -1777,7 +1777,8 @@ unsafe fn xml_init_sax_parser_ctxt(
         } else {
             (*ctxt).vctxt.warning = Some(parser_validity_warning);
         }
-        (*ctxt).vctxt.node_max = 0;
+        // (*ctxt).vctxt.node_max = 0;
+        (*ctxt).vctxt.node_tab.clear();
         (*ctxt).options |= XmlParserOption::XmlParseDTDValid as i32;
     }
     (*ctxt).replace_entities = get_substitute_entities_default_value();
@@ -1872,9 +1873,6 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     (*ctxt).ext_sub_system = None;
     (*ctxt).sax = None;
     (*ctxt).directory = None;
-    if !(*ctxt).vctxt.node_tab.is_null() {
-        xml_free((*ctxt).vctxt.node_tab as _);
-    }
     if !(*ctxt).dict.is_null() {
         xml_dict_free((*ctxt).dict);
     }

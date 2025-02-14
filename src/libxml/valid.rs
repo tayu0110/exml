@@ -23,7 +23,7 @@ use std::io::Write;
 use std::{
     collections::HashMap,
     ffi::{c_char, CStr, CString},
-    mem::{size_of, size_of_val},
+    mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut, NonNull},
     rc::Rc,
@@ -53,7 +53,7 @@ use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{
-        globals::{xml_free, xml_malloc, xml_realloc},
+        globals::{xml_free, xml_malloc},
         hash::XmlHashTable,
         parser::XmlParserMode,
         parser_internals::xml_string_current_char,
@@ -123,9 +123,7 @@ pub struct XmlValidCtxt {
 
     /* Node analysis stack used when validating within entities */
     pub(crate) node: *mut XmlNode,          /* Current parsed Node */
-    pub(crate) node_nr: i32,                /* Depth of the parsing stack */
-    pub(crate) node_max: i32,               /* Max depth of the parsing stack */
-    pub(crate) node_tab: *mut *mut XmlNode, /* array of nodes */
+    pub(crate) node_tab: Vec<*mut XmlNode>, /* array of nodes */
 
     pub(crate) flags: u32,             /* internal flags */
     pub(crate) doc: Option<XmlDocPtr>, /* the document */
@@ -151,9 +149,9 @@ impl Default for XmlValidCtxt {
             error: None,
             warning: None,
             node: null_mut(),
-            node_nr: 0,
-            node_max: 0,
-            node_tab: null_mut(),
+            // node_nr: 0,
+            // node_max: 0,
+            node_tab: vec![],
             flags: 0,
             doc: None,
             valid: 0,
@@ -2366,9 +2364,6 @@ pub unsafe fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
     if cur.is_null() {
         return;
     }
-    if !(*cur).node_tab.is_null() {
-        xml_free((*cur).node_tab as _);
-    }
     drop_in_place(cur);
     xml_free(cur as _);
 }
@@ -3695,49 +3690,17 @@ unsafe fn xml_valid_get_elem_decl(
 }
 
 unsafe fn node_vpush(ctxt: XmlValidCtxtPtr, value: *mut XmlNode) -> i32 {
-    if (*ctxt).node_max <= 0 {
-        (*ctxt).node_max = 4;
-        (*ctxt).node_tab =
-            xml_malloc((*ctxt).node_max as usize * size_of_val(&*(*ctxt).node_tab.add(0)))
-                as *mut *mut XmlNode;
-        if (*ctxt).node_tab.is_null() {
-            xml_verr_memory(ctxt as _, Some("malloc failed"));
-            (*ctxt).node_max = 0;
-            return 0;
-        }
-    }
-    if (*ctxt).node_nr >= (*ctxt).node_max {
-        let tmp: *mut *mut XmlNode = xml_realloc(
-            (*ctxt).node_tab as _,
-            (*ctxt).node_max as usize * 2 * size_of_val(&*(*ctxt).node_tab.add(0)),
-        ) as *mut *mut XmlNode;
-        if tmp.is_null() {
-            xml_verr_memory(ctxt as _, Some("realloc failed"));
-            return 0;
-        }
-        (*ctxt).node_max *= 2;
-        (*ctxt).node_tab = tmp;
-    }
-    *(*ctxt).node_tab.add((*ctxt).node_nr as usize) = value;
+    (*ctxt).node_tab.push(value);
     (*ctxt).node = value;
-    let res = (*ctxt).node_nr;
-    (*ctxt).node_nr += 1;
-    res
+    (*ctxt).node_tab.len() as i32 - 1
 }
 
 unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> *mut XmlNode {
-    if (*ctxt).node_nr <= 0 {
+    let Some(res) = (*ctxt).node_tab.pop() else {
         return null_mut();
-    }
-    (*ctxt).node_nr -= 1;
-    if (*ctxt).node_nr > 0 {
-        (*ctxt).node = *(*ctxt).node_tab.add((*ctxt).node_nr as usize - 1);
-    } else {
-        (*ctxt).node = null_mut();
-    }
-    let ret: *mut XmlNode = *(*ctxt).node_tab.add((*ctxt).node_nr as usize);
-    *(*ctxt).node_tab.add((*ctxt).node_nr as usize) = null_mut();
-    ret
+    };
+    (*ctxt).node = (*ctxt).node_tab.last().cloned().unwrap_or(null_mut());
+    res
 }
 
 /// Check that an element follows #CDATA
@@ -3797,12 +3760,7 @@ unsafe fn xml_validate_one_cdata_element(
         }
     }
     // done:
-    (*ctxt).node_max = 0;
-    (*ctxt).node_nr = 0;
-    if !(*ctxt).node_tab.is_null() {
-        xml_free((*ctxt).node_tab as _);
-        (*ctxt).node_tab = null_mut();
-    }
+    (*ctxt).node_tab.clear();
     ret
 }
 
@@ -4437,9 +4395,7 @@ unsafe fn xml_validate_element_content(
             if xml_regexp_is_determinist(elem_decl.cont_model) == 0 {
                 return -1;
             }
-            (*ctxt).node_max = 0;
-            (*ctxt).node_nr = 0;
-            (*ctxt).node_tab = null_mut();
+            (*ctxt).node_tab.clear();
             let exec: XmlRegExecCtxtPtr =
                 xml_reg_new_exec_ctxt(elem_decl.cont_model, None, null_mut());
             if !exec.is_null() {
@@ -4734,12 +4690,7 @@ unsafe fn xml_validate_element_content(
             (*ctxt).vstate_tab = null_mut();
         }
     }
-    (*ctxt).node_max = 0;
-    (*ctxt).node_nr = 0;
-    if !(*ctxt).node_tab.is_null() {
-        xml_free((*ctxt).node_tab as _);
-        (*ctxt).node_tab = null_mut();
-    }
+    (*ctxt).node_tab.clear();
     ret
 }
 
