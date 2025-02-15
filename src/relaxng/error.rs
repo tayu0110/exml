@@ -6,10 +6,10 @@ use crate::{
     error::{XmlParserErrors, __xml_raise_error},
     globals::{GenericError, StructuredError},
     libxml::{
-        globals::{xml_free, xml_malloc, xml_realloc},
+        globals::xml_free,
         relaxng::{
-            XmlRelaxNGValidErr, XmlRelaxNGValidError, XmlRelaxNGValidErrorPtr, FLAGS_IGNORABLE,
-            FLAGS_NEGATIVE, FLAGS_NOERROR,
+            XmlRelaxNGValidErr, XmlRelaxNGValidError, FLAGS_IGNORABLE, FLAGS_NEGATIVE,
+            FLAGS_NOERROR,
         },
         xmlstring::{xml_char_strdup, xml_escape_format_string, xml_str_equal, xml_strdup},
     },
@@ -379,47 +379,34 @@ const MAX_ERROR: usize = 5;
 /// Show all validation error over a given index.
 #[doc(alias = "xmlRelaxNGDumpValidError")]
 pub(crate) unsafe fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) {
-    let mut k: usize;
-    let mut err: XmlRelaxNGValidErrorPtr;
-    let mut dup: XmlRelaxNGValidErrorPtr;
-
-    k = 0;
-    'main: for i in 0..(*ctxt).err_nr {
-        err = (*ctxt).err_tab.add(i as usize);
+    let mut k = 0;
+    for (i, err) in (*ctxt).err_tab.iter_mut().enumerate() {
         if k < MAX_ERROR {
-            for j in 0..i {
-                dup = (*ctxt).err_tab.add(j as usize);
-                if (*err).err == (*dup).err
-                    && (*err).node == (*dup).node
-                    && xml_str_equal((*err).arg1, (*dup).arg1)
-                    && xml_str_equal((*err).arg2, (*dup).arg2)
-                {
-                    if (*err).flags & ERROR_IS_DUP != 0 {
-                        if !(*err).arg1.is_null() {
-                            xml_free((*err).arg1 as _);
-                        }
-                        (*err).arg1 = null_mut();
-                        if !(*err).arg2.is_null() {
-                            xml_free((*err).arg2 as _);
-                        }
-                        (*err).arg2 = null_mut();
-                        (*err).flags = 0;
+            if (*ctxt).err_tab[..i].iter().any(|dup| {
+                err.err == dup.err
+                    && err.node == dup.node
+                    && xml_str_equal(err.arg1, dup.arg1)
+                    && xml_str_equal(err.arg2, dup.arg2)
+            }) {
+                if err.flags & ERROR_IS_DUP != 0 {
+                    if !err.arg1.is_null() {
+                        xml_free(err.arg1 as _);
                     }
-                    continue 'main;
+                    err.arg1 = null_mut();
+                    if !err.arg2.is_null() {
+                        xml_free(err.arg2 as _);
+                    }
+                    err.arg2 = null_mut();
+                    err.flags = 0;
                 }
+                continue;
             }
-            xml_relaxng_show_valid_error(
-                ctxt,
-                (*err).err,
-                (*err).node,
-                (*err).seq,
-                (*err).arg1,
-                (*err).arg2,
-            );
+            xml_relaxng_show_valid_error(ctxt, err.err, err.node, err.seq, err.arg1, err.arg2);
             k += 1;
         }
     }
-    (*ctxt).err_nr = 0;
+
+    (*ctxt).err_tab.clear();
 }
 
 /// Pushes a new error on top of the error stack
@@ -433,109 +420,72 @@ unsafe fn xml_relaxng_valid_error_push(
     arg2: *const u8,
     dup: i32,
 ) -> i32 {
-    if (*ctxt).err_tab.is_null() {
-        (*ctxt).err_max = 8;
-        (*ctxt).err_nr = 0;
-        (*ctxt).err_tab =
-            xml_malloc((*ctxt).err_max as usize * size_of::<XmlRelaxNGValidError>()) as _;
-        if (*ctxt).err_tab.is_null() {
-            xml_rng_verr_memory(ctxt, "pushing error\n");
-            return 0;
+    if let Some(last_error) = (*ctxt).err_tab.last() {
+        if !(*ctxt).state.is_null()
+            && last_error.node == (*(*ctxt).state).node
+            && last_error.err == err
+        {
+            return (*ctxt).err_tab.len() as i32 - 1;
         }
-        (*ctxt).err = null_mut();
     }
-    if (*ctxt).err_nr >= (*ctxt).err_max {
-        (*ctxt).err_max *= 2;
-        (*ctxt).err_tab = xml_realloc(
-            (*ctxt).err_tab as _,
-            (*ctxt).err_max as usize * size_of::<XmlRelaxNGValidError>(),
-        ) as _;
-        if (*ctxt).err_tab.is_null() {
-            xml_rng_verr_memory(ctxt, "pushing error\n");
-            return 0;
-        }
-        (*ctxt).err = (*ctxt).err_tab.add((*ctxt).err_nr as usize - 1);
-    }
-    if !(*ctxt).err.is_null()
-        && !(*ctxt).state.is_null()
-        && (*(*ctxt).err).node == (*(*ctxt).state).node
-        && (*(*ctxt).err).err == err
-    {
-        return (*ctxt).err_nr;
-    }
-    let cur: XmlRelaxNGValidErrorPtr = (*ctxt).err_tab.add((*ctxt).err_nr as usize);
-    (*cur).err = err;
+    let mut cur = XmlRelaxNGValidError {
+        err,
+        ..Default::default()
+    };
     if dup != 0 {
-        (*cur).arg1 = xml_strdup(arg1);
-        (*cur).arg2 = xml_strdup(arg2);
-        (*cur).flags = ERROR_IS_DUP;
+        cur.arg1 = xml_strdup(arg1);
+        cur.arg2 = xml_strdup(arg2);
+        cur.flags = ERROR_IS_DUP;
     } else {
-        (*cur).arg1 = arg1;
-        (*cur).arg2 = arg2;
-        (*cur).flags = 0;
+        cur.arg1 = arg1;
+        cur.arg2 = arg2;
+        cur.flags = 0;
     }
     if !(*ctxt).state.is_null() {
-        (*cur).node = (*(*ctxt).state).node;
-        (*cur).seq = (*(*ctxt).state).seq;
+        cur.node = (*(*ctxt).state).node;
+        cur.seq = (*(*ctxt).state).seq;
     } else {
-        (*cur).node = null_mut();
-        (*cur).seq = null_mut();
+        cur.node = null_mut();
+        cur.seq = null_mut();
     }
-    (*ctxt).err = cur;
-    (*ctxt).err_nr += 1;
-    (*ctxt).err_nr - 1
+    (*ctxt).err_tab.push(cur);
+    (*ctxt).err_tab.len() as i32 - 1
 }
 
 /// Pops the top error from the error stack
 #[doc(alias = "xmlRelaxNGValidErrorPop")]
 pub(crate) unsafe fn xml_relaxng_valid_error_pop(ctxt: XmlRelaxNGValidCtxtPtr) {
-    if (*ctxt).err_nr <= 0 {
-        (*ctxt).err = null_mut();
+    let Some(cur) = (*ctxt).err_tab.pop() else {
         return;
-    }
-    (*ctxt).err_nr -= 1;
-    if (*ctxt).err_nr > 0 {
-        (*ctxt).err = (*ctxt).err_tab.add((*ctxt).err_nr as usize - 1);
-    } else {
-        (*ctxt).err = null_mut();
-    }
-    let cur: XmlRelaxNGValidErrorPtr = (*ctxt).err_tab.add((*ctxt).err_nr as usize);
-    if (*cur).flags & ERROR_IS_DUP != 0 {
-        if !(*cur).arg1.is_null() {
-            xml_free((*cur).arg1 as _);
+    };
+
+    if cur.flags & ERROR_IS_DUP != 0 {
+        if !cur.arg1.is_null() {
+            xml_free(cur.arg1 as _);
         }
-        (*cur).arg1 = null_mut();
-        if !(*cur).arg2.is_null() {
-            xml_free((*cur).arg2 as _);
+        if !cur.arg2.is_null() {
+            xml_free(cur.arg2 as _);
         }
-        (*cur).arg2 = null_mut();
-        (*cur).flags = 0;
     }
 }
 
 /// pop and discard all errors until the given level is reached
 #[doc(alias = "xmlRelaxNGPopErrors")]
 pub(crate) unsafe fn xml_relaxng_pop_errors(ctxt: XmlRelaxNGValidCtxtPtr, level: i32) {
-    let mut err: XmlRelaxNGValidErrorPtr;
-
-    for i in level..(*ctxt).err_nr {
-        err = (*ctxt).err_tab.add(i as usize);
-        if (*err).flags & ERROR_IS_DUP != 0 {
-            if !(*err).arg1.is_null() {
-                xml_free((*err).arg1 as _);
+    for err in (*ctxt).err_tab[level as usize..].iter_mut() {
+        if err.flags & ERROR_IS_DUP != 0 {
+            if !err.arg1.is_null() {
+                xml_free(err.arg1 as _);
             }
-            (*err).arg1 = null_mut();
-            if !(*err).arg2.is_null() {
-                xml_free((*err).arg2 as _);
+            err.arg1 = null_mut();
+            if !err.arg2.is_null() {
+                xml_free(err.arg2 as _);
             }
-            (*err).arg2 = null_mut();
-            (*err).flags = 0;
+            err.arg2 = null_mut();
+            err.flags = 0;
         }
     }
-    (*ctxt).err_nr = level;
-    if (*ctxt).err_nr <= 0 {
-        (*ctxt).err = null_mut();
-    }
+    (*ctxt).err_tab.truncate(level as usize);
 }
 
 /// Register a validation error, either generating it if it's sure
@@ -562,7 +512,7 @@ pub(crate) unsafe fn xml_relaxng_add_valid_error(
 
         // Flush first any stacked error which might be the
         // real cause of the problem.
-        if (*ctxt).err_nr != 0 {
+        if !(*ctxt).err_tab.is_empty() {
             xml_relaxng_dump_valid_error(ctxt);
         }
         if !(*ctxt).state.is_null() {

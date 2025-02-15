@@ -25,7 +25,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::{size_of, take},
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null, null_mut},
     slice::from_raw_parts,
 };
 
@@ -319,6 +319,19 @@ pub struct XmlRelaxNGValidError {
     pub(crate) seq: *mut XmlNode,       // the current child
     pub(crate) arg1: *const XmlChar,    // first arg
     pub(crate) arg2: *const XmlChar,    // second arg
+}
+
+impl Default for XmlRelaxNGValidError {
+    fn default() -> Self {
+        Self {
+            err: XmlRelaxNGValidErr::default(),
+            flags: 0,
+            node: null_mut(),
+            seq: null_mut(),
+            arg1: null(),
+            arg2: null(),
+        }
+    }
 }
 
 pub type XmlRelaxNGIncludePtr = *mut XmlRelaxNGInclude;
@@ -684,7 +697,7 @@ unsafe fn xml_relaxng_element_match(
                 if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
                     xml_relaxng_dump_valid_error(ctxt);
                 }
-            } else if (*ctxt).err_nr > 0 {
+            } else if !(*ctxt).err_tab.is_empty() {
                 xml_relaxng_pop_errors(ctxt, 0);
             }
         }
@@ -6672,7 +6685,7 @@ unsafe fn xml_relaxng_validate_value(
                 if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
                     xml_relaxng_dump_valid_error(ctxt);
                 }
-            } else if (*ctxt).err_nr > 0 {
+            } else if !(*ctxt).err_tab.is_empty() {
                 xml_relaxng_pop_errors(ctxt, 0);
             }
         }
@@ -6768,7 +6781,7 @@ unsafe fn xml_relaxng_validate_value(
                 cur = (*(*ctxt).state).value;
             }
             (*ctxt).flags = oldflags;
-            if (*ctxt).err_nr > 0 {
+            if !(*ctxt).err_tab.is_empty() {
                 xml_relaxng_pop_errors(ctxt, 0);
             }
         }
@@ -6784,13 +6797,13 @@ unsafe fn xml_relaxng_validate_value(
             (*ctxt).flags = oldflags;
             if ret != 0 {
                 (*(*ctxt).state).value = temp;
-                if (*ctxt).err_nr > 0 {
+                if !(*ctxt).err_tab.is_empty() {
                     xml_relaxng_pop_errors(ctxt, 0);
                 }
                 ret = 0;
                 break 'to_break;
             }
-            if (*ctxt).err_nr > 0 {
+            if !(*ctxt).err_tab.is_empty() {
                 xml_relaxng_pop_errors(ctxt, 0);
             }
         }
@@ -7469,7 +7482,7 @@ unsafe fn xml_relaxng_validate_interleave(
     let mut ret: i32 = 0;
     let mut i: i32;
     let nbgroups: i32;
-    let err_nr: i32 = (*ctxt).err_nr;
+    let err_nr = (*ctxt).err_tab.len();
     let mut oldstate: XmlRelaxNGValidStatePtr;
     let partitions: XmlRelaxNGPartitionPtr;
     let mut group: XmlRelaxNGInterleaveGroupPtr;
@@ -7776,8 +7789,8 @@ unsafe fn xml_relaxng_validate_interleave(
         prev.next = NodePtr::from_ptr(cur);
         cur = prev.as_ptr();
     }
-    if ret == 0 && (*ctxt).err_nr > err_nr {
-        xml_relaxng_pop_errors(ctxt, err_nr);
+    if ret == 0 && (*ctxt).err_tab.len() > err_nr {
+        xml_relaxng_pop_errors(ctxt, err_nr as i32);
     }
 
     xml_free(list as _);
@@ -7798,7 +7811,6 @@ unsafe fn xml_relaxng_validate_state(
 
     let mut tmp: i32;
     let oldflags: i32;
-    let mut err_nr: i32;
     let mut oldstate: XmlRelaxNGValidStatePtr = null_mut();
     let mut state: XmlRelaxNGValidStatePtr;
 
@@ -7835,7 +7847,7 @@ unsafe fn xml_relaxng_validate_state(
             (*(*ctxt).state).seq = node;
         }
         XmlRelaxNGType::Element => 'to_break: {
-            err_nr = (*ctxt).err_nr;
+            let err_nr = (*ctxt).err_tab.len();
             node = xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw(node).unwrap())
                 .map_or(null_mut(), |node| node.as_ptr());
             if node.is_null() {
@@ -7867,18 +7879,18 @@ unsafe fn xml_relaxng_validate_state(
                         .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap()),
                 )
                 .map_or(null_mut(), |node| node.as_ptr());
-                if (*ctxt).err_nr > err_nr {
-                    xml_relaxng_pop_errors(ctxt, err_nr);
+                if (*ctxt).err_tab.len() > err_nr {
+                    xml_relaxng_pop_errors(ctxt, err_nr as i32);
                 }
-                if (*ctxt).err_nr != 0 {
-                    while !(*ctxt).err.is_null()
-                        && (((*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrElemname
-                            && xml_str_equal((*(*ctxt).err).arg2, (*node).name))
-                            || ((*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrElemextrans
-                                && xml_str_equal((*(*ctxt).err).arg1, (*node).name))
-                            || (*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrNoelem
-                            || (*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrNotelem)
-                    {
+                if !(*ctxt).err_tab.is_empty() {
+                    while (*ctxt).err_tab.last().map_or(false, |err| {
+                        (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemname
+                            && xml_str_equal(err.arg2, (*node).name))
+                            || (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemextrans
+                                && xml_str_equal(err.arg1, (*node).name))
+                            || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNoelem
+                            || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNotelem
+                    }) {
                         xml_relaxng_valid_error_pop(ctxt);
                     }
                 }
@@ -7897,22 +7909,22 @@ unsafe fn xml_relaxng_validate_state(
                 break 'to_break;
             }
             ret = 0;
-            if (*ctxt).err_nr != 0 {
-                if (*ctxt).err_nr > err_nr {
-                    xml_relaxng_pop_errors(ctxt, err_nr);
+            if !(*ctxt).err_tab.is_empty() {
+                if (*ctxt).err_tab.len() > err_nr {
+                    xml_relaxng_pop_errors(ctxt, err_nr as i32);
                 }
-                while !(*ctxt).err.is_null()
-                    && (((*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrElemname
-                        && xml_str_equal((*(*ctxt).err).arg2, (*node).name))
-                        || ((*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrElemextrans
-                            && xml_str_equal((*(*ctxt).err).arg1, (*node).name))
-                        || (*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrNoelem
-                        || (*(*ctxt).err).err == XmlRelaxNGValidErr::XmlRelaxngErrNotelem)
-                {
+                while (*ctxt).err_tab.last().map_or(false, |err| {
+                    (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemname
+                        && xml_str_equal(err.arg2, (*node).name))
+                        || (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemextrans
+                            && xml_str_equal(err.arg1, (*node).name))
+                        || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNoelem
+                        || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNotelem
+                }) {
                     xml_relaxng_valid_error_pop(ctxt);
                 }
             }
-            err_nr = (*ctxt).err_nr;
+            let err_nr = (*ctxt).err_tab.len();
 
             oldflags = (*ctxt).flags;
             if (*ctxt).flags & FLAGS_MIXED_CONTENT != 0 {
@@ -8072,12 +8084,12 @@ unsafe fn xml_relaxng_validate_state(
                     xml_relaxng_dump_valid_error(ctxt);
                     ret = 0;
                 }
-            } else if (*ctxt).err_nr > err_nr {
-                xml_relaxng_pop_errors(ctxt, err_nr);
+            } else if (*ctxt).err_tab.len() > err_nr {
+                xml_relaxng_pop_errors(ctxt, err_nr as i32);
             }
         }
         XmlRelaxNGType::Optional => 'to_break: {
-            err_nr = (*ctxt).err_nr;
+            let err_nr = (*ctxt).err_tab.len();
             oldflags = (*ctxt).flags;
             (*ctxt).flags |= FLAGS_IGNORABLE;
             oldstate = xml_relaxng_copy_valid_state(ctxt, (*ctxt).state);
@@ -8089,8 +8101,8 @@ unsafe fn xml_relaxng_validate_state(
                 (*ctxt).state = oldstate;
                 (*ctxt).flags = oldflags;
                 ret = 0;
-                if (*ctxt).err_nr > err_nr {
-                    xml_relaxng_pop_errors(ctxt, err_nr);
+                if (*ctxt).err_tab.len() > err_nr {
+                    xml_relaxng_pop_errors(ctxt, err_nr as i32);
                 }
                 break 'to_break;
             }
@@ -8102,8 +8114,8 @@ unsafe fn xml_relaxng_validate_state(
                     xml_relaxng_free_valid_state(ctxt, oldstate);
                     (*ctxt).flags = oldflags;
                     ret = -1;
-                    if (*ctxt).err_nr > err_nr {
-                        xml_relaxng_pop_errors(ctxt, err_nr);
+                    if (*ctxt).err_tab.len() > err_nr {
+                        xml_relaxng_pop_errors(ctxt, err_nr as i32);
                     }
                     break 'to_break;
                 }
@@ -8113,19 +8125,19 @@ unsafe fn xml_relaxng_validate_state(
             }
             (*ctxt).flags = oldflags;
             ret = 0;
-            if (*ctxt).err_nr > err_nr {
-                xml_relaxng_pop_errors(ctxt, err_nr);
+            if (*ctxt).err_tab.len() > err_nr {
+                xml_relaxng_pop_errors(ctxt, err_nr as i32);
             }
         }
         ty @ XmlRelaxNGType::Oneormore | ty @ XmlRelaxNGType::Zeroormore => 'to_break: {
             if matches!(ty, XmlRelaxNGType::Oneormore) {
-                err_nr = (*ctxt).err_nr;
+                let err_nr = (*ctxt).err_tab.len();
                 ret = xml_relaxng_validate_definition_list(ctxt, (*define).content);
                 if ret != 0 {
                     break 'to_break;
                 }
-                if (*ctxt).err_nr > err_nr {
-                    xml_relaxng_pop_errors(ctxt, err_nr);
+                if (*ctxt).err_tab.len() > err_nr {
+                    xml_relaxng_pop_errors(ctxt, err_nr as i32);
                 }
             }
 
@@ -8265,7 +8277,7 @@ unsafe fn xml_relaxng_validate_state(
             node = xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw(node).unwrap())
                 .map_or(null_mut(), |node| node.as_ptr());
 
-            err_nr = (*ctxt).err_nr;
+            let err_nr = (*ctxt).err_tab.len();
             if (*define).dflags & IS_TRIABLE as i16 != 0
                 && !(*define).data.is_null()
                 && !node.is_null()
@@ -8348,8 +8360,8 @@ unsafe fn xml_relaxng_validate_state(
                 if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
                     xml_relaxng_dump_valid_error(ctxt);
                 }
-            } else if (*ctxt).err_nr > err_nr {
-                xml_relaxng_pop_errors(ctxt, err_nr);
+            } else if (*ctxt).err_tab.len() > err_nr {
+                xml_relaxng_pop_errors(ctxt, err_nr as i32);
             }
         }
         XmlRelaxNGType::Def | XmlRelaxNGType::Group => {

@@ -10,7 +10,7 @@ use crate::{
         globals::{xml_free, xml_malloc},
         relaxng::{
             xml_relaxng_add_states_uniq, xml_relaxng_validate_progressive_callback,
-            XmlRelaxNGGrammarPtr, XmlRelaxNGPtr, XmlRelaxNGValidErr, XmlRelaxNGValidErrorPtr,
+            XmlRelaxNGGrammarPtr, XmlRelaxNGPtr, XmlRelaxNGValidErr, XmlRelaxNGValidError,
         },
         xmlregexp::{
             xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_free_exec_ctxt,
@@ -88,10 +88,10 @@ pub struct XmlRelaxNGValidCtxt {
 
     // Errors accumulated in branches may have to be stacked to be
     // provided back when it's sure they affect validation.
-    pub(crate) err: XmlRelaxNGValidErrorPtr,     // Last error
-    pub(crate) err_nr: i32,                      // Depth of the error stack
-    pub(crate) err_max: i32,                     // Max depth of the error stack
-    pub(crate) err_tab: XmlRelaxNGValidErrorPtr, // stack of errors
+    // pub(crate) err: XmlRelaxNGValidErrorPtr,     // Last error
+    // pub(crate) err_nr: i32,                      // Depth of the error stack
+    // pub(crate) err_max: i32,                     // Max depth of the error stack
+    pub(crate) err_tab: Vec<XmlRelaxNGValidError>, // stack of errors
 
     pub(crate) state: XmlRelaxNGValidStatePtr, // the current validation state
     pub(crate) states: XmlRelaxNGStatesPtr,    // the accumulated state list
@@ -242,10 +242,10 @@ impl Default for XmlRelaxNGValidCtxt {
             depth: 0,
             idref: 0,
             err_no: 0,
-            err: null_mut(),
-            err_nr: 0,
-            err_max: 0,
-            err_tab: null_mut(),
+            // err: null_mut(),
+            // err_nr: 0,
+            // err_max: 0,
+            err_tab: vec![],
             state: null_mut(),
             states: null_mut(),
             free_state: null_mut(),
@@ -280,10 +280,6 @@ pub unsafe fn xml_relaxng_new_valid_ctxt(schema: XmlRelaxNGPtr) -> XmlRelaxNGVal
         (*ret).error = Some(state.generic_error);
         (*ret).user_data = state.generic_error_context.clone();
     });
-    (*ret).err_nr = 0;
-    (*ret).err_max = 0;
-    (*ret).err = null_mut();
-    (*ret).err_tab = null_mut();
     if !schema.is_null() {
         (*ret).idref = (*schema).idref;
     }
@@ -310,9 +306,6 @@ pub unsafe fn xml_relaxng_free_valid_ctxt(ctxt: XmlRelaxNGValidCtxtPtr) {
     }
     for state in (*ctxt).free_states.drain(..) {
         xml_relaxng_free_states(null_mut(), state);
-    }
-    if !(*ctxt).err_tab.is_null() {
-        xml_free((*ctxt).err_tab as _);
     }
     let mut exec = (*ctxt).elem_pop();
     while !exec.is_null() {
