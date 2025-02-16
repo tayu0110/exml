@@ -2722,7 +2722,7 @@ unsafe fn xml_shell_set_content(
         node,
         CStr::from_ptr(value).to_bytes().to_vec(),
         0,
-        addr_of_mut!(results),
+        &mut results,
     );
     if ret == XmlParserErrors::XmlErrOK {
         if let Some(children) = (*node).children() {

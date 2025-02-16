@@ -8717,7 +8717,7 @@ unsafe fn xml_schema_parse_attribute_group_ref(
 unsafe fn xml_schema_parse_local_attributes(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    child: *mut *mut XmlNode,
+    child: &mut *mut XmlNode,
     list: *mut XmlSchemaItemListPtr,
     parent_type: i32,
     has_refs: *mut i32,
@@ -9147,7 +9147,7 @@ unsafe fn xml_schema_parse_extension(
         if xml_schema_parse_local_attributes(
             ctxt,
             schema,
-            addr_of_mut!(child),
+            &mut child,
             addr_of_mut!((*typ).attr_uses) as *mut XmlSchemaItemListPtr,
             XmlSchemaTypeType::XmlSchemaTypeExtension as i32,
             null_mut(),
@@ -9724,7 +9724,7 @@ unsafe fn xml_schema_parse_complex_type(
         if xml_schema_parse_local_attributes(
             ctxt,
             schema,
-            addr_of_mut!(child),
+            &mut child,
             addr_of_mut!((*typ).attr_uses) as *mut XmlSchemaItemListPtr,
             XmlSchemaTypeType::XmlSchemaTypeRestriction as i32,
             null_mut(),
@@ -11552,7 +11552,7 @@ unsafe fn xml_schema_parse_restriction(
         if xml_schema_parse_local_attributes(
             ctxt,
             schema,
-            addr_of_mut!(child),
+            &mut child,
             addr_of_mut!((*typ).attr_uses) as *mut XmlSchemaItemListPtr,
             XmlSchemaTypeType::XmlSchemaTypeRestriction as i32,
             null_mut(),
@@ -12460,7 +12460,7 @@ unsafe fn xml_schema_parse_attribute_group_definition(
     if xml_schema_parse_local_attributes(
         pctxt,
         schema,
-        addr_of_mut!(child),
+        &mut child,
         addr_of_mut!((*ret).attr_uses) as *mut XmlSchemaItemListPtr,
         XmlSchemaTypeType::XmlSchemaTypeAttributegroup as _,
         addr_of_mut!(has_refs),

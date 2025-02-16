@@ -1872,7 +1872,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     oldctxt: XmlParserCtxtPtr,
     string: *const XmlChar,
     user_data: Option<GenericErrorContext>,
-    lst: *mut *mut XmlNode,
+    mut lst: Option<&mut *mut XmlNode>,
 ) -> XmlParserErrors {
     let mut content: *mut XmlNode = null_mut();
     let mut last: *mut XmlNode = null_mut();
@@ -1889,8 +1889,8 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         return XmlParserErrors::XmlErrEntityLoop;
     }
 
-    if !lst.is_null() {
-        *lst = null_mut();
+    if let Some(lst) = lst.as_mut() {
+        **lst = null_mut();
     }
     if string.is_null() {
         return XmlParserErrors::XmlErrInternalError;
@@ -1994,33 +1994,35 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         ret = XmlParserErrors::XmlErrOK;
     }
 
-    if !lst.is_null() && matches!(ret, XmlParserErrors::XmlErrOK) {
-        // Return the newly created nodeset after unlinking it from
-        // they pseudo parent.
-        let mut cur = my_doc
-            .children()
-            .unwrap()
-            .children()
-            .map_or(null_mut(), |c| c.as_ptr());
-        *lst = cur;
-        while !cur.is_null() {
-            #[cfg(feature = "libxml_valid")]
-            if (*oldctxt).validate != 0
-                && (*oldctxt).well_formed != 0
-                && (*cur).element_type() == XmlElementType::XmlElementNode
-            {
-                if let Some(my_doc) = (*oldctxt).my_doc.filter(|doc| doc.int_subset.is_some()) {
-                    (*oldctxt).valid &= xml_validate_element(
-                        addr_of_mut!((*oldctxt).vctxt),
-                        my_doc,
-                        XmlGenericNodePtr::from_raw(cur),
-                    );
+    if let Some(lst) = lst {
+        if matches!(ret, XmlParserErrors::XmlErrOK) {
+            // Return the newly created nodeset after unlinking it from
+            // they pseudo parent.
+            let mut cur = my_doc
+                .children()
+                .unwrap()
+                .children()
+                .map_or(null_mut(), |c| c.as_ptr());
+            *lst = cur;
+            while !cur.is_null() {
+                #[cfg(feature = "libxml_valid")]
+                if (*oldctxt).validate != 0
+                    && (*oldctxt).well_formed != 0
+                    && (*cur).element_type() == XmlElementType::XmlElementNode
+                {
+                    if let Some(my_doc) = (*oldctxt).my_doc.filter(|doc| doc.int_subset.is_some()) {
+                        (*oldctxt).valid &= xml_validate_element(
+                            addr_of_mut!((*oldctxt).vctxt),
+                            my_doc,
+                            XmlGenericNodePtr::from_raw(cur),
+                        );
+                    }
                 }
+                (*cur).set_parent(None);
+                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
             }
-            (*cur).set_parent(None);
-            cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+            my_doc.children.unwrap().set_children(None);
         }
-        my_doc.children.unwrap().set_children(None);
     }
     if let Some(mut my_doc) = (*ctxt).my_doc {
         xml_free_node(my_doc.children.map_or(null_mut(), |c| c.as_ptr()));
@@ -2205,7 +2207,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 ctxt,
                 ent.content.load(Ordering::Relaxed),
                 user_data,
-                addr_of_mut!(list),
+                Some(&mut list),
             );
             (*ctxt).depth -= 1;
         } else if matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
@@ -2225,7 +2227,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 (!external_id.is_null())
                     .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
                     .as_deref(),
-                addr_of_mut!(list),
+                Some(&mut list),
             );
             assert_eq!(has_sax, sax.is_some());
             (*ctxt).sax = sax;
@@ -2341,7 +2343,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     ctxt,
                     ent.content.load(Ordering::Relaxed),
                     user_data,
-                    null_mut(),
+                    None,
                 );
                 (*ctxt).depth -= 1;
             } else if matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
@@ -2363,7 +2365,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     (!external_id.is_null())
                         .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
                         .as_deref(),
-                    null_mut(),
+                    None,
                 );
                 assert_eq!(has_sax, sax.is_some());
                 (*ctxt).sax = sax;

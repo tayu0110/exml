@@ -937,10 +937,10 @@ unsafe fn xml_xptr_range_inside_function(ctxt: XmlXPathParserContextPtr, nargs: 
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_get_start_point(
     obj: XmlXPathObjectPtr,
-    node: *mut *mut XmlNode,
+    node: &mut *mut XmlNode,
     indx: &mut usize,
 ) -> i32 {
-    if obj.is_null() || node.is_null() {
+    if obj.is_null() {
         return -1;
     }
 
@@ -975,10 +975,10 @@ unsafe fn xml_xptr_get_start_point(
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_get_end_point(
     obj: XmlXPathObjectPtr,
-    node: *mut *mut XmlNode,
+    node: &mut *mut XmlNode,
     indx: &mut usize,
 ) -> i32 {
-    if obj.is_null() || node.is_null() {
+    if obj.is_null() {
         return -1;
     }
 
@@ -1129,12 +1129,9 @@ pub(crate) unsafe fn xml_xptr_advance_node(mut cur: *mut XmlNode, level: *mut i3
 /// Returns -1 in case of failure, 0 otherwise
 #[doc(alias = "xmlXPtrAdvanceChar")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_advance_char(node: *mut *mut XmlNode, indx: &mut usize, mut bytes: i32) -> i32 {
+unsafe fn xml_xptr_advance_char(node: &mut *mut XmlNode, indx: &mut usize, mut bytes: i32) -> i32 {
     let mut cur: *mut XmlNode;
 
-    if node.is_null() {
-        return -1;
-    }
     cur = *node;
     if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
         return -1;
@@ -1205,11 +1202,11 @@ unsafe fn xml_xptr_advance_char(node: *mut *mut XmlNode, indx: &mut usize, mut b
 /// Returns -1 in case of failure, 0 otherwise
 #[doc(alias = "xmlXPtrGetLastChar")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_get_last_char(node: *mut *mut XmlNode, indx: &mut usize) -> i32 {
+unsafe fn xml_xptr_get_last_char(node: &mut *mut XmlNode, indx: &mut usize) -> i32 {
     let mut cur: *mut XmlNode;
     let mut len = 0;
 
-    if node.is_null() || (*node).is_null() || (*(*node)).typ == XmlElementType::XmlNamespaceDecl {
+    if node.is_null() || (*(*node)).typ == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
     cur = *node;
@@ -1255,7 +1252,7 @@ unsafe fn xml_xptr_match_string(
     mut string: &str,
     start: *mut XmlNode,
     startindex: usize,
-    end: *mut *mut XmlNode,
+    end: &mut *mut XmlNode,
     endindex: &mut usize,
 ) -> i32 {
     let mut cur: *mut XmlNode;
@@ -1263,7 +1260,7 @@ unsafe fn xml_xptr_match_string(
     if start.is_null() || (*start).typ == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
-    if end.is_null() || (*end).is_null() || (*(*end)).typ == XmlElementType::XmlNamespaceDecl {
+    if end.is_null() || (*(*end)).typ == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
     cur = start;
@@ -1318,19 +1315,15 @@ unsafe fn xml_xptr_match_string(
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_search_string(
     string: &str,
-    start: *mut *mut XmlNode,
+    start: &mut *mut XmlNode,
     startindex: &mut usize,
-    end: *mut *mut XmlNode,
+    end: &mut *mut XmlNode,
     endindex: &mut usize,
 ) -> i32 {
     let mut cur: *mut XmlNode;
     let mut str: *const XmlChar;
 
-    if start.is_null() || (*start).is_null() || (*(*start)).typ == XmlElementType::XmlNamespaceDecl
-    {
-        return -1;
-    }
-    if end.is_null() {
+    if start.is_null() || (*(*start)).typ == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
     cur = *start;
@@ -1500,19 +1493,19 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
         // The loop is to search for each element in the location set
         // the list of location set corresponding to that search
         for &loc in &(*oldset).loc_tab {
-            xml_xptr_get_start_point(loc, &raw mut start, &mut startindex);
-            xml_xptr_get_end_point(loc, &raw mut end, &mut endindex);
-            xml_xptr_advance_char(&raw mut start, &mut startindex, 0);
-            xml_xptr_get_last_char(&raw mut end, &mut endindex);
+            xml_xptr_get_start_point(loc, &mut start, &mut startindex);
+            xml_xptr_get_end_point(loc, &mut end, &mut endindex);
+            xml_xptr_advance_char(&mut start, &mut startindex, 0);
+            xml_xptr_get_last_char(&mut end, &mut endindex);
 
             while {
                 fend = end;
                 fendindex = endindex;
                 found = xml_xptr_search_string(
                     (*string).stringval.as_deref().unwrap(),
-                    &raw mut start,
+                    &mut start,
                     &mut startindex,
-                    &raw mut fend,
+                    &mut fend,
                     &mut fendindex,
                 );
                 if found == 1 {
@@ -1521,11 +1514,11 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
                             newset,
                             xml_xptr_new_range(start, startindex as i32, fend, fendindex as i32),
                         );
-                    } else if xml_xptr_advance_char(&raw mut start, &mut startindex, pos - 1) == 0 {
+                    } else if xml_xptr_advance_char(&mut start, &mut startindex, pos - 1) == 0 {
                         if !number.is_null() && num > 0 {
                             let mut rend = start;
                             let mut rindx = startindex - 1;
-                            if xml_xptr_advance_char(&raw mut rend, &mut rindx, num) == 0 {
+                            if xml_xptr_advance_char(&mut rend, &mut rindx, num) == 0 {
                                 xml_xptr_location_set_add(
                                     newset,
                                     xml_xptr_new_range(

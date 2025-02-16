@@ -4576,8 +4576,8 @@ macro_rules! xp_test_hit_ns {
 unsafe fn xml_xpath_node_collect_and_test(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    mut first: *mut *mut XmlNode,
-    mut last: *mut *mut XmlNode,
+    mut first: Option<&mut *mut XmlNode>,
+    mut last: Option<&mut *mut XmlNode>,
     to_bool: i32,
 ) -> i32 {
     let axis: XmlXPathAxisVal = (*op).value.try_into().unwrap();
@@ -4625,21 +4625,21 @@ unsafe fn xml_xpath_node_collect_and_test(
     let mut merge_and_clear: XmlXPathNodeSetMergeFunction = xml_xpath_node_set_merge_and_clear;
     match axis {
         XmlXPathAxisVal::AxisAncestor => {
-            first = null_mut();
+            first = None;
             next = Some(xml_xpath_next_ancestor);
         }
         XmlXPathAxisVal::AxisAncestorOrSelf => {
-            first = null_mut();
+            first = None;
             next = Some(xml_xpath_next_ancestor_or_self);
         }
         XmlXPathAxisVal::AxisAttribute => {
-            first = null_mut();
-            last = null_mut();
+            first = None;
+            last = None;
             next = Some(xml_xpath_next_attribute);
             merge_and_clear = xml_xpath_node_set_merge_and_clear_no_dupls;
         }
         XmlXPathAxisVal::AxisChild => {
-            last = null_mut();
+            last = None;
             if matches!(
                 test,
                 XmlXPathTestVal::NodeTestName | XmlXPathTestVal::NodeTestAll
@@ -4653,42 +4653,42 @@ unsafe fn xml_xpath_node_collect_and_test(
             merge_and_clear = xml_xpath_node_set_merge_and_clear_no_dupls;
         }
         XmlXPathAxisVal::AxisDescendant => {
-            last = null_mut();
+            last = None;
             next = Some(xml_xpath_next_descendant);
         }
         XmlXPathAxisVal::AxisDescendantOrSelf => {
-            last = null_mut();
+            last = None;
             next = Some(xml_xpath_next_descendant_or_self);
         }
         XmlXPathAxisVal::AxisFollowing => {
-            last = null_mut();
+            last = None;
             next = Some(xml_xpath_next_following);
         }
         XmlXPathAxisVal::AxisFollowingSibling => {
-            last = null_mut();
+            last = None;
             next = Some(xml_xpath_next_following_sibling);
         }
         XmlXPathAxisVal::AxisNamespace => {
-            first = null_mut();
-            last = null_mut();
+            first = None;
+            last = None;
             next = Some(xml_xpath_next_namespace as XmlXPathTraversalFunction);
             merge_and_clear = xml_xpath_node_set_merge_and_clear_no_dupls;
         }
         XmlXPathAxisVal::AxisParent => {
-            first = null_mut();
+            first = None;
             next = Some(xml_xpath_next_parent);
         }
         XmlXPathAxisVal::AxisPreceding => {
-            first = null_mut();
+            first = None;
             next = Some(xml_xpath_next_preceding_internal);
         }
         XmlXPathAxisVal::AxisPrecedingSibling => {
-            first = null_mut();
+            first = None;
             next = Some(xml_xpath_next_preceding_sibling);
         }
         XmlXPathAxisVal::AxisSelf => {
-            first = null_mut();
-            last = null_mut();
+            first = None;
+            last = None;
             next = Some(xml_xpath_next_self);
             merge_and_clear = xml_xpath_node_set_merge_and_clear_no_dupls;
         }
@@ -4786,22 +4786,22 @@ unsafe fn xml_xpath_node_collect_and_test(
             !cur.is_null()
         } {
             // QUESTION TODO: What does the "first" and "last" stuff do?
-            if !first.is_null() && !(*first).is_null() {
-                if *first == cur {
+            if let Some(first) = first.as_mut().filter(|first| !first.is_null()) {
+                if **first == cur {
                     break;
                 }
                 if total % 256 == 0
-                    && xml_xpath_cmp_nodes_ext(*first, cur).map_or(false, |f| f.is_le())
+                    && xml_xpath_cmp_nodes_ext(**first, cur).map_or(false, |f| f.is_le())
                 {
                     break;
                 }
             }
-            if !last.is_null() && !(*last).is_null() {
-                if *last == cur {
+            if let Some(last) = last.as_mut().filter(|last| !last.is_null()) {
+                if **last == cur {
                     break;
                 }
                 if total % 256 == 0
-                    && xml_xpath_cmp_nodes_ext(cur, *last).map_or(false, |f| f.is_le())
+                    && xml_xpath_cmp_nodes_ext(cur, **last).map_or(false, |f| f.is_le())
                 {
                     break;
                 }
@@ -5064,7 +5064,7 @@ unsafe fn xml_xpath_comp_swap(op: XmlXPathStepOpPtr) {
 unsafe fn xml_xpath_comp_op_eval_last(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    last: *mut *mut XmlNode,
+    last: &mut *mut XmlNode,
 ) -> i32 {
     let mut total: i32 = 0;
     let cur: i32;
@@ -5173,7 +5173,7 @@ unsafe fn xml_xpath_comp_op_eval_last(
             } else {
                 total += xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch1 as usize]);
                 CHECK_ERROR0!(ctxt);
-                total += xml_xpath_node_collect_and_test(ctxt, op, null_mut(), last, 0);
+                total += xml_xpath_node_collect_and_test(ctxt, op, None, Some(last), 0);
             }
         }
         XmlXPathOp::XpathOpValue => {
@@ -5330,7 +5330,7 @@ unsafe fn xml_xpath_location_set_filter(
 unsafe fn xml_xpath_comp_op_eval_filter_first(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    first: *mut *mut XmlNode,
+    first: &mut *mut XmlNode,
 ) -> i32 {
     let mut total: i32 = 0;
 
@@ -5362,7 +5362,7 @@ unsafe fn xml_xpath_comp_op_eval_filter_first(
             total += xml_xpath_comp_op_eval_last(
                 ctxt,
                 &raw mut (*comp).steps[(*op).ch1 as usize],
-                addr_of_mut!(last),
+                &mut last,
             );
             CHECK_ERROR0!(ctxt);
             // The nodeset should be in document order,
@@ -5433,7 +5433,7 @@ unsafe fn xml_xpath_comp_op_eval_filter_first(
 unsafe fn xml_xpath_comp_op_eval_first(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    first: *mut *mut XmlNode,
+    first: &mut *mut XmlNode,
 ) -> i32 {
     let mut total: i32 = 0;
     let cur: i32;
@@ -5546,7 +5546,7 @@ unsafe fn xml_xpath_comp_op_eval_first(
             } else {
                 total = xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch1 as usize]);
                 CHECK_ERROR0!(ctxt);
-                total += xml_xpath_node_collect_and_test(ctxt, op, first, null_mut(), 0);
+                total += xml_xpath_node_collect_and_test(ctxt, op, Some(first), None, 0);
             }
         }
         XmlXPathOp::XpathOpValue => {
@@ -5771,7 +5771,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
             total += xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch1 as usize]);
             CHECK_ERROR0!(ctxt);
 
-            total += xml_xpath_node_collect_and_test(ctxt, op, null_mut(), null_mut(), 0);
+            total += xml_xpath_node_collect_and_test(ctxt, op, None, None, 0);
         }
         XmlXPathOp::XpathOpValue => {
             value_push(
@@ -5919,7 +5919,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                     total += xml_xpath_comp_op_eval_first(
                         ctxt,
                         &raw mut (*comp).steps[(*op).ch1 as usize],
-                        addr_of_mut!(first),
+                        &mut first,
                     );
                     CHECK_ERROR0!(ctxt);
                     // The nodeset should be in document order, Keep only the first value
@@ -5963,7 +5963,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                     total += xml_xpath_comp_op_eval_last(
                         ctxt,
                         &raw mut (*comp).steps[(*op).ch1 as usize],
-                        addr_of_mut!(last),
+                        &mut last,
                     );
                     CHECK_ERROR0!(ctxt);
                     // The nodeset should be in document order, Keep only the last value
@@ -6251,7 +6251,7 @@ unsafe fn xml_xpath_comp_op_eval_to_boolean(
                     return -1;
                 }
 
-                xml_xpath_node_collect_and_test(ctxt, op, null_mut(), null_mut(), 1);
+                xml_xpath_node_collect_and_test(ctxt, op, None, None, 1);
                 if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
                     return -1;
                 }

@@ -1994,7 +1994,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory(
     user_data: Option<GenericErrorContext>,
     depth: i32,
     string: *const XmlChar,
-    lst: *mut *mut XmlNode,
+    lst: Option<&mut *mut XmlNode>,
 ) -> i32 {
     xml_parse_balanced_chunk_memory_recover(doc, sax, user_data, depth, string, lst, 0)
 }
@@ -2034,20 +2034,13 @@ pub unsafe fn xml_parse_in_node_context(
     node: XmlGenericNodePtr,
     data: Vec<u8>,
     mut options: i32,
-    lst: *mut *mut XmlNode,
+    lst: &mut *mut XmlNode,
 ) -> XmlParserErrors {
     let ctxt: XmlParserCtxtPtr;
     let mut cur: *mut XmlNode;
     let mut nsnr = 0;
     let ret: XmlParserErrors;
 
-    // check all input parameters, grab the document
-    // if node.is_null() {
-    //     return XmlParserErrors::XmlErrInternalError;
-    // }
-    if lst.is_null() {
-        return XmlParserErrors::XmlErrInternalError;
-    }
     match node.element_type() {
         XmlElementType::XmlElementNode
         | XmlElementType::XmlAttributeNode
@@ -2246,7 +2239,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     user_data: Option<GenericErrorContext>,
     depth: i32,
     string: *const XmlChar,
-    lst: *mut *mut XmlNode,
+    mut lst: Option<&mut *mut XmlNode>,
     recover: i32,
 ) -> i32 {
     let replaced = sax.is_some();
@@ -2258,8 +2251,8 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         return XmlParserErrors::XmlErrEntityLoop as i32;
     }
 
-    if !lst.is_null() {
-        *lst = null_mut();
+    if let Some(lst) = lst.as_mut() {
+        **lst = null_mut();
     }
     if string.is_null() {
         return -1;
@@ -2347,21 +2340,23 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         ret = 0;
     }
 
-    if !lst.is_null() && (ret == 0 || recover == 1) {
-        // Return the newly created nodeset after unlinking it from
-        // they pseudo parent.
-        let mut cur = new_doc
-            .children
-            .unwrap()
-            .children()
-            .map_or(null_mut(), |c| c.as_ptr());
-        *lst = cur;
-        while !cur.is_null() {
-            (*cur).set_doc(doc);
-            (*cur).set_parent(None);
-            cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+    if let Some(lst) = lst {
+        if ret == 0 || recover == 1 {
+            // Return the newly created nodeset after unlinking it from
+            // they pseudo parent.
+            let mut cur = new_doc
+                .children
+                .unwrap()
+                .children()
+                .map_or(null_mut(), |c| c.as_ptr());
+            *lst = cur;
+            while !cur.is_null() {
+                (*cur).set_doc(doc);
+                (*cur).set_parent(None);
+                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+            }
+            new_doc.children.unwrap().set_children(None);
         }
-        new_doc.children.unwrap().set_children(None);
     }
 
     if replaced {
@@ -2391,7 +2386,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     depth: i32,
     url: Option<&str>,
     id: Option<&str>,
-    list: *mut *mut XmlNode,
+    mut list: Option<&mut *mut XmlNode>,
 ) -> (Option<Box<XmlSAXHandler>>, XmlParserErrors) {
     let ret: XmlParserErrors;
     let mut start: [XmlChar; 4] = [0; 4];
@@ -2408,15 +2403,12 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         return (sax, XmlParserErrors::XmlErrEntityLoop);
     }
 
-    if !list.is_null() {
-        *list = null_mut();
+    if let Some(list) = list.as_mut() {
+        **list = null_mut();
     }
     if url.is_none() && id.is_none() {
         return (sax, XmlParserErrors::XmlErrInternalError);
     }
-    // if doc.is_null() {
-    //     return (sax, XmlParserErrors::XmlErrInternalError);
-    // }
 
     let ctxt = match xml_create_entity_parser_ctxt_internal(sax, user_data, url, id, None, oldctxt)
     {
@@ -2540,7 +2532,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
             (*oldctxt).last_error = (*ctxt).last_error.clone();
         }
     } else {
-        if !list.is_null() {
+        if let Some(list) = list {
             // Return the newly created nodeset after unlinking it from they pseudo parent.
             let mut cur = new_doc
                 .children()
@@ -2606,7 +2598,7 @@ pub(crate) unsafe fn xml_parse_external_entity(
     depth: i32,
     url: Option<&str>,
     id: Option<&str>,
-    lst: *mut *mut XmlNode,
+    lst: Option<&mut *mut XmlNode>,
 ) -> i32 {
     xml_parse_external_entity_private(doc, null_mut(), sax, user_data, depth, url, id, lst).1 as i32
 }
@@ -2624,7 +2616,7 @@ pub unsafe fn xml_parse_ctxt_external_entity(
     ctx: XmlParserCtxtPtr,
     url: Option<&str>,
     id: Option<&str>,
-    lst: *mut *mut XmlNode,
+    lst: Option<&mut *mut XmlNode>,
 ) -> i32 {
     if ctx.is_null() {
         return -1;
