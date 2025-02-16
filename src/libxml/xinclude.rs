@@ -41,7 +41,7 @@ use crate::{
     error::__xml_raise_error,
     io::xml_parser_get_directory,
     libxml::{
-        globals::{xml_free, xml_malloc, xml_realloc},
+        globals::{xml_free, xml_malloc},
         parser::{
             xml_ctxt_use_options, xml_init_parser, xml_load_external_entity, xml_parse_document,
             XmlParserOption, XML_DETECT_IDS,
@@ -129,13 +129,13 @@ pub struct XmlXIncludeCtxt {
     // inc_max: i32,                    /* size of includes tab */
     inc_tab: Vec<XmlXIncludeRefPtr>, /* array of included references */
 
-    txt_nr: i32,                  /* number of unparsed documents */
-    txt_max: i32,                 /* size of unparsed documents tab */
-    txt_tab: *mut XmlXIncludeTxt, /* array of unparsed documents */
+    // txt_nr: i32,                  /* number of unparsed documents */
+    // txt_max: i32,                 /* size of unparsed documents tab */
+    txt_tab: Vec<XmlXIncludeTxt>, /* array of unparsed documents */
 
-    url_nr: i32,                  /* number of documents stacked */
-    url_max: i32,                 /* size of document stack */
-    url_tab: *mut XmlXIncludeDoc, /* document stack */
+    // url_nr: i32,                  /* number of documents stacked */
+    // url_max: i32,                 /* size of document stack */
+    url_tab: Vec<XmlXIncludeDoc>, /* document stack */
 
     nb_errors: i32,     /* the number of errors detected */
     fatal_err: i32,     /* abort processing */
@@ -157,12 +157,8 @@ impl Default for XmlXIncludeCtxt {
         Self {
             doc: None,
             inc_tab: vec![],
-            txt_nr: 0,
-            txt_max: 0,
-            txt_tab: null_mut(),
-            url_nr: 0,
-            url_max: 0,
-            url_tab: null_mut(),
+            txt_tab: vec![],
+            url_tab: vec![],
             nb_errors: 0,
             fatal_err: 0,
             legacy: 0,
@@ -1395,9 +1391,9 @@ unsafe fn xml_xinclude_load_doc(
                 break 'load (*ctxt).doc;
             }
             // Prevent reloading the document twice.
-            for i in 0..(*ctxt).url_nr {
-                if xml_str_equal(url, (*(*ctxt).url_tab.add(i as usize)).url) {
-                    if (*(*ctxt).url_tab.add(i as usize)).expanding != 0 {
+            for inc_doc in &(*ctxt).url_tab {
+                if xml_str_equal(url, inc_doc.url) {
+                    if inc_doc.expanding != 0 {
                         xml_xinclude_err!(
                             ctxt,
                             (*refe).elem,
@@ -1406,7 +1402,7 @@ unsafe fn xml_xinclude_load_doc(
                         );
                         break 'error;
                     }
-                    let Some(doc) = (*(*ctxt).url_tab.add(i as usize)).doc else {
+                    let Some(doc) = inc_doc.doc else {
                         break 'error;
                     };
                     break 'load Some(doc);
@@ -1436,31 +1432,13 @@ unsafe fn xml_xinclude_load_doc(
             }
 
             // Also cache NULL docs
-            if (*ctxt).url_nr >= (*ctxt).url_max {
-                let new_size: usize = if (*ctxt).url_max != 0 {
-                    (*ctxt).url_max as usize * 2
-                } else {
-                    8
-                };
-
-                let tmp: *mut XmlXIncludeDoc =
-                    xml_realloc((*ctxt).url_tab as _, size_of::<XmlXIncludeDoc>() * new_size) as _;
-                if tmp.is_null() {
-                    xml_xinclude_err_memory(ctxt, (*refe).elem, Some("growing XInclude URL table"));
-                    if let Some(doc) = doc {
-                        xml_free_doc(doc);
-                    }
-                    break 'error;
-                }
-                (*ctxt).url_max = new_size as _;
-                (*ctxt).url_tab = tmp;
-            }
-            cache_nr = (*ctxt).url_nr;
-            (*ctxt).url_nr += 1;
-            cache = (*ctxt).url_tab.add(cache_nr as usize);
-            (*cache).doc = doc;
-            (*cache).url = xml_strdup(url);
-            (*cache).expanding = 0;
+            cache_nr = (*ctxt).url_tab.len() as i32;
+            (*ctxt).url_tab.push(XmlXIncludeDoc {
+                doc,
+                url: xml_strdup(url),
+                expanding: 0,
+            });
+            cache = &raw mut (*ctxt).url_tab[cache_nr as usize];
 
             let Some(doc) = doc else {
                 break 'error;
@@ -1492,7 +1470,7 @@ unsafe fn xml_xinclude_load_doc(
             (*cache).expanding = 1;
             xml_xinclude_recurse_doc(ctxt, doc, url);
             // urlTab might be reallocated.
-            cache = (*ctxt).url_tab.add(cache_nr as usize);
+            cache = &raw mut (*ctxt).url_tab[cache_nr as usize];
             (*cache).expanding = 0;
             Some(doc)
         };
@@ -1852,9 +1830,9 @@ unsafe fn xml_xinclude_load_txt(
     }
 
     // Prevent reloading the document twice.
-    for i in 0..(*ctxt).txt_nr {
-        if xml_str_equal(url, (*(*ctxt).txt_tab.add(i as usize)).url) {
-            let node = xml_new_doc_text((*ctxt).doc, (*(*ctxt).txt_tab.add(i as usize)).text);
+    for txt in &(*ctxt).txt_tab {
+        if xml_str_equal(url, txt.url) {
+            let node = xml_new_doc_text((*ctxt).doc, txt.text);
             // goto loaded;
             (*refe).inc = node.map_or(null_mut(), |node| node.as_ptr());
             xml_free_input_stream(input_stream);
@@ -1969,31 +1947,10 @@ unsafe fn xml_xinclude_load_txt(
 
     (*node).add_content_len(content, len);
 
-    if (*ctxt).txt_nr >= (*ctxt).txt_max {
-        let new_size: usize = if (*ctxt).txt_max != 0 {
-            (*ctxt).txt_max as usize * 2
-        } else {
-            8
-        };
-
-        let tmp: *mut XmlXIncludeTxt =
-            xml_realloc((*ctxt).txt_tab as _, size_of::<XmlXIncludeTxt>() * new_size) as _;
-        if tmp.is_null() {
-            xml_xinclude_err_memory(ctxt, (*refe).elem, Some("growing XInclude text table"));
-            // goto error;
-            xml_free_node(node.as_ptr());
-            xml_free_input_stream(input_stream);
-            xml_free_parser_ctxt(pctxt);
-            xml_free_uri(uri);
-            xml_free(url as _);
-            return ret;
-        }
-        (*ctxt).txt_max = new_size as _;
-        (*ctxt).txt_tab = tmp;
-    }
-    (*(*ctxt).txt_tab.add((*ctxt).txt_nr as usize)).text = xml_strdup(node.content);
-    (*(*ctxt).txt_tab.add((*ctxt).txt_nr as usize)).url = xml_strdup(url);
-    (*ctxt).txt_nr += 1;
+    (*ctxt).txt_tab.push(XmlXIncludeTxt {
+        text: xml_strdup(node.content),
+        url: xml_strdup(url),
+    });
 
     // loaded:
     // Add the element as the replacement copy.
@@ -2514,26 +2471,20 @@ pub unsafe fn xml_xinclude_free_context(ctxt: XmlXIncludeCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
-    if !(*ctxt).url_tab.is_null() {
-        for i in 0..(*ctxt).url_nr {
-            if let Some(doc) = (*(*ctxt).url_tab.add(i as usize)).doc {
-                xml_free_doc(doc);
-            }
-            xml_free((*(*ctxt).url_tab.add(i as usize)).url as _);
+    for inc_doc in (*ctxt).url_tab.drain(..) {
+        if let Some(doc) = inc_doc.doc {
+            xml_free_doc(doc);
         }
-        xml_free((*ctxt).url_tab as _);
+        xml_free(inc_doc.url as _);
     }
     for inc in (*ctxt).inc_tab.drain(..) {
         if !inc.is_null() {
             xml_xinclude_free_ref(inc);
         }
     }
-    if !(*ctxt).txt_tab.is_null() {
-        for i in 0..(*ctxt).txt_nr {
-            xml_free((*(*ctxt).txt_tab.add(i as usize)).text as _);
-            xml_free((*(*ctxt).txt_tab.add(i as usize)).url as _);
-        }
-        xml_free((*ctxt).txt_tab as _);
+    for txt in (*ctxt).txt_tab.drain(..) {
+        xml_free(txt.text as _);
+        xml_free(txt.url as _);
     }
     if !(*ctxt).base.is_null() {
         xml_free((*ctxt).base as _);
