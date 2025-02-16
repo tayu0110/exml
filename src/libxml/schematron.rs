@@ -246,9 +246,9 @@ pub struct XmlSchematronParserCtxt {
 
     namespaces: Option<Vec<(*const u8, *const u8)>>, /* the array of namespaces */
 
-    nb_includes: i32,            /* number of includes in the array */
-    max_includes: i32,           /* size of the array */
-    includes: *mut *mut XmlNode, /* the array of includes */
+    // nb_includes: i32,            /* number of includes in the array */
+    // max_includes: i32,           /* size of the array */
+    includes: Vec<*mut XmlNode>, /* the array of includes */
 
     /* error reporting data */
     user_data: Option<GenericErrorContext>, /* user specific data block */
@@ -272,9 +272,7 @@ impl Default for XmlSchematronParserCtxt {
             xctxt: null_mut(),
             schema: null_mut(),
             namespaces: None,
-            nb_includes: 0,
-            max_includes: 0,
-            includes: null_mut(),
+            includes: vec![],
             user_data: None,
             error: None,
             warning: None,
@@ -323,11 +321,10 @@ pub unsafe fn xml_schematron_new_parser_ctxt(url: *const c_char) -> XmlSchematro
         xml_schematron_perr_memory(null_mut(), "allocating schema parser context", null_mut());
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
+    std::ptr::write(&mut *ret, XmlSchematronParserCtxt::default());
     (*ret).typ = XML_STRON_CTXT_PARSER;
     (*ret).dict = xml_dict_create();
     (*ret).url = xml_dict_lookup((*ret).dict, url as _, -1);
-    (*ret).includes = null_mut();
     (*ret).xctxt = xml_xpath_new_context(None);
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
