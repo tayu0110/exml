@@ -2463,19 +2463,6 @@ unsafe fn xml_xptr_eval_full_xptr(ctxt: XmlXPathParserContextPtr, mut name: *mut
 /// Parse and evaluate an XPointer
 #[doc(alias = "xmlXPtrEvalXPointer")]
 unsafe fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
-    if (*ctxt).value_tab.is_null() {
-        // Allocate the value stack
-        (*ctxt).value_tab =
-            xml_malloc(10 * size_of::<XmlXPathObjectPtr>()) as *mut XmlXPathObjectPtr;
-        if (*ctxt).value_tab.is_null() {
-            xml_xptr_err_memory("allocating evaluation context");
-            return;
-        }
-        (*ctxt).value_nr = 0;
-        (*ctxt).value_max = 10;
-        (*ctxt).value = null_mut();
-        (*ctxt).value_frame = 0;
-    }
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) == b'/' {
         xml_xpath_root(ctxt);

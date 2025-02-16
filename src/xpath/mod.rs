@@ -47,7 +47,7 @@ use std::{
     borrow::Cow,
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null_mut},
+    ptr::{addr_of_mut, null, null_mut},
 };
 
 use libc::memset;
@@ -436,15 +436,32 @@ pub struct XmlXPathParserContext {
 
     pub(crate) context: XmlXPathContextPtr, /* the evaluation context */
     pub(crate) value: XmlXPathObjectPtr,    /* the current value */
-    pub(crate) value_nr: i32,               /* number of values stacked */
-    pub(crate) value_max: i32,              /* max number of values stacked */
-    pub(crate) value_tab: *mut XmlXPathObjectPtr, /* stack of values */
+    // pub(crate) value_nr: i32,               /* number of values stacked */
+    // pub(crate) value_max: i32,              /* max number of values stacked */
+    pub(crate) value_tab: Vec<XmlXPathObjectPtr>, /* stack of values */
 
     pub(crate) comp: XmlXPathCompExprPtr, /* the precompiled expression */
     pub(crate) xptr: i32,                 /* it this an XPointer expression */
     pub(crate) ancestor: *mut XmlNode,    /* used for walking preceding axis */
 
     pub(crate) value_frame: i32, /* unused */
+}
+
+impl Default for XmlXPathParserContext {
+    fn default() -> Self {
+        Self {
+            cur: null(),
+            base: null(),
+            error: 0,
+            context: null_mut(),
+            value: null_mut(),
+            value_tab: vec![],
+            comp: null_mut(),
+            xptr: 0,
+            ancestor: null_mut(),
+            value_frame: 0,
+        }
+    }
 }
 
 #[cfg(feature = "xpath")]
@@ -1177,10 +1194,10 @@ pub unsafe fn xml_xpath_eval(str: *const XmlChar, ctx: XmlXPathContextPtr) -> Xm
         res = value_pop(ctxt);
         if res.is_null() {
             generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
-        } else if (*ctxt).value_nr > 0 {
+        } else if !(*ctxt).value_tab.is_empty() {
             generic_error!(
                 "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
-                (*ctxt).value_nr as i32
+                (*ctxt).value_tab.len() as i32
             );
         }
     }
@@ -1369,19 +1386,11 @@ unsafe fn xml_xpath_comp_parser_context(
         xml_xpath_err_memory(ctxt, Some("creating evaluation context\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathParserContext>());
+    std::ptr::write(&mut *ret, XmlXPathParserContext::default());
 
     // Allocate the value stack
-    (*ret).value_tab = xml_malloc(10 * size_of::<XmlXPathObjectPtr>()) as *mut XmlXPathObjectPtr;
-    if (*ret).value_tab.is_null() {
-        xml_free(ret as _);
-        xml_xpath_err_memory(ctxt, Some("creating evaluation context\n"));
-        return null_mut();
-    }
-    (*ret).value_nr = 0;
-    (*ret).value_max = 10;
+    (*ret).value_tab.reserve(10);
     (*ret).value = null_mut();
-
     (*ret).context = ctxt;
     (*ret).comp = comp;
 
@@ -1423,10 +1432,10 @@ unsafe fn xml_xpath_compiled_eval_internal(
             if to_bool == 0 {
                 generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
             }
-        } else if (*pctxt).value_nr > 0 {
+        } else if !(*pctxt).value_tab.is_empty() {
             generic_error!(
                 "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
-                (*pctxt).value_nr as i32
+                (*pctxt).value_tab.len() as i32
             );
         }
     }

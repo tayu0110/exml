@@ -32,7 +32,7 @@ use std::{
     iter::repeat,
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut, NonNull},
+    ptr::{addr_of_mut, drop_in_place, null, null_mut, NonNull},
 };
 
 use libc::{memcpy, memset, INT_MAX, INT_MIN};
@@ -409,7 +409,7 @@ macro_rules! CHECK_ARITY {
                 $crate::xpath::XmlXPathError::XPathInvalidArity as i32
             );
         }
-        if (*$ctxt).value_nr < (*$ctxt).value_frame + $x {
+        if ((*$ctxt).value_tab.len() as i32) < (*$ctxt).value_frame + $x {
             $crate::XP_ERROR!($ctxt, $crate::xpath::XmlXPathError::XPathStackError as i32);
         }
     };
@@ -1641,7 +1641,7 @@ unsafe fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
 ///
 /// Returns the xmlXPathParserContext just allocated.
 #[doc(alias = "xmlXPathNewParserContext")]
-pub unsafe extern "C" fn xml_xpath_new_parser_context(
+pub unsafe fn xml_xpath_new_parser_context(
     str: *const XmlChar,
     ctxt: XmlXPathContextPtr,
 ) -> XmlXPathParserContextPtr {
@@ -1651,14 +1651,14 @@ pub unsafe extern "C" fn xml_xpath_new_parser_context(
         xml_xpath_err_memory(ctxt, Some("creating parser context\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathParserContext>());
+    std::ptr::write(&mut *ret, XmlXPathParserContext::default());
     (*ret).cur = str;
     (*ret).base = (*ret).cur;
     (*ret).context = ctxt;
 
     (*ret).comp = xml_xpath_new_comp_expr();
     if (*ret).comp.is_null() {
-        xml_free((*ret).value_tab as _);
+        drop_in_place(ret);
         xml_free(ret as _);
         return null_mut();
     }
@@ -1668,16 +1668,13 @@ pub unsafe extern "C" fn xml_xpath_new_parser_context(
 
 /// Free up an xmlXPathParserContext
 #[doc(alias = "xmlXPathFreeParserContext")]
-pub unsafe extern "C" fn xml_xpath_free_parser_context(ctxt: XmlXPathParserContextPtr) {
-    if !(*ctxt).value_tab.is_null() {
-        for i in 0..(*ctxt).value_nr {
-            if !(*ctxt).context.is_null() {
-                xml_xpath_release_object((*ctxt).context, *(*ctxt).value_tab.add(i as usize));
-            } else {
-                xml_xpath_free_object(*(*ctxt).value_tab.add(i as usize));
-            }
+pub unsafe fn xml_xpath_free_parser_context(ctxt: XmlXPathParserContextPtr) {
+    for value in (*ctxt).value_tab.drain(..) {
+        if !(*ctxt).context.is_null() {
+            xml_xpath_release_object((*ctxt).context, value);
+        } else {
+            xml_xpath_free_object(value);
         }
-        xml_free((*ctxt).value_tab as _);
     }
     if !(*ctxt).comp.is_null() {
         #[cfg(feature = "libxml_pattern")]
@@ -1687,6 +1684,7 @@ pub unsafe extern "C" fn xml_xpath_free_parser_context(ctxt: XmlXPathParserConte
         }
         xml_xpath_free_comp_expr((*ctxt).comp);
     }
+    drop_in_place(ctxt);
     xml_free(ctxt as _);
 }
 
@@ -1695,20 +1693,14 @@ pub unsafe extern "C" fn xml_xpath_free_parser_context(ctxt: XmlXPathParserConte
 ///
 /// Returns the XPath object just removed
 #[doc(alias = "valuePop")]
-pub unsafe extern "C" fn value_pop(ctxt: XmlXPathParserContextPtr) -> XmlXPathObjectPtr {
-    if ctxt.is_null() || (*ctxt).value_nr <= 0 {
+pub unsafe fn value_pop(ctxt: XmlXPathParserContextPtr) -> XmlXPathObjectPtr {
+    if ctxt.is_null() || (*ctxt).value_tab.is_empty() {
         return null_mut();
     }
 
-    (*ctxt).value_nr -= 1;
-    if (*ctxt).value_nr > 0 {
-        (*ctxt).value = *(*ctxt).value_tab.add((*ctxt).value_nr as usize - 1);
-    } else {
-        (*ctxt).value = null_mut();
-    }
-    let ret: XmlXPathObjectPtr = *(*ctxt).value_tab.add((*ctxt).value_nr as usize);
-    *(*ctxt).value_tab.add((*ctxt).value_nr as usize) = null_mut();
-    ret
+    let res = (*ctxt).value_tab.pop().unwrap();
+    (*ctxt).value = (*ctxt).value_tab.last().cloned().unwrap_or(null_mut());
+    res
 }
 
 /// Handle a redefinition of attribute error
@@ -1729,10 +1721,7 @@ unsafe fn xml_xpath_perr_memory(ctxt: XmlXPathParserContextPtr, extra: Option<&s
 ///
 /// The object is destroyed in case of error.
 #[doc(alias = "valuePush")]
-pub unsafe extern "C" fn value_push(
-    ctxt: XmlXPathParserContextPtr,
-    value: XmlXPathObjectPtr,
-) -> i32 {
+pub unsafe fn value_push(ctxt: XmlXPathParserContextPtr, value: XmlXPathObjectPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -1742,29 +1731,14 @@ pub unsafe extern "C" fn value_push(
         (*ctxt).error = XmlXPathError::XPathMemoryError as i32;
         return -1;
     }
-    if (*ctxt).value_nr >= (*ctxt).value_max {
-        if (*ctxt).value_max >= XPATH_MAX_STACK_DEPTH as i32 {
-            xml_xpath_perr_memory(ctxt, Some("XPath stack depth limit reached\n"));
-            xml_xpath_free_object(value);
-            return -1;
-        }
-        let tmp: *mut XmlXPathObjectPtr = xml_realloc(
-            (*ctxt).value_tab as _,
-            2 * (*ctxt).value_max as usize * size_of::<XmlXPathObjectPtr>(),
-        ) as *mut XmlXPathObjectPtr;
-        if tmp.is_null() {
-            xml_xpath_perr_memory(ctxt, Some("pushing value\n"));
-            xml_xpath_free_object(value);
-            return -1;
-        }
-        (*ctxt).value_max *= 2;
-        (*ctxt).value_tab = tmp;
+    if (*ctxt).value_tab.len() == XPATH_MAX_STACK_DEPTH {
+        xml_xpath_perr_memory(ctxt, Some("XPath stack depth limit reached\n"));
+        xml_xpath_free_object(value);
+        return -1;
     }
-    *(*ctxt).value_tab.add((*ctxt).value_nr as usize) = value;
+    (*ctxt).value_tab.push(value);
     (*ctxt).value = value;
-    let res = (*ctxt).value_nr;
-    (*ctxt).value_nr += 1;
-    res
+    (*ctxt).value_tab.len() as i32 - 1
 }
 
 pub const XML_NODESET_DEFAULT: usize = 10;
@@ -5855,25 +5829,20 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
         }
         XmlXPathOp::XpathOpFunction => 'to_break: {
             let func: XmlXPathFunction;
-
-            let frame: i32 = (*ctxt).value_nr;
+            let frame = (*ctxt).value_tab.len();
             if (*op).ch1 != -1 {
                 total += xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch1 as usize]);
                 if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
                     break 'to_break;
                 }
             }
-            if (*ctxt).value_nr < frame + (*op).value {
+            if (*ctxt).value_tab.len() < frame + (*op).value as usize {
                 generic_error!("xmlXPathCompOpEval: parameter error\n");
                 (*ctxt).error = XmlXPathError::XPathInvalidOperand as i32;
                 break 'to_break;
             }
             for i in 0..(*op).value {
-                if (*(*ctxt)
-                    .value_tab
-                    .add(((*ctxt).value_nr as usize - 1) - i as usize))
-                .is_null()
-                {
+                if (*ctxt).value_tab[((*ctxt).value_tab.len() - 1) - i as usize].is_null() {
                     generic_error!("xmlXPathCompOpEval: parameter error\n");
                     (*ctxt).error = XmlXPathError::XPathInvalidOperand as i32;
                     break;
@@ -5921,7 +5890,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
             (*(*ctxt).context).function = old_func;
             (*(*ctxt).context).function_uri = old_func_uri;
             if (*ctxt).error == XmlXPathError::XPathExpressionOK as i32
-                && (*ctxt).value_nr != frame + 1
+                && (*ctxt).value_tab.len() != frame + 1
             {
                 XP_ERROR0!(ctxt, XmlXPathError::XPathStackError as i32);
             }
@@ -6350,18 +6319,6 @@ pub(crate) unsafe fn xml_xpath_run_eval(ctxt: XmlXPathParserContextPtr, to_bool:
         return -1;
     }
 
-    if (*ctxt).value_tab.is_null() {
-        // Allocate the value stack
-        (*ctxt).value_tab =
-            xml_malloc(10 * size_of::<XmlXPathObjectPtr>()) as *mut XmlXPathObjectPtr;
-        if (*ctxt).value_tab.is_null() {
-            xml_xpath_perr_memory(ctxt, Some("creating evaluation context\n"));
-            return -1;
-        }
-        (*ctxt).value_nr = 0;
-        (*ctxt).value_max = 10;
-        (*ctxt).value = null_mut();
-    }
     #[cfg(feature = "libxml_pattern")]
     if !(*(*ctxt).comp).stream.is_null() {
         let res: i32;
