@@ -370,11 +370,11 @@ impl XmlTextReader {
                     self.state = XmlTextReaderState::Error;
                     return -1;
                 }
-                (*self.ctxt).node.is_null()
+                (*self.ctxt).node.is_none()
                     && (self.mode != XmlTextReaderMode::XmlTextreaderModeEof
                         && self.state != XmlTextReaderState::Done)
             } {}
-            if (*self.ctxt).node.is_null() {
+            if (*self.ctxt).node.is_none() {
                 if let Some(my_doc) = (*self.ctxt).my_doc {
                     self.node = my_doc.children.map_or(null_mut(), |c| c.as_ptr());
                 }
@@ -389,7 +389,7 @@ impl XmlTextReader {
                     self.node = my_doc.children.map_or(null_mut(), |c| c.as_ptr());
                 }
                 if self.node.is_null() {
-                    self.node = (*self.ctxt).node_tab[0];
+                    self.node = (*self.ctxt).node_tab[0].as_ptr();
                 }
                 self.state = XmlTextReaderState::Element;
             }
@@ -437,10 +437,11 @@ impl XmlTextReader {
                                     | XmlElementType::XmlDocumentNode
                                     | XmlElementType::XmlHTMLDocumentNode
                             ))
-                        && ((*self.ctxt).node.is_null()
-                            || (*self.ctxt).node == self.node
-                            || (*self.ctxt).node
-                                == (*self.node).parent().map_or(null_mut(), |p| p.as_ptr()))
+                        && (*self.ctxt).node.map_or(true, |node| {
+                            node.as_ptr() == self.node
+                                || node.as_ptr()
+                                    == (*self.node).parent().map_or(null_mut(), |p| p.as_ptr())
+                        })
                         && !matches!((*self.ctxt).instate, XmlParserInputState::XmlParserEOF)
                     {
                         val = self.push_data();
@@ -2895,13 +2896,13 @@ unsafe fn xml_text_reader_start_element(
     if !reader.is_null() {
         if let Some(start_element) = (*reader).start_element {
             start_element(ctx, fullname, atts);
-            if !(*ctxt).node.is_null()
-                && !(*ctxt).input.is_null()
-                && !(*(*ctxt).input).cur.is_null()
-                && *(*(*ctxt).input).cur.add(0) == b'/'
-                && *(*(*ctxt).input).cur.add(1) == b'>'
-            {
-                (*(*ctxt).node).extra = NODE_IS_EMPTY as _;
+            if let Some(mut node) = (*ctxt).node.filter(|_| {
+                !(*ctxt).input.is_null()
+                    && !(*(*ctxt).input).cur.is_null()
+                    && *(*(*ctxt).input).cur.add(0) == b'/'
+                    && *(*(*ctxt).input).cur.add(1) == b'>'
+            }) {
+                node.extra = NODE_IS_EMPTY as _;
             }
         }
     }
@@ -2958,13 +2959,13 @@ unsafe fn xml_text_reader_start_element_ns(
                 nb_defaulted,
                 attributes,
             );
-            if !(*ctxt).node.is_null()
-                && !(*ctxt).input.is_null()
-                && !(*(*ctxt).input).cur.is_null()
-                && *(*(*ctxt).input).cur.add(0) == b'/'
-                && *(*(*ctxt).input).cur.add(1) == b'>'
-            {
-                (*(*ctxt).node).extra = NODE_IS_EMPTY as _;
+            if let Some(mut node) = (*ctxt).node.filter(|_| {
+                !(*ctxt).input.is_null()
+                    && !(*(*ctxt).input).cur.is_null()
+                    && *(*(*ctxt).input).cur.add(0) == b'/'
+                    && *(*(*ctxt).input).cur.add(1) == b'>'
+            }) {
+                node.extra = NODE_IS_EMPTY as _;
             }
         }
     }
@@ -5397,8 +5398,8 @@ pub unsafe fn xml_text_reader_locator_line_number(locator: XmlTextReaderLocatorP
     if locator.is_null() {
         return -1;
     }
-    if !(*ctx).node.is_null() {
-        ret = (*(*ctx).node).get_line_no() as _;
+    if let Some(node) = (*ctx).node {
+        ret = node.get_line_no() as _;
     } else {
         // inspired from error.c
         let mut input: XmlParserInputPtr;
@@ -5433,10 +5434,8 @@ pub unsafe fn xml_text_reader_locator_base_uri(locator: XmlTextReaderLocatorPtr)
     if locator.is_null() {
         return null_mut();
     }
-    if !(*ctx).node.is_null() {
-        let tmp = (*(*ctx).node)
-            .get_base(None)
-            .map(|c| CString::new(c).unwrap());
+    if let Some(node) = (*ctx).node {
+        let tmp = node.get_base(None).map(|c| CString::new(c).unwrap());
         ret = xml_strdup(tmp.as_ref().map_or(null_mut(), |t| t.as_ptr() as *const u8));
     } else {
         // inspired from error.c

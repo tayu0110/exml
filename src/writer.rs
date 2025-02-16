@@ -54,7 +54,9 @@ use crate::{
     list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
     save::attr_serialize_text_content,
-    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDoc, XmlDocPtr, XmlNode},
+    tree::{
+        xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDoc, XmlDocPtr, XmlNode, XmlNodePtr,
+    },
     uri::canonic_path,
 };
 
@@ -308,7 +310,7 @@ impl<'a> XmlTextWriter<'a> {
         };
 
         (*ctxt).my_doc = Some(doc);
-        (*ctxt).node = node;
+        (*ctxt).node = XmlNodePtr::from_raw(node).unwrap();
         ret.no_doc_free = 1;
 
         doc.set_compress_mode(compression);

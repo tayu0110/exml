@@ -9,15 +9,16 @@ use std::{
 use crate::{
     libxml::{
         valid::xml_remove_id,
-        xmlstring::{xml_strlen, xml_strncat, XmlChar},
+        xmlstring::{xml_strdup, xml_strlen, xml_strncat, XmlChar},
     },
     uri::build_uri,
 };
 
 use super::{
-    xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge, NodePtr, XmlAttr,
-    XmlAttrPtr, XmlAttribute, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
-    XmlElementType, XmlEntity, XmlNode, XmlNodePtr, XmlNs, XML_XML_NAMESPACE,
+    add_prop_sibling, xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge,
+    xml_tree_err_memory, NodePtr, XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributeType, XmlDoc,
+    XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement, XmlElementType, XmlEntity, XmlNode, XmlNodePtr,
+    XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -729,6 +730,100 @@ impl XmlGenericNodePtr {
         Box::from_raw(self.0.as_ptr())
     }
 
+    /// Search a Ns registered under a given name space for a document.  
+    /// recurse on the parents until it finds the defined namespace or return NULL otherwise.  
+    /// `namespace` can be NULL, this is a search for the default namespace.
+    ///
+    /// We don't allow to cross entities boundaries.  
+    /// If you don't declare the namespace within those you will be in troubles !!!  
+    /// A warning is generated to cover this case.
+    ///
+    /// Returns the namespace pointer or NULL.
+    #[doc(alias = "xmlSearchNs")]
+    pub unsafe fn search_ns(
+        self,
+        doc: Option<XmlDocPtr>,
+        namespace: Option<&str>,
+    ) -> Option<XmlNsPtr> {
+        let orig = self;
+
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
+        if namespace == Some("xml") {
+            if doc.is_none() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
+                let mut node = XmlNodePtr::try_from(self).unwrap();
+                // The XML-1.0 namespace is normally held on the root element.
+                // In this case exceptionally create it on the node element.
+                let Some(cur) = XmlNsPtr::new(XmlNs {
+                    typ: XML_LOCAL_NAMESPACE,
+                    href: xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
+                    prefix: xml_strdup(c"xml".as_ptr() as _),
+                    next: node.ns_def.map_or(null_mut(), |ns| ns.as_ptr()),
+                    ..Default::default()
+                }) else {
+                    xml_tree_err_memory("searching namespace");
+                    return None;
+                };
+                node.ns_def = Some(cur);
+                return Some(cur);
+            }
+            let mut doc = doc.or(self.document())?;
+            // Return the XML namespace declaration held by the doc.
+            if doc.old_ns.is_none() {
+                return doc.ensure_xmldecl();
+            } else {
+                return doc.old_ns;
+            }
+        }
+        let mut node = Some(self);
+        while let Some(cur_node) = node {
+            if matches!(
+                cur_node.element_type(),
+                XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlEntityDecl
+            ) {
+                return None;
+            }
+            if let Some(cur_node) = XmlNodePtr::try_from(cur_node).ok().filter(|cur_node| {
+                matches!(cur_node.element_type(), XmlElementType::XmlElementNode)
+            }) {
+                let mut cur = cur_node.ns_def;
+                while let Some(now) = cur {
+                    if now.prefix().is_none() && namespace.is_none() && !now.href.is_null() {
+                        return Some(now);
+                    }
+                    if now.href().is_some()
+                        && now.prefix().is_some()
+                        && namespace == now.prefix().as_deref()
+                    {
+                        return Some(now);
+                    }
+                    cur = XmlNsPtr::from_raw(now.next).unwrap();
+                }
+                if orig != cur_node.into() {
+                    let cur = cur_node.ns;
+                    if let Some(cur) = cur {
+                        if cur.prefix().is_none() && namespace.is_none() && !cur.href.is_null() {
+                            return Some(cur);
+                        }
+                        if cur.prefix().is_some()
+                            && cur.href().is_some()
+                            && namespace == cur.prefix().as_deref()
+                        {
+                            return Some(cur);
+                        }
+                    }
+                }
+            }
+            node = cur_node
+                .parent()
+                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        }
+        None
+    }
+
     /// update all nodes under the tree to point to the right document
     #[doc(alias = "xmlSetTreeDoc")]
     pub unsafe fn set_doc(mut self, doc: Option<XmlDocPtr>) {
@@ -854,6 +949,80 @@ impl XmlGenericNodePtr {
         self.set_last(NodePtr::from_ptr(cur.as_ptr()));
 
         Some(cur)
+    }
+
+    /// Add a new element `elem` to the list of siblings of `self`
+    /// merging adjacent TEXT nodes (`elem` may be freed)  
+    /// If the new element was already inserted in a document
+    /// it is first unlinked from its existing context.
+    ///
+    /// See the note regarding namespaces in xmlAddChild.
+    ///
+    /// Returns the new element or NULL in case of error.
+    #[doc(alias = "xmlAddSibling")]
+    pub unsafe fn add_sibling(self, mut elem: XmlGenericNodePtr) -> *mut XmlNode {
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+
+        if elem.element_type() == XmlElementType::XmlNamespaceDecl {
+            return null_mut();
+        }
+
+        if self == elem {
+            return null_mut();
+        }
+
+        let mut cur = self;
+        // Constant time is we can rely on the -> parent -> last to find the last sibling.
+        if let Some(last) = self
+            .parent()
+            .filter(|p| {
+                !matches!(self.element_type(), XmlElementType::XmlAttributeNode)
+                    && p.children().is_some()
+            })
+            .and_then(|p| p.last().filter(|l| l.next().is_none()))
+        {
+            cur = XmlGenericNodePtr::from_raw(last.as_ptr()).unwrap();
+        } else {
+            while let Some(next) = cur.next() {
+                cur = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+            }
+        }
+
+        elem.unlink();
+
+        if let Some((mut cur, elem)) = XmlNodePtr::try_from(cur)
+            .ok()
+            .filter(|cur| cur.element_type() == XmlElementType::XmlTextNode)
+            .zip(
+                XmlNodePtr::try_from(elem)
+                    .ok()
+                    .filter(|elem| elem.element_type() == XmlElementType::XmlTextNode),
+            )
+            .filter(|(cur, elem)| cur.name() == elem.name())
+        {
+            cur.add_content(elem.content);
+            xml_free_node(elem.as_ptr());
+            return cur.as_ptr();
+        }
+        if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {
+            return add_prop_sibling(cur.as_ptr(), cur.as_ptr(), elem.as_ptr());
+        }
+
+        if elem.document() != cur.document() {
+            elem.set_doc(cur.document());
+        }
+        let parent = cur.parent();
+        elem.set_prev(NodePtr::from_ptr(cur.as_ptr()));
+        elem.set_next(None);
+        elem.set_parent(parent);
+        cur.set_next(NodePtr::from_ptr(elem.as_ptr()));
+        if let Some(mut parent) = parent {
+            parent.set_last(NodePtr::from_ptr(elem.as_ptr()));
+        }
+
+        elem.as_ptr()
     }
 }
 

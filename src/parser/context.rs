@@ -49,7 +49,7 @@ use crate::{
     },
     parser::{__xml_err_encoding, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int},
     tree::{
-        xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlEntityType, XmlNode,
+        xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlEntityType, XmlNode, XmlNodePtr,
         XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::build_uri,
@@ -103,9 +103,9 @@ pub struct XmlParserCtxt {
 
     // Node analysis stack only used for DOM building
     // Current parsed Node
-    pub(crate) node: *mut XmlNode,
+    pub(crate) node: Option<XmlNodePtr>,
     // array of nodes
-    pub(crate) node_tab: Vec<*mut XmlNode>,
+    pub(crate) node_tab: Vec<XmlNodePtr>,
 
     // Whether node info should be kept
     pub(crate) record_info: i32,
@@ -478,7 +478,7 @@ impl XmlParserCtxt {
         self.space_tab.clear();
 
         self.node_tab.clear();
-        self.node = null_mut();
+        self.node = None;
 
         self.name_tab.clear();
         self.name = None;
@@ -929,8 +929,9 @@ impl XmlParserCtxt {
             self.halt();
             return -1;
         }
-        self.node = value;
-        self.node_tab.push(value);
+        self.node = XmlNodePtr::from_raw(value).unwrap();
+        self.node_tab
+            .push(XmlNodePtr::from_raw(value).unwrap().unwrap());
         self.node_tab.len() as i32 - 1
     }
 
@@ -939,8 +940,12 @@ impl XmlParserCtxt {
     /// Returns the node just removed
     #[doc(alias = "nodePop")]
     pub(crate) fn node_pop(&mut self) -> *mut XmlNode {
-        let res = self.node_tab.pop().unwrap_or(null_mut());
-        self.node = *self.node_tab.last().unwrap_or(&null_mut());
+        let res = self
+            .node_tab
+            .pop()
+            .map(|node| node.as_ptr())
+            .unwrap_or(null_mut());
+        self.node = self.node_tab.last().cloned();
         res
     }
 
@@ -1576,7 +1581,7 @@ impl Default for XmlParserCtxt {
             html: 0,
             input: null_mut(),
             input_tab: vec![],
-            node: null_mut(),
+            node: None,
             node_tab: vec![],
             record_info: 0,
             node_seq: XmlParserNodeInfoSeq::default(),
@@ -1733,7 +1738,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     // Allocate the Node stack
     (*ctxt).node_tab.clear();
     (*ctxt).node_tab.shrink_to(10);
-    (*ctxt).node = null_mut();
+    (*ctxt).node = None;
 
     // Allocate the Name stack
     (*ctxt).name_tab.clear();

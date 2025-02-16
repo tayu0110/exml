@@ -2173,7 +2173,9 @@ pub unsafe fn xml_parse_in_node_context(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if !(*ctxt).node.is_null() && XmlGenericNodePtr::from_raw((*ctxt).node) != Some(node) {
+    if (*ctxt).node.map_or(false, |ctxt_node| {
+        XmlGenericNodePtr::from(ctxt_node) != node
+    }) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
         (*ctxt).well_formed = 0;
     }
@@ -2326,7 +2328,8 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if NodePtr::from_ptr((*ctxt).node) != new_doc.children {
+    if NodePtr::from_ptr((*ctxt).node.map_or(null_mut(), |node| node.as_ptr())) != new_doc.children
+    {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
     }
 
@@ -2520,7 +2523,8 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if NodePtr::from_ptr((*ctxt).node) != new_doc.children {
+    if NodePtr::from_ptr((*ctxt).node.map_or(null_mut(), |node| node.as_ptr())) != new_doc.children
+    {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
     }
 
@@ -5450,11 +5454,11 @@ unsafe fn are_blanks(
     }
 
     // Look if the element is mixed content in the DTD if available
-    if (*ctxt).node.is_null() {
+    let Some(context_node) = (*ctxt).node else {
         return 0;
-    }
+    };
     if let Some(my_doc) = (*ctxt).my_doc {
-        ret = xml_is_mixed_element(my_doc, (*(*ctxt).node).name);
+        ret = xml_is_mixed_element(my_doc, context_node.name);
         if ret == 0 {
             return 1;
         }
@@ -5467,7 +5471,7 @@ unsafe fn are_blanks(
     if (*ctxt).current_byte() != b'<' && (*ctxt).current_byte() != 0xD {
         return 0;
     }
-    if (*(*ctxt).node).children().is_none()
+    if context_node.children().is_none()
         && (*ctxt).current_byte() == b'<'
         && (*ctxt).nth_byte(1) == b'/'
     // index out of bound may occur at this `nth_byte` ??? It may be necessary to fix.
@@ -5475,15 +5479,15 @@ unsafe fn are_blanks(
         return 0;
     }
 
-    let last_child: *mut XmlNode = (*(*ctxt).node).get_last_child();
+    let last_child: *mut XmlNode = context_node.get_last_child();
     if last_child.is_null() {
-        if (*(*ctxt).node).element_type() != XmlElementType::XmlElementNode
-            && !(*(*ctxt).node).content.is_null()
+        if context_node.element_type() != XmlElementType::XmlElementNode
+            && !context_node.content.is_null()
         {
             return 0;
         }
     } else if (*last_child).is_text_node()
-        || (*(*ctxt).node)
+        || context_node
             .children()
             .filter(|c| c.is_text_node())
             .is_some()
@@ -6462,14 +6466,14 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                     // The Name in the document type declaration must match
                     // the element type of the root element.
                     #[cfg(feature = "libxml_valid")]
-                    if (*ctxt).validate != 0 && (*ctxt).well_formed != 0 && !(*ctxt).node.is_null()
-                    {
-                        if let Some(my_doc) = (*ctxt)
-                            .my_doc
-                            .filter(|doc| NodePtr::from_ptr((*ctxt).node) == doc.children)
-                        {
-                            (*ctxt).valid &=
-                                xml_validate_root(addr_of_mut!((*ctxt).vctxt) as _, my_doc);
+                    if (*ctxt).validate != 0 && (*ctxt).well_formed != 0 {
+                        if let Some(context_node) = (*ctxt).node {
+                            if let Some(my_doc) = (*ctxt).my_doc.filter(|doc| {
+                                NodePtr::from_ptr(context_node.as_ptr()) == doc.children
+                            }) {
+                                (*ctxt).valid &=
+                                    xml_validate_root(addr_of_mut!((*ctxt).vctxt) as _, my_doc);
+                            }
                         }
                     }
 

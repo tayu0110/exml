@@ -8320,16 +8320,16 @@ unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> 
         }
     }
 
-    if (*ctxt).node.is_null() {
+    let Some(context_node) = (*ctxt).node else {
         return 0;
-    }
-    last_child = (*(*ctxt).node).get_last_child();
+    };
+    last_child = context_node.get_last_child();
     while !last_child.is_null() && (*last_child).element_type() == XmlElementType::XmlCommentNode {
         last_child = (*last_child).prev.map_or(null_mut(), |p| p.as_ptr());
     }
     if last_child.is_null() {
-        if (*(*ctxt).node).element_type() != XmlElementType::XmlElementNode
-            && !(*(*ctxt).node).content.is_null()
+        if context_node.element_type() != XmlElementType::XmlElementNode
+            && !context_node.content.is_null()
         {
             return 0;
         }
@@ -8660,7 +8660,7 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
             node_info.end_pos =
                 (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
             node_info.end_line = (*(*ctxt).input).line as _;
-            node_info.node = NonNull::new((*ctxt).node);
+            node_info.node = NonNull::new((*ctxt).node.map_or(null_mut(), |node| node.as_ptr()));
             xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
         }
         return;
@@ -8694,7 +8694,7 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     if current_node.is_some() && (*ctxt).record_info != 0 {
         node_info.end_pos = (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
         node_info.end_line = (*(*ctxt).input).line as _;
-        node_info.node = NonNull::new((*ctxt).node);
+        node_info.node = NonNull::new((*ctxt).node.map_or(null_mut(), |node| node.as_ptr()));
         xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
     }
     if (*ctxt).current_byte() == 0 {
@@ -8753,7 +8753,7 @@ unsafe fn html_init_parser_ctxt(
     // Allocate the Node stack
     (*ctxt).input_tab.clear();
     (*ctxt).node_tab.shrink_to(10);
-    (*ctxt).node = null_mut();
+    (*ctxt).node = None;
 
     // Allocate the Name stack
     (*ctxt).name_tab.clear();
@@ -8842,14 +8842,16 @@ pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtP
 #[doc(alias = "htmlParserFinishElementParsing")]
 unsafe fn html_parser_finish_element_parsing(ctxt: HtmlParserCtxtPtr) {
     // Capture end position and add node
-    if !(*ctxt).node.is_null() && (*ctxt).record_info != 0 {
-        let node_info = (*ctxt).node_info_tab.last_mut().expect("Internal Error");
-        node_info.borrow_mut().end_pos =
-            (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
-        node_info.borrow_mut().end_line = (*(*ctxt).input).line as _;
-        node_info.borrow_mut().node = NonNull::new((*ctxt).node);
-        xml_parser_add_node_info(ctxt, node_info.clone());
-        html_node_info_pop(ctxt);
+    if let Some(node) = (*ctxt).node {
+        if (*ctxt).record_info != 0 {
+            let node_info = (*ctxt).node_info_tab.last_mut().expect("Internal Error");
+            node_info.borrow_mut().end_pos =
+                (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
+            node_info.borrow_mut().end_line = (*(*ctxt).input).line as _;
+            node_info.borrow_mut().node = NonNull::new(node.as_ptr());
+            xml_parser_add_node_info(ctxt, node_info.clone());
+            html_node_info_pop(ctxt);
+        }
     }
     if (*ctxt).current_byte() == 0 {
         html_auto_close_on_end(ctxt);
@@ -10765,7 +10767,7 @@ pub unsafe fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).space_tab.clear();
 
     (*ctxt).node_tab.clear();
-    (*ctxt).node = null_mut();
+    (*ctxt).node = None;
 
     (*ctxt).name_tab.clear();
     (*ctxt).name = None;

@@ -1981,7 +1981,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if NodePtr::from_ptr((*ctxt).node) != my_doc.children {
+    if NodePtr::from_ptr((*ctxt).node.map_or(null_mut(), |node| node.as_ptr())) != my_doc.children {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
     }
 
@@ -2282,7 +2282,9 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             } else {
                 ent.owner = 0;
                 while !list.is_null() {
-                    (*list).set_parent(NodePtr::from_ptr((*ctxt).node));
+                    (*list).set_parent(NodePtr::from_ptr(
+                        (*ctxt).node.map_or(null_mut(), |node| node.as_ptr()),
+                    ));
                     (*list).doc = (*ctxt).my_doc;
                     if (*list).next.is_none() {
                         ent.last.store(list, Ordering::Relaxed);
@@ -2426,7 +2428,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         // and, if it's NULL, we copy in whatever was in the entity.
         // If it's not NULL we leave it alone.  This is somewhat of a
         // hack - maybe we should have further tests to determine what to do.
-        if !(*ctxt).node.is_null() {
+        if let Some(mut context_node) = (*ctxt).node {
             // Seems we are generating the DOM content, do
             // a simple tree copy for all references except the first
             // In the first occurrence list contains the replacement.
@@ -2456,7 +2458,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         if first_child.is_null() {
                             first_child = nw;
                         }
-                        nw = (*(*ctxt).node).add_child(nw);
+                        nw = context_node.add_child(nw);
                     }
                     if cur == ent.last.load(Ordering::Relaxed) as _ {
                         // needed to detect some strange empty
@@ -2504,7 +2506,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         }
                         (*ent).add_child(nw);
                     }
-                    (*(*ctxt).node).add_child(cur);
+                    context_node.add_child(cur);
                     if cur == last {
                         break;
                     }
@@ -2533,7 +2535,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 {
                     (*ent.last.load(Ordering::Relaxed)).name = nbktext;
                 }
-                (*(*ctxt).node).add_child_list(ent.children.load(Ordering::Relaxed));
+                context_node.add_child_list(ent.children.load(Ordering::Relaxed));
             }
 
             // This is to avoid a nasty side effect, see characters() in SAX.c
@@ -3122,17 +3124,19 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
         line,
         (*ctxt).ns_tab.len() as i32 - ns_nr as i32,
     );
-    let cur: *mut XmlNode = (*ctxt).node;
+    let cur = (*ctxt).node;
 
     // [ VC: Root Element Type ]
     // The Name in the document type declaration must match the element type of the root element.
     #[cfg(feature = "libxml_valid")]
-    if (*ctxt).validate != 0 && (*ctxt).well_formed != 0 && !(*ctxt).node.is_null() {
-        if let Some(my_doc) = (*ctxt)
-            .my_doc
-            .filter(|doc| NodePtr::from_ptr((*ctxt).node) == doc.children)
-        {
-            (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt), my_doc);
+    if (*ctxt).validate != 0 && (*ctxt).well_formed != 0 {
+        if let Some(context_node) = (*ctxt).node {
+            if let Some(my_doc) = (*ctxt)
+                .my_doc
+                .filter(|doc| NodePtr::from_ptr(context_node.as_ptr()) == doc.children)
+            {
+                (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt), my_doc);
+            }
         }
     }
 
@@ -3172,29 +3176,33 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
         if ns_nr != (*ctxt).ns_tab.len() {
             (*ctxt).ns_pop((*ctxt).ns_tab.len() - ns_nr);
         }
-        if !cur.is_null() && (*ctxt).record_info != 0 {
-            let node_info = XmlParserNodeInfo {
-                node: NonNull::new(cur),
-                begin_pos,
-                begin_line,
-                end_pos: (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64,
-                end_line: (*(*ctxt).input).line as u64,
-            };
-            xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
+        if let Some(cur) = cur {
+            if (*ctxt).record_info != 0 {
+                let node_info = XmlParserNodeInfo {
+                    node: NonNull::new(cur.as_ptr()),
+                    begin_pos,
+                    begin_line,
+                    end_pos: (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64,
+                    end_line: (*(*ctxt).input).line as u64,
+                };
+                xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
+            }
         }
         return 1;
     }
     if (*ctxt).current_byte() == b'>' {
         (*ctxt).advance(1);
-        if !cur.is_null() && (*ctxt).record_info != 0 {
-            let node_info = XmlParserNodeInfo {
-                node: NonNull::new(cur),
-                begin_pos,
-                begin_line,
-                end_pos: 0,
-                end_line: 0,
-            };
-            xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
+        if let Some(cur) = cur {
+            if (*ctxt).record_info != 0 {
+                let node_info = XmlParserNodeInfo {
+                    node: NonNull::new(cur.as_ptr()),
+                    begin_pos,
+                    begin_line,
+                    end_pos: 0,
+                    end_line: 0,
+                };
+                xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
+            }
         }
     } else {
         xml_fatal_err_msg_str_int_str!(
@@ -3221,7 +3229,7 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
 /// Parse the end of an XML element. Always consumes '</'.
 #[doc(alias = "xmlParseElementEnd")]
 pub(crate) unsafe fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
-    let cur: *mut XmlNode = (*ctxt).node;
+    let cur = (*ctxt).node;
 
     if (*ctxt).name_tab.is_empty() {
         if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
@@ -3242,11 +3250,13 @@ pub(crate) unsafe fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
     }
 
     // Capture end position
-    if !cur.is_null() && (*ctxt).record_info != 0 {
-        if let Some(node_info) = xml_parser_find_node_info(ctxt, cur) {
-            node_info.borrow_mut().end_pos =
-                (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
-            node_info.borrow_mut().end_line = (*(*ctxt).input).line as _;
+    if let Some(cur) = cur {
+        if (*ctxt).record_info != 0 {
+            if let Some(node_info) = xml_parser_find_node_info(ctxt, cur.as_ptr()) {
+                node_info.borrow_mut().end_pos =
+                    (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
+                node_info.borrow_mut().end_line = (*(*ctxt).input).line as _;
+            }
         }
     }
 }

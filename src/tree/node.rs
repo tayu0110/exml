@@ -2464,7 +2464,7 @@ impl From<&mut XmlNode> for NodePtr {
 ///
 /// Returns the attribute being inserted or NULL in case of error.
 #[doc(alias = "xmlAddPropSibling")]
-unsafe fn add_prop_sibling(
+pub(super) unsafe fn add_prop_sibling(
     prev: *mut XmlNode,
     cur: *mut XmlNode,
     prop: *mut XmlNode,
