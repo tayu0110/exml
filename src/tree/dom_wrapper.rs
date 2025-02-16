@@ -1976,7 +1976,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
     ctxt: XmlDOMWrapCtxtPtr,
     source_doc: Option<XmlDocPtr>,
     node: *mut XmlNode,
-    res_node: *mut *mut XmlNode,
+    res_node: &mut *mut XmlNode,
     dest_doc: XmlDocPtr,
     dest_parent: *mut XmlNode,
     deep: i32,
@@ -2002,7 +2002,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
     // if dest_doc.is_null() {
     //     return -1;
     // }
-    if node.is_null() || res_node.is_null() {
+    if node.is_null() {
         return -1;
     }
     // TODO: Initially we support only element-nodes.
