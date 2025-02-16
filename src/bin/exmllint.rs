@@ -2149,13 +2149,13 @@ unsafe fn stream_file(filename: *mut c_char) {
         } else if CMD_ARGS.loaddtd {
             xml_text_reader_set_parser_prop(
                 &mut *reader,
-                XmlParserProperties::XmlParserLoaddtd as i32,
+                XmlParserProperties::XmlParserLoadDTD as i32,
                 1,
             );
         }
         #[cfg(not(feature = "libxml_valid"))]
         if CMD_ARGS.loaddtd {
-            xml_text_reader_set_parser_prop(reader, XmlParserProperties::XmlParserLoaddtd, 1);
+            xml_text_reader_set_parser_prop(reader, XmlParserProperties::XmlParserLoadDTD, 1);
         }
         #[cfg(feature = "schema")]
         if let Some(relaxng) = CMD_ARGS.relaxng.as_deref() {

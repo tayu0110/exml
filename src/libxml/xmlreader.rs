@@ -26,13 +26,11 @@ use std::{
     any::type_name,
     ffi::c_char,
     io::Read,
-    mem::{size_of, size_of_val},
+    mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::Ordering,
 };
-
-use libc::memset;
 
 #[cfg(feature = "schema")]
 use crate::relaxng::{xml_relaxng_new_parser_ctxt, XmlRelaxNGValidCtxtPtr};
@@ -117,8 +115,8 @@ pub enum XmlTextReaderMode {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlParserProperties {
-    XmlParserLoaddtd = 1,
-    XmlParserDefaultattrs = 2,
+    XmlParserLoadDTD = 1,
+    XmlParserDefaultAttrs = 2,
     XmlParserValidate = 3,
     XmlParserSubstEntities = 4,
 }
@@ -126,10 +124,10 @@ pub enum XmlParserProperties {
 impl TryFrom<i32> for XmlParserProperties {
     type Error = anyhow::Error;
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlParserLoaddtd as i32 {
-            Ok(Self::XmlParserLoaddtd)
-        } else if value == Self::XmlParserDefaultattrs as i32 {
-            Ok(Self::XmlParserDefaultattrs)
+        if value == Self::XmlParserLoadDTD as i32 {
+            Ok(Self::XmlParserLoadDTD)
+        } else if value == Self::XmlParserDefaultAttrs as i32 {
+            Ok(Self::XmlParserDefaultAttrs)
         } else if value == Self::XmlParserValidate as i32 {
             Ok(Self::XmlParserValidate)
         } else if value == Self::XmlParserSubstEntities as i32 {
@@ -153,7 +151,7 @@ pub enum XmlReaderTypes {
     XmlReaderTypeElement = 1,
     XmlReaderTypeAttribute = 2,
     XmlReaderTypeText = 3,
-    XmlReaderTypeCdata = 4,
+    XmlReaderTypeCDATA = 4,
     XmlReaderTypeEntityReference = 5,
     XmlReaderTypeEntity = 6,
     XmlReaderTypeProcessingInstruction = 7,
@@ -256,12 +254,12 @@ pub struct XmlTextReader {
     // entity stack when traversing entities content
     // Current Entity Ref Node
     ent: *mut XmlNode,
-    // Depth of the entities stack
-    ent_nr: i32,
-    // Max depth of the entities stack
-    ent_max: i32,
+    // // Depth of the entities stack
+    // ent_nr: i32,
+    // // Max depth of the entities stack
+    // ent_max: i32,
     // array of entities
-    ent_tab: *mut *mut XmlNode,
+    ent_tab: Vec<*mut XmlNode>,
 
     // error handling
     // callback function
@@ -316,15 +314,15 @@ pub struct XmlTextReader {
     // counts for xinclude
     #[cfg(feature = "xinclude")]
     in_xinclude: i32,
-    // number of preserve patterns
-    #[cfg(feature = "libxml_pattern")]
-    pattern_nr: i32,
-    // max preserve patterns
-    #[cfg(feature = "libxml_pattern")]
-    pattern_max: i32,
+    // // number of preserve patterns
+    // #[cfg(feature = "libxml_pattern")]
+    // pattern_nr: i32,
+    // // max preserve patterns
+    // #[cfg(feature = "libxml_pattern")]
+    // pattern_max: i32,
     // array of preserve patterns
     #[cfg(feature = "libxml_pattern")]
-    pattern_tab: *mut XmlPatternPtr,
+    pattern_tab: Vec<XmlPatternPtr>,
     // level of preserves
     preserves: i32,
     // the set of options set
@@ -505,7 +503,7 @@ impl XmlTextReader {
                         let f = self.in_xinclude == 0;
                         if self.preserves == 0
                             && f
-                            && self.ent_nr == 0
+                            && self.ent_tab.is_empty()
                             && (*self.node).prev.is_some()
                             && (*self.node).prev.unwrap().element_type()
                                 != XmlElementType::XmlDTDNode
@@ -564,7 +562,7 @@ impl XmlTextReader {
                         if !oldnode.is_null()
                             && self.preserves == 0
                             && f
-                            && self.ent_nr == 0
+                            && self.ent_tab.is_empty()
                             && (*oldnode).element_type() != XmlElementType::XmlDTDNode
                             && (*oldnode).extra & NODE_IS_PRESERVED as u16 == 0
                         {
@@ -583,7 +581,7 @@ impl XmlTextReader {
                     let f = self.in_xinclude == 0;
                     if self.preserves == 0
                         && f
-                        && self.ent_nr == 0
+                        && self.ent_tab.is_empty()
                         && (*self.node).last().is_some()
                         && (*self.node).last().unwrap().extra & NODE_IS_PRESERVED as u16 == 0
                     {
@@ -710,14 +708,14 @@ impl XmlTextReader {
             }
         }
         #[cfg(feature = "libxml_pattern")]
-        if self.pattern_nr > 0
+        if !self.pattern_tab.is_empty()
             && !matches!(
                 self.state,
                 XmlTextReaderState::End | XmlTextReaderState::Backtrack
             )
         {
-            for i in 0..self.pattern_nr {
-                if xml_pattern_match(*self.pattern_tab.add(i as usize), self.node) == 1 {
+            for &pattern in &self.pattern_tab {
+                if xml_pattern_match(pattern, self.node) == 1 {
                     self.preserve();
                     break;
                 }
@@ -1173,32 +1171,10 @@ impl XmlTextReader {
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "xmlTextReaderEntPush")]
     #[cfg(feature = "libxml_reader")]
-    unsafe fn entity_push(&mut self, value: *mut XmlNode) -> i32 {
-        use crate::generic_error;
-
-        use super::globals::xml_realloc;
-
-        if self.ent_nr >= self.ent_max {
-            let new_size: usize = if self.ent_max == 0 {
-                10
-            } else {
-                self.ent_max as usize * 2
-            };
-
-            let tmp: *mut *mut XmlNode =
-                xml_realloc(self.ent_tab as _, new_size * size_of::<*mut XmlNode>())
-                    as *mut *mut XmlNode;
-            if tmp.is_null() {
-                generic_error!("xmlRealloc failed !\n");
-                return -1;
-            }
-            self.ent_tab = tmp;
-            self.ent_max = new_size as _;
-        }
-        *self.ent_tab.add(self.ent_nr as usize) = value;
+    fn entity_push(&mut self, value: *mut XmlNode) -> i32 {
+        self.ent_tab.push(value);
         self.ent = value;
-        self.ent_nr += 1;
-        self.ent_nr - 1
+        self.ent_tab.len() as i32 - 1
     }
 
     /// Pops the top element entity from the entities stack
@@ -1206,19 +1182,12 @@ impl XmlTextReader {
     /// Returns the entity just removed
     #[doc(alias = "xmlTextReaderEntPop")]
     #[cfg(feature = "libxml_reader")]
-    unsafe fn entity_pop(&mut self) -> *mut XmlNode {
-        if self.ent_nr <= 0 {
+    fn entity_pop(&mut self) -> *mut XmlNode {
+        let Some(res) = self.ent_tab.pop() else {
             return null_mut();
-        }
-        self.ent_nr -= 1;
-        if self.ent_nr > 0 {
-            self.ent = *self.ent_tab.add(self.ent_nr as usize - 1);
-        } else {
-            self.ent = null_mut();
-        }
-        let ret: *mut XmlNode = *self.ent_tab.add(self.ent_nr as usize);
-        *self.ent_tab.add(self.ent_nr as usize) = null_mut();
-        ret
+        };
+        self.ent = self.ent_tab.last().copied().unwrap_or(null_mut());
+        res
     }
 
     /// Push the current node for validation
@@ -1406,7 +1375,7 @@ impl XmlTextReader {
                     node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
                     if (*node).element_type() == XmlElementType::XmlElementNode {
                         let mut tmp: *mut XmlNode;
-                        if self.ent_nr == 0 {
+                        if self.ent_tab.is_empty() {
                             while {
                                 tmp = (*node).last().map_or(null_mut(), |l| l.as_ptr());
                                 !tmp.is_null()
@@ -1790,13 +1759,13 @@ impl XmlTextReader {
         let ctxt = self.ctxt;
 
         match prop {
-            XmlParserProperties::XmlParserLoaddtd => {
+            XmlParserProperties::XmlParserLoadDTD => {
                 if (*ctxt).loadsubset != 0 || (*ctxt).validate != 0 {
                     return 1;
                 }
                 0
             }
-            XmlParserProperties::XmlParserDefaultattrs => {
+            XmlParserProperties::XmlParserDefaultAttrs => {
                 if (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0 {
                     return 1;
                 }
@@ -2434,7 +2403,7 @@ impl XmlTextReader {
                     XmlReaderTypes::XmlReaderTypeText
                 }
             }
-            XmlElementType::XmlCDATASectionNode => XmlReaderTypes::XmlReaderTypeCdata,
+            XmlElementType::XmlCDATASectionNode => XmlReaderTypes::XmlReaderTypeCDATA,
             XmlElementType::XmlEntityRefNode => XmlReaderTypes::XmlReaderTypeEntityReference,
             XmlElementType::XmlEntityNode => XmlReaderTypes::XmlReaderTypeEntity,
             XmlElementType::XmlPINode => XmlReaderTypes::XmlReaderTypeProcessingInstruction,
@@ -2751,43 +2720,14 @@ impl XmlTextReader {
     ) -> i32 {
         use std::ffi::CString;
 
-        use crate::generic_error;
-
-        use super::globals::xml_realloc;
-
         let pattern = CString::new(pattern).unwrap();
         let comp: XmlPatternPtr = xml_patterncompile(pattern.as_ptr() as *const u8, 0, namespaces);
         if comp.is_null() {
             return -1;
         }
 
-        if self.pattern_max <= 0 {
-            self.pattern_max = 4;
-            self.pattern_tab =
-                xml_malloc(self.pattern_max as usize * size_of_val(&*self.pattern_tab.add(0)))
-                    as *mut XmlPatternPtr;
-            if self.pattern_tab.is_null() {
-                generic_error!("xmlMalloc failed !\n");
-                return -1;
-            }
-        }
-        if self.pattern_nr >= self.pattern_max {
-            self.pattern_max *= 2;
-            let tmp: *mut XmlPatternPtr = xml_realloc(
-                self.pattern_tab as _,
-                self.pattern_max as usize * size_of_val(&*self.pattern_tab.add(0)),
-            ) as *mut XmlPatternPtr;
-            if tmp.is_null() {
-                generic_error!("xmlRealloc failed !\n");
-                self.pattern_max /= 2;
-                return -1;
-            }
-            self.pattern_tab = tmp;
-        }
-        *self.pattern_tab.add(self.pattern_nr as usize) = comp;
-        let res = self.pattern_nr;
-        self.pattern_nr += 1;
-        res
+        self.pattern_tab.push(comp);
+        self.pattern_tab.len() as i32 - 1
     }
 
     /// Provides the text value of the node if present
@@ -2876,9 +2816,9 @@ impl Default for XmlTextReader {
             buffer: "".to_owned(),
             dict: null_mut(),
             ent: null_mut(),
-            ent_nr: 0,
-            ent_max: 0,
-            ent_tab: null_mut(),
+            // ent_nr: 0,
+            // ent_max: 0,
+            ent_tab: vec![],
             error_func: None,
             error_func_arg: None,
             #[cfg(feature = "schema")]
@@ -2909,12 +2849,12 @@ impl Default for XmlTextReader {
             xincctxt: null_mut(),
             #[cfg(feature = "xinclude")]
             in_xinclude: 0,
+            // #[cfg(feature = "libxml_pattern")]
+            // pattern_nr: 0,
+            // #[cfg(feature = "libxml_pattern")]
+            // pattern_max: 0,
             #[cfg(feature = "libxml_pattern")]
-            pattern_nr: 0,
-            #[cfg(feature = "libxml_pattern")]
-            pattern_max: 0,
-            #[cfg(feature = "libxml_pattern")]
-            pattern_tab: null_mut(),
+            pattern_tab: vec![],
             preserves: 0,
             parser_flags: 0,
             serror_func: None,
@@ -3109,9 +3049,6 @@ pub unsafe fn xml_new_text_reader(
     }
     std::ptr::write(ret, XmlTextReader::default());
     (*ret).doc = None;
-    (*ret).ent_tab = null_mut();
-    (*ret).ent_max = 0;
-    (*ret).ent_nr = 0;
     (*ret).input = Some(input);
     let mut sax = XmlSAXHandler::default();
     xml_sax_version(&mut sax, 2);
@@ -3207,8 +3144,7 @@ pub unsafe fn xml_new_text_reader(
     }
     #[cfg(feature = "libxml_pattern")]
     {
-        (*ret).pattern_max = 0;
-        (*ret).pattern_tab = null_mut();
+        (*ret).pattern_tab.clear();
     }
     ret
 }
@@ -3284,13 +3220,12 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         xml_xinclude_free_context((*reader).xincctxt);
     }
     #[cfg(feature = "libxml_pattern")]
-    if !(*reader).pattern_tab.is_null() {
-        for i in 0..(*reader).pattern_nr {
-            if !(*(*reader).pattern_tab.add(i as usize)).is_null() {
-                xml_free_pattern(*(*reader).pattern_tab.add(i as usize));
+    {
+        for pattern in (*reader).pattern_tab.drain(..) {
+            if !pattern.is_null() {
+                xml_free_pattern(pattern);
             }
         }
-        xml_free((*reader).pattern_tab as _);
     }
     if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeClosed {
         xml_text_reader_close(&mut *reader);
@@ -3302,9 +3237,6 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         if (*reader).allocs & XML_TEXTREADER_CTXT != 0 {
             xml_free_parser_ctxt((*reader).ctxt);
         }
-    }
-    if !(*reader).ent_tab.is_null() {
-        xml_free((*reader).ent_tab as _);
     }
     if !(*reader).dict.is_null() {
         xml_dict_free((*reader).dict);
@@ -3344,7 +3276,7 @@ pub unsafe fn xml_text_reader_setup(
     options |= XmlParserOption::XmlParseCompact as i32;
 
     (*reader).doc = None;
-    (*reader).ent_nr = 0;
+    (*reader).ent_tab.clear();
     (*reader).parser_flags = options;
     (*reader).validate = XmlTextReaderValidate::NotValidate;
     if input.is_some() && (*reader).input.is_some() && (*reader).allocs & XML_TEXTREADER_INPUT != 0
@@ -3507,17 +3439,9 @@ pub unsafe fn xml_text_reader_setup(
         (*reader).in_xinclude = 0;
     }
     #[cfg(feature = "libxml_pattern")]
-    {
-        if (*reader).pattern_tab.is_null() {
-            (*reader).pattern_nr = 0;
-            (*reader).pattern_max = 0;
-        }
-        while (*reader).pattern_nr > 0 {
-            (*reader).pattern_nr -= 1;
-            if !(*(*reader).pattern_tab.add((*reader).pattern_nr as usize)).is_null() {
-                xml_free_pattern(*(*reader).pattern_tab.add((*reader).pattern_nr as usize));
-                *(*reader).pattern_tab.add((*reader).pattern_nr as usize) = null_mut();
-            }
+    while let Some(pattern) = (*reader).pattern_tab.pop() {
+        if !pattern.is_null() {
+            xml_free_pattern(pattern);
         }
     }
 
@@ -4339,7 +4263,7 @@ pub unsafe fn xml_text_reader_set_parser_prop(
     let ctxt: XmlParserCtxtPtr = reader.ctxt;
 
     match XmlParserProperties::try_from(prop) {
-        Ok(XmlParserProperties::XmlParserLoaddtd) => {
+        Ok(XmlParserProperties::XmlParserLoadDTD) => {
             if value != 0 {
                 if (*ctxt).loadsubset == 0 {
                     if reader.mode != XmlTextReaderMode::XmlTextreaderModeInitial {
@@ -4352,7 +4276,7 @@ pub unsafe fn xml_text_reader_set_parser_prop(
             }
             0
         }
-        Ok(XmlParserProperties::XmlParserDefaultattrs) => {
+        Ok(XmlParserProperties::XmlParserDefaultAttrs) => {
             if value != 0 {
                 (*ctxt).loadsubset |= XML_COMPLETE_ATTRS as i32;
             } else if (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0 {
@@ -5186,19 +5110,12 @@ pub unsafe fn xml_text_reader_const_xml_version(reader: &mut XmlTextReader) -> *
 pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
     use crate::generic_error;
 
-    // if doc.is_null() {
-    //     return null_mut();
-    // }
-
     let ret: XmlTextReaderPtr = xml_malloc(size_of::<XmlTextReader>()) as _;
     if ret.is_null() {
         generic_error!("xmlNewTextReader : malloc failed\n");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlTextReader>());
-    (*ret).ent_nr = 0;
-    // (*ret).input = None;
-    std::ptr::write(&raw mut (*ret).input, None);
+    std::ptr::write(&mut *ret, XmlTextReader::default());
     (*ret).mode = XmlTextReaderMode::XmlTextreaderModeInitial;
     (*ret).node = null_mut();
     (*ret).curnode = null_mut();
@@ -5324,7 +5241,7 @@ pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) ->
         (*(*reader).ctxt).reset();
     }
 
-    (*reader).ent_nr = 0;
+    (*reader).ent_tab.clear();
     (*reader).input = None;
     (*reader).mode = XmlTextReaderMode::XmlTextreaderModeInitial;
     (*reader).node = null_mut();
