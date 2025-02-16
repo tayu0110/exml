@@ -61,7 +61,7 @@ use crate::{
         valid::{xml_validate_pop_element, xml_validate_push_cdata, xml_validate_push_element},
         xinclude::{
             xml_xinclude_new_context, xml_xinclude_process_node, xml_xinclude_set_flags,
-            xml_xinclude_set_streaming_mode, XmlXincludeCtxtPtr,
+            xml_xinclude_set_streaming_mode, XmlXIncludeCtxtPtr,
         },
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
@@ -310,7 +310,7 @@ pub struct XmlTextReader {
     xinclude_name: *const XmlChar,
     // the xinclude context
     #[cfg(feature = "xinclude")]
-    xincctxt: XmlXincludeCtxtPtr,
+    xincctxt: XmlXIncludeCtxtPtr,
     // counts for xinclude
     #[cfg(feature = "xinclude")]
     in_xinclude: i32,
