@@ -2113,7 +2113,7 @@ unsafe fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: Option<&
     }
 }
 
-/// ```ignore
+/// ```text
 /// XPtrPart ::= 'xpointer' '(' XPtrExpr ')'
 ///            | Scheme '(' SchemeSpecificExpr ')'
 ///

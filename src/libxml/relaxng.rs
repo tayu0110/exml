@@ -7529,18 +7529,8 @@ unsafe fn xml_relaxng_validate_interleave(
     }
 
     // Build arrays to store the first and last node of the chain pertaining to each group
-    let list: *mut *mut XmlNode = xml_malloc(nbgroups as usize * size_of::<*mut XmlNode>()) as _;
-    if list.is_null() {
-        xml_rng_verr_memory(ctxt, "validating\n");
-        return -1;
-    }
-    memset(list as _, 0, nbgroups as usize * size_of::<*mut XmlNode>());
-    let lasts: *mut *mut XmlNode = xml_malloc(nbgroups as usize * size_of::<*mut XmlNode>()) as _;
-    if lasts.is_null() {
-        xml_rng_verr_memory(ctxt, "validating\n");
-        return -1;
-    }
-    memset(lasts as _, 0, nbgroups as usize * size_of::<*mut XmlNode>());
+    let mut list = vec![null_mut(); nbgroups as usize];
+    let mut lasts: Vec<*mut XmlNode> = vec![null_mut(); nbgroups as usize];
 
     // Walk the sequence of children finding the right group and sorting them in sequences.
     cur = (*(*ctxt).state).seq;
@@ -7612,12 +7602,12 @@ unsafe fn xml_relaxng_validate_interleave(
         if i >= nbgroups {
             break;
         }
-        if !(*lasts.add(i as usize)).is_null() {
-            (*(*lasts.add(i as usize))).next = NodePtr::from_ptr(cur);
-            *lasts.add(i as usize) = cur;
+        if !lasts[i as usize].is_null() {
+            (*lasts[i as usize]).next = NodePtr::from_ptr(cur);
+            lasts[i as usize] = cur;
         } else {
-            *list.add(i as usize) = cur;
-            *lasts.add(i as usize) = cur;
+            list[i as usize] = cur;
+            lasts[i as usize] = cur;
         }
         if let Some(next) = (*cur).next {
             lastchg = next.as_ptr();
@@ -7648,13 +7638,13 @@ unsafe fn xml_relaxng_validate_interleave(
                 break;
             }
             group = *(*partitions).groups.add(i as usize);
-            if !(*lasts.add(i as usize)).is_null() {
-                last = (*(*lasts.add(i as usize)))
+            if !lasts[i as usize].is_null() {
+                last = (*(lasts[i as usize]))
                     .next
                     .take()
                     .map_or(null_mut(), |n| n.as_ptr());
             }
-            (*(*ctxt).state).seq = *list.add(i as usize);
+            (*(*ctxt).state).seq = list[i as usize];
             ret = xml_relaxng_validate_definition(ctxt, (*group).rule);
             if ret != 0 {
                 break;
@@ -7759,8 +7749,8 @@ unsafe fn xml_relaxng_validate_interleave(
                 ret = -1;
                 break;
             }
-            if !(*lasts.add(i as usize)).is_null() {
-                (*(*lasts.add(i as usize))).next = NodePtr::from_ptr(last);
+            if !lasts[i as usize].is_null() {
+                (*(lasts[i as usize])).next = NodePtr::from_ptr(last);
             }
         }
         if !(*ctxt).state.is_null() {
@@ -7793,8 +7783,6 @@ unsafe fn xml_relaxng_validate_interleave(
         xml_relaxng_pop_errors(ctxt, err_nr as i32);
     }
 
-    xml_free(list as _);
-    xml_free(lasts as _);
     ret
 }
 
