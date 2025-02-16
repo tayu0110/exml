@@ -2418,7 +2418,9 @@ unsafe fn xml_xpath_is_axis_name(name: *const XmlChar) -> Option<XmlXPathAxisVal
 
 /// Parse a Literal
 ///
-/// `[29]   Literal ::=   '"' [^"]* '"' | "'" [^']* "'"`
+/// ```text
+/// [29]   Literal ::=   '"' [^"]* '"' | "'" [^']* "'"
+/// ```
 ///
 /// Returns the value found or NULL in case of error
 #[doc(alias = "xmlXPathParseLiteral")]
@@ -5238,11 +5240,7 @@ unsafe fn xml_xpath_location_set_filter(
     min_pos: i32,
     max_pos: i32,
 ) {
-    let mut i: i32;
-    let mut j: i32;
-    let mut pos: i32;
-
-    if locset.is_null() || (*locset).loc_nr == 0 || filter_op_index == -1 {
+    if locset.is_null() || (*locset).loc_tab.is_empty() || filter_op_index == -1 {
         return;
     }
 
@@ -5252,16 +5250,16 @@ unsafe fn xml_xpath_location_set_filter(
     let oldcs: i32 = (*xpctxt).context_size;
     let oldpp: i32 = (*xpctxt).proximity_position;
 
-    (*xpctxt).context_size = (*locset).loc_nr;
+    (*xpctxt).context_size = (*locset).loc_tab.len() as i32;
 
-    i = 0;
-    j = 0;
-    pos = 1;
-    while i < (*locset).loc_nr {
-        let context_node: *mut XmlNode = (*(*(*locset).loc_tab.add(i as usize))).user as _;
+    let mut i = 0;
+    let mut j = 0;
+    let mut pos = 1;
+    while i < (*locset).loc_tab.len() {
+        let context_node: *mut XmlNode = (*(*locset).loc_tab[i]).user as _;
 
         (*xpctxt).node = context_node;
-        (*xpctxt).proximity_position = i + 1;
+        (*xpctxt).proximity_position = i as i32 + 1;
 
         // Also set the xpath document in case things like
         // key() are evaluated in the predicate.
@@ -5283,22 +5281,22 @@ unsafe fn xml_xpath_location_set_filter(
             break;
         }
         if res < 0 {
-            /* Shouldn't happen */
+            // Shouldn't happen
             xml_xpath_err(ctxt, XmlXPathError::XPathExprError as i32);
             break;
         }
 
         if res != 0 && (pos >= min_pos && pos <= max_pos) {
             if i != j {
-                *(*locset).loc_tab.add(j as usize) = *(*locset).loc_tab.add(i as usize);
-                *(*locset).loc_tab.add(i as usize) = null_mut();
+                (*locset).loc_tab[j] = (*locset).loc_tab[i];
+                (*locset).loc_tab[i] = null_mut();
             }
 
             j += 1;
         } else {
             /* Remove the entry from the initial location set. */
-            xml_xpath_free_object(*(*locset).loc_tab.add(i as usize));
-            *(*locset).loc_tab.add(i as usize) = null_mut();
+            xml_xpath_free_object((*locset).loc_tab[i]);
+            (*locset).loc_tab[i] = null_mut();
         }
 
         if res != 0 {
@@ -5314,31 +5312,14 @@ unsafe fn xml_xpath_location_set_filter(
     }
 
     // Free remaining nodes.
-    while i < (*locset).loc_nr {
-        xml_xpath_free_object(*(*locset).loc_tab.add(i as usize));
+    while i < (*locset).loc_tab.len() {
+        xml_xpath_free_object((*locset).loc_tab[i]);
         i += 1;
     }
 
-    (*locset).loc_nr = j;
-
+    (*locset).loc_tab.truncate(j);
     // If too many elements were removed, shrink table to preserve memory.
-    if (*locset).loc_max > XML_NODESET_DEFAULT as i32 && (*locset).loc_nr < (*locset).loc_max / 2 {
-        let mut loc_max: i32 = (*locset).loc_nr;
-
-        if loc_max < XML_NODESET_DEFAULT as i32 {
-            loc_max = XML_NODESET_DEFAULT as i32;
-        }
-        let tmp: *mut XmlXPathObjectPtr = xml_realloc(
-            (*locset).loc_tab as _,
-            loc_max as usize * size_of::<XmlXPathObjectPtr>(),
-        ) as *mut XmlXPathObjectPtr;
-        if tmp.is_null() {
-            xml_xpath_perr_memory(ctxt, Some("shrinking locset\n"));
-        } else {
-            (*locset).loc_tab = tmp;
-            (*locset).loc_max = loc_max;
-        }
-    }
+    (*locset).loc_tab.shrink_to(XML_NODESET_DEFAULT);
 
     (*xpctxt).node = oldnode;
     (*xpctxt).doc = olddoc;
@@ -5420,8 +5401,8 @@ unsafe fn xml_xpath_comp_op_eval_filter_first(
 
             if !locset.is_null() {
                 xml_xpath_location_set_filter(ctxt, locset, (*op).ch2, 1, 1);
-                if (*locset).loc_nr > 0 {
-                    *first = (*(*(*locset).loc_tab.add(0))).user as *mut XmlNode;
+                if !(*locset).loc_tab.is_empty() {
+                    *first = (*(*locset).loc_tab[0]).user as *mut XmlNode;
                 }
             }
 
@@ -6025,7 +6006,13 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
             #[cfg(feature = "libxml_xptr_locs")]
             if (*(*ctxt).value).typ == XmlXPathObjectType::XPathLocationset {
                 let locset: XmlLocationSetPtr = (*(*ctxt).value).user as _;
-                xml_xpath_location_set_filter(ctxt, locset, (*op).ch2, 1, (*locset).loc_nr);
+                xml_xpath_location_set_filter(
+                    ctxt,
+                    locset,
+                    (*op).ch2,
+                    1,
+                    (*locset).loc_tab.len() as i32,
+                );
                 break 'to_break;
             }
 
@@ -6086,7 +6073,9 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                     CHECK_TYPE0!(ctxt, XmlXPathObjectType::XPathLocationset);
 
                     if (*(*ctxt).value).user.is_null()
-                        || (*((*(*ctxt).value).user as XmlLocationSetPtr)).loc_nr == 0
+                        || (*((*(*ctxt).value).user as XmlLocationSetPtr))
+                            .loc_tab
+                            .is_empty()
                     {
                         break 'to_break;
                     }
@@ -6095,13 +6084,12 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
 
                     newlocset = xml_xptr_location_set_create(null_mut());
 
-                    for i in 0..(*oldlocset).loc_nr {
+                    for (i, &iloc) in (*oldlocset).loc_tab.iter().enumerate() {
                         // Run the evaluation with a node list made of a
                         // single item in the nodelocset.
-                        (*(*ctxt).context).node =
-                            (*(*(*oldlocset).loc_tab.add(i as usize))).user as _;
-                        (*(*ctxt).context).context_size = (*oldlocset).loc_nr;
-                        (*(*ctxt).context).proximity_position = i + 1;
+                        (*(*ctxt).context).node = (*iloc).user as _;
+                        (*(*ctxt).context).context_size = (*oldlocset).loc_tab.len() as i32;
+                        (*(*ctxt).context).proximity_position = i as i32 + 1;
                         tmp =
                             xml_xpath_cache_new_node_set((*ctxt).context, (*(*ctxt).context).node);
                         value_push(ctxt, tmp);
@@ -6120,22 +6108,20 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                         res = value_pop(ctxt);
                         if (*res).typ == XmlXPathObjectType::XPathLocationset {
                             let rloc: XmlLocationSetPtr = (*res).user as XmlLocationSetPtr;
-                            for j in 0..(*rloc).loc_nr {
+                            for &jloc in &(*rloc).loc_tab {
                                 range = xml_xptr_new_range(
-                                    (*(*(*oldlocset).loc_tab.add(i as usize))).user as _,
-                                    (*(*(*oldlocset).loc_tab.add(i as usize))).index,
-                                    (*(*(*rloc).loc_tab.add(j as usize))).user2 as _,
-                                    (*(*(*rloc).loc_tab.add(j as usize))).index2,
+                                    (*iloc).user as _,
+                                    (*iloc).index,
+                                    (*jloc).user2 as _,
+                                    (*jloc).index2,
                                 );
                                 if !range.is_null() {
                                     xml_xptr_location_set_add(newlocset, range);
                                 }
                             }
                         } else {
-                            range = xml_xptr_new_range_node_object(
-                                (*(*(*oldlocset).loc_tab.add(i as usize))).user as *mut XmlNode,
-                                res,
-                            );
+                            range =
+                                xml_xptr_new_range_node_object((*iloc).user as *mut XmlNode, res);
                             if !range.is_null() {
                                 xml_xptr_location_set_add(newlocset, range);
                             }
@@ -6770,7 +6756,7 @@ pub unsafe fn xml_xpath_evaluate_predicate_result(
             if ptr.is_null() {
                 return 0;
             }
-            return ((*ptr).loc_nr != 0) as i32;
+            return (!(*ptr).loc_tab.is_empty()) as i32;
         }
         _ => {
             generic_error!("Internal error at {}:{}\n", file!(), line!());

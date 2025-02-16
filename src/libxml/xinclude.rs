@@ -180,9 +180,6 @@ pub unsafe fn xml_xinclude_process_flags_data(
     flags: i32,
     data: *mut c_void,
 ) -> i32 {
-    // if doc.is_null() {
-    //     return -1;
-    // }
     let Some(tree) = doc.get_root_element() else {
         return -1;
     };
@@ -1317,15 +1314,12 @@ unsafe fn xml_xinclude_copy_xpointer(
             if set.is_null() {
                 return null_mut();
             }
-            for i in 0..(*set).loc_nr {
+            for &loc in &(*set).loc_tab {
                 if last.is_null() {
-                    list = xml_xinclude_copy_xpointer(ctxt, *(*set).loc_tab.add(i as usize));
+                    list = xml_xinclude_copy_xpointer(ctxt, loc);
                     last = list;
                 } else {
-                    (*last).add_next_sibling(xml_xinclude_copy_xpointer(
-                        ctxt,
-                        *(*set).loc_tab.add(i as usize),
-                    ));
+                    (*last).add_next_sibling(xml_xinclude_copy_xpointer(ctxt, loc));
                 }
                 if !last.is_null() {
                     while let Some(next) = (*last).next() {

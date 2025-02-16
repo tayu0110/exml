@@ -119,10 +119,10 @@ unsafe fn xml_xpath_debug_dump_location_set<'a>(
         return;
     }
 
-    for i in 0..(*cur).loc_nr {
+    for (i, &loc) in (*cur).loc_tab.iter().enumerate() {
         write!(output, "{}", shift);
         write!(output, "{} : ", i + 1);
-        xml_xpath_debug_dump_object(output, *(*cur).loc_tab.add(i as usize), depth + 1);
+        xml_xpath_debug_dump_object(output, loc, depth + 1);
     }
 }
 
