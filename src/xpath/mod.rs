@@ -153,7 +153,7 @@ pub struct XmlXPathVariable {
 /// An XPath evaluation function, the parameters are on the XPath context stack.
 #[doc(alias = "xmlXPathEvalFunc")]
 #[cfg(feature = "xpath")]
-pub type XmlXPathEvalFunc = unsafe extern "C" fn(ctxt: XmlXPathParserContextPtr, nargs: i32);
+pub type XmlXPathEvalFunc = unsafe fn(ctxt: XmlXPathParserContextPtr, nargs: i32);
 
 // Extra function: a name and a evaluation function.
 #[cfg(feature = "xpath")]
@@ -401,13 +401,24 @@ pub type XmlXPathCompExprPtr = *mut XmlXPathCompExpr;
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlXPathCompExpr {
-    pub(crate) nb_step: i32,  /* Number of steps in this expression */
-    pub(crate) max_step: i32, /* Maximum number of steps allocated */
-    pub(crate) steps: *mut XmlXPathStepOp, /* ops for computation of this expression */
-    pub(crate) last: i32,     /* index of last step in expression */
-    pub(crate) expr: *mut XmlChar, /* the expression being computed */
+    // pub(crate) nb_step: i32,  /* Number of steps in this expression */
+    // pub(crate) max_step: i32, /* Maximum number of steps allocated */
+    pub(crate) steps: Vec<XmlXPathStepOp>, /* ops for computation of this expression */
+    pub(crate) last: i32,                  /* index of last step in expression */
+    pub(crate) expr: *mut XmlChar,         /* the expression being computed */
     #[cfg(feature = "libxml_pattern")]
     pub(crate) stream: XmlPatternPtr,
+}
+
+impl Default for XmlXPathCompExpr {
+    fn default() -> Self {
+        Self {
+            steps: vec![],
+            last: 0,
+            expr: null_mut(),
+            stream: null_mut(),
+        }
+    }
 }
 
 #[cfg(feature = "xpath")]
@@ -648,7 +659,7 @@ pub fn xml_xpath_cast_boolean_to_number(val: bool) -> f64 {
 /// Returns the number value
 #[doc(alias = "xmlXPathCastStringToNumber")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_string_to_number(val: *const XmlChar) -> f64 {
+pub unsafe fn xml_xpath_cast_string_to_number(val: *const XmlChar) -> f64 {
     xml_xpath_string_eval_number(val)
 }
 
@@ -657,7 +668,7 @@ pub unsafe extern "C" fn xml_xpath_cast_string_to_number(val: *const XmlChar) ->
 /// Returns the number value
 #[doc(alias = "xmlXPathCastNodeToNumber")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_node_to_number(node: *mut XmlNode) -> f64 {
+pub unsafe fn xml_xpath_cast_node_to_number(node: *mut XmlNode) -> f64 {
     use std::ffi::CString;
 
     if node.is_null() {
@@ -889,7 +900,7 @@ pub unsafe fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPt
 
 /// Frees the xsltPointerList structure. This does not free the content of the list.
 #[doc(alias = "xsltPointerListFree")]
-unsafe extern "C" fn xml_pointer_list_free(list: XmlPointerListPtr) {
+unsafe fn xml_pointer_list_free(list: XmlPointerListPtr) {
     if list.is_null() {
         return;
     }
@@ -916,7 +927,7 @@ unsafe fn xml_xpath_cache_free_object_list(list: XmlPointerListPtr) {
     xml_pointer_list_free(list);
 }
 
-unsafe extern "C" fn xml_xpath_free_cache(cache: XmlXpathContextCachePtr) {
+unsafe fn xml_xpath_free_cache(cache: XmlXpathContextCachePtr) {
     if cache.is_null() {
         return;
     }
@@ -941,7 +952,7 @@ unsafe extern "C" fn xml_xpath_free_cache(cache: XmlXpathContextCachePtr) {
 /// Free up an xmlXPathContext
 #[doc(alias = "xmlXPathFreeContext")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
+pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
     if ctxt.is_null() {
         return;
     }
@@ -960,7 +971,7 @@ pub unsafe extern "C" fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
 ///
 /// Returns the xmlXPathCache just allocated.
 #[doc(alias = "xmlXPathNewCache")]
-unsafe extern "C" fn xml_xpath_new_cache() -> XmlXpathContextCachePtr {
+unsafe fn xml_xpath_new_cache() -> XmlXpathContextCachePtr {
     let ret: XmlXpathContextCachePtr =
         xml_malloc(size_of::<XmlXpathContextCache>()) as XmlXpathContextCachePtr;
     if ret.is_null() {
@@ -990,7 +1001,7 @@ unsafe extern "C" fn xml_xpath_new_cache() -> XmlXpathContextCachePtr {
 /// Returns 0 if the setting succeeded, and -1 on API or internal errors.
 #[doc(alias = "xmlXPathContextSetCache")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_context_set_cache(
+pub unsafe fn xml_xpath_context_set_cache(
     ctxt: XmlXPathContextPtr,
     active: i32,
     mut value: i32,
@@ -1038,9 +1049,6 @@ pub unsafe fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
 
     let mut count: isize = 0;
 
-    // if doc.is_null() {
-    //     return -1;
-    // }
     let mut cur = doc.children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
         if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
@@ -1102,7 +1110,7 @@ pub unsafe fn xml_xpath_set_context_node(node: *mut XmlNode, ctx: XmlXPathContex
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathNodeEval")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_node_eval(
+pub unsafe fn xml_xpath_node_eval(
     node: *mut XmlNode,
     str: *const XmlChar,
     ctx: XmlXPathContextPtr,
@@ -1148,10 +1156,7 @@ macro_rules! CHECK_CTXT {
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathEval")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_eval(
-    str: *const XmlChar,
-    ctx: XmlXPathContextPtr,
-) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_eval(str: *const XmlChar, ctx: XmlXPathContextPtr) -> XmlXPathObjectPtr {
     use crate::generic_error;
 
     let res: XmlXPathObjectPtr;
@@ -1190,7 +1195,7 @@ pub unsafe extern "C" fn xml_xpath_eval(
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathEvalExpression")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_eval_expression(
+pub unsafe fn xml_xpath_eval_expression(
     str: *const XmlChar,
     ctxt: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
@@ -1244,7 +1249,7 @@ pub unsafe fn xml_xpath_eval_predicate(ctxt: XmlXPathContextPtr, res: XmlXPathOb
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathCompile")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_compile(str: *const XmlChar) -> XmlXPathCompExprPtr {
+pub unsafe fn xml_xpath_compile(str: *const XmlChar) -> XmlXPathCompExprPtr {
     xml_xpath_ctxt_compile(null_mut(), str)
 }
 
@@ -1254,7 +1259,7 @@ pub unsafe extern "C" fn xml_xpath_compile(str: *const XmlChar) -> XmlXPathCompE
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathCtxtCompile")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_ctxt_compile(
+pub unsafe fn xml_xpath_ctxt_compile(
     ctxt: XmlXPathContextPtr,
     str: *const XmlChar,
 ) -> XmlXPathCompExprPtr {
@@ -1305,11 +1310,11 @@ pub unsafe extern "C" fn xml_xpath_ctxt_compile(
         comp = null_mut();
     } else {
         comp = (*pctxt).comp;
-        if (*comp).nb_step > 1 && (*comp).last >= 0 {
+        if (*comp).steps.len() > 1 && (*comp).last >= 0 {
             if !ctxt.is_null() {
                 old_depth = (*ctxt).depth;
             }
-            xml_xpath_optimize_expression(pctxt, (*comp).steps.add((*comp).last as usize));
+            xml_xpath_optimize_expression(pctxt, &raw mut (*comp).steps[(*comp).last as usize]);
             if !ctxt.is_null() {
                 (*ctxt).depth = old_depth;
             }
@@ -1354,7 +1359,7 @@ macro_rules! CHECK_CTXT_NEG {
 ///
 /// Returns the xmlXPathParserContext just allocated.
 #[doc(alias = "xmlXPathCompParserContext")]
-unsafe extern "C" fn xml_xpath_comp_parser_context(
+unsafe fn xml_xpath_comp_parser_context(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
 ) -> XmlXPathParserContextPtr {
@@ -1389,7 +1394,7 @@ unsafe extern "C" fn xml_xpath_comp_parser_context(
 /// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathCompiledEvalInternal")]
-unsafe extern "C" fn xml_xpath_compiled_eval_internal(
+unsafe fn xml_xpath_compiled_eval_internal(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
     res_obj_ptr: *mut XmlXPathObjectPtr,
@@ -1472,37 +1477,32 @@ pub unsafe fn xml_xpath_compiled_eval_to_boolean(
 #[doc(alias = "xmlXPathFreeCompExpr")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
-    let mut op: XmlXPathStepOpPtr;
+    use std::ptr::drop_in_place;
 
     if comp.is_null() {
         return;
     }
-    for i in 0..(*comp).nb_step {
-        op = (*comp).steps.add(i as usize);
-        if !(*op).value4.is_null() {
-            if matches!((*op).op, XmlXPathOp::XpathOpValue) {
-                xml_xpath_free_object((*op).value4 as _);
+    for op in &(*comp).steps {
+        if !op.value4.is_null() {
+            if matches!(op.op, XmlXPathOp::XpathOpValue) {
+                xml_xpath_free_object(op.value4 as _);
             } else {
-                xml_free((*op).value4 as _);
+                xml_free(op.value4 as _);
             }
         }
-        if !(*op).value5.is_null() {
-            xml_free((*op).value5 as _);
+        if !op.value5.is_null() {
+            xml_free(op.value5 as _);
         }
-    }
-    if !(*comp).steps.is_null() {
-        xml_free((*comp).steps as _);
     }
     #[cfg(feature = "libxml_pattern")]
-    {
-        if !(*comp).stream.is_null() {
-            xml_free_pattern_list((*comp).stream);
-        }
+    if !(*comp).stream.is_null() {
+        xml_free_pattern_list((*comp).stream);
     }
     if !(*comp).expr.is_null() {
         xml_free((*comp).expr as _);
     }
 
+    drop_in_place(comp);
     xml_free(comp as _);
 }
 

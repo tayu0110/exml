@@ -415,7 +415,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                 xml_xpath_debug_dump_step_op(
                     output,
                     comp,
-                    (*comp).steps.add((*op).ch1 as usize),
+                    &raw mut (*comp).steps[(*op).ch1 as usize],
                     depth + 1,
                 );
             }
@@ -423,7 +423,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                 xml_xpath_debug_dump_step_op(
                     output,
                     comp,
-                    (*comp).steps.add((*op).ch2 as usize),
+                    &raw mut (*comp).steps[(*op).ch2 as usize],
                     depth + 1,
                 );
             }
@@ -477,7 +477,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
         xml_xpath_debug_dump_step_op(
             output,
             comp,
-            (*comp).steps.add((*op).ch1 as usize),
+            &raw mut (*comp).steps[(*op).ch1 as usize],
             depth + 1,
         );
     }
@@ -485,7 +485,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
         xml_xpath_debug_dump_step_op(
             output,
             comp,
-            (*comp).steps.add((*op).ch2 as usize),
+            &raw mut (*comp).steps[(*op).ch2 as usize],
             depth + 1,
         );
     }
@@ -509,11 +509,15 @@ pub unsafe fn xml_xpath_debug_dump_comp_expr<'a>(
     if !(*comp).stream.is_null() {
         writeln!(output, "Streaming Expression");
     } else {
-        writeln!(output, "Compiled Expression : {} elements", (*comp).nb_step,);
+        writeln!(
+            output,
+            "Compiled Expression : {} elements",
+            (*comp).steps.len(),
+        );
         xml_xpath_debug_dump_step_op(
             output,
             comp,
-            (*comp).steps.add((*comp).last as usize),
+            &raw mut (*comp).steps[(*comp).last as usize],
             depth + 1,
         );
     }
