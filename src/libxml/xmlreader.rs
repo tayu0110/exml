@@ -253,9 +253,9 @@ pub struct XmlTextReader {
 
     // entity stack when traversing entities content
     // Current Entity Ref Node
-    ent: *mut XmlNode,
+    ent: Option<XmlNodePtr>,
     // array of entities
-    ent_tab: Vec<*mut XmlNode>,
+    ent_tab: Vec<XmlNodePtr>,
 
     // error handling
     // callback function
@@ -694,7 +694,7 @@ impl XmlTextReader {
                     children.element_type() == XmlElementType::XmlEntityDecl
                         && children.children().is_some()
                 }) {
-                    if self.entity_push(node.as_ptr()) < 0 {
+                    if self.entity_push(node) < 0 {
                         // goto get_next_node;
                         continue 'get_next_node;
                     }
@@ -715,13 +715,13 @@ impl XmlTextReader {
             if self
                 .node
                 .and_then(|node| XmlEntityPtr::try_from(node).ok())
-                .filter(|ent| {
-                    !self.ent.is_null()
-                        && (*self.ent).children() == NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode)
+                .zip(self.ent)
+                .filter(|(node, ent)| {
+                    ent.children == NodePtr::from_ptr(node.as_ptr() as *mut XmlNode)
                 })
                 .is_some()
             {
-                self.node = XmlGenericNodePtr::from_raw(self.entity_pop());
+                self.node = self.entity_pop().map(|ent| ent.into());
                 self.depth += 1;
                 // goto get_next_node;
                 continue 'get_next_node;
@@ -1203,9 +1203,9 @@ impl XmlTextReader {
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "xmlTextReaderEntPush")]
     #[cfg(feature = "libxml_reader")]
-    fn entity_push(&mut self, value: *mut XmlNode) -> i32 {
+    fn entity_push(&mut self, value: XmlNodePtr) -> i32 {
         self.ent_tab.push(value);
-        self.ent = value;
+        self.ent = Some(value);
         self.ent_tab.len() as i32 - 1
     }
 
@@ -1214,12 +1214,10 @@ impl XmlTextReader {
     /// Returns the entity just removed
     #[doc(alias = "xmlTextReaderEntPop")]
     #[cfg(feature = "libxml_reader")]
-    fn entity_pop(&mut self) -> *mut XmlNode {
-        let Some(res) = self.ent_tab.pop() else {
-            return null_mut();
-        };
-        self.ent = self.ent_tab.last().copied().unwrap_or(null_mut());
-        res
+    fn entity_pop(&mut self) -> Option<XmlNodePtr> {
+        let res = self.ent_tab.pop()?;
+        self.ent = self.ent_tab.last().copied();
+        Some(res)
     }
 
     /// Push the current node for validation
@@ -1344,7 +1342,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderValidateEntity")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
     unsafe fn validate_entity(&mut self) {
-        use crate::tree::{NodeCommon, NodePtr};
+        use crate::tree::{NodeCommon, XmlEntity, XmlEntityPtr};
 
         let oldnode: *mut XmlNode = self.node.map_or(null_mut(), |node| node.as_ptr());
         let mut node: *mut XmlNode = self.node.map_or(null_mut(), |node| node.as_ptr());
@@ -1353,12 +1351,13 @@ impl XmlTextReader {
             'inner: {
                 'skip_children: {
                     if (*node).element_type() == XmlElementType::XmlEntityRefNode {
-                        if let Some(children) = (*node).children().filter(|children| {
+                        let entity_ref = XmlNodePtr::from_raw(node).unwrap().unwrap();
+                        if let Some(children) = entity_ref.children.filter(|children| {
                             children.element_type() == XmlElementType::XmlEntityDecl
                                 && children.children().is_some()
                         }) {
-                            if self.entity_push(node) < 0 {
-                                if node == oldnode {
+                            if self.entity_push(entity_ref) < 0 {
+                                if entity_ref.as_ptr() == oldnode {
                                     // break;
                                     break 'main;
                                 }
@@ -1423,11 +1422,18 @@ impl XmlTextReader {
                         self.node = XmlGenericNodePtr::from_raw(node);
                         self.validate_pop();
                     }
-                    if (*node).element_type() == XmlElementType::XmlEntityDecl
-                        && !self.ent.is_null()
-                        && (*self.ent).children() == NodePtr::from_ptr(node)
+                    if XmlEntityPtr::from_raw(node as *mut XmlEntity)
+                        .ok()
+                        .flatten()
+                        .zip(self.ent.and_then(|ent| ent.children).and_then(|ent| {
+                            XmlEntityPtr::from_raw(ent.as_ptr() as *mut XmlEntity)
+                                .ok()
+                                .flatten()
+                        }))
+                        .filter(|&(node, ent)| ent == node)
+                        .is_some()
                     {
-                        node = self.entity_pop();
+                        node = self.entity_pop().map_or(null_mut(), |node| node.as_ptr());
                     }
                     if node == oldnode {
                         break;
@@ -2762,7 +2768,7 @@ impl Default for XmlTextReader {
             preserve: 0,
             buffer: "".to_owned(),
             dict: null_mut(),
-            ent: null_mut(),
+            ent: None,
             ent_tab: vec![],
             error_func: None,
             error_func_arg: None,
