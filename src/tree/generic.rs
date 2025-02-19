@@ -824,6 +824,116 @@ impl XmlGenericNodePtr {
         None
     }
 
+    /// Searches the language of a node, i.e. the values of the xml:lang
+    /// attribute or the one carried by the nearest ancestor.
+    ///
+    /// Returns a pointer to the lang value, or null_mut() if not found.  
+    /// It's up to the caller to free the memory with xml_free().
+    #[doc(alias = "xmlNodeGetLang")]
+    pub unsafe fn get_lang(self) -> Option<String> {
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
+        let mut cur = Some(self);
+        while let Some(now) = cur {
+            if let Some(now) = XmlNodePtr::try_from(now)
+                .ok()
+                .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+            {
+                let lang = now.get_ns_prop("lang", XML_XML_NAMESPACE.to_str().ok());
+                if lang.is_some() {
+                    return lang;
+                }
+            }
+            cur = now
+                .parent()
+                .and_then(|now| XmlGenericNodePtr::from_raw(now.as_ptr()));
+        }
+        None
+    }
+
+    /// Get line number of `self`.
+    /// Try to override the limitation of lines being store in 16 bits ints
+    ///
+    /// Returns the line number if successful, -1 otherwise
+    #[doc(alias = "xmlGetLineNoInternal")]
+    unsafe fn get_line_no_internal(self, depth: i32) -> i64 {
+        let mut result = -1;
+
+        if depth >= 5 {
+            return -1;
+        }
+
+        if let Some(node) = XmlNodePtr::try_from(self).ok().filter(|node| {
+            matches!(
+                node.element_type(),
+                XmlElementType::XmlElementNode
+                    | XmlElementType::XmlTextNode
+                    | XmlElementType::XmlCommentNode
+                    | XmlElementType::XmlPINode
+            )
+        }) {
+            if node.line == 65535 {
+                if matches!(node.element_type(), XmlElementType::XmlTextNode)
+                    && !node.psvi.is_null()
+                {
+                    result = node.psvi as isize as i64;
+                } else if let Some(children) = node
+                    .children()
+                    .filter(|_| matches!(node.element_type(), XmlElementType::XmlElementNode))
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                {
+                    result = children.get_line_no_internal(depth + 1);
+                } else if let Some(next) = node
+                    .next()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                {
+                    result = next.get_line_no_internal(depth + 1);
+                } else if let Some(prev) = node
+                    .prev()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                {
+                    result = prev.get_line_no_internal(depth + 1);
+                }
+            }
+            if result == -1 || result == 65535 {
+                result = node.line as i64;
+            }
+        } else if let Some(prev) = self
+            .prev()
+            .filter(|p| {
+                matches!(
+                    p.element_type(),
+                    XmlElementType::XmlElementNode
+                        | XmlElementType::XmlTextNode
+                        | XmlElementType::XmlCommentNode
+                        | XmlElementType::XmlPINode
+                )
+            })
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+        {
+            result = prev.get_line_no_internal(depth + 1);
+        } else if let Some(parent) = self
+            .parent()
+            .filter(|p| matches!(p.element_type(), XmlElementType::XmlElementNode))
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+        {
+            result = parent.get_line_no_internal(depth + 1);
+        }
+
+        result
+    }
+
+    /// Get line number of `self`.
+    /// Try to override the limitation of lines being store in 16 bits ints
+    /// if XML_PARSE_BIG_LINES parser option was used
+    ///
+    /// Returns the line number if successful, -1 otherwise
+    #[doc(alias = "xmlGetLineNo")]
+    pub unsafe fn get_line_no(&self) -> i64 {
+        self.get_line_no_internal(0)
+    }
+
     /// update all nodes under the tree to point to the right document
     #[doc(alias = "xmlSetTreeDoc")]
     pub unsafe fn set_doc(mut self, doc: Option<XmlDocPtr>) {
