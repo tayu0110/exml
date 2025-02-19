@@ -230,7 +230,7 @@ pub struct XmlParserCtxt {
     // number of freed element nodes
     pub(crate) free_elems_nr: i32,
     // List of freed element nodes
-    pub(crate) free_elems: *mut XmlNode,
+    pub(crate) free_elems: Option<XmlNodePtr>,
     // number of freed attributes nodes
     pub(crate) free_attrs_nr: i32,
     // List of freed attributes nodes
@@ -1636,16 +1636,13 @@ impl Default for XmlParserCtxt {
             options: 0,
             dict_names: 0,
             free_elems_nr: 0,
-            free_elems: null_mut(),
+            free_elems: None,
             free_attrs_nr: 0,
             free_attrs: None,
             last_error: XmlError::default(),
             parse_mode: XmlParserMode::default(),
             nbentities: 0,
             sizeentities: 0,
-            // node_info: null_mut(),
-            // node_info_nr: 0,
-            // node_info_max: 0,
             node_info_tab: vec![],
             input_id: 0,
             sizeentcopy: 0,
@@ -1890,13 +1887,13 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         table.clear_with(|data, _| xml_free(data as _));
     }
     let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
-    if !(*ctxt).free_elems.is_null() {
-        let mut cur = (*ctxt).free_elems;
-        while !cur.is_null() {
-            let next = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-            xml_free(cur as _);
-            cur = next;
-        }
+    let mut cur = (*ctxt).free_elems;
+    while let Some(now) = cur {
+        let next = now
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        now.free();
+        cur = next;
     }
     if let Some(attrs) = (*ctxt).free_attrs.take() {
         let mut cur = Some(attrs);

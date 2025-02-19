@@ -2127,9 +2127,10 @@ pub unsafe fn xml_sax2_start_element_ns(
         }
     }
     // allocate the node
-    let mut ret = if !(*ctxt).free_elems.is_null() {
-        let mut ret = XmlNodePtr::from_raw((*ctxt).free_elems).unwrap().unwrap();
-        (*ctxt).free_elems = ret.next().map_or(null_mut(), |n| n.as_ptr());
+    let mut ret = if let Some(mut ret) = (*ctxt).free_elems {
+        (*ctxt).free_elems = ret
+            .next()
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         (*ctxt).free_elems_nr -= 1;
         std::ptr::write(&mut *ret, XmlNode::default());
         ret.doc = Some(my_doc);
@@ -2331,15 +2332,14 @@ pub unsafe fn xml_sax2_start_element_ns(
 #[doc(alias = "xmlSAX2TextNode")]
 unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodePtr> {
     // Allocate
-    let ret = if !(*ctxt).free_elems.is_null() {
-        let ret = (*ctxt).free_elems;
-        (*ctxt).free_elems = (*ret).next.map_or(null_mut(), |n| n.as_ptr());
+    let ret = if let Some(mut ret) = (*ctxt).free_elems {
+        (*ctxt).free_elems = ret
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         (*ctxt).free_elems_nr -= 1;
-        if !ret.is_null() {
-            std::ptr::write(&mut *ret, XmlNode::default());
-            (*ret).typ = XmlElementType::XmlTextNode;
-        }
-        XmlNodePtr::from_raw(ret).unwrap()
+        std::ptr::write(&mut *ret, XmlNode::default());
+        ret.typ = XmlElementType::XmlTextNode;
+        Some(ret)
     } else {
         XmlNodePtr::new(XmlNode::default())
     };

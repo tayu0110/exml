@@ -3591,8 +3591,12 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: *mut
                 && !(*reader).ctxt.is_null()
                 && (*(*reader).ctxt).free_elems_nr < MAX_FREE_NODES
             {
-                (*cur).next = NodePtr::from_ptr((*(*reader).ctxt).free_elems);
-                (*(*reader).ctxt).free_elems = cur;
+                (*cur).next = NodePtr::from_ptr(
+                    (*(*reader).ctxt)
+                        .free_elems
+                        .map_or(null_mut(), |node| node.as_ptr()),
+                );
+                (*(*reader).ctxt).free_elems = XmlNodePtr::from_raw(cur).unwrap();
                 (*(*reader).ctxt).free_elems_nr += 1;
             } else {
                 XmlNodePtr::from_raw(cur).unwrap().unwrap().free();
@@ -3735,8 +3739,12 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: *mut XmlNode)
         && !(*reader).ctxt.is_null()
         && (*(*reader).ctxt).free_elems_nr < MAX_FREE_NODES
     {
-        (*cur).next = NodePtr::from_ptr((*(*reader).ctxt).free_elems);
-        (*(*reader).ctxt).free_elems = cur;
+        (*cur).next = NodePtr::from_ptr(
+            (*(*reader).ctxt)
+                .free_elems
+                .map_or(null_mut(), |node| node.as_ptr()),
+        );
+        (*(*reader).ctxt).free_elems = XmlNodePtr::from_raw(cur).unwrap();
         (*(*reader).ctxt).free_elems_nr += 1;
     } else {
         XmlNodePtr::from_raw(cur).unwrap().unwrap().free();
