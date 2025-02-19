@@ -341,11 +341,11 @@ impl XmlNodeSet {
 
         // @@ with_ns to check whether namespace nodes should be looked at @@
         // prevent duplicates
-        for &node in &self.node_tab {
-            if node.is_null()
-                && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-                && (*node).next == NodePtr::from_ptr(node)
-                && (*ns).prefix() == (*(node as *mut XmlNs)).prefix()
+        for &cur_node in &self.node_tab {
+            if !cur_node.is_null()
+                && matches!((*cur_node).element_type(), XmlElementType::XmlNamespaceDecl)
+                && (*cur_node).next == NodePtr::from_ptr(node)
+                && (*ns).prefix() == (*(cur_node as *mut XmlNs)).prefix()
             {
                 return 0;
             }
