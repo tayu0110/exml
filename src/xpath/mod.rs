@@ -869,7 +869,7 @@ pub unsafe fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> 
         ns.sort();
     }
 
-    xml_xpath_cast_node_to_string(ns.node_tab[0]).into()
+    xml_xpath_cast_node_to_string(ns.node_tab[0].as_ptr()).into()
 }
 
 /// Create a new xmlXPathContext

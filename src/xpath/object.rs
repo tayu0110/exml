@@ -104,7 +104,7 @@ const XPATH_LOCATIONSET: usize = 7;
 
 pub type XmlXPathObjectPtr = *mut XmlXPathObject;
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct XmlXPathObject {
     pub typ: XmlXPathObjectType,
     pub nodesetval: Option<Box<XmlNodeSet>>,

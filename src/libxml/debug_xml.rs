@@ -1972,7 +1972,7 @@ unsafe fn xml_shell_print_xpath_result_ctxt(ctxt: XmlShellCtxtPtr, list: XmlXPat
                 #[cfg(feature = "libxml_output")]
                 if let Some(nodeset) = (*list).nodesetval.as_deref() {
                     for &node in &nodeset.node_tab {
-                        xml_shell_print_node_ctxt(ctxt, XmlGenericNodePtr::from_raw(node).unwrap());
+                        xml_shell_print_node_ctxt(ctxt, node);
                     }
                 } else {
                     generic_error!("Empty node set\n");
@@ -3224,12 +3224,7 @@ pub unsafe fn xml_shell<'a>(
                         XmlXPathObjectType::XPathNodeset => {
                             if let Some(nodeset) = (*list).nodesetval.as_deref() {
                                 for &node in &nodeset.node_tab {
-                                    xml_shell_du(
-                                        ctxt,
-                                        null_mut(),
-                                        XmlGenericNodePtr::from_raw(node).unwrap(),
-                                        None,
-                                    );
+                                    xml_shell_du(ctxt, null_mut(), node, None);
                                 }
                             }
                         }
@@ -3407,19 +3402,9 @@ pub unsafe fn xml_shell<'a>(
 
                             for &node in &nodeset.node_tab {
                                 if dir != 0 {
-                                    xml_shell_dir(
-                                        ctxt,
-                                        null_mut(),
-                                        XmlGenericNodePtr::from_raw(node),
-                                        None,
-                                    );
+                                    xml_shell_dir(ctxt, null_mut(), Some(node), None);
                                 } else {
-                                    xml_shell_list(
-                                        ctxt,
-                                        null_mut(),
-                                        XmlGenericNodePtr::from_raw(node),
-                                        None,
-                                    );
+                                    xml_shell_list(ctxt, null_mut(), Some(node), None);
                                 }
                             }
                         }
@@ -3522,7 +3507,9 @@ pub unsafe fn xml_shell<'a>(
                         XmlXPathObjectType::XPathNodeset => {
                             if let Some(nodeset) = (*list).nodesetval.as_deref() {
                                 for &node in &nodeset.node_tab {
-                                    if xml_shell_pwd(ctxt, dir.as_mut_ptr(), node, None) == 0 {
+                                    if xml_shell_pwd(ctxt, dir.as_mut_ptr(), node.as_ptr(), None)
+                                        == 0
+                                    {
                                         let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
                                         writeln!((*ctxt).output, "{dir}");
                                     }
@@ -3621,7 +3608,7 @@ pub unsafe fn xml_shell<'a>(
                         XmlXPathObjectType::XPathNodeset => {
                             if let Some(nodeset) = (*list).nodesetval.as_deref() {
                                 if nodeset.node_tab.len() == 1 {
-                                    (*ctxt).node = XmlGenericNodePtr::from_raw(nodeset.node_tab[0]);
+                                    (*ctxt).node = Some(nodeset.node_tab[0]);
                                     if (*ctxt)
                                         .node
                                         .take_if(|node| {
@@ -3748,12 +3735,7 @@ pub unsafe fn xml_shell<'a>(
                                     if i > 0 {
                                         writeln!((*ctxt).output, " -------");
                                     }
-                                    xml_shell_cat(
-                                        ctxt,
-                                        null_mut(),
-                                        XmlGenericNodePtr::from_raw(node),
-                                        None,
-                                    );
+                                    xml_shell_cat(ctxt, null_mut(), Some(node), None);
                                 }
                             }
                         }

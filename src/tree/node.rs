@@ -394,7 +394,10 @@ impl XmlNode {
                 Some(buf)
             }
             XmlElementType::XmlAttributeNode => {
-                (*(self as *const XmlNode as *const XmlAttr)).get_prop_node_value_internal()
+                let attr = XmlAttrPtr::from_raw(self as *const XmlNode as *mut XmlAttr)
+                    .unwrap()
+                    .unwrap();
+                attr.get_content()
             }
             XmlElementType::XmlCommentNode | XmlElementType::XmlPINode => {
                 if !self.content.is_null() {
@@ -421,17 +424,16 @@ impl XmlNode {
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd => None,
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                let mut buf = String::new();
-                self.get_content_to(&mut buf);
-                Some(buf)
+                let doc = XmlDocPtr::from_raw(self as *const XmlNode as *mut XmlDoc)
+                    .unwrap()
+                    .unwrap();
+                doc.get_content()
             }
             XmlElementType::XmlNamespaceDecl => {
-                let ns = self.as_namespace_decl_node().unwrap();
-                (!ns.as_ref().href.is_null()).then(|| {
-                    CStr::from_ptr(ns.as_ref().href as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                })
+                let ns = XmlNsPtr::from_raw(self as *const XmlNode as *mut XmlNs)
+                    .unwrap()
+                    .unwrap();
+                ns.get_content()
             }
             XmlElementType::XmlElementDecl => {
                 /* TODO !!! */

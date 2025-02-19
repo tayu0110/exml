@@ -2395,7 +2395,7 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                         };
                         let buf = Rc::new(RefCell::new(buf));
                         for &node in &nodeset.node_tab {
-                            (*node).dump_output(buf.clone(), None, 0, 0, None);
+                            node.dump_output(buf.clone(), None, 0, 0, None);
                             buf.borrow_mut().write_bytes(b"\n").ok();
                         }
                         buf.borrow_mut().flush();

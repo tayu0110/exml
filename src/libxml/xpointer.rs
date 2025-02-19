@@ -51,7 +51,7 @@ use crate::{
         parser::xml_init_parser,
         xmlstring::{xml_str_equal, xml_strlen, XmlChar},
     },
-    tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlNode},
+    tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode},
     xpath::{
         internals::{
             value_pop, value_push, xml_xpath_eval_expr, xml_xpath_free_parser_context,
@@ -454,7 +454,7 @@ pub(crate) unsafe fn xml_xptr_new_location_set_node_set(
         }
 
         for &node in &set.node_tab {
-            xml_xptr_location_set_add(newset, xml_xptr_new_collapsed_range(node));
+            xml_xptr_location_set_add(newset, xml_xptr_new_collapsed_range(node.as_ptr()));
         }
 
         (*ret).user = newset as _;
@@ -494,7 +494,7 @@ pub(crate) unsafe fn xml_xptr_new_range_node_object(
             let Some(nodeset) = (*end).nodesetval.as_deref().filter(|s| !s.is_empty()) else {
                 return null_mut();
             };
-            end_node = *nodeset.node_tab.last().unwrap();
+            end_node = nodeset.node_tab.last().unwrap().as_ptr();
             end_index = -1;
         }
         _ => {
@@ -2048,13 +2048,13 @@ unsafe fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: i32) {
         value_push(ctxt, xml_xpath_new_node_set(null_mut()));
         return;
     }
-    let cur: *mut XmlNode = xml_xptr_get_nth_child(oldset.node_tab[0], indx as usize);
+    let cur: *mut XmlNode = xml_xptr_get_nth_child(oldset.node_tab[0].as_ptr(), indx as usize);
     if cur.is_null() {
         xml_xpath_free_object(obj);
         value_push(ctxt, xml_xpath_new_node_set(null_mut()));
         return;
     }
-    oldset.node_tab[0] = cur;
+    oldset.node_tab[0] = XmlGenericNodePtr::from_raw(cur).unwrap();
     value_push(ctxt, obj);
 }
 
@@ -2686,9 +2686,6 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut Xm
                 return null_mut();
             };
             for &node in &set.node_tab {
-                if node.is_null() {
-                    continue;
-                }
                 match (*node).element_type() {
                     XmlElementType::XmlTextNode
                     | XmlElementType::XmlCDATASectionNode
@@ -2713,13 +2710,10 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut Xm
                     _ => unreachable!(),
                 }
                 if last.is_null() {
-                    list = xml_copy_node(XmlGenericNodePtr::from_raw(node).unwrap(), 1);
+                    list = xml_copy_node(node, 1);
                     last = list;
                 } else {
-                    (*last).add_next_sibling(xml_copy_node(
-                        XmlGenericNodePtr::from_raw(node).unwrap(),
-                        1,
-                    ));
+                    (*last).add_next_sibling(xml_copy_node(node, 1));
                     if let Some(next) = (*last).next() {
                         last = next.as_ptr();
                     }

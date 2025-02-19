@@ -7,7 +7,7 @@ use crate::{
         debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node},
         xmlstring::XmlChar,
     },
-    tree::{NodeCommon, XmlAttrPtr, XmlElementType, XmlGenericNodePtr},
+    tree::{XmlAttrPtr, XmlElementType, XmlGenericNodePtr},
     xpath::{
         xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathAxisVal, XmlXPathObjectType, XmlXPathOp,
         XmlXPathTestVal, XmlXPathTypeVal,
@@ -78,7 +78,7 @@ unsafe fn xml_xpath_debug_dump_node_set<'a>(
     for (i, &node) in cur.node_tab.iter().enumerate() {
         write!(output, "{}", shift);
         write!(output, "{}", i + 1);
-        xml_xpath_debug_dump_node(output, XmlGenericNodePtr::from_raw(node), depth + 1);
+        xml_xpath_debug_dump_node(output, Some(node), depth + 1);
     }
 }
 

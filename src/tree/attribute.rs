@@ -124,6 +124,19 @@ impl XmlAttr {
         None
     }
 
+    /// Read the value of a node, this can be either the text carried
+    /// directly by this node if it's a TEXT node or the aggregate string
+    /// of the values carried by this node child's (TEXT and ENTITY_REF).  
+    ///
+    /// Entity references are substituted.
+    ///
+    /// Returns a new #XmlChar * or null_mut() if no content is available.  
+    /// It's up to the caller to free the memory with xml_free().
+    #[doc(alias = "xmlNodeGetContent")]
+    pub unsafe fn get_content(&self) -> Option<String> {
+        self.get_prop_node_value_internal()
+    }
+
     /// Read the value of a node `cur`, this can be either the text carried
     /// directly by this node if it's a TEXT node or the aggregate string
     /// of the values carried by this node child's (TEXT and ENTITY_REF).

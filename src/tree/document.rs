@@ -139,6 +139,25 @@ impl XmlDoc {
         self.compression
     }
 
+    /// Read the value of a node, this can be either the text carried
+    /// directly by this node if it's a TEXT node or the aggregate string
+    /// of the values carried by this node child's (TEXT and ENTITY_REF).  
+    ///
+    /// Entity references are substituted.
+    ///
+    /// Returns a new #XmlChar * or null_mut() if no content is available.  
+    /// It's up to the caller to free the memory with xml_free().
+    #[doc(alias = "xmlNodeGetContent")]
+    pub unsafe fn get_content(&self) -> Option<String> {
+        assert!(matches!(
+            self.element_type(),
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
+        ));
+        let mut buf = String::new();
+        self.get_content_to(&mut buf);
+        Some(buf)
+    }
+
     /// Read the value of a node `cur`, this can be either the text carried
     /// directly by this node if it's a TEXT node or the aggregate string
     /// of the values carried by this node child's (TEXT and ENTITY_REF).

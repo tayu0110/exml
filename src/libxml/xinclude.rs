@@ -55,7 +55,7 @@ use crate::{
     tree::{
         xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
-        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDoc, XmlDocPtr,
+        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDocPtr,
         XmlElementType, XmlEntityPtr, XmlEntityType, XmlGenericNodePtr, XmlNode, XmlNodePtr,
         XML_XML_NAMESPACE,
     },
@@ -1235,19 +1235,13 @@ unsafe fn xml_xinclude_copy_xpointer(
                 return null_mut();
             };
             for &now in &set.node_tab {
-                if now.is_null() {
-                    continue;
-                }
                 let node = match (*now).element_type() {
                     XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                        let Some(node) = XmlDocPtr::from_raw(now as *mut XmlDoc)
-                            .unwrap()
-                            .unwrap()
-                            .get_root_element()
+                        let Some(node) = XmlDocPtr::try_from(now).unwrap().get_root_element()
                         else {
                             xml_xinclude_err!(
                                 ctxt,
-                                now,
+                                now.as_ptr(),
                                 XmlParserErrors::XmlErrInternalError,
                                 "document without root\n"
                             );
@@ -1259,11 +1253,11 @@ unsafe fn xml_xinclude_copy_xpointer(
                     | XmlElementType::XmlCDATASectionNode
                     | XmlElementType::XmlElementNode
                     | XmlElementType::XmlPINode
-                    | XmlElementType::XmlCommentNode => XmlNodePtr::from_raw(now).unwrap().unwrap(),
+                    | XmlElementType::XmlCommentNode => XmlNodePtr::try_from(now).unwrap(),
                     _ => {
                         xml_xinclude_err!(
                             ctxt,
-                            now,
+                            now.as_ptr(),
                             XmlParserErrors::XmlXIncludeXPtrResult,
                             "invalid node type in XPtr result\n"
                         );
@@ -1565,11 +1559,10 @@ unsafe fn xml_xinclude_load_doc(
                     XmlXPathObjectType::XPathRange | XmlXPathObjectType::XPathLocationset => {} // _ => {}
                 }
                 if let Some(set) = (*xptr).nodesetval.as_deref_mut() {
-                    for node in set.node_tab.iter_mut() {
-                        if node.is_null() {
-                            continue;
-                        }
-                        match (**node).element_type() {
+                    let mut i = 0;
+                    while i < set.node_tab.len() {
+                        let node = set.node_tab[i];
+                        match node.element_type() {
                             XmlElementType::XmlElementNode
                             | XmlElementType::XmlTextNode
                             | XmlElementType::XmlCDATASectionNode
@@ -1578,7 +1571,9 @@ unsafe fn xml_xinclude_load_doc(
                             | XmlElementType::XmlPINode
                             | XmlElementType::XmlCommentNode
                             | XmlElementType::XmlDocumentNode
-                            | XmlElementType::XmlHTMLDocumentNode => continue,
+                            | XmlElementType::XmlHTMLDocumentNode => {
+                                // continue to next loop
+                            }
 
                             XmlElementType::XmlAttributeNode => {
                                 let fragment =
@@ -1590,7 +1585,7 @@ unsafe fn xml_xinclude_load_doc(
                                     "XPointer selects an attribute: #{}\n",
                                     fragment
                                 );
-                                *node = null_mut();
+                                set.node_tab.swap_remove(i);
                                 continue;
                             }
                             XmlElementType::XmlNamespaceDecl => {
@@ -1603,7 +1598,7 @@ unsafe fn xml_xinclude_load_doc(
                                     "XPointer selects a namespace: #{}\n",
                                     fragment
                                 );
-                                *node = null_mut();
+                                set.node_tab.swap_remove(i);
                                 continue;
                             }
                             XmlElementType::XmlDocumentTypeNode
@@ -1624,12 +1619,12 @@ unsafe fn xml_xinclude_load_doc(
                                     "XPointer selects unexpected nodes: #{}\n",
                                     fragment
                                 );
-                                *node = null_mut();
-                                *node = null_mut();
+                                set.node_tab.swap_remove(i);
                                 continue; /* for */
                             }
                             _ => unreachable!(),
                         }
+                        i += 1;
                     }
                 }
                 (*refe).inc = xml_xinclude_copy_xpointer(ctxt, xptr);

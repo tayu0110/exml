@@ -246,8 +246,6 @@ unsafe fn initialize_libxml2() {
 }
 
 unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
-    let mut ret: *mut XmlNode = null_mut();
-
     if cur.is_null() || xpath.is_null() {
         return null_mut();
     }
@@ -269,15 +267,16 @@ unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
     if res.is_null() {
         return null_mut();
     }
+    let mut ret = None;
     if (*res).typ == XmlXPathObjectType::XPathNodeset {
         if let Some(nodeset) = (*res).nodesetval.as_deref() {
             if !nodeset.node_tab.is_empty() {
-                ret = nodeset.node_tab[0];
+                ret = Some(nodeset.node_tab[0]);
             }
         }
     }
     xml_xpath_free_object(res);
-    ret
+    ret.map_or(null_mut(), |node| node.as_ptr())
 }
 
 unsafe fn get_string(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlChar {

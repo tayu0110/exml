@@ -1463,7 +1463,7 @@ unsafe fn xml_schematron_get_node(
     if (*ret).typ == XmlXPathObjectType::XPathNodeset {
         if let Some(nodeset) = (*ret).nodesetval.as_deref() {
             if !nodeset.node_tab.is_empty() {
-                node = nodeset.node_tab[0];
+                node = nodeset.node_tab[0].as_ptr();
             }
         }
     }
@@ -1533,7 +1533,10 @@ unsafe fn xml_schematron_format_report(
                             if indx > 0 {
                                 ret = xml_strcat(ret, spacer);
                             }
-                            ret = xml_strcat(ret, (*node).name);
+                            ret = xml_strcat(
+                                ret,
+                                node.name().map_or(null_mut(), |name| name.as_ptr()),
+                            );
                         }
                     } else {
                         generic_error!("Empty node set\n");

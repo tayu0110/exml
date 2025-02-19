@@ -707,7 +707,7 @@ impl XmlGenericNodePtr {
     }
 
     // Temporary workaround
-    pub(crate) fn as_ptr(self) -> *mut XmlNode {
+    pub fn as_ptr(self) -> *mut XmlNode {
         self.0.as_ptr() as *mut XmlNode
     }
 
@@ -822,6 +822,29 @@ impl XmlGenericNodePtr {
                 .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
         }
         None
+    }
+
+    /// Read the value of a node, this can be either the text carried
+    /// directly by this node if it's a TEXT node or the aggregate string
+    /// of the values carried by this node child's (TEXT and ENTITY_REF).  
+    ///
+    /// Entity references are substituted.
+    ///
+    /// Returns a new #XmlChar * or null_mut() if no content is available.  
+    /// It's up to the caller to free the memory with xml_free().
+    #[doc(alias = "xmlNodeGetContent")]
+    pub unsafe fn get_content(self) -> Option<String> {
+        if let Ok(ns) = XmlNsPtr::try_from(self) {
+            ns.get_content()
+        } else if let Ok(attr) = XmlAttrPtr::try_from(self) {
+            attr.get_content()
+        } else if let Ok(doc) = XmlDocPtr::try_from(self) {
+            doc.get_content()
+        } else if let Ok(node) = XmlNodePtr::try_from(self) {
+            node.get_content()
+        } else {
+            None
+        }
     }
 
     /// Read the value of a node `cur`, this can be either the text carried
