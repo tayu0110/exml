@@ -89,7 +89,7 @@ unsafe fn xml_xpath_debug_dump_value_tree<'a>(
 ) {
     let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
-    let Some(cur) = cur.filter(|c| !c.is_empty() && !c.get(0).is_null()) else {
+    let Some(cur) = cur.filter(|c| !c.is_empty() && c.get(0).is_some()) else {
         write!(output, "{}", shift);
         writeln!(output, "Value Tree is NULL !");
         return;

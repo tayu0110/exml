@@ -307,7 +307,7 @@ pub(crate) unsafe fn gen_xml_xpath_object_ptr(no: i32, _nr: i32) -> XmlXPathObje
         return xml_xpath_new_boolean(true);
     }
     if no == 3 {
-        return xml_xpath_new_node_set(null_mut());
+        return xml_xpath_new_node_set(None);
     }
     null_mut()
 }

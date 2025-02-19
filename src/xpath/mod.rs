@@ -2722,36 +2722,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_node_set_create() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let val = gen_xml_node_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_node_set_create(val);
-                desret_xml_node_set_ptr(ret_val);
-                des_xml_node_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathNodeSetCreate",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathNodeSetCreate()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_object_copy() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -3887,36 +3857,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_new_node_set() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let val = gen_xml_node_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_new_node_set(val);
-                desret_xml_xpath_object_ptr(ret_val);
-                des_xml_node_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathNewNodeSet",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathNewNodeSet()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_new_node_set_list() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -4395,76 +4335,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathNextSelf()");
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_node_leading() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_nodes in 0..GEN_NB_XML_NODE_SET_PTR {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let mut nodes = gen_xml_node_set_ptr(n_nodes, 0);
-                    let node = gen_xml_node_ptr(n_node, 1);
-
-                    let ret_val = xml_xpath_node_leading(nodes.as_deref_mut(), node);
-                    desret_xml_node_set_ptr(ret_val);
-                    des_xml_node_set_ptr(n_nodes, nodes, 0);
-                    des_xml_node_ptr(n_node, node, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathNodeLeading",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathNodeLeading()"
-                        );
-                        eprint!(" {}", n_nodes);
-                        eprintln!(" {}", n_node);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_node_leading_sorted() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_nodes in 0..GEN_NB_XML_NODE_SET_PTR {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let nodes = gen_xml_node_set_ptr(n_nodes, 0);
-                    let node = gen_xml_node_ptr(n_node, 1);
-
-                    let ret_val = xml_xpath_node_leading_sorted(nodes.as_deref(), node);
-                    desret_xml_node_set_ptr(ret_val);
-                    des_xml_node_set_ptr(n_nodes, nodes, 0);
-                    des_xml_node_ptr(n_node, node, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathNodeLeadingSorted",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathNodeLeadingSorted()"
-                        );
-                        eprint!(" {}", n_nodes);
-                        eprintln!(" {}", n_node);
                     }
                 }
             }

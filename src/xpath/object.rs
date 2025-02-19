@@ -12,7 +12,7 @@ use crate::libxml::xpointer::{
 use crate::{
     generic_error,
     libxml::globals::{xml_free, xml_malloc},
-    tree::XmlNode,
+    tree::XmlGenericNodePtr,
 };
 
 use super::{
@@ -240,7 +240,7 @@ pub unsafe fn xml_xpath_new_boolean(val: bool) -> XmlXPathObjectPtr {
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNewNodeSet")]
-pub unsafe fn xml_xpath_new_node_set(val: *mut XmlNode) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_new_node_set(val: Option<XmlGenericNodePtr>) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
         xml_xpath_err_memory(null_mut(), Some("creating nodeset\n"));
@@ -279,7 +279,7 @@ pub unsafe fn xml_xpath_wrap_node_set(val: Option<Box<XmlNodeSet>>) -> XmlXPathO
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNewValueTree")]
-pub unsafe fn xml_xpath_new_value_tree(val: *mut XmlNode) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_new_value_tree(val: Option<XmlGenericNodePtr>) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
         xml_xpath_err_memory(null_mut(), Some("creating result value tree\n"));
@@ -288,7 +288,7 @@ pub unsafe fn xml_xpath_new_value_tree(val: *mut XmlNode) -> XmlXPathObjectPtr {
     std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathXSLTTree;
     (*ret).boolval = true;
-    (*ret).user = val as *mut c_void;
+    (*ret).user = val.map_or(null_mut(), |node| node.as_ptr()) as *mut c_void;
     (*ret).nodesetval = xml_xpath_node_set_create(val);
     ret
 }

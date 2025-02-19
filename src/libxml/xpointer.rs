@@ -2040,18 +2040,18 @@ unsafe fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: i32) {
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
     let Some(oldset) = (*obj).nodesetval.as_deref_mut().filter(|_| indx > 0) else {
         xml_xpath_free_object(obj);
-        value_push(ctxt, xml_xpath_new_node_set(null_mut()));
+        value_push(ctxt, xml_xpath_new_node_set(None));
         return;
     };
     if oldset.node_tab.len() != 1 {
         xml_xpath_free_object(obj);
-        value_push(ctxt, xml_xpath_new_node_set(null_mut()));
+        value_push(ctxt, xml_xpath_new_node_set(None));
         return;
     }
     let cur: *mut XmlNode = xml_xptr_get_nth_child(oldset.node_tab[0].as_ptr(), indx as usize);
     if cur.is_null() {
         xml_xpath_free_object(obj);
-        value_push(ctxt, xml_xpath_new_node_set(null_mut()));
+        value_push(ctxt, xml_xpath_new_node_set(None));
         return;
     }
     oldset.node_tab[0] = XmlGenericNodePtr::from_raw(cur).unwrap();
@@ -2451,9 +2451,7 @@ pub unsafe fn xml_xptr_eval(str: *const XmlChar, ctx: XmlXPathContextPtr) -> Xml
                     // Evaluation may push a root nodeset which is unused
                     let set = (*tmp).nodesetval.as_deref();
                     if set.map_or(true, |s| {
-                        s.len() != 1
-                            || s.get(0)
-                                != (*ctx).doc.map_or(null_mut(), |doc| doc.as_ptr()) as *mut XmlNode
+                        s.len() != 1 || s.get(0) != (*ctx).doc.map(|doc| doc.into())
                     }) {
                         stack += 1;
                     }
@@ -2806,7 +2804,7 @@ pub(crate) unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPt
 
             // Run the evaluation with a node list made of a single item in the nodeset.
             (*(*ctxt).context).node = (*loc).user as _;
-            tmp = xml_xpath_new_node_set((*(*ctxt).context).node);
+            tmp = xml_xpath_new_node_set(XmlGenericNodePtr::from_raw((*(*ctxt).context).node));
             value_push(ctxt, tmp);
             (*(*ctxt).context).context_size = (*oldset).loc_tab.len() as i32;
             (*(*ctxt).context).proximity_position = i as i32 + 1;
