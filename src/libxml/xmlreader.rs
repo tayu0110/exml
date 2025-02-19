@@ -76,7 +76,7 @@ use crate::{
     parser::XmlParserCtxtPtr,
     tree::{
         xml_copy_dtd, xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
-        xml_free_ns_list, xml_new_doc_text, XmlDoc, XmlElementType, XmlNode,
+        xml_free_ns_list, xml_new_doc_text, XmlDoc, XmlElementType, XmlNode, XmlNodePtr,
         __XML_REGISTER_CALLBACKS,
     },
 };
@@ -243,7 +243,7 @@ pub struct XmlTextReader {
     // depth of the current node
     depth: i32,
     // fake xmlNs chld
-    faketext: *mut XmlNode,
+    faketext: Option<XmlNodePtr>,
     // preserve the resulting document
     preserve: i32,
     // used to return const xmlChar *
@@ -973,16 +973,15 @@ impl XmlTextReader {
                 .unwrap()
                 .unwrap();
 
-            if self.faketext.is_null() {
-                self.faketext = xml_new_doc_text((*self.node).doc, ns.href)
-                    .map_or(null_mut(), |node| node.as_ptr());
-            } else {
-                if !(*self.faketext).content.is_null() {
-                    xml_free((*self.faketext).content as _);
+            if let Some(mut faketext) = self.faketext {
+                if !faketext.content.is_null() {
+                    xml_free(faketext.content as _);
                 }
-                (*self.faketext).content = xml_strdup(ns.href);
+                faketext.content = xml_strdup(ns.href);
+            } else {
+                self.faketext = xml_new_doc_text((*self.node).doc, ns.href);
             }
-            self.curnode = self.faketext;
+            self.curnode = self.faketext.map_or(null_mut(), |node| node.as_ptr());
         } else {
             let Some(next) = (*self.curnode).next else {
                 return 0;
@@ -2812,7 +2811,7 @@ impl Default for XmlTextReader {
             node: null_mut(),
             curnode: null_mut(),
             depth: 0,
-            faketext: null_mut(),
+            faketext: None,
             preserve: 0,
             buffer: "".to_owned(),
             dict: null_mut(),
@@ -4179,9 +4178,8 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
     reader.node = null_mut();
     reader.curnode = null_mut();
     reader.mode = XmlTextReaderMode::XmlTextreaderModeClosed;
-    if !reader.faketext.is_null() {
-        xml_free_node(reader.faketext);
-        reader.faketext = null_mut();
+    if let Some(faketext) = reader.faketext.take() {
+        xml_free_node(faketext.as_ptr());
     }
     if !reader.ctxt.is_null() {
         #[cfg(all(feature = "libxml_regexp", feature = "libxml_valid"))]
