@@ -124,6 +124,36 @@ impl XmlAttr {
         None
     }
 
+    /// Read the value of a node `cur`, this can be either the text carried
+    /// directly by this node if it's a TEXT node or the aggregate string
+    /// of the values carried by this node child's (TEXT and ENTITY_REF).
+    ///
+    /// Entity references are substituted. Fills up the buffer `buf` with this value.
+    ///
+    /// Returns 0 in case of success and -1 in case of error.
+    #[doc(alias = "xmlBufGetNodeContent")]
+    pub unsafe fn get_content_to(&self, buf: &mut String) -> i32 {
+        assert!(matches!(
+            self.element_type(),
+            XmlElementType::XmlAttributeNode
+        ));
+        let mut tmp = self.children;
+
+        while let Some(now) = tmp {
+            if matches!(now.element_type(), XmlElementType::XmlTextNode) {
+                buf.push_str(
+                    CStr::from_ptr(now.content as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
+            } else {
+                now.get_content_to(buf);
+            }
+            tmp = now.next;
+        }
+        0
+    }
+
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
     #[doc(alias = "xmlNodeSetBase")]
     #[cfg(any(feature = "libxml_tree", feature = "xinclude"))]

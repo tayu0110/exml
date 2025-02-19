@@ -824,6 +824,28 @@ impl XmlGenericNodePtr {
         None
     }
 
+    /// Read the value of a node `cur`, this can be either the text carried
+    /// directly by this node if it's a TEXT node or the aggregate string
+    /// of the values carried by this node child's (TEXT and ENTITY_REF).
+    ///
+    /// Entity references are substituted. Fills up the buffer `buf` with this value.
+    ///
+    /// Returns 0 in case of success and -1 in case of error.
+    #[doc(alias = "xmlBufGetNodeContent")]
+    pub unsafe fn get_content_to(self, buf: &mut String) -> i32 {
+        if let Ok(attr) = XmlAttrPtr::try_from(self) {
+            attr.get_content_to(buf)
+        } else if let Ok(doc) = XmlDocPtr::try_from(self) {
+            doc.get_content_to(buf)
+        } else if let Ok(ns) = XmlNsPtr::try_from(self) {
+            ns.get_content_to(buf)
+        } else if let Ok(node) = XmlNodePtr::try_from(self) {
+            node.get_content_to(buf)
+        } else {
+            0
+        }
+    }
+
     /// Searches the language of a node, i.e. the values of the xml:lang
     /// attribute or the one carried by the nearest ancestor.
     ///

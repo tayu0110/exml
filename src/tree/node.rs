@@ -41,8 +41,8 @@ use super::{
     xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node, xml_free_prop,
     xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory,
     InvalidNodePointerCastError, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributePtr,
-    XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNs, XmlNsPtr, XML_CHECK_DTD,
-    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNs, XmlNsPtr,
+    XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
@@ -530,21 +530,10 @@ impl XmlNode {
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                let attr: *mut XmlAttr = self as *const XmlNode as _;
-                let mut tmp = (*attr).children;
-
-                while let Some(now) = tmp {
-                    if matches!(now.element_type(), XmlElementType::XmlTextNode) {
-                        buf.push_str(
-                            CStr::from_ptr(now.content as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                        );
-                    } else {
-                        now.get_content_to(buf);
-                    }
-                    tmp = now.next;
-                }
+                let attr = XmlAttrPtr::from_raw(self as *const XmlNode as *mut XmlAttr)
+                    .unwrap()
+                    .unwrap();
+                attr.get_content_to(buf);
             }
             XmlElementType::XmlCommentNode | XmlElementType::XmlPINode => {
                 buf.push_str(
@@ -577,28 +566,16 @@ impl XmlNode {
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd => {}
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                let mut next = self.children();
-                while let Some(cur) = next {
-                    if matches!(
-                        cur.element_type(),
-                        XmlElementType::XmlElementNode
-                            | XmlElementType::XmlTextNode
-                            | XmlElementType::XmlCDATASectionNode
-                    ) {
-                        cur.get_content_to(buf);
-                    }
-                    next = cur.next();
-                }
+                let doc = XmlDocPtr::from_raw(self as *const XmlNode as *mut XmlDoc)
+                    .unwrap()
+                    .unwrap();
+                doc.get_content_to(buf);
             }
             XmlElementType::XmlNamespaceDecl => {
-                buf.push_str(
-                    &self
-                        .as_namespace_decl_node()
-                        .unwrap()
-                        .as_ref()
-                        .href()
-                        .unwrap(),
-                );
+                let ns = XmlNsPtr::from_raw(self as *const XmlNode as *mut XmlNs)
+                    .unwrap()
+                    .unwrap();
+                ns.get_content_to(buf);
             }
             XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
