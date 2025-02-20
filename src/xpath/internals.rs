@@ -4603,8 +4603,8 @@ macro_rules! xp_test_hit_ns {
 unsafe fn xml_xpath_node_collect_and_test(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    mut first: Option<&mut *mut XmlNode>,
-    mut last: Option<&mut *mut XmlNode>,
+    mut first: Option<&mut Option<XmlGenericNodePtr>>,
+    mut last: Option<&mut Option<XmlGenericNodePtr>>,
     to_bool: i32,
 ) -> i32 {
     let axis: XmlXPathAxisVal = (*op).value.try_into().unwrap();
@@ -4812,22 +4812,30 @@ unsafe fn xml_xpath_node_collect_and_test(
             cur
         } {
             // QUESTION TODO: What does the "first" and "last" stuff do?
-            if let Some(first) = first.as_mut().filter(|first| !first.is_null()) {
-                if **first == cur.as_ptr() {
+            if let Some(first) = first.as_mut().filter(|first| !first.is_none()) {
+                if **first == Some(cur) {
                     break;
                 }
                 if total % 256 == 0
-                    && xml_xpath_cmp_nodes_ext(**first, cur.as_ptr()).map_or(false, |f| f.is_le())
+                    && xml_xpath_cmp_nodes_ext(
+                        (**first).map_or(null_mut(), |first| first.as_ptr()),
+                        cur.as_ptr(),
+                    )
+                    .map_or(false, |f| f.is_le())
                 {
                     break;
                 }
             }
-            if let Some(last) = last.as_mut().filter(|last| !last.is_null()) {
-                if **last == cur.as_ptr() {
+            if let Some(last) = last.as_mut().filter(|last| !last.is_none()) {
+                if **last == Some(cur) {
                     break;
                 }
                 if total % 256 == 0
-                    && xml_xpath_cmp_nodes_ext(cur.as_ptr(), **last).map_or(false, |f| f.is_le())
+                    && xml_xpath_cmp_nodes_ext(
+                        cur.as_ptr(),
+                        (**last).map_or(null_mut(), |last| last.as_ptr()),
+                    )
+                    .map_or(false, |f| f.is_le())
                 {
                     break;
                 }
@@ -5094,7 +5102,7 @@ unsafe fn xml_xpath_comp_swap(op: XmlXPathStepOpPtr) {
 unsafe fn xml_xpath_comp_op_eval_last(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    last: &mut *mut XmlNode,
+    last: &mut Option<XmlGenericNodePtr>,
 ) -> i32 {
     let mut total: i32 = 0;
     let cur: i32;
@@ -5124,7 +5132,7 @@ unsafe fn xml_xpath_comp_op_eval_last(
                         if nodeset.node_tab.len() > 1 {
                             nodeset.sort();
                         }
-                        *last = nodeset.node_tab.last().unwrap().as_ptr();
+                        *last = Some(nodeset.node_tab.last().copied().unwrap());
                     }
                 }
             }
@@ -5363,7 +5371,7 @@ unsafe fn xml_xpath_location_set_filter(
 unsafe fn xml_xpath_comp_op_eval_filter_first(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    first: &mut *mut XmlNode,
+    first: &mut Option<XmlGenericNodePtr>,
 ) -> i32 {
     let mut total: i32 = 0;
 
@@ -5390,7 +5398,7 @@ unsafe fn xml_xpath_comp_op_eval_filter_first(
             && !(*comp).steps[f as usize].value4.is_null()
             && xml_str_equal((*comp).steps[f as usize].value4 as _, c"last".as_ptr() as _)
         {
-            let mut last: *mut XmlNode = null_mut();
+            let mut last = None;
 
             total += xml_xpath_comp_op_eval_last(
                 ctxt,
@@ -5408,7 +5416,7 @@ unsafe fn xml_xpath_comp_op_eval_filter_first(
                     .filter(|n| n.len() > 1)
                 {
                     xml_xpath_node_set_keep_last(Some(nodeset));
-                    *first = nodeset.node_tab[0].as_ptr();
+                    *first = Some(nodeset.node_tab[0]);
                 }
             }
             return total;
@@ -5435,7 +5443,8 @@ unsafe fn xml_xpath_comp_op_eval_filter_first(
             if !locset.is_null() {
                 xml_xpath_location_set_filter(ctxt, locset, (*op).ch2, 1, 1);
                 if !(*locset).loc_tab.is_empty() {
-                    *first = (*(*locset).loc_tab[0]).user as *mut XmlNode;
+                    *first =
+                        XmlGenericNodePtr::from_raw((*(*locset).loc_tab[0]).user as *mut XmlNode);
                 }
             }
 
@@ -5451,7 +5460,7 @@ unsafe fn xml_xpath_comp_op_eval_filter_first(
     if let Some(set) = (*obj).nodesetval.as_deref_mut() {
         xml_xpath_node_set_filter(ctxt, Some(set), (*op).ch2, 1, 1, true);
         if !set.node_tab.is_empty() {
-            *first = set.node_tab[0].as_ptr();
+            *first = Some(set.node_tab[0]);
         }
     }
     value_push(ctxt, obj);
@@ -5466,7 +5475,7 @@ unsafe fn xml_xpath_comp_op_eval_filter_first(
 unsafe fn xml_xpath_comp_op_eval_first(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
-    first: &mut *mut XmlNode,
+    first: &mut Option<XmlGenericNodePtr>,
 ) -> i32 {
     let mut total: i32 = 0;
     let cur: i32;
@@ -5508,7 +5517,7 @@ unsafe fn xml_xpath_comp_op_eval_first(
                     if nodeset.node_tab.len() > 1 {
                         nodeset.sort();
                     }
-                    *first = nodeset.node_tab[0].as_ptr();
+                    *first = Some(nodeset.node_tab[0]);
                 }
             }
             cur = xml_xpath_comp_op_eval_first(
@@ -5953,7 +5962,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                     && (*val).typ == XmlXPathObjectType::XPathNumber
                     && (*val).floatval == 1.0
                 {
-                    let mut first: *mut XmlNode = null_mut();
+                    let mut first = None;
 
                     total += xml_xpath_comp_op_eval_first(
                         ctxt,
@@ -5997,7 +6006,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                     && !(*comp).steps[f as usize].value4.is_null()
                     && xml_str_equal((*comp).steps[f as usize].value4 as _, c"last".as_ptr() as _)
                 {
-                    let mut last: *mut XmlNode = null_mut();
+                    let mut last = None;
 
                     total += xml_xpath_comp_op_eval_last(
                         ctxt,
