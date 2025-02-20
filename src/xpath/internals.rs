@@ -67,7 +67,7 @@ use crate::{
         },
     },
     tree::{
-        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocPtr, XmlDtdPtr,
+        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlDocPtr, XmlDtdPtr,
         XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xpath::{
@@ -7178,39 +7178,38 @@ pub unsafe fn xml_xpath_register_all_functions(ctxt: XmlXPathContextPtr) {
 ///
 /// Returns an int usable as a hash
 #[doc(alias = "xmlXPathNodeValHash")]
-unsafe fn xml_xpath_node_val_hash(mut node: *mut XmlNode) -> u32 {
+unsafe fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
     let mut len: i32 = 2;
-    let mut string: *const XmlChar;
-    let mut tmp: *mut XmlNode;
     let mut ret: u32 = 0;
 
-    if node.is_null() {
+    let Some(mut node) = node else {
         return 0;
-    }
+    };
 
-    if matches!((*node).element_type(), XmlElementType::XmlDocumentNode) {
-        tmp = XmlDocPtr::from_raw(node as *mut XmlDoc)
-            .unwrap()
+    if matches!(node.element_type(), XmlElementType::XmlDocumentNode) {
+        if let Some(tmp) = XmlDocPtr::try_from(node)
             .unwrap()
             .get_root_element()
-            .map_or(null_mut(), |root| root.as_ptr());
-        if tmp.is_null() {
-            node = (*node).children().map_or(null_mut(), |c| c.as_ptr());
-        } else {
+            .map(|root| root.into())
+        {
             node = tmp;
-        }
-
-        if node.is_null() {
+        } else if let Some(tmp) = node
+            .children()
+            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
+        {
+            node = tmp;
+        } else {
             return 0;
         }
     }
 
-    match (*node).element_type() {
+    let mut tmp = match node.element_type() {
         XmlElementType::XmlCommentNode
         | XmlElementType::XmlPINode
         | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlTextNode => {
-            string = (*node).content;
+            let node = XmlNodePtr::try_from(node).unwrap();
+            let string = node.content;
             if string.is_null() {
                 return 0;
             }
@@ -7220,7 +7219,8 @@ unsafe fn xml_xpath_node_val_hash(mut node: *mut XmlNode) -> u32 {
             return *string.add(0) as u32 + ((*string.add(1) as u32) << 8);
         }
         XmlElementType::XmlNamespaceDecl => {
-            string = (*(node as *mut XmlNs)).href;
+            let ns = XmlNsPtr::try_from(node).unwrap();
+            let string = ns.href;
             if string.is_null() {
                 return 0;
             }
@@ -7230,29 +7230,25 @@ unsafe fn xml_xpath_node_val_hash(mut node: *mut XmlNode) -> u32 {
             return *string.add(0) as u32 + ((*string.add(1) as u32) << 8);
         }
         XmlElementType::XmlAttributeNode => {
-            tmp = (*node)
-                .as_attribute_node()
-                .unwrap()
-                .as_ref()
-                .children
-                .map_or(null_mut(), |c| c.as_ptr());
+            let attr = XmlAttrPtr::try_from(node).unwrap();
+            attr.children
+                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
         }
-        XmlElementType::XmlElementNode => {
-            tmp = (*node).children().map_or(null_mut(), |c| c.as_ptr());
-        }
+        XmlElementType::XmlElementNode => node
+            .children()
+            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr())),
         _ => {
             return 0;
         }
-    }
-    while !tmp.is_null() {
-        match (*tmp).element_type() {
+    };
+    while let Some(now) = tmp {
+        let string = match now.element_type() {
             XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
-                string = (*tmp).content;
+                let node = XmlNodePtr::try_from(now).unwrap();
+                node.content
             }
-            _ => {
-                string = null_mut();
-            }
-        }
+            _ => null_mut(),
+        };
         if !string.is_null() && *string.add(0) != 0 {
             if len == 1 {
                 return ret + ((*string.add(0) as u32) << 8);
@@ -7265,40 +7261,46 @@ unsafe fn xml_xpath_node_val_hash(mut node: *mut XmlNode) -> u32 {
             }
         }
         // Skip to next node
-        if let Some(children) = (*tmp).children().filter(|children| {
-            !matches!((*tmp).element_type(), XmlElementType::XmlDTDNode)
-                && !matches!(children.element_type(), XmlElementType::XmlEntityDecl)
-        }) {
-            tmp = children.as_ptr();
+        if let Some(children) = now
+            .children()
+            .filter(|children| {
+                !matches!(now.element_type(), XmlElementType::XmlDTDNode)
+                    && !matches!(children.element_type(), XmlElementType::XmlEntityDecl)
+            })
+            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+        {
+            tmp = Some(children);
             continue;
         }
-        if tmp == node {
+        if tmp == Some(node) {
             break;
         }
 
-        if let Some(next) = (*tmp).next {
-            tmp = next.as_ptr();
+        if let Some(next) = now
+            .next()
+            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+        {
+            tmp = Some(next);
             continue;
         }
 
-        loop {
-            tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
-            if tmp.is_null() {
-                break;
-            }
+        tmp = loop {
+            let Some(tmp) = now
+                .parent()
+                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+            else {
+                break None;
+            };
             if tmp == node {
-                tmp = null_mut();
-                break;
+                break None;
             }
-            if let Some(next) = (*tmp).next() {
-                tmp = next.as_ptr();
-                break;
+            if let Some(next) = tmp
+                .next()
+                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+            {
+                break Some(next);
             }
-
-            if tmp.is_null() {
-                break;
-            }
-        }
+        };
     }
     ret
 }
@@ -7373,10 +7375,10 @@ unsafe fn xml_xpath_equal_node_sets(
         return 0;
     }
     for (i, &node1) in ns1.node_tab.iter().enumerate() {
-        *hashs1.add(i) = xml_xpath_node_val_hash(node1.as_ptr());
+        *hashs1.add(i) = xml_xpath_node_val_hash(Some(node1));
         for (j, &node2) in ns2.node_tab.iter().enumerate() {
             if i == 0 {
-                *hashs2.add(j) = xml_xpath_node_val_hash(node2.as_ptr());
+                *hashs2.add(j) = xml_xpath_node_val_hash(Some(node2));
             }
             if *hashs1.add(i) != *hashs2.add(j) {
                 if neq != 0 {
@@ -7506,7 +7508,7 @@ unsafe fn xml_xpath_equal_node_set_string(arg: XmlXPathObjectPtr, str: &str, neq
     let cstr = CString::new(str).unwrap();
     let hash: u32 = xml_xpath_string_hash(cstr.as_ptr() as *const u8);
     for &node in &ns.node_tab {
-        if xml_xpath_node_val_hash(node.as_ptr()) == hash {
+        if xml_xpath_node_val_hash(Some(node)) == hash {
             let str2 = node.get_content();
             if (str2.is_some() && Some(str) == str2.as_deref())
                 || (str2.is_none() && str.is_empty())
