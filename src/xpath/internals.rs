@@ -1743,15 +1743,20 @@ pub const XML_NODESET_DEFAULT: usize = 10;
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNodeSetDupNs")]
-pub unsafe fn xml_xpath_node_set_dup_ns(node: *mut XmlNode, ns: *mut XmlNs) -> *mut XmlNode {
-    if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-    if node.is_null() || matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-        if (*ns).node.is_none() {
-            (*ns).node = (*ns).next.map(|next| next.into());
+pub unsafe fn xml_xpath_node_set_dup_ns(
+    node: Option<XmlGenericNodePtr>,
+    mut ns: XmlNsPtr,
+) -> Option<XmlGenericNodePtr> {
+    // if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
+    //     return null_mut();
+    // }
+    if node.map_or(true, |node| {
+        matches!(node.element_type(), XmlElementType::XmlNamespaceDecl)
+    }) {
+        if ns.node.is_none() {
+            ns.node = ns.next.map(|next| next.into());
         }
-        return ns as *mut XmlNode;
+        return Some(ns.into());
     }
 
     // Allocate a new Namespace and fill the fields.
@@ -1760,17 +1765,17 @@ pub unsafe fn xml_xpath_node_set_dup_ns(node: *mut XmlNode, ns: *mut XmlNs) -> *
         ..Default::default()
     }) else {
         xml_xpath_err_memory(null_mut(), Some("duplicating namespace\n"));
-        return null_mut();
+        return None;
     };
-    if !(*ns).href.is_null() {
-        cur.href = xml_strdup((*ns).href);
+    if !ns.href.is_null() {
+        cur.href = xml_strdup(ns.href);
     }
-    if (*ns).prefix().is_some() {
-        cur.prefix = xml_strdup((*ns).prefix);
+    if ns.prefix().is_some() {
+        cur.prefix = xml_strdup(ns.prefix);
     }
     // cur.next = node as *mut XmlNs;
-    cur.node = XmlGenericNodePtr::from_raw(node);
-    cur.as_ptr() as *mut XmlNode
+    cur.node = node;
+    Some(cur.into())
 }
 
 /// This is the cached version of xmlXPathNewNodeSet().
@@ -3796,8 +3801,6 @@ unsafe fn xml_xpath_run_stream_eval(
     let mut max_depth: i32;
     let mut ret: i32;
     let mut depth: i32;
-    let mut cur: *mut XmlNode = null_mut();
-    let mut limit: *mut XmlNode = null_mut();
 
     if ctxt.is_null() || comp.is_null() {
         return -1;
@@ -3854,15 +3857,16 @@ unsafe fn xml_xpath_run_stream_eval(
         return 0;
     }
 
-    if from_root != 0 {
-        cur = (*ctxt).doc.map_or(null_mut(), |doc| doc.as_ptr()) as *mut XmlNode;
+    let mut limit = None;
+    let cur = if from_root != 0 {
+        (*ctxt).doc.map(|doc| doc.into())
     } else if !(*ctxt).node.is_null() {
         match (*(*ctxt).node).element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlHTMLDocumentNode => {
-                cur = (*ctxt).node;
+                limit = XmlGenericNodePtr::from_raw((*ctxt).node);
             }
             XmlElementType::XmlAttributeNode
             | XmlElementType::XmlTextNode
@@ -3882,11 +3886,13 @@ unsafe fn xml_xpath_run_stream_eval(
             | XmlElementType::XmlXIncludeEnd => {}
             _ => unreachable!(),
         }
-        limit = cur;
-    }
-    if cur.is_null() {
+        limit
+    } else {
+        None
+    };
+    let Some(mut cur) = cur else {
         return 0;
-    }
+    };
 
     let patstream: XmlStreamCtxtPtr = xml_pattern_get_stream_ctxt(comp);
     if patstream.is_null() {
@@ -3909,7 +3915,7 @@ unsafe fn xml_xpath_run_stream_eval(
             }
             // TODO: Check memory error.
             if let Some(nodeset) = (*(*result_seq)).nodesetval.as_deref_mut() {
-                nodeset.add_unique(XmlGenericNodePtr::from_raw(cur).unwrap());
+                nodeset.add_unique(cur);
             }
         }
     }
@@ -3930,25 +3936,25 @@ unsafe fn xml_xpath_run_stream_eval(
                         (*ctxt).op_count += 1;
                     }
 
-                    match (*cur).element_type() {
+                    match cur.element_type() {
                         XmlElementType::XmlElementNode
                         | XmlElementType::XmlTextNode
                         | XmlElementType::XmlCDATASectionNode
                         | XmlElementType::XmlCommentNode
                         | XmlElementType::XmlPINode => 'to_break: {
-                            ret = if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                            {
+                            ret = if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
+                                let node = XmlNodePtr::try_from(cur).unwrap();
                                 xml_stream_push(
                                     patstream,
-                                    (*cur).name,
-                                    (*cur).ns.map_or(null_mut(), |ns| ns.href),
+                                    node.name,
+                                    node.ns.map_or(null_mut(), |ns| ns.href),
                                 )
                             } else if eval_all_nodes != 0 {
                                 xml_stream_push_node(
                                     patstream,
                                     null(),
                                     null(),
-                                    (*cur).element_type() as i32,
+                                    cur.element_type() as i32,
                                 )
                             } else {
                                 break 'to_break;
@@ -3964,21 +3970,22 @@ unsafe fn xml_xpath_run_stream_eval(
                                     return 1;
                                 }
                                 if let Some(nodeset) = (*(*result_seq)).nodesetval.as_deref_mut() {
-                                    if nodeset.add_unique(XmlGenericNodePtr::from_raw(cur).unwrap())
-                                        < 0
-                                    {
+                                    if nodeset.add_unique(cur) < 0 {
                                         (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXPath;
                                         (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
                                     }
                                 }
                             }
-                            if (*cur).children().is_none() || depth >= max_depth {
+                            if cur.children().is_none() || depth >= max_depth {
                                 // ret =
                                 xml_stream_pop(patstream);
-                                while let Some(next) = (*cur).next {
-                                    cur = next.as_ptr();
+                                while let Some(next) = cur
+                                    .next()
+                                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+                                {
+                                    cur = next;
                                     if !matches!(
-                                        (*cur).element_type(),
+                                        cur.element_type(),
                                         XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
                                     ) {
                                         // goto next_node;
@@ -3996,26 +4003,33 @@ unsafe fn xml_xpath_run_stream_eval(
                 if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
                     break 'main;
                 }
-                if let Some(children) = (*cur).children().filter(|_| depth < max_depth) {
+                if let Some(children) = cur
+                    .children()
+                    .filter(|_| depth < max_depth)
+                    .and_then(|cur| XmlGenericNodePtr::from_raw(cur.as_ptr()))
+                {
                     // Do not descend on entities declarations
                     if !matches!(children.element_type(), XmlElementType::XmlEntityDecl) {
-                        cur = children.as_ptr();
+                        cur = children;
                         depth += 1;
                         // Skip DTDs
-                        if !matches!((*cur).element_type(), XmlElementType::XmlDTDNode) {
+                        if !matches!(cur.element_type(), XmlElementType::XmlDTDNode) {
                             break 'to_continue_main;
                         }
                     }
                 }
 
-                if cur == limit {
+                if Some(cur) == limit {
                     break 'main;
                 }
 
-                while let Some(next) = (*cur).next {
-                    cur = next.as_ptr();
+                while let Some(next) = cur
+                    .next()
+                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+                {
+                    cur = next;
                     if !matches!(
-                        (*cur).element_type(),
+                        cur.element_type(),
                         XmlElementType::XmlEntityDecl | XmlElementType::XmlDTDNode
                     ) {
                         // goto next_node;
@@ -4026,20 +4040,25 @@ unsafe fn xml_xpath_run_stream_eval(
                 break 'next_node;
             }
 
-            'inner: while {
-                cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+            'inner: loop {
+                let Some(parent) = cur
+                    .parent()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                else {
+                    break 'main;
+                };
                 depth -= 1;
-                if cur.is_null()
-                    || cur == limit
-                    || matches!((*cur).element_type(), XmlElementType::XmlDocumentNode)
+                cur = parent;
+                if Some(cur) == limit
+                    || matches!(cur.element_type(), XmlElementType::XmlDocumentNode)
                 {
                     // goto done;
                     break 'main;
                 }
-                if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+                if matches!(cur.element_type(), XmlElementType::XmlElementNode)
                     || (eval_all_nodes != 0
                         && matches!(
-                            (*cur).element_type(),
+                            cur.element_type(),
                             XmlElementType::XmlTextNode
                                 | XmlElementType::XmlCDATASectionNode
                                 | XmlElementType::XmlCommentNode
@@ -4049,15 +4068,17 @@ unsafe fn xml_xpath_run_stream_eval(
                     // ret =
                     xml_stream_pop(patstream);
                 };
-                if let Some(next) = (*cur).next {
-                    cur = next.as_ptr();
+                if let Some(next) = cur
+                    .next()
+                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+                {
+                    cur = next;
                     break 'inner;
                 }
-                !cur.is_null()
-            } {}
+            }
         }
 
-        !cur.is_null() && depth >= 0
+        depth >= 0
     } {}
 
     // done:

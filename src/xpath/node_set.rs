@@ -3,8 +3,7 @@ use std::ptr::null_mut;
 use crate::{
     hash::XmlHashTable,
     tree::{
-        xml_free_node_list, NodeCommon, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr,
-        XmlNsPtr,
+        xml_free_node_list, NodeCommon, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr,
     },
     xpath::xml_xpath_node_set_free_ns,
 };
@@ -37,18 +36,10 @@ impl XmlNodeSet {
         if let Some(val) = val {
             ret.node_tab = vec![];
             if let Ok(ns) = XmlNsPtr::try_from(val) {
-                let ns_node = xml_xpath_node_set_dup_ns(
-                    ns.node
-                        .or(ns.next.map(|next| next.into()))
-                        .map_or(null_mut(), |node| node.as_ptr()),
-                    ns.as_ptr(),
-                );
+                let ns_node =
+                    xml_xpath_node_set_dup_ns(ns.node.or(ns.next.map(|next| next.into())), ns)?;
 
-                if ns_node.is_null() {
-                    return None;
-                }
-                ret.node_tab
-                    .push(XmlGenericNodePtr::from_raw(ns_node).unwrap());
+                ret.node_tab.push(ns_node);
             } else {
                 ret.node_tab.push(val);
             }
@@ -268,18 +259,13 @@ impl XmlNodeSet {
             return -1;
         }
         if let Ok(ns) = XmlNsPtr::try_from(val) {
-            let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns(
-                ns.node
-                    .or(ns.next.map(|next| next.into()))
-                    .map_or(null_mut(), |node| node.as_ptr()),
-                ns.as_ptr(),
-            );
-
-            if ns_node.is_null() {
+            let Some(ns_node) =
+                xml_xpath_node_set_dup_ns(ns.node.or(ns.next.map(|next| next.into())), ns)
+            else {
                 return -1;
-            }
-            self.node_tab
-                .push(XmlGenericNodePtr::from_raw(ns_node).unwrap());
+            };
+
+            self.node_tab.push(ns_node);
         } else {
             self.node_tab.push(val);
         }
@@ -299,18 +285,13 @@ impl XmlNodeSet {
             return -1;
         }
         if let Ok(ns) = XmlNsPtr::try_from(val) {
-            let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns(
-                ns.node
-                    .or(ns.next.map(|next| next.into()))
-                    .map_or(null_mut(), |node| node.as_ptr()),
-                ns.as_ptr(),
-            );
-
-            if ns_node.is_null() {
+            let Some(ns_node) =
+                xml_xpath_node_set_dup_ns(ns.node.or(ns.next.map(|next| next.into())), ns)
+            else {
                 return -1;
-            }
-            self.node_tab
-                .push(XmlGenericNodePtr::from_raw(ns_node).unwrap());
+            };
+
+            self.node_tab.push(ns_node);
         } else {
             self.node_tab.push(val);
         }
@@ -346,12 +327,10 @@ impl XmlNodeSet {
             xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
             return -1;
         }
-        let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns(node.as_ptr(), ns.as_ptr());
-        if ns_node.is_null() {
+        let Some(ns_node) = xml_xpath_node_set_dup_ns(Some(node.into()), ns) else {
             return -1;
-        }
-        self.node_tab
-            .push(XmlGenericNodePtr::from_raw(ns_node).unwrap());
+        };
+        self.node_tab.push(ns_node);
         0
     }
 }
@@ -825,20 +804,14 @@ pub unsafe fn xml_xpath_node_set_merge(
             return None;
         }
         if let Ok(ns) = XmlNsPtr::try_from(n2) {
-            let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns(
-                ns.node
-                    .or(ns.next.map(|next| next.into()))
-                    .map_or(null_mut(), |node| node.as_ptr()),
-                ns.as_ptr(),
-            );
-
-            if ns_node.is_null() {
-                // goto error;
+            let Some(ns_node) =
+                xml_xpath_node_set_dup_ns(ns.node.or(ns.next.map(|next| next.into())), ns)
+            else {
                 xml_xpath_free_node_set(Some(val1));
                 return None;
-            }
-            val1.node_tab
-                .push(XmlGenericNodePtr::from_raw(ns_node).unwrap());
+            };
+
+            val1.node_tab.push(ns_node);
         } else {
             val1.node_tab.push(n2);
         }
