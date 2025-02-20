@@ -3,8 +3,8 @@ use std::ptr::null_mut;
 use crate::{
     hash::XmlHashTable,
     tree::{
-        xml_free_node_list, NodeCommon, NodePtr, XmlElementType, XmlGenericNodePtr, XmlNode,
-        XmlNodePtr, XmlNsPtr,
+        xml_free_node_list, NodeCommon, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr,
+        XmlNsPtr,
     },
     xpath::xml_xpath_node_set_free_ns,
 };
@@ -37,7 +37,12 @@ impl XmlNodeSet {
         if let Some(val) = val {
             ret.node_tab = vec![];
             if let Ok(ns) = XmlNsPtr::try_from(val) {
-                let ns_node = xml_xpath_node_set_dup_ns(ns.next as *mut XmlNode, ns.as_ptr());
+                let ns_node = xml_xpath_node_set_dup_ns(
+                    ns.node
+                        .or(ns.next.map(|next| next.into()))
+                        .map_or(null_mut(), |node| node.as_ptr()),
+                    ns.as_ptr(),
+                );
 
                 if ns_node.is_null() {
                     return None;
@@ -91,10 +96,7 @@ impl XmlNodeSet {
                     if ns1 == ns2 {
                         return true;
                     }
-                    if !ns1.next.is_null()
-                        && ns2.next == ns1.next
-                        && ns1.prefix() == (*ns2).prefix()
-                    {
+                    if ns1.node.is_some() && ns2.node == ns1.node && ns1.prefix() == ns2.prefix() {
                         return true;
                     }
                 }
@@ -156,7 +158,7 @@ impl XmlNodeSet {
         let table = &mut self.node_tab;
         while let Some(node) = table.pop() {
             if let Ok(ns) = XmlNsPtr::try_from(node) {
-                xml_xpath_node_set_free_ns(ns.as_ptr());
+                xml_xpath_node_set_free_ns(ns);
             } else if free_actual_tree {
                 xml_free_node_list(node.as_ptr());
             }
@@ -204,7 +206,7 @@ impl XmlNodeSet {
             return;
         }
         if let Ok(ns) = XmlNsPtr::try_from(self.node_tab[val as usize]) {
-            xml_xpath_node_set_free_ns(ns.as_ptr());
+            xml_xpath_node_set_free_ns(ns);
         }
         self.node_tab.remove(val as usize);
     }
@@ -212,16 +214,12 @@ impl XmlNodeSet {
     /// Removes an xmlNodePtr from an existing NodeSet
     #[doc(alias = "xmlXPathNodeSetDel")]
     pub unsafe fn delete(&mut self, val: XmlGenericNodePtr) {
-        // if val.is_null() {
-        //     return;
-        // }
-
         // find node in nodeTab
         let Some(pos) = self.node_tab.iter().position(|&node| node == val) else {
             return;
         };
         if let Ok(ns) = XmlNsPtr::try_from(self.node_tab[pos]) {
-            xml_xpath_node_set_free_ns(ns.as_ptr());
+            xml_xpath_node_set_free_ns(ns);
         }
         self.node_tab.remove(pos);
     }
@@ -237,7 +235,7 @@ impl XmlNodeSet {
         if has_ns_nodes {
             for &node in &self.node_tab[new_len..] {
                 if let Ok(ns) = XmlNsPtr::try_from(node) {
-                    xml_xpath_node_set_free_ns(ns.as_ptr());
+                    xml_xpath_node_set_free_ns(ns);
                 }
             }
         }
@@ -256,10 +254,6 @@ impl XmlNodeSet {
     /// Returns 0 in case of success, and -1 in case of error
     #[doc(alias = "xmlXPathNodeSetAdd")]
     pub unsafe fn add(&mut self, val: XmlGenericNodePtr) -> i32 {
-        // if val.is_null() {
-        //     return -1;
-        // }
-
         // @@ with_ns to check whether namespace nodes should be looked at @@
         // prevent duplicates
         for &node in &self.node_tab {
@@ -274,8 +268,12 @@ impl XmlNodeSet {
             return -1;
         }
         if let Ok(ns) = XmlNsPtr::try_from(val) {
-            let ns_node: *mut XmlNode =
-                xml_xpath_node_set_dup_ns(ns.next as *mut XmlNode, ns.as_ptr());
+            let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns(
+                ns.node
+                    .or(ns.next.map(|next| next.into()))
+                    .map_or(null_mut(), |node| node.as_ptr()),
+                ns.as_ptr(),
+            );
 
             if ns_node.is_null() {
                 return -1;
@@ -294,10 +292,6 @@ impl XmlNodeSet {
     /// Returns 0 in case of success and -1 in case of failure
     #[doc(alias = "xmlXPathNodeSetAddUnique")]
     pub unsafe fn add_unique(&mut self, val: XmlGenericNodePtr) -> i32 {
-        // if val.is_null() {
-        //     return -1;
-        // }
-
         // @@ with_ns to check whether namespace nodes should be looked at @@
         // grow the nodeTab if needed
         if self.node_tab.len() >= XPATH_MAX_NODESET_LENGTH {
@@ -305,8 +299,12 @@ impl XmlNodeSet {
             return -1;
         }
         if let Ok(ns) = XmlNsPtr::try_from(val) {
-            let ns_node: *mut XmlNode =
-                xml_xpath_node_set_dup_ns(ns.next as *mut XmlNode, ns.as_ptr());
+            let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns(
+                ns.node
+                    .or(ns.next.map(|next| next.into()))
+                    .map_or(null_mut(), |node| node.as_ptr()),
+                ns.as_ptr(),
+            );
 
             if ns_node.is_null() {
                 return -1;
@@ -335,7 +333,7 @@ impl XmlNodeSet {
         for &cur_node in &self.node_tab {
             if XmlNsPtr::try_from(cur_node)
                 .ok()
-                .filter(|cur_node| cur_node.next() == NodePtr::from_ptr(node.as_ptr()))
+                .filter(|cur_node| cur_node.node == Some(node.into()))
                 .filter(|cur_node| ns.prefix() == cur_node.prefix())
                 .is_some()
             {
@@ -720,9 +718,9 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear(
                 continue 'b;
             }
             if let Some((n1, n2)) = XmlNsPtr::try_from(n1).ok().zip(XmlNsPtr::try_from(n2).ok()) {
-                if n1.next == n2.next && n1.prefix() == n2.prefix() {
+                if n1.node == n2.node && n1.prefix() == n2.prefix() {
                     // Free the namespace node.
-                    xml_xpath_node_set_free_ns(n2.as_ptr());
+                    xml_xpath_node_set_free_ns(n2);
                     // goto skip_node;
                     continue 'b;
                 }
@@ -807,7 +805,7 @@ pub unsafe fn xml_xpath_node_set_merge(
                 || XmlNsPtr::try_from(n1)
                     .ok()
                     .zip(XmlNsPtr::try_from(n2).ok())
-                    .filter(|(n1, n2)| n1.next == n2.next)
+                    .filter(|(n1, n2)| n1.node == n2.node)
                     .filter(|(n1, n2)| n1.prefix() == n2.prefix())
                     .is_some()
             {
@@ -827,8 +825,12 @@ pub unsafe fn xml_xpath_node_set_merge(
             return None;
         }
         if let Ok(ns) = XmlNsPtr::try_from(n2) {
-            let ns_node: *mut XmlNode =
-                xml_xpath_node_set_dup_ns(ns.next as *mut XmlNode, ns.as_ptr());
+            let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns(
+                ns.node
+                    .or(ns.next.map(|next| next.into()))
+                    .map_or(null_mut(), |node| node.as_ptr()),
+                ns.as_ptr(),
+            );
 
             if ns_node.is_null() {
                 // goto error;

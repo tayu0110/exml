@@ -2277,15 +2277,11 @@ unsafe fn stream_file(filename: *mut c_char) {
 unsafe fn walk_doc(doc: XmlDocPtr) {
     use std::{ptr::null, sync::atomic::Ordering};
 
-    use exml::{
-        libxml::{
-            pattern::{
-                xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile,
-                xml_stream_push,
-            },
-            xmlreader::{xml_free_text_reader, xml_reader_walker},
+    use exml::libxml::{
+        pattern::{
+            xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile, xml_stream_push,
         },
-        tree::XmlNsPtr,
+        xmlreader::{xml_free_text_reader, xml_reader_walker},
     };
 
     let mut ret: i32;
@@ -2304,7 +2300,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
         while let Some(now) = ns.filter(|_| i < 10) {
             namespaces[i] = (now.href, now.prefix);
             i += 1;
-            ns = XmlNsPtr::from_raw(now.next).unwrap();
+            ns = now.next;
         }
 
         if let Some(pattern) = CMD_ARGS.path.as_deref() {

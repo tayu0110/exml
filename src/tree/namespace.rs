@@ -39,16 +39,17 @@ use super::{
 
 #[repr(C)]
 pub struct XmlNs {
-    // TODO: Change to `Option<XmlGenericNodePtr>`.
-    //       `next` can be treated as `Option<XmlNsPtr>` in most cases,
-    //       but must be `Option<XmlGenericNodePtr>`
-    //       because different types of node pointers may be stored for XPath.
-    pub next: *mut XmlNs,                  /* next Ns link for this node  */
+    pub next: Option<XmlNsPtr>,            /* next Ns link for this node  */
     pub(crate) typ: XmlNsType,             /* global or local */
     pub href: *const XmlChar,              /* URL for the namespace */
     pub prefix: *const XmlChar,            /* prefix for the namespace */
     pub(crate) _private: *mut c_void,      /* application data */
     pub(crate) context: Option<XmlDocPtr>, /* normally an xmlDoc */
+    // For XPath. Not used except for XPath.
+    // In the original libxml2, in order to handle namespaces and nodes as a set,
+    // the `next` is set to the node that will be the set.
+    // However, this crate provides a separate member for XPath.
+    pub node: Option<XmlGenericNodePtr>,
 }
 
 impl XmlNs {
@@ -101,12 +102,13 @@ impl XmlNs {
 impl Default for XmlNs {
     fn default() -> Self {
         Self {
-            next: null_mut(),
+            next: None,
             typ: XmlNsType::XmlNamespaceDecl,
             href: null_mut(),
             prefix: null_mut(),
             _private: null_mut(),
             context: None,
+            node: None,
         }
     }
 }
@@ -134,10 +136,12 @@ impl NodeCommon for XmlNs {
     }
     fn set_last(&mut self, _last: Option<NodePtr>) {}
     fn next(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.next as *mut XmlNode)
+        NodePtr::from_ptr(self.next.map_or(null_mut(), |ns| ns.as_ptr()) as *mut XmlNode)
     }
     fn set_next(&mut self, next: Option<NodePtr>) {
-        self.next = next.map_or(null_mut(), |p| p.as_ptr() as *mut XmlNs);
+        unsafe {
+            self.next = next.and_then(|p| XmlNsPtr::from_raw(p.as_ptr() as *mut XmlNs).unwrap());
+        }
     }
     fn prev(&self) -> Option<NodePtr> {
         None
@@ -324,8 +328,8 @@ pub unsafe fn xml_new_ns(
                 xml_free_ns(cur);
                 return None;
             }
-            while !prev.next.is_null() {
-                prev = XmlNsPtr::from_raw(prev.next).unwrap().unwrap();
+            while let Some(next) = prev.next {
+                prev = next;
                 if (prev.prefix.is_null() && cur.prefix.is_null())
                     || xml_str_equal(prev.prefix, cur.prefix)
                 {
@@ -333,7 +337,7 @@ pub unsafe fn xml_new_ns(
                     return None;
                 }
             }
-            prev.next = cur.as_ptr();
+            prev.next = Some(cur);
         } else {
             (*node).ns_def = Some(cur);
         }
@@ -356,10 +360,10 @@ pub unsafe fn xml_free_ns(cur: XmlNsPtr) {
 /// Free up all the structures associated to the chained namespaces.
 #[doc(alias = "xmlFreeNsList")]
 pub unsafe fn xml_free_ns_list(cur: XmlNsPtr) {
-    let mut next = XmlNsPtr::from_raw(cur.next).unwrap();
+    let mut next = cur.next;
     xml_free_ns(cur);
     while let Some(now) = next {
-        next = XmlNsPtr::from_raw(now.next).unwrap();
+        next = now.next;
         xml_free_ns(now);
     }
 }

@@ -2381,7 +2381,7 @@ unsafe fn xml_ns_in_scope(
                 {
                     return 0;
                 }
-                tst = XmlNsPtr::from_raw(now.next).unwrap();
+                tst = now.next;
             }
         }
         node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -2420,13 +2420,13 @@ pub unsafe fn xml_copy_namespace_list(mut cur: Option<XmlNsPtr>) -> Option<XmlNs
             return None;
         };
         if let Some(mut l) = p {
-            l.next = q.as_ptr();
+            l.next = Some(q);
             p = Some(q);
         } else {
             ret = Some(q);
             p = ret;
         }
-        cur = XmlNsPtr::from_raw(now.next).unwrap();
+        cur = now.next;
     }
     ret
 }
@@ -2514,7 +2514,7 @@ unsafe fn xml_tree_nslist_lookup_by_prefix(
         if prefix == now.prefix || xml_str_equal(prefix, now.prefix) {
             return ns;
         }
-        ns = XmlNsPtr::from_raw(now.next).unwrap();
+        ns = now.next;
     }
     None
 }
@@ -2532,9 +2532,6 @@ unsafe fn xml_search_ns_by_prefix_strict(
 ) -> i32 {
     let mut cur: *mut XmlNode;
 
-    // if doc.is_null() {
-    //     return -1;
-    // }
     if node.is_null() || matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
         return -1;
     }
@@ -2566,7 +2563,7 @@ unsafe fn xml_search_ns_by_prefix_strict(
                     }
                     return 1;
                 }
-                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                ns = now.next;
             }
         } else if (matches!((*cur).element_type(), XmlElementType::XmlEntityNode)
             || matches!((*cur).element_type(), XmlElementType::XmlEntityDecl))
@@ -2623,7 +2620,7 @@ unsafe fn xml_search_ns_by_namespace_strict(
                 let mut ns = (*cur).ns_def;
                 while let Some(now) = ns {
                     if prefixed != 0 && now.prefix().is_none() {
-                        ns = XmlNsPtr::from_raw(now.next).unwrap();
+                        ns = now.next;
                         continue;
                     }
                     if !prev.is_null() {
@@ -2639,10 +2636,10 @@ unsafe fn xml_search_ns_by_namespace_strict(
                                 // Shadowed.
                                 break;
                             }
-                            prevns = XmlNsPtr::from_raw(pns.next).unwrap();
+                            prevns = pns.next;
                         }
                         if prevns.is_some() {
-                            ns = XmlNsPtr::from_raw(now.next).unwrap();
+                            ns = now.next;
                             continue;
                         }
                     }
@@ -2661,7 +2658,7 @@ unsafe fn xml_search_ns_by_namespace_strict(
                             // be an other matching ns-decl with an unshadowed
                             // prefix.
                             if ret == 0 {
-                                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                                ns = now.next;
                                 continue;
                             }
                         }

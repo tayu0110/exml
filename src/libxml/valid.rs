@@ -3541,8 +3541,6 @@ pub unsafe fn xml_validate_element(
     doc: XmlDocPtr,
     root: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    use crate::tree::XmlNsPtr;
-
     let mut ret: i32 = 1;
 
     let Some(root) = root else {
@@ -3596,7 +3594,7 @@ pub unsafe fn xml_validate_element(
                 } else {
                     ret &= xml_validate_one_namespace(ctxt, doc, node, None, now, now.href);
                 }
-                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                ns = now.next;
             }
 
             if let Some(children) = elem.children() {
@@ -4711,8 +4709,6 @@ pub unsafe fn xml_validate_one_element(
     doc: XmlDocPtr,
     elem: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    use crate::tree::XmlNsPtr;
-
     let mut cont: XmlElementContentPtr;
     let mut child: *mut XmlNode;
     let mut ret: i32 = 1;
@@ -5106,7 +5102,7 @@ pub unsafe fn xml_validate_one_element(
                         if now.prefix().is_none() {
                             break 'found;
                         }
-                        ns = XmlNsPtr::from_raw(now.next).unwrap();
+                        ns = now.next;
                     }
                 } else if cur_attr.prefix.as_deref() == Some("xmlns") {
                     let mut ns = elem.ns_def;
@@ -5114,7 +5110,7 @@ pub unsafe fn xml_validate_one_element(
                         if cur_attr.name() == now.prefix() {
                             break 'found;
                         }
-                        ns = XmlNsPtr::from_raw(now.next).unwrap();
+                        ns = now.next;
                     }
                 } else {
                     let mut attrib = elem.properties;
@@ -5222,7 +5218,7 @@ pub unsafe fn xml_validate_one_element(
                             }
                             break 'found;
                         }
-                        ns = XmlNsPtr::from_raw(now.next).unwrap();
+                        ns = now.next;
                     }
                 } else if cur_attr.prefix.as_deref() == Some("xmlns") {
                     let mut ns = elem.ns_def;
@@ -5247,7 +5243,7 @@ pub unsafe fn xml_validate_one_element(
                             }
                             break 'found;
                         }
-                        ns = XmlNsPtr::from_raw(now.next).unwrap();
+                        ns = now.next;
                     }
                 }
             }

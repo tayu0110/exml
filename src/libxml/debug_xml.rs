@@ -322,7 +322,7 @@ impl XmlDebugCtxt<'_> {
             let mut ns = node.as_node().unwrap().as_ref().ns_def;
             while let Some(now) = ns {
                 self.ns_check_scope(node, now);
-                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                ns = now.next;
             }
             if let Some(ns) = node.as_node().unwrap().as_ref().ns {
                 self.ns_check_scope(node, ns);
@@ -783,11 +783,11 @@ impl XmlDebugCtxt<'_> {
     }
 
     #[doc(alias = "xmlCtxtDumpNamespaceList")]
-    unsafe fn dump_namespace_list(&mut self, mut ns: Option<&XmlNs>) {
+    unsafe fn dump_namespace_list(&mut self, mut ns: Option<XmlNsPtr>) {
         while let Some(now) = ns {
-            self.dump_namespace(Some(now));
+            self.dump_namespace(Some(&*now));
             let next = now.next;
-            ns = (!next.is_null()).then(|| &*next);
+            ns = next;
         }
     }
 
@@ -1068,7 +1068,7 @@ impl XmlDebugCtxt<'_> {
             .filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
             .and_then(|node| node.as_ref().ns_def)
         {
-            self.dump_namespace_list(Some(&*ns_def));
+            self.dump_namespace_list(Some(ns_def));
         }
         if let Some(prop) = XmlNodePtr::try_from(node)
             .ok()
@@ -1272,7 +1272,7 @@ impl XmlDebugCtxt<'_> {
                 }
             }
             if let Some(old_ns) = doc.old_ns {
-                self.dump_namespace_list(Some(&*old_ns));
+                self.dump_namespace_list(Some(old_ns));
             }
         }
     }
@@ -1483,7 +1483,7 @@ unsafe fn xml_ns_check_scope(node: XmlGenericNodePtr, ns: XmlNsPtr) -> i32 {
                 if now.prefix() == ns.prefix() {
                     return -2;
                 }
-                cur = XmlNsPtr::from_raw(now.next).unwrap();
+                cur = now.next;
             }
         }
         node = now
@@ -2834,7 +2834,7 @@ unsafe fn xml_shell_register_root_namespaces(
         } else {
             xml_xpath_register_ns((*ctxt).pctxt, c"defaultns".as_ptr() as _, now.href);
         }
-        ns = XmlNsPtr::from_raw(now.next).unwrap();
+        ns = now.next;
     }
     0
 }

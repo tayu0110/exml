@@ -1895,12 +1895,10 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                 if let Some(ns_def) = now.ns_def.take() {
                                     if let Some(par_def) = parent.ns_def {
                                         let mut last = par_def;
-                                        while let Some(next) =
-                                            XmlNsPtr::from_raw(last.next).unwrap()
-                                        {
+                                        while let Some(next) = last.next {
                                             last = next;
                                         }
-                                        last.next = ns_def.as_ptr();
+                                        last.next = Some(ns_def);
                                     } else {
                                         parent.ns_def = Some(ns_def);
                                     }

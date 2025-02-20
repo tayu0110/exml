@@ -241,7 +241,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 }
                 xml_free_uri(uri);
             }
-            ns = XmlNsPtr::from_raw(now.next).unwrap();
+            ns = now.next;
         }
         0
     }
@@ -341,7 +341,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         has_empty_ns = true;
                     }
                 }
-                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                ns = now.next;
             }
             n = node
                 .parent()
@@ -1306,24 +1306,24 @@ unsafe fn xml_c14n_is_node_in_nodeset(
     if let (Some(nodes), Some(node)) = (nodes, node) {
         if let Ok(node) = XmlNsPtr::try_from(node) {
             let mut ns = XmlNs { ..*node };
+            ns.node = ns.next.map(|ns| ns.into());
 
             // this is a libxml hack! check xpath.c for details
             if let Some(parent) =
                 parent.filter(|p| p.element_type() == XmlElementType::XmlAttributeNode)
             {
-                ns.next = parent.parent().map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
+                ns.node = XmlGenericNodePtr::from_raw(parent.parent().unwrap().as_ptr());
+                // ns.next = parent.parent().map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
             } else if let Some(parent) = parent {
-                ns.next = parent.as_ptr() as *mut XmlNs;
+                ns.node = Some(parent);
+                // ns.next = parent.as_ptr() as *mut XmlNs;
             }
 
             // If the input is an XPath node-set, then the node-set must explicitly
             // contain every node to be rendered to the canonical form.
-            return nodes.contains(
-                XmlNsPtr::from_raw(&raw mut ns)
-                    .ok()
-                    .flatten()
-                    .map(|ns| ns.into()),
-            ) as i32;
+            return nodes.contains(Some(
+                XmlNsPtr::from_raw(&raw mut ns).unwrap().unwrap().into(),
+            )) as i32;
         } else {
             return nodes.contains(Some(node)) as i32;
         }

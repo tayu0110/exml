@@ -123,8 +123,8 @@ use crate::{
         NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
-        XmlNodePtr, XmlNsPtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT,
-        XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
+        XmlNodePtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
+        XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::{canonic_path, XmlURI},
     xpath::xml_init_xpath_internal,
@@ -2141,7 +2141,7 @@ pub unsafe fn xml_parse_in_node_context(
                     (*ctxt).ns_push(cur_ns.prefix().as_deref(), &cur_ns.href().unwrap());
                     nsnr += 1;
                 }
-                ns = XmlNsPtr::from_raw(cur_ns.next).unwrap();
+                ns = cur_ns.next;
             }
             cur = now
                 .parent()

@@ -759,7 +759,7 @@ impl XmlGenericNodePtr {
                     typ: XML_LOCAL_NAMESPACE,
                     href: xml_strdup(XML_XML_NAMESPACE.as_ptr() as _),
                     prefix: xml_strdup(c"xml".as_ptr() as _),
-                    next: node.ns_def.map_or(null_mut(), |ns| ns.as_ptr()),
+                    next: node.ns_def,
                     ..Default::default()
                 }) else {
                     xml_tree_err_memory("searching namespace");
@@ -800,7 +800,7 @@ impl XmlGenericNodePtr {
                     {
                         return Some(now);
                     }
-                    cur = XmlNsPtr::from_raw(now.next).unwrap();
+                    cur = now.next;
                 }
                 if orig != cur_node.into() {
                     let cur = cur_node.ns;

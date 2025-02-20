@@ -332,7 +332,7 @@ unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
                 if shadowed != 0 {
                     (*mi).shadow_depth = 0;
                 }
-                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                ns = now.next;
             }
         }
         cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -367,16 +367,13 @@ unsafe fn xml_dom_wrap_store_ns(
     ns_name: *const XmlChar,
     prefix: Option<&str>,
 ) -> Option<XmlNsPtr> {
-    // if doc.is_null() {
-    //     return None;
-    // }
     let mut ns = doc.ensure_xmldecl()?;
-    if let Some(next) = XmlNsPtr::from_raw(ns.next).unwrap() {
+    if let Some(next) = ns.next {
         if next.prefix().as_deref() == prefix && xml_str_equal(next.href, ns_name) {
             return Some(next);
         }
         ns = next;
-        while let Some(next) = XmlNsPtr::from_raw(ns.next).unwrap() {
+        while let Some(next) = ns.next {
             if next.prefix().as_deref() == prefix && xml_str_equal(next.href, ns_name) {
                 return Some(next);
             }
@@ -384,8 +381,8 @@ unsafe fn xml_dom_wrap_store_ns(
         }
     }
     // Create.
-    ns.next = xml_new_ns(null_mut(), ns_name, prefix).map_or(null_mut(), |ns| ns.as_ptr());
-    XmlNsPtr::from_raw(ns.next).unwrap()
+    ns.next = xml_new_ns(null_mut(), ns_name, prefix);
+    ns.next
 }
 
 /// Declares a new namespace on @elem. It tries to use the
@@ -439,10 +436,10 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
                 )?;
                 if let Some(ns_def) = (*elem).ns_def {
                     let mut ns2 = ns_def;
-                    while let Some(next) = XmlNsPtr::from_raw(ns2.next).unwrap() {
+                    while let Some(next) = ns2.next {
                         ns2 = next;
                     }
-                    ns2.next = ret.as_ptr();
+                    ns2.next = Some(ret);
                 } else {
                     (*elem).ns_def = Some(ret);
                 }
@@ -679,11 +676,10 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                                             if let Some(mut prevns) = prevns {
                                                 prevns.next = cur_ns.next;
                                             } else {
-                                                (*cur).ns_def =
-                                                    XmlNsPtr::from_raw(cur_ns.next).unwrap();
+                                                (*cur).ns_def = cur_ns.next;
                                             }
                                             // goto next_ns_decl;
-                                            ns = XmlNsPtr::from_raw(cur_ns.next).unwrap();
+                                            ns = cur_ns.next;
                                             continue 'b;
                                         }
                                     });
@@ -721,7 +717,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
 
                                 prevns = Some(cur_ns);
                                 // next_ns_decl:
-                                ns = XmlNsPtr::from_raw(cur_ns.next).unwrap();
+                                ns = cur_ns.next;
                             }
                         }
                         if adoptns == 0 {
@@ -1158,7 +1154,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                     {
                                         break 'internal_error;
                                     }
-                                    ns = XmlNsPtr::from_raw(now.next).unwrap();
+                                    ns = now.next;
                                 }
                             }
                             // No namespace, no fun.
@@ -1749,7 +1745,7 @@ pub unsafe fn xml_dom_wrap_remove_node(
                             // goto internal_error;
                             return -1;
                         }
-                        ns = XmlNsPtr::from_raw(now.next).unwrap();
+                        ns = now.next;
                     }
                 }
 
@@ -2165,7 +2161,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 }
 
                                 if let Some(mut last) = clone_ns_def_slot {
-                                    last.next = new.as_ptr();
+                                    last.next = Some(new);
                                     clone_ns_def_slot = Some(new);
                                 } else {
                                     clone_ns_def_slot = Some(new);
@@ -2201,7 +2197,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                         break 'internal_error;
                                     }
                                 }
-                                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                                ns = now.next;
                             }
                         }
                         // (*cur).ns will be processed further down.

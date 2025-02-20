@@ -704,7 +704,7 @@ unsafe fn xml_buf_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut Xm
 unsafe fn xml_ns_list_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, mut cur: Option<XmlNsPtr>) {
     while let Some(now) = cur {
         xml_ns_dump_output(None, now, Some(ctxt));
-        cur = XmlNsPtr::from_raw(now.next).unwrap();
+        cur = now.next;
     }
 }
 
@@ -1843,6 +1843,6 @@ pub(crate) unsafe fn attr_serialize_text_content<'a>(
 pub(crate) unsafe fn xml_ns_list_dump_output(buf: &mut XmlOutputBuffer, mut cur: Option<XmlNsPtr>) {
     while let Some(now) = cur {
         xml_ns_dump_output(Some(buf), now, None);
-        cur = XmlNsPtr::from_raw(now.next).unwrap();
+        cur = now.next;
     }
 }

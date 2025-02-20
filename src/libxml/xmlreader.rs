@@ -1609,10 +1609,7 @@ impl XmlTextReader {
     pub unsafe fn get_attribute(&mut self, name: &str) -> Option<String> {
         use std::ffi::CStr;
 
-        use crate::{
-            parser::split_qname2,
-            tree::{NodeCommon, XmlNsPtr},
-        };
+        use crate::{parser::split_qname2, tree::NodeCommon};
 
         if self.curnode.is_some() {
             return None;
@@ -1635,7 +1632,7 @@ impl XmlTextReader {
                                 .into_owned(),
                         );
                     }
-                    ns = XmlNsPtr::from_raw(now.next).unwrap();
+                    ns = now.next;
                 }
                 return None;
             }
@@ -1655,7 +1652,7 @@ impl XmlTextReader {
                     );
                     break;
                 }
-                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                ns = now.next;
             }
         } else if let Some(ns) = current_node.search_ns(self.node.unwrap().document(), Some(prefix))
         {
@@ -1683,7 +1680,7 @@ impl XmlTextReader {
     ) -> Option<String> {
         use std::ffi::CStr;
 
-        use crate::tree::{NodeCommon, XmlNsPtr};
+        use crate::tree::NodeCommon;
 
         if self.curnode.is_some() {
             return None;
@@ -1707,7 +1704,7 @@ impl XmlTextReader {
                             .into_owned(),
                     );
                 }
-                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                ns = now.next;
             }
             return None;
         }
@@ -1724,7 +1721,7 @@ impl XmlTextReader {
     pub unsafe fn get_attribute_no(&mut self, no: i32) -> Option<String> {
         use std::ffi::CStr;
 
-        use crate::tree::{NodeCommon, XmlNsPtr};
+        use crate::tree::NodeCommon;
 
         if self.curnode.is_some() {
             return None;
@@ -1737,7 +1734,7 @@ impl XmlTextReader {
         let mut ns = current_node.ns_def;
         let mut i = 0;
         while let Some(now) = ns.filter(|_| i < no) {
-            ns = XmlNsPtr::from_raw(now.next).unwrap();
+            ns = now.next;
             i += 1;
         }
 
@@ -1888,10 +1885,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToAttribute")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_attribute(&mut self, name: &str) -> i32 {
-        use crate::{
-            parser::split_qname2,
-            tree::{NodeCommon, XmlNsPtr},
-        };
+        use crate::{parser::split_qname2, tree::NodeCommon};
 
         if self.node.is_none() {
             return -1;
@@ -1918,7 +1912,7 @@ impl XmlTextReader {
                         self.curnode = Some(now.into());
                         return 1;
                     }
-                    ns = XmlNsPtr::from_raw(now.next).unwrap();
+                    ns = now.next;
                 }
                 return 0;
             }
@@ -1947,7 +1941,7 @@ impl XmlTextReader {
                     self.curnode = Some(now.into());
                     return 1;
                 }
-                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                ns = now.next;
             }
         // goto not_found;
         } else {
@@ -1977,7 +1971,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToAttributeNs")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_attribute_ns(&mut self, local_name: &str, namespace_uri: &str) -> i32 {
-        use crate::tree::{NodeCommon, XmlNsPtr};
+        use crate::tree::NodeCommon;
 
         if self.node.is_none() {
             return -1;
@@ -2000,7 +1994,7 @@ impl XmlTextReader {
                     self.curnode = Some(now.into());
                     return 1;
                 }
-                ns = XmlNsPtr::from_raw(now.next).unwrap();
+                ns = now.next;
             }
             return 0;
         }
@@ -2030,7 +2024,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToAttributeNo")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_attribute_no(&mut self, no: i32) -> i32 {
-        use crate::tree::{NodeCommon, XmlNsPtr};
+        use crate::tree::NodeCommon;
 
         // TODO: handle the xmlDecl
         let Some(current_node) = self
@@ -2046,7 +2040,7 @@ impl XmlTextReader {
         let mut ns = current_node.ns_def;
         let mut i = 0;
         while let Some(now) = ns.filter(|_| i < no) {
-            ns = XmlNsPtr::from_raw(now.next).unwrap();
+            ns = now.next;
             i += 1;
         }
 
@@ -2126,8 +2120,8 @@ impl XmlTextReader {
         };
 
         if let Ok(ns) = XmlNsPtr::try_from(curnode) {
-            if !ns.next.is_null() {
-                self.curnode = XmlGenericNodePtr::from_raw(ns.next);
+            if let Some(next) = ns.next {
+                self.curnode = Some(next.into());
                 return 1;
             }
             if let Some(prop) = current_node.properties {
@@ -3768,7 +3762,7 @@ unsafe fn xml_text_reader_collect_siblings(mut node: *mut XmlNode) -> *mut XmlCh
 #[doc(alias = "xmlTextReaderAttributeCount")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32 {
-    use crate::tree::{NodeCommon, XmlNsPtr};
+    use crate::tree::NodeCommon;
 
     let Some(current_node) = reader.node else {
         return 0;
@@ -3795,7 +3789,7 @@ pub unsafe fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32
     let mut ns = node.ns_def;
     while let Some(now) = ns {
         ret += 1;
-        ns = XmlNsPtr::from_raw(now.next).unwrap();
+        ns = now.next;
     }
     ret
 }

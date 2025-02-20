@@ -2186,7 +2186,7 @@ pub unsafe fn xml_sax2_start_element_ns(
             continue;
         };
         if let Some(mut l) = last {
-            l.next = ns.as_ptr();
+            l.next = Some(ns);
             last = Some(ns);
         } else {
             ret.ns_def = Some(ns);

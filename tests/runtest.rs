@@ -3985,15 +3985,12 @@ unsafe fn pattern_test(
     _err: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::{
-        libxml::{
-            pattern::{
-                xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
-                xml_patterncompile, xml_stream_push,
-            },
-            xmlreader::{xml_free_text_reader, xml_reader_walker},
+    use exml::libxml::{
+        pattern::{
+            xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
+            xml_patterncompile, xml_stream_push,
         },
-        tree::XmlNsPtr,
+        xmlreader::{xml_free_text_reader, xml_reader_walker},
     };
 
     let mut patternc: XmlPatternPtr;
@@ -4076,7 +4073,7 @@ unsafe fn pattern_test(
                     while let Some(now) = ns.filter(|_| j < 10) {
                         namespaces[j] = (now.href, now.prefix);
                         j += 1;
-                        ns = XmlNsPtr::from_raw(now.next).unwrap();
+                        ns = now.next;
                     }
 
                     patternc = xml_patterncompile(str.as_ptr(), 0, Some(namespaces[..=j].to_vec()));
@@ -4145,7 +4142,6 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             xmlstring::xml_str_equal,
         },
-        tree::XmlNsPtr,
         xpath::{
             internals::xml_xpath_register_ns, xml_xpath_eval_expression, xml_xpath_free_context,
             xml_xpath_new_context, XmlXPathContextPtr,
@@ -4211,7 +4207,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
             xml_free_doc(doc);
             return null_mut();
         }
-        ns = XmlNsPtr::from_raw(now.next).unwrap();
+        ns = now.next;
     }
 
     // Evaluate xpath

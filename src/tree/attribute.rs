@@ -104,7 +104,7 @@ impl XmlAttr {
                     {
                         return Some(cur_ns);
                     }
-                    cur = XmlNsPtr::from_raw(cur_ns.next).unwrap();
+                    cur = cur_ns.next;
                 }
                 let cur = now.ns;
                 if let Some(cur) = cur.filter(|cur| {
