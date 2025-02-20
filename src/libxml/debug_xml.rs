@@ -3203,10 +3203,10 @@ pub unsafe fn xml_shell<'a>(
             if arg[0] == 0 {
                 xml_shell_du(ctxt, null_mut(), (*ctxt).node.unwrap(), None);
             } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
+                (*(*ctxt).pctxt).node = (*ctxt).node;
                 #[cfg(feature = "xpath")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
+                    (*(*ctxt).pctxt).node = (*ctxt).node;
                     list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
                 }
                 #[cfg(not(feature = "xpath"))]
@@ -3290,7 +3290,7 @@ pub unsafe fn xml_shell<'a>(
                         CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                     );
                 }
-                (*(*ctxt).pctxt).node = null_mut();
+                (*(*ctxt).pctxt).node = None;
             }
         } else if strcmp(command.as_ptr(), c"base".as_ptr()) == 0 {
             xml_shell_base(ctxt, null_mut(), (*ctxt).node, None);
@@ -3341,7 +3341,7 @@ pub unsafe fn xml_shell<'a>(
             if arg[0] == 0 {
                 generic_error!("xpath: expression required\n");
             } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
+                (*(*ctxt).pctxt).node = (*ctxt).node;
                 list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
                 xml_xpath_debug_dump_object(&mut (*ctxt).output, list, 0);
                 xml_xpath_free_object(list);
@@ -3377,10 +3377,10 @@ pub unsafe fn xml_shell<'a>(
                     xml_shell_list(ctxt, null_mut(), (*ctxt).node, None);
                 }
             } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
+                (*(*ctxt).pctxt).node = (*ctxt).node;
                 #[cfg(feature = "xpath")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
+                    (*(*ctxt).pctxt).node = (*ctxt).node;
                     list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
                 }
                 #[cfg(not(feature = "xpath"))]
@@ -3470,7 +3470,7 @@ pub unsafe fn xml_shell<'a>(
                         CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                     );
                 }
-                (*(*ctxt).pctxt).node = null_mut();
+                (*(*ctxt).pctxt).node = None;
             }
         } else if strcmp(command.as_ptr(), c"whereis".as_ptr()) == 0 {
             let mut dir: [c_char; 500] = [0; 500];
@@ -3487,7 +3487,7 @@ pub unsafe fn xml_shell<'a>(
                     writeln!((*ctxt).output, "{dir}");
                 }
             } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
+                (*(*ctxt).pctxt).node = (*ctxt).node;
                 #[cfg(feature = "xpath")]
                 {
                     list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
@@ -3578,7 +3578,7 @@ pub unsafe fn xml_shell<'a>(
                         CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                     );
                 }
-                (*(*ctxt).pctxt).node = null_mut();
+                (*(*ctxt).pctxt).node = None;
             }
         } else if strcmp(command.as_ptr(), c"cd".as_ptr()) == 0 {
             if arg[0] == 0 {
@@ -3586,7 +3586,7 @@ pub unsafe fn xml_shell<'a>(
             } else {
                 #[cfg(feature = "xpath")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
+                    (*(*ctxt).pctxt).node = (*ctxt).node;
                     let l = strlen(arg.as_ptr());
                     if l >= 2 && arg[l - 1] == b'/' as _ {
                         arg[l - 1] = 0;
@@ -3695,7 +3695,7 @@ pub unsafe fn xml_shell<'a>(
                     );
                 }
 
-                (*(*ctxt).pctxt).node = null_mut();
+                (*(*ctxt).pctxt).node = None;
             }
         } else if {
             #[cfg(feature = "libxml_output")]
@@ -3711,10 +3711,10 @@ pub unsafe fn xml_shell<'a>(
             if arg[0] == 0 {
                 xml_shell_cat(ctxt, null_mut(), (*ctxt).node, None);
             } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
+                (*(*ctxt).pctxt).node = (*ctxt).node;
                 #[cfg(feature = "xpath")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node.map_or(null_mut(), |node| node.as_ptr());
+                    (*(*ctxt).pctxt).node = (*ctxt).node;
                     list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
                 }
                 #[cfg(not(feature = "xpath"))]
@@ -3801,7 +3801,7 @@ pub unsafe fn xml_shell<'a>(
                         CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                     );
                 }
-                (*(*ctxt).pctxt).node = null_mut();
+                (*(*ctxt).pctxt).node = None;
             }
         } else {
             generic_error!(

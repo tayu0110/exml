@@ -2203,10 +2203,7 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
         //   context initialized to the root
         //   context position initialized to 1
         //   context size initialized to 1
-        (*(*ctxt).context).node = (*(*ctxt).context)
-            .doc
-            .map_or(null_mut(), |doc| doc.as_ptr())
-            as *mut XmlNode;
+        (*(*ctxt).context).node = (*(*ctxt).context).doc.map(|doc| doc.into());
         (*(*ctxt).context).proximity_position = 1;
         (*(*ctxt).context).context_size = 1;
         #[cfg(feature = "libxml_xptr_locs")]
@@ -2781,7 +2778,7 @@ pub(crate) unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPt
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathLocationset);
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
     let oldset: XmlLocationSetPtr = (*obj).user as _;
-    (*(*ctxt).context).node = null_mut();
+    (*(*ctxt).context).node = None;
 
     if oldset.is_null() || (*oldset).loc_tab.is_empty() {
         (*(*ctxt).context).context_size = 0;
@@ -2803,8 +2800,8 @@ pub(crate) unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPt
             (*ctxt).cur = cur;
 
             // Run the evaluation with a node list made of a single item in the nodeset.
-            (*(*ctxt).context).node = (*loc).user as _;
-            tmp = xml_xpath_new_node_set(XmlGenericNodePtr::from_raw((*(*ctxt).context).node));
+            (*(*ctxt).context).node = XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode);
+            tmp = xml_xpath_new_node_set((*(*ctxt).context).node);
             value_push(ctxt, tmp);
             (*(*ctxt).context).context_size = (*oldset).loc_tab.len() as i32;
             (*(*ctxt).context).proximity_position = i as i32 + 1;
@@ -2828,12 +2825,12 @@ pub(crate) unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPt
                 xml_xpath_free_object(res);
             }
 
-            (*(*ctxt).context).node = null_mut();
+            (*(*ctxt).context).node = None;
         }
 
         // The result is used as the new evaluation set.
         xml_xpath_free_object(obj);
-        (*(*ctxt).context).node = null_mut();
+        (*(*ctxt).context).node = None;
         (*(*ctxt).context).context_size = -1;
         (*(*ctxt).context).proximity_position = -1;
         value_push(ctxt, xml_xptr_wrap_location_set(newset));

@@ -702,7 +702,8 @@ impl XmlGenericNodePtr {
         NonNull::new(Box::leak(boxed)).map(Self)
     }
 
-    pub(crate) fn from_raw<T: NodeCommon>(ptr: *mut T) -> Option<Self> {
+    // Temporary workaround
+    pub fn from_raw<T: NodeCommon>(ptr: *mut T) -> Option<Self> {
         NonNull::new(ptr as *mut dyn NodeCommon).map(Self)
     }
 
@@ -822,6 +823,38 @@ impl XmlGenericNodePtr {
                 .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
         }
         None
+    }
+
+    /// Search all the namespace applying to a given element.
+    ///
+    /// Returns an `Vec` of all the `xmlNsPtr` found.
+    #[doc(alias = "xmlGetNsList")]
+    #[cfg(any(feature = "libxml_tree", feature = "xpath", feature = "schema"))]
+    pub unsafe fn get_ns_list(self, _doc: Option<XmlDocPtr>) -> Option<Vec<XmlNsPtr>> {
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
+
+        let mut ret: Vec<XmlNsPtr> = vec![];
+        let mut node = Some(self);
+        while let Some(now) = node {
+            if let Some(node) = XmlNodePtr::try_from(now)
+                .ok()
+                .filter(|node| matches!(node.element_type(), XmlElementType::XmlElementNode))
+            {
+                let mut cur = node.ns_def;
+                while let Some(now) = cur {
+                    if ret.iter().all(|&ret| now.prefix() != (*ret).prefix()) {
+                        ret.push(now);
+                    }
+                    cur = now.next
+                }
+            }
+            node = now
+                .parent()
+                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        }
+        Some(ret)
     }
 
     /// Read the value of a node, this can be either the text carried

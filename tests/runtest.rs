@@ -2572,7 +2572,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
         ctxt = xml_xpath_new_context(xpath_document);
         (*ctxt).node = xpath_document
             .and_then(|doc| doc.get_root_element())
-            .map_or(null_mut(), |root| root.into());
+            .map(|root| root.into());
         if expr != 0 {
             res = xml_xpath_eval_expression(str as _, ctxt);
         } else {

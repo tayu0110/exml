@@ -2456,8 +2456,7 @@ unsafe fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
         PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
         return;
     }
-    let doc: *mut XmlDoc = doc.into();
-    (*ctxt).node = doc as *mut XmlNode;
+    (*ctxt).node = Some(doc.into());
     let res: XmlXPathObjectPtr = xml_xpath_eval(query as _, ctxt);
     xml_xpath_free_context(ctxt);
 

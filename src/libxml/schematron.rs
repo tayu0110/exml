@@ -35,7 +35,7 @@ use crate::{
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     libxml::xmlstring::xml_str_equal,
     parser::{xml_read_file, xml_read_memory},
-    tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlNode},
+    tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode},
     xpath::{
         internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
         xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_comp_expr,
@@ -1421,7 +1421,7 @@ unsafe fn xml_schematron_register_variables(
     ctxt: XmlXPathContextPtr,
     mut letr: XmlSchematronLetPtr,
     instance: XmlDocPtr,
-    cur: *mut XmlNode,
+    cur: Option<XmlGenericNodePtr>,
 ) -> i32 {
     let mut let_eval: XmlXPathObjectPtr;
 
@@ -1444,17 +1444,20 @@ unsafe fn xml_schematron_register_variables(
 
 unsafe fn xml_schematron_get_node(
     ctxt: XmlSchematronValidCtxtPtr,
-    cur: *mut XmlNode,
+    cur: Option<XmlGenericNodePtr>,
     xpath: *const XmlChar,
 ) -> *mut XmlNode {
     let mut node: *mut XmlNode = null_mut();
 
-    if ctxt.is_null() || cur.is_null() || xpath.is_null() {
+    if ctxt.is_null() || xpath.is_null() {
         return null_mut();
     }
+    let Some(cur) = cur else {
+        return null_mut();
+    };
 
-    (*(*ctxt).xctxt).doc = (*cur).doc;
-    (*(*ctxt).xctxt).node = cur;
+    (*(*ctxt).xctxt).doc = cur.document();
+    (*(*ctxt).xctxt).node = Some(cur);
     let ret: XmlXPathObjectPtr = xml_xpath_eval(xpath, (*ctxt).xctxt);
     if ret.is_null() {
         return null_mut();
@@ -1501,7 +1504,11 @@ unsafe fn xml_schematron_format_report(
             node = cur;
             if let Some(path) = path {
                 let path = CString::new(path).unwrap();
-                node = xml_schematron_get_node(ctxt, cur, path.as_ptr() as *const u8);
+                node = xml_schematron_get_node(
+                    ctxt,
+                    XmlGenericNodePtr::from_raw(cur),
+                    path.as_ptr() as *const u8,
+                );
                 if node.is_null() {
                     node = cur;
                 }
@@ -1731,7 +1738,7 @@ unsafe fn xml_schematron_run_test(
     ctxt: XmlSchematronValidCtxtPtr,
     test: XmlSchematronTestPtr,
     instance: XmlDocPtr,
-    cur: *mut XmlNode,
+    cur: Option<XmlGenericNodePtr>,
     pattern: XmlSchematronPatternPtr,
 ) -> i32 {
     let mut failed: i32;
@@ -1780,7 +1787,13 @@ unsafe fn xml_schematron_run_test(
         (*ctxt).nberrors += 1;
     }
 
-    xml_schematron_report_success(ctxt, test, cur, pattern, (failed == 0) as i32);
+    xml_schematron_report_success(
+        ctxt,
+        test,
+        cur.map_or(null_mut(), |cur| cur.as_ptr()),
+        pattern,
+        (failed == 0) as i32,
+    );
 
     (failed == 0) as i32
 }
@@ -1913,8 +1926,12 @@ pub unsafe fn xml_schematron_validate_doc(
                 if xml_pattern_match((*rule).pattern, cur) == 1 {
                     test = (*rule).tests;
 
-                    if xml_schematron_register_variables((*ctxt).xctxt, (*rule).lets, instance, cur)
-                        != 0
+                    if xml_schematron_register_variables(
+                        (*ctxt).xctxt,
+                        (*rule).lets,
+                        instance,
+                        XmlGenericNodePtr::from_raw(cur),
+                    ) != 0
                     {
                         return -1;
                     }
@@ -1924,7 +1941,7 @@ pub unsafe fn xml_schematron_validate_doc(
                             ctxt,
                             test,
                             instance,
-                            cur,
+                            XmlGenericNodePtr::from_raw(cur),
                             (*rule).pattern as XmlSchematronPatternPtr,
                         );
                         test = (*test).next;
@@ -1960,11 +1977,17 @@ pub unsafe fn xml_schematron_validate_doc(
                             (*ctxt).xctxt,
                             (*rule).lets,
                             instance,
-                            cur,
+                            XmlGenericNodePtr::from_raw(cur),
                         );
 
                         while !test.is_null() {
-                            xml_schematron_run_test(ctxt, test, instance, cur, pattern);
+                            xml_schematron_run_test(
+                                ctxt,
+                                test,
+                                instance,
+                                XmlGenericNodePtr::from_raw(cur),
+                                pattern,
+                            );
                             test = (*test).next;
                         }
 

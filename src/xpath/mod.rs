@@ -63,7 +63,7 @@ use crate::{
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, XmlChar},
     },
-    tree::{NodeCommon, NodePtr, XmlDocPtr, XmlElementType, XmlNode, XmlNsPtr},
+    tree::{NodeCommon, NodePtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNsPtr},
 };
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
@@ -236,8 +236,8 @@ pub type XmlXPathContextPtr = *mut XmlXPathContext;
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlXPathContext {
-    pub doc: Option<XmlDocPtr>, /* The current document */
-    pub node: *mut XmlNode,     /* The current node */
+    pub doc: Option<XmlDocPtr>,          /* The current document */
+    pub node: Option<XmlGenericNodePtr>, /* The current node */
 
     pub(crate) nb_variables_unused: i32, /* unused (hash table) */
     pub(crate) max_variables_unused: i32, /* unused (hash table) */
@@ -309,7 +309,7 @@ impl Default for XmlXPathContext {
     fn default() -> Self {
         Self {
             doc: None,
-            node: null_mut(),
+            node: None,
             nb_variables_unused: 0,
             max_variables_unused: 0,
             var_hash: None,
@@ -685,10 +685,10 @@ pub unsafe fn xml_xpath_cast_string_to_number(val: *const XmlChar) -> f64 {
 /// Returns the number value
 #[doc(alias = "xmlXPathCastNodeToNumber")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_to_number(node: *mut XmlNode) -> f64 {
+pub unsafe fn xml_xpath_cast_node_to_number(node: Option<XmlGenericNodePtr>) -> f64 {
     use std::ffi::CString;
 
-    if node.is_null() {
+    if node.is_none() {
         return XML_XPATH_NAN;
     }
     let strval = xml_xpath_cast_node_to_string(node);
@@ -847,12 +847,9 @@ pub fn xml_xpath_cast_number_to_string(val: f64) -> Cow<'static, str> {
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastNodeToString")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_to_string(node: *mut XmlNode) -> String {
-    if node.is_null() {
-        "".to_owned()
-    } else {
-        (*node).get_content().unwrap_or_else(|| "".to_owned())
-    }
+pub unsafe fn xml_xpath_cast_node_to_string(node: Option<XmlGenericNodePtr>) -> String {
+    node.and_then(|node| node.get_content())
+        .unwrap_or_else(|| "".to_owned())
 }
 
 /// Converts a node-set to its string value.
@@ -869,7 +866,7 @@ pub unsafe fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> 
         ns.sort();
     }
 
-    xml_xpath_cast_node_to_string(ns.node_tab[0].as_ptr()).into()
+    xml_xpath_cast_node_to_string(Some(ns.node_tab[0])).into()
 }
 
 /// Create a new xmlXPathContext
@@ -885,7 +882,7 @@ pub unsafe fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPt
     }
     std::ptr::write(&mut *ret, XmlXPathContext::default());
     (*ret).doc = doc;
-    (*ret).node = null_mut();
+    (*ret).node = None;
 
     (*ret).var_hash = None;
 
@@ -1108,13 +1105,16 @@ pub unsafe fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
 /// Returns -1 in case of error or 0 if successful
 #[doc(alias = "xmlXPathSetContextNode")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_set_context_node(node: *mut XmlNode, ctx: XmlXPathContextPtr) -> i32 {
-    if node.is_null() || ctx.is_null() {
+pub unsafe fn xml_xpath_set_context_node(node: XmlGenericNodePtr, ctx: XmlXPathContextPtr) -> i32 {
+    // if node.is_null() {
+    //     return -1;
+    // }
+    if ctx.is_null() {
         return -1;
     }
 
-    if (*node).doc == (*ctx).doc {
-        (*ctx).node = node;
+    if node.document() == (*ctx).doc {
+        (*ctx).node = Some(node);
         return 0;
     }
     -1
@@ -1128,7 +1128,7 @@ pub unsafe fn xml_xpath_set_context_node(node: *mut XmlNode, ctx: XmlXPathContex
 #[doc(alias = "xmlXPathNodeEval")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_node_eval(
-    node: *mut XmlNode,
+    node: XmlGenericNodePtr,
     str: *const XmlChar,
     ctx: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
@@ -2010,66 +2010,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_cast_node_to_number() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let node = gen_xml_node_ptr(n_node, 0);
-
-                let ret_val = xml_xpath_cast_node_to_number(node);
-                desret_double(ret_val);
-                des_xml_node_ptr(n_node, node, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathCastNodeToNumber",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathCastNodeToNumber()"
-                    );
-                    eprintln!(" {}", n_node);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_cast_node_to_string() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let node = gen_xml_node_ptr(n_node, 0);
-
-                let _ = xml_xpath_cast_node_to_string(node);
-                // desret_xml_char_ptr(ret_val);
-                des_xml_node_ptr(n_node, node, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathCastNodeToString",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathCastNodeToString()"
-                    );
-                    eprintln!(" {}", n_node);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_cast_number_to_boolean() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -2679,49 +2619,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_new_context() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_xpath_node_eval() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_ctx in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let node = gen_xml_node_ptr(n_node, 0);
-                        let str = gen_const_xml_char_ptr(n_str, 1);
-                        let ctx = gen_xml_xpath_context_ptr(n_ctx, 2);
-
-                        let ret_val = xml_xpath_node_eval(node, str, ctx);
-                        desret_xml_xpath_object_ptr(ret_val);
-                        des_xml_node_ptr(n_node, node, 0);
-                        des_const_xml_char_ptr(n_str, str, 1);
-                        des_xml_xpath_context_ptr(n_ctx, ctx, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlXPathNodeEval",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathNodeEval()");
-                            eprint!(" {}", n_node);
-                            eprint!(" {}", n_str);
-                            eprintln!(" {}", n_ctx);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_object_copy() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -2746,41 +2643,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlXPathObjectCopy()"
                     );
                     eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_set_context_node() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_ctx in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let node = gen_xml_node_ptr(n_node, 0);
-                    let ctx = gen_xml_xpath_context_ptr(n_ctx, 1);
-
-                    let ret_val = xml_xpath_set_context_node(node, ctx);
-                    desret_int(ret_val);
-                    des_xml_node_ptr(n_node, node, 0);
-                    des_xml_xpath_context_ptr(n_ctx, ctx, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathSetContextNode",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathSetContextNode()"
-                        );
-                        eprint!(" {}", n_node);
-                        eprintln!(" {}", n_ctx);
-                    }
                 }
             }
         }

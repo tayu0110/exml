@@ -422,7 +422,7 @@ pub unsafe fn xml_xpath_distinct_sorted(nodes: Option<&XmlNodeSet>) -> Option<Bo
     let mut hash = XmlHashTable::with_capacity(l);
     for i in 0..l {
         let cur = nodes.get(i).unwrap();
-        let strval = xml_xpath_cast_node_to_string(cur.as_ptr());
+        let strval = xml_xpath_cast_node_to_string(Some(cur));
         if hash.lookup(&strval).is_none() {
             if hash.add_entry(&strval, ()).is_err() {
                 xml_xpath_free_node_set(Some(ret));

@@ -45,7 +45,7 @@ use exml::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_init_types,
         xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
     },
-    tree::{xml_free_doc, XmlNode},
+    tree::{xml_free_doc, XmlGenericNodePtr, XmlNode},
     uri::build_uri,
     xpath::{
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,
@@ -253,7 +253,7 @@ unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
         return null_mut();
     };
     (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
-    (*CTXT_XPATH.load(Ordering::Relaxed)).node = cur;
+    (*CTXT_XPATH.load(Ordering::Relaxed)).node = XmlGenericNodePtr::from_raw(cur);
     let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath as _);
     if comp.is_null() {
         eprintln!(
@@ -289,7 +289,7 @@ unsafe fn get_string(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlChar {
         return null_mut();
     };
     (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
-    (*CTXT_XPATH.load(Ordering::Relaxed)).node = cur;
+    (*CTXT_XPATH.load(Ordering::Relaxed)).node = XmlGenericNodePtr::from_raw(cur);
     let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath as _);
     if comp.is_null() {
         eprintln!(
