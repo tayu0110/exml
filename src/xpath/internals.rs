@@ -67,8 +67,8 @@ use crate::{
         },
     },
     tree::{
-        xml_build_qname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlDocPtr, XmlDtdPtr,
-        XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_build_qname, NodeCommon, XmlAttr, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
+        XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xpath::{
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
@@ -8921,32 +8921,38 @@ pub unsafe fn xml_xpath_next_attribute(
 ///
 /// returns 1 if @ancestor is a @node's ancestor, 0 otherwise.
 #[doc(alias = "xmlXPathIsAncestor")]
-unsafe fn xml_xpath_is_ancestor(ancestor: *mut XmlNode, mut node: *mut XmlNode) -> i32 {
-    if ancestor.is_null() || node.is_null() {
+unsafe fn xml_xpath_is_ancestor(
+    ancestor: Option<XmlGenericNodePtr>,
+    node: Option<XmlGenericNodePtr>,
+) -> i32 {
+    let Some((ancestor, mut node)) = ancestor.zip(node) else {
+        return 0;
+    };
+    if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
         return 0;
     }
-    if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-        return 0;
-    }
-    if matches!((*ancestor).element_type(), XmlElementType::XmlNamespaceDecl) {
+    if matches!(ancestor.element_type(), XmlElementType::XmlNamespaceDecl) {
         return 0;
     }
     // nodes need to be in the same document
-    if (*ancestor).doc != (*node).doc {
+    if ancestor.document() != node.document() {
         return 0;
     }
     // avoid searching if ancestor or node is the root node
-    if ancestor == (*node).doc.map_or(null_mut(), |doc| doc.as_ptr()) as *mut XmlNode {
+    if Some(ancestor) == node.document().map(|doc| doc.into()) {
         return 1;
     }
-    if node == (*ancestor).doc.map_or(null_mut(), |doc| doc.as_ptr()) as *mut XmlNode {
+    if Some(node) == ancestor.document().map(|doc| doc.into()) {
         return 0;
     }
-    while let Some(parent) = (*node).parent() {
-        if parent.as_ptr() == ancestor {
+    while let Some(parent) = node
+        .parent()
+        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+    {
+        if parent == ancestor {
             return 1;
         }
-        node = parent.as_ptr();
+        node = parent;
     }
     0
 }
@@ -8961,56 +8967,68 @@ unsafe fn xml_xpath_is_ancestor(ancestor: *mut XmlNode, mut node: *mut XmlNode) 
 #[doc(alias = "xmlXPathNextPreceding")]
 pub unsafe fn xml_xpath_next_preceding(
     ctxt: XmlXPathParserContextPtr,
-    mut cur: *mut XmlNode,
-) -> *mut XmlNode {
+    cur: Option<XmlGenericNodePtr>,
+) -> Option<XmlGenericNodePtr> {
     if ctxt.is_null() || (*ctxt).context.is_null() {
-        return null_mut();
+        return None;
     }
-    if cur.is_null() {
-        cur = (*(*ctxt).context).node;
-        if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
-            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-        } else if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-            let ns: *mut XmlNs = cur as *mut XmlNs;
-
-            if (*ns).node.map_or(true, |node| {
-                matches!(node.element_type(), XmlElementType::XmlNamespaceDecl)
-            }) {
-                return null_mut();
-            }
-            cur = (*ns).node.map_or(null_mut(), |node| node.as_ptr());
+    let mut cur = cur.or_else(|| {
+        let cur = XmlGenericNodePtr::from_raw((*(*ctxt).context).node)?;
+        if matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
+            cur.parent()
+                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+        } else if let Ok(ns) = XmlNsPtr::try_from(cur) {
+            ns.node
+                .filter(|node| node.element_type() != XmlElementType::XmlNamespaceDecl)
+        } else {
+            None
         }
+    })?;
+    if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
+        return None;
     }
-    if cur.is_null() || matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-        return null_mut();
-    }
-    if let Some(prev) = (*cur)
-        .prev
+    if let Some(prev) = cur
+        .prev()
         .filter(|p| matches!(p.element_type(), XmlElementType::XmlDTDNode))
+        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
     {
-        cur = prev.as_ptr();
+        cur = prev;
     }
     loop {
-        if let Some(prev) = (*cur).prev {
-            cur = prev.as_ptr();
-            while let Some(last) = (*cur).last() {
-                cur = last.as_ptr();
+        if let Some(prev) = cur
+            .prev()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+        {
+            cur = prev;
+            while let Some(last) = cur
+                .last()
+                .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
+            {
+                cur = last;
             }
-            return cur;
+            break Some(cur);
         }
 
-        cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-        if cur.is_null() {
-            return null_mut();
+        cur = cur
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
+        if Some(cur)
+            == (*(*ctxt).context)
+                .doc
+                .unwrap()
+                .children
+                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
+        {
+            break None;
         }
-        if NodePtr::from_ptr(cur) == (*(*ctxt).context).doc.unwrap().children {
-            return null_mut();
-        }
-        if xml_xpath_is_ancestor(cur, (*(*ctxt).context).node) == 0 {
-            break;
+        if xml_xpath_is_ancestor(
+            Some(cur),
+            XmlGenericNodePtr::from_raw((*(*ctxt).context).node),
+        ) == 0
+        {
+            break Some(cur);
         }
     }
-    cur
 }
 
 /// Traversal function for the "ancestor" direction

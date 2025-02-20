@@ -3887,41 +3887,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_next_preceding() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-                    let cur = gen_xml_node_ptr(n_cur, 1);
-
-                    let ret_val = xml_xpath_next_preceding(ctxt, cur);
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                    des_xml_node_ptr(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathNextPreceding",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathNextPreceding()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_node_set_merge() {
         #[cfg(feature = "xpath")]
         unsafe {
