@@ -45,10 +45,10 @@ pub struct XmlNs {
     pub prefix: *const XmlChar,            /* prefix for the namespace */
     pub(crate) _private: *mut c_void,      /* application data */
     pub(crate) context: Option<XmlDocPtr>, /* normally an xmlDoc */
-    // For XPath. Not used except for XPath.
-    // In the original libxml2, in order to handle namespaces and nodes as a set,
-    // the `next` is set to the node that will be the set.
-    // However, this crate provides a separate member for XPath.
+    /// For XPath. Not used except for XPath.
+    /// In the original libxml2, in order to handle namespaces and nodes as a set,
+    /// the `next` is set to the node that will be the set.
+    /// However, this crate provides a separate member for XPath.
     pub node: Option<XmlGenericNodePtr>,
 }
 
