@@ -4821,11 +4821,7 @@ unsafe fn xml_xpath_node_collect_and_test(
                     break;
                 }
                 if total % 256 == 0
-                    && xml_xpath_cmp_nodes_ext(
-                        (**first).map_or(null_mut(), |first| first.as_ptr()),
-                        cur.as_ptr(),
-                    )
-                    .map_or(false, |f| f.is_le())
+                    && xml_xpath_cmp_nodes_ext((**first).unwrap(), cur).map_or(false, |f| f.is_le())
                 {
                     break;
                 }
@@ -4835,11 +4831,7 @@ unsafe fn xml_xpath_node_collect_and_test(
                     break;
                 }
                 if total % 256 == 0
-                    && xml_xpath_cmp_nodes_ext(
-                        cur.as_ptr(),
-                        (**last).map_or(null_mut(), |last| last.as_ptr()),
-                    )
-                    .map_or(false, |f| f.is_le())
+                    && xml_xpath_cmp_nodes_ext(cur, (**last).unwrap()).map_or(false, |f| f.is_le())
                 {
                     break;
                 }

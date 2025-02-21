@@ -174,11 +174,8 @@ impl XmlNodeSet {
             for i in incr..len {
                 let mut j = i as i32 - incr as i32;
                 while j >= 0 {
-                    if xml_xpath_cmp_nodes_ext(
-                        table[j as usize].as_ptr(),
-                        table[j as usize + incr].as_ptr(),
-                    )
-                    .map_or(false, |f| f.is_gt())
+                    if xml_xpath_cmp_nodes_ext(table[j as usize], table[j as usize + incr])
+                        .map_or(false, |f| f.is_gt())
                     {
                         table.swap(j as usize, j as usize + incr);
                         j -= incr as i32;

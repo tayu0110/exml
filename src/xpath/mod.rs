@@ -63,7 +63,9 @@ use crate::{
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, XmlChar},
     },
-    tree::{NodeCommon, NodePtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNsPtr},
+    tree::{
+        NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNsPtr,
+    },
 };
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
@@ -1586,24 +1588,18 @@ pub unsafe fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
 /// if it's the same node, -1 otherwise
 #[doc(alias = "xmlXPathCmpNodesExt")]
 unsafe fn xml_xpath_cmp_nodes_ext(
-    mut node1: *mut XmlNode,
-    mut node2: *mut XmlNode,
+    mut node1: XmlGenericNodePtr,
+    mut node2: XmlGenericNodePtr,
 ) -> Option<std::cmp::Ordering> {
-    let mut depth1: i32;
-    let mut depth2: i32;
     let mut misc: i32 = 0;
     let mut precedence1: i32 = 0;
     let mut precedence2: i32 = 0;
-    let mut misc_node1: *mut XmlNode = null_mut();
-    let mut misc_node2: *mut XmlNode = null_mut();
-    let mut cur: *mut XmlNode;
+    let mut misc_node1 = None;
+    let mut misc_node2 = None;
 
-    let mut l1: isize;
-    let mut l2: isize;
-
-    if node1.is_null() || node2.is_null() {
-        return None;
-    }
+    // if node1.is_null() || node2.is_null() {
+    //     return None;
+    // }
 
     if node1 == node2 {
         return Some(std::cmp::Ordering::Equal);
@@ -1611,15 +1607,19 @@ unsafe fn xml_xpath_cmp_nodes_ext(
 
     // a couple of optimizations which will avoid computations in most cases
     'turtle_comparison: {
-        match (*node1).element_type() {
+        match node1.element_type() {
             XmlElementType::XmlElementNode => {
-                if matches!((*node2).element_type(), XmlElementType::XmlElementNode) {
-                    if 0 > (*node1).content as isize
-                        && 0 > (*node2).content as isize
-                        && (*node1).doc == (*node2).doc
+                let node1 = XmlNodePtr::try_from(node1).unwrap();
+                if let Some(node2) = XmlNodePtr::try_from(node2)
+                    .ok()
+                    .filter(|node2| node2.element_type() == XmlElementType::XmlElementNode)
+                {
+                    if 0 > node1.content as isize
+                        && 0 > node2.content as isize
+                        && node1.doc == node2.doc
                     {
-                        l1 = -((*node1).content as isize);
-                        l2 = -((*node2).content as isize);
+                        let l1 = -(node1.content as isize);
+                        let l2 = -(node2.content as isize);
                         if l1 < l2 {
                             return Some(std::cmp::Ordering::Less);
                         }
@@ -1633,44 +1633,59 @@ unsafe fn xml_xpath_cmp_nodes_ext(
             }
             XmlElementType::XmlAttributeNode => {
                 precedence1 = 1; /* element is owner */
-                misc_node1 = node1;
-                node1 = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
+                misc_node1 = Some(node1);
+                node1 = node1
+                    .parent()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                    .unwrap();
                 misc = 1;
             }
             XmlElementType::XmlTextNode
             | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlPINode => {
-                misc_node1 = node1;
+                misc_node1 = Some(node1);
                 // Find nearest element node.
-                if (*node1).prev.is_some() {
+                let n1 = if let Some(mut prev1) = node1
+                    .prev()
+                    .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
+                {
                     loop {
-                        node1 = (*node1).prev.map_or(null_mut(), |p| p.as_ptr());
-                        if matches!((*node1).element_type(), XmlElementType::XmlElementNode) {
+                        node1 = prev1;
+                        if matches!(node1.element_type(), XmlElementType::XmlElementNode) {
                             precedence1 = 3; /* element in prev-sibl axis */
-                            break;
+                            break Some(node1);
                         }
-                        if (*node1).prev.is_none() {
+                        let Some(prev) = node1
+                            .prev()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                        else {
                             precedence1 = 2; /* element is parent */
                             // URGENT TODO: Are there any cases, where the
                             // parent of such a node is not an element node?
-                            node1 = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
-                            break;
-                        }
+                            break node1
+                                .parent()
+                                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                        };
+                        prev1 = prev;
                     }
                 } else {
                     precedence1 = 2; /* element is parent */
-                    node1 = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
-                }
-                if node1.is_null()
-                    || !matches!((*node1).element_type(), XmlElementType::XmlElementNode)
-                    || 0 <= (*node1).content as isize
+                    node1
+                        .parent()
+                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                };
+                if let Some(n1) = n1
+                    .and_then(|n1| XmlNodePtr::try_from(n1).ok())
+                    .filter(|n1| n1.element_type() == XmlElementType::XmlElementNode)
+                    .filter(|n1| 0 > n1.content as isize)
                 {
-                    // Fallback for whatever case.
-                    node1 = misc_node1;
-                    precedence1 = 0;
-                } else {
+                    node1 = n1.into();
                     misc = 1;
+                } else {
+                    // Fallback for whatever case.
+                    node1 = misc_node1.unwrap();
+                    precedence1 = 0;
                 }
             }
             XmlElementType::XmlNamespaceDecl => {
@@ -1680,44 +1695,59 @@ unsafe fn xml_xpath_cmp_nodes_ext(
             _ => {}
         }
 
-        match (*node2).element_type() {
+        match node2.element_type() {
             XmlElementType::XmlElementNode => {}
             XmlElementType::XmlAttributeNode => {
                 precedence2 = 1; /* element is owner */
-                misc_node2 = node2;
-                node2 = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
+                misc_node2 = Some(node2);
+                node2 = node2
+                    .parent()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                    .unwrap();
                 misc = 1;
             }
             XmlElementType::XmlTextNode
             | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlPINode => {
-                misc_node2 = node2;
-                if (*node2).prev.is_some() {
+                misc_node2 = Some(node2);
+                let n2 = if let Some(mut prev2) = node2
+                    .prev()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                {
                     loop {
-                        node2 = (*node2).prev.map_or(null_mut(), |p| p.as_ptr());
-                        if matches!((*node2).element_type(), XmlElementType::XmlElementNode) {
+                        node2 = prev2;
+                        if matches!(node2.element_type(), XmlElementType::XmlElementNode) {
                             precedence2 = 3; /* element in prev-sibl axis */
-                            break;
+                            break Some(node2);
                         }
-                        if (*node2).prev.is_none() {
+                        let Some(prev) = node2
+                            .prev()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                        else {
                             precedence2 = 2; /* element is parent */
-                            node2 = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
-                            break;
-                        }
+                            break node2
+                                .parent()
+                                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                        };
+                        prev2 = prev;
                     }
                 } else {
                     precedence2 = 2; /* element is parent */
-                    node2 = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
-                }
-                if node2.is_null()
-                    || !matches!((*node2).element_type(), XmlElementType::XmlElementNode)
-                    || 0 <= (*node2).content as isize
+                    node2
+                        .parent()
+                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                };
+                if let Some(n2) = n2
+                    .and_then(|n2| XmlNodePtr::try_from(n2).ok())
+                    .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+                    .filter(|node| 0 > node.content as isize)
                 {
-                    node2 = misc_node2;
-                    precedence2 = 0;
-                } else {
+                    node2 = n2.into();
                     misc = 1;
+                } else {
+                    node2 = misc_node2.unwrap();
+                    precedence2 = 0;
                 }
             }
             XmlElementType::XmlNamespaceDecl => {
@@ -1730,15 +1760,20 @@ unsafe fn xml_xpath_cmp_nodes_ext(
                 if precedence1 == precedence2 {
                     // The ugly case; but normally there aren't many
                     // adjacent non-element nodes around.
-                    cur = (*misc_node2).prev.map_or(null_mut(), |p| p.as_ptr());
-                    while !cur.is_null() {
+                    let mut cur = misc_node2
+                        .unwrap()
+                        .prev()
+                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                    while let Some(now) = cur {
                         if cur == misc_node1 {
                             return Some(std::cmp::Ordering::Less);
                         }
-                        if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+                        if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                             return Some(std::cmp::Ordering::Greater);
                         }
-                        cur = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
+                        cur = now
+                            .prev()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
                     }
                     return Some(std::cmp::Ordering::Greater);
                 } else {
@@ -1760,34 +1795,155 @@ unsafe fn xml_xpath_cmp_nodes_ext(
             //   Text-6(precedence2 == 3)
             // </foo>
             if precedence2 == 3 && precedence1 > 1 {
-                cur = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
-                while !cur.is_null() {
-                    if cur == node2 {
+                let mut cur = node1
+                    .parent()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                while let Some(now) = cur {
+                    if now == node2 {
                         return Some(std::cmp::Ordering::Less);
                     }
-                    cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+                    cur = now
+                        .parent()
+                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
                 }
             }
             if precedence1 == 3 && precedence2 > 1 {
-                cur = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
-                while !cur.is_null() {
-                    if cur == node1 {
+                let mut cur = node2
+                    .parent()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                while let Some(now) = cur {
+                    if now == node1 {
                         return Some(std::cmp::Ordering::Greater);
                     }
-                    cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+                    cur = now
+                        .parent()
+                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
                 }
             }
         }
 
         // Speedup using document order if available.
-        if matches!((*node1).element_type(), XmlElementType::XmlElementNode)
-            && matches!((*node2).element_type(), XmlElementType::XmlElementNode)
-            && 0 > (*node1).content as isize
-            && 0 > (*node2).content as isize
-            && (*node1).doc == (*node2).doc
+        if let Some((node1, node2)) = XmlNodePtr::try_from(node1)
+            .ok()
+            .zip(XmlNodePtr::try_from(node2).ok())
         {
-            l1 = -((*node1).content as isize);
-            l2 = -((*node2).content as isize);
+            if node1.element_type() == XmlElementType::XmlElementNode
+                && node2.element_type() == XmlElementType::XmlElementNode
+                && 0 > node1.content as isize
+                && 0 > node2.content as isize
+                && node1.doc == node2.doc
+            {
+                let l1 = -(node1.content as isize);
+                let l2 = -(node2.content as isize);
+                if l1 < l2 {
+                    return Some(std::cmp::Ordering::Less);
+                }
+                if l1 > l2 {
+                    return Some(std::cmp::Ordering::Greater);
+                }
+            }
+        }
+    }
+
+    // turtle_comparison:
+
+    if Some(node1)
+        == node2
+            .prev()
+            .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
+    {
+        return Some(std::cmp::Ordering::Less);
+    }
+    if Some(node1)
+        == node2
+            .next()
+            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+    {
+        return Some(std::cmp::Ordering::Greater);
+    }
+
+    // compute depth to root
+    let mut depth2 = 0;
+    let mut cur = node2;
+    while let Some(parent) = cur
+        .parent()
+        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+    {
+        if parent == node1 {
+            return Some(std::cmp::Ordering::Less);
+        }
+        depth2 += 1;
+        cur = parent;
+    }
+    let root = cur;
+    let mut depth1 = 0;
+    let mut cur = node1;
+    while let Some(parent) = cur
+        .parent()
+        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+    {
+        if parent == node2 {
+            return Some(std::cmp::Ordering::Greater);
+        }
+        depth1 += 1;
+        cur = parent;
+    }
+    // Distinct document (or distinct entities :-( ) case.
+    if root != cur {
+        return None;
+    }
+    // get the nearest common ancestor.
+    while depth1 > depth2 {
+        depth1 -= 1;
+        node1 = node1
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+            .unwrap();
+    }
+    while depth2 > depth1 {
+        depth2 -= 1;
+        node2 = node2
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+            .unwrap();
+    }
+    while node1.parent() != node2.parent() {
+        // should not happen but just in case ...
+        node1 = node1
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
+        node2 = node2
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
+    }
+    // Find who's first.
+    if Some(node1)
+        == node2
+            .prev()
+            .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
+    {
+        return Some(std::cmp::Ordering::Less);
+    }
+    if Some(node1)
+        == node2
+            .next()
+            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+    {
+        return Some(std::cmp::Ordering::Greater);
+    }
+    // Speedup using document order if available.
+    if let Some((node1, node2)) = XmlNodePtr::try_from(node1)
+        .ok()
+        .zip(XmlNodePtr::try_from(node2).ok())
+    {
+        if node1.element_type() == XmlElementType::XmlElementNode
+            && node2.element_type() == XmlElementType::XmlElementNode
+            && 0 > node1.content as isize
+            && 0 > node2.content as isize
+            && node1.doc == node2.doc
+        {
+            let l1 = -(node1.content as isize);
+            let l2 = -(node2.content as isize);
             if l1 < l2 {
                 return Some(std::cmp::Ordering::Less);
             }
@@ -1797,85 +1953,16 @@ unsafe fn xml_xpath_cmp_nodes_ext(
         }
     }
 
-    // turtle_comparison:
-
-    if NodePtr::from_ptr(node1) == (*node2).prev {
-        return Some(std::cmp::Ordering::Less);
-    }
-    if NodePtr::from_ptr(node1) == (*node2).next {
-        return Some(std::cmp::Ordering::Greater);
-    }
-    // compute depth to root
-    depth2 = 0;
-    cur = node2;
-    while let Some(parent) = (*cur).parent() {
-        if parent.as_ptr() == node1 {
-            return Some(std::cmp::Ordering::Less);
-        }
-        depth2 += 1;
-        cur = parent.as_ptr();
-    }
-    let root: *mut XmlNode = cur;
-    depth1 = 0;
-    cur = node1;
-    while let Some(parent) = (*cur).parent() {
-        if parent.as_ptr() == node2 {
-            return Some(std::cmp::Ordering::Greater);
-        }
-        depth1 += 1;
-        cur = parent.as_ptr();
-    }
-    // Distinct document (or distinct entities :-( ) case.
-    if root != cur {
-        return None;
-    }
-    // get the nearest common ancestor.
-    while depth1 > depth2 {
-        depth1 -= 1;
-        node1 = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
-    }
-    while depth2 > depth1 {
-        depth2 -= 1;
-        node2 = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
-    }
-    while (*node1).parent() != (*node2).parent() {
-        node1 = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
-        node2 = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
-        /* should not happen but just in case ... */
-        if node1.is_null() || node2.is_null() {
-            return None;
-        }
-    }
-    // Find who's first.
-    if NodePtr::from_ptr(node1) == (*node2).prev {
-        return Some(std::cmp::Ordering::Less);
-    }
-    if NodePtr::from_ptr(node1) == (*node2).next {
-        return Some(std::cmp::Ordering::Greater);
-    }
-    // Speedup using document order if available.
-    if matches!((*node1).element_type(), XmlElementType::XmlElementNode)
-        && matches!((*node2).element_type(), XmlElementType::XmlElementNode)
-        && 0 > (*node1).content as isize
-        && 0 > (*node2).content as isize
-        && (*node1).doc == (*node2).doc
-    {
-        l1 = -((*node1).content as isize);
-        l2 = -((*node2).content as isize);
-        if l1 < l2 {
-            return Some(std::cmp::Ordering::Less);
-        }
-        if l1 > l2 {
-            return Some(std::cmp::Ordering::Greater);
-        }
-    }
-
-    let mut cur = (*node1).next;
+    let mut cur = node1
+        .next()
+        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
     while let Some(now) = cur {
-        if Some(now) == NodePtr::from_ptr(node2) {
+        if now == node2 {
             return Some(std::cmp::Ordering::Less);
         }
-        cur = now.next;
+        cur = now
+            .next()
+            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
     }
     // assume there is no sibling list corruption
     Some(std::cmp::Ordering::Greater)
