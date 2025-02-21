@@ -4229,7 +4229,9 @@ unsafe fn xml_xpath_next_preceding_internal(
                 .node
                 .filter(|node| node.element_type() != XmlElementType::XmlNamespaceDecl)?;
         }
-        (*ctxt).ancestor = cur.parent().map_or(null_mut(), |p| p.as_ptr());
+        (*ctxt).ancestor = cur
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
         Some(cur)
     })?;
     if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -4255,10 +4257,12 @@ unsafe fn xml_xpath_next_preceding_internal(
         {
             return None;
         }
-        if Some(cur) != XmlGenericNodePtr::from_raw((*ctxt).ancestor) {
+        if Some(cur) != (*ctxt).ancestor {
             return Some(cur);
         }
-        (*ctxt).ancestor = cur.parent().map_or(null_mut(), |p| p.as_ptr());
+        (*ctxt).ancestor = cur
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
     }
     cur = cur
         .prev()

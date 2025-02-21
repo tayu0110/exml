@@ -247,14 +247,14 @@ unsafe fn xml_xptr_new_range_internal(
 #[doc(alias = "xmlXPtrCmpPoints")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_cmp_points(
-    node1: *mut XmlNode,
+    node1: XmlGenericNodePtr,
     index1: i32,
-    node2: *mut XmlNode,
+    node2: XmlGenericNodePtr,
     index2: i32,
 ) -> i32 {
-    if node1.is_null() || node2.is_null() {
-        return -2;
-    }
+    // if node1.is_null() || node2.is_null() {
+    //     return -2;
+    // }
     // a couple of optimizations which will avoid computations in most cases
     if node1 == node2 {
         if index1 < index2 {
@@ -284,9 +284,9 @@ unsafe fn xml_xptr_range_check_order(range: XmlXPathObjectPtr) {
         return;
     }
     tmp = xml_xptr_cmp_points(
-        (*range).user as _,
+        XmlGenericNodePtr::from_raw((*range).user as *mut XmlNode).unwrap(),
         (*range).index,
-        (*range).user2 as _,
+        XmlGenericNodePtr::from_raw((*range).user2 as *mut XmlNode).unwrap(),
         (*range).index2,
     );
     if tmp == -1 {
