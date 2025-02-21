@@ -34,7 +34,8 @@ use crate::libxml::{
 
 use super::{
     xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDocPtr,
-    XmlElementType, XmlGenericNodePtr, XmlNode, XmlNsType, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNsType, XML_LOCAL_NAMESPACE,
+    XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
@@ -280,11 +281,13 @@ impl From<XmlNsPtr> for *mut XmlNs {
 /// Returns a new namespace pointer or NULL
 #[doc(alias = "xmlNewNs")]
 pub unsafe fn xml_new_ns(
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
     href: *const XmlChar,
     prefix: Option<&str>,
 ) -> Option<XmlNsPtr> {
-    if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
+    if node.map_or(false, |node| {
+        node.element_type() != XmlElementType::XmlElementNode
+    }) {
         return None;
     }
 
@@ -319,8 +322,8 @@ pub unsafe fn xml_new_ns(
 
     // Add it at the end to preserve parsing order ...
     // and checks for existing use of the prefix
-    if !node.is_null() {
-        if let Some(ns_def) = (*node).ns_def {
+    if let Some(mut node) = node {
+        if let Some(ns_def) = node.ns_def {
             let mut prev = ns_def;
             if (prev.prefix.is_null() && cur.prefix.is_null())
                 || xml_str_equal(prev.prefix, cur.prefix)
@@ -339,7 +342,7 @@ pub unsafe fn xml_new_ns(
             }
             prev.next = Some(cur);
         } else {
-            (*node).ns_def = Some(cur);
+            node.ns_def = Some(cur);
         }
     }
     Some(cur)

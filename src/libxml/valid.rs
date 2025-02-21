@@ -25,7 +25,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut, NonNull},
+    ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     sync::atomic::Ordering,
 };
@@ -2007,7 +2007,10 @@ pub unsafe fn xml_add_id(
 /// Returns null_mut() if not found,
 /// otherwise the xmlAttrPtr defining the ID or XmlDocPtr as `*mut dyn NodeCommon`.
 #[doc(alias = "xmlGetID")]
-pub unsafe fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> Option<NonNull<dyn NodeCommon>> {
+pub unsafe fn xml_get_id(
+    doc: XmlDocPtr,
+    id: *const XmlChar,
+) -> Option<Result<XmlAttrPtr, XmlDocPtr>> {
     if id.is_null() {
         return None;
     }
@@ -2015,11 +2018,11 @@ pub unsafe fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> Option<NonNull<d
     let table = doc.ids.as_deref()?;
     let id_ptr = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())?;
     match id_ptr.attr {
-        Some(attr) => NonNull::new(attr.as_ptr() as *mut dyn NodeCommon),
+        Some(attr) => Some(Ok(attr)),
         None => {
             // We are operating on a stream, return a well known reference
             // since the attribute node doesn't exist anymore
-            NonNull::new(doc.as_ptr() as *mut dyn NodeCommon)
+            Some(Err(doc))
         }
     }
 }

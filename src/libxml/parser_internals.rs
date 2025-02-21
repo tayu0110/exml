@@ -75,7 +75,7 @@ use crate::{
         NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
-        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
+        XmlNodePtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
 };
@@ -2435,79 +2435,77 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             if (list.is_null() && ent.owner == 0)
                 || matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader)
             {
-                let mut nw: *mut XmlNode;
-                let mut cur: *mut XmlNode;
-                let mut first_child: *mut XmlNode = null_mut();
+                let mut first_child = None;
 
                 // when operating on a reader, the entities definitions
                 // are always owning the entities subtree.
                 // if ((*ctxt).parseMode == XML_PARSE_READER)
                 //     (*ent).owner = 1;
 
-                cur = ent.children.load(Ordering::Relaxed) as _;
-                while !cur.is_null() {
-                    nw = xml_doc_copy_node(
-                        XmlGenericNodePtr::from_raw(cur).unwrap(),
-                        (*ctxt).my_doc,
-                        1,
-                    );
-                    if !nw.is_null() {
-                        if (*nw)._private.is_null() {
-                            (*nw)._private = (*cur)._private;
+                let mut cur =
+                    XmlNodePtr::from_raw(ent.children.load(Ordering::Relaxed) as _).unwrap();
+                while let Some(cur_node) = cur {
+                    let mut nw =
+                        xml_doc_copy_node(XmlGenericNodePtr::from(cur_node), (*ctxt).my_doc, 1)
+                            .map(|nw| XmlNodePtr::try_from(nw).unwrap());
+                    if let Some(mut now) = nw {
+                        if now._private.is_null() {
+                            now._private = cur_node._private;
                         }
-                        if first_child.is_null() {
+                        if first_child.is_none() {
                             first_child = nw;
                         }
-                        nw = context_node.add_child(nw);
+                        nw = XmlNodePtr::from_raw(context_node.add_child(now.as_ptr())).unwrap();
                     }
-                    if cur == ent.last.load(Ordering::Relaxed) as _ {
+                    if cur == XmlNodePtr::from_raw(ent.last.load(Ordering::Relaxed) as _).unwrap() {
                         // needed to detect some strange empty
                         // node cases in the reader tests
-                        if matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader)
-                            && !nw.is_null()
-                            && matches!((*nw).element_type(), XmlElementType::XmlElementNode)
-                            && (*nw).children().is_none()
-                        {
-                            (*nw).extra = 1;
+                        if matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader) {
+                            if let Some(mut nw) = nw
+                                .filter(|nw| nw.element_type() == XmlElementType::XmlElementNode)
+                                .filter(|nw| nw.children.is_none())
+                            {
+                                nw.extra = 1;
+                            }
                         }
 
                         break;
                     }
-                    cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+                    cur = cur_node
+                        .next
+                        .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
                 }
             } else if list.is_null() || !(*ctxt).input_tab.is_empty() {
-                let mut nw: *mut XmlNode;
-                let mut cur: *mut XmlNode;
-                let mut next: *mut XmlNode;
-                let mut first_child: *mut XmlNode = null_mut();
+                let mut first_child = None;
 
                 // Copy the entity child list and make it the new
                 // entity child list. The goal is to make sure any
                 // ID or REF referenced will be the one from the
                 // document content and not the entity copy.
-                cur = ent.children.load(Ordering::Relaxed) as _;
+                let mut cur =
+                    XmlNodePtr::from_raw(ent.children.load(Ordering::Relaxed) as _).unwrap();
                 ent.children.store(null_mut(), Ordering::Relaxed);
-                let last: *mut XmlNode = ent.last.load(Ordering::Relaxed) as _;
+                let last = XmlNodePtr::from_raw(ent.last.load(Ordering::Relaxed) as _).unwrap();
                 ent.last.store(null_mut(), Ordering::Relaxed);
-                while !cur.is_null() {
-                    next = (*cur).next.take().map_or(null_mut(), |n| n.as_ptr());
-                    (*cur).set_parent(None);
-                    nw = xml_doc_copy_node(
-                        XmlGenericNodePtr::from_raw(cur).unwrap(),
-                        (*ctxt).my_doc,
-                        1,
-                    );
-                    if !nw.is_null() {
-                        if (*nw)._private.is_null() {
-                            (*nw)._private = (*cur)._private;
+                while let Some(mut cur_node) = cur {
+                    let next = cur_node
+                        .next
+                        .take()
+                        .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                    cur_node.set_parent(None);
+                    let nw = xml_doc_copy_node(cur_node.into(), (*ctxt).my_doc, 1)
+                        .map(|nw| XmlNodePtr::try_from(nw).unwrap());
+                    if let Some(mut nw) = nw {
+                        if nw._private.is_null() {
+                            nw._private = cur_node._private;
                         }
-                        if first_child.is_null() {
-                            first_child = cur;
+                        if first_child.is_none() {
+                            first_child = Some(cur_node);
                         }
-                        (*ent).add_child(nw);
+                        (*ent).add_child(nw.as_ptr());
                     }
-                    context_node.add_child(cur);
-                    if cur == last {
+                    context_node.add_child(cur_node.as_ptr());
+                    if Some(cur_node) == last {
                         break;
                     }
                     cur = next;

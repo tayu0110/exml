@@ -25705,7 +25705,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                     ns.is_some()
                                 } {}
                                 ns = xml_new_ns(
-                                    (*vctxt).validation_root,
+                                    XmlNodePtr::from_raw((*vctxt).validation_root).unwrap(),
                                     (*iattr).ns_name,
                                     Some(&prefix),
                                 );

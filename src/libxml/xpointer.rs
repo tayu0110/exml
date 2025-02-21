@@ -2499,7 +2499,6 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
     let mut list: *mut XmlNode = null_mut();
     let mut last: *mut XmlNode = null_mut();
     let mut parent: *mut XmlNode = null_mut();
-    let mut tmp: *mut XmlNode;
     /* pointers to traversal nodes */
     let mut cur: *mut XmlNode;
     let mut end: *mut XmlNode;
@@ -2519,7 +2518,8 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
     }
     end = (*range).user2 as _;
     if end.is_null() {
-        return xml_copy_node(XmlGenericNodePtr::from_raw(start).unwrap(), 1);
+        return xml_copy_node(XmlGenericNodePtr::from_raw(start).unwrap(), 1)
+            .map_or(null_mut(), |node| node.as_ptr());
     }
     if (*end).typ == XmlElementType::XmlNamespaceDecl {
         return null_mut();
@@ -2559,14 +2559,14 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                 }
                 return list;
             } else {
-                tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 0);
+                let tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 0);
                 if list.is_null() {
-                    list = tmp;
-                    parent = tmp;
+                    list = tmp.map_or(null_mut(), |node| node.as_ptr());
+                    parent = tmp.map_or(null_mut(), |node| node.as_ptr());
                 } else if !last.is_null() {
-                    parent = (*last).add_next_sibling(tmp);
+                    parent = (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
                 } else {
-                    parent = (*parent).add_child(tmp);
+                    parent = (*parent).add_child(tmp.map_or(null_mut(), |node| node.as_ptr()));
                 }
                 last = null_mut();
 
@@ -2603,22 +2603,22 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                 list = tmp.map_or(null_mut(), |node| node.as_ptr());
             } else {
                 if cur == start && index1 > 1 {
-                    tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 0);
-                    list = tmp;
-                    parent = tmp;
+                    let tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 0);
+                    list = tmp.map_or(null_mut(), |node| node.as_ptr());
+                    parent = tmp.map_or(null_mut(), |node| node.as_ptr());
                     last = null_mut();
                     cur = xml_xptr_get_nth_child(cur, index1 as usize - 1);
                     index1 = 0;
                     // Now gather the remaining nodes from cur to end
                     continue; /* while */
                 }
-                tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 1);
-                list = tmp;
+                let tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 1);
+                list = tmp.map_or(null_mut(), |node| node.as_ptr());
                 parent = null_mut();
-                last = tmp;
+                last = tmp.map_or(null_mut(), |node| node.as_ptr());
             }
         } else {
-            tmp = null_mut();
+            let mut tmp = None;
             match (*cur).typ {
                 XmlElementType::XmlDTDNode
                 | XmlElementType::XmlElementDecl
@@ -2638,15 +2638,15 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                     tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 1);
                 }
             }
-            if !tmp.is_null() {
+            if let Some(tmp) = tmp {
                 if list.is_null() || (last.is_null() && parent.is_null()) {
                     STRANGE!();
                     return null_mut();
                 }
                 if !last.is_null() {
-                    (*last).add_next_sibling(tmp);
+                    (*last).add_next_sibling(tmp.as_ptr());
                 } else {
-                    last = (*parent).add_child(tmp);
+                    last = (*parent).add_child(tmp.as_ptr());
                 }
             }
         }
@@ -2705,10 +2705,12 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut Xm
                     _ => unreachable!(),
                 }
                 if last.is_null() {
-                    list = xml_copy_node(node, 1);
+                    list = xml_copy_node(node, 1).map_or(null_mut(), |node| node.as_ptr());
                     last = list;
                 } else {
-                    (*last).add_next_sibling(xml_copy_node(node, 1));
+                    (*last).add_next_sibling(
+                        xml_copy_node(node, 1).map_or(null_mut(), |node| node.as_ptr()),
+                    );
                     if let Some(next) = (*last).next() {
                         last = next.as_ptr();
                     }
@@ -2740,6 +2742,7 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut Xm
                 XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode).unwrap(),
                 0,
             )
+            .map_or(null_mut(), |node| node.as_ptr())
         }
         _ => {}
     }

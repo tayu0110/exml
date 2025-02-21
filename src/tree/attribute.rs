@@ -612,25 +612,37 @@ pub(super) unsafe fn xml_copy_prop_internal(
             } else {
                 // we are in trouble: we need a new reconciled namespace.
                 // This is expensive
-                ret.ns = xml_new_reconciled_ns(target.doc, target.as_ptr(), cur_ns);
+                ret.ns = xml_new_reconciled_ns(target.doc, target, cur_ns);
             }
         } else {
             // Humm, we are copying an element whose namespace is defined
             // out of the new tree scope. Search it in the original tree
             // and add it at the top of the new tree
             if let Some(ns) = cur.parent.unwrap().search_ns(cur.doc, prefix.as_deref()) {
-                let mut root: *mut XmlNode = target.as_ptr();
-                let mut pred: *mut XmlNode = null_mut();
+                let mut root = XmlGenericNodePtr::from(target);
+                let mut pred = None;
 
-                while let Some(parent) = (*root).parent() {
-                    pred = root;
-                    root = parent.as_ptr();
+                while let Some(parent) = root
+                    .parent()
+                    .and_then(|r| XmlGenericNodePtr::from_raw(r.as_ptr()))
+                {
+                    pred = Some(root);
+                    root = parent;
                 }
-                if root == target.doc.map_or(null_mut(), |doc| doc.as_ptr()) as _ {
+                ret.ns = if Some(root) == target.doc.map(|doc| doc.into()) {
                     // correct possibly cycling above the document elt
-                    root = pred;
-                }
-                ret.ns = xml_new_ns(root, ns.href, ns.prefix().as_deref());
+                    xml_new_ns(
+                        pred.map(|p| XmlNodePtr::try_from(p).unwrap()),
+                        ns.href,
+                        ns.prefix().as_deref(),
+                    )
+                } else {
+                    xml_new_ns(
+                        Some(XmlNodePtr::try_from(root).unwrap()),
+                        ns.href,
+                        ns.prefix().as_deref(),
+                    )
+                };
             }
         }
     } else {

@@ -381,7 +381,7 @@ unsafe fn xml_dom_wrap_store_ns(
         }
     }
     // Create.
-    ns.next = xml_new_ns(null_mut(), ns_name, prefix);
+    ns.next = xml_new_ns(None, ns_name, prefix);
     ns.next
 }
 
@@ -428,7 +428,7 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
                 // goto ns_next_prefix;
             } else {
                 let ret = xml_new_ns(
-                    null_mut(),
+                    None,
                     ns_name,
                     (!pref.is_null())
                         .then(|| CStr::from_ptr(pref as *const i8).to_string_lossy())

@@ -899,9 +899,10 @@ unsafe fn xml_xinclude_copy_node(
             copy = xml_static_copy_node(
                 XmlGenericNodePtr::from_raw(cur).unwrap(),
                 (*ctxt).doc,
-                insert_parent,
+                XmlGenericNodePtr::from_raw(insert_parent),
                 2,
-            );
+            )
+            .map_or(null_mut(), |node| node.as_ptr());
             if copy.is_null() {
                 // goto error;
                 xml_free_node_list(result);
@@ -1034,7 +1035,8 @@ unsafe fn xml_xinclude_copy_range(
     }
     end = (*range).user2 as _;
     if end.is_null() {
-        return xml_doc_copy_node(XmlGenericNodePtr::from_raw(start).unwrap(), (*ctxt).doc, 1);
+        return xml_doc_copy_node(XmlGenericNodePtr::from_raw(start).unwrap(), (*ctxt).doc, 1)
+            .map_or(null_mut(), |node| node.as_ptr());
     }
     if (*end).typ == XmlElementType::XmlNamespaceDecl {
         return null_mut();
@@ -1058,7 +1060,8 @@ unsafe fn xml_xinclude_copy_range(
                     XmlGenericNodePtr::from_raw(list_parent).unwrap(),
                     (*ctxt).doc,
                     2,
-                );
+                )
+                .map_or(null_mut(), |node| node.as_ptr());
                 (*tmp2).add_child(list);
                 list = tmp2;
                 list_parent = (*list_parent).parent().map_or(null_mut(), |n| n.as_ptr());
@@ -1106,7 +1109,8 @@ unsafe fn xml_xinclude_copy_range(
                 end_level = level; /* remember the level of the end node */
                 end_flag = 1;
                 // last node - need to take care of properties + namespaces
-                tmp = xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), (*ctxt).doc, 2);
+                tmp = xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), (*ctxt).doc, 2)
+                    .map_or(null_mut(), |node| node.as_ptr());
                 if list.is_null() {
                     list = tmp;
                     list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -1158,7 +1162,8 @@ unsafe fn xml_xinclude_copy_range(
 
                 // start of the range - need to take care of
                 // properties and namespaces
-                tmp = xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), (*ctxt).doc, 2);
+                tmp = xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), (*ctxt).doc, 2)
+                    .map_or(null_mut(), |node| node.as_ptr());
                 list = tmp;
                 last = tmp;
                 list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -1191,7 +1196,8 @@ unsafe fn xml_xinclude_copy_range(
                         XmlGenericNodePtr::from_raw(cur).unwrap(),
                         (*ctxt).doc,
                         2,
-                    );
+                    )
+                    .map_or(null_mut(), |node| node.as_ptr());
                 }
             }
             if !tmp.is_null() {
@@ -1474,6 +1480,7 @@ unsafe fn xml_xinclude_load_doc(
             // Add the top children list as the replacement copy.
             (*refe).inc = doc.map_or(null_mut(), |doc| {
                 xml_doc_copy_node(doc.get_root_element().unwrap().into(), (*ctxt).doc, 1)
+                    .map_or(null_mut(), |node| node.as_ptr())
             });
         } else {
             #[cfg(feature = "xpointer")]

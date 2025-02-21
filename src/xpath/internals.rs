@@ -4784,10 +4784,9 @@ unsafe fn xml_xpath_node_collect_and_test(
     let mut out_seq = None;
     // Used to feed predicate evaluation.
     let mut seq = None;
-    let context_node: *mut XmlNode = null_mut();
     let mut context_idx = 0;
 
-    'main: while (context_idx < context_seq.node_tab.len() || !context_node.is_null())
+    'main: while context_idx < context_seq.node_tab.len()
         && (*ctxt).error == XmlXPathError::XPathExpressionOK as i32
     {
         (*xpctxt).node = Some(context_seq.node_tab[context_idx]);
@@ -9251,12 +9250,14 @@ unsafe fn xml_xpath_get_elements_by_ids(
             // constraint, like Visa3D spec.
             // if (xmlValidateNCName(ID, 1) == 0)
             if let Some(attr) = xml_get_id(doc, id) {
-                let elem = if let Some(attr) = attr.as_ref().as_attribute_node() {
-                    attr.as_ref()
-                        .parent
+                let elem = if let Ok(attr) = attr {
+                    attr.parent
                         .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                } else if matches!(attr.as_ref().element_type(), XmlElementType::XmlElementNode) {
-                    XmlGenericNodePtr::from_raw(attr.as_ptr() as *mut XmlNode)
+                // The following branch can not be reachable
+                // because `xml_get_id` can only return `XmlAttrPtr` or `XmlDocPtr`...
+                // What is the purpose of this branch ???
+                // } else if matches!(attr.element_type(), XmlElementType::XmlElementNode) {
+                //     Some(XmlGenericNodePtr::from(attr))
                 } else {
                     None
                 };

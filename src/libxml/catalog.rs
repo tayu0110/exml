@@ -1954,7 +1954,7 @@ impl XmlCatalogEntry {
 
         (*doc).add_child(dtd.map_or(null_mut(), |dtd| dtd.as_ptr()) as _);
 
-        let Some(ns) = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, None) else {
+        let Some(ns) = xml_new_ns(None, XML_CATALOGS_NAMESPACE.as_ptr() as _, None) else {
             xml_free_doc(doc);
             return -1;
         };

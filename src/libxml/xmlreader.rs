@@ -786,7 +786,6 @@ impl XmlTextReader {
     pub unsafe fn read_inner_xml(&mut self) -> *mut XmlChar {
         use crate::{libxml::xmlstring::xml_strndup, tree::XmlGenericNodePtr};
 
-        let mut node: *mut XmlNode;
         let mut cur_node: *mut XmlNode;
 
         if self.expand().is_null() {
@@ -801,15 +800,16 @@ impl XmlTextReader {
             .map_or(null_mut(), |c| c.as_ptr());
         while !cur_node.is_null() {
             // XXX: Why is the node copied?
-            node = xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur_node).unwrap(), doc, 1);
+            let node =
+                xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur_node).unwrap(), doc, 1).unwrap();
             // XXX: Why do we need a second buffer?
             let mut buff2 = vec![];
-            if (*node).dump_memory(&mut buff2, doc, 0, 0) == 0 {
-                xml_free_node(node);
+            if node.dump_memory(&mut buff2, doc, 0, 0) == 0 {
+                xml_free_node(node.as_ptr());
                 return null_mut();
             }
             buff.extend(buff2);
-            xml_free_node(node);
+            xml_free_node(node.as_ptr());
             cur_node = (*cur_node).next.map_or(null_mut(), |n| n.as_ptr());
         }
         xml_strndup(buff.as_ptr(), buff.len() as i32)
@@ -822,10 +822,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadOuterXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_outer_xml(&mut self) -> *mut XmlChar {
-        use crate::{
-            libxml::xmlstring::xml_strndup,
-            tree::{XmlDtdPtr, XmlGenericNodePtr},
-        };
+        use crate::{libxml::xmlstring::xml_strndup, tree::XmlDtdPtr};
 
         if self.expand().is_null() {
             return null_mut();
@@ -836,7 +833,7 @@ impl XmlTextReader {
         if let Ok(dtd) = XmlDtdPtr::try_from(node) {
             node = xml_copy_dtd(dtd).map(|dtd| dtd.into()).unwrap();
         } else {
-            node = XmlGenericNodePtr::from_raw(xml_doc_copy_node(node, doc, 1)).unwrap();
+            node = xml_doc_copy_node(node, doc, 1).unwrap();
         }
         let mut buff = vec![];
         if node.dump_memory(&mut buff, doc, 0, 0) == 0 {

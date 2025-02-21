@@ -2085,7 +2085,11 @@ impl XmlNode {
                 }
                 if !f {
                     // OK we need to recreate a new namespace definition
-                    if let Some(n) = xml_new_reconciled_ns(Some(doc), self, *node_ns) {
+                    if let Some(n) = xml_new_reconciled_ns(
+                        Some(doc),
+                        XmlNodePtr::from_raw(self).unwrap().unwrap(),
+                        *node_ns,
+                    ) {
                         // :-( what if else ???
                         // check if we need to grow the cache buffers.
                         new_ns.push(n);
@@ -2111,7 +2115,11 @@ impl XmlNode {
                         }
                         if !f {
                             // OK we need to recreate a new namespace definition
-                            if let Some(n) = xml_new_reconciled_ns(Some(doc), self, attr_ns) {
+                            if let Some(n) = xml_new_reconciled_ns(
+                                Some(doc),
+                                XmlNodePtr::from_raw(self).unwrap().unwrap(),
+                                attr_ns,
+                            ) {
                                 // :-( what if else ???
                                 // check if we need to grow the cache buffers.
                                 new_ns.push(n);
