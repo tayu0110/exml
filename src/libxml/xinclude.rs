@@ -888,7 +888,12 @@ unsafe fn xml_xinclude_copy_node(
             }
             // TODO: Insert xmlElementType::XML_XINCLUDE_START and xmlElementType::XML_XINCLUDE_END nodes
             if !(*refe).inc.is_null() {
-                copy = xml_static_copy_node_list((*refe).inc, (*ctxt).doc, insert_parent);
+                copy = xml_static_copy_node_list(
+                    XmlGenericNodePtr::from_raw((*refe).inc),
+                    (*ctxt).doc,
+                    XmlGenericNodePtr::from_raw(insert_parent),
+                )
+                .map_or(null_mut(), |node| node.as_ptr());
                 if copy.is_null() {
                     // goto error;
                     xml_free_node_list(result);

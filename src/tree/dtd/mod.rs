@@ -122,6 +122,19 @@ impl XmlDtd {
     ) -> Option<XmlAttributePtr> {
         self.attributes?.lookup3(name, prefix, Some(elem)).copied()
     }
+
+    /// update all nodes under the tree to point to the right document
+    #[doc(alias = "xmlSetTreeDoc")]
+    pub unsafe fn set_doc(&mut self, doc: Option<XmlDocPtr>) {
+        if self.doc != doc {
+            if let Some(mut children) = self.children {
+                children.set_doc_all_sibling(doc);
+            }
+
+            // FIXME: self.ns should be updated as in xmlStaticCopyNode().
+            self.doc = doc;
+        }
+    }
 }
 
 impl Default for XmlDtd {

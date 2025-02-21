@@ -99,8 +99,12 @@ impl XmlAttr {
                     if !cur_ns.href.is_null()
                         && cur_ns.href().as_deref() == Some(href)
                         && cur_ns.prefix().is_some()
-                        && xml_ns_in_scope(doc, self as *mut Self as _, now.as_ptr(), cur_ns.prefix)
-                            == 1
+                        && xml_ns_in_scope(
+                            doc,
+                            XmlGenericNodePtr::from_raw(self as *mut Self),
+                            Some(now.into()),
+                            cur_ns.prefix,
+                        ) == 1
                     {
                         return Some(cur_ns);
                     }
@@ -111,8 +115,12 @@ impl XmlAttr {
                     !cur.href.is_null()
                         && cur.href().as_deref() == Some(href)
                         && cur.prefix().is_some()
-                        && xml_ns_in_scope(doc, self as *mut Self as _, now.as_ptr(), cur.prefix)
-                            == 1
+                        && xml_ns_in_scope(
+                            doc,
+                            XmlGenericNodePtr::from_raw(self as *mut Self),
+                            Some(now.into()),
+                            cur.prefix,
+                        ) == 1
                 }) {
                     return Some(cur);
                 }
@@ -650,11 +658,14 @@ pub(super) unsafe fn xml_copy_prop_internal(
     }
 
     if let Some(children) = cur.children() {
-        ret.children = NodePtr::from_ptr(xml_static_copy_node_list(
-            children.as_ptr(),
-            ret.doc,
-            ret.as_ptr() as _,
-        ));
+        ret.children = NodePtr::from_ptr(
+            xml_static_copy_node_list(
+                XmlGenericNodePtr::from_raw(children.as_ptr()),
+                ret.doc,
+                Some(ret.into()),
+            )
+            .map_or(null_mut(), |node| node.as_ptr()),
+        );
         ret.last = None;
         let mut tmp = ret.children;
         while let Some(now) = tmp {

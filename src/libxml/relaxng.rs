@@ -1740,7 +1740,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                     )
                                 } else {
                                     xml_new_child(
-                                        now.as_ptr(),
+                                        now.into(),
                                         now.ns,
                                         "name",
                                         cname.as_ptr() as *const u8,

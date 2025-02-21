@@ -2017,7 +2017,12 @@ impl XmlNode {
                     if !now.href.is_null()
                         && xml_str_equal(now.href, href.as_ptr() as *const u8)
                         && (!is_attr || now.prefix().is_some())
-                        && xml_ns_in_scope(doc, orig, node, now.prefix) == 1
+                        && xml_ns_in_scope(
+                            doc,
+                            XmlGenericNodePtr::from_raw(orig),
+                            XmlGenericNodePtr::from_raw(node),
+                            now.prefix,
+                        ) == 1
                     {
                         return Some(now);
                     }
@@ -2029,7 +2034,12 @@ impl XmlNode {
                         !cur.href.is_null()
                             && xml_str_equal(cur.href, href.as_ptr() as *const u8)
                             && (!is_attr || (*cur).prefix().is_some())
-                            && xml_ns_in_scope(doc, orig, node, cur.prefix) == 1
+                            && xml_ns_in_scope(
+                                doc,
+                                XmlGenericNodePtr::from_raw(orig),
+                                XmlGenericNodePtr::from_raw(node),
+                                cur.prefix,
+                            ) == 1
                     }) {
                         return Some(cur);
                     }

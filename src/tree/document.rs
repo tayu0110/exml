@@ -725,7 +725,10 @@ impl XmlDoc {
             old = now.next();
         }
         if let Some(old) = old {
-            xml_replace_node(old.as_ptr(), root);
+            xml_replace_node(
+                XmlGenericNodePtr::from_raw(old.as_ptr()).unwrap(),
+                XmlGenericNodePtr::from_raw(root),
+            );
         } else if let Some(mut children) = self.children() {
             children.add_sibling(root);
         } else {
@@ -1039,18 +1042,21 @@ pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> Option<XmlDocPtr> 
             xml_free_doc(ret);
             return None;
         };
-        (*(ret_int_subset.as_ptr() as *mut XmlNode)).set_doc(Some(ret));
+        ret_int_subset.set_doc(Some(ret));
         ret_int_subset.parent = Some(ret);
     }
     if doc.old_ns.is_some() {
         ret.old_ns = xml_copy_namespace_list(doc.old_ns);
     }
     if let Some(children) = doc.children {
-        ret.children = NodePtr::from_ptr(xml_static_copy_node_list(
-            children.as_ptr(),
-            Some(ret),
-            ret.as_ptr() as _,
-        ));
+        ret.children = NodePtr::from_ptr(
+            xml_static_copy_node_list(
+                XmlGenericNodePtr::from_raw(children.as_ptr()),
+                Some(ret),
+                Some(ret.into()),
+            )
+            .map_or(null_mut(), |node| node.as_ptr()),
+        );
         ret.last = None;
         let mut tmp = ret.children;
         while let Some(now) = tmp {
