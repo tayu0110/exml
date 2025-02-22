@@ -2533,7 +2533,9 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 {
                     (*ent.last.load(Ordering::Relaxed)).name = nbktext;
                 }
-                context_node.add_child_list(ent.children.load(Ordering::Relaxed));
+                context_node.add_child_list(
+                    XmlGenericNodePtr::from_raw(ent.children.load(Ordering::Relaxed)).unwrap(),
+                );
             }
 
             // This is to avoid a nasty side effect, see characters() in SAX.c

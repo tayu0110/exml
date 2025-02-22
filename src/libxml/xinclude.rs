@@ -1104,7 +1104,9 @@ unsafe fn xml_xinclude_copy_range(
                 }
                 // prune and return full set
                 if level == last_level {
-                    (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
+                    (*last)
+                        .add_next_sibling(tmp.unwrap().into())
+                        .map_or(null_mut(), |node| node.as_ptr());
                 } else {
                     (*last).add_child(tmp.unwrap().into());
                 }
@@ -1121,7 +1123,9 @@ unsafe fn xml_xinclude_copy_range(
                     list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
                     last = tmp.map_or(null_mut(), |node| node.as_ptr());
                 } else if level == last_level {
-                    last = (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
+                    last = (*last)
+                        .add_next_sibling(tmp.unwrap())
+                        .map_or(null_mut(), |node| node.as_ptr());
                 } else {
                     last = (*last)
                         .add_child(tmp.unwrap())
@@ -1208,7 +1212,9 @@ unsafe fn xml_xinclude_copy_range(
             }
             if let Some(tmp) = tmp {
                 if level == last_level {
-                    last = (*last).add_next_sibling(tmp.as_ptr());
+                    last = (*last)
+                        .add_next_sibling(tmp)
+                        .map_or(null_mut(), |node| node.as_ptr());
                 } else {
                     last = (*last)
                         .add_child(tmp)
@@ -1309,7 +1315,9 @@ unsafe fn xml_xinclude_copy_xpointer(
                     list = xml_xinclude_copy_xpointer(ctxt, loc);
                     last = list;
                 } else {
-                    (*last).add_next_sibling(xml_xinclude_copy_xpointer(ctxt, loc));
+                    (*last).add_next_sibling(
+                        XmlGenericNodePtr::from_raw(xml_xinclude_copy_xpointer(ctxt, loc)).unwrap(),
+                    );
                 }
                 if !last.is_null() {
                     while let Some(next) = (*last).next() {
@@ -2232,7 +2240,7 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
             end = list;
             list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
 
-            (*cur).add_prev_sibling(end);
+            (*cur).add_prev_sibling(XmlGenericNodePtr::from_raw(end).unwrap());
         }
         // FIXME: xmlUnlinkNode doesn't coalesce text nodes.
         (*cur).unlink();
@@ -2264,14 +2272,14 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
             return -1;
         };
         end.typ = XmlElementType::XmlXIncludeEnd;
-        (*cur).add_next_sibling(end.as_ptr());
+        (*cur).add_next_sibling(end.into());
 
         // Add the list of nodes
         while !list.is_null() {
             cur = list;
             list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
 
-            end.add_prev_sibling(cur);
+            end.add_prev_sibling(XmlGenericNodePtr::from_raw(cur).unwrap());
         }
     }
 

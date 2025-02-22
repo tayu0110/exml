@@ -2553,7 +2553,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                 }
                 // prune and return full set
                 if !last.is_null() {
-                    (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
+                    (*last).add_next_sibling(tmp.unwrap().into());
                 } else {
                     (*parent).add_child(tmp.unwrap().into());
                 }
@@ -2564,7 +2564,9 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                     list = tmp.map_or(null_mut(), |node| node.as_ptr());
                     parent = tmp.map_or(null_mut(), |node| node.as_ptr());
                 } else if !last.is_null() {
-                    parent = (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
+                    parent = (*last)
+                        .add_next_sibling(tmp.unwrap())
+                        .map_or(null_mut(), |node| node.as_ptr());
                 } else {
                     parent = (*parent)
                         .add_child(tmp.unwrap())
@@ -2646,7 +2648,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                     return null_mut();
                 }
                 if !last.is_null() {
-                    (*last).add_next_sibling(tmp.as_ptr());
+                    (*last).add_next_sibling(tmp);
                 } else {
                     last = (*parent)
                         .add_child(tmp)
@@ -2705,16 +2707,14 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut Xm
                     | XmlElementType::XmlDTDNode
                     | XmlElementType::XmlElementDecl
                     | XmlElementType::XmlAttributeDecl
-                    | XmlElementType::XmlEntityDecl => continue, /* for */
+                    | XmlElementType::XmlEntityDecl => continue,
                     _ => unreachable!(),
                 }
                 if last.is_null() {
                     list = xml_copy_node(node, 1).map_or(null_mut(), |node| node.as_ptr());
                     last = list;
                 } else {
-                    (*last).add_next_sibling(
-                        xml_copy_node(node, 1).map_or(null_mut(), |node| node.as_ptr()),
-                    );
+                    (*last).add_next_sibling(xml_copy_node(node, 1).unwrap());
                     if let Some(next) = (*last).next() {
                         last = next.as_ptr();
                     }
@@ -2731,7 +2731,9 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut Xm
                     list = xml_xptr_build_node_list(loc);
                     last = list;
                 } else {
-                    (*last).add_next_sibling(xml_xptr_build_node_list(loc));
+                    (*last).add_next_sibling(
+                        XmlGenericNodePtr::from_raw(xml_xptr_build_node_list(loc)).unwrap(),
+                    );
                 }
                 if !last.is_null() {
                     while let Some(next) = (*last).next() {

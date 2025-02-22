@@ -1100,17 +1100,17 @@ impl XmlGenericNodePtr {
     ///
     /// Returns the new element or NULL in case of error.
     #[doc(alias = "xmlAddSibling")]
-    pub unsafe fn add_sibling(self, mut elem: XmlGenericNodePtr) -> *mut XmlNode {
+    pub unsafe fn add_sibling(self, mut elem: XmlGenericNodePtr) -> Option<XmlGenericNodePtr> {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
+            return None;
         }
 
         if elem.element_type() == XmlElementType::XmlNamespaceDecl {
-            return null_mut();
+            return None;
         }
 
         if self == elem {
-            return null_mut();
+            return None;
         }
 
         let mut cur = self;
@@ -1144,10 +1144,17 @@ impl XmlGenericNodePtr {
         {
             cur.add_content(elem.content);
             xml_free_node(elem.as_ptr());
-            return cur.as_ptr();
+            return Some(cur.into());
         }
         if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {
-            return add_prop_sibling(cur.as_ptr(), cur.as_ptr(), elem.as_ptr());
+            return Some(
+                add_prop_sibling(
+                    XmlAttrPtr::try_from(cur).ok(),
+                    XmlAttrPtr::try_from(cur).unwrap(),
+                    XmlAttrPtr::try_from(elem).unwrap(),
+                )
+                .into(),
+            );
         }
 
         if elem.document() != cur.document() {
@@ -1162,7 +1169,7 @@ impl XmlGenericNodePtr {
             parent.set_last(NodePtr::from_ptr(elem.as_ptr()));
         }
 
-        elem.as_ptr()
+        Some(elem)
     }
 }
 

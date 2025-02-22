@@ -2217,7 +2217,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         if matches!(parent.element_type(), XmlElementType::XmlElementNode) {
             parent.add_child(ret.into());
         } else {
-            parent.add_sibling(ret.as_ptr());
+            parent.add_sibling(ret.into());
         }
     }
 
@@ -2909,7 +2909,7 @@ pub unsafe fn xml_sax2_processing_instruction(
     if matches!(parent.element_type(), XmlElementType::XmlElementNode) {
         parent.add_child(ret.into());
     } else {
-        parent.add_sibling(ret.as_ptr());
+        parent.add_sibling(ret.into());
     }
 }
 
@@ -2951,7 +2951,7 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: &str) {
     if matches!(parent.element_type(), XmlElementType::XmlElementNode) {
         parent.add_child(ret.into());
     } else {
-        parent.add_sibling(ret.as_ptr());
+        parent.add_sibling(ret.into());
     }
 }
 

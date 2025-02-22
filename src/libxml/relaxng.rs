@@ -1727,7 +1727,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                 let text = if let Some(mut children) = now.children() {
                                     xml_new_doc_node(now.doc, now.ns, "name", null_mut()).map(
                                         |mut node| {
-                                            children.add_prev_sibling(node.as_ptr());
+                                            children.add_prev_sibling(node.into());
                                             let text = xml_new_doc_text(
                                                 node.doc,
                                                 cname.as_ptr() as *const u8,
@@ -1879,9 +1879,13 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                 }
                                 tmp = (*child).next.map_or(null_mut(), |n| n.as_ptr());
                                 (*child).unlink();
-                                ins = XmlNodePtr::from_raw(ins.add_next_sibling(child))
-                                    .unwrap()
-                                    .unwrap();
+                                ins = XmlNodePtr::try_from(
+                                    ins.add_next_sibling(
+                                        XmlGenericNodePtr::from_raw(child).unwrap(),
+                                    )
+                                    .unwrap(),
+                                )
+                                .unwrap();
                                 child = tmp;
                             }
                             // Since we are about to delete cur, if its nsDef is non-NULL we

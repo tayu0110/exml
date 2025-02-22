@@ -345,7 +345,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
                 // Create a new Meta element with the right attributes
                 let meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
                 if let Some(mut children) = (*head).children() {
-                    children.add_prev_sibling(meta.map_or(null_mut(), |node| node.as_ptr()));
+                    children.add_prev_sibling(meta.unwrap().into());
                 } else {
                     (*head).add_child(meta.unwrap().into());
                 }

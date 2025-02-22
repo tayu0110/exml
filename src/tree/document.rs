@@ -330,7 +330,9 @@ impl XmlDoc {
                                     last = node.as_ptr();
                                     head = node.as_ptr();
                                 } else {
-                                    last = (*last).add_next_sibling(node.as_ptr());
+                                    last = (*last)
+                                        .add_next_sibling(node.into())
+                                        .map_or(null_mut(), |node| node.as_ptr());
                                 }
                             }
 
@@ -372,7 +374,9 @@ impl XmlDoc {
                                 last = node.as_ptr();
                                 head = node.as_ptr();
                             } else {
-                                last = (*last).add_next_sibling(node.as_ptr());
+                                last = (*last)
+                                    .add_next_sibling(node.into())
+                                    .map_or(null_mut(), |node| node.as_ptr());
                             }
                         }
                         xml_free(val as _);
@@ -418,7 +422,7 @@ impl XmlDoc {
             if last.is_null() {
                 head = node.as_ptr();
             } else {
-                (*last).add_next_sibling(node.as_ptr());
+                (*last).add_next_sibling(node.into());
             }
         }
 
@@ -598,7 +602,9 @@ impl XmlDoc {
                                     last = node.as_ptr();
                                     ret = node.as_ptr();
                                 } else {
-                                    last = (*last).add_next_sibling(node.as_ptr());
+                                    last = (*last)
+                                        .add_next_sibling(node.into())
+                                        .map_or(null_mut(), |node| node.as_ptr());
                                 }
                             }
 
@@ -638,7 +644,9 @@ impl XmlDoc {
                                 last = node.as_ptr();
                                 ret = node.as_ptr();
                             } else {
-                                last = (*last).add_next_sibling(node.as_ptr());
+                                last = (*last)
+                                    .add_next_sibling(node.into())
+                                    .map_or(null_mut(), |node| node.as_ptr());
                             }
                         }
                         xml_free(val as _);
@@ -678,7 +686,7 @@ impl XmlDoc {
             if last.is_null() {
                 ret = node.as_ptr();
             } else {
-                (*last).add_next_sibling(node.as_ptr());
+                (*last).add_next_sibling(node.into());
             }
         } else if ret.is_null() {
             ret = xml_new_doc_text(
@@ -715,7 +723,7 @@ impl XmlDoc {
             return null_mut();
         }
         (*root).unlink();
-        (*root).set_doc(XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap());
+        (*root).set_doc(XmlDocPtr::from_raw(self).unwrap());
         (*root).set_parent(NodePtr::from_ptr(self as *mut XmlDoc as *mut XmlNode));
         let mut old = self.children();
         while let Some(now) = old {
@@ -730,7 +738,7 @@ impl XmlDoc {
                 XmlGenericNodePtr::from_raw(root),
             );
         } else if let Some(mut children) = self.children() {
-            children.add_sibling(root);
+            children.add_sibling(XmlGenericNodePtr::from_raw(root).unwrap());
         } else {
             self.set_children(NodePtr::from_ptr(root));
             self.set_last(NodePtr::from_ptr(root));
