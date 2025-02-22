@@ -1600,9 +1600,12 @@ unsafe fn xml_sax2_attribute_internal(
     };
 
     if (*ctxt).replace_entities == 0 && (*ctxt).html == 0 {
-        ret.children = (*ctxt)
-            .my_doc
-            .and_then(|doc| NodePtr::from_ptr(doc.get_node_list(value)));
+        ret.children = (*ctxt).my_doc.and_then(|doc| {
+            NodePtr::from_ptr(
+                doc.get_node_list(value)
+                    .map_or(null_mut(), |node| node.as_ptr()),
+            )
+        });
         let mut tmp = ret.children;
         while let Some(mut now) = tmp {
             now.set_parent(NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode));
@@ -2475,7 +2478,10 @@ unsafe fn xml_sax2_attribute_ns(
         // otherwise with ' or "
         ret.children = (*ctxt).my_doc.and_then(|doc| {
             let len = CStr::from_ptr(value as *const i8).to_bytes().len();
-            NodePtr::from_ptr(doc.get_node_list_with_strlen(value, len as i32))
+            NodePtr::from_ptr(
+                doc.get_node_list_with_strlen(value, len as i32)
+                    .map_or(null_mut(), |node| node.as_ptr()),
+            )
         });
         let mut tmp = ret.children;
         while let Some(mut now) = tmp {

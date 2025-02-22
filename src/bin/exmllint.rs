@@ -2483,7 +2483,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 let mut doc = xml_new_doc(Some("1.0")).unwrap();
                 let mut n = xml_new_doc_node(Some(doc), None, "info", null_mut()).unwrap();
                 n.set_content(c"abc".as_ptr() as _);
-                doc.set_root_element(n.into());
+                doc.set_root_element(n);
                 Some(doc)
             } else {
                 None

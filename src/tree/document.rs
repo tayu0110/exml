@@ -191,16 +191,16 @@ impl XmlDoc {
     ///
     /// Returns a pointer to the first child.
     #[doc(alias = "xmlStringGetNodeList")]
-    pub unsafe fn get_node_list(&self, value: *const XmlChar) -> *mut XmlNode {
-        let mut ret: *mut XmlNode = null_mut();
-        let mut head: *mut XmlNode = null_mut();
-        let mut last: *mut XmlNode = null_mut();
+    pub unsafe fn get_node_list(&self, value: *const XmlChar) -> Option<XmlNodePtr> {
+        let mut ret = None;
+        let mut head: Option<XmlNodePtr> = None;
+        let mut last: Option<XmlNodePtr> = None;
         let mut val: *mut XmlChar = null_mut();
         let mut cur: *const XmlChar = value;
         let mut q: *const XmlChar;
 
         if value.is_null() {
-            return null_mut();
+            return None;
         }
 
         let mut buf = vec![];
@@ -287,8 +287,8 @@ impl XmlDoc {
                         if !val.is_null() {
                             xml_free(val as _);
                         }
-                        if !head.is_null() {
-                            xml_free_node_list(head);
+                        if let Some(head) = head {
+                            xml_free_node_list(head.as_ptr());
                         }
                         return ret;
                     }
@@ -318,21 +318,21 @@ impl XmlDoc {
                                     if !val.is_null() {
                                         xml_free(val as _);
                                     }
-                                    if !head.is_null() {
-                                        xml_free_node_list(head);
+                                    if let Some(head) = head {
+                                        xml_free_node_list(head.as_ptr());
                                     }
                                     return ret;
                                 };
                                 node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
                                 buf.clear();
 
-                                if last.is_null() {
-                                    last = node.as_ptr();
-                                    head = node.as_ptr();
-                                } else {
-                                    last = (*last)
+                                if let Some(mut l) = last {
+                                    last = l
                                         .add_next_sibling(node.into())
-                                        .map_or(null_mut(), |node| node.as_ptr());
+                                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                                } else {
+                                    last = Some(node);
+                                    head = Some(node);
                                 }
                             }
 
@@ -345,8 +345,8 @@ impl XmlDoc {
                                 if !val.is_null() {
                                     xml_free(val as _);
                                 }
-                                if !head.is_null() {
-                                    xml_free_node_list(head);
+                                if let Some(head) = head {
+                                    xml_free_node_list(head.as_ptr());
                                 }
                                 return ret;
                             };
@@ -358,7 +358,8 @@ impl XmlDoc {
                                 // but set the flag anyway to avoid recursion.
                                 ent.flags |= XML_ENT_EXPANDING as i32;
                                 ent.set_children(NodePtr::from_ptr(
-                                    self.get_node_list(node.content),
+                                    self.get_node_list(node.content)
+                                        .map_or(null_mut(), |node| node.as_ptr()),
                                 ));
                                 ent.owner = 1;
                                 ent.flags &= !XML_ENT_EXPANDING as i32;
@@ -370,13 +371,13 @@ impl XmlDoc {
                                     temp = now.next;
                                 }
                             }
-                            if last.is_null() {
-                                last = node.as_ptr();
-                                head = node.as_ptr();
-                            } else {
-                                last = (*last)
+                            if let Some(mut l) = last {
+                                last = l
                                     .add_next_sibling(node.into())
-                                    .map_or(null_mut(), |node| node.as_ptr());
+                                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+                            } else {
+                                last = Some(node);
+                                head = Some(node);
                             }
                         }
                         xml_free(val as _);
@@ -397,7 +398,7 @@ impl XmlDoc {
                 cur = cur.add(1);
             }
         }
-        if cur != q || head.is_null() {
+        if cur != q || head.is_none() {
             // Handle the last piece of text.
             buf.extend(from_raw_parts(q, cur.offset_from(q) as usize));
         }
@@ -411,30 +412,26 @@ impl XmlDoc {
                 if !val.is_null() {
                     xml_free(val as _);
                 }
-                if !head.is_null() {
-                    xml_free_node_list(head);
+                if let Some(head) = head {
+                    xml_free_node_list(head.as_ptr());
                 }
                 return ret;
             };
             node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
             buf.clear();
 
-            if last.is_null() {
-                head = node.as_ptr();
-            } else {
+            if let Some(mut last) = last {
                 (*last).add_next_sibling(node.into());
+            } else {
+                head = Some(node);
             }
         }
 
         ret = head;
-        head = null_mut();
 
         // out:
         if !val.is_null() {
             xml_free(val as _);
-        }
-        if !head.is_null() {
-            xml_free_node_list(head);
         }
         ret
     }
@@ -448,15 +445,15 @@ impl XmlDoc {
         &self,
         value: *const XmlChar,
         len: i32,
-    ) -> *mut XmlNode {
-        let mut ret: *mut XmlNode = null_mut();
-        let mut last: *mut XmlNode = null_mut();
+    ) -> Option<XmlNodePtr> {
+        let mut ret = None;
+        let mut last: Option<XmlNodePtr> = None;
         let mut val: *mut XmlChar;
         let mut cur: *const XmlChar;
         let mut q: *const XmlChar;
 
         if value.is_null() {
-            return null_mut();
+            return None;
         }
         cur = value;
         let end: *const XmlChar = cur.add(len as usize);
@@ -598,13 +595,13 @@ impl XmlDoc {
                                 node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
                                 buf.clear();
 
-                                if last.is_null() {
-                                    last = node.as_ptr();
-                                    ret = node.as_ptr();
-                                } else {
-                                    last = (*last)
+                                if let Some(mut l) = last {
+                                    last = l
                                         .add_next_sibling(node.into())
-                                        .map_or(null_mut(), |node| node.as_ptr());
+                                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                                } else {
+                                    last = Some(node);
+                                    ret = Some(node);
                                 }
                             }
 
@@ -627,7 +624,8 @@ impl XmlDoc {
                                 // but set the flag anyway to avoid recursion.
                                 ent.flags |= XML_ENT_EXPANDING as i32;
                                 ent.children.store(
-                                    self.get_node_list(node.content as _),
+                                    self.get_node_list(node.content as _)
+                                        .map_or(null_mut(), |node| node.as_ptr()),
                                     Ordering::Relaxed,
                                 );
                                 ent.owner = 1;
@@ -640,13 +638,13 @@ impl XmlDoc {
                                     temp = now.next();
                                 }
                             }
-                            if last.is_null() {
-                                last = node.as_ptr();
-                                ret = node.as_ptr();
-                            } else {
-                                last = (*last)
+                            if let Some(mut l) = last {
+                                last = l
                                     .add_next_sibling(node.into())
-                                    .map_or(null_mut(), |node| node.as_ptr());
+                                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+                            } else {
+                                last = Some(node);
+                                ret = Some(node);
                             }
                         }
                         xml_free(val as _);
@@ -683,17 +681,16 @@ impl XmlDoc {
             node.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
             buf.clear();
 
-            if last.is_null() {
-                ret = node.as_ptr();
+            if let Some(mut last) = last {
+                last.add_next_sibling(node.into());
             } else {
-                (*last).add_next_sibling(node.into());
+                ret = Some(node);
             }
-        } else if ret.is_null() {
+        } else if ret.is_none() {
             ret = xml_new_doc_text(
                 XmlDocPtr::from_raw(self as *const XmlDoc as *mut XmlDoc).unwrap(),
                 c"".as_ptr() as _,
-            )
-            .map_or(null_mut(), |node| node.as_ptr());
+            );
         }
 
         // out:
@@ -716,34 +713,35 @@ impl XmlDoc {
     /// Returns the old root element if any was found, NULL if root was NULL
     #[doc(alias = "xmlDocSetRootElement")]
     #[cfg(any(feature = "libxml_tree", feature = "libxml_writer"))]
-    pub unsafe fn set_root_element(&mut self, root: *mut XmlNode) -> *mut XmlNode {
+    pub unsafe fn set_root_element(&mut self, mut root: XmlNodePtr) -> Option<XmlNodePtr> {
         use crate::tree::{xml_replace_node, NodeCommon};
 
-        if root.is_null() || matches!((*root).element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
         (*root).unlink();
         (*root).set_doc(XmlDocPtr::from_raw(self).unwrap());
         (*root).set_parent(NodePtr::from_ptr(self as *mut XmlDoc as *mut XmlNode));
-        let mut old = self.children();
+        let mut old = self
+            .children()
+            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
         while let Some(now) = old {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                 break;
             }
-            old = now.next();
+            old = now
+                .next()
+                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
         }
         if let Some(old) = old {
             xml_replace_node(
                 XmlGenericNodePtr::from_raw(old.as_ptr()).unwrap(),
-                XmlGenericNodePtr::from_raw(root),
+                Some(XmlGenericNodePtr::from(root)),
             );
         } else if let Some(mut children) = self.children() {
-            children.add_sibling(XmlGenericNodePtr::from_raw(root).unwrap());
+            children.add_sibling(XmlGenericNodePtr::from(root));
         } else {
-            self.set_children(NodePtr::from_ptr(root));
-            self.set_last(NodePtr::from_ptr(root));
+            self.set_children(NodePtr::from_ptr(root.as_ptr()));
+            self.set_last(NodePtr::from_ptr(root.as_ptr()));
         }
-        old.map_or(null_mut(), |o| o.as_ptr())
+        old.map(|o| XmlNodePtr::try_from(o).unwrap())
     }
 
     /// Set the compression ratio for a document, ZLIB based.

@@ -777,6 +777,23 @@ impl XmlGenericNodePtr {
         None
     }
 
+    /// Search and get the value of an attribute associated to a node.
+    ///
+    /// This attribute has to be anchored in the namespace specified.
+    ///
+    /// This does the entity substitution.
+    ///
+    /// This function looks in DTD attribute declaration for #FIXED or
+    /// default declaration values unless DTD use has been turned off.
+    ///
+    /// Returns the attribute value or NULL if not found.  
+    /// It's up to the caller to free the memory with xml_free().
+    #[doc(alias = "xmlGetNsProp")]
+    pub unsafe fn get_ns_prop(&self, name: &str, name_space: Option<&str>) -> Option<String> {
+        let node = XmlNodePtr::try_from(*self).ok()?;
+        node.get_ns_prop(name, name_space)
+    }
+
     /// Search all the namespace applying to a given element.
     ///
     /// Returns an `Vec` of all the `xmlNsPtr` found.

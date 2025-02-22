@@ -447,7 +447,12 @@ pub unsafe fn xml_new_doc_prop(
         return None;
     };
     if !value.is_null() {
-        cur.children = doc.and_then(|doc| NodePtr::from_ptr(doc.get_node_list(value)));
+        cur.children = doc.and_then(|doc| {
+            NodePtr::from_ptr(
+                doc.get_node_list(value)
+                    .map_or(null_mut(), |node| node.as_ptr()),
+            )
+        });
         cur.last = None;
 
         let mut tmp = cur.children();
