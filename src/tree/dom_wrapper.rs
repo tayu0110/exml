@@ -1016,13 +1016,12 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
 unsafe fn xml_dom_wrap_adopt_branch(
     ctxt: XmlDOMWrapCtxtPtr,
     source_doc: Option<XmlDocPtr>,
-    node: *mut XmlNode,
+    node: XmlNodePtr,
     dest_doc: XmlDocPtr,
     dest_parent: Option<XmlNodePtr>,
     _options: i32,
 ) -> i32 {
     let mut ret: i32 = 0;
-    let mut cur: *mut XmlNode;
     let mut cur_elem = None;
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
@@ -1048,31 +1047,28 @@ unsafe fn xml_dom_wrap_adopt_branch(
 
     'exit: {
         'internal_error: {
-            cur = node;
-            if !cur.is_null() && matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-                break 'internal_error;
-            }
+            let mut cur = Some(XmlGenericNodePtr::from(node));
 
-            'main: while !cur.is_null() {
+            'main: while let Some(mut cur_node) = cur {
                 let mut leave_node = false;
 
                 // Paranoid source-doc sanity check.
-                if (*cur).doc != source_doc {
+                if cur_node.document() != source_doc {
                     // We'll assume XIncluded nodes if the doc differs.
                     // TODO: Do we need to reconciliate XIncluded nodes?
                     // This here skips XIncluded nodes and tries to handle
                     // broken sequences.
-                    if (*cur).next.is_some() {
-                        let mut next = (*cur).next;
+                    if cur_node.next().is_some() {
+                        let mut next = cur_node.next();
                         while let Some(now) = next.filter(|now| {
                             !matches!(now.element_type(), XmlElementType::XmlXIncludeEnd)
-                                && now.doc != (*node).doc
+                                && now.doc != node.doc
                         }) {
-                            cur = now.as_ptr();
+                            cur_node = XmlGenericNodePtr::from_raw(now.as_ptr()).unwrap();
                             next = now.next;
                         }
 
-                        if (*cur).doc != (*node).doc {
+                        if cur_node.document() != node.doc {
                             // goto leave_node;
                             leave_node = true;
                         }
@@ -1083,14 +1079,15 @@ unsafe fn xml_dom_wrap_adopt_branch(
                 }
 
                 if !leave_node {
-                    (*cur).doc = Some(dest_doc);
-                    match (*cur).element_type() {
+                    cur_node.set_document(Some(dest_doc));
+                    match cur_node.element_type() {
                         XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
                             // TODO
                             return -1;
                         }
                         XmlElementType::XmlElementNode => {
-                            cur_elem = XmlNodePtr::from_raw(cur).unwrap();
+                            let mut node = XmlNodePtr::try_from(cur_node).unwrap();
+                            cur_elem = Some(node);
                             depth += 1;
                             // Namespace declarations.
                             // - (*ns).href and (*ns).prefix are never in the dict, so
@@ -1098,7 +1095,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             // - Note that for custom handling of ns-references,
                             //   the ns-decls need not be stored in the ns-map,
                             //   since they won't be referenced by (*node).ns.
-                            if (*cur).ns_def.is_some()
+                            if node.ns_def.is_some()
                                 && (ctxt.is_null() || (*ctxt).get_ns_for_node_func.is_none())
                             {
                                 if parnsdone == 0 {
@@ -1113,7 +1110,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
 
                                     parnsdone = 1;
                                 }
-                                let mut ns = (*cur).ns_def;
+                                let mut ns = node.ns_def;
                                 while let Some(now) = ns {
                                     // Does it shadow any ns-decl?
                                     if XML_NSMAP_NOTEMPTY!(ns_map) {
@@ -1142,7 +1139,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                 }
                             }
                             // No namespace, no fun.
-                            if let Some(cur_ns) = (*cur).ns.as_mut() {
+                            if node.ns.is_some() {
                                 if parnsdone == 0 {
                                     if xml_dom_wrap_ns_norm_gather_in_scope_ns(
                                         &raw mut ns_map,
@@ -1158,9 +1155,8 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                 if XML_NSMAP_NOTEMPTY!(ns_map) {
                                     // Search for a mapping.
                                     XML_NSMAP_FOREACH!(ns_map, mi, {
-                                        if (*mi).shadow_depth == -1 && Some(*cur_ns) == (*mi).old_ns
-                                        {
-                                            *cur_ns = (*mi).new_ns.unwrap();
+                                        if (*mi).shadow_depth == -1 && node.ns == (*mi).old_ns {
+                                            node.ns = (*mi).new_ns;
                                             // goto ns_end;
                                             ns_end = true;
                                             break;
@@ -1174,16 +1170,16 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                         // User-defined behaviour.
                                         let ns = ((*ctxt).get_ns_for_node_func.unwrap())(
                                             ctxt,
-                                            cur,
-                                            cur_ns.href,
-                                            cur_ns.prefix,
+                                            node.as_ptr(),
+                                            node.ns.unwrap().href,
+                                            node.ns.unwrap().prefix,
                                         );
                                         // Insert mapping if ns is available; it's the users fault
                                         // if not.
                                         if xml_dom_wrap_ns_map_add_item(
                                             &raw mut ns_map,
                                             -1,
-                                            (*cur).ns,
+                                            node.ns,
                                             ns,
                                             XML_TREE_NSMAP_CUSTOM,
                                         )
@@ -1191,7 +1187,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                         {
                                             break 'internal_error;
                                         }
-                                        (*cur).ns = ns;
+                                        node.ns = ns;
                                     } else {
                                         // Acquire a normalized ns-decl and add it to the map.
                                         let mut ns = None;
@@ -1199,40 +1195,39 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                             dest_doc,
                                             // ns-decls on curElem or on (*destDoc).oldNs
                                             dest_parent.and(cur_elem),
-                                            (*cur).ns.unwrap(),
+                                            node.ns.unwrap(),
                                             &mut ns,
                                             &raw mut ns_map,
                                             depth,
                                             ancestors_only,
                                             // ns-decls must be prefixed for attributes.
                                             matches!(
-                                                (*cur).element_type(),
+                                                node.element_type(),
                                                 XmlElementType::XmlAttributeNode
                                             ) as i32,
                                         ) == -1
                                         {
                                             break 'internal_error;
                                         }
-                                        (*cur).ns = ns;
+                                        node.ns = ns;
                                     }
                                 }
                             }
                             // ns_end:
                             // Further node properties.
                             // TODO: Is this all?
-                            (*cur).psvi = null_mut();
-                            (*cur).line = 0;
-                            (*cur).extra = 0;
+                            node.psvi = null_mut();
+                            node.line = 0;
+                            node.extra = 0;
                             // Walk attributes.
-                            if let Some(prop) = (*cur).properties {
+                            if let Some(prop) = node.properties {
                                 // Process first attribute node.
-                                cur = prop.as_ptr() as _;
+                                cur = Some(prop.into());
                                 continue;
                             }
                         }
                         XmlElementType::XmlAttributeNode => {
-                            let mut attr =
-                                XmlAttrPtr::from_raw(cur as *mut XmlAttr).unwrap().unwrap();
+                            let mut attr = XmlAttrPtr::try_from(cur_node).unwrap();
                             // No namespace, no fun.
                             if attr.ns.is_some() {
                                 if parnsdone == 0 {
@@ -1324,21 +1319,20 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             leave_node = true;
                         }
                         XmlElementType::XmlEntityRefNode => {
+                            let mut cur = XmlNodePtr::try_from(cur_node).unwrap();
                             // Remove reference to the entity-node.
-                            (*cur).content = null_mut();
-                            (*cur).set_children(None);
-                            (*cur).set_last(None);
+                            cur.content = null_mut();
+                            cur.set_children(None);
+                            cur.set_last(None);
                             if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
                                 // Assign new entity-node if available.
-                                let ent =
-                                    xml_get_doc_entity(Some(dest_doc), &(*cur).name().unwrap());
+                                let ent = xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
                                 if let Some(ent) = ent {
-                                    (*cur).content = ent.content.load(Ordering::Relaxed);
-                                    (*cur).set_children(NodePtr::from_ptr(
+                                    cur.content = ent.content.load(Ordering::Relaxed);
+                                    cur.set_children(NodePtr::from_ptr(
                                         ent.as_ptr() as *mut XmlNode
                                     ));
-                                    (*cur)
-                                        .set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                                    cur.set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
                                 }
                             }
                             // goto leave_node;
@@ -1353,8 +1347,8 @@ unsafe fn xml_dom_wrap_adopt_branch(
 
                     if !leave_node {
                         // Walk the tree.
-                        if let Some(children) = (*cur).children() {
-                            cur = children.as_ptr();
+                        if let Some(children) = cur_node.children() {
+                            cur = XmlGenericNodePtr::from_raw(children.as_ptr());
                             continue;
                         }
                     }
@@ -1362,11 +1356,11 @@ unsafe fn xml_dom_wrap_adopt_branch(
 
                 // leave_node:
                 'leave_node: loop {
-                    if cur == node {
+                    if cur_node == node.into() {
                         break 'main;
                     }
                     if matches!(
-                        (*cur).element_type(),
+                        cur_node.element_type(),
                         XmlElementType::XmlElementNode
                             | XmlElementType::XmlXIncludeStart
                             | XmlElementType::XmlXIncludeEnd
@@ -1386,20 +1380,24 @@ unsafe fn xml_dom_wrap_adopt_branch(
                         }
                         depth -= 1;
                     }
-                    if let Some(next) = (*cur).next {
-                        cur = next.as_ptr();
-                    } else if let Some(children) = (*cur).parent().and_then(|p| {
+                    if let Some(next) = cur_node.next() {
+                        cur_node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                    } else if let Some(children) = cur_node.parent().and_then(|p| {
                         p.children().filter(|_| {
-                            matches!((*cur).element_type(), XmlElementType::XmlAttributeNode)
+                            matches!(cur_node.element_type(), XmlElementType::XmlAttributeNode)
                         })
                     }) {
-                        cur = children.as_ptr();
+                        cur_node = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
                     } else {
-                        cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+                        cur_node = cur_node
+                            .parent()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                            .unwrap();
                         // goto leave_node;
                         continue 'leave_node;
                     }
 
+                    cur = Some(cur_node);
                     break;
                 }
             }
@@ -1443,12 +1441,6 @@ unsafe fn xml_dom_wrap_adopt_attr(
     dest_parent: Option<XmlNodePtr>,
     _options: i32,
 ) -> i32 {
-    let mut cur: *mut XmlNode;
-
-    // if dest_doc.is_null() {
-    //     return -1;
-    // }
-
     attr.doc = Some(dest_doc);
     if let Some(attr_ns) = attr.ns {
         let mut ns = None;
@@ -1496,50 +1488,61 @@ unsafe fn xml_dom_wrap_adopt_attr(
     let Some(children) = attr.children else {
         return 0;
     };
-    cur = children.as_ptr();
-    if !cur.is_null() && matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
+    if matches!(children.element_type(), XmlElementType::XmlNamespaceDecl) {
         // goto internal_error;
         return -1;
     }
-    while !cur.is_null() {
-        (*cur).doc = Some(dest_doc);
-        match (*cur).element_type() {
+    let mut cur = XmlGenericNodePtr::from_raw(children.as_ptr());
+    'main: while let Some(mut cur_node) = cur {
+        cur_node.set_document(Some(dest_doc));
+        match cur_node.element_type() {
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {}
             XmlElementType::XmlEntityRefNode => {
+                let mut cur = XmlNodePtr::try_from(cur_node).unwrap();
                 // Remove reference to the entity-node.
-                (*cur).content = null_mut();
-                (*cur).set_children(None);
-                (*cur).set_last(None);
+                cur.content = null_mut();
+                cur.set_children(None);
+                cur.set_last(None);
                 if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
                     // Assign new entity-node if available.
-                    let ent = xml_get_doc_entity(Some(dest_doc), &(*cur).name().unwrap());
+                    let ent = xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
                     if let Some(ent) = ent {
-                        (*cur).content = ent.content.load(Ordering::Relaxed);
-                        (*cur).set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
-                        (*cur).set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                        cur.content = ent.content.load(Ordering::Relaxed);
+                        cur.set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                        cur.set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
                     }
                 }
             }
             _ => {}
         }
-        if let Some(children) = (*cur).children() {
-            cur = children.as_ptr();
+        if let Some(children) = cur_node
+            .children()
+            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
+        {
+            cur = Some(children);
             continue;
         }
         // next_sibling:
         'next_sibling: loop {
-            if cur == attr.as_ptr() as _ {
-                break;
+            if cur_node == attr.into() {
+                break 'main;
             }
-            if let Some(next) = (*cur).next {
-                cur = next.as_ptr();
+            if let Some(next) = cur_node
+                .next()
+                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+            {
+                cur_node = next;
             } else {
-                cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+                cur_node = cur_node
+                    .parent()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                    .unwrap();
                 // goto next_sibling;
                 continue 'next_sibling;
             }
 
-            break;
+            cur = Some(cur_node);
+            break 'next_sibling;
         }
     }
     0
@@ -1568,27 +1571,26 @@ unsafe fn xml_dom_wrap_adopt_attr(
 pub unsafe fn xml_dom_wrap_adopt_node(
     ctxt: XmlDOMWrapCtxtPtr,
     source_doc: Option<XmlDocPtr>,
-    node: *mut XmlNode,
+    mut node: XmlGenericNodePtr,
     dest_doc: XmlDocPtr,
     dest_parent: Option<XmlNodePtr>,
     options: i32,
 ) -> i32 {
-    if node.is_null()
-        || matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
+    if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl)
         || dest_parent.map_or(false, |dest_parent| dest_parent.doc != Some(dest_doc))
     {
         return -1;
     }
-    // Check (*node).doc sanity.
-    if (*node).doc.map_or(false, |doc| Some(doc) != source_doc) && source_doc.is_some() {
+    // Check node.doc sanity.
+    if node.document().map_or(false, |doc| Some(doc) != source_doc) && source_doc.is_some() {
         // Might be an XIncluded node.
         return -1;
     }
-    let source_doc = source_doc.or((*node).doc);
+    let source_doc = source_doc.or(node.document());
     if source_doc == Some(dest_doc) {
         return -1;
     }
-    match (*node).element_type() {
+    match node.element_type() {
         XmlElementType::XmlElementNode
         | XmlElementType::XmlAttributeNode
         | XmlElementType::XmlTextNode
@@ -1605,47 +1607,38 @@ pub unsafe fn xml_dom_wrap_adopt_node(
         }
     }
     // Unlink only if @node was not already added to @destParent.
-    if (*node)
+    if node
         .parent()
         .filter(|p| dest_parent.map(|d| d.into()) != XmlGenericNodePtr::from_raw(p.as_ptr()))
         .is_some()
     {
-        (*node).unlink();
+        node.unlink();
     }
 
-    if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
+    if let Some(node) = XmlNodePtr::try_from(node)
+        .ok()
+        .filter(|node| matches!(node.element_type(), XmlElementType::XmlElementNode))
+    {
         return xml_dom_wrap_adopt_branch(ctxt, source_doc, node, dest_doc, dest_parent, options);
-    } else if matches!((*node).element_type(), XmlElementType::XmlAttributeNode) {
-        return xml_dom_wrap_adopt_attr(
-            ctxt,
-            source_doc,
-            XmlAttrPtr::from_raw(node as *mut XmlAttr).unwrap().unwrap(),
-            dest_doc,
-            dest_parent,
-            options,
-        );
+    } else if let Ok(attr) = XmlAttrPtr::try_from(node) {
+        return xml_dom_wrap_adopt_attr(ctxt, source_doc, attr, dest_doc, dest_parent, options);
     } else {
-        let cur: *mut XmlNode = node;
-
-        (*cur).doc = Some(dest_doc);
-        // Optimize string adoption.
-        // if !source_doc.is_null() && (*source_doc).dict == (*dest_doc).dict {
-        //     adopt_str = 0;
-        // }
-        match (*node).element_type() {
+        node.set_document(Some(dest_doc));
+        match node.element_type() {
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {}
             XmlElementType::XmlEntityRefNode => {
+                let mut node = XmlNodePtr::try_from(node).unwrap();
                 // Remove reference to the entity-node.
-                (*node).content = null_mut();
-                (*node).set_children(None);
-                (*node).set_last(None);
+                node.content = null_mut();
+                node.set_children(None);
+                node.set_last(None);
                 if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
                     // Assign new entity-node if available.
-                    let ent = xml_get_doc_entity(Some(dest_doc), &(*node).name().unwrap());
+                    let ent = xml_get_doc_entity(Some(dest_doc), &node.name().unwrap());
                     if let Some(ent) = ent {
-                        (*node).content = ent.content.load(Ordering::Relaxed);
-                        (*node).set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
-                        (*node).set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                        node.content = ent.content.load(Ordering::Relaxed);
+                        node.set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                        node.set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
                     }
                 }
             }
@@ -1669,31 +1662,28 @@ pub unsafe fn xml_dom_wrap_adopt_node(
 pub unsafe fn xml_dom_wrap_remove_node(
     ctxt: XmlDOMWrapCtxtPtr,
     doc: XmlDocPtr,
-    mut node: *mut XmlNode,
+    mut node: XmlGenericNodePtr,
     _options: i32,
 ) -> i32 {
     let mut list = vec![];
     let mut nb_list: i32 = 0;
 
-    // if doc.is_null() {
-    //     return -1;
-    // }
-    if node.is_null() || (*node).doc != Some(doc) {
+    if node.document() != Some(doc) {
         return -1;
     }
 
     // TODO: 0 or -1 ?
-    if (*node).parent().is_none() {
+    if node.parent().is_none() {
         return 0;
     }
 
-    match (*node).element_type() {
+    match node.element_type() {
         XmlElementType::XmlTextNode
         | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode => {
-            (*node).unlink();
+            node.unlink();
             return 0;
         }
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
@@ -1701,13 +1691,14 @@ pub unsafe fn xml_dom_wrap_remove_node(
             return 1;
         }
     }
-    (*node).unlink();
+    node.unlink();
     // Save out-of-scope ns-references in (*doc).oldNs.
     'main: loop {
-        match (*node).element_type() {
+        match node.element_type() {
             XmlElementType::XmlElementNode => {
-                if ctxt.is_null() && (*node).ns_def.is_some() {
-                    let mut ns = (*node).ns_def;
+                let mut cur_node = XmlNodePtr::try_from(node).unwrap();
+                if ctxt.is_null() && cur_node.ns_def.is_some() {
+                    let mut ns = cur_node.ns_def;
                     while let Some(now) = ns {
                         if xml_dom_wrap_ns_norm_add_ns_map_item2(
                             &mut list,
@@ -1724,33 +1715,32 @@ pub unsafe fn xml_dom_wrap_remove_node(
                     }
                 }
 
-                if (*node).ns.is_some() {
+                if cur_node.ns.is_some() {
                     // Find a mapping.
                     for (_, j) in (0..nb_list).zip((0..).step_by(2)) {
-                        if (*node).ns == Some(list[j]) {
-                            (*node).ns = Some(list[j + 1]);
+                        if cur_node.ns == Some(list[j]) {
+                            cur_node.ns = Some(list[j + 1]);
                             // goto next_node;
-                            if let Some(children) = (*node).children().filter(|_| {
-                                matches!((*node).element_type(), XmlElementType::XmlElementNode)
+                            if let Some(children) = cur_node.children().filter(|_| {
+                                matches!(cur_node.element_type(), XmlElementType::XmlElementNode)
                             }) {
-                                node = children.as_ptr();
+                                node = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
                                 continue 'main;
                             }
                             // next_sibling:
                             'next_sibling: loop {
-                                if node.is_null() {
-                                    break;
-                                }
-                                if let Some(next) = (*node).next {
-                                    node = next.as_ptr();
+                                if let Some(next) = node.next() {
+                                    node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
                                 } else {
-                                    node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                                    let Some(parent) = node
+                                        .parent()
+                                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                                    else {
+                                        break 'main;
+                                    };
+                                    node = parent;
                                     // goto next_sibling;
                                     continue 'next_sibling;
-                                }
-
-                                if node.is_null() {
-                                    break 'main;
                                 }
 
                                 continue 'main;
@@ -1764,8 +1754,8 @@ pub unsafe fn xml_dom_wrap_remove_node(
                         // Add to doc's oldNs.
                         ns = xml_dom_wrap_store_ns(
                             doc,
-                            (*node).ns.unwrap().href,
-                            (*node).ns.unwrap().prefix().as_deref(),
+                            cur_node.ns.unwrap().href,
+                            cur_node.ns.unwrap().prefix().as_deref(),
                         );
                         if ns.is_none() {
                             // goto internal_error;
@@ -1778,7 +1768,7 @@ pub unsafe fn xml_dom_wrap_remove_node(
                             &mut list,
                             // &raw mut size_list,
                             &raw mut nb_list,
-                            (*node).ns.unwrap(),
+                            cur_node.ns.unwrap(),
                             ns,
                         ) == -1
                         {
@@ -1786,43 +1776,43 @@ pub unsafe fn xml_dom_wrap_remove_node(
                             return -1;
                         }
                     }
-                    (*node).ns = ns;
+                    cur_node.ns = ns;
                 }
-                if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-                    if let Some(prop) = (*node).properties {
-                        node = prop.as_ptr() as _;
+                if matches!(node.element_type(), XmlElementType::XmlElementNode) {
+                    if let Some(prop) = cur_node.properties {
+                        node = XmlGenericNodePtr::from_raw(prop.as_ptr()).unwrap();
                         continue;
                     }
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                if (*node).ns.is_some() {
+                let mut attr = XmlAttrPtr::try_from(node).unwrap();
+                if attr.ns.is_some() {
                     // Find a mapping.
                     for (_, j) in (0..nb_list).zip((0..).step_by(2)) {
-                        if (*node).ns == Some(list[j]) {
-                            (*node).ns = Some(list[j + 1]);
+                        if attr.ns == Some(list[j]) {
+                            attr.ns = Some(list[j + 1]);
                             // goto next_node;
-                            if let Some(children) = (*node).children().filter(|_| {
-                                matches!((*node).element_type(), XmlElementType::XmlElementNode)
+                            if let Some(children) = attr.children().filter(|_| {
+                                matches!(attr.element_type(), XmlElementType::XmlElementNode)
                             }) {
-                                node = children.as_ptr();
+                                node = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
                                 continue 'main;
                             }
                             // next_sibling:
                             'next_sibling: loop {
-                                if node.is_null() {
-                                    break;
-                                }
-                                if let Some(next) = (*node).next {
-                                    node = next.as_ptr();
+                                if let Some(next) = node.next() {
+                                    node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
                                 } else {
-                                    node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                                    let Some(parent) = node
+                                        .parent()
+                                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                                    else {
+                                        break 'main;
+                                    };
+                                    node = parent;
                                     // goto next_sibling;
                                     continue 'next_sibling;
-                                }
-
-                                if node.is_null() {
-                                    break 'main;
                                 }
 
                                 continue 'main;
@@ -1836,8 +1826,8 @@ pub unsafe fn xml_dom_wrap_remove_node(
                         // Add to doc's oldNs.
                         ns = xml_dom_wrap_store_ns(
                             doc,
-                            (*node).ns.unwrap().href,
-                            (*node).ns.unwrap().prefix().as_deref(),
+                            attr.ns.unwrap().href,
+                            attr.ns.unwrap().prefix().as_deref(),
                         );
                         if ns.is_none() {
                             // goto internal_error;
@@ -1850,7 +1840,7 @@ pub unsafe fn xml_dom_wrap_remove_node(
                             &mut list,
                             // &raw mut size_list,
                             &raw mut nb_list,
-                            (*node).ns.unwrap(),
+                            attr.ns.unwrap(),
                             ns,
                         ) == -1
                         {
@@ -1858,60 +1848,54 @@ pub unsafe fn xml_dom_wrap_remove_node(
                             return -1;
                         }
                     }
-                    (*node).ns = ns;
-                }
-                if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-                    if let Some(prop) = (*node).properties {
-                        node = prop.as_ptr() as _;
-                        continue;
-                    }
+                    attr.ns = ns;
                 }
             }
             _ => {
-                // goto next_sibling;
                 'next_sibling: loop {
-                    if node.is_null() {
-                        break;
-                    }
-                    if let Some(next) = (*node).next {
-                        node = next.as_ptr();
+                    if let Some(next) = node.next() {
+                        node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
                     } else {
-                        node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                        let Some(parent) = node
+                            .parent()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                        else {
+                            break 'main;
+                        };
+                        node = parent;
                         // goto next_sibling;
                         continue 'next_sibling;
                     }
 
-                    if node.is_null() {
-                        break 'main;
-                    }
                     continue 'main;
                 }
             }
         }
         // next_node:
-        if let Some(children) = (*node)
+        if let Some(children) = node
             .children()
-            .filter(|_| matches!((*node).element_type(), XmlElementType::XmlElementNode))
+            .filter(|_| matches!(node.element_type(), XmlElementType::XmlElementNode))
         {
-            node = children.as_ptr();
+            node = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
             continue;
         }
         // next_sibling:
         'next_sibling: loop {
-            if node.is_null() {
-                break;
-            }
-            if let Some(next) = (*node).next {
-                node = next.as_ptr();
+            if let Some(next) = node.next() {
+                node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
             } else {
-                node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                let Some(parent) = node
+                    .parent()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                else {
+                    break 'main;
+                };
+                node = parent;
                 // goto next_sibling;
                 continue 'next_sibling;
             }
-        }
 
-        if node.is_null() {
-            break;
+            continue 'main;
         }
     }
 
