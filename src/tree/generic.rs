@@ -16,9 +16,9 @@ use crate::{
 
 use super::{
     add_prop_sibling, xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge,
-    xml_tree_err_memory, NodePtr, XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributeType, XmlDoc,
-    XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement, XmlElementType, XmlEntity, XmlNode, XmlNodePtr,
-    XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_tree_err_memory, NodePtr, XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributePtr,
+    XmlAttributeType, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType, XmlEntity, XmlEntityPtr,
+    XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -36,72 +36,6 @@ pub trait NodeCommon {
     fn set_prev(&mut self, prev: Option<NodePtr>);
     fn document(&self) -> Option<XmlDocPtr>;
     fn set_document(&mut self, doc: Option<XmlDocPtr>);
-
-    fn as_node(&self) -> Option<NonNull<XmlNode>> {
-        // TODO: Remove unneeded types
-        match self.element_type() {
-            XmlElementType::XmlElementNode
-            | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCDATASectionNode
-            | XmlElementType::XmlEntityRefNode
-            | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPINode
-            | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlNotationNode
-            | XmlElementType::XmlXIncludeStart
-            | XmlElementType::XmlXIncludeEnd => NonNull::new(self as *const Self as *mut XmlNode),
-            _ => None,
-        }
-    }
-    fn as_attribute_node(&self) -> Option<NonNull<XmlAttr>> {
-        match self.element_type() {
-            XmlElementType::XmlAttributeNode => NonNull::new(self as *const Self as *mut XmlAttr),
-            _ => None,
-        }
-    }
-    fn as_attribute_decl_node(&self) -> Option<NonNull<XmlAttribute>> {
-        match self.element_type() {
-            XmlElementType::XmlAttributeDecl => {
-                NonNull::new(self as *const Self as *mut XmlAttribute)
-            }
-            _ => None,
-        }
-    }
-    fn as_document_node(&self) -> Option<NonNull<XmlDoc>> {
-        match self.element_type() {
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                NonNull::new(self as *const Self as *mut XmlDoc)
-            }
-            _ => None,
-        }
-    }
-    fn as_dtd_node(&self) -> Option<NonNull<XmlDtd>> {
-        match self.element_type() {
-            XmlElementType::XmlDTDNode | XmlElementType::XmlDocumentTypeNode => {
-                NonNull::new(self as *const Self as *mut XmlDtd)
-            }
-            _ => None,
-        }
-    }
-    fn as_element_decl_node(&self) -> Option<NonNull<XmlElement>> {
-        match self.element_type() {
-            XmlElementType::XmlElementDecl => NonNull::new(self as *const Self as *mut XmlElement),
-            _ => None,
-        }
-    }
-    fn as_entity_decl_node(&self) -> Option<NonNull<XmlEntity>> {
-        match self.element_type() {
-            XmlElementType::XmlEntityDecl => NonNull::new(self as *const Self as *mut XmlEntity),
-            _ => None,
-        }
-    }
-    fn as_namespace_decl_node(&self) -> Option<NonNull<XmlNs>> {
-        match self.element_type() {
-            XmlElementType::XmlNamespaceDecl => NonNull::new(self as *const Self as *mut XmlNs),
-            _ => None,
-        }
-    }
 
     /// Check whether this node is a Text node or not.
     #[doc(alias = "xmlNodeIsText")]
@@ -151,8 +85,10 @@ pub trait NodeCommon {
         }
         let mut bases: Vec<String> = vec![];
         while let Some(now) = cur {
-            if let Some(ent) = now.as_entity_decl_node() {
-                let ret = ent.as_ref().uri.load(Ordering::Relaxed);
+            if let Ok(ent) =
+                XmlEntityPtr::try_from(XmlGenericNodePtr::from_raw(now.as_ptr()).unwrap())
+            {
+                let ret = ent.uri.load(Ordering::Relaxed);
                 return (!ret.is_null()).then(|| {
                     CStr::from_ptr(ret as *const i8)
                         .to_string_lossy()
@@ -217,11 +153,10 @@ pub trait NodeCommon {
             }
             Some("".to_owned())
         } else if matches!(self.element_type(), XmlElementType::XmlAttributeDecl) {
-            let def = self
-                .as_attribute_decl_node()
+            let attr_decl = XmlAttributePtr::from_raw(self as *const Self as *mut XmlAttribute)
                 .unwrap()
-                .as_ref()
-                .default_value;
+                .unwrap();
+            let def = attr_decl.default_value;
             (!def.is_null()).then(|| {
                 CStr::from_ptr(def as *const i8)
                     .to_string_lossy()
@@ -292,9 +227,12 @@ pub trait NodeCommon {
             | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlNotationNode => {
-                let mut node = self.as_node().unwrap();
+                let mut node = XmlNodePtr::try_from(
+                    XmlGenericNodePtr::from_raw(self as *mut Self as *mut XmlNode).unwrap(),
+                )
+                .unwrap();
                 if !content.is_null() {
-                    node.as_mut().content = xml_strncat(node.as_ref().content, content, len);
+                    node.content = xml_strncat(node.content, content, len);
                 }
             }
             XmlElementType::XmlDocumentNode

@@ -342,6 +342,9 @@ impl XmlNode {
                 }
                 current.parent()
             } else if matches!(current.element_type(), XmlElementType::XmlAttributeNode) {
+                let attr = XmlAttrPtr::from_raw(current.as_ptr() as *mut XmlAttr)
+                    .unwrap()
+                    .unwrap();
                 sep = "/@";
                 if let Some(ns) = current.ns {
                     name = if let Some(prefix) = ns.prefix() {
@@ -350,14 +353,9 @@ impl XmlNode {
                         format!("{}", current.name().unwrap()).into()
                     };
                 } else {
-                    name = current
-                        .as_attribute_node()
-                        .unwrap()
-                        .as_ref()
-                        .name()
-                        .unwrap();
+                    name = attr.name().unwrap().into_owned().into();
                 }
-                current.as_attribute_node().unwrap().as_ref().parent()
+                attr.parent()
             } else {
                 return None;
             };
@@ -1249,7 +1247,8 @@ impl XmlNode {
             }
             XmlElementType::XmlElementNode => {}
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                let doc = self.as_document_node().unwrap().as_mut();
+                let mut doc =
+                    XmlDocPtr::try_from(XmlGenericNodePtr::from_raw(self).unwrap()).unwrap();
                 doc.set_base(uri);
                 return;
             }

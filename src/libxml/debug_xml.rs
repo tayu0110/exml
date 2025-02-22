@@ -319,15 +319,16 @@ impl XmlDebugCtxt<'_> {
             );
         }
         if node.element_type() == XmlElementType::XmlElementNode {
-            let mut ns = node.as_node().unwrap().as_ref().ns_def;
+            let node = XmlNodePtr::try_from(node).unwrap();
+            let mut ns = node.ns_def;
             while let Some(now) = ns {
-                self.ns_check_scope(node, now);
+                self.ns_check_scope(node.into(), now);
                 ns = now.next;
             }
-            if let Some(ns) = node.as_node().unwrap().as_ref().ns {
-                self.ns_check_scope(node, ns);
+            if let Some(ns) = node.ns {
+                self.ns_check_scope(node.into(), ns);
             }
-        } else if let Some(ns) = node.as_attribute_node().and_then(|attr| attr.as_ref().ns) {
+        } else if let Some(ns) = XmlAttrPtr::try_from(node).ok().and_then(|attr| attr.ns) {
             self.ns_check_scope(node, ns);
         }
 
@@ -340,10 +341,17 @@ impl XmlDebugCtxt<'_> {
                 | XmlElementType::XmlDTDNode
                 | XmlElementType::XmlHTMLDocumentNode
                 | XmlElementType::XmlDocumentNode
-        ) && !node.as_node().unwrap().as_ref().content.is_null()
-        {
-            let content = node.as_node().unwrap().as_ref().content;
-            self.check_string(&CStr::from_ptr(content as *const i8).to_string_lossy());
+        ) {
+            let content = if let Ok(node) = XmlNodePtr::try_from(node) {
+                node.content
+            } else if let Ok(ent) = XmlEntityPtr::try_from(node) {
+                ent.content.load(Ordering::Relaxed)
+            } else {
+                todo!("What is this type ????: {:?}", node.element_type());
+            };
+            if !content.is_null() {
+                self.check_string(&CStr::from_ptr(content as *const i8).to_string_lossy());
+            }
         }
         match (*node).element_type() {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
@@ -936,14 +944,14 @@ impl XmlDebugCtxt<'_> {
             XmlElementType::XmlTextNode => {
                 if self.check == 0 {
                     self.dump_spaces();
-                    let node = node.as_node().unwrap();
-                    if node.as_ref().name == XML_STRING_TEXT_NOENC.as_ptr() as *const XmlChar {
+                    let node = XmlNodePtr::try_from(node).unwrap();
+                    if node.name == XML_STRING_TEXT_NOENC.as_ptr() as *const XmlChar {
                         write!(self.output, "TEXT no enc");
                     } else {
                         write!(self.output, "TEXT");
                     }
                     if self.options & DUMP_TEXT_TYPE != 0 {
-                        if xml_dict_owns(self.dict, node.as_ref().content) == 1 {
+                        if xml_dict_owns(self.dict, node.content) == 1 {
                             writeln!(self.output, " interned");
                         } else {
                             writeln!(self.output);
@@ -1063,10 +1071,10 @@ impl XmlDebugCtxt<'_> {
             writeln!(self.output, "PBM: doc.is_null() !!!");
         }
         self.depth += 1;
-        if let Some(ns_def) = node
-            .as_node()
-            .filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
-            .and_then(|node| node.as_ref().ns_def)
+        if let Some(ns_def) = XmlNodePtr::try_from(node)
+            .ok()
+            .filter(|n| n.element_type() == XmlElementType::XmlElementNode)
+            .and_then(|node| node.ns_def)
         {
             self.dump_namespace_list(Some(ns_def));
         }
@@ -1079,8 +1087,8 @@ impl XmlDebugCtxt<'_> {
         }
         if node.element_type() != XmlElementType::XmlEntityRefNode {
             if node.element_type() != XmlElementType::XmlElementNode && self.check == 0 {
-                let content = if let Some(node) = node.as_node() {
-                    node.as_ref().content
+                let content = if let Ok(node) = XmlNodePtr::try_from(node) {
+                    node.content
                 } else {
                     null()
                 };
@@ -1475,7 +1483,7 @@ unsafe fn xml_ns_check_scope(node: XmlGenericNodePtr, ns: XmlNsPtr) -> i32 {
             now.element_type(),
             XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
         ) {
-            let mut cur = now.as_node().unwrap().as_ref().ns_def;
+            let mut cur = XmlNodePtr::try_from(now).unwrap().ns_def;
             while let Some(now) = cur {
                 if now == ns {
                     return 1;
@@ -1491,13 +1499,8 @@ unsafe fn xml_ns_check_scope(node: XmlGenericNodePtr, ns: XmlNsPtr) -> i32 {
             .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
     }
     // the xml namespace may be declared on the document node
-    if let Some(node) = node.filter(|node| {
-        matches!(
-            node.element_type(),
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
-        )
-    }) {
-        let old_ns = node.as_document_node().unwrap().as_ref().old_ns;
+    if let Some(node) = node.and_then(|node| XmlDocPtr::try_from(node).ok()) {
+        let old_ns = node.old_ns;
         if old_ns == Some(ns) {
             return 1;
         }
@@ -1797,15 +1800,15 @@ pub unsafe fn xml_ls_count_node(node: Option<XmlGenericNodePtr>) -> usize {
     let mut list = match node.element_type() {
         XmlElementType::XmlElementNode => node.children(),
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-            node.as_document_node().unwrap().as_ref().children()
+            XmlDocPtr::try_from(node).unwrap().children
         }
-        XmlElementType::XmlAttributeNode => node.as_attribute_node().unwrap().as_ref().children(),
+        XmlElementType::XmlAttributeNode => XmlAttrPtr::try_from(node).unwrap().children,
         XmlElementType::XmlTextNode
         | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode => {
-            let node = node.as_node().unwrap();
-            let content = node.as_ref().content;
+            let node = XmlNodePtr::try_from(node).unwrap();
+            let content = node.content;
             return if !content.is_null() {
                 CStr::from_ptr(content as *const i8).to_bytes().len()
             } else {
@@ -1942,11 +1945,11 @@ unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlGenericNodeP
         (*ctxt).output.as_mut()
     };
     let mut boxed = Box::new(fp);
-    if node.element_type() == XmlElementType::XmlDocumentNode {
-        node.as_document_node()
-            .unwrap()
-            .as_mut()
-            .dump_file(&mut boxed);
+    if let Some(mut doc) = XmlDocPtr::try_from(node)
+        .ok()
+        .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
+    {
+        doc.dump_file(&mut boxed);
     } else if node.element_type() == XmlElementType::XmlAttributeNode {
         xml_debug_dump_attr_list(&mut boxed, XmlAttrPtr::try_from(node).ok(), 0);
     } else {
@@ -2091,13 +2094,8 @@ pub unsafe fn xml_shell_dir(
         writeln!((*ctxt).output, "NULL");
         return 0;
     };
-    if node.element_type() == XmlElementType::XmlDocumentNode
-        || node.element_type() == XmlElementType::XmlHTMLDocumentNode
-    {
-        xml_debug_dump_document_head(
-            Some(&mut (*ctxt).output),
-            node.as_document_node().map(|d| d.as_ref()),
-        );
+    if let Ok(doc) = XmlDocPtr::try_from(node) {
+        xml_debug_dump_document_head(Some(&mut (*ctxt).output), Some(&*doc));
     } else if node.element_type() == XmlElementType::XmlAttributeNode {
         xml_debug_dump_attr(&mut (*ctxt).output, XmlAttrPtr::try_from(node).ok(), 0);
     } else {

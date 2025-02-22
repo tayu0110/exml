@@ -1231,8 +1231,10 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             }
                         }
                         XmlElementType::XmlAttributeNode => {
+                            let mut attr =
+                                XmlAttrPtr::from_raw(cur as *mut XmlAttr).unwrap().unwrap();
                             // No namespace, no fun.
-                            if let Some(cur_ns) = (*cur).ns.as_mut() {
+                            if attr.ns.is_some() {
                                 if parnsdone == 0 {
                                     if xml_dom_wrap_ns_norm_gather_in_scope_ns(
                                         &raw mut ns_map,
@@ -1248,9 +1250,8 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                 if XML_NSMAP_NOTEMPTY!(ns_map) {
                                     // Search for a mapping.
                                     XML_NSMAP_FOREACH!(ns_map, mi, {
-                                        if (*mi).shadow_depth == -1 && Some(*cur_ns) == (*mi).old_ns
-                                        {
-                                            *cur_ns = (*mi).new_ns.unwrap();
+                                        if (*mi).shadow_depth == -1 && attr.ns == (*mi).old_ns {
+                                            attr.ns = (*mi).new_ns;
                                             // goto ns_end;
                                             ns_end = true;
                                             break;
@@ -1264,16 +1265,16 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                         // User-defined behaviour.
                                         let ns = ((*ctxt).get_ns_for_node_func.unwrap())(
                                             ctxt,
-                                            cur,
-                                            cur_ns.href,
-                                            cur_ns.prefix,
+                                            attr.as_ptr() as *mut XmlNode,
+                                            attr.ns.unwrap().href,
+                                            attr.ns.unwrap().prefix,
                                         );
                                         // Insert mapping if ns is available; it's the users fault
                                         // if not.
                                         if xml_dom_wrap_ns_map_add_item(
                                             &raw mut ns_map,
                                             -1,
-                                            (*cur).ns,
+                                            attr.ns,
                                             ns,
                                             XML_TREE_NSMAP_CUSTOM,
                                         )
@@ -1281,7 +1282,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                         {
                                             break 'internal_error;
                                         }
-                                        (*cur).ns = ns;
+                                        attr.ns = ns;
                                     } else {
                                         // Acquire a normalized ns-decl and add it to the map.
                                         let mut ns = None;
@@ -1289,21 +1290,21 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                             dest_doc,
                                             // ns-decls on curElem or on (*destDoc).oldNs
                                             dest_parent.and(cur_elem),
-                                            (*cur).ns.unwrap(),
+                                            attr.ns.unwrap(),
                                             &mut ns,
                                             &raw mut ns_map,
                                             depth,
                                             ancestors_only,
                                             // ns-decls must be prefixed for attributes.
                                             matches!(
-                                                (*cur).element_type(),
+                                                attr.element_type(),
                                                 XmlElementType::XmlAttributeNode
                                             ) as i32,
                                         ) == -1
                                         {
                                             break 'internal_error;
                                         }
-                                        (*cur).ns = ns;
+                                        attr.ns = ns;
                                     }
                                 }
                             }
@@ -1311,18 +1312,12 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             // TODO: Is this all?
                             // Attributes.
                             if let Some(source_doc) = source_doc.filter(|_| {
-                                matches!(
-                                    (*cur).as_attribute_node().unwrap().as_ref().atype,
-                                    Some(XmlAttributeType::XmlAttributeID)
-                                )
+                                matches!(attr.atype, Some(XmlAttributeType::XmlAttributeID))
                             }) {
-                                xml_remove_id(
-                                    source_doc,
-                                    XmlAttrPtr::from_raw(cur as _).unwrap().unwrap(),
-                                );
+                                xml_remove_id(source_doc, attr);
                             }
-                            (*cur).as_attribute_node().unwrap().as_mut().atype = None;
-                            (*cur).as_attribute_node().unwrap().as_mut().psvi = null_mut();
+                            attr.atype = None;
+                            attr.psvi = null_mut();
                         }
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                             // goto leave_node;

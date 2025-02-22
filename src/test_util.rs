@@ -51,8 +51,8 @@ use crate::{
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, NodeCommon, XmlAttr,
         XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr,
-        XmlDtd, XmlElement, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntitiesTablePtr, XmlEntity, XmlNode, XmlNs,
+        XmlDtd, XmlDtdPtr, XmlElement, XmlElementContentPtr, XmlElementContentType, XmlElementType,
+        XmlElementTypeVal, XmlEntitiesTablePtr, XmlEntity, XmlGenericNodePtr, XmlNode, XmlNs,
     },
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
@@ -737,12 +737,9 @@ unsafe fn get_api_dtd() -> *mut XmlDtd {
             && (*API_DOC.get()).children.is_some()
             && (*API_DOC.get()).children.unwrap().element_type() == XmlElementType::XmlDTDNode
         {
-            API_DTD.set(
-                (*(*API_DOC.get()).children().unwrap().as_ptr())
-                    .as_dtd_node()
-                    .unwrap()
-                    .as_ptr(),
-            );
+            let children =
+                XmlGenericNodePtr::from_raw((*API_DOC.get()).children().unwrap().as_ptr()).unwrap();
+            API_DTD.set(XmlDtdPtr::try_from(children).unwrap().as_ptr());
         }
     }
     API_DTD.get()

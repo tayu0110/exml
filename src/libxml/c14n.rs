@@ -764,11 +764,11 @@ impl<T> XmlC14NCtx<'_, T> {
                 // angle brackets (>) are replaced by &gt;, and all #xD characters are
                 // replaced by &#xD;.
 
-                let cur = cur.as_node().unwrap();
+                let cur = XmlNodePtr::try_from(cur).unwrap();
                 // cdata sections are processed as text nodes
                 // todo: verify that cdata sections are included in XPath nodes set
-                if visible && !cur.as_ref().content.is_null() {
-                    let buffer: *mut XmlChar = xml_c11n_normalize_text(cur.as_ref().content);
+                if visible && !cur.content.is_null() {
+                    let buffer: *mut XmlChar = xml_c11n_normalize_text(cur.content);
                     if !buffer.is_null() {
                         self.buf
                             .borrow_mut()
@@ -799,12 +799,12 @@ impl<T> XmlC14NCtx<'_, T> {
                     }
 
                     self.buf.borrow_mut().write_str(&(*cur).name().unwrap());
-                    let cur = cur.as_node().unwrap();
-                    if !cur.as_ref().content.is_null() && *cur.as_ref().content != b'\0' {
+                    let cur = XmlNodePtr::try_from(cur).unwrap();
+                    if !cur.content.is_null() && *cur.content != b'\0' {
                         self.buf.borrow_mut().write_str(" ");
 
                         /* todo: do we need to normalize pi? */
-                        let buffer: *mut XmlChar = xml_c11n_normalize_pi(cur.as_ref().content);
+                        let buffer: *mut XmlChar = xml_c11n_normalize_pi(cur.content);
                         if !buffer.is_null() {
                             self.buf
                                 .borrow_mut()
@@ -824,21 +824,19 @@ impl<T> XmlC14NCtx<'_, T> {
                 }
             }
             XmlElementType::XmlCommentNode => {
-                /*
-                 * Comment Nodes
-                 * Nothing if generating canonical XML without  comments. For
-                 * canonical XML with comments, generate the opening comment
-                 * symbol (<!--), the string value of the node, and the
-                 * closing comment symbol (-->). Also, a trailing #xA is rendered
-                 * after the closing comment symbol for comment children of the
-                 * root node with a lesser document order than the document
-                 * element, and a leading #xA is rendered before the opening
-                 * comment symbol of comment children of the root node with a
-                 * greater document order than the document element. (Comment
-                 * children of the root node represent comments outside of the
-                 * top-level document element and outside of the document type
-                 * declaration).
-                 */
+                // Comment Nodes
+                // Nothing if generating canonical XML without  comments. For
+                // canonical XML with comments, generate the opening comment
+                // symbol (<!--), the string value of the node, and the
+                // closing comment symbol (-->). Also, a trailing #xA is rendered
+                // after the closing comment symbol for comment children of the
+                // root node with a lesser document order than the document
+                // element, and a leading #xA is rendered before the opening
+                // comment symbol of comment children of the root node with a
+                // greater document order than the document element. (Comment
+                // children of the root node represent comments outside of the
+                // top-level document element and outside of the document type
+                // declaration).
                 if visible && self.with_comments {
                     if matches!(self.pos, XmlC14NPosition::XmlC14NAfterDocumentElement) {
                         self.buf.borrow_mut().write_str("\x0A<!--");
@@ -846,10 +844,10 @@ impl<T> XmlC14NCtx<'_, T> {
                         self.buf.borrow_mut().write_str("<!--");
                     }
 
-                    let cur = cur.as_node().unwrap();
-                    if !cur.as_ref().content.is_null() {
+                    let cur = XmlNodePtr::try_from(cur).unwrap();
+                    if !cur.content.is_null() {
                         /* todo: do we need to normalize comment? */
-                        let buffer: *mut XmlChar = xml_c11n_normalize_comment(cur.as_ref().content);
+                        let buffer: *mut XmlChar = xml_c11n_normalize_comment(cur.content);
                         if !buffer.is_null() {
                             self.buf
                                 .borrow_mut()
