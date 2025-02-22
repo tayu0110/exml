@@ -2613,22 +2613,18 @@ unsafe fn xml_search_ns_by_prefix_strict(
 #[doc(alias = "xmlSearchNsByNamespaceStrict")]
 unsafe fn xml_search_ns_by_namespace_strict(
     mut doc: XmlDocPtr,
-    node: *mut XmlNode,
+    node: XmlGenericNodePtr,
     ns_name: *const XmlChar,
     ret_ns: &mut Option<XmlNsPtr>,
     prefixed: i32,
 ) -> i32 {
-    let mut cur: *mut XmlNode;
-    let mut prev: *mut XmlNode = null_mut();
-    let mut out: *mut XmlNode = null_mut();
-
-    // if doc.is_null() {
-    //     return -1;
-    // }
     if ns_name.is_null() {
         return -1;
     }
-    if node.is_null() || matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
+    // if node.is_null() {
+    //     return -1;
+    // }
+    if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
         return -1;
     }
 
@@ -2640,20 +2636,24 @@ unsafe fn xml_search_ns_by_namespace_strict(
         }
         return 1;
     }
-    cur = node;
-    loop {
-        if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-            if (*cur).ns_def.is_some() {
-                let mut ns = (*cur).ns_def;
+    let mut cur = Some(node);
+    let mut prev: Option<XmlNodePtr> = None;
+    let mut out = None;
+    while let Some(cur_node) = cur.filter(|&cur| Some(cur) != cur.document().map(|doc| doc.into()))
+    {
+        if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+            let cur = XmlNodePtr::try_from(cur_node).unwrap();
+            if cur.ns_def.is_some() {
+                let mut ns = cur.ns_def;
                 while let Some(now) = ns {
                     if prefixed != 0 && now.prefix().is_none() {
                         ns = now.next;
                         continue;
                     }
-                    if !prev.is_null() {
+                    if let Some(prev) = prev {
                         // Check the last level of ns-decls for a
                         // shadowing prefix.
-                        let mut prevns = (*prev).ns_def;
+                        let mut prevns = prev.ns_def;
                         while let Some(pns) = prevns {
                             if pns.prefix() == now.prefix()
                                 || (pns.prefix().is_some()
@@ -2674,11 +2674,11 @@ unsafe fn xml_search_ns_by_namespace_strict(
                     if ns_name == now.href || xml_str_equal(ns_name, now.href) {
                         // At this point the prefix can only be shadowed,
                         // if we are the the (at least) 3rd level of ns-decls.
-                        if !out.is_null() {
+                        if out.is_some() {
                             let ret: i32 = xml_ns_in_scope(
                                 Some(doc),
-                                XmlGenericNodePtr::from_raw(node),
-                                XmlGenericNodePtr::from_raw(prev),
+                                Some(node),
+                                prev.map(|prev| prev.into()),
                                 now.prefix,
                             );
                             if ret < 0 {
@@ -2699,18 +2699,16 @@ unsafe fn xml_search_ns_by_namespace_strict(
                     }
                 }
                 out = prev;
-                prev = cur;
+                prev = Some(cur);
             }
-        } else if (matches!((*cur).element_type(), XmlElementType::XmlEntityNode)
-            || matches!((*cur).element_type(), XmlElementType::XmlEntityDecl))
+        } else if (matches!(cur_node.element_type(), XmlElementType::XmlEntityNode)
+            || matches!(cur_node.element_type(), XmlElementType::XmlEntityDecl))
         {
             return 0;
         }
-        cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-
-        if cur.is_null() || (*cur).doc.map_or(null_mut(), |doc| doc.as_ptr()) == cur as _ {
-            break;
-        }
+        cur = cur_node
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
     }
     0
 }
@@ -2770,44 +2768,6 @@ mod tests {
                                 eprint!(" {}", n_memory);
                                 eprintln!(" {}", n_len);
                             }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_domwrap_reconcile_namespaces() {
-        unsafe {
-            let mut leaks = 0;
-            for n_ctxt in 0..GEN_NB_XML_DOMWRAP_CTXT_PTR {
-                for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                    for n_options in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_domwrap_ctxt_ptr(n_ctxt, 0);
-                        let elem = gen_xml_node_ptr(n_elem, 1);
-                        let options = gen_int(n_options, 2);
-
-                        let ret_val = xml_dom_wrap_reconcile_namespaces(ctxt, elem, options);
-                        desret_int(ret_val);
-                        des_xml_domwrap_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_node_ptr(n_elem, elem, 1);
-                        des_int(n_options, options, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlDOMWrapReconcileNamespaces",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlDOMWrapReconcileNamespaces()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_elem);
-                            eprintln!(" {}", n_options);
                         }
                     }
                 }
