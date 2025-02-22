@@ -1067,7 +1067,7 @@ unsafe fn xml_xinclude_copy_range(
                     2,
                 )
                 .map_or(null_mut(), |node| node.as_ptr());
-                (*tmp2).add_child(list);
+                (*tmp2).add_child(XmlGenericNodePtr::from_raw(list).unwrap());
                 list = tmp2;
                 list_parent = (*list_parent).parent().map_or(null_mut(), |n| n.as_ptr());
                 level += 1;
@@ -1106,7 +1106,7 @@ unsafe fn xml_xinclude_copy_range(
                 if level == last_level {
                     (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
                 } else {
-                    (*last).add_child(tmp.map_or(null_mut(), |node| node.as_ptr()));
+                    (*last).add_child(tmp.unwrap().into());
                 }
                 return list;
             } else {
@@ -1114,16 +1114,18 @@ unsafe fn xml_xinclude_copy_range(
                 end_level = level; /* remember the level of the end node */
                 end_flag = 1;
                 // last node - need to take care of properties + namespaces
-                tmp = xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), (*ctxt).doc, 2)
-                    .map_or(null_mut(), |node| node.as_ptr());
+                let tmp =
+                    xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), (*ctxt).doc, 2);
                 if list.is_null() {
-                    list = tmp;
+                    list = tmp.map_or(null_mut(), |node| node.as_ptr());
                     list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-                    last = tmp;
+                    last = tmp.map_or(null_mut(), |node| node.as_ptr());
                 } else if level == last_level {
-                    last = (*last).add_next_sibling(tmp);
+                    last = (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
                 } else {
-                    last = (*last).add_child(tmp);
+                    last = (*last)
+                        .add_child(tmp.unwrap())
+                        .map_or(null_mut(), |node| node.as_ptr());
                     last_level = level;
                 }
 
@@ -1183,7 +1185,7 @@ unsafe fn xml_xinclude_copy_range(
                 }
             }
         } else {
-            tmp = null_mut();
+            let mut tmp = None;
             match (*cur).typ {
                 XmlElementType::XmlDTDNode
                 | XmlElementType::XmlElementDecl
@@ -1201,15 +1203,16 @@ unsafe fn xml_xinclude_copy_range(
                         XmlGenericNodePtr::from_raw(cur).unwrap(),
                         (*ctxt).doc,
                         2,
-                    )
-                    .map_or(null_mut(), |node| node.as_ptr());
+                    );
                 }
             }
-            if !tmp.is_null() {
+            if let Some(tmp) = tmp {
                 if level == last_level {
-                    last = (*last).add_next_sibling(tmp);
+                    last = (*last).add_next_sibling(tmp.as_ptr());
                 } else {
-                    last = (*last).add_child(tmp);
+                    last = (*last)
+                        .add_child(tmp)
+                        .map_or(null_mut(), |node| node.as_ptr());
                     last_level = level;
                 }
             }

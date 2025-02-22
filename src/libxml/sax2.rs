@@ -1937,7 +1937,7 @@ pub unsafe fn xml_sax2_start_element(
             parent = XmlGenericNodePtr::from_raw(children.as_ptr());
         }
     } else {
-        my_doc.add_child(ret.as_ptr());
+        my_doc.add_child(ret.into());
     }
     (*ctxt).nodemem = -1;
     if (*ctxt).linenumbers != 0 && !(*ctxt).input.is_null() {
@@ -1958,7 +1958,7 @@ pub unsafe fn xml_sax2_start_element(
     // Link the child element
     if let Some(mut parent) = parent {
         if matches!(parent.element_type(), XmlElementType::XmlElementNode) {
-            parent.add_child(ret.as_ptr());
+            parent.add_child(ret.into());
         } else {
             parent.add_sibling(ret.into());
         }
@@ -2163,7 +2163,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     }
 
     if parent.is_none() {
-        my_doc.add_child(ret.as_ptr());
+        my_doc.add_child(ret.into());
     }
     // Build the namespace list
     let mut last = None::<XmlNsPtr>;
@@ -2215,7 +2215,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     // Link the child element
     if let Some(mut parent) = parent {
         if matches!(parent.element_type(), XmlElementType::XmlElementNode) {
-            parent.add_child(ret.as_ptr());
+            parent.add_child(ret.into());
         } else {
             parent.add_sibling(ret.as_ptr());
         }
@@ -2710,8 +2710,7 @@ pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: &str) {
         xml_new_reference((*ctxt).my_doc, name)
     };
     if (*ctxt).node.map_or(true, |mut node| {
-        node.add_child(ret.map_or(null_mut(), |node| node.as_ptr()))
-            .is_null()
+        node.add_child(ret.unwrap().into()).is_none()
     }) {
         if let Some(ret) = ret {
             xml_free_node(ret.as_ptr());
@@ -2837,7 +2836,7 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
                 xml_new_cdata_block((*ctxt).my_doc, ch)
             };
             if let Some(last_child) = last_child {
-                (*ctxt).node.unwrap().add_child(last_child.as_ptr());
+                (*ctxt).node.unwrap().add_child(last_child.into());
                 if (*ctxt).node.unwrap().children().is_some() {
                     (*ctxt).nodelen = ch.len() as i32;
                     (*ctxt).nodemem = ch.len() as i32 + 1;
@@ -2897,18 +2896,18 @@ pub unsafe fn xml_sax2_processing_instruction(
     }
     let mut my_doc = (*ctxt).my_doc.unwrap();
     if (*ctxt).in_subset == 1 {
-        my_doc.int_subset.unwrap().add_child(ret.as_ptr());
+        my_doc.int_subset.unwrap().add_child(ret.into());
         return;
     } else if (*ctxt).in_subset == 2 {
-        my_doc.ext_subset.unwrap().add_child(ret.as_ptr());
+        my_doc.ext_subset.unwrap().add_child(ret.into());
         return;
     }
     let Some(mut parent) = parent else {
-        my_doc.add_child(ret.as_ptr());
+        my_doc.add_child(ret.into());
         return;
     };
     if matches!(parent.element_type(), XmlElementType::XmlElementNode) {
-        parent.add_child(ret.as_ptr());
+        parent.add_child(ret.into());
     } else {
         parent.add_sibling(ret.as_ptr());
     }
@@ -2939,18 +2938,18 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: &str) {
 
     let mut my_doc = (*ctxt).my_doc.unwrap();
     if (*ctxt).in_subset == 1 {
-        my_doc.int_subset.unwrap().add_child(ret.as_ptr());
+        my_doc.int_subset.unwrap().add_child(ret.into());
         return;
     } else if (*ctxt).in_subset == 2 {
-        my_doc.ext_subset.unwrap().add_child(ret.as_ptr());
+        my_doc.ext_subset.unwrap().add_child(ret.into());
         return;
     }
     let Some(mut parent) = parent else {
-        my_doc.add_child(ret.as_ptr());
+        my_doc.add_child(ret.into());
         return;
     };
     if matches!(parent.element_type(), XmlElementType::XmlElementNode) {
-        parent.add_child(ret.as_ptr());
+        parent.add_child(ret.into());
     } else {
         parent.add_sibling(ret.as_ptr());
     }

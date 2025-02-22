@@ -1111,10 +1111,10 @@ pub(crate) unsafe fn xml_static_copy_node(
         // Assuming that the subtree to be copied always has its text
         // nodes coalesced, the somewhat confusing call to xmlAddChild
         // could be removed.
-        let tmp: *mut XmlNode = parent.add_child(ret.as_ptr());
+        let tmp = parent.add_child(ret.into());
         /* node could have coalesced */
-        if tmp != ret.as_ptr() {
-            return XmlGenericNodePtr::from_raw(tmp);
+        if tmp != Some(ret.into()) {
+            return tmp;
         }
     }
 
@@ -1273,7 +1273,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
             };
             if let Some(int_subset) = doc.int_subset {
                 let q = int_subset;
-                parent.unwrap().add_child(q.as_ptr() as *mut XmlNode);
+                parent.unwrap().add_child(q.into());
                 Some(q.into())
             } else {
                 let Some(mut new) = xml_copy_dtd(XmlDtdPtr::try_from(cur_node).unwrap()) else {
@@ -1286,7 +1286,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
                 new.doc = Some(doc);
                 new.set_parent(NodePtr::from_ptr(parent.map_or(null_mut(), |p| p.as_ptr())));
                 doc.int_subset = Some(new);
-                parent.unwrap().add_child(new.as_ptr() as *mut XmlNode);
+                parent.unwrap().add_child(new.into());
                 Some(new.into())
             }
         } else {

@@ -2126,7 +2126,7 @@ pub unsafe fn xml_parse_in_node_context(
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrNoMemory;
     };
-    node.add_child(fake.as_ptr());
+    node.add_child(fake.into());
 
     // At this point, `node.element_type()` is ElementNode, DocumentNode or HTMLDocumentNode.
     if let Ok(node) = XmlNodePtr::try_from(node) {
@@ -2294,7 +2294,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         xml_free_doc(new_doc);
         return -1;
     };
-    new_doc.add_child(new_root.as_ptr());
+    new_doc.add_child(new_root.into());
     (*ctxt).node_push(new_root.as_ptr());
     // doc.is_null() is only supported for historic reasons
     if let Some(doc) = doc {
@@ -2443,7 +2443,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         xml_free_doc(new_doc);
         return (sax, XmlParserErrors::XmlErrInternalError);
     };
-    new_doc.add_child(new_root.as_ptr());
+    new_doc.add_child(new_root.into());
     (*ctxt).node_push(new_doc.children.map_or(null_mut(), |c| c.as_ptr()));
     (*ctxt).my_doc = Some(doc);
     new_root.doc = Some(doc);
@@ -5479,18 +5479,17 @@ unsafe fn are_blanks(
         return 0;
     }
 
-    let last_child: *mut XmlNode = context_node.get_last_child();
-    if last_child.is_null() {
-        if context_node.element_type() != XmlElementType::XmlElementNode
-            && !context_node.content.is_null()
+    if let Some(last_child) = context_node.get_last_child() {
+        if last_child.is_text_node()
+            || context_node
+                .children()
+                .filter(|c| c.is_text_node())
+                .is_some()
         {
             return 0;
         }
-    } else if (*last_child).is_text_node()
-        || context_node
-            .children()
-            .filter(|c| c.is_text_node())
-            .is_some()
+    } else if context_node.element_type() != XmlElementType::XmlElementNode
+        && !context_node.content.is_null()
     {
         return 0;
     }

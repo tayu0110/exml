@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     ffi::CStr,
     ops::{Deref, DerefMut},
-    ptr::{null, null_mut, NonNull},
+    ptr::{null_mut, NonNull},
     sync::atomic::Ordering,
 };
 
@@ -170,11 +170,12 @@ pub trait NodeCommon {
     /// Search the last child of a node.
     /// Returns the last child or null_mut() if none.
     #[doc(alias = "xmlGetLastChild")]
-    fn get_last_child(&self) -> *mut XmlNode {
+    fn get_last_child(&self) -> Option<XmlGenericNodePtr> {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
+            return None;
         }
-        self.last().map_or(null_mut(), |p| p.as_ptr())
+        self.last()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
     }
 
     /// Append the extra substring to the node content.
@@ -205,8 +206,8 @@ pub trait NodeCommon {
             XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
                 let last = self.last();
                 if let Some(new_node) = xml_new_doc_text_len(self.document(), content, len) {
-                    let tmp = self.add_child(new_node.as_ptr());
-                    if tmp != new_node.as_ptr() {
+                    let tmp = self.add_child(new_node.into());
+                    if tmp != Some(new_node.into()) {
                         return;
                     }
                     if let Some(last) =
@@ -261,73 +262,84 @@ pub trait NodeCommon {
     ///
     /// Returns the child or NULL in case of error.
     #[doc(alias = "xmlAddChild")]
-    unsafe fn add_child(&mut self, cur: *mut XmlNode) -> *mut XmlNode {
-        let mut prev: *mut XmlNode;
+    unsafe fn add_child(&mut self, mut cur: XmlGenericNodePtr) -> Option<XmlGenericNodePtr> {
+        let mut cur_node = XmlGenericNodePtr::from_raw(self as *mut Self as *mut XmlNode).unwrap();
 
-        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
+        if matches!(cur_node.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
         }
 
-        if cur.is_null() || matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
+        if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
         }
 
-        if self as *mut Self as *mut XmlNode == cur {
-            return null_mut();
+        if cur_node == cur {
+            return None;
         }
         // If cur is a TEXT node, merge its content with adjacent TEXT nodes cur is then freed.
-        if matches!((*cur).typ, XmlElementType::XmlTextNode) {
-            if matches!(self.element_type(), XmlElementType::XmlTextNode)
-                && !(*(self as *mut Self as *mut XmlNode)).content.is_null()
-                && self.name().map_or(null(), |c| c.as_ptr()) == (*cur).name
-            {
-                (*(self as *mut Self as *mut XmlNode)).add_content((*cur).content);
-                xml_free_node(cur);
-                return self as *mut Self as *mut XmlNode;
+        if matches!(cur.element_type(), XmlElementType::XmlTextNode) {
+            let cur = XmlNodePtr::try_from(cur).unwrap();
+            if let Some(mut cur_node) = XmlNodePtr::try_from(cur_node).ok().filter(|cur_node| {
+                matches!(cur_node.element_type(), XmlElementType::XmlTextNode)
+                    && !cur_node.content.is_null()
+                    && self.name() == cur.name()
+            }) {
+                cur_node.add_content(cur.content);
+                xml_free_node(cur.as_ptr());
+                return Some(cur_node.into());
             }
             if let Some(mut last) = self.last().filter(|l| {
                 matches!(l.typ, XmlElementType::XmlTextNode)
-                    && l.name == (*cur).name
-                    && self.last() != NodePtr::from_ptr(cur)
+                    && l.name == cur.name
+                    && self
+                        .last()
+                        .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
+                        != Some(cur.into())
             }) {
-                last.add_content((*cur).content);
-                xml_free_node(cur);
-                return self.last().map_or(null_mut(), |l| l.as_ptr());
+                last.add_content(cur.content);
+                xml_free_node(cur.as_ptr());
+                return self
+                    .last()
+                    .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
             }
         }
 
         // add the new element at the end of the children list.
-        prev = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-        (*cur).set_parent(NodePtr::from_ptr(self as *mut Self as *mut XmlNode));
-        if (*cur).doc != self.document() {
-            (*cur).set_doc(self.document());
+        let prev = cur
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        cur.set_parent(NodePtr::from_ptr(cur_node.as_ptr()));
+        if cur.document() != self.document() {
+            cur.set_doc(self.document());
         }
         // this check prevents a loop on tree-traversions if a developer
         // tries to add a node to its parent multiple times
-        if prev == self as *mut Self as *mut XmlNode {
-            return cur;
+        if prev == Some(cur_node) {
+            return Some(cur);
         }
 
         // Coalescing
-        if matches!(self.element_type(), XmlElementType::XmlTextNode)
-            && !(*(self as *mut Self as *mut XmlNode)).content.is_null()
-            && self as *mut Self as *mut XmlNode != cur
-        {
-            (*(self as *mut Self as *mut XmlNode)).add_content((*cur).content);
-            xml_free_node(cur);
-            return self as *mut Self as *mut XmlNode;
+        if let Some(mut cur_node) = XmlNodePtr::try_from(cur_node).ok().filter(|&cur_node| {
+            matches!(cur_node.element_type(), XmlElementType::XmlTextNode)
+                && !cur_node.content.is_null()
+                && cur != cur_node.into()
+        }) {
+            cur_node.add_content(XmlNodePtr::try_from(cur).unwrap().content);
+            xml_free_node(cur.as_ptr());
+            return Some(cur_node.into());
         }
-        if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
-            if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
-                return null_mut();
+        if let Ok(mut cur) = XmlAttrPtr::try_from(cur) {
+            if !matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                return None;
             }
-            if (*(self as *mut Self as *mut XmlNode)).properties.is_some() {
+            let mut cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+            if cur_node.properties.is_some() {
                 // check if an attribute with the same name exists
 
-                let lastattr = if let Some(ns) = (*cur).ns {
+                let lastattr = if let Some(ns) = cur.ns {
                     let href = ns.href;
-                    (*(self as *mut Self as *mut XmlNode)).has_ns_prop(
-                        CStr::from_ptr((*cur).name as *const i8)
+                    cur_node.has_ns_prop(
+                        CStr::from_ptr(cur.name as *const i8)
                             .to_string_lossy()
                             .as_ref(),
                         (!href.is_null())
@@ -335,47 +347,49 @@ pub trait NodeCommon {
                             .as_deref(),
                     )
                 } else {
-                    (*(self as *mut Self as *mut XmlNode)).has_ns_prop(
-                        CStr::from_ptr((*cur).name as *const i8)
+                    cur_node.has_ns_prop(
+                        CStr::from_ptr(cur.name as *const i8)
                             .to_string_lossy()
                             .as_ref(),
                         None,
                     )
                 };
-                if let Some(mut lastattr) = lastattr.and_then(|attr| attr.ok()).filter(|&attr| {
-                    attr != XmlAttrPtr::from_raw(cur as *mut XmlAttr).unwrap().unwrap()
-                }) {
+                if let Some(mut lastattr) = lastattr
+                    .and_then(|attr| attr.ok())
+                    .filter(|&attr| attr != cur)
+                {
                     // different instance, destroy it (attributes must be unique)
                     (*lastattr).unlink();
                     xml_free_prop(lastattr);
                 }
                 match lastattr {
-                    Some(Ok(attr)) if attr.as_ptr() == cur as *mut XmlAttr => return cur,
-                    Some(Err(attr)) if attr.as_ptr() == cur as *mut XmlAttribute => return cur,
+                    Some(Ok(attr)) if attr == cur => return Some(cur.into()),
                     _ => {}
                 }
             }
-            if let Some(mut lastattr) = (*(self as *mut Self as *mut XmlNode)).properties {
+            if let Some(mut lastattr) = cur_node.properties {
                 // find the end
                 while let Some(next) = lastattr.next {
                     lastattr = next;
                 }
-                lastattr.next = XmlAttrPtr::from_raw(cur as _).unwrap();
-                (*(cur as *mut XmlAttr)).prev = Some(lastattr);
+                lastattr.next = Some(cur);
+                cur.prev = Some(lastattr);
             } else {
-                (*(self as *mut Self as *mut XmlNode)).properties =
-                    XmlAttrPtr::from_raw(cur as _).unwrap();
+                cur_node.properties = Some(cur);
             }
-        } else if self.children().is_none() {
-            self.set_children(NodePtr::from_ptr(cur));
-            self.set_last(NodePtr::from_ptr(cur));
+        } else if cur_node.children().is_none() {
+            cur_node.set_children(NodePtr::from_ptr(cur.as_ptr()));
+            cur_node.set_last(NodePtr::from_ptr(cur.as_ptr()));
         } else {
-            prev = self.last().map_or(null_mut(), |l| l.as_ptr());
-            (*prev).next = NodePtr::from_ptr(cur);
-            (*cur).prev = NodePtr::from_ptr(prev);
-            self.set_last(NodePtr::from_ptr(cur));
+            let mut prev = cur_node
+                .last()
+                .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
+                .unwrap();
+            prev.set_next(NodePtr::from_ptr(cur.as_ptr()));
+            cur.set_prev(NodePtr::from_ptr(prev.as_ptr()));
+            cur_node.set_last(NodePtr::from_ptr(cur.as_ptr()));
         }
-        cur
+        Some(cur)
     }
 
     /// Finds the first child node of that element which is a Element node.

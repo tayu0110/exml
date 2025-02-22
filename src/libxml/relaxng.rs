@@ -1732,9 +1732,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                                 node.doc,
                                                 cname.as_ptr() as *const u8,
                                             );
-                                            node.add_child(
-                                                text.map_or(null_mut(), |node| node.as_ptr()),
-                                            );
+                                            node.add_child(text.unwrap().into());
                                             node
                                         },
                                     )

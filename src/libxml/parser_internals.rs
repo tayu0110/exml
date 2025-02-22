@@ -1960,7 +1960,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     };
     my_doc.children = None;
     my_doc.last = None;
-    my_doc.add_child(new_root.as_ptr());
+    my_doc.add_child(new_root.into());
     (*ctxt).node_push(my_doc.children.map_or(null_mut(), |c| c.as_ptr()));
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
     (*ctxt).depth = (*oldctxt).depth;
@@ -2455,7 +2455,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         if first_child.is_none() {
                             first_child = nw;
                         }
-                        nw = XmlNodePtr::from_raw(context_node.add_child(now.as_ptr())).unwrap();
+                        nw = XmlNodePtr::try_from(context_node.add_child(now.into()).unwrap()).ok();
                     }
                     if cur == XmlNodePtr::from_raw(ent.last.load(Ordering::Relaxed) as _).unwrap() {
                         // needed to detect some strange empty
@@ -2502,9 +2502,9 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         if first_child.is_none() {
                             first_child = Some(cur_node);
                         }
-                        (*ent).add_child(nw.as_ptr());
+                        (*ent).add_child(nw.into());
                     }
-                    context_node.add_child(cur_node.as_ptr());
+                    context_node.add_child(cur_node.into());
                     if Some(cur_node) == last {
                         break;
                     }

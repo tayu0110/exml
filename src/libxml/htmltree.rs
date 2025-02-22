@@ -347,7 +347,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
                 if let Some(mut children) = (*head).children() {
                     children.add_prev_sibling(meta.map_or(null_mut(), |node| node.as_ptr()));
                 } else {
-                    (*head).add_child(meta.map_or(null_mut(), |node| node.as_ptr()));
+                    (*head).add_child(meta.unwrap().into());
                 }
                 xml_new_prop(
                     meta,

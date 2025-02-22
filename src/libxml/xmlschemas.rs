@@ -27475,7 +27475,7 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         xml_new_doc_text((*(*inode).node).doc, (*(*inode).decl).value)
                     };
                     if let Some(text_child) = text_child {
-                        (*(*inode).node).add_child(text_child.as_ptr());
+                        (*(*inode).node).add_child(text_child.into());
                     } else {
                         VERROR_INT!(
                             vctxt,

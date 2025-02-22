@@ -2555,7 +2555,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                 if !last.is_null() {
                     (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
                 } else {
-                    (*parent).add_child(tmp.map_or(null_mut(), |node| node.as_ptr()));
+                    (*parent).add_child(tmp.unwrap().into());
                 }
                 return list;
             } else {
@@ -2566,7 +2566,9 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                 } else if !last.is_null() {
                     parent = (*last).add_next_sibling(tmp.map_or(null_mut(), |node| node.as_ptr()));
                 } else {
-                    parent = (*parent).add_child(tmp.map_or(null_mut(), |node| node.as_ptr()));
+                    parent = (*parent)
+                        .add_child(tmp.unwrap())
+                        .map_or(null_mut(), |node| node.as_ptr());
                 }
                 last = null_mut();
 
@@ -2646,7 +2648,9 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                 if !last.is_null() {
                     (*last).add_next_sibling(tmp.as_ptr());
                 } else {
-                    last = (*parent).add_child(tmp.as_ptr());
+                    last = (*parent)
+                        .add_child(tmp)
+                        .map_or(null_mut(), |node| node.as_ptr());
                 }
             }
         }

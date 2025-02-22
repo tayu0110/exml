@@ -61,7 +61,10 @@ use crate::{
         xml_free_input_stream, xml_free_parser_ctxt, xml_new_input_stream, XmlParserCtxt,
         XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
     },
-    tree::{xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlNode},
+    tree::{
+        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType,
+        XmlGenericNodePtr, XmlNode,
+    },
     uri::canonic_path,
 };
 
@@ -8278,8 +8281,6 @@ const ALLOW_PCDATA: &[&str] = &[
 /// Returns 1 if ignorable 0 otherwise.
 #[doc(alias = "areBlanks")]
 unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> i32 {
-    let mut last_child: *mut XmlNode;
-
     for j in 0..len {
         if !xml_is_blank_char(*str.add(j as usize) as u32) {
             return 0;
@@ -8323,11 +8324,26 @@ unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> 
     let Some(context_node) = (*ctxt).node else {
         return 0;
     };
-    last_child = context_node.get_last_child();
-    while !last_child.is_null() && (*last_child).element_type() == XmlElementType::XmlCommentNode {
-        last_child = (*last_child).prev.map_or(null_mut(), |p| p.as_ptr());
+    let mut last_child = context_node.get_last_child();
+    while let Some(now) =
+        last_child.filter(|last_child| last_child.element_type() == XmlElementType::XmlCommentNode)
+    {
+        last_child = now
+            .prev()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
     }
-    if last_child.is_null() {
+    if let Some(last_child) = last_child {
+        if last_child.is_text_node() {
+            return 0;
+        }
+        // keep ws in constructs like <p><b>xy</b> <i>z</i><p>
+        // for all tags "p" allowing PCDATA
+        for &pcdata in ALLOW_PCDATA {
+            if last_child.name().as_deref() == Some(pcdata) {
+                return 0;
+            }
+        }
+    } else {
         if context_node.element_type() != XmlElementType::XmlElementNode
             && !context_node.content.is_null()
         {
@@ -8337,16 +8353,6 @@ unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> 
         // for all tags "b" allowing PCDATA
         for &pcdata in ALLOW_PCDATA {
             if name == pcdata {
-                return 0;
-            }
-        }
-    } else if (*last_child).is_text_node() {
-        return 0;
-    } else {
-        // keep ws in constructs like <p><b>xy</b> <i>z</i><p>
-        // for all tags "p" allowing PCDATA
-        for &pcdata in ALLOW_PCDATA {
-            if (*last_child).name().as_deref() == Some(pcdata) {
                 return 0;
             }
         }
