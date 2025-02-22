@@ -42,7 +42,7 @@ use super::{
 #[doc(alias = "xmlDOMWrapAcquireNsFunction")]
 pub type XmlDOMWrapAcquireNsFunction = unsafe fn(
     ctxt: XmlDOMWrapCtxtPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     ns_name: *const XmlChar,
     ns_prefix: *const XmlChar,
 ) -> Option<XmlNsPtr>;
@@ -1170,7 +1170,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                         // User-defined behaviour.
                                         let ns = ((*ctxt).get_ns_for_node_func.unwrap())(
                                             ctxt,
-                                            node.as_ptr(),
+                                            Some(node.into()),
                                             node.ns.unwrap().href,
                                             node.ns.unwrap().prefix,
                                         );
@@ -1260,7 +1260,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                         // User-defined behaviour.
                                         let ns = ((*ctxt).get_ns_for_node_func.unwrap())(
                                             ctxt,
-                                            attr.as_ptr() as *mut XmlNode,
+                                            Some(attr.into()),
                                             attr.ns.unwrap().href,
                                             attr.ns.unwrap().prefix,
                                         );
@@ -1930,15 +1930,14 @@ pub unsafe fn xml_dom_wrap_remove_node(
 pub unsafe fn xml_dom_wrap_clone_node(
     ctxt: XmlDOMWrapCtxtPtr,
     source_doc: Option<XmlDocPtr>,
-    node: *mut XmlNode,
-    res_node: &mut *mut XmlNode,
+    node: XmlGenericNodePtr,
+    res_node: &mut Option<XmlGenericNodePtr>,
     dest_doc: XmlDocPtr,
     dest_parent: Option<XmlGenericNodePtr>,
     deep: i32,
     _options: i32,
 ) -> i32 {
     let mut ret: i32 = 0;
-    let mut cur: *mut XmlNode;
     let mut cur_elem = None;
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
@@ -1949,27 +1948,23 @@ pub unsafe fn xml_dom_wrap_clone_node(
     // @ancestorsOnly:
     // TODO: @ancestorsOnly should be set per option.
     let ancestors_only: i32 = 0;
-    let mut result_clone: *mut XmlNode = null_mut();
-    let mut clone: *mut XmlNode;
-    let mut parent_clone: *mut XmlNode = null_mut();
-    let mut prev_clone: *mut XmlNode = null_mut();
+    let mut result_clone: Option<XmlGenericNodePtr> = None;
+    let mut parent_clone: Option<XmlGenericNodePtr> = None;
+    let mut prev_clone: Option<XmlGenericNodePtr> = None;
 
-    // if dest_doc.is_null() {
+    // if node.is_null() {
     //     return -1;
     // }
-    if node.is_null() {
-        return -1;
-    }
     // TODO: Initially we support only element-nodes.
-    if !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
+    if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
         return 1;
     }
-    // Check (*node).doc sanity.
-    if (*node).doc.map_or(false, |doc| Some(doc) != source_doc) && source_doc.is_some() {
+    // Check node.doc sanity.
+    if node.document().map_or(false, |doc| Some(doc) != source_doc) && source_doc.is_some() {
         // Might be an XIncluded node.
         return -1;
     }
-    let Some(source_doc) = source_doc.or((*node).doc) else {
+    let Some(source_doc) = source_doc.or(node.document()) else {
         return -1;
     };
 
@@ -1978,24 +1973,20 @@ pub unsafe fn xml_dom_wrap_clone_node(
         ns_map = (*ctxt).namespace_map as _;
     }
 
-    *res_node = null_mut();
+    *res_node = None;
 
-    cur = node;
-    if !cur.is_null() && matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-        return -1;
-    }
-
+    let mut cur = Some(node);
     'exit: {
         'internal_error: {
-            'main: while !cur.is_null() {
-                if (*cur).doc != Some(source_doc) {
+            'main: while let Some(cur_node) = cur {
+                if cur_node.document() != Some(source_doc) {
                     // We'll assume XIncluded nodes if the doc differs.
                     // TODO: Do we need to reconciliate XIncluded nodes?
                     // TODO: This here returns -1 in this case.
                     break 'internal_error;
                 }
                 // Create a new node.
-                match (*cur).element_type() {
+                let mut clone = match cur_node.element_type() {
                     XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
                         // TODO: What to do with XInclude?
                         break 'internal_error;
@@ -2008,82 +1999,102 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     | XmlElementType::XmlDocumentFragNode
                     | XmlElementType::XmlEntityRefNode
                     | XmlElementType::XmlEntityNode => {
+                        let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                         // Nodes of xmlNode structure.
-                        let Some(new) = XmlNodePtr::new(XmlNode::default()) else {
+                        let Some(mut new) = XmlNodePtr::new(XmlNode::default()) else {
                             xml_tree_err_memory("xmlDOMWrapCloneNode(): allocating a node");
                             break 'internal_error;
                         };
-                        clone = new.as_ptr();
+                        new.typ = cur_node.element_type();
                         // Set hierarchical links.
-                        if !result_clone.is_null() {
-                            (*clone).set_parent(NodePtr::from_ptr(parent_clone));
-                            if !prev_clone.is_null() {
-                                (*prev_clone).next = NodePtr::from_ptr(clone);
-                                (*clone).prev = NodePtr::from_ptr(prev_clone);
+                        if result_clone.is_some() {
+                            new.set_parent(NodePtr::from_ptr(parent_clone.unwrap().as_ptr()));
+                            if let Some(mut prev_clone) = prev_clone {
+                                prev_clone.set_next(NodePtr::from_ptr(new.as_ptr()));
+                                new.prev = NodePtr::from_ptr(prev_clone.as_ptr());
                             } else {
-                                (*parent_clone).set_children(NodePtr::from_ptr(clone));
+                                parent_clone
+                                    .unwrap()
+                                    .set_children(NodePtr::from_ptr(new.as_ptr()));
                             }
                         } else {
-                            result_clone = clone;
+                            result_clone = Some(XmlGenericNodePtr::from(new));
                         }
+                        // Clone the name of the node if any.
+                        if cur_node.name == XML_STRING_TEXT.as_ptr() as _ {
+                            new.name = XML_STRING_TEXT.as_ptr() as _;
+                        } else if cur_node.name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
+                            // NOTE: Although xmlStringTextNoenc is never assigned to a node
+                            //   in tree.c, it might be set in Libxslt via
+                            //   "xsl:disable-output-escaping".
+                            new.name = XML_STRING_TEXT_NOENC.as_ptr() as _;
+                        } else if cur_node.name == XML_STRING_COMMENT.as_ptr() as _ {
+                            new.name = XML_STRING_COMMENT.as_ptr() as _;
+                        } else if !cur_node.name.is_null() {
+                            new.name = xml_strdup(cur_node.name);
+                        }
+                        XmlGenericNodePtr::from(new)
                     }
                     XmlElementType::XmlAttributeNode => {
+                        let cur_node = XmlAttrPtr::try_from(cur_node).unwrap();
                         // Attributes (xmlAttr).
                         // Use xmlRealloc to avoid -Warray-bounds warning
-                        let Some(new) = XmlAttrPtr::new(XmlAttr::default()) else {
+                        let Some(mut new) = XmlAttrPtr::new(XmlAttr::default()) else {
                             xml_tree_err_memory("xmlDOMWrapCloneNode(): allocating an attr-node");
                             break 'internal_error;
                         };
-                        clone = new.as_ptr() as *mut XmlNode;
+                        new.typ = cur_node.element_type();
                         // Set hierarchical links.
                         // TODO: Change this to add to the end of attributes.
-                        if !result_clone.is_null() {
-                            (*clone).set_parent(NodePtr::from_ptr(parent_clone));
-                            if !prev_clone.is_null() {
-                                (*prev_clone).next = NodePtr::from_ptr(clone);
-                                (*clone).prev = NodePtr::from_ptr(prev_clone);
+                        if result_clone.is_some() {
+                            new.set_parent(NodePtr::from_ptr(parent_clone.unwrap().as_ptr()));
+                            if let Some(mut prev_clone) = prev_clone {
+                                prev_clone
+                                    .set_next(NodePtr::from_ptr(new.as_ptr() as *mut XmlNode));
+                                new.prev = XmlAttrPtr::try_from(prev_clone).ok();
                             } else {
-                                (*parent_clone).properties =
-                                    XmlAttrPtr::from_raw(clone as _).unwrap();
+                                XmlNodePtr::try_from(parent_clone.unwrap())
+                                    .unwrap()
+                                    .properties = Some(new);
                             }
                         } else {
-                            result_clone = clone;
+                            result_clone = Some(new.into());
                         }
+                        // Clone the name of the node if any.
+                        if cur_node.name == XML_STRING_TEXT.as_ptr() as _ {
+                            new.name = XML_STRING_TEXT.as_ptr() as _;
+                        } else if cur_node.name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
+                            // NOTE: Although xmlStringTextNoenc is never assigned to a node
+                            //   in tree.c, it might be set in Libxslt via
+                            //   "xsl:disable-output-escaping".
+                            new.name = XML_STRING_TEXT_NOENC.as_ptr() as _;
+                        } else if cur_node.name == XML_STRING_COMMENT.as_ptr() as _ {
+                            new.name = XML_STRING_COMMENT.as_ptr() as _;
+                        } else if !cur_node.name.is_null() {
+                            new.name = xml_strdup(cur_node.name);
+                        }
+
+                        XmlGenericNodePtr::from(new)
                     }
                     _ => {
                         // TODO QUESTION: Any other nodes expected?
                         break 'internal_error;
                     }
-                }
-
-                (*clone).typ = (*cur).element_type();
-                (*clone).doc = Some(dest_doc);
-
-                // Clone the name of the node if any.
-                if (*cur).name == XML_STRING_TEXT.as_ptr() as _ {
-                    (*clone).name = XML_STRING_TEXT.as_ptr() as _;
-                } else if (*cur).name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
-                    // NOTE: Although xmlStringTextNoenc is never assigned to a node
-                    //   in tree.c, it might be set in Libxslt via
-                    //   "xsl:disable-output-escaping".
-                    (*clone).name = XML_STRING_TEXT_NOENC.as_ptr() as _;
-                } else if (*cur).name == XML_STRING_COMMENT.as_ptr() as _ {
-                    (*clone).name = XML_STRING_COMMENT.as_ptr() as _;
-                } else if !(*cur).name.is_null() {
-                    (*clone).name = xml_strdup((*cur).name);
-                }
+                };
+                clone.set_document(Some(dest_doc));
 
                 let mut leave_node = false;
-                match (*cur).element_type() {
+                match cur_node.element_type() {
                     XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
                         // TODO
                         return -1;
                     }
                     XmlElementType::XmlElementNode => {
-                        cur_elem = XmlNodePtr::from_raw(cur).unwrap();
+                        let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                        cur_elem = Some(cur_node);
                         depth += 1;
                         // Namespace declarations.
-                        if (*cur).ns_def.is_some() {
+                        if cur_node.ns_def.is_some() {
                             if parnsdone == 0 {
                                 if dest_parent.is_some() && ctxt.is_null() {
                                     // Gather @parent's in-scope ns-decls.
@@ -2099,7 +2110,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                             }
                             // Clone namespace declarations.
                             let mut clone_ns_def_slot = None::<XmlNsPtr>;
-                            let mut ns = (*cur).ns_def;
+                            let mut ns = cur_node.ns_def;
                             while let Some(now) = ns {
                                 // Create a new xmlNs.
                                 let Some(mut new) = XmlNsPtr::new(XmlNs {
@@ -2124,7 +2135,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                     clone_ns_def_slot = Some(new);
                                 } else {
                                     clone_ns_def_slot = Some(new);
-                                    (*clone).ns_def = Some(new);
+                                    XmlNodePtr::try_from(clone).unwrap().ns_def = Some(new);
                                 }
 
                                 // Note that for custom handling of ns-references,
@@ -2159,15 +2170,16 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 ns = now.next;
                             }
                         }
-                        // (*cur).ns will be processed further down.
+                        // cur_node.ns will be processed further down.
                     }
                     XmlElementType::XmlAttributeNode => {
                         // IDs will be processed further down.
-                        // (*cur).ns will be processed further down.
+                        // cur_node.ns will be processed further down.
                     }
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
+                        let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                         // Note that this will also cover the values of attributes.
-                        (*clone).content = xml_strdup((*cur).content);
+                        XmlNodePtr::try_from(clone).unwrap().content = xml_strdup(cur_node.content);
                         // goto leave_node;
                         leave_node = true;
                     }
@@ -2177,36 +2189,39 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         leave_node = true;
                     }
                     XmlElementType::XmlEntityRefNode => {
+                        let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                         if source_doc != dest_doc {
                             if dest_doc.int_subset.is_some() || dest_doc.ext_subset.is_some() {
                                 // Different doc: Assign new entity-node if available.
                                 let ent =
-                                    xml_get_doc_entity(Some(dest_doc), &(*cur).name().unwrap());
+                                    xml_get_doc_entity(Some(dest_doc), &cur_node.name().unwrap());
                                 if let Some(ent) = ent {
-                                    (*clone).content = ent.content.load(Ordering::Relaxed);
-                                    (*clone).set_children(NodePtr::from_ptr(
+                                    XmlNodePtr::try_from(clone).unwrap().content =
+                                        ent.content.load(Ordering::Relaxed);
+                                    clone.set_children(NodePtr::from_ptr(
                                         ent.as_ptr() as *mut XmlNode
                                     ));
-                                    (*clone)
-                                        .set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                                    clone.set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
                                 }
                             }
                         } else {
                             // Same doc: Use the current node's entity declaration and value.
-                            (*clone).content = (*cur).content;
-                            (*clone).set_children((*cur).children());
-                            (*clone).set_last((*cur).last());
+                            XmlNodePtr::try_from(clone).unwrap().content = cur_node.content;
+                            clone.set_children(cur_node.children());
+                            clone.set_last(cur_node.last());
                         }
                         // goto leave_node;
                         leave_node = true;
                     }
                     XmlElementType::XmlPINode => {
-                        (*clone).content = xml_strdup((*cur).content);
+                        let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                        XmlNodePtr::try_from(clone).unwrap().content = xml_strdup(cur_node.content);
                         // goto leave_node;
                         leave_node = true;
                     }
                     XmlElementType::XmlCommentNode => {
-                        (*clone).content = xml_strdup((*cur).content);
+                        let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                        XmlNodePtr::try_from(clone).unwrap().content = xml_strdup(cur_node.content);
                         // goto leave_node;
                         leave_node = true;
                     }
@@ -2216,7 +2231,12 @@ pub unsafe fn xml_dom_wrap_clone_node(
                 }
 
                 if !leave_node {
-                    if let Some(cur_ns) = (*cur).ns {
+                    let cur_ns = if let Ok(node) = XmlNodePtr::try_from(node) {
+                        node.ns
+                    } else {
+                        XmlAttrPtr::try_from(node).unwrap().ns
+                    };
+                    if let Some(cur_ns) = cur_ns {
                         // handle_ns_reference:
                         // The following will take care of references to ns-decls
                         // and is intended only for element- and attribute-nodes.
@@ -2238,9 +2258,9 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         if XML_NSMAP_NOTEMPTY!(ns_map) {
                             // Search for a mapping.
                             XML_NSMAP_FOREACH!(ns_map, mi, {
-                                if (*mi).shadow_depth == -1 && (*cur).ns == (*mi).old_ns {
+                                if (*mi).shadow_depth == -1 && Some(cur_ns) == (*mi).old_ns {
                                     // This is the nice case: a mapping was found.
-                                    (*clone).ns = (*mi).new_ns;
+                                    XmlNodePtr::try_from(clone).unwrap().ns = (*mi).new_ns;
                                     // goto end_ns_reference;
                                     end_ns_reference = true;
                                     break;
@@ -2254,7 +2274,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 // User-defined behaviour.
                                 let ns = ((*ctxt).get_ns_for_node_func.unwrap())(
                                     ctxt,
-                                    cur,
+                                    Some(cur_node),
                                     cur_ns.href,
                                     cur_ns.prefix,
                                 );
@@ -2262,7 +2282,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 if xml_dom_wrap_ns_map_add_item(
                                     &raw mut ns_map,
                                     -1,
-                                    (*cur).ns,
+                                    Some(cur_ns),
                                     ns,
                                     XML_TREE_NSMAP_CUSTOM,
                                 )
@@ -2270,7 +2290,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 {
                                     break 'internal_error;
                                 }
-                                (*clone).ns = ns;
+                                XmlNodePtr::try_from(clone).unwrap().ns = ns;
                             } else {
                                 // Acquire a normalized ns-decl and add it to the map.
                                 let mut ns = None;
@@ -2278,7 +2298,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                     dest_doc,
                                     // ns-decls on curElem or on (*destDoc).oldNs
                                     dest_parent.and(cur_elem),
-                                    (*cur).ns.unwrap(),
+                                    cur_ns,
                                     &mut ns,
                                     &raw mut ns_map,
                                     depth,
@@ -2286,14 +2306,14 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                     ancestors_only,
                                     // ns-decls must be prefixed for attributes.
                                     matches!(
-                                        (*cur).element_type(),
+                                        cur_node.element_type(),
                                         XmlElementType::XmlAttributeNode
                                     ) as i32,
                                 ) == -1
                                 {
                                     break 'internal_error;
                                 }
-                                (*clone).ns = ns;
+                                XmlNodePtr::try_from(clone).unwrap().ns = ns;
                             }
                         }
                     }
@@ -2301,21 +2321,23 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     // Some post-processing.
                     //
                     // Handle ID attributes.
-                    if matches!((*clone).element_type(), XmlElementType::XmlAttributeNode)
-                        && (*clone).parent().is_some()
+                    if matches!(clone.element_type(), XmlElementType::XmlAttributeNode)
+                        && clone.parent().is_some()
                         && xml_is_id(
                             Some(dest_doc),
-                            XmlNodePtr::from_raw((*clone).parent().unwrap().as_ptr()).unwrap(),
-                            XmlAttrPtr::from_raw(clone as _).unwrap(),
+                            XmlNodePtr::from_raw(clone.parent().unwrap().as_ptr()).unwrap(),
+                            XmlAttrPtr::try_from(clone).ok(),
                         ) != 0
                     {
-                        let children = (*cur).children();
-                        if let Some(id_val) = children.and_then(|c| c.get_string((*cur).doc, 1)) {
+                        let children = cur_node.children();
+                        if let Some(id_val) =
+                            children.and_then(|c| c.get_string(cur_node.document(), 1))
+                        {
                             if xml_add_id(
                                 null_mut(),
                                 dest_doc,
                                 &id_val,
-                                XmlAttrPtr::from_raw(cur as _).unwrap().unwrap(),
+                                XmlAttrPtr::try_from(cur_node).unwrap(),
                             )
                             .is_none()
                             {
@@ -2327,23 +2349,24 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     // The following will traverse the tree **************************
                     //
                     // Walk the element's attributes before descending into child-nodes.
-                    if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-                        if let Some(prop) = (*cur).properties {
-                            prev_clone = null_mut();
-                            parent_clone = clone;
-                            cur = prop.as_ptr() as _;
+                    if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                        let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                        if let Some(prop) = cur_node.properties {
+                            prev_clone = None;
+                            parent_clone = Some(clone);
+                            cur = Some(prop.into());
                             continue 'main;
                         }
                     }
                     // into_content:
                     // Descend into child-nodes.
-                    if let Some(children) = (*cur).children().filter(|_| {
+                    if let Some(children) = cur_node.children().filter(|_| {
                         deep != 0
-                            || matches!((*cur).element_type(), XmlElementType::XmlAttributeNode)
+                            || matches!(cur_node.element_type(), XmlElementType::XmlAttributeNode)
                     }) {
-                        prev_clone = null_mut();
-                        parent_clone = clone;
-                        cur = children.as_ptr();
+                        prev_clone = None;
+                        parent_clone = Some(clone);
+                        cur = XmlGenericNodePtr::from_raw(children.as_ptr());
                         continue 'main;
                     }
                 }
@@ -2352,12 +2375,13 @@ pub unsafe fn xml_dom_wrap_clone_node(
                 'leave_node: loop {
                     // At this point we are done with the node, its content
                     // and an element-nodes's attribute-nodes.
-                    if cur == node {
+                    if cur == Some(node) {
                         break 'main;
                     }
-                    if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                        || matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
-                        || matches!((*cur).element_type(), XmlElementType::XmlXIncludeEnd)
+                    let cur_node = cur.unwrap();
+                    if matches!(cur_node.element_type(), XmlElementType::XmlElementNode)
+                        || matches!(cur_node.element_type(), XmlElementType::XmlXIncludeStart)
+                        || matches!(cur_node.element_type(), XmlElementType::XmlXIncludeEnd)
                     {
                         // TODO: Do we expect nsDefs on xmlElementType::XML_XINCLUDE_START?
                         if XML_NSMAP_NOTEMPTY!(ns_map) {
@@ -2374,37 +2398,52 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         }
                         depth -= 1;
                     }
-                    if let Some(next) = (*cur).next {
-                        prev_clone = clone;
-                        cur = next.as_ptr();
-                    } else if !matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
-                        // Set (*clone).last.
-                        if let Some(mut parent) = (*clone).parent() {
-                            parent.set_last(NodePtr::from_ptr(clone));
+                    if let Some(next) = cur_node.next() {
+                        prev_clone = Some(clone);
+                        cur = XmlGenericNodePtr::from_raw(next.as_ptr());
+                    } else if !matches!(cur_node.element_type(), XmlElementType::XmlAttributeNode) {
+                        // Set clone.last.
+                        if let Some(mut parent) = clone.parent() {
+                            parent.set_last(NodePtr::from_ptr(clone.as_ptr()));
                         }
-                        clone = (*clone).parent().map_or(null_mut(), |p| p.as_ptr());
-                        if !clone.is_null() {
-                            parent_clone = (*clone).parent().map_or(null_mut(), |p| p.as_ptr());
-                        }
+                        clone = clone
+                            .parent()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                            .unwrap();
+                        parent_clone = clone
+                            .parent()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
                         // Process parent --> next;
-                        cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+                        cur = cur_node
+                            .parent()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
                         // goto leave_node;
                         continue 'leave_node;
                     } else {
                         // This is for attributes only.
-                        clone = (*clone).parent().map_or(null_mut(), |p| p.as_ptr());
-                        parent_clone = (*clone).parent().map_or(null_mut(), |p| p.as_ptr());
+                        clone = clone
+                            .parent()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                            .unwrap();
+                        parent_clone = clone
+                            .parent()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
                         // Process parent-element --> children.
-                        cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+                        cur = cur_node
+                            .parent()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
                         // goto into_content;
                         // Descend into child-nodes.
-                        if let Some(children) = (*cur).children().filter(|_| {
+                        if let Some(children) = cur_node.children().filter(|_| {
                             deep != 0
-                                || matches!((*cur).element_type(), XmlElementType::XmlAttributeNode)
+                                || matches!(
+                                    cur_node.element_type(),
+                                    XmlElementType::XmlAttributeNode
+                                )
                         }) {
-                            prev_clone = null_mut();
-                            parent_clone = clone;
-                            cur = children.as_ptr();
+                            prev_clone = None;
+                            parent_clone = Some(clone);
+                            cur = XmlGenericNodePtr::from_raw(children.as_ptr());
                             continue 'main;
                         }
                         continue 'leave_node;
