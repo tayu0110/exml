@@ -3022,7 +3022,7 @@ unsafe fn xml_relaxng_parse_value(
                     .as_ref(),
                 (*def).value,
                 addr_of_mut!(val),
-                node.as_ptr(),
+                Some(node.into()),
             );
             if success != 1 {
                 let value = CStr::from_ptr((*def).value as *const i8).to_string_lossy();
@@ -6490,7 +6490,7 @@ unsafe fn xml_relaxng_validate_datatype(
     ctxt: XmlRelaxNGValidCtxtPtr,
     value: *const XmlChar,
     define: XmlRelaxNGDefinePtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
 ) -> i32 {
     let mut ret: i32;
     let mut tmp: i32;
@@ -6618,10 +6618,10 @@ unsafe fn xml_relaxng_validate_value(
                                 .to_string_lossy()
                                 .as_ref(),
                             (*define).value,
-                            (*define).node,
+                            XmlGenericNodePtr::from_raw((*define).node),
                             (*define).attrs as _,
                             value,
-                            (*(*ctxt).state).node,
+                            XmlGenericNodePtr::from_raw((*(*ctxt).state).node),
                         );
                     } else {
                         ret = -1;
@@ -6660,7 +6660,12 @@ unsafe fn xml_relaxng_validate_value(
             }
         }
         XmlRelaxNGType::Datatype => {
-            ret = xml_relaxng_validate_datatype(ctxt, value, define, (*(*ctxt).state).seq);
+            ret = xml_relaxng_validate_datatype(
+                ctxt,
+                value,
+                define,
+                XmlGenericNodePtr::from_raw((*(*ctxt).state).seq),
+            );
             if ret == 0 {
                 xml_relaxng_next_value(ctxt);
             }
@@ -8405,7 +8410,12 @@ unsafe fn xml_relaxng_validate_state(
                     break 'to_break;
                 }
             }
-            ret = xml_relaxng_validate_datatype(ctxt, content, define, (*(*ctxt).state).seq);
+            ret = xml_relaxng_validate_datatype(
+                ctxt,
+                content,
+                define,
+                XmlGenericNodePtr::from_raw((*(*ctxt).state).seq),
+            );
             if ret == -1 {
                 VALID_ERR2!(
                     ctxt,

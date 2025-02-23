@@ -62,8 +62,8 @@ use crate::{
     },
     tree::{
         xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
-        xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttr, XmlAttrPtr,
-        XmlAttributeType, XmlElementType, XmlEntityType, XmlNode,
+        xml_validate_nmtoken, xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlEntityType,
+        XmlGenericNodePtr, XmlNode,
     },
     xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };
@@ -1037,7 +1037,7 @@ pub unsafe fn xml_schema_validate_predefined_type(
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
 ) -> i32 {
-    xml_schema_val_predef_type_node(typ, value, val, null_mut())
+    xml_schema_val_predef_type_node(typ, value, val, None)
 }
 
 /// Parse an u64 into 3 fields.
@@ -1877,7 +1877,7 @@ unsafe fn xml_schema_val_atomic_list_node(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
     ret: *mut XmlSchemaValPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
 ) -> i32 {
     let mut cur: *mut XmlChar;
     let mut nb_values: i32 = 0;
@@ -2011,7 +2011,7 @@ unsafe fn xml_schema_val_atomic_type(
     typ: XmlSchemaTypePtr,
     mut value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     flags: i32,
     ws: XmlSchemaWhitespaceValueType,
     norm_on_the_fly: i32,
@@ -2038,7 +2038,8 @@ unsafe fn xml_schema_val_atomic_type(
     if !val.is_null() {
         *val = null_mut();
     }
-    if (flags == 0 && !value.is_null())
+    if flags == 0
+        && !value.is_null()
         && ((*typ).built_in_type != XmlSchemaValType::XmlSchemasString as i32
             && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnytype as i32
             && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnysimpletype as i32)
@@ -2712,12 +2713,12 @@ unsafe fn xml_schema_val_atomic_type(
                                 if ret != 0 {
                                     break 'done;
                                 }
-                                if !node.is_null() {
+                                if let Some(node) = node {
                                     let mut prefix: *mut XmlChar = null_mut();
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
-                                    let ns = (*node).search_ns(
-                                        (*node).doc,
+                                    let ns = node.search_ns(
+                                        node.document(),
                                         (!prefix.is_null())
                                             .then(|| {
                                                 CStr::from_ptr(prefix as *const i8)
@@ -2785,43 +2786,42 @@ unsafe fn xml_schema_val_atomic_type(
                                         break 'error;
                                     }
                                 }
-                                if ret == 0
-                                    && !node.is_null()
-                                    && (*node).element_type() == XmlElementType::XmlAttributeNode
-                                {
-                                    let mut attr = XmlAttrPtr::from_raw(node as *mut XmlAttr)
-                                        .unwrap()
-                                        .unwrap();
-
-                                    // NOTE: the IDness might have already be declared in the DTD
-                                    if !matches!(attr.atype, Some(XmlAttributeType::XmlAttributeID))
+                                if ret == 0 {
+                                    if let Some(mut attr) =
+                                        node.and_then(|node| XmlAttrPtr::try_from(node).ok())
                                     {
-                                        let strip: *mut XmlChar = xml_schema_strip(value);
-                                        let res = if !strip.is_null() {
-                                            let res = xml_add_id(
-                                                null_mut(),
-                                                (*node).doc.unwrap(),
-                                                CStr::from_ptr(strip as *const i8)
-                                                    .to_string_lossy()
-                                                    .as_ref(),
-                                                attr,
-                                            );
-                                            xml_free(strip as _);
-                                            res
-                                        } else {
-                                            xml_add_id(
-                                                null_mut(),
-                                                (*node).doc.unwrap(),
-                                                CStr::from_ptr(value as *const i8)
-                                                    .to_string_lossy()
-                                                    .as_ref(),
-                                                attr,
-                                            )
-                                        };
-                                        if res.is_none() {
-                                            ret = 2;
-                                        } else {
-                                            attr.atype = Some(XmlAttributeType::XmlAttributeID);
+                                        // NOTE: the IDness might have already be declared in the DTD
+                                        if !matches!(
+                                            attr.atype,
+                                            Some(XmlAttributeType::XmlAttributeID)
+                                        ) {
+                                            let strip: *mut XmlChar = xml_schema_strip(value);
+                                            let res = if !strip.is_null() {
+                                                let res = xml_add_id(
+                                                    null_mut(),
+                                                    attr.doc.unwrap(),
+                                                    CStr::from_ptr(strip as *const i8)
+                                                        .to_string_lossy()
+                                                        .as_ref(),
+                                                    attr,
+                                                );
+                                                xml_free(strip as _);
+                                                res
+                                            } else {
+                                                xml_add_id(
+                                                    null_mut(),
+                                                    attr.doc.unwrap(),
+                                                    CStr::from_ptr(value as *const i8)
+                                                        .to_string_lossy()
+                                                        .as_ref(),
+                                                    attr,
+                                                )
+                                            };
+                                            if res.is_none() {
+                                                ret = 2;
+                                            } else {
+                                                attr.atype = Some(XmlAttributeType::XmlAttributeID);
+                                            }
                                         }
                                     }
                                 }
@@ -2837,36 +2837,33 @@ unsafe fn xml_schema_val_atomic_type(
                                     (*v).value.str = xml_strdup(value);
                                     *val = v;
                                 }
-                                if ret == 0
-                                    && !node.is_null()
-                                    && (*node).element_type() == XmlElementType::XmlAttributeNode
-                                {
-                                    let mut attr = XmlAttrPtr::from_raw(node as *mut XmlAttr)
-                                        .unwrap()
-                                        .unwrap();
-
-                                    let strip: *mut XmlChar = xml_schema_strip(value);
-                                    if !strip.is_null() {
-                                        xml_add_ref(
-                                            null_mut(),
-                                            (*node).doc.unwrap(),
-                                            CStr::from_ptr(strip as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
-                                            attr,
-                                        );
-                                        xml_free(strip as _);
-                                    } else {
-                                        xml_add_ref(
-                                            null_mut(),
-                                            (*node).doc.unwrap(),
-                                            CStr::from_ptr(value as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
-                                            attr,
-                                        );
+                                if ret == 0 {
+                                    if let Some(mut attr) =
+                                        node.and_then(|node| XmlAttrPtr::try_from(node).ok())
+                                    {
+                                        let strip: *mut XmlChar = xml_schema_strip(value);
+                                        if !strip.is_null() {
+                                            xml_add_ref(
+                                                null_mut(),
+                                                attr.doc.unwrap(),
+                                                CStr::from_ptr(strip as *const i8)
+                                                    .to_string_lossy()
+                                                    .as_ref(),
+                                                attr,
+                                            );
+                                            xml_free(strip as _);
+                                        } else {
+                                            xml_add_ref(
+                                                null_mut(),
+                                                attr.doc.unwrap(),
+                                                CStr::from_ptr(value as *const i8)
+                                                    .to_string_lossy()
+                                                    .as_ref(),
+                                                attr,
+                                            );
+                                        }
+                                        attr.atype = Some(XmlAttributeType::XmlAttributeIDREF);
                                     }
-                                    attr.atype = Some(XmlAttributeType::XmlAttributeIDREF);
                                 }
                                 break 'done;
                             }
@@ -2882,15 +2879,12 @@ unsafe fn xml_schema_val_atomic_type(
                                 } else {
                                     ret = 0;
                                 }
-                                if ret == 0
-                                    && !node.is_null()
-                                    && (*node).element_type() == XmlElementType::XmlAttributeNode
-                                {
-                                    let mut attr = XmlAttrPtr::from_raw(node as *mut XmlAttr)
-                                        .unwrap()
-                                        .unwrap();
-
-                                    attr.atype = Some(XmlAttributeType::XmlAttributeIDREFS);
+                                if ret == 0 {
+                                    if let Some(mut attr) =
+                                        node.and_then(|node| XmlAttrPtr::try_from(node).ok())
+                                    {
+                                        attr.atype = Some(XmlAttributeType::XmlAttributeIDREFS);
+                                    }
                                 }
                                 break 'done;
                             }
@@ -2898,73 +2892,67 @@ unsafe fn xml_schema_val_atomic_type(
                                 let strip: *mut XmlChar;
 
                                 ret = xml_validate_ncname(value, 1);
-                                if node.is_null() || (*node).doc.is_none() {
-                                    ret = 3;
-                                }
-                                if ret == 0 {
-                                    strip = xml_schema_strip(value);
-                                    let ent = if !strip.is_null() {
-                                        let e = xml_get_doc_entity(
-                                            (*node).doc,
-                                            &CStr::from_ptr(strip as *const i8).to_string_lossy(),
-                                        );
-                                        xml_free(strip as _);
-                                        e
-                                    } else {
-                                        xml_get_doc_entity(
-                                            (*node).doc,
-                                            &CStr::from_ptr(value as *const i8).to_string_lossy(),
-                                        )
-                                    };
-                                    if ent.map_or(true, |ent| {
-                                        !matches!(
-                                            ent.etype,
-                                            XmlEntityType::XmlExternalGeneralUnparsedEntity
-                                        )
-                                    }) {
-                                        ret = 4;
+                                if let Some(node) = node.filter(|node| node.document().is_some()) {
+                                    if ret == 0 {
+                                        strip = xml_schema_strip(value);
+                                        let ent = if !strip.is_null() {
+                                            let e = xml_get_doc_entity(
+                                                node.document(),
+                                                &CStr::from_ptr(strip as *const i8)
+                                                    .to_string_lossy(),
+                                            );
+                                            xml_free(strip as _);
+                                            e
+                                        } else {
+                                            xml_get_doc_entity(
+                                                node.document(),
+                                                &CStr::from_ptr(value as *const i8)
+                                                    .to_string_lossy(),
+                                            )
+                                        };
+                                        if ent.map_or(true, |ent| {
+                                            !matches!(
+                                                ent.etype,
+                                                XmlEntityType::XmlExternalGeneralUnparsedEntity
+                                            )
+                                        }) {
+                                            ret = 4;
+                                        }
                                     }
-                                }
-                                if ret == 0 && !val.is_null() {
-                                    // TODO;
-                                    todo!()
-                                }
-                                if ret == 0
-                                    && !node.is_null()
-                                    && (*node).element_type() == XmlElementType::XmlAttributeNode
-                                {
-                                    let mut attr = XmlAttrPtr::from_raw(node as *mut XmlAttr)
-                                        .unwrap()
-                                        .unwrap();
-
-                                    attr.atype = Some(XmlAttributeType::XmlAttributeEntity);
+                                    if ret == 0 && !val.is_null() {
+                                        // TODO;
+                                        todo!()
+                                    }
+                                    if ret == 0 {
+                                        if let Ok(mut attr) = XmlAttrPtr::try_from(node) {
+                                            attr.atype = Some(XmlAttributeType::XmlAttributeEntity);
+                                        }
+                                    }
+                                } else {
+                                    ret = 3;
                                 }
                                 break 'done;
                             }
                             XmlSchemaValType::XmlSchemasEntities => {
-                                if node.is_null() || (*node).doc.is_none() {
+                                let Some(node) = node.filter(|node| node.document().is_some())
+                                else {
                                     break 'return3;
-                                }
+                                };
                                 ret = xml_schema_val_atomic_list_node(
                                     XML_SCHEMA_TYPE_ENTITY_DEF.get(),
                                     value,
                                     val,
-                                    node,
+                                    Some(node),
                                 );
                                 if ret <= 0 {
                                     ret = 1;
                                 } else {
                                     ret = 0;
                                 }
-                                if ret == 0
-                                    && !node.is_null()
-                                    && (*node).element_type() == XmlElementType::XmlAttributeNode
-                                {
-                                    let mut attr = XmlAttrPtr::from_raw(node as *mut XmlAttr)
-                                        .unwrap()
-                                        .unwrap();
-
-                                    attr.atype = Some(XmlAttributeType::XmlAttributeEntities);
+                                if ret == 0 {
+                                    if let Ok(mut attr) = XmlAttrPtr::try_from(node) {
+                                        attr.atype = Some(XmlAttributeType::XmlAttributeEntities);
+                                    }
                                 }
                                 break 'done;
                             }
@@ -2973,13 +2961,13 @@ unsafe fn xml_schema_val_atomic_type(
                                 let mut local: *mut XmlChar = null_mut();
 
                                 ret = xml_validate_qname(value, 1);
-                                if ret == 0 && !node.is_null() {
+                                if let Some(node) = node.filter(|_| ret == 0) {
                                     let mut prefix: *mut XmlChar = null_mut();
 
                                     local = xml_split_qname2(value, addr_of_mut!(prefix));
                                     if !prefix.is_null() {
-                                        if let Some(ns) = (*node).search_ns(
-                                            (*node).doc,
+                                        if let Some(ns) = node.search_ns(
+                                            node.document(),
                                             Some(
                                                 CStr::from_ptr(prefix as *const i8)
                                                     .to_string_lossy()
@@ -3000,45 +2988,48 @@ unsafe fn xml_schema_val_atomic_type(
                                         xml_free(prefix as _);
                                     }
                                 }
-                                if node.is_null() || (*node).doc.is_none() {
-                                    ret = 3;
-                                }
-                                if ret == 0 {
-                                    ret = xml_validate_notation_use(
-                                        null_mut(),
-                                        (*node).doc.unwrap(),
-                                        CStr::from_ptr(value as *const i8)
-                                            .to_string_lossy()
-                                            .as_ref(),
-                                    );
-                                    if ret == 1 {
-                                        ret = 0;
-                                    } else {
-                                        ret = 1;
-                                    }
-                                }
-                                if ret == 0 && !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasNotation);
-                                    if !v.is_null() {
-                                        if !local.is_null() {
-                                            (*v).value.qname.name = local;
+                                if let Some(doc) = node.and_then(|node| node.document()) {
+                                    if ret == 0 {
+                                        ret = xml_validate_notation_use(
+                                            null_mut(),
+                                            doc,
+                                            CStr::from_ptr(value as *const i8)
+                                                .to_string_lossy()
+                                                .as_ref(),
+                                        );
+                                        if ret == 1 {
+                                            ret = 0;
                                         } else {
-                                            (*v).value.qname.name = xml_strdup(value);
+                                            ret = 1;
                                         }
-                                        if !uri.is_null() {
-                                            (*v).value.qname.uri = uri;
-                                        }
-
-                                        *val = v;
-                                    } else {
-                                        if !local.is_null() {
-                                            xml_free(local as _);
-                                        }
-                                        if !uri.is_null() {
-                                            xml_free(uri as _);
-                                        }
-                                        break 'error;
                                     }
+                                    if ret == 0 && !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            XmlSchemaValType::XmlSchemasNotation,
+                                        );
+                                        if !v.is_null() {
+                                            if !local.is_null() {
+                                                (*v).value.qname.name = local;
+                                            } else {
+                                                (*v).value.qname.name = xml_strdup(value);
+                                            }
+                                            if !uri.is_null() {
+                                                (*v).value.qname.uri = uri;
+                                            }
+
+                                            *val = v;
+                                        } else {
+                                            if !local.is_null() {
+                                                xml_free(local as _);
+                                            }
+                                            if !uri.is_null() {
+                                                xml_free(uri as _);
+                                            }
+                                            break 'error;
+                                        }
+                                    }
+                                } else {
+                                    ret = 3;
                                 }
                                 break 'done;
                             }
@@ -3140,7 +3131,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     cur = xml_strndup(start, i);
                                     if cur.is_null() {
                                         xml_schema_type_err_memory(
-                                            node,
+                                            node.map_or(null_mut(), |node| node.as_ptr()),
                                             Some("allocating hexbin data"),
                                         );
                                         xml_free(v as _);
@@ -3286,7 +3277,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     base = xml_malloc_atomic(i as usize + pad as usize + 1) as _;
                                     if base.is_null() {
                                         xml_schema_type_err_memory(
-                                            node,
+                                            node.map_or(null_mut(), |node| node.as_ptr()),
                                             Some("allocating base64 data"),
                                         );
                                         xml_free(v as _);
@@ -3655,7 +3646,7 @@ pub unsafe fn xml_schema_val_predef_type_node(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
 ) -> i32 {
     xml_schema_val_atomic_type(
         typ,
@@ -6455,7 +6446,7 @@ pub unsafe fn xml_schema_val_predef_type_node_no_norm(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
 ) -> i32 {
     xml_schema_val_atomic_type(
         typ,
@@ -7677,121 +7668,6 @@ mod tests {
                         );
                         eprint!(" {}", n_type);
                         eprintln!(" {}", n_facet_type);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_new_facet() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schema_new_notationvalue() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schema_new_qname_value() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schema_new_string_value() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schema_val_predef_type_node() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_type in 0..GEN_NB_XML_SCHEMA_TYPE_PTR {
-                for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_val in 0..GEN_NB_XML_SCHEMA_VAL_PTR_PTR {
-                        for n_node in 0..GEN_NB_XML_NODE_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let typ = gen_xml_schema_type_ptr(n_type, 0);
-                            let value = gen_const_xml_char_ptr(n_value, 1);
-                            let val = gen_xml_schema_val_ptr_ptr(n_val, 2);
-                            let node = gen_xml_node_ptr(n_node, 3);
-
-                            let ret_val = xml_schema_val_predef_type_node(typ, value, val, node);
-                            desret_int(ret_val);
-                            des_xml_schema_type_ptr(n_type, typ, 0);
-                            des_const_xml_char_ptr(n_value, value, 1);
-                            des_xml_schema_val_ptr_ptr(n_val, val, 2);
-                            des_xml_node_ptr(n_node, node, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlSchemaValPredefTypeNode",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlSchemaValPredefTypeNode()"
-                                );
-                                eprint!(" {}", n_type);
-                                eprint!(" {}", n_value);
-                                eprint!(" {}", n_val);
-                                eprintln!(" {}", n_node);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_val_predef_type_node_no_norm() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_type in 0..GEN_NB_XML_SCHEMA_TYPE_PTR {
-                for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_val in 0..GEN_NB_XML_SCHEMA_VAL_PTR_PTR {
-                        for n_node in 0..GEN_NB_XML_NODE_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let typ = gen_xml_schema_type_ptr(n_type, 0);
-                            let value = gen_const_xml_char_ptr(n_value, 1);
-                            let val = gen_xml_schema_val_ptr_ptr(n_val, 2);
-                            let node = gen_xml_node_ptr(n_node, 3);
-
-                            let ret_val =
-                                xml_schema_val_predef_type_node_no_norm(typ, value, val, node);
-                            desret_int(ret_val);
-                            des_xml_schema_type_ptr(n_type, typ, 0);
-                            des_const_xml_char_ptr(n_value, value, 1);
-                            des_xml_schema_val_ptr_ptr(n_val, val, 2);
-                            des_xml_node_ptr(n_node, node, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlSchemaValPredefTypeNodeNoNorm",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlSchemaValPredefTypeNodeNoNorm()"
-                                );
-                                eprint!(" {}", n_type);
-                                eprint!(" {}", n_value);
-                                eprint!(" {}", n_val);
-                                eprintln!(" {}", n_node);
-                            }
-                        }
                     }
                 }
             }

@@ -778,7 +778,6 @@ impl XmlNode {
     /// Use xmlGetNsProp() or xmlGetNoNsProp() for namespace aware processing.
     ///
     /// Returns the attribute value or NULL if not found.  
-    /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetProp")]
     pub unsafe fn get_prop(&self, name: &str) -> Option<String> {
         match self.has_prop(name)? {
@@ -797,7 +796,6 @@ impl XmlNode {
     /// default declaration values unless DTD use has been turned off.
     ///
     /// Returns the attribute value or NULL if not found.  
-    /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetNsProp")]
     pub unsafe fn get_ns_prop(&self, name: &str, name_space: Option<&str>) -> Option<String> {
         let prop =
@@ -818,7 +816,6 @@ impl XmlNode {
     /// an attribute in no namespace.
     ///
     /// Returns the attribute value or NULL if not found.  
-    /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetNoNsProp")]
     pub unsafe fn get_no_ns_prop(&self, name: &str) -> Option<String> {
         let prop =
@@ -863,7 +860,6 @@ impl XmlNode {
     /// attribute or the one carried by the nearest ancestor.
     ///
     /// Returns a pointer to the lang value, or null_mut() if not found.  
-    /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlNodeGetLang")]
     pub unsafe fn get_lang(&self) -> Option<String> {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -916,7 +912,7 @@ impl XmlNode {
     /// Build the string equivalent to the text contained in the Node list
     /// made of TEXTs and ENTITY_REFs.
     ///
-    /// Returns a pointer to the string copy, the caller must free it with `xml_free()`.
+    /// Returns a pointer to the string copy.
     #[doc(alias = "xmlNodeListGetString")]
     pub unsafe fn get_string(&self, doc: Option<XmlDocPtr>, in_line: i32) -> Option<String> {
         let mut node = XmlGenericNodePtr::from_raw(self as *const Self as *mut Self);

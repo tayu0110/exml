@@ -145,8 +145,8 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
-        XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration,
+        XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
@@ -3667,14 +3667,14 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                                 bi_type,
                                 value,
                                 addr_of_mut!(val),
-                                node,
+                                XmlGenericNodePtr::from_raw(node),
                             );
                         } else {
                             ret = xml_schema_val_predef_type_node_no_norm(
                                 bi_type,
                                 value,
                                 null_mut(),
-                                node,
+                                XmlGenericNodePtr::from_raw(node),
                             );
                         }
                     }
@@ -3698,14 +3698,14 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                                 bi_type,
                                 value,
                                 addr_of_mut!(val),
-                                node,
+                                XmlGenericNodePtr::from_raw(node),
                             );
                         } else {
                             ret = xml_schema_val_predef_type_node_no_norm(
                                 bi_type,
                                 value,
                                 null_mut(),
-                                node,
+                                XmlGenericNodePtr::from_raw(node),
                             );
                         }
                     }
@@ -5953,12 +5953,7 @@ unsafe fn xml_schema_pval_attr_node_value(
         | Ok(XmlSchemaValType::XmlSchemasAnyURI)
         | Ok(XmlSchemaValType::XmlSchemasToken)
         | Ok(XmlSchemaValType::XmlSchemasLanguage) => {
-            ret = xml_schema_val_predef_type_node(
-                typ,
-                value,
-                null_mut(),
-                attr.as_ptr() as *mut XmlNode,
-            );
+            ret = xml_schema_val_predef_type_node(typ, value, null_mut(), Some(attr.into()));
         }
         _ => {
             PERROR_INT!(
