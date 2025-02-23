@@ -443,7 +443,7 @@ unsafe fn xml_relaxng_valid_error_push(
     }
     if !(*ctxt).state.is_null() {
         cur.node = (*(*ctxt).state).node;
-        cur.seq = (*(*ctxt).state).seq;
+        cur.seq = (*(*ctxt).state).seq.map_or(null_mut(), |seq| seq.as_ptr());
     } else {
         cur.node = null_mut();
         cur.seq = null_mut();
@@ -507,25 +507,27 @@ pub(crate) unsafe fn xml_relaxng_add_valid_error(
 
     // generate the error directly
     if (*ctxt).flags & FLAGS_IGNORABLE == 0 || (*ctxt).flags & FLAGS_NEGATIVE != 0 {
-        let mut node: *mut XmlNode;
-        let seq: *mut XmlNode;
-
         // Flush first any stacked error which might be the
         // real cause of the problem.
         if !(*ctxt).err_tab.is_empty() {
             xml_relaxng_dump_valid_error(ctxt);
         }
-        if !(*ctxt).state.is_null() {
-            node = (*(*ctxt).state).node;
-            seq = (*(*ctxt).state).seq;
+        let (mut node, seq) = if !(*ctxt).state.is_null() {
+            ((*(*ctxt).state).node, (*(*ctxt).state).seq)
         } else {
-            node = null_mut();
-            seq = node;
-        }
-        if node.is_null() && seq.is_null() {
+            (null_mut(), None)
+        };
+        if node.is_null() && seq.is_none() {
             node = (*ctxt).pnode;
         }
-        xml_relaxng_show_valid_error(ctxt, err, node, seq, arg1, arg2);
+        xml_relaxng_show_valid_error(
+            ctxt,
+            err,
+            node,
+            seq.map_or(null_mut(), |seq| seq.as_ptr()),
+            arg1,
+            arg2,
+        );
     } else {
         // Stack the error for later processing if needed
         xml_relaxng_valid_error_push(ctxt, err, arg1, arg2, dup);

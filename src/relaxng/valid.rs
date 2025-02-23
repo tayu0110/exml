@@ -18,7 +18,7 @@ use crate::{
         },
     },
     relaxng::{VALID_ERR, VALID_ERR2},
-    tree::{NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode},
+    tree::{NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode},
 };
 
 use super::{xml_rng_verr_memory, XmlRelaxNGDefinePtr};
@@ -42,13 +42,11 @@ pub type XmlRelaxNGValidStatePtr = *mut XmlRelaxNGValidState;
 #[doc(alias = "xmlRelaxNGValidState")]
 #[repr(C)]
 pub struct XmlRelaxNGValidState {
-    pub(crate) node: *mut XmlNode, // the current node
-    pub(crate) seq: *mut XmlNode,  // the sequence of children left to validate
-    // pub(crate) nb_attrs: i32,            // the number of attributes
-    // pub(crate) max_attrs: i32,           // the size of attrs
-    pub(crate) nb_attr_left: i32, // the number of attributes left to validate
-    pub(crate) value: *mut u8,    // the value when operating on string
-    pub(crate) endvalue: *mut u8, // the end value when operating on string
+    pub(crate) node: *mut XmlNode,             // the current node
+    pub(crate) seq: Option<XmlGenericNodePtr>, // the sequence of children left to validate
+    pub(crate) nb_attr_left: i32,              // the number of attributes left to validate
+    pub(crate) value: *mut u8,                 // the value when operating on string
+    pub(crate) endvalue: *mut u8,              // the end value when operating on string
     pub(crate) attrs: Vec<Option<XmlAttrPtr>>, // the array of attributes
 }
 
@@ -56,9 +54,7 @@ impl Default for XmlRelaxNGValidState {
     fn default() -> Self {
         Self {
             node: null_mut(),
-            seq: null_mut(),
-            // nb_attrs: 0,
-            // max_attrs: 0,
+            seq: None,
             nb_attr_left: 0,
             value: null_mut(),
             endvalue: null_mut(),
@@ -414,10 +410,12 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     (*ret).endvalue = null_mut();
     if node.is_null() {
         (*ret).node = (*ctxt).doc.map_or(null_mut(), |doc| doc.as_ptr()) as _;
-        (*ret).seq = root.map_or(null_mut(), |root| root.as_ptr());
+        (*ret).seq = root.map(|root| root.into());
     } else {
         (*ret).node = node;
-        (*ret).seq = (*node).children().map_or(null_mut(), |c| c.as_ptr());
+        (*ret).seq = (*node)
+            .children()
+            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
     }
     (*ret).attrs.clear();
     if nb_attrs > 0 {

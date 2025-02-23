@@ -6660,12 +6660,7 @@ unsafe fn xml_relaxng_validate_value(
             }
         }
         XmlRelaxNGType::Datatype => {
-            ret = xml_relaxng_validate_datatype(
-                ctxt,
-                value,
-                define,
-                XmlGenericNodePtr::from_raw((*(*ctxt).state).seq),
-            );
+            ret = xml_relaxng_validate_datatype(ctxt, value, define, (*(*ctxt).state).seq);
             if ret == 0 {
                 xml_relaxng_next_value(ctxt);
             }
@@ -6953,7 +6948,6 @@ unsafe fn xml_relaxng_validate_attribute(
 ) -> i32 {
     let ret: i32;
     let oldvalue: *mut XmlChar;
-    let oldseq: *mut XmlNode;
 
     if (*(*ctxt).state).nb_attr_left <= 0 {
         return -1;
@@ -6980,8 +6974,8 @@ unsafe fn xml_relaxng_validate_attribute(
                 .as_ref()
                 .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
             oldvalue = (*(*ctxt).state).value;
-            oldseq = (*(*ctxt).state).seq;
-            (*(*ctxt).state).seq = prop.as_ptr() as _;
+            let oldseq = (*(*ctxt).state).seq;
+            (*(*ctxt).state).seq = Some(prop.into());
             (*(*ctxt).state).value = value;
             (*(*ctxt).state).endvalue = null_mut();
             ret = xml_relaxng_validate_value_content(ctxt, (*define).content);
@@ -7017,8 +7011,8 @@ unsafe fn xml_relaxng_validate_attribute(
             .as_ref()
             .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
         oldvalue = (*(*ctxt).state).value;
-        oldseq = (*(*ctxt).state).seq;
-        (*(*ctxt).state).seq = prop.as_ptr() as _;
+        let oldseq = (*(*ctxt).state).seq;
+        (*(*ctxt).state).seq = Some(prop.into());
         (*(*ctxt).state).value = value;
         ret = xml_relaxng_validate_value_content(ctxt, (*define).content);
         if !(*(*ctxt).state).value.is_null() {
@@ -7152,7 +7146,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
     (*ctxt).perr = 0;
     let mut cur = content;
     while let Some(now) = cur {
-        (*(*ctxt).state).seq = now.as_ptr();
+        (*(*ctxt).state).seq = Some(now.into());
         match now.element_type() {
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                 if !now.is_blank_node() {
@@ -7189,7 +7183,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
     ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
     if ret == 1 {
         ret = 0;
-        (*(*ctxt).state).seq = null_mut();
+        (*(*ctxt).state).seq = None;
     } else if ret == 0 {
         // TODO: get some of the names needed to exit the current state of exec
         VALID_ERR2!(
@@ -7221,16 +7215,16 @@ unsafe fn xml_relaxng_validate_compiled_content(
 #[doc(alias = "xmlRelaxNGValidateElementEnd")]
 unsafe fn xml_relaxng_validate_element_end(ctxt: XmlRelaxNGValidCtxtPtr, dolog: i32) -> i32 {
     let state: XmlRelaxNGValidStatePtr = (*ctxt).state;
-    if !(*state).seq.is_null() {
-        (*state).seq = xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw((*state).seq).unwrap())
-            .map_or(null_mut(), |node| node.as_ptr());
-        if !(*state).seq.is_null() {
+    if let Some(seq) = (*state).seq.map(|seq| XmlNodePtr::try_from(seq).unwrap()) {
+        let next = xml_relaxng_skip_ignored(ctxt, Some(seq));
+        (*state).seq = next.map(|next| next.into());
+        if let Some(seq) = next {
             if dolog != 0 {
                 VALID_ERR3!(
                     ctxt,
                     XmlRelaxNGValidErr::XmlRelaxngErrExtracontent,
                     (*(*state).node).name,
-                    (*(*state).seq).name
+                    seq.name
                 );
             }
             return -1;
@@ -7271,7 +7265,7 @@ unsafe fn xml_relaxng_best_state(ctxt: XmlRelaxNGValidCtxtPtr) -> i32 {
         if state.is_null() {
             continue;
         }
-        if !(*state).seq.is_null() {
+        if (*state).seq.is_some() {
             if best == -1 || value > 100000 {
                 value = 100000;
                 best = i as i32;
@@ -7508,9 +7502,11 @@ unsafe fn xml_relaxng_validate_interleave(
             if !(*ctxt).state.is_null() {
                 (*(*ctxt).state).seq = xml_relaxng_skip_ignored(
                     ctxt,
-                    XmlNodePtr::from_raw((*(*ctxt).state).seq).unwrap(),
+                    (*(*ctxt).state)
+                        .seq
+                        .map(|seq| XmlNodePtr::try_from(seq).unwrap()),
                 )
-                .map_or(null_mut(), |node| node.as_ptr());
+                .map(|node| node.into());
             }
             if (*(*(*(*partitions).groups.add(0))).rule).typ == XmlRelaxNGType::Text {
                 ret = xml_relaxng_validate_definition(ctxt, (*(*(*partitions).groups.add(1))).rule);
@@ -7520,9 +7516,11 @@ unsafe fn xml_relaxng_validate_interleave(
             if ret == 0 && !(*ctxt).state.is_null() {
                 (*(*ctxt).state).seq = xml_relaxng_skip_ignored(
                     ctxt,
-                    XmlNodePtr::from_raw((*(*ctxt).state).seq).unwrap(),
+                    (*(*ctxt).state)
+                        .seq
+                        .map(|seq| XmlNodePtr::try_from(seq).unwrap()),
                 )
-                .map_or(null_mut(), |node| node.as_ptr());
+                .map(|node| node.into());
             }
             (*ctxt).flags = oldflags;
             return ret;
@@ -7534,12 +7532,16 @@ unsafe fn xml_relaxng_validate_interleave(
     let mut lasts: Vec<Option<XmlNodePtr>> = vec![None; nbgroups as usize];
 
     // Walk the sequence of children finding the right group and sorting them in sequences.
-    let mut cur =
-        xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw((*(*ctxt).state).seq).unwrap());
+    let mut cur = xml_relaxng_skip_ignored(
+        ctxt,
+        (*(*ctxt).state)
+            .seq
+            .map(|seq| XmlNodePtr::try_from(seq).unwrap()),
+    );
     let start = cur;
     let mut lastchg = None;
     while let Some(cur_node) = cur {
-        (*(*ctxt).state).seq = cur_node.as_ptr();
+        (*(*ctxt).state).seq = Some(cur_node.into());
         if let Some(triage) = (*partitions)
             .triage
             .filter(|_| (*partitions).flags & IS_DETERMINIST != 0)
@@ -7640,7 +7642,7 @@ unsafe fn xml_relaxng_validate_interleave(
                     .take()
                     .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
             }
-            (*(*ctxt).state).seq = list[i as usize].map_or(null_mut(), |node| node.as_ptr());
+            (*(*ctxt).state).seq = list[i as usize].map(|node| node.into());
             ret = xml_relaxng_validate_definition(ctxt, (*group).rule);
             if ret != 0 {
                 break;
@@ -7648,7 +7650,9 @@ unsafe fn xml_relaxng_validate_interleave(
             if !(*ctxt).state.is_null() {
                 let cur = xml_relaxng_skip_ignored(
                     ctxt,
-                    XmlNodePtr::from_raw((*(*ctxt).state).seq).unwrap(),
+                    (*(*ctxt).state)
+                        .seq
+                        .map(|seq| XmlNodePtr::try_from(seq).unwrap()),
                 );
                 xml_relaxng_free_valid_state(ctxt, oldstate);
                 oldstate = (*ctxt).state;
@@ -7679,8 +7683,10 @@ unsafe fn xml_relaxng_validate_interleave(
 
                 // PBM: what happen if there is attributes checks in the interleaves
                 for (j, &state) in (*(*ctxt).states).tab_state.iter().enumerate() {
-                    cur =
-                        xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw((*state).seq).unwrap());
+                    cur = xml_relaxng_skip_ignored(
+                        ctxt,
+                        (*state).seq.map(|seq| XmlNodePtr::try_from(seq).unwrap()),
+                    );
                     if cur.is_none() {
                         if found == 0 {
                             lowattr = (*state).nb_attr_left;
@@ -7747,7 +7753,7 @@ unsafe fn xml_relaxng_validate_interleave(
             xml_relaxng_free_valid_state(ctxt, (*ctxt).state);
         }
         (*ctxt).state = oldstate;
-        (*(*ctxt).state).seq = lastelem.map_or(null_mut(), |node| node.as_ptr());
+        (*(*ctxt).state).seq = lastelem.map(|node| node.into());
         if ret != 0 {
             VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrInterseq);
             ret = -1;
@@ -7787,9 +7793,7 @@ unsafe fn xml_relaxng_validate_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
 ) -> i32 {
-    let mut node: *mut XmlNode;
     let mut ret: i32 = 0;
-
     let mut tmp: i32;
     let oldflags: i32;
     let mut oldstate: XmlRelaxNGValidStatePtr = null_mut();
@@ -7800,11 +7804,13 @@ unsafe fn xml_relaxng_validate_state(
         return -1;
     }
 
-    if !(*ctxt).state.is_null() {
-        node = (*(*ctxt).state).seq;
+    let mut node = if !(*ctxt).state.is_null() {
+        (*(*ctxt).state)
+            .seq
+            .map(|seq| XmlNodePtr::try_from(seq).unwrap())
     } else {
-        node = null_mut();
-    }
+        None
+    };
     (*ctxt).depth += 1;
     match (*define).typ {
         XmlRelaxNGType::Empty => {
@@ -7814,24 +7820,25 @@ unsafe fn xml_relaxng_validate_state(
             ret = -1;
         }
         XmlRelaxNGType::Text => {
-            while !node.is_null()
-                && matches!(
-                    (*node).element_type(),
+            while let Some(now) = node.filter(|node| {
+                matches!(
+                    node.element_type(),
                     XmlElementType::XmlTextNode
                         | XmlElementType::XmlCommentNode
                         | XmlElementType::XmlPINode
                         | XmlElementType::XmlCDATASectionNode
                 )
-            {
-                node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
+            }) {
+                node = now
+                    .next()
+                    .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
             }
-            (*(*ctxt).state).seq = node;
+            (*(*ctxt).state).seq = node.map(|node| node.into());
         }
         XmlRelaxNGType::Element => 'to_break: {
             let err_nr = (*ctxt).err_tab.len();
-            node = xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw(node).unwrap())
-                .map_or(null_mut(), |node| node.as_ptr());
-            if node.is_null() {
+            node = xml_relaxng_skip_ignored(ctxt, node);
+            let Some(mut node) = node else {
                 VALID_ERR2!(
                     ctxt,
                     XmlRelaxNGValidErr::XmlRelaxngErrNoelem,
@@ -7842,8 +7849,8 @@ unsafe fn xml_relaxng_validate_state(
                     xml_relaxng_dump_valid_error(ctxt);
                 }
                 break 'to_break;
-            }
-            if (*node).element_type() != XmlElementType::XmlElementNode {
+            };
+            if node.element_type() != XmlElementType::XmlElementNode {
                 VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrNotelem);
                 ret = -1;
                 if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
@@ -7852,23 +7859,22 @@ unsafe fn xml_relaxng_validate_state(
                 break 'to_break;
             }
             // This node was already validated successfully against this definition.
-            if (*node).psvi == define as _ {
+            if node.psvi == define as _ {
                 (*(*ctxt).state).seq = xml_relaxng_skip_ignored(
                     ctxt,
-                    (*node)
-                        .next
+                    node.next()
                         .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap()),
                 )
-                .map_or(null_mut(), |node| node.as_ptr());
+                .map(|node| node.into());
                 if (*ctxt).err_tab.len() > err_nr {
                     xml_relaxng_pop_errors(ctxt, err_nr as i32);
                 }
                 if !(*ctxt).err_tab.is_empty() {
                     while (*ctxt).err_tab.last().map_or(false, |err| {
                         (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemname
-                            && xml_str_equal(err.arg2, (*node).name))
+                            && xml_str_equal(err.arg2, node.name))
                             || (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemextrans
-                                && xml_str_equal(err.arg1, (*node).name))
+                                && xml_str_equal(err.arg1, node.name))
                             || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNoelem
                             || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNotelem
                     }) {
@@ -7877,11 +7883,7 @@ unsafe fn xml_relaxng_validate_state(
                 }
                 break 'to_break;
             }
-            ret = xml_relaxng_element_match(
-                ctxt,
-                define,
-                XmlNodePtr::from_raw(node).unwrap().unwrap(),
-            );
+            ret = xml_relaxng_element_match(ctxt, define, node);
             if ret <= 0 {
                 ret = -1;
                 if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
@@ -7896,9 +7898,9 @@ unsafe fn xml_relaxng_validate_state(
                 }
                 while (*ctxt).err_tab.last().map_or(false, |err| {
                     (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemname
-                        && xml_str_equal(err.arg2, (*node).name))
+                        && xml_str_equal(err.arg2, node.name))
                         || (err.err == XmlRelaxNGValidErr::XmlRelaxngErrElemextrans
-                            && xml_str_equal(err.arg1, (*node).name))
+                            && xml_str_equal(err.arg1, node.name))
                         || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNoelem
                         || err.err == XmlRelaxNGValidErr::XmlRelaxngErrNotelem
                 }) {
@@ -7911,7 +7913,7 @@ unsafe fn xml_relaxng_validate_state(
             if (*ctxt).flags & FLAGS_MIXED_CONTENT != 0 {
                 (*ctxt).flags -= FLAGS_MIXED_CONTENT;
             }
-            state = xml_relaxng_new_valid_state(ctxt, node);
+            state = xml_relaxng_new_valid_state(ctxt, node.as_ptr());
             if state.is_null() {
                 ret = -1;
                 if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
@@ -7925,27 +7927,26 @@ unsafe fn xml_relaxng_validate_state(
                 tmp = xml_relaxng_validate_attribute_list(ctxt, (*define).attrs);
                 if tmp != 0 {
                     ret = -1;
-                    VALID_ERR2!(
-                        ctxt,
-                        XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid,
-                        (*node).name
-                    );
+                    VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid, node.name);
                 }
             }
             if !(*define).cont_model.is_null() {
                 let tmpstate: XmlRelaxNGValidStatePtr = (*ctxt).state;
                 let tmpstates: XmlRelaxNGStatesPtr = (*ctxt).states;
 
-                let nstate: XmlRelaxNGValidStatePtr = xml_relaxng_new_valid_state(ctxt, node);
+                let nstate: XmlRelaxNGValidStatePtr =
+                    xml_relaxng_new_valid_state(ctxt, node.as_ptr());
                 (*ctxt).state = nstate;
                 (*ctxt).states = null_mut();
 
                 tmp = xml_relaxng_validate_compiled_content(
                     ctxt,
                     (*define).cont_model,
-                    XmlNodePtr::from_raw((*(*ctxt).state).seq).unwrap(),
+                    (*(*ctxt).state)
+                        .seq
+                        .map(|seq| XmlNodePtr::try_from(seq).unwrap()),
                 );
-                let nseq: *mut XmlNode = (*(*ctxt).state).seq;
+                let nseq = (*(*ctxt).state).seq;
                 (*ctxt).state = tmpstate;
                 (*ctxt).states = tmpstates;
                 xml_relaxng_free_valid_state(ctxt, nstate);
@@ -8000,14 +8001,14 @@ unsafe fn xml_relaxng_validate_state(
                             VALID_ERR2!(
                                 ctxt,
                                 XmlRelaxNGValidErr::XmlRelaxngErrContentvalid,
-                                (*node).name
+                                node.name
                             );
                             (*ctxt).state = null_mut();
                         } else {
                             VALID_ERR2!(
                                 ctxt,
                                 XmlRelaxNGValidErr::XmlRelaxngErrContentvalid,
-                                (*node).name
+                                node.name
                             );
                         }
                     }
@@ -8047,18 +8048,17 @@ unsafe fn xml_relaxng_validate_state(
                 }
             }
             if ret == 0 {
-                (*node).psvi = define as _;
+                node.psvi = define as _;
             }
             (*ctxt).flags = oldflags;
             (*ctxt).state = oldstate;
             if !oldstate.is_null() {
                 (*oldstate).seq = xml_relaxng_skip_ignored(
                     ctxt,
-                    (*node)
-                        .next
+                    node.next
                         .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap()),
                 )
-                .map_or(null_mut(), |node| node.as_ptr());
+                .map(|node| node.into());
             }
             if ret != 0 {
                 if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
@@ -8255,52 +8255,47 @@ unsafe fn xml_relaxng_validate_state(
             let mut list: XmlRelaxNGDefinePtr = null_mut();
             let mut states: XmlRelaxNGStatesPtr = null_mut();
 
-            node = xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw(node).unwrap())
-                .map_or(null_mut(), |node| node.as_ptr());
+            node = xml_relaxng_skip_ignored(ctxt, node);
 
             let err_nr = (*ctxt).err_tab.len();
-            if (*define).dflags & IS_TRIABLE as i16 != 0
-                && !(*define).data.is_null()
-                && !node.is_null()
-            {
-                // node.is_null() can't be optimized since IS_TRIABLE
-                // doesn't account for choice which may lead to
-                // only attributes.
-                let triage: XmlHashTablePtr = (*define).data as _;
+            if (*define).dflags & IS_TRIABLE as i16 != 0 && !(*define).data.is_null() {
+                if let Some(node) = node {
+                    // node.is_null() can't be optimized since IS_TRIABLE
+                    // doesn't account for choice which may lead to
+                    // only attributes.
+                    let triage: XmlHashTablePtr = (*define).data as _;
 
-                // Something we can optimize cleanly there is only one
-                // possible branch out !
-                if matches!(
-                    (*node).element_type(),
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
-                ) {
-                    list = xml_hash_lookup2(triage, c"#text".as_ptr() as _, null_mut()) as _;
-                } else if (*node).element_type() == XmlElementType::XmlElementNode {
-                    if let Some(ns) = (*node).ns {
-                        list = xml_hash_lookup2(triage, (*node).name, ns.href) as _;
-                        if list.is_null() {
-                            list = xml_hash_lookup2(triage, c"#any".as_ptr() as _, ns.href) as _;
+                    // Something we can optimize cleanly there is only one
+                    // possible branch out !
+                    if matches!(
+                        node.element_type(),
+                        XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+                    ) {
+                        list = xml_hash_lookup2(triage, c"#text".as_ptr() as _, null_mut()) as _;
+                    } else if node.element_type() == XmlElementType::XmlElementNode {
+                        if let Some(ns) = node.ns {
+                            list = xml_hash_lookup2(triage, node.name, ns.href) as _;
+                            if list.is_null() {
+                                list =
+                                    xml_hash_lookup2(triage, c"#any".as_ptr() as _, ns.href) as _;
+                            }
+                        } else {
+                            list = xml_hash_lookup2(triage, node.name, null_mut()) as _;
                         }
-                    } else {
-                        list = xml_hash_lookup2(triage, (*node).name, null_mut()) as _;
+                        if list.is_null() {
+                            list = xml_hash_lookup2(triage, c"#any".as_ptr() as _, null_mut()) as _;
+                        }
                     }
                     if list.is_null() {
-                        list = xml_hash_lookup2(triage, c"#any".as_ptr() as _, null_mut()) as _;
+                        ret = -1;
+                        VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrElemwrong, node.name);
+                        break 'to_break;
                     }
-                }
-                if list.is_null() {
-                    ret = -1;
-                    VALID_ERR2!(
-                        ctxt,
-                        XmlRelaxNGValidErr::XmlRelaxngErrElemwrong,
-                        (*node).name
-                    );
+                    ret = xml_relaxng_validate_definition(ctxt, list);
+                    // Is This correct ??????
+                    // if ret == 0 {}
                     break 'to_break;
                 }
-                ret = xml_relaxng_validate_definition(ctxt, list);
-                // Is This correct ??????
-                // if ret == 0 {}
-                break 'to_break;
             }
             list = (*define).content;
             oldflags = (*ctxt).flags;
@@ -8362,27 +8357,27 @@ unsafe fn xml_relaxng_validate_state(
             ret = xml_relaxng_validate_definition(ctxt, (*define).content);
         }
         XmlRelaxNGType::Datatype => 'to_break: {
-            let mut child: *mut XmlNode;
             let mut content: *mut XmlChar = null_mut();
-
-            child = node;
-            while !child.is_null() {
-                if (*child).element_type() == XmlElementType::XmlElementNode {
+            let mut child = node;
+            while let Some(cur_node) = child {
+                if cur_node.element_type() == XmlElementType::XmlElementNode {
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrDataelem,
-                        (*node).parent().unwrap().name
+                        node.unwrap().parent().unwrap().name
                     );
                     ret = -1;
                     break;
                 } else if matches!(
-                    (*child).element_type(),
+                    cur_node.element_type(),
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
-                    content = xml_strcat(content, (*child).content);
+                    content = xml_strcat(content, cur_node.content);
                 }
                 // TODO: handle entities ...
-                child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+                child = cur_node
+                    .next
+                    .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
             }
             if ret == -1 {
                 if !content.is_null() {
@@ -8398,12 +8393,7 @@ unsafe fn xml_relaxng_validate_state(
                     break 'to_break;
                 }
             }
-            ret = xml_relaxng_validate_datatype(
-                ctxt,
-                content,
-                define,
-                XmlGenericNodePtr::from_raw((*(*ctxt).state).seq),
-            );
+            ret = xml_relaxng_validate_datatype(ctxt, content, define, (*(*ctxt).state).seq);
             if ret == -1 {
                 VALID_ERR2!(
                     ctxt,
@@ -8411,7 +8401,7 @@ unsafe fn xml_relaxng_validate_state(
                     (*define).name
                 );
             } else if ret == 0 {
-                (*(*ctxt).state).seq = null_mut();
+                (*(*ctxt).state).seq = None;
             }
             if !content.is_null() {
                 xml_free(content as _);
@@ -8419,26 +8409,26 @@ unsafe fn xml_relaxng_validate_state(
         }
         XmlRelaxNGType::Value => 'to_break: {
             let mut content: *mut XmlChar = null_mut();
-            let mut child: *mut XmlNode;
-
-            child = node;
-            while !child.is_null() {
-                if (*child).element_type() == XmlElementType::XmlElementNode {
+            let mut child = node;
+            while let Some(cur_node) = child {
+                if cur_node.element_type() == XmlElementType::XmlElementNode {
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrValelem,
-                        (*node).parent().unwrap().name
+                        node.unwrap().parent().unwrap().name
                     );
                     ret = -1;
                     break;
                 } else if matches!(
-                    (*child).element_type(),
+                    cur_node.element_type(),
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
-                    content = xml_strcat(content, (*child).content);
+                    content = xml_strcat(content, cur_node.content);
                 }
                 // TODO: handle entities ...
-                child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+                child = cur_node
+                    .next
+                    .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
             }
             if ret == -1 {
                 if !content.is_null() {
@@ -8461,37 +8451,35 @@ unsafe fn xml_relaxng_validate_state(
             if ret == -1 {
                 VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrValue, (*define).name);
             } else if ret == 0 {
-                (*(*ctxt).state).seq = null_mut();
+                (*(*ctxt).state).seq = None;
             }
             if !content.is_null() {
                 xml_free(content as _);
             }
         }
         XmlRelaxNGType::List => 'to_break: {
-            let mut content: *mut XmlChar;
-            let mut child: *mut XmlNode;
-
             // Make sure it's only text nodes
-
-            content = null_mut();
-            child = node;
-            while !child.is_null() {
-                if (*child).element_type() == XmlElementType::XmlElementNode {
+            let mut content = null_mut();
+            let mut child = node;
+            while let Some(cur_node) = child {
+                if cur_node.element_type() == XmlElementType::XmlElementNode {
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrListelem,
-                        (*node).parent().unwrap().name
+                        node.unwrap().parent().unwrap().name
                     );
                     ret = -1;
                     break;
                 } else if matches!(
-                    (*child).element_type(),
+                    cur_node.element_type(),
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
-                    content = xml_strcat(content, (*child).content);
+                    content = xml_strcat(content, cur_node.content);
                 }
                 // TODO: handle entities ...
-                child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+                child = cur_node
+                    .next
+                    .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
             }
             if ret == -1 {
                 if !content.is_null() {
@@ -8517,8 +8505,11 @@ unsafe fn xml_relaxng_validate_state(
             (*(*ctxt).state).endvalue = oldendvalue;
             if ret == -1 {
                 VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrList);
-            } else if ret == 0 && !node.is_null() {
-                (*(*ctxt).state).seq = (*node).next.map_or(null_mut(), |n| n.as_ptr());
+            } else if let Some(node) = node.filter(|_| ret == 0) {
+                (*(*ctxt).state).seq = node
+                    .next
+                    .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap())
+                    .map(|node| node.into());
             }
             if !content.is_null() {
                 xml_free(content as _);
@@ -8661,7 +8652,6 @@ unsafe fn xml_relaxng_validate_definition(
 unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     let mut ret: i32;
     let mut state: XmlRelaxNGValidStatePtr;
-    let mut node: *mut XmlNode;
 
     if ctxt.is_null() || (*ctxt).schema.is_null() {
         return -1;
@@ -8677,12 +8667,13 @@ unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDo
     state = xml_relaxng_new_valid_state(ctxt, null_mut());
     (*ctxt).state = state;
     ret = xml_relaxng_validate_definition(ctxt, (*grammar).start);
-    if !(*ctxt).state.is_null() && !(*state).seq.is_null() {
+    if !(*ctxt).state.is_null() && (*state).seq.is_some() {
         state = (*ctxt).state;
-        node = (*state).seq;
-        node = xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw(node).unwrap())
-            .map_or(null_mut(), |node| node.as_ptr());
-        if !node.is_null() && ret != -1 {
+        let node = xml_relaxng_skip_ignored(
+            ctxt,
+            (*state).seq.map(|seq| XmlNodePtr::try_from(seq).unwrap()),
+        );
+        if node.is_some() && ret != -1 {
             VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrExtradata);
             ret = -1;
         }
@@ -8690,10 +8681,11 @@ unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDo
         let mut tmp: i32 = -1;
 
         for &state in &(*(*ctxt).states).tab_state {
-            node = (*state).seq;
-            node = xml_relaxng_skip_ignored(ctxt, XmlNodePtr::from_raw(node).unwrap())
-                .map_or(null_mut(), |node| node.as_ptr());
-            if node.is_null() {
+            let node = xml_relaxng_skip_ignored(
+                ctxt,
+                (*state).seq.map(|seq| XmlNodePtr::try_from(seq).unwrap()),
+            );
+            if node.is_none() {
                 tmp = 0;
             }
             xml_relaxng_free_valid_state(ctxt, state);
@@ -8912,7 +8904,7 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
         }
     }
     if !(*ctxt).state.is_null() {
-        (*(*ctxt).state).seq = null_mut();
+        (*(*ctxt).state).seq = None;
         ret = xml_relaxng_validate_element_end(ctxt, 1);
         if ret != 0 {
             (*ctxt).pstate = -1;
@@ -8925,7 +8917,7 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
 
         for &state in &(*(*ctxt).states).tab_state {
             (*ctxt).state = state;
-            (*(*ctxt).state).seq = null_mut();
+            (*(*ctxt).state).seq = None;
 
             if xml_relaxng_validate_element_end(ctxt, 0) == 0 {
                 tmp = 0;
@@ -9004,15 +8996,12 @@ pub unsafe fn xml_relaxng_validate_full_element(
     if ctxt.is_null() || (*ctxt).pdef.is_null() {
         return -1;
     }
-    // if elem.is_null() {
-    //     return -1;
-    // }
     let state: XmlRelaxNGValidStatePtr =
         xml_relaxng_new_valid_state(ctxt, elem.parent().map_or(null_mut(), |p| p.as_ptr()));
     if state.is_null() {
         return -1;
     }
-    (*state).seq = elem.as_ptr();
+    (*state).seq = Some(elem.into());
     (*ctxt).state = state;
     (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngOk as i32;
     ret = xml_relaxng_validate_definition(ctxt, (*ctxt).pdef);
