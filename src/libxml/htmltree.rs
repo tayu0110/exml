@@ -131,126 +131,133 @@ pub unsafe fn html_new_doc_no_dtd(
 /// Returns the current encoding as flagged in the HTML source
 #[doc(alias = "htmlGetMetaEncoding")]
 pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
-    let mut cur: HtmlNodePtr;
     let mut content: *const XmlChar;
     let mut encoding: *const XmlChar;
 
     // if doc.is_null() {
     //     return None;
     // }
-    cur = doc.children.map_or(null_mut(), |c| c.as_ptr());
+    let mut cur = doc
+        .children
+        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
 
     // Search the html
     'goto_found_meta: {
         'goto_found_head: {
-            while !cur.is_null() {
-                if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                    && !(*cur).name.is_null()
-                {
-                    if xml_str_equal((*cur).name, c"html".as_ptr() as _) {
-                        break;
-                    }
-                    if xml_str_equal((*cur).name, c"head".as_ptr() as _) {
-                        break 'goto_found_head;
-                    }
-                    if xml_str_equal((*cur).name, c"meta".as_ptr() as _) {
-                        break 'goto_found_meta;
+            while let Some(now) = cur {
+                if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                    let cur = HtmlNodePtr::try_from(now).unwrap();
+                    if !cur.name.is_null() {
+                        if xml_str_equal(cur.name, c"html".as_ptr() as _) {
+                            break;
+                        }
+                        if xml_str_equal(cur.name, c"head".as_ptr() as _) {
+                            break 'goto_found_head;
+                        }
+                        if xml_str_equal(cur.name, c"meta".as_ptr() as _) {
+                            break 'goto_found_meta;
+                        }
                     }
                 }
-                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+                cur = now
+                    .next()
+                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
             }
-            if cur.is_null() {
-                return None;
-            }
-            cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+            cur = cur?
+                .children()
+                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
             // Search the head
-            while !cur.is_null() {
-                if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                    && !(*cur).name.is_null()
-                {
-                    if xml_str_equal((*cur).name, c"head".as_ptr() as _) {
-                        break;
-                    }
-                    if xml_str_equal((*cur).name, c"meta".as_ptr() as _) {
-                        break 'goto_found_meta;
+            while let Some(now) = cur {
+                if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                    let now = HtmlNodePtr::try_from(now).unwrap();
+                    if !now.name.is_null() {
+                        if xml_str_equal(now.name, c"head".as_ptr() as _) {
+                            break;
+                        }
+                        if xml_str_equal(now.name, c"meta".as_ptr() as _) {
+                            break 'goto_found_meta;
+                        }
                     }
                 }
-                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-            }
-            if cur.is_null() {
-                return None;
+                cur = now
+                    .next()
+                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
             }
         }
         // found_head:
-        cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+        cur = cur?
+            .children()
+            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
     }
 
     // Search the meta elements
 
     // found_meta:
-    while !cur.is_null() {
-        if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-            && !(*cur).name.is_null())
-            && xml_str_equal((*cur).name, c"meta".as_ptr() as _)
-        {
-            let mut attr = (*cur).properties;
-            let mut http = 0;
-            let mut value: *const XmlChar;
+    while let Some(cur_node) = cur {
+        if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+            let cur_node = HtmlNodePtr::try_from(cur_node).unwrap();
+            if !cur_node.name.is_null() && cur_node.name().as_deref() == Some("meta") {
+                let mut attr = cur_node.properties;
+                let mut http = 0;
+                let mut value: *const XmlChar;
 
-            content = null_mut();
-            while let Some(now) = attr {
-                if let Some(children) = now.children.filter(|c| {
-                    matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none()
-                }) {
-                    value = children.content;
-                    if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
-                        && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
-                    {
-                        http = 1;
-                    } else if !value.is_null()
-                        && xml_strcasecmp(now.name, c"content".as_ptr() as _) == 0
-                    {
-                        content = value;
-                    }
-                    if http != 0 && !content.is_null() {
-                        // goto found_content;
-                        encoding = xml_strstr(content, c"charset=".as_ptr() as _);
-                        if encoding.is_null() {
-                            encoding = xml_strstr(content, c"Charset=".as_ptr() as _);
+                content = null_mut();
+                while let Some(now) = attr {
+                    if let Some(children) = now.children.filter(|c| {
+                        matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none()
+                    }) {
+                        value = children.content;
+                        if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
+                            && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
+                        {
+                            http = 1;
+                        } else if !value.is_null()
+                            && xml_strcasecmp(now.name, c"content".as_ptr() as _) == 0
+                        {
+                            content = value;
                         }
-                        if encoding.is_null() {
-                            encoding = xml_strstr(content, c"CHARSET=".as_ptr() as _);
-                        }
-                        if !encoding.is_null() {
-                            encoding = encoding.add(8);
-                        } else {
-                            encoding = xml_strstr(content, c"charset =".as_ptr() as _);
+                        if http != 0 && !content.is_null() {
+                            // goto found_content;
+                            encoding = xml_strstr(content, c"charset=".as_ptr() as _);
                             if encoding.is_null() {
-                                encoding = xml_strstr(content, c"Charset =".as_ptr() as _);
+                                encoding = xml_strstr(content, c"Charset=".as_ptr() as _);
                             }
                             if encoding.is_null() {
-                                encoding = xml_strstr(content, c"CHARSET =".as_ptr() as _);
+                                encoding = xml_strstr(content, c"CHARSET=".as_ptr() as _);
                             }
                             if !encoding.is_null() {
-                                encoding = encoding.add(9);
+                                encoding = encoding.add(8);
+                            } else {
+                                encoding = xml_strstr(content, c"charset =".as_ptr() as _);
+                                if encoding.is_null() {
+                                    encoding = xml_strstr(content, c"Charset =".as_ptr() as _);
+                                }
+                                if encoding.is_null() {
+                                    encoding = xml_strstr(content, c"CHARSET =".as_ptr() as _);
+                                }
+                                if !encoding.is_null() {
+                                    encoding = encoding.add(9);
+                                }
                             }
-                        }
-                        if !encoding.is_null() {
-                            while *encoding == b' ' || *encoding == b'\t' {
-                                encoding = encoding.add(1);
+                            if !encoding.is_null() {
+                                while *encoding == b' ' || *encoding == b'\t' {
+                                    encoding = encoding.add(1);
+                                }
                             }
+                            return Some(
+                                CStr::from_ptr(encoding as *const i8)
+                                    .to_string_lossy()
+                                    .into_owned(),
+                            );
                         }
-                        return Some(
-                            CStr::from_ptr(encoding as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                        );
                     }
+                    attr = now.next;
                 }
-                attr = now.next;
             }
         }
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+        cur = cur_node
+            .next()
+            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
     }
     None
 }
@@ -263,14 +270,6 @@ pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "htmlSetMetaEncoding")]
 pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> i32 {
-    let mut cur: HtmlNodePtr;
-    let mut meta: HtmlNodePtr = null_mut();
-    let mut head: HtmlNodePtr = null_mut();
-
-    // if doc.is_null() {
-    //     return -1;
-    // }
-
     // html isn't a real encoding it's just libxml2 way to get entities
     if encoding.as_ref().map(|e| e.to_ascii_lowercase()).as_deref() == Some("html") {
         return -1;
@@ -282,158 +281,197 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
         String::new()
     };
 
-    cur = doc.children.map_or(null_mut(), |c| c.as_ptr());
+    let mut cur = doc
+        .children
+        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
 
     let mut found_head = false;
     let mut found_meta = false;
     // Search the html
-    while !cur.is_null() {
-        if matches!((*cur).element_type(), XmlElementType::XmlElementNode) && !(*cur).name.is_null()
-        {
-            if xml_strcasecmp((*cur).name, c"html".as_ptr() as _) == 0 {
-                break;
-            }
-            if xml_strcasecmp((*cur).name, c"head".as_ptr() as _) == 0 {
-                // goto found_head;
-                found_head = true;
-                break;
-            }
-            if xml_strcasecmp((*cur).name, c"meta".as_ptr() as _) == 0 {
-                // goto found_meta;
-                found_meta = true;
-                break;
-            }
-        }
-
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-    }
-
-    if !found_head && !found_meta {
-        if cur.is_null() {
-            return -1;
-        }
-        cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-
-        // Search the head
-        while !cur.is_null() {
-            if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                && !(*cur).name.is_null()
-            {
-                if xml_strcasecmp((*cur).name, c"head".as_ptr() as _) == 0 {
+    while let Some(now) = cur {
+        if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+            let now = HtmlNodePtr::try_from(now).unwrap();
+            if !now.name.is_null() {
+                if xml_strcasecmp(now.name, c"html".as_ptr() as _) == 0 {
                     break;
                 }
-                if xml_strcasecmp((*cur).name, c"meta".as_ptr() as _) == 0 {
-                    head = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+                if xml_strcasecmp(now.name, c"head".as_ptr() as _) == 0 {
+                    // goto found_head;
+                    found_head = true;
+                    break;
+                }
+                if xml_strcasecmp(now.name, c"meta".as_ptr() as _) == 0 {
                     // goto found_meta;
                     found_meta = true;
+                    break;
                 }
             }
-            cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
-        if cur.is_null() {
+
+        cur = now
+            .next()
+            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+    }
+
+    let mut head = None;
+    if !found_head && !found_meta {
+        let Some(tmp) = cur else {
+            return -1;
+        };
+        cur = tmp
+            .children()
+            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+
+        // Search the head
+        while let Some(now) = cur {
+            if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                let now = HtmlNodePtr::try_from(now).unwrap();
+                if !now.name.is_null() {
+                    if xml_strcasecmp(now.name, c"head".as_ptr() as _) == 0 {
+                        break;
+                    }
+                    if xml_strcasecmp(now.name, c"meta".as_ptr() as _) == 0 {
+                        head = now
+                            .parent()
+                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                        // goto found_meta;
+                        found_meta = true;
+                    }
+                }
+            }
+            cur = now
+                .next()
+                .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        }
+        if cur.is_none() {
             return -1;
         }
     }
-
-    let create = |meta: *mut crate::tree::XmlNode,
-                  encoding: Option<&str>,
-                  head: *mut crate::tree::XmlNode,
-                  newcontent: &str,
-                  content: Option<&str>| {
-        if meta.is_null() {
-            if encoding.is_some() && !head.is_null() {
-                // Create a new Meta element with the right attributes
-                let meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
-                if let Some(mut children) = (*head).children() {
-                    children.add_prev_sibling(meta.unwrap().into());
-                } else {
-                    (*head).add_child(meta.unwrap().into());
-                }
-                xml_new_prop(
-                    meta,
-                    c"http-equiv".as_ptr() as _,
-                    c"Content-Type".as_ptr() as _,
-                );
-                let newcontent = CString::new(newcontent).unwrap();
-                xml_new_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
-            }
-        } else {
-            // remove the meta tag if NULL is passed
-            if encoding.is_none() {
-                (*meta).unlink();
-                xml_free_node(meta);
-            }
-            // change the document only if there is a real encoding change
-            else if content.map_or(true, |c| {
-                !c.to_ascii_lowercase()
-                    .contains(&encoding.unwrap().to_ascii_lowercase())
-            }) {
-                (*meta).set_prop("content", Some(newcontent));
-            }
-        }
-
-        0
-    };
 
     // found_head:
 
     if !found_meta {
         head = cur;
-        assert!(!cur.is_null());
-        let Some(children) = (*cur).children() else {
+        assert!(cur.is_some());
+        let Some(children) = cur
+            .unwrap()
+            .children()
+            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+        else {
             // goto create;
-            return create(meta, encoding, head, &newcontent, None);
+            if encoding.is_some() {
+                if let Some(mut head) = head {
+                    // Create a new Meta element with the right attributes
+                    let meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
+                    if let Some(children) = head
+                        .children()
+                        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+                    {
+                        children.add_prev_sibling(meta.unwrap().into());
+                    } else {
+                        head.add_child(meta.unwrap().into());
+                    }
+                    xml_new_prop(
+                        meta,
+                        c"http-equiv".as_ptr() as _,
+                        c"Content-Type".as_ptr() as _,
+                    );
+                    let newcontent = CString::new(newcontent).unwrap();
+                    xml_new_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
+                }
+            }
+            return 0;
         };
-        cur = children.as_ptr();
+        cur = Some(children);
     }
 
     // found_meta:
     // Search and update all the remaining the meta elements carrying
     // encoding information
+    let mut meta = None;
     let mut content = None;
-    while !cur.is_null() {
-        if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-            && !(*cur).name.is_null())
-            && (xml_strcasecmp((*cur).name, c"meta".as_ptr() as _) == 0)
-        {
-            let mut attr = (*cur).properties;
-            let mut http = 0;
-            let mut value: *const XmlChar;
+    while let Some(cur_node) = cur {
+        if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+            let cur_node = HtmlNodePtr::try_from(cur_node).unwrap();
+            if cur_node
+                .name()
+                .as_deref()
+                .map_or(false, |name| name.eq_ignore_ascii_case("meta"))
+            {
+                let mut attr = cur_node.properties;
+                let mut http = 0;
+                let mut value: *const XmlChar;
 
-            content = None;
-            while let Some(now) = attr {
-                if let Some(children) = now.children.filter(|c| {
-                    matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none()
-                }) {
-                    value = children.content;
-                    if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
-                        && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
-                    {
-                        http = 1;
-                    } else if !value.is_null()
-                        && xml_strcasecmp(now.name, c"content".as_ptr() as _) == 0
-                    {
-                        content = Some(
-                            CStr::from_ptr(value as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                        );
+                content = None;
+                while let Some(now) = attr {
+                    if let Some(children) = now.children.filter(|c| {
+                        matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none()
+                    }) {
+                        value = children.content;
+                        if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
+                            && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
+                        {
+                            http = 1;
+                        } else if !value.is_null()
+                            && xml_strcasecmp(now.name, c"content".as_ptr() as _) == 0
+                        {
+                            content = Some(
+                                CStr::from_ptr(value as *const i8)
+                                    .to_string_lossy()
+                                    .into_owned(),
+                            );
+                        }
+                        if http != 0 && content.is_some() {
+                            break;
+                        }
                     }
-                    if http != 0 && content.is_some() {
-                        break;
-                    }
+                    attr = now.next;
                 }
-                attr = now.next;
-            }
-            if http != 0 && content.is_some() {
-                meta = cur;
-                break;
+                if http != 0 && content.is_some() {
+                    meta = cur;
+                    break;
+                }
             }
         }
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+        cur = cur_node
+            .next()
+            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
     }
     // create:
-    create(meta, encoding, head, &newcontent, content.as_deref())
+    if let Some(mut meta) = meta {
+        // remove the meta tag if NULL is passed
+        if encoding.is_none() {
+            meta.unlink();
+            xml_free_node(meta.as_ptr());
+        }
+        // change the document only if there is a real encoding change
+        else if content.map_or(true, |c| {
+            !c.to_ascii_lowercase()
+                .contains(&encoding.unwrap().to_ascii_lowercase())
+        }) {
+            meta.set_prop("content", Some(&newcontent));
+        }
+    } else if let Some(mut head) = head.filter(|_| encoding.is_some()) {
+        // Create a new Meta element with the right attributes
+        let meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
+        if let Some(children) = head
+            .children()
+            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+        {
+            children.add_prev_sibling(meta.unwrap().into());
+        } else {
+            head.add_child(meta.unwrap().into());
+        }
+        xml_new_prop(
+            meta,
+            c"http-equiv".as_ptr() as _,
+            c"Content-Type".as_ptr() as _,
+        );
+        let newcontent = CString::new(newcontent).unwrap();
+        xml_new_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
+    }
+
+    0
 }
 
 /// Dump an HTML document in memory and return the xmlChar * and it's size.  
@@ -681,25 +719,16 @@ unsafe fn html_save_err_memory(extra: &str) {
 unsafe fn html_buf_node_dump_format<'a>(
     buf: &mut (impl Write + 'a),
     doc: Option<XmlDocPtr>,
-    cur: *mut XmlNode,
+    cur: HtmlNodePtr,
     format: i32,
 ) -> usize {
     use crate::io::XmlOutputBuffer;
 
-    if cur.is_null() {
-        return usize::MAX;
-    }
     let Some(mut outbuf) = XmlOutputBuffer::from_writer(buf, None) else {
         return usize::MAX;
     };
 
-    html_node_dump_format_output(
-        &mut outbuf,
-        doc,
-        XmlGenericNodePtr::from_raw(cur),
-        None,
-        format,
-    );
+    html_node_dump_format_output(&mut outbuf, doc, Some(cur.into()), None, format);
     // Is this correct ????
     outbuf.written as usize
 }
@@ -712,13 +741,9 @@ unsafe fn html_buf_node_dump_format<'a>(
 pub unsafe fn html_node_dump<'a>(
     buf: &mut (impl Write + 'a),
     doc: Option<XmlDocPtr>,
-    cur: *mut XmlNode,
+    cur: HtmlNodePtr,
 ) -> i32 {
     use crate::libxml::parser::xml_init_parser;
-
-    if cur.is_null() {
-        return -1;
-    }
 
     xml_init_parser();
 
@@ -1000,10 +1025,8 @@ pub unsafe fn html_node_dump_format_output(
             parser_internals::{XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
         },
         save::xml_ns_list_dump_output,
-        tree::{xml_encode_entities_reentrant, NodePtr, XmlNodePtr},
+        tree::{xml_encode_entities_reentrant, XmlNodePtr},
     };
-
-    let mut parent: *mut XmlNode;
 
     xml_init_parser();
 
@@ -1012,7 +1035,9 @@ pub unsafe fn html_node_dump_format_output(
     };
 
     let root = cur;
-    parent = cur.parent().map_or(null_mut(), |p| p.as_ptr());
+    let mut parent = cur
+        .parent()
+        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
     'main: loop {
         match cur.element_type() {
             XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode => {
@@ -1022,8 +1047,12 @@ pub unsafe fn html_node_dump_format_output(
                 }
                 if let Some(children) = cur.children() {
                     // Always validate cur.parent when descending.
-                    if cur.parent() == NodePtr::from_ptr(parent) {
-                        parent = doc.as_ptr() as *mut XmlNode;
+                    if cur
+                        .parent()
+                        .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+                        == parent
+                    {
+                        parent = Some(doc.into());
                         cur = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
                         continue;
                     }
@@ -1036,7 +1065,12 @@ pub unsafe fn html_node_dump_format_output(
                 let node = XmlNodePtr::try_from(cur).unwrap();
                 // Some users like lxml are known to pass nodes with a corrupted
                 // tree structure. Fall back to a recursive call to handle this case.
-                if node.parent() != NodePtr::from_ptr(parent) && node.children().is_some() {
+                if node
+                    .parent()
+                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+                    != parent
+                    && node.children().is_some()
+                {
                     html_node_dump_format_output(buf, doc, Some(cur), _encoding, format);
                     break 'to_break;
                 }
@@ -1081,7 +1115,7 @@ pub unsafe fn html_node_dump_format_output(
                         // p, pre, param
                         buf.write_str("\n");
                     }
-                    parent = node.as_ptr();
+                    parent = Some(node.into());
                     cur = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
                     continue 'main;
                 } else if info.map_or(false, |info| {
@@ -1099,15 +1133,17 @@ pub unsafe fn html_node_dump_format_output(
                     buf.write_str(">");
                 }
 
-                if (format != 0
+                if format != 0
                     && node.next.is_some()
-                    && info.map_or(false, |info| info.isinline == 0))
-                    && (!matches!(
+                    && info.map_or(false, |info| info.isinline == 0)
+                    && !matches!(
                         node.next.unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
-                    ) && !parent.is_null()
-                        && !(*parent).name.is_null()
-                        && *(*parent).name.add(0) != b'p')
+                    )
+                    && parent
+                        .as_deref()
+                        .and_then(|parent| parent.name())
+                        .map_or(false, |name| !name.starts_with('p'))
                 {
                     buf.write_str("\n");
                 }
@@ -1124,9 +1160,10 @@ pub unsafe fn html_node_dump_format_output(
                 }
                 if (node.name == XML_STRING_TEXT.as_ptr() as _
                     || node.name != XML_STRING_TEXT_NOENC.as_ptr() as _)
-                    && (parent.is_null()
-                        || (xml_strcasecmp((*parent).name, c"script".as_ptr() as _) != 0
-                            && xml_strcasecmp((*parent).name, c"style".as_ptr() as _) != 0))
+                    && parent.map_or(true, |parent| {
+                        !parent.name().unwrap().eq_ignore_ascii_case("script")
+                            && !parent.name().unwrap().eq_ignore_ascii_case("style")
+                    })
                 {
                     let buffer: *mut XmlChar = xml_encode_entities_reentrant(doc, node.content);
                     if !buffer.is_null() {
@@ -1187,9 +1224,11 @@ pub unsafe fn html_node_dump_format_output(
                 break;
             }
 
-            cur = XmlGenericNodePtr::from_raw(parent).unwrap();
+            cur = parent.unwrap();
             // cur.parent was validated when descending.
-            parent = cur.parent().map_or(null_mut(), |p| p.as_ptr());
+            parent = cur
+                .parent()
+                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
 
             if matches!(
                 cur.element_type(),
@@ -1228,15 +1267,17 @@ pub unsafe fn html_node_dump_format_output(
                 buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
                 buf.write_str(">");
 
-                if (format != 0
+                if format != 0
                     && info.map_or(false, |info| info.isinline == 0)
-                    && node.next.is_some())
-                    && (!matches!(
+                    && node.next.is_some()
+                    && !matches!(
                         node.next.unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
-                    ) && !parent.is_null()
-                        && !(*parent).name.is_null()
-                        && *(*parent).name.add(0) != b'p')
+                    )
+                    && parent
+                        .as_deref()
+                        .and_then(|parent| parent.name())
+                        .map_or(false, |name| !name.starts_with('p'))
                 {
                     buf.write_str("\n");
                 }
@@ -1282,10 +1323,10 @@ pub unsafe fn html_doc_content_dump_format_output(
 pub unsafe fn html_node_dump_output(
     buf: &mut XmlOutputBuffer,
     doc: Option<XmlDocPtr>,
-    cur: *mut XmlNode,
+    cur: XmlGenericNodePtr,
     _encoding: *const c_char,
 ) {
-    html_node_dump_format_output(buf, doc, XmlGenericNodePtr::from_raw(cur), None, 1);
+    html_node_dump_format_output(buf, doc, Some(cur), None, 1);
 }
 
 /// These are the HTML attributes which will be output

@@ -472,7 +472,12 @@ impl XmlNode {
         {
             #[cfg(feature = "html")]
             {
-                html_node_dump_output(&mut outbuf, Some(doc), self, null_mut());
+                html_node_dump_output(
+                    &mut outbuf,
+                    Some(doc),
+                    XmlGenericNodePtr::from_raw(self).unwrap(),
+                    null_mut(),
+                );
             }
             #[cfg(not(feature = "html"))]
             {
@@ -581,7 +586,7 @@ impl XmlGenericNodePtr {
         {
             #[cfg(feature = "html")]
             {
-                html_node_dump_output(&mut outbuf, Some(doc), self.as_ptr(), null_mut());
+                html_node_dump_output(&mut outbuf, Some(doc), self, null_mut());
             }
             #[cfg(not(feature = "html"))]
             {

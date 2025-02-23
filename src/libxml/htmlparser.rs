@@ -63,7 +63,7 @@ use crate::{
     },
     tree::{
         xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType,
-        XmlGenericNodePtr, XmlNode,
+        XmlGenericNodePtr, XmlNodePtr,
     },
     uri::canonic_path,
 };
@@ -85,7 +85,7 @@ pub type HtmlSAXHandlerPtr = XmlSAXHandlerPtr;
 pub type HtmlParserInput = XmlParserInput;
 pub type HtmlParserInputPtr = XmlParserInputPtr;
 pub type HtmlDocPtr = XmlDocPtr;
-pub type HtmlNodePtr = *mut XmlNode;
+pub type HtmlNodePtr = XmlNodePtr;
 
 pub type HtmlElemDescPtr = *mut HtmlElemDesc;
 // Internal description of an HTML element, representing HTML 4.01
@@ -4265,15 +4265,19 @@ pub unsafe fn html_entity_value_lookup(value: u32) -> *const HtmlEntityDesc {
 /// Returns 1 if autoclosed, 0 otherwise
 #[doc(alias = "htmlIsAutoClosed")]
 pub unsafe fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> i32 {
-    if elem.is_null() {
-        return 1;
-    }
-    let mut child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
-    while !child.is_null() {
-        if html_auto_close_tag(doc, (*elem).name, child) != 0 {
+    // if elem.is_null() {
+    //     return 1;
+    // }
+    let mut child = elem
+        .children()
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    while let Some(now) = child {
+        if html_auto_close_tag(doc, elem.name, now) != 0 {
             return 1;
         }
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        child = now
+            .next()
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
     0
 }
@@ -5328,14 +5332,14 @@ pub unsafe fn html_auto_close_tag(
     name: *const XmlChar,
     elem: HtmlNodePtr,
 ) -> i32 {
-    if elem.is_null() {
-        return 1;
-    }
-    if xml_str_equal(name, (*elem).name) {
+    // if elem.is_null() {
+    //     return 1;
+    // }
+    if xml_str_equal(name, elem.name) {
         return 0;
     }
     if html_check_auto_close(
-        (*elem).name,
+        elem.name,
         (!name.is_null())
             .then(|| CStr::from_ptr(name as *const i8).to_string_lossy())
             .as_deref(),
@@ -5343,12 +5347,16 @@ pub unsafe fn html_auto_close_tag(
     {
         return 1;
     }
-    let mut child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
-    while !child.is_null() {
-        if html_auto_close_tag(_doc, name, child) != 0 {
+    let mut child = elem
+        .children()
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    while let Some(now) = child {
+        if html_auto_close_tag(_doc, name, now) != 0 {
             return 1;
         }
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        child = now
+            .next()
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
     0
 }
@@ -11225,9 +11233,9 @@ pub fn html_element_status_here(parent: &HtmlElemDesc, elt: &HtmlElemDesc) -> Ht
 /// - For other nodes, htmlStatus::HTML_NA (no checks performed)
 #[doc(alias = "htmlNodeStatus")]
 pub unsafe fn html_node_status(node: HtmlNodePtr, legacy: i32) -> HtmlStatus {
-    if node.is_null() {
-        return HtmlStatus::HtmlInvalid;
-    }
+    // if node.is_null() {
+    //     return HtmlStatus::HtmlInvalid;
+    // }
 
     match (*node).element_type() {
         XmlElementType::XmlElementNode => {
@@ -11250,7 +11258,7 @@ pub unsafe fn html_node_status(node: HtmlNodePtr, legacy: i32) -> HtmlStatus {
         }
         XmlElementType::XmlAttributeNode => {
             html_tag_lookup(&(*node).parent().unwrap().name().unwrap())
-                .map(|desc| html_attr_allowed(desc, (*node).name, legacy))
+                .map(|desc| html_attr_allowed(desc, node.name, legacy))
                 .unwrap_or(HtmlStatus::HtmlInvalid)
         }
         _ => HtmlStatus::HtmlNa,
@@ -11568,38 +11576,6 @@ mod tests {
                 );
             }
             assert!(leaks == 0, "{leaks} Leaks are found in htmlNewParserCtxt()");
-        }
-    }
-
-    #[test]
-    fn test_html_node_status() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_CONST_HTML_NODE_PTR {
-                for n_legacy in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let node = gen_const_html_node_ptr(n_node, 0);
-                    let legacy = gen_int(n_legacy, 1);
-
-                    let ret_val = html_node_status(node as HtmlNodePtr, legacy);
-                    desret_html_status(ret_val);
-                    des_const_html_node_ptr(n_node, node as HtmlNodePtr, 0);
-                    des_int(n_legacy, legacy, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlNodeStatus",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_node);
-                        eprintln!(" {}", n_legacy);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlNodeStatus()");
         }
     }
 

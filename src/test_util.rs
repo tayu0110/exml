@@ -1300,11 +1300,6 @@ pub(crate) fn des_int_ptr(_no: i32, _val: *mut i32, _nr: i32) {}
 pub(crate) fn des_const_unsigned_char_ptr(_no: i32, _val: *const u8, _nr: i32) {}
 
 #[cfg(feature = "html")]
-pub(crate) fn gen_const_html_node_ptr(_no: i32, _nr: i32) -> HtmlNodePtr {
-    null_mut()
-}
-
-#[cfg(feature = "html")]
 pub(crate) fn des_const_html_node_ptr(_no: i32, _val: HtmlNodePtr, _nr: i32) {}
 
 #[cfg(feature = "html")]
@@ -1337,10 +1332,6 @@ pub(crate) unsafe fn desret_html_doc_ptr(val: Option<HtmlDocPtr>) {
     }
 }
 
-#[cfg(feature = "html")]
-pub(crate) unsafe fn gen_html_node_ptr(_no: i32, _nr: i32) -> HtmlNodePtr {
-    null_mut()
-}
 #[cfg(feature = "html")]
 pub(crate) unsafe fn des_html_node_ptr(_no: i32, _val: HtmlNodePtr, _nr: i32) {}
 

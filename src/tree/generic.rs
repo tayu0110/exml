@@ -1261,6 +1261,27 @@ impl XmlGenericNodePtr {
         Some(buffer)
     }
 
+    /// Set (or reset) an attribute carried by a node.
+    ///
+    /// If `name` has a prefix, then the corresponding namespace-binding will be used,
+    /// if in scope; it is an error it there's no such ns-binding for the prefix in scope.
+    ///
+    /// Returns the attribute pointer.
+    #[doc(alias = "xmlSetProp")]
+    #[cfg(any(
+        feature = "libxml_tree",
+        feature = "xinclude",
+        feature = "schema",
+        feature = "html"
+    ))]
+    pub unsafe fn set_prop(self, name: &str, value: Option<&str>) -> Option<XmlAttrPtr> {
+        if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
+            return None;
+        }
+        let mut node = XmlNodePtr::try_from(self).unwrap();
+        node.set_prop(name, value)
+    }
+
     /// update all nodes under the tree to point to the right document
     #[doc(alias = "xmlSetTreeDoc")]
     pub unsafe fn set_doc(mut self, doc: Option<XmlDocPtr>) {
@@ -1466,6 +1487,101 @@ impl XmlGenericNodePtr {
             parent.set_last(NodePtr::from_ptr(elem.as_ptr()));
         }
 
+        Some(elem)
+    }
+
+    /// Add a new node `elem` as the previous sibling of `self`
+    /// merging adjacent TEXT nodes (`elem` may be freed)  
+    /// If the new node was already inserted in a document it is
+    /// first unlinked from its existing context.  
+    /// If the new node is ATTRIBUTE, it is added into properties instead of children.  
+    /// If there is an attribute with equal name, it is first destroyed.
+    ///
+    /// See the note regarding namespaces in xmlAddChild.
+    ///
+    /// Returns the new node or null_mut() in case of error.
+    #[doc(alias = "xmlAddPrevSibling")]
+    #[cfg(any(
+        feature = "libxml_tree",
+        feature = "html",
+        feature = "schema",
+        feature = "xinclude"
+    ))]
+    pub unsafe fn add_prev_sibling(
+        mut self,
+        mut elem: XmlGenericNodePtr,
+    ) -> Option<XmlGenericNodePtr> {
+        use crate::libxml::{
+            globals::xml_free,
+            xmlstring::{xml_strcat, xml_strdup},
+        };
+
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
+        if elem.element_type() == XmlElementType::XmlNamespaceDecl {
+            return None;
+        }
+
+        if self == elem {
+            return None;
+        }
+
+        elem.unlink();
+
+        if matches!(elem.element_type(), XmlElementType::XmlTextNode) {
+            let elem = XmlNodePtr::try_from(elem).unwrap();
+            if matches!(self.element_type(), XmlElementType::XmlTextNode) {
+                let mut node = XmlNodePtr::try_from(self).unwrap();
+                let mut tmp = xml_strdup(elem.content);
+                tmp = xml_strcat(tmp, node.content);
+                node.set_content(tmp);
+                xml_free(tmp as _);
+                xml_free_node(elem.as_ptr());
+                return Some(self);
+            }
+            if let Some(mut prev) = self
+                .prev()
+                .filter(|p| {
+                    matches!(p.element_type(), XmlElementType::XmlTextNode)
+                        && self.name() == p.name()
+                })
+                .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
+            {
+                prev.add_content(elem.content);
+                xml_free_node(elem.as_ptr());
+                return Some(prev);
+            }
+        } else if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {
+            return Some(
+                add_prop_sibling(
+                    self.prev()
+                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                        .map(|p| XmlAttrPtr::try_from(p).unwrap()),
+                    XmlAttrPtr::try_from(self).unwrap(),
+                    XmlAttrPtr::try_from(elem).unwrap(),
+                )
+                .into(),
+            );
+        }
+
+        if elem.document() != self.document() {
+            elem.set_doc(self.document());
+        }
+        elem.set_parent(self.parent());
+        elem.set_prev(self.prev());
+        self.set_prev(NodePtr::from_ptr(elem.as_ptr()));
+        elem.set_next(NodePtr::from_ptr(self.as_ptr()));
+        if let Some(mut prev) = elem.prev() {
+            prev.set_next(NodePtr::from_ptr(elem.as_ptr()));
+        }
+        if let Some(mut parent) = elem
+            .parent()
+            .filter(|p| p.children() == elem.next())
+            .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+        {
+            parent.set_children(NodePtr::from_ptr(elem.as_ptr()));
+        }
         Some(elem)
     }
 
