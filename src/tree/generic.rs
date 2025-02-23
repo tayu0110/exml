@@ -1001,6 +1001,266 @@ impl XmlGenericNodePtr {
         self.get_line_no_internal(0)
     }
 
+    /// Build a structure based Path for the given node
+    ///
+    /// Returns the new path or `None` in case of error.  
+    #[doc(alias = "xmlGetNodePath")]
+    #[cfg(feature = "libxml_tree")]
+    pub unsafe fn get_node_path(self) -> Option<String> {
+        let mut occur: i32;
+        let mut generic: i32;
+
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
+
+        let mut buffer = String::with_capacity(500);
+        let mut buf = String::with_capacity(500);
+        let mut cur = Some(self);
+        let mut sep: &str;
+        while let Some(current) = cur {
+            let mut name: Cow<'_, str> = "".into();
+            occur = 0;
+            let next = if matches!(
+                current.element_type(),
+                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
+            ) {
+                if buffer.starts_with('/') {
+                    break;
+                }
+                sep = "/";
+                None
+            } else if matches!(current.element_type(), XmlElementType::XmlElementNode) {
+                let current = XmlNodePtr::try_from(current).unwrap();
+                generic = 0;
+                sep = "/";
+                if let Some(ns) = current.ns {
+                    name = if let Some(prefix) = ns.prefix() {
+                        Cow::Owned(format!("{prefix}:{}", current.name().unwrap(),))
+                    } else {
+                        // We cannot express named elements in the default
+                        // namespace, so use "*".
+                        generic = 1;
+                        "*".into()
+                    };
+                } else {
+                    name = current.name().unwrap().into_owned().into();
+                }
+
+                // Thumbler index computation
+                // TODO: the occurrence test seems bogus for namespaced names
+                let mut tmp = current
+                    .prev()
+                    .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                while let Some(now) = tmp {
+                    if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                        let now = XmlNodePtr::try_from(now).unwrap();
+                        if generic != 0
+                            || (current.name() == now.name()
+                                && (now.ns == current.ns
+                                    || current
+                                        .ns
+                                        .zip(now.ns)
+                                        .map_or(false, |(c, n)| c.prefix() == n.prefix())))
+                        {
+                            occur += 1;
+                        }
+                    }
+                    tmp = now
+                        .prev()
+                        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                }
+                if occur == 0 {
+                    let mut tmp = current
+                        .next()
+                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    while let Some(now) = tmp.filter(|_| occur == 0) {
+                        if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                            let now = XmlNodePtr::try_from(now).unwrap();
+                            if generic != 0
+                                || (current.name() == now.name()
+                                    && (now.ns == current.ns
+                                        || current
+                                            .ns
+                                            .zip(now.ns)
+                                            .map_or(false, |(c, n)| c.prefix() == n.prefix())))
+                            {
+                                occur += 1;
+                            }
+                        }
+                        tmp = now
+                            .next()
+                            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    }
+                    if occur != 0 {
+                        occur = 1;
+                    }
+                } else {
+                    occur += 1;
+                }
+                current
+                    .parent()
+                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+            } else if matches!(current.element_type(), XmlElementType::XmlCommentNode) {
+                sep = "/";
+                name = "comment()".into();
+
+                // Thumbler index computation
+                let mut tmp = current
+                    .prev()
+                    .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                while let Some(now) = tmp {
+                    if matches!(now.element_type(), XmlElementType::XmlCommentNode) {
+                        occur += 1;
+                    }
+                    tmp = now
+                        .prev()
+                        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                }
+                if occur == 0 {
+                    let mut tmp = current
+                        .next()
+                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    while let Some(now) = tmp.filter(|_| occur == 0) {
+                        if matches!(now.element_type(), XmlElementType::XmlCommentNode) {
+                            occur += 1;
+                        }
+                        tmp = now
+                            .next()
+                            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    }
+                    if occur != 0 {
+                        occur = 1;
+                    }
+                } else {
+                    occur += 1;
+                }
+                current
+                    .parent()
+                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+            } else if matches!(
+                current.element_type(),
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+            ) {
+                sep = "/";
+                name = "text()".into();
+
+                // Thumbler index computation
+                let mut tmp = current
+                    .prev()
+                    .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                while let Some(now) = tmp {
+                    if matches!(
+                        now.element_type(),
+                        XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+                    ) {
+                        occur += 1;
+                    }
+                    tmp = now
+                        .prev()
+                        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                }
+                // Evaluate if this is the only text- or CDATA-section-node;
+                // if yes, then we'll get "text()".as_ptr() as _, otherwise "text()[1]".
+                if occur == 0 {
+                    let mut tmp = current
+                        .next()
+                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    while let Some(now) = tmp {
+                        if matches!(
+                            now.element_type(),
+                            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+                        ) {
+                            occur = 1;
+                            break;
+                        }
+                        tmp = now
+                            .next()
+                            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    }
+                } else {
+                    occur += 1;
+                }
+                current
+                    .parent()
+                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+            } else if matches!(current.element_type(), XmlElementType::XmlPINode) {
+                sep = "/";
+                name = Cow::Owned(format!(
+                    "processing-instruction('{}')",
+                    current.name().unwrap()
+                ));
+
+                // Thumbler index computation
+                let mut tmp = current
+                    .prev()
+                    .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                while let Some(now) = tmp {
+                    if matches!(now.element_type(), XmlElementType::XmlPINode)
+                        && current.name() == now.name()
+                    {
+                        occur += 1;
+                    }
+                    tmp = now
+                        .prev()
+                        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                }
+                if occur == 0 {
+                    let mut tmp = current
+                        .next()
+                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    while let Some(now) = tmp.filter(|_| occur == 0) {
+                        if matches!(now.element_type(), XmlElementType::XmlPINode)
+                            && current.name() == now.name()
+                        {
+                            occur += 1;
+                        }
+                        tmp = now
+                            .next()
+                            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    }
+                    if occur != 0 {
+                        occur = 1;
+                    }
+                } else {
+                    occur += 1;
+                }
+                current
+                    .parent()
+                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+            } else if matches!(current.element_type(), XmlElementType::XmlAttributeNode) {
+                let attr = XmlAttrPtr::try_from(current).unwrap();
+                sep = "/@";
+                if let Some(ns) = attr.ns {
+                    name = if let Some(prefix) = ns.prefix() {
+                        format!("{prefix}:{}", attr.name().unwrap()).into()
+                    } else {
+                        format!("{}", attr.name().unwrap()).into()
+                    };
+                } else {
+                    name = attr.name().unwrap().into_owned().into();
+                }
+                attr.parent()
+                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+            } else {
+                return None;
+            };
+
+            {
+                use std::fmt::Write as _;
+                if occur == 0 {
+                    write!(buf, "{sep}{name}{buffer}").ok();
+                } else {
+                    write!(buf, "{sep}{name}[{occur}]{buffer}").ok();
+                }
+            }
+            (buffer, buf) = (buf, buffer);
+            buf.clear();
+            cur = next;
+        }
+        Some(buffer)
+    }
+
     /// update all nodes under the tree to point to the right document
     #[doc(alias = "xmlSetTreeDoc")]
     pub unsafe fn set_doc(mut self, doc: Option<XmlDocPtr>) {

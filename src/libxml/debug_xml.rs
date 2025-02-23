@@ -38,7 +38,7 @@ use crate::{
         xml_free_node_list, xml_get_doc_entity, xml_validate_name, NodeCommon, XmlAttrPtr,
         XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtdPtr,
         XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType,
-        XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -1883,8 +1883,8 @@ pub struct XmlShellCtxt<'a> {
 pub type XmlShellCmd = unsafe fn(
     ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
-    node: *mut XmlNode,
-    node2: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
+    node2: Option<XmlGenericNodePtr>,
 ) -> i32;
 
 /// Print the xpath error to libxml default error channel
@@ -2518,16 +2518,19 @@ pub unsafe fn xml_shell_du(
 pub unsafe fn xml_shell_pwd(
     _ctxt: XmlShellCtxtPtr,
     buffer: *mut c_char,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
     use libc::snprintf;
 
-    if node.is_null() || buffer.is_null() {
+    if buffer.is_null() {
         return -1;
     }
+    let Some(node) = node else {
+        return -1;
+    };
 
-    let Some(path) = (*node).get_node_path() else {
+    let Some(path) = node.get_node_path() else {
         return -1;
     };
 
@@ -2702,8 +2705,6 @@ unsafe fn xml_shell_set_content(
     node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    let mut results: *mut XmlNode = null_mut();
-
     if ctxt.is_null() {
         return 0;
     }
@@ -2716,6 +2717,7 @@ unsafe fn xml_shell_set_content(
         return 0;
     }
 
+    let mut results = None;
     let ret = xml_parse_in_node_context(
         node,
         CStr::from_ptr(value).to_bytes().to_vec(),
@@ -2723,12 +2725,15 @@ unsafe fn xml_shell_set_content(
         &mut results,
     );
     if ret == XmlParserErrors::XmlErrOK {
-        if let Some(children) = (*node).children() {
+        if let Some(children) = node
+            .children()
+            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+        {
             xml_free_node_list(children.as_ptr());
-            (*node).set_children(None);
-            (*node).set_last(None);
+            node.set_children(None);
+            node.set_last(None);
         }
-        node.add_child_list(XmlGenericNodePtr::from_raw(results).unwrap());
+        node.add_child_list(results.unwrap());
     } else {
         writeln!((*ctxt).output, "failed to parse content");
     }
@@ -3187,13 +3192,7 @@ pub unsafe fn xml_shell<'a>(
         } else if strcmp(command.as_ptr(), c"pwd".as_ptr()) == 0 {
             let mut dir: [c_char; 500] = [0; 500];
 
-            if xml_shell_pwd(
-                ctxt,
-                dir.as_mut_ptr(),
-                (*ctxt).node.map_or(null_mut(), |node| node.as_ptr()),
-                None,
-            ) == 0
-            {
+            if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, None) == 0 {
                 let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
                 writeln!((*ctxt).output, "{dir}");
             }
@@ -3474,13 +3473,7 @@ pub unsafe fn xml_shell<'a>(
             let mut dir: [c_char; 500] = [0; 500];
 
             if arg[0] == 0 {
-                if xml_shell_pwd(
-                    ctxt,
-                    dir.as_mut_ptr(),
-                    (*ctxt).node.map_or(null_mut(), |node| node.as_ptr()),
-                    None,
-                ) == 0
-                {
+                if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, None) == 0 {
                     let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
                     writeln!((*ctxt).output, "{dir}");
                 }
@@ -3505,8 +3498,7 @@ pub unsafe fn xml_shell<'a>(
                         XmlXPathObjectType::XPathNodeset => {
                             if let Some(nodeset) = (*list).nodesetval.as_deref() {
                                 for &node in &nodeset.node_tab {
-                                    if xml_shell_pwd(ctxt, dir.as_mut_ptr(), node.as_ptr(), None)
-                                        == 0
+                                    if xml_shell_pwd(ctxt, dir.as_mut_ptr(), Some(node), None) == 0
                                     {
                                         let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
                                         writeln!((*ctxt).output, "{dir}");

@@ -2034,10 +2034,9 @@ pub unsafe fn xml_parse_in_node_context(
     node: XmlGenericNodePtr,
     data: Vec<u8>,
     mut options: i32,
-    lst: &mut *mut XmlNode,
+    lst: &mut Option<XmlGenericNodePtr>,
 ) -> XmlParserErrors {
     let ctxt: XmlParserCtxtPtr;
-    let mut cur: *mut XmlNode;
     let mut nsnr = 0;
     let ret: XmlParserErrors;
 
@@ -2193,26 +2192,31 @@ pub unsafe fn xml_parse_in_node_context(
     // Return the newly created nodeset after unlinking it from
     // the pseudo sibling.
 
-    cur = fake.next.take().map_or(null_mut(), |n| n.as_ptr());
+    let mut cur = fake
+        .next
+        .take()
+        .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
     node.set_last(NodePtr::from_ptr(fake.as_ptr()));
 
-    if !cur.is_null() {
-        (*cur).prev = None;
+    if let Some(mut cur) = cur {
+        cur.set_prev(None);
     }
 
     *lst = cur;
 
-    while !cur.is_null() {
-        (*cur).set_parent(None);
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+    while let Some(mut now) = cur {
+        now.set_parent(None);
+        cur = now
+            .next()
+            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
     }
 
     fake.unlink();
     xml_free_node(fake.as_ptr());
 
     if !matches!(ret, XmlParserErrors::XmlErrOK) {
-        xml_free_node_list(*lst);
-        *lst = null_mut();
+        xml_free_node_list(lst.map_or(null_mut(), |node| node.as_ptr()));
+        *lst = None;
     }
 
     xml_free_parser_ctxt(ctxt);
