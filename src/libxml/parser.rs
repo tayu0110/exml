@@ -49,7 +49,7 @@ use std::{
     ffi::{c_char, c_void, CStr, CString},
     io::Read,
     mem::{size_of, take},
-    ptr::{addr_of_mut, null, null_mut, NonNull},
+    ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
     str::from_utf8,
@@ -122,7 +122,7 @@ use crate::{
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
         NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr,
         XmlNodePtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
@@ -1994,7 +1994,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory(
     user_data: Option<GenericErrorContext>,
     depth: i32,
     string: *const XmlChar,
-    lst: Option<&mut *mut XmlNode>,
+    lst: Option<&mut Option<XmlGenericNodePtr>>,
 ) -> i32 {
     xml_parse_balanced_chunk_memory_recover(doc, sax, user_data, depth, string, lst, 0)
 }
@@ -2245,12 +2245,11 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     user_data: Option<GenericErrorContext>,
     depth: i32,
     string: *const XmlChar,
-    mut lst: Option<&mut *mut XmlNode>,
+    mut lst: Option<&mut Option<XmlGenericNodePtr>>,
     recover: i32,
 ) -> i32 {
     let replaced = sax.is_some();
     let mut oldsax = None;
-    let content: *mut XmlNode;
     let ret: i32;
 
     if depth > 40 {
@@ -2258,7 +2257,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     }
 
     if let Some(lst) = lst.as_mut() {
-        **lst = null_mut();
+        **lst = None;
     }
     if string.is_null() {
         return -1;
@@ -2301,12 +2300,12 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     new_doc.add_child(new_root.into());
     (*ctxt).node_push(new_root.as_ptr());
     // doc.is_null() is only supported for historic reasons
-    if let Some(doc) = doc {
+    if let Some(mut doc) = doc {
         (*ctxt).my_doc = Some(new_doc);
         new_doc.children.unwrap().doc = Some(doc);
         // Ensure that doc has XML spec namespace
-        (*(doc.as_ptr() as *mut XmlNode))
-            .search_ns_by_href(Some(doc), XML_XML_NAMESPACE.to_str().unwrap());
+        let d = doc;
+        doc.search_ns_by_href(Some(d), XML_XML_NAMESPACE.to_str().unwrap());
         new_doc.old_ns = doc.old_ns;
     } else {
         (*ctxt).my_doc = Some(new_doc);
@@ -2321,9 +2320,12 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     (*ctxt).detect_sax2();
 
     if let Some(mut doc) = doc {
-        content = doc.children.take().map_or(null_mut(), |c| c.as_ptr());
+        let content = doc
+            .children
+            .take()
+            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
         xml_parse_content(ctxt);
-        doc.children = NodePtr::from_ptr(content);
+        doc.children = NodePtr::from_ptr(content.map_or(null_mut(), |node| node.as_ptr()));
     } else {
         xml_parse_content(ctxt);
     }
@@ -2355,12 +2357,14 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
                 .children
                 .unwrap()
                 .children()
-                .map_or(null_mut(), |c| c.as_ptr());
+                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
             *lst = cur;
-            while !cur.is_null() {
-                (*cur).set_doc(doc);
-                (*cur).set_parent(None);
-                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+            while let Some(mut now) = cur {
+                now.set_doc(doc);
+                now.set_parent(None);
+                cur = now
+                    .next()
+                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
             }
             new_doc.children.unwrap().set_children(None);
         }
@@ -2393,7 +2397,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     depth: i32,
     url: Option<&str>,
     id: Option<&str>,
-    mut list: Option<&mut *mut XmlNode>,
+    mut list: Option<&mut Option<XmlGenericNodePtr>>,
 ) -> (Option<Box<XmlSAXHandler>>, XmlParserErrors) {
     let ret: XmlParserErrors;
     let mut start: [XmlChar; 4] = [0; 4];
@@ -2411,7 +2415,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     }
 
     if let Some(list) = list.as_mut() {
-        **list = null_mut();
+        **list = None;
     }
     if url.is_none() && id.is_none() {
         return (sax, XmlParserErrors::XmlErrInternalError);
@@ -2546,11 +2550,13 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
                 .children()
                 .unwrap()
                 .children()
-                .map_or(null_mut(), |c| c.as_ptr());
+                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
             *list = cur;
-            while !cur.is_null() {
-                (*cur).set_parent(None);
-                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+            while let Some(mut now) = cur {
+                now.set_parent(None);
+                cur = now
+                    .next()
+                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
             }
             new_doc.children.unwrap().set_children(None);
         }
@@ -2606,7 +2612,7 @@ pub(crate) unsafe fn xml_parse_external_entity(
     depth: i32,
     url: Option<&str>,
     id: Option<&str>,
-    lst: Option<&mut *mut XmlNode>,
+    lst: Option<&mut Option<XmlGenericNodePtr>>,
 ) -> i32 {
     xml_parse_external_entity_private(doc, null_mut(), sax, user_data, depth, url, id, lst).1 as i32
 }
@@ -2624,7 +2630,7 @@ pub unsafe fn xml_parse_ctxt_external_entity(
     ctx: XmlParserCtxtPtr,
     url: Option<&str>,
     id: Option<&str>,
-    lst: Option<&mut *mut XmlNode>,
+    lst: Option<&mut Option<XmlGenericNodePtr>>,
 ) -> i32 {
     if ctx.is_null() {
         return -1;
@@ -7181,12 +7187,11 @@ pub unsafe fn xml_new_io_input_stream(
 #[doc(alias = "xmlParserFindNodeInfo")]
 pub(crate) unsafe fn xml_parser_find_node_info(
     ctxt: XmlParserCtxtPtr,
-    node: *mut XmlNode,
+    node: XmlNodePtr,
 ) -> Option<Rc<RefCell<XmlParserNodeInfo>>> {
     if ctxt.is_null() {
         return None;
     }
-    let node = NonNull::new(node)?;
     // Find position where node should be at
     let pos = (*ctxt).node_seq.binary_search(Some(node)).ok()?;
     Some((*ctxt).node_seq[pos].clone())

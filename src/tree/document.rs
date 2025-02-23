@@ -22,7 +22,7 @@ use std::{
     any::type_name,
     borrow::Cow,
     collections::HashMap,
-    ffi::CStr,
+    ffi::{CStr, CString},
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{null_mut, NonNull},
@@ -37,17 +37,18 @@ use crate::{
     libxml::{
         globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
         parser_internals::xml_copy_char_multi_byte,
-        xmlstring::{xml_strdup, xml_strndup, XmlChar},
+        xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
     },
     list::XmlList,
 };
 
 use super::{
     xml_free_dtd, xml_free_node_list, xml_free_ns_list, xml_get_doc_entity, xml_new_doc_text,
-    xml_new_reference, xml_tree_err, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
-    NodePtr, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlEntityType, XmlGenericNodePtr,
-    XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED,
-    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
+    xml_new_reference, xml_ns_in_scope, xml_tree_err, xml_tree_err_memory,
+    InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDocProperties, XmlDtd, XmlDtdPtr,
+    XmlElementType, XmlEntityType, XmlGenericNodePtr, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+    XmlRef, XML_ENT_EXPANDING, XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -101,6 +102,70 @@ pub struct XmlDoc {
 }
 
 impl XmlDoc {
+    /// Search a Ns aliasing a given URI.
+    /// Recurse on the parents until it finds the defined namespace or return NULL otherwise.
+    ///
+    /// Returns the namespace pointer or NULL.
+    #[doc(alias = "xmlSearchNsByHref")]
+    pub unsafe fn search_ns_by_href(
+        &mut self,
+        doc: Option<XmlDocPtr>,
+        href: &str,
+    ) -> Option<XmlNsPtr> {
+        let orig = XmlGenericNodePtr::from_raw(self).unwrap();
+
+        if href == XML_XML_NAMESPACE.to_str().unwrap() {
+            let mut doc = doc.or(self.document())?;
+            // Return the XML namespace declaration held by the doc.
+            if doc.old_ns.is_none() {
+                return doc.ensure_xmldecl();
+            } else {
+                return doc.old_ns;
+            }
+        }
+        let mut node = Some(orig);
+        while let Some(cur_node) = node {
+            if matches!(
+                cur_node.element_type(),
+                XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlEntityDecl
+            ) {
+                return None;
+            }
+            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let href = CString::new(href).unwrap();
+                let mut cur = cur_node.ns_def;
+                while let Some(now) = cur {
+                    if !now.href.is_null()
+                        && xml_str_equal(now.href, href.as_ptr() as *const u8)
+                        && now.prefix().is_some()
+                        && xml_ns_in_scope(doc, Some(orig), node, now.prefix) == 1
+                    {
+                        return Some(now);
+                    }
+                    cur = now.next;
+                }
+                if orig != cur_node.into() {
+                    let cur = cur_node.ns;
+                    if let Some(cur) = cur.filter(|cur| {
+                        !cur.href.is_null()
+                            && xml_str_equal(cur.href, href.as_ptr() as *const u8)
+                            && (*cur).prefix().is_some()
+                            && xml_ns_in_scope(doc, Some(orig), node, cur.prefix) == 1
+                    }) {
+                        return Some(cur);
+                    }
+                }
+            }
+            node = cur_node
+                .parent()
+                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        }
+        None
+    }
+
     /// Get the internal subset of a document
     /// Returns a pointer to the DTD structure or null_mut() if not found
     #[doc(alias = "xmlGetIntSubset")]

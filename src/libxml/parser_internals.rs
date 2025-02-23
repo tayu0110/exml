@@ -26,7 +26,7 @@ use std::{
     ffi::{CStr, CString},
     io::Write,
     mem::size_of,
-    ptr::{addr_of_mut, null, null_mut, NonNull},
+    ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     str::from_utf8_unchecked,
     sync::atomic::Ordering,
@@ -1872,10 +1872,10 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     oldctxt: XmlParserCtxtPtr,
     string: *const XmlChar,
     user_data: Option<GenericErrorContext>,
-    mut lst: Option<&mut *mut XmlNode>,
+    mut lst: Option<&mut Option<XmlGenericNodePtr>>,
 ) -> XmlParserErrors {
-    let mut content: *mut XmlNode = null_mut();
-    let mut last: *mut XmlNode = null_mut();
+    let mut content = None;
+    let mut last = None;
     let ret: XmlParserErrors;
 
     if ((*oldctxt).depth > 40 && (*oldctxt).options & XmlParserOption::XmlParseHuge as i32 == 0)
@@ -1890,7 +1890,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     }
 
     if let Some(lst) = lst.as_mut() {
-        **lst = null_mut();
+        **lst = None;
     }
     if string.is_null() {
         return XmlParserErrors::XmlErrInternalError;
@@ -1932,8 +1932,12 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     let mut new_doc = None;
     let mut my_doc = if let Some(my_doc) = (*oldctxt).my_doc {
         (*ctxt).my_doc = Some(my_doc);
-        content = my_doc.children.map_or(null_mut(), |c| c.as_ptr());
-        last = my_doc.last.map_or(null_mut(), |l| l.as_ptr());
+        content = my_doc
+            .children
+            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        last = my_doc
+            .last
+            .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
         my_doc
     } else {
         let Some(mut new) = xml_new_doc(Some("1.0")) else {
@@ -2002,32 +2006,31 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
                 .children()
                 .unwrap()
                 .children()
-                .map_or(null_mut(), |c| c.as_ptr());
+                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
             *lst = cur;
-            while !cur.is_null() {
+            while let Some(mut now) = cur {
                 #[cfg(feature = "libxml_valid")]
                 if (*oldctxt).validate != 0
                     && (*oldctxt).well_formed != 0
-                    && (*cur).element_type() == XmlElementType::XmlElementNode
+                    && now.element_type() == XmlElementType::XmlElementNode
                 {
                     if let Some(my_doc) = (*oldctxt).my_doc.filter(|doc| doc.int_subset.is_some()) {
-                        (*oldctxt).valid &= xml_validate_element(
-                            addr_of_mut!((*oldctxt).vctxt),
-                            my_doc,
-                            XmlGenericNodePtr::from_raw(cur),
-                        );
+                        (*oldctxt).valid &=
+                            xml_validate_element(addr_of_mut!((*oldctxt).vctxt), my_doc, cur);
                     }
                 }
-                (*cur).set_parent(None);
-                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+                now.set_parent(None);
+                cur = now
+                    .next()
+                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
             }
             my_doc.children.unwrap().set_children(None);
         }
     }
     if let Some(mut my_doc) = (*ctxt).my_doc {
         xml_free_node(my_doc.children.map_or(null_mut(), |c| c.as_ptr()));
-        my_doc.children = NodePtr::from_ptr(content);
-        my_doc.last = NodePtr::from_ptr(last);
+        my_doc.children = NodePtr::from_ptr(content.map_or(null_mut(), |node| node.as_ptr()));
+        my_doc.last = NodePtr::from_ptr(last.map_or(null_mut(), |node| node.as_ptr()));
     }
 
     // Also record the size of the entity parsed
@@ -2066,7 +2069,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
 pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     let val: *mut XmlChar;
     let mut was_checked: i32;
-    let mut list: *mut XmlNode = null_mut();
+    let mut list = None;
     let mut ret: XmlParserErrors;
 
     if (*ctxt).current_byte() != b'&' {
@@ -2247,51 +2250,54 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         ent.expanded_size = (*ctxt).sizeentcopy;
         if matches!(ret, XmlParserErrors::XmlErrEntityLoop) {
             (*ctxt).halt();
-            xml_free_node_list(list);
+            xml_free_node_list(list.map_or(null_mut(), |list| list.as_ptr()));
             return;
         }
         if xml_parser_entity_check(ctxt, oldsizeentcopy) != 0 {
-            xml_free_node_list(list);
+            xml_free_node_list(list.map_or(null_mut(), |list| list.as_ptr()));
             return;
         }
 
-        if matches!(ret, XmlParserErrors::XmlErrOK) && !list.is_null() {
-            ent.children.store(list, Ordering::Relaxed);
+        if let Some(l) = list.filter(|_| matches!(ret, XmlParserErrors::XmlErrOK)) {
+            ent.children.store(l.as_ptr(), Ordering::Relaxed);
             // Prune it directly in the generated document
             // except for single text nodes.
             if (*ctxt).replace_entities == 0
                 || matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader)
-                || (matches!((*list).element_type(), XmlElementType::XmlTextNode)
-                    && (*list).next.is_none())
+                || (matches!(l.element_type(), XmlElementType::XmlTextNode) && l.next().is_none())
             {
                 ent.owner = 1;
-                while !list.is_null() {
-                    (*list).set_parent(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
-                    if (*list).doc.map_or(null_mut(), |doc| doc.as_ptr())
+                let mut cur = Some(l);
+                while let Some(mut now) = cur {
+                    now.set_parent(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                    if now.document().map_or(null_mut(), |doc| doc.as_ptr())
                         != ent.doc.load(Ordering::Relaxed) as _
                     {
-                        (*list)
-                            .set_doc(XmlDocPtr::from_raw(ent.doc.load(Ordering::Relaxed)).unwrap());
+                        now.set_doc(XmlDocPtr::from_raw(ent.doc.load(Ordering::Relaxed)).unwrap());
                     }
-                    if (*list).next.is_none() {
-                        ent.last.store(list, Ordering::Relaxed);
+                    if now.next().is_none() {
+                        ent.last.store(now.as_ptr(), Ordering::Relaxed);
                     }
-                    list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
+                    cur = now
+                        .next()
+                        .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
                 }
-                list = null_mut();
+                list = None;
             } else {
                 ent.owner = 0;
-                while !list.is_null() {
-                    (*list).set_parent(NodePtr::from_ptr(
+                while let Some(mut now) = list {
+                    now.set_parent(NodePtr::from_ptr(
                         (*ctxt).node.map_or(null_mut(), |node| node.as_ptr()),
                     ));
-                    (*list).doc = (*ctxt).my_doc;
-                    if (*list).next.is_none() {
-                        ent.last.store(list, Ordering::Relaxed);
+                    now.set_document((*ctxt).my_doc);
+                    if now.next().is_none() {
+                        ent.last.store(now.as_ptr(), Ordering::Relaxed);
                     }
-                    list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
+                    list = now
+                        .next()
+                        .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
                 }
-                list = ent.children.load(Ordering::Relaxed) as _;
+                list = XmlGenericNodePtr::from_raw(ent.children.load(Ordering::Relaxed));
             }
         } else if !matches!(
             ret,
@@ -2308,9 +2314,8 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             if !ent.content.load(Ordering::Relaxed).is_null() {
                 *ent.content.load(Ordering::Relaxed).add(0) = 0;
             }
-        } else if !list.is_null() {
-            xml_free_node_list(list);
-            list = null_mut();
+        } else if let Some(list) = list.take() {
+            xml_free_node_list(list.as_ptr());
         }
 
         // Prevent entity from being parsed and expanded twice (Bug 760367).
@@ -2432,7 +2437,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             // Seems we are generating the DOM content, do
             // a simple tree copy for all references except the first
             // In the first occurrence list contains the replacement.
-            if (list.is_null() && ent.owner == 0)
+            if (list.is_none() && ent.owner == 0)
                 || matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader)
             {
                 let mut first_child = None;
@@ -2475,7 +2480,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         .next
                         .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
                 }
-            } else if list.is_null() || !(*ctxt).input_tab.is_empty() {
+            } else if list.is_none() || !(*ctxt).input_tab.is_empty() {
                 let mut first_child = None;
 
                 // Copy the entity child list and make it the new
@@ -3179,7 +3184,7 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
         if let Some(cur) = cur {
             if (*ctxt).record_info != 0 {
                 let node_info = XmlParserNodeInfo {
-                    node: NonNull::new(cur.as_ptr()),
+                    node: Some(cur),
                     begin_pos,
                     begin_line,
                     end_pos: (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64,
@@ -3195,7 +3200,7 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
         if let Some(cur) = cur {
             if (*ctxt).record_info != 0 {
                 let node_info = XmlParserNodeInfo {
-                    node: NonNull::new(cur.as_ptr()),
+                    node: Some(cur),
                     begin_pos,
                     begin_line,
                     end_pos: 0,
@@ -3252,7 +3257,7 @@ pub(crate) unsafe fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
     // Capture end position
     if let Some(cur) = cur {
         if (*ctxt).record_info != 0 {
-            if let Some(node_info) = xml_parser_find_node_info(ctxt, cur.as_ptr()) {
+            if let Some(node_info) = xml_parser_find_node_info(ctxt, cur) {
                 node_info.borrow_mut().end_pos =
                     (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
                 node_info.borrow_mut().end_line = (*(*ctxt).input).line as _;

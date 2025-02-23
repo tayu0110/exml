@@ -27,7 +27,7 @@ use std::{
     io::Read,
     mem::{size_of, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut, NonNull},
+    ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     str::from_utf8,
     sync::atomic::{AtomicI32, Ordering},
@@ -8666,7 +8666,7 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
             node_info.end_pos =
                 (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
             node_info.end_line = (*(*ctxt).input).line as _;
-            node_info.node = NonNull::new((*ctxt).node.map_or(null_mut(), |node| node.as_ptr()));
+            node_info.node = (*ctxt).node;
             xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
         }
         return;
@@ -8700,7 +8700,7 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     if current_node.is_some() && (*ctxt).record_info != 0 {
         node_info.end_pos = (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
         node_info.end_line = (*(*ctxt).input).line as _;
-        node_info.node = NonNull::new((*ctxt).node.map_or(null_mut(), |node| node.as_ptr()));
+        node_info.node = (*ctxt).node;
         xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
     }
     if (*ctxt).current_byte() == 0 {
@@ -8854,7 +8854,7 @@ unsafe fn html_parser_finish_element_parsing(ctxt: HtmlParserCtxtPtr) {
             node_info.borrow_mut().end_pos =
                 (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
             node_info.borrow_mut().end_line = (*(*ctxt).input).line as _;
-            node_info.borrow_mut().node = NonNull::new(node.as_ptr());
+            node_info.borrow_mut().node = Some(node);
             xml_parser_add_node_info(ctxt, node_info.clone());
             html_node_info_pop(ctxt);
         }

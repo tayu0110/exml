@@ -40,15 +40,14 @@
 use std::{
     cell::RefCell,
     ops::{Index, IndexMut},
-    ptr::NonNull,
     rc::Rc,
 };
 
-use crate::tree::XmlNode;
+use crate::tree::XmlNodePtr;
 
 pub type XmlParserNodeInfoSeqPtr = *mut XmlParserNodeInfoSeq;
 #[repr(C)]
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct XmlParserNodeInfoSeq {
     buffer: Vec<Rc<RefCell<XmlParserNodeInfo>>>,
 }
@@ -71,7 +70,7 @@ impl XmlParserNodeInfoSeq {
     ///
     /// Returns a long indicating the position of the record
     #[doc(alias = "xmlParserFindNodeInfoIndex")]
-    pub(crate) fn binary_search(&self, node: Option<NonNull<XmlNode>>) -> Result<usize, usize> {
+    pub(crate) fn binary_search(&self, node: Option<XmlNodePtr>) -> Result<usize, usize> {
         self.buffer
             .binary_search_by_key(&node, |node| node.borrow().node)
     }
@@ -102,9 +101,9 @@ impl IndexMut<usize> for XmlParserNodeInfoSeq {
 pub type XmlParserNodeInfoPtr = *mut XmlParserNodeInfo;
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct XmlParserNodeInfo {
-    pub(crate) node: Option<NonNull<XmlNode>>,
+    pub(crate) node: Option<XmlNodePtr>,
     // Position & line # that text that created the node begins & ends on
     pub(crate) begin_pos: u64,
     pub(crate) begin_line: u64,
