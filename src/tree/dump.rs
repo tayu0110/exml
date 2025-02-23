@@ -38,7 +38,7 @@ use crate::{
         xhtml_node_dump_output, xml_node_dump_output_internal, xml_save_err, xml_save_err_memory,
         XmlSaveCtxt, XmlSaveOption,
     },
-    tree::is_xhtml,
+    tree::{is_xhtml, XmlNodePtr},
 };
 
 use super::{XmlDoc, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode};
@@ -442,9 +442,15 @@ impl XmlNode {
             }
 
             if is_html {
-                xhtml_node_dump_output(&mut ctxt, self);
+                xhtml_node_dump_output(
+                    &mut ctxt,
+                    XmlNodePtr::from_raw(self).unwrap().unwrap().into(),
+                );
             } else {
-                xml_node_dump_output_internal(&mut ctxt as _, self);
+                xml_node_dump_output_internal(
+                    &mut ctxt as _,
+                    XmlNodePtr::from_raw(self).unwrap().unwrap().into(),
+                );
             }
         }
         #[cfg(not(feature = "html"))]
@@ -551,9 +557,9 @@ impl XmlGenericNodePtr {
             }
 
             if is_html {
-                xhtml_node_dump_output(&mut ctxt, self.as_ptr());
+                xhtml_node_dump_output(&mut ctxt, self);
             } else {
-                xml_node_dump_output_internal(&mut ctxt as _, self.as_ptr());
+                xml_node_dump_output_internal(&mut ctxt as _, self);
             }
         }
         #[cfg(not(feature = "html"))]

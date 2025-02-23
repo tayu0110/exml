@@ -1345,7 +1345,14 @@ pub unsafe fn xml_dump_entities_table<'a>(buf: &mut (impl Write + 'a), table: Xm
     let Some(table) = XmlHashTableRef::from_raw(table) else {
         return;
     };
-    table.scan(|data, _, _, _| xml_dump_entity_decl(buf, data.0 as *mut XmlEntity));
+    table.scan(|data, _, _, _| {
+        xml_dump_entity_decl(
+            buf,
+            XmlEntityPtr::from_raw(data.0 as *mut XmlEntity)
+                .unwrap()
+                .unwrap(),
+        )
+    });
 }
 
 /// This will dump the quoted string value, taking care of the special
@@ -1412,42 +1419,39 @@ unsafe fn xml_dump_entity_content<'a>(buf: &mut (impl Write + 'a), content: *con
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlDumpEntityDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut XmlEntity) {
+pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
     use crate::io::write_quoted;
 
-    if ent.is_null() {
-        return;
-    }
-    let name = CStr::from_ptr((*ent).name.load(Ordering::Relaxed) as _).to_string_lossy();
-    match (*ent).etype {
+    let name = CStr::from_ptr(ent.name.load(Ordering::Relaxed) as _).to_string_lossy();
+    match ent.etype {
         XmlEntityType::XmlInternalGeneralEntity => {
             write!(buf, "<!ENTITY {name} ");
-            if !(*ent).orig.load(Ordering::Relaxed).is_null() {
+            if !ent.orig.load(Ordering::Relaxed).is_null() {
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).orig.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.orig.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
             } else {
-                xml_dump_entity_content(buf, (*ent).content.load(Ordering::Relaxed) as _);
+                xml_dump_entity_content(buf, ent.content.load(Ordering::Relaxed) as _);
             }
             writeln!(buf, ">");
         }
         XmlEntityType::XmlExternalGeneralParsedEntity => {
             write!(buf, "<!ENTITY {name}");
-            if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
+            if !ent.external_id.load(Ordering::Relaxed).is_null() {
                 write!(buf, " PUBLIC ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
                 write!(buf, " ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
@@ -1455,7 +1459,7 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut Xm
                 write!(buf, " SYSTEM ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
@@ -1464,18 +1468,18 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut Xm
         }
         XmlEntityType::XmlExternalGeneralUnparsedEntity => {
             write!(buf, "<!ENTITY {name}");
-            if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
+            if !ent.external_id.load(Ordering::Relaxed).is_null() {
                 write!(buf, " PUBLIC ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
                 write!(buf, " ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
@@ -1483,19 +1487,19 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut Xm
                 write!(buf, " SYSTEM ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
             }
-            if !(*ent).content.load(Ordering::Relaxed).is_null() {
+            if !ent.content.load(Ordering::Relaxed).is_null() {
                 /* Should be true ! */
                 write!(buf, " NDATA ");
-                if !(*ent).orig.load(Ordering::Relaxed).is_null() {
+                if !ent.orig.load(Ordering::Relaxed).is_null() {
                     write!(
                         buf,
                         "{}",
-                        CStr::from_ptr((*ent).orig.load(Ordering::Acquire) as _)
+                        CStr::from_ptr(ent.orig.load(Ordering::Acquire) as _)
                             .to_string_lossy()
                             .as_ref()
                     );
@@ -1503,7 +1507,7 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut Xm
                     write!(
                         buf,
                         "{}",
-                        CStr::from_ptr((*ent).content.load(Ordering::Acquire) as _)
+                        CStr::from_ptr(ent.content.load(Ordering::Acquire) as _)
                             .to_string_lossy()
                             .as_ref()
                     );
@@ -1513,12 +1517,12 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut Xm
         }
         XmlEntityType::XmlInternalParameterEntity => {
             write!(buf, "<!ENTITY % {name} ");
-            if (*ent).orig.load(Ordering::Relaxed).is_null() {
-                xml_dump_entity_content(buf, (*ent).content.load(Ordering::Relaxed) as _);
+            if ent.orig.load(Ordering::Relaxed).is_null() {
+                xml_dump_entity_content(buf, ent.content.load(Ordering::Relaxed) as _);
             } else {
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).orig.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.orig.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
@@ -1527,18 +1531,18 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut Xm
         }
         XmlEntityType::XmlExternalParameterEntity => {
             write!(buf, "<!ENTITY % {name}");
-            if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
+            if !ent.external_id.load(Ordering::Relaxed).is_null() {
                 write!(buf, " PUBLIC ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
                 write!(buf, " ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
@@ -1546,7 +1550,7 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: *mut Xm
                 write!(buf, " SYSTEM ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
