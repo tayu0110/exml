@@ -1224,7 +1224,11 @@ unsafe fn xml_xinclude_copy_range(
             }
         }
         // Skip to next node in document order
-        cur = xml_xptr_advance_node(cur, addr_of_mut!(level));
+        cur = xml_xptr_advance_node(
+            XmlGenericNodePtr::from_raw(cur).unwrap(),
+            addr_of_mut!(level),
+        )
+        .map_or(null_mut(), |node| node.as_ptr());
         if end_flag != 0 && level >= end_level {
             break;
         }

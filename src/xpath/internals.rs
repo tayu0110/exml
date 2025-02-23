@@ -6148,9 +6148,11 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                             let rloc: XmlLocationSetPtr = (*res).user as XmlLocationSetPtr;
                             for &jloc in &(*rloc).loc_tab {
                                 range = xml_xptr_new_range(
-                                    (*iloc).user as _,
+                                    XmlGenericNodePtr::from_raw((*iloc).user as *mut XmlNode)
+                                        .unwrap(),
                                     (*iloc).index,
-                                    (*jloc).user2 as _,
+                                    XmlGenericNodePtr::from_raw((*jloc).user2 as *mut XmlNode)
+                                        .unwrap(),
                                     (*jloc).index2,
                                 );
                                 if !range.is_null() {
@@ -6158,8 +6160,10 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                                 }
                             }
                         } else {
-                            range =
-                                xml_xptr_new_range_node_object((*iloc).user as *mut XmlNode, res);
+                            range = xml_xptr_new_range_node_object(
+                                XmlGenericNodePtr::from_raw((*iloc).user as *mut XmlNode).unwrap(),
+                                res,
+                            );
                             if !range.is_null() {
                                 xml_xptr_location_set_add(newlocset, range);
                             }
@@ -6204,7 +6208,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                             }
 
                             res = value_pop(ctxt);
-                            range = xml_xptr_new_range_node_object(node.as_ptr(), res);
+                            range = xml_xptr_new_range_node_object(node, res);
                             if !range.is_null() {
                                 xml_xptr_location_set_add(newlocset, range);
                             }

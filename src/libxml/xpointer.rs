@@ -124,8 +124,8 @@ unsafe fn xml_xptr_err_memory(extra: &str) {
 #[doc(alias = "xmlXPtrNewLocationSetNodes")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_new_location_set_nodes(
-    start: *mut XmlNode,
-    end: *mut XmlNode,
+    start: XmlGenericNodePtr,
+    end: Option<XmlGenericNodePtr>,
 ) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
@@ -134,10 +134,10 @@ unsafe fn xml_xptr_new_location_set_nodes(
     }
     std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathLocationset;
-    if end.is_null() {
-        (*ret).user = xml_xptr_location_set_create(xml_xptr_new_collapsed_range(start)) as _;
-    } else {
+    if let Some(end) = end {
         (*ret).user = xml_xptr_location_set_create(xml_xptr_new_range_nodes(start, end)) as _;
+    } else {
+        (*ret).user = xml_xptr_location_set_create(xml_xptr_new_collapsed_range(start)) as _;
     }
     ret
 }
@@ -212,17 +212,21 @@ pub(crate) unsafe fn xml_xptr_location_set_merge(
 #[doc(alias = "xmlXPtrNewRangeInternal")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_new_range_internal(
-    start: *mut XmlNode,
+    start: Option<XmlGenericNodePtr>,
     startindex: i32,
-    end: *mut XmlNode,
+    end: Option<XmlGenericNodePtr>,
     endindex: i32,
 ) -> XmlXPathObjectPtr {
     // Namespace nodes must be copied (see xmlXPathNodeSetDupNs).
     // Disallow them for now.
-    if !start.is_null() && matches!((*start).element_type(), XmlElementType::XmlNamespaceDecl) {
+    if start.map_or(false, |start| {
+        matches!(start.element_type(), XmlElementType::XmlNamespaceDecl)
+    }) {
         return null_mut();
     }
-    if !end.is_null() && matches!((*end).element_type(), XmlElementType::XmlNamespaceDecl) {
+    if end.map_or(false, |end| {
+        matches!(end.element_type(), XmlElementType::XmlNamespaceDecl)
+    }) {
         return null_mut();
     }
 
@@ -233,9 +237,9 @@ unsafe fn xml_xptr_new_range_internal(
     }
     std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathRange;
-    (*ret).user = start as _;
+    (*ret).user = start.map_or(null_mut(), |node| node.as_ptr()) as _;
     (*ret).index = startindex;
-    (*ret).user2 = end as _;
+    (*ret).user2 = end.map_or(null_mut(), |node| node.as_ptr()) as _;
     (*ret).index2 = endindex;
     ret
 }
@@ -305,17 +309,17 @@ unsafe fn xml_xptr_range_check_order(range: XmlXPathObjectPtr) {
 #[doc(alias = "xmlXPtrNewRange")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe fn xml_xptr_new_range(
-    start: *mut XmlNode,
+    start: XmlGenericNodePtr,
     startindex: i32,
-    end: *mut XmlNode,
+    end: XmlGenericNodePtr,
     endindex: i32,
 ) -> XmlXPathObjectPtr {
-    if start.is_null() {
-        return null_mut();
-    }
-    if end.is_null() {
-        return null_mut();
-    }
+    // if start.is_null() {
+    //     return null_mut();
+    // }
+    // if end.is_null() {
+    //     return null_mut();
+    // }
     if startindex < 0 {
         return null_mut();
     }
@@ -323,7 +327,8 @@ pub(crate) unsafe fn xml_xptr_new_range(
         return null_mut();
     }
 
-    let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(start, startindex, end, endindex);
+    let ret: XmlXPathObjectPtr =
+        xml_xptr_new_range_internal(Some(start), startindex, Some(end), endindex);
     xml_xptr_range_check_order(ret);
     ret
 }
@@ -351,9 +356,9 @@ pub(crate) unsafe fn xml_xptr_new_range_points(
     }
 
     let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(
-        (*start).user as _,
+        XmlGenericNodePtr::from_raw((*start).user as *mut XmlNode),
         (*start).index,
-        (*end).user as _,
+        XmlGenericNodePtr::from_raw((*end).user as *mut XmlNode),
         (*end).index,
     );
     xml_xptr_range_check_order(ret);
@@ -366,12 +371,12 @@ pub(crate) unsafe fn xml_xptr_new_range_points(
 #[doc(alias = "xmlXPtrNewRangeNodePoint")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe fn xml_xptr_new_range_node_point(
-    start: *mut XmlNode,
+    start: XmlGenericNodePtr,
     end: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
-    if start.is_null() {
-        return null_mut();
-    }
+    // if start.is_null() {
+    //     return null_mut();
+    // }
     if end.is_null() {
         return null_mut();
     }
@@ -379,8 +384,12 @@ pub(crate) unsafe fn xml_xptr_new_range_node_point(
         return null_mut();
     }
 
-    let ret: XmlXPathObjectPtr =
-        xml_xptr_new_range_internal(start, -1, (*end).user as _, (*end).index);
+    let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(
+        Some(start),
+        -1,
+        XmlGenericNodePtr::from_raw((*end).user as *mut XmlNode),
+        (*end).index,
+    );
     xml_xptr_range_check_order(ret);
     ret
 }
@@ -392,20 +401,24 @@ pub(crate) unsafe fn xml_xptr_new_range_node_point(
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe fn xml_xptr_new_range_point_node(
     start: XmlXPathObjectPtr,
-    end: *mut XmlNode,
+    end: XmlGenericNodePtr,
 ) -> XmlXPathObjectPtr {
     if start.is_null() {
         return null_mut();
     }
-    if end.is_null() {
-        return null_mut();
-    }
+    // if end.is_null() {
+    //     return null_mut();
+    // }
     if !matches!((*start).typ, XmlXPathObjectType::XPathPoint) {
         return null_mut();
     }
 
-    let ret: XmlXPathObjectPtr =
-        xml_xptr_new_range_internal((*start).user as _, (*start).index, end, -1);
+    let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(
+        XmlGenericNodePtr::from_raw((*start).user as *mut XmlNode),
+        (*start).index,
+        Some(end),
+        -1,
+    );
     xml_xptr_range_check_order(ret);
     ret
 }
@@ -416,17 +429,17 @@ pub(crate) unsafe fn xml_xptr_new_range_point_node(
 #[doc(alias = "xmlXPtrNewRangeNodes")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe fn xml_xptr_new_range_nodes(
-    start: *mut XmlNode,
-    end: *mut XmlNode,
+    start: XmlGenericNodePtr,
+    end: XmlGenericNodePtr,
 ) -> XmlXPathObjectPtr {
-    if start.is_null() {
-        return null_mut();
-    }
-    if end.is_null() {
-        return null_mut();
-    }
+    // if start.is_null() {
+    //     return null_mut();
+    // }
+    // if end.is_null() {
+    //     return null_mut();
+    // }
 
-    let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(start, -1, end, -1);
+    let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(Some(start), -1, Some(end), -1);
     xml_xptr_range_check_order(ret);
     ret
 }
@@ -454,7 +467,7 @@ pub(crate) unsafe fn xml_xptr_new_location_set_node_set(
         }
 
         for &node in &set.node_tab {
-            xml_xptr_location_set_add(newset, xml_xptr_new_collapsed_range(node.as_ptr()));
+            xml_xptr_location_set_add(newset, xml_xptr_new_collapsed_range(node));
         }
 
         (*ret).user = newset as _;
@@ -468,42 +481,41 @@ pub(crate) unsafe fn xml_xptr_new_location_set_node_set(
 #[doc(alias = "xmlXPtrNewRangeNodeObject")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe fn xml_xptr_new_range_node_object(
-    start: *mut XmlNode,
+    start: XmlGenericNodePtr,
     end: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
-    let end_node: *mut XmlNode;
     let end_index: i32;
 
-    if start.is_null() {
-        return null_mut();
-    }
+    // if start.is_null() {
+    //     return null_mut();
+    // }
     if end.is_null() {
         return null_mut();
     }
-    match (*end).typ {
+    let end_node = match (*end).typ {
         XmlXPathObjectType::XPathPoint => {
-            end_node = (*end).user as _;
             end_index = (*end).index;
+            XmlGenericNodePtr::from_raw((*end).user as *mut XmlNode)
         }
         XmlXPathObjectType::XPathRange => {
-            end_node = (*end).user2 as _;
             end_index = (*end).index2;
+            XmlGenericNodePtr::from_raw((*end).user2 as *mut XmlNode)
         }
         XmlXPathObjectType::XPathNodeset => {
             // Empty set ...
             let Some(nodeset) = (*end).nodesetval.as_deref().filter(|s| !s.is_empty()) else {
                 return null_mut();
             };
-            end_node = nodeset.node_tab.last().unwrap().as_ptr();
             end_index = -1;
+            nodeset.node_tab.last().copied()
         }
         _ => {
             /* TODO */
             return null_mut();
         }
-    }
+    };
 
-    let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(start, -1, end_node, end_index);
+    let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(Some(start), -1, end_node, end_index);
     xml_xptr_range_check_order(ret);
     ret
 }
@@ -513,12 +525,12 @@ pub(crate) unsafe fn xml_xptr_new_range_node_object(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewCollapsedRange")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_new_collapsed_range(start: *mut XmlNode) -> XmlXPathObjectPtr {
-    if start.is_null() {
-        return null_mut();
-    }
+pub(crate) unsafe fn xml_xptr_new_collapsed_range(start: XmlGenericNodePtr) -> XmlXPathObjectPtr {
+    // if start.is_null() {
+    //     return null_mut();
+    // }
 
-    let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(start, -1, null_mut(), -1);
+    let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(Some(start), -1, None, -1);
     ret
 }
 
@@ -626,23 +638,27 @@ pub(crate) unsafe fn xml_xptr_location_set_remove(cur: XmlLocationSetPtr, val: i
 /// Returns the number of child for an element, -1 in case of error
 #[doc(alias = "xmlXPtrGetArity")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_get_arity(cur: *mut XmlNode) -> i32 {
+unsafe fn xml_xptr_get_arity(cur: XmlGenericNodePtr) -> i32 {
     let mut i: i32;
-    if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
+    if cur.element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
-    let mut cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+    let mut cur = cur
+        .children()
+        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
     i = 0;
-    while !cur.is_null() {
+    while let Some(now) = cur {
         if matches!(
-            (*cur).typ,
+            now.element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlHTMLDocumentNode
         ) {
             i += 1;
         }
-        cur = (*cur).next().map_or(null_mut(), |p| p.as_ptr());
+        cur = now
+            .next()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
     }
     i
 }
@@ -650,22 +666,25 @@ unsafe fn xml_xptr_get_arity(cur: *mut XmlNode) -> i32 {
 /// Returns the index of the node in its parent children list, -1 in case of error
 #[doc(alias = "xmlXPtrGetIndex")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_get_index(mut cur: *mut XmlNode) -> i32 {
+unsafe fn xml_xptr_get_index(cur: XmlGenericNodePtr) -> i32 {
     let mut i: i32;
-    if cur.is_null() || (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
+    if cur.element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
     i = 1;
-    while !cur.is_null() {
+    let mut cur = Some(cur);
+    while let Some(now) = cur {
         if matches!(
-            (*cur).element_type(),
+            now.element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlHTMLDocumentNode
         ) {
             i += 1;
         }
-        cur = (*cur).prev().map_or(null_mut(), |p| p.as_ptr());
+        cur = now
+            .prev()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
     }
     i
 }
@@ -693,26 +712,26 @@ unsafe fn xml_xptr_covering_range(
     match (*loc).typ {
         XmlXPathObjectType::XPathPoint => {
             return xml_xptr_new_range(
-                (*loc).user as _,
+                XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap(),
                 (*loc).index,
-                (*loc).user as _,
+                XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap(),
                 (*loc).index,
             )
         }
         XmlXPathObjectType::XPathRange => {
             if !(*loc).user2.is_null() {
                 return xml_xptr_new_range(
-                    (*loc).user as _,
+                    XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap(),
                     (*loc).index,
-                    (*loc).user2 as _,
+                    XmlGenericNodePtr::from_raw((*loc).user2 as *mut XmlNode).unwrap(),
                     (*loc).index2,
                 );
             } else {
-                let mut node: *mut XmlNode = (*loc).user as *mut XmlNode;
-                if node == doc.as_ptr() as *mut XmlNode {
+                let mut node = XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap();
+                if node == doc.into() {
                     return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
                 } else {
-                    match (*node).typ {
+                    match node.element_type() {
                         XmlElementType::XmlAttributeNode => {
                             /* !!! our model is slightly different than XPath */
                             return xml_xptr_new_range(node, 0, node, xml_xptr_get_arity(node));
@@ -728,7 +747,10 @@ unsafe fn xml_xptr_covering_range(
                         | XmlElementType::XmlHTMLDocumentNode => {
                             let indx: i32 = xml_xptr_get_index(node);
 
-                            node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                            node = node
+                                .parent()
+                                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                                .unwrap();
                             return xml_xptr_new_range(node, indx - 1, node, indx + 1);
                         }
                         _ => return null_mut(),
@@ -804,6 +826,8 @@ unsafe fn xml_xptr_inside_range(
     ctxt: XmlXPathParserContextPtr,
     loc: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
+    use crate::tree::XmlNodePtr;
+
     if loc.is_null() {
         return null_mut();
     }
@@ -812,16 +836,22 @@ unsafe fn xml_xptr_inside_range(
     }
     match (*loc).typ {
         XmlXPathObjectType::XPathPoint => {
-            let node: *mut XmlNode = (*loc).user as *mut XmlNode;
-            match (*node).typ {
+            let node = XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap();
+            match node.element_type() {
                 XmlElementType::XmlPINode
                 | XmlElementType::XmlCommentNode
                 | XmlElementType::XmlTextNode
                 | XmlElementType::XmlCDATASectionNode => {
-                    if (*node).content.is_null() {
-                        return xml_xptr_new_range(node, 0, node, 0);
+                    let node = XmlNodePtr::try_from(node).unwrap();
+                    if node.content.is_null() {
+                        return xml_xptr_new_range(node.into(), 0, node.into(), 0);
                     } else {
-                        return xml_xptr_new_range(node, 0, node, xml_strlen((*node).content));
+                        return xml_xptr_new_range(
+                            node.into(),
+                            0,
+                            node.into(),
+                            xml_strlen(node.content),
+                        );
                     }
                 }
                 XmlElementType::XmlAttributeNode
@@ -837,19 +867,30 @@ unsafe fn xml_xptr_inside_range(
             return null_mut();
         }
         XmlXPathObjectType::XPathRange => {
-            let node: *mut XmlNode = (*loc).user as *mut XmlNode;
+            let node = XmlGenericNodePtr::from_raw((*loc).user as *mut XmlNode).unwrap();
             if !(*loc).user2.is_null() {
-                return xml_xptr_new_range(node, (*loc).index, (*loc).user2 as _, (*loc).index2);
+                return xml_xptr_new_range(
+                    node,
+                    (*loc).index,
+                    XmlGenericNodePtr::from_raw((*loc).user2 as *mut XmlNode).unwrap(),
+                    (*loc).index2,
+                );
             } else {
-                match (*node).typ {
+                match node.element_type() {
                     XmlElementType::XmlPINode
                     | XmlElementType::XmlCommentNode
                     | XmlElementType::XmlTextNode
                     | XmlElementType::XmlCDATASectionNode => {
-                        if (*node).content.is_null() {
-                            return xml_xptr_new_range(node, 0, node, 0);
+                        let node = XmlNodePtr::try_from(node).unwrap();
+                        if node.content.is_null() {
+                            return xml_xptr_new_range(node.into(), 0, node.into(), 0);
                         } else {
-                            return xml_xptr_new_range(node, 0, node, xml_strlen((*node).content));
+                            return xml_xptr_new_range(
+                                node.into(),
+                                0,
+                                node.into(),
+                                xml_strlen(node.content),
+                            );
                         }
                     }
                     XmlElementType::XmlAttributeNode
@@ -937,7 +978,7 @@ unsafe fn xml_xptr_range_inside_function(ctxt: XmlXPathParserContextPtr, nargs: 
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_get_start_point(
     obj: XmlXPathObjectPtr,
-    node: &mut *mut XmlNode,
+    node: &mut Option<XmlGenericNodePtr>,
     indx: &mut usize,
 ) -> i32 {
     if obj.is_null() {
@@ -946,7 +987,7 @@ unsafe fn xml_xptr_get_start_point(
 
     match (*obj).typ {
         XmlXPathObjectType::XPathPoint => {
-            *node = (*obj).user as _;
+            *node = XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode);
             if (*obj).index <= 0 {
                 *indx = 0;
             } else {
@@ -955,7 +996,7 @@ unsafe fn xml_xptr_get_start_point(
             return 0;
         }
         XmlXPathObjectType::XPathRange => {
-            *node = (*obj).user as _;
+            *node = XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode);
             if (*obj).index <= 0 {
                 *indx = 0;
             } else {
@@ -975,7 +1016,7 @@ unsafe fn xml_xptr_get_start_point(
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_get_end_point(
     obj: XmlXPathObjectPtr,
-    node: &mut *mut XmlNode,
+    node: &mut Option<XmlGenericNodePtr>,
     indx: &mut usize,
 ) -> i32 {
     if obj.is_null() {
@@ -984,7 +1025,7 @@ unsafe fn xml_xptr_get_end_point(
 
     match (*obj).typ {
         XmlXPathObjectType::XPathPoint => {
-            *node = (*obj).user as _;
+            *node = XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode);
             if (*obj).index <= 0 {
                 *indx = 0;
             } else {
@@ -993,7 +1034,7 @@ unsafe fn xml_xptr_get_end_point(
             return 0;
         }
         XmlXPathObjectType::XPathRange => {
-            *node = (*obj).user as _;
+            *node = XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode);
             if (*obj).index <= 0 {
                 *indx = 0;
             } else {
@@ -1008,18 +1049,18 @@ unsafe fn xml_xptr_get_end_point(
 
 /// Returns the @no'th element child of @cur or NULL
 #[doc(alias = "xmlXPtrGetNthChild")]
-unsafe fn xml_xptr_get_nth_child(mut cur: *mut XmlNode, no: usize) -> *mut XmlNode {
-    if cur.is_null() || (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
-        return cur;
+unsafe fn xml_xptr_get_nth_child(cur: XmlGenericNodePtr, no: usize) -> Option<XmlGenericNodePtr> {
+    if cur.element_type() == XmlElementType::XmlNamespaceDecl {
+        return Some(cur);
     }
-    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+    let mut cur = cur
+        .children()
+        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
     let mut i = 0;
     while i <= no {
-        if cur.is_null() {
-            return cur;
-        }
+        let now = cur?;
         if matches!(
-            (*cur).element_type(),
+            now.element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlHTMLDocumentNode
@@ -1030,7 +1071,9 @@ unsafe fn xml_xptr_get_nth_child(mut cur: *mut XmlNode, no: usize) -> *mut XmlNo
             }
         }
 
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+        cur = now
+            .next()
+            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
     }
     cur
 }
@@ -1041,29 +1084,35 @@ unsafe fn xml_xptr_get_nth_child(mut cur: *mut XmlNode, no: usize) -> *mut XmlNo
 /// Returns -1 in case of failure, 0 otherwise
 #[doc(alias = "xmlXPtrAdvanceNode")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_advance_node(mut cur: *mut XmlNode, level: *mut i32) -> *mut XmlNode {
+pub(crate) unsafe fn xml_xptr_advance_node(
+    mut cur: XmlGenericNodePtr,
+    level: *mut i32,
+) -> Option<XmlGenericNodePtr> {
     // next:
     'next: loop {
-        if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
-            return null_mut();
+        if cur.element_type() == XmlElementType::XmlNamespaceDecl {
+            return None;
         }
-        if (*cur).children().is_some() {
-            cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+        if let Some(children) = cur
+            .children()
+            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+        {
+            cur = children;
             if !level.is_null() {
                 *level += 1;
             }
             // goto found;
             // found:
             if !matches!(
-                (*cur).typ,
+                cur.element_type(),
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlTextNode
                     | XmlElementType::XmlDocumentNode
                     | XmlElementType::XmlHTMLDocumentNode
                     | XmlElementType::XmlCDATASectionNode
             ) {
-                if (*cur).typ == XmlElementType::XmlEntityRefNode {
-                    /* Shouldn't happen */
+                if cur.element_type() == XmlElementType::XmlEntityRefNode {
+                    // Shouldn't happen
                     // TODO
                     // goto skip;
                 } else {
@@ -1071,30 +1120,31 @@ pub(crate) unsafe fn xml_xptr_advance_node(mut cur: *mut XmlNode, level: *mut i3
                     continue 'next;
                 }
             } else {
-                return cur;
+                return Some(cur);
             }
         }
         // skip:		/* This label should only be needed if something is wrong! */
         'skip: loop {
-            if let Some(next) = (*cur).next() {
-                cur = next.as_ptr();
+            if let Some(next) = cur
+                .next()
+                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+            {
+                cur = next;
                 // goto found;
             } else {
                 loop {
-                    cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
                     if !level.is_null() {
                         *level -= 1;
                     }
-                    if cur.is_null() {
-                        return null_mut();
-                    }
-                    if let Some(next) = (*cur).next() {
-                        cur = next.as_ptr();
+                    cur = cur
+                        .parent()
+                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
+                    if let Some(next) = cur
+                        .next()
+                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+                    {
+                        cur = next;
                         // goto found;
-                        break;
-                    }
-
-                    if cur.is_null() {
                         break;
                     }
                 }
@@ -1102,14 +1152,14 @@ pub(crate) unsafe fn xml_xptr_advance_node(mut cur: *mut XmlNode, level: *mut i3
 
             // found:
             if !matches!(
-                (*cur).typ,
+                cur.element_type(),
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlTextNode
                     | XmlElementType::XmlDocumentNode
                     | XmlElementType::XmlHTMLDocumentNode
                     | XmlElementType::XmlCDATASectionNode
             ) {
-                if (*cur).typ == XmlElementType::XmlEntityRefNode {
+                if cur.element_type() == XmlElementType::XmlEntityRefNode {
                     /* Shouldn't happen */
                     // TODO
                     // goto skip;
@@ -1119,7 +1169,7 @@ pub(crate) unsafe fn xml_xptr_advance_node(mut cur: *mut XmlNode, level: *mut i3
                 continue 'next;
             }
 
-            break 'next cur;
+            break 'next Some(cur);
         }
     }
 }
@@ -1129,11 +1179,17 @@ pub(crate) unsafe fn xml_xptr_advance_node(mut cur: *mut XmlNode, level: *mut i3
 /// Returns -1 in case of failure, 0 otherwise
 #[doc(alias = "xmlXPtrAdvanceChar")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_advance_char(node: &mut *mut XmlNode, indx: &mut usize, mut bytes: i32) -> i32 {
-    let mut cur: *mut XmlNode;
+unsafe fn xml_xptr_advance_char(
+    node: &mut Option<XmlGenericNodePtr>,
+    indx: &mut usize,
+    mut bytes: i32,
+) -> i32 {
+    use crate::tree::XmlNodePtr;
 
-    cur = *node;
-    if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
+    let mut cur = *node;
+    if cur.map_or(true, |cur| {
+        cur.element_type() == XmlElementType::XmlNamespaceDecl
+    }) {
         return -1;
     }
     let mut pos = *indx as i32;
@@ -1141,28 +1197,28 @@ unsafe fn xml_xptr_advance_char(node: &mut *mut XmlNode, indx: &mut usize, mut b
     while bytes >= 0 {
         // First position to the beginning of the first text node
         // corresponding to this point
-        while !cur.is_null()
-            && matches!(
-                (*cur).typ,
+        while let Some(now) = cur.filter(|cur| {
+            matches!(
+                cur.element_type(),
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlDocumentNode
                     | XmlElementType::XmlHTMLDocumentNode
             )
-        {
+        }) {
             if pos > 0 {
-                cur = xml_xptr_get_nth_child(cur, pos as usize);
+                cur = xml_xptr_get_nth_child(now, pos as usize);
                 pos = 0;
             } else {
-                cur = xml_xptr_advance_node(cur, null_mut());
+                cur = xml_xptr_advance_node(now, null_mut());
                 pos = 0;
             }
         }
 
-        if cur.is_null() {
-            *node = null_mut();
+        let Some(now) = cur else {
+            *node = None;
             *indx = 0;
             return -1;
-        }
+        };
 
         // if there is no move needed return the current value.
         if pos == 0 {
@@ -1175,8 +1231,11 @@ unsafe fn xml_xptr_advance_char(node: &mut *mut XmlNode, indx: &mut usize, mut b
         }
         // We should have a text (or cdata) node ...
         let mut len = 0;
-        if (*cur).typ != XmlElementType::XmlElementNode && !(*cur).content.is_null() {
-            len = xml_strlen((*cur).content);
+        if now.element_type() != XmlElementType::XmlElementNode {
+            let cur = XmlNodePtr::try_from(now).unwrap();
+            if !cur.content.is_null() {
+                len = xml_strlen(cur.content);
+            }
         }
         if pos > len {
             // Strange, the indx in the text node is greater than it's len
@@ -1185,7 +1244,7 @@ unsafe fn xml_xptr_advance_char(node: &mut *mut XmlNode, indx: &mut usize, mut b
         }
         if pos + bytes >= len {
             bytes -= len - pos;
-            cur = xml_xptr_advance_node(cur, null_mut());
+            cur = xml_xptr_advance_node(now, null_mut());
             pos = 0;
         } else if pos + bytes < len {
             pos += bytes;
@@ -1202,36 +1261,44 @@ unsafe fn xml_xptr_advance_char(node: &mut *mut XmlNode, indx: &mut usize, mut b
 /// Returns -1 in case of failure, 0 otherwise
 #[doc(alias = "xmlXPtrGetLastChar")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_get_last_char(node: &mut *mut XmlNode, indx: &mut usize) -> i32 {
-    let mut cur: *mut XmlNode;
+unsafe fn xml_xptr_get_last_char(node: &mut Option<XmlGenericNodePtr>, indx: &mut usize) -> i32 {
+    use crate::tree::XmlNodePtr;
+
     let mut len = 0;
 
-    if node.is_null() || (*(*node)).typ == XmlElementType::XmlNamespaceDecl {
+    if node.map_or(true, |node| {
+        node.element_type() == XmlElementType::XmlNamespaceDecl
+    }) {
         return -1;
     }
-    cur = *node;
+    let mut cur = *node;
     let pos = *indx;
 
     if matches!(
-        (*cur).typ,
+        cur.unwrap().element_type(),
         XmlElementType::XmlElementNode
             | XmlElementType::XmlDocumentNode
             | XmlElementType::XmlHTMLDocumentNode
     ) && pos > 0
     {
-        cur = xml_xptr_get_nth_child(cur, pos);
+        cur = xml_xptr_get_nth_child(cur.unwrap(), pos);
     }
-    while !cur.is_null() {
-        if let Some(last) = (*cur).last() {
-            cur = last.as_ptr();
-        } else if (*cur).typ != XmlElementType::XmlElementNode && !(*cur).content.is_null() {
-            len = xml_strlen((*cur).content) as usize;
+    while let Some(now) = cur {
+        if let Some(last) = now
+            .last()
+            .and_then(|last| XmlGenericNodePtr::from_raw(last.as_ptr()))
+        {
+            cur = Some(last);
+        } else if let Some(now) = XmlNodePtr::try_from(now).ok().filter(|now| {
+            now.element_type() != XmlElementType::XmlElementNode && !now.content.is_null()
+        }) {
+            len = xml_strlen(now.content) as usize;
             break;
         } else {
             return -1;
         }
     }
-    if cur.is_null() {
+    if cur.is_none() {
         return -1;
     }
     *node = cur;
@@ -1250,55 +1317,60 @@ unsafe fn xml_xptr_get_last_char(node: &mut *mut XmlNode, indx: &mut usize) -> i
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_match_string(
     mut string: &str,
-    start: *mut XmlNode,
+    start: XmlGenericNodePtr,
     startindex: usize,
-    end: &mut *mut XmlNode,
+    end: &mut Option<XmlGenericNodePtr>,
     endindex: &mut usize,
 ) -> i32 {
-    let mut cur: *mut XmlNode;
+    use crate::tree::XmlNodePtr;
 
-    if start.is_null() || (*start).typ == XmlElementType::XmlNamespaceDecl {
+    if start.element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
-    if end.is_null() || (*(*end)).typ == XmlElementType::XmlNamespaceDecl {
+    if end.map_or(true, |end| {
+        end.element_type() == XmlElementType::XmlNamespaceDecl
+    }) {
         return -1;
     }
-    cur = start;
+    let mut cur = start;
     let mut pos = startindex - 1;
     let mut stringlen = string.len();
 
     while stringlen > 0 {
-        if cur == *end && pos + stringlen > *endindex {
+        if Some(cur) == *end && pos + stringlen > *endindex {
             return 0;
         }
 
-        if (*cur).typ != XmlElementType::XmlElementNode && !(*cur).content.is_null() {
-            let content = CStr::from_ptr((*cur).content as *const i8).to_string_lossy();
-            let len = content.len();
-            if len >= pos + stringlen {
-                let is_match = &content.as_bytes()[pos..pos + stringlen] == string.as_bytes();
-                if is_match {
-                    *end = cur;
-                    *endindex = pos + stringlen;
-                    return 1;
+        if cur.element_type() != XmlElementType::XmlElementNode {
+            let cur = XmlNodePtr::try_from(cur).unwrap();
+            if !cur.content.is_null() {
+                let content = CStr::from_ptr(cur.content as *const i8).to_string_lossy();
+                let len = content.len();
+                if len >= pos + stringlen {
+                    let is_match = &content.as_bytes()[pos..pos + stringlen] == string.as_bytes();
+                    if is_match {
+                        *end = Some(cur.into());
+                        *endindex = pos + stringlen;
+                        return 1;
+                    } else {
+                        return 0;
+                    }
                 } else {
-                    return 0;
-                }
-            } else {
-                let sub = len - pos;
-                let is_match = content.as_bytes()[pos..pos + sub] == string.as_bytes()[..sub];
-                if is_match {
-                    string = &string[sub..];
-                    stringlen -= sub;
-                } else {
-                    return 0;
+                    let sub = len - pos;
+                    let is_match = content.as_bytes()[pos..pos + sub] == string.as_bytes()[..sub];
+                    if is_match {
+                        string = &string[sub..];
+                        stringlen -= sub;
+                    } else {
+                        return 0;
+                    }
                 }
             }
         }
-        cur = xml_xptr_advance_node(cur, null_mut());
-        if cur.is_null() {
+        let Some(next) = xml_xptr_advance_node(cur, null_mut()) else {
             return 0;
-        }
+        };
+        cur = next;
         pos = 0;
     }
     1
@@ -1315,56 +1387,68 @@ unsafe fn xml_xptr_match_string(
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_search_string(
     string: &str,
-    start: &mut *mut XmlNode,
+    start: &mut Option<XmlGenericNodePtr>,
     startindex: &mut usize,
-    end: &mut *mut XmlNode,
+    end: &mut Option<XmlGenericNodePtr>,
     endindex: &mut usize,
 ) -> i32 {
-    let mut cur: *mut XmlNode;
+    use crate::tree::XmlNodePtr;
+
     let mut str: *const XmlChar;
 
-    if start.is_null() || (*(*start)).typ == XmlElementType::XmlNamespaceDecl {
+    if start.map_or(true, |start| {
+        start.element_type() == XmlElementType::XmlNamespaceDecl
+    }) {
         return -1;
     }
-    cur = *start;
+    let mut cur = *start;
     let mut pos = *startindex - 1;
     let first = *string.as_bytes().first().unwrap_or(&0);
 
-    while !cur.is_null() {
-        if (*cur).typ != XmlElementType::XmlElementNode && !(*cur).content.is_null() {
-            let len = CStr::from_ptr((*cur).content as *const i8).to_bytes().len();
-            while pos <= len {
-                if first != 0 {
-                    str = xml_strchr((*cur).content.add(pos), first);
-                    if !str.is_null() {
-                        pos = str.offset_from((*cur).content as *mut XmlChar) as _;
-                        if xml_xptr_match_string(string, cur, pos + 1, end, endindex) != 0 {
-                            *start = cur;
-                            *startindex = pos + 1;
-                            return 1;
+    while let Some(cur_node) = cur {
+        if cur_node.element_type() != XmlElementType::XmlElementNode {
+            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+            if !cur_node.content.is_null() {
+                let len = CStr::from_ptr(cur_node.content as *const i8)
+                    .to_bytes()
+                    .len();
+                while pos <= len {
+                    if first != 0 {
+                        str = xml_strchr(cur_node.content.add(pos), first);
+                        if !str.is_null() {
+                            pos = str.offset_from(cur_node.content as *mut XmlChar) as _;
+                            if xml_xptr_match_string(
+                                string,
+                                cur_node.into(),
+                                pos + 1,
+                                end,
+                                endindex,
+                            ) != 0
+                            {
+                                *start = cur;
+                                *startindex = pos + 1;
+                                return 1;
+                            }
+                            pos += 1;
+                        } else {
+                            pos = len + 1;
                         }
-                        pos += 1;
                     } else {
-                        pos = len + 1;
+                        // An empty string is considered to match before each
+                        // character of the string-value and after the final character.
+                        *start = cur;
+                        *startindex = pos + 1;
+                        *end = cur;
+                        *endindex = pos + 1;
+                        return 1;
                     }
-                } else {
-                    // An empty string is considered to match before each
-                    // character of the string-value and after the final character.
-                    *start = cur;
-                    *startindex = pos + 1;
-                    *end = cur;
-                    *endindex = pos + 1;
-                    return 1;
                 }
             }
         }
         if cur == *end && pos >= *endindex {
             return 0;
         }
-        cur = xml_xptr_advance_node(cur, null_mut());
-        if cur.is_null() {
-            return 0;
-        }
+        cur = xml_xptr_advance_node(cur_node, null_mut());
         pos = 1;
     }
     0
@@ -1406,9 +1490,9 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
     let mut startindex = 0usize;
     let mut endindex = 0usize;
     let mut fendindex: usize;
-    let mut start: *mut XmlNode = null_mut();
-    let mut end: *mut XmlNode = null_mut();
-    let mut fend: *mut XmlNode;
+    let mut start = None;
+    let mut end = None;
+    let mut fend;
     let mut set: XmlXPathObjectPtr = null_mut();
     let oldset: XmlLocationSetPtr;
     let mut newset: XmlLocationSetPtr = null_mut();
@@ -1512,7 +1596,12 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
                     if position.is_null() {
                         xml_xptr_location_set_add(
                             newset,
-                            xml_xptr_new_range(start, startindex as i32, fend, fendindex as i32),
+                            xml_xptr_new_range(
+                                start.unwrap(),
+                                startindex as i32,
+                                fend.unwrap(),
+                                fendindex as i32,
+                            ),
                         );
                     } else if xml_xptr_advance_char(&mut start, &mut startindex, pos - 1) == 0 {
                         if !number.is_null() && num > 0 {
@@ -1522,9 +1611,9 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
                                 xml_xptr_location_set_add(
                                     newset,
                                     xml_xptr_new_range(
-                                        start,
+                                        start.unwrap(),
                                         startindex as i32,
-                                        rend,
+                                        rend.unwrap(),
                                         rindx as i32,
                                     ),
                                 );
@@ -1533,9 +1622,9 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
                             xml_xptr_location_set_add(
                                 newset,
                                 xml_xptr_new_range(
-                                    start,
+                                    start.unwrap(),
                                     startindex as i32,
-                                    start,
+                                    start.unwrap(),
                                     startindex as i32,
                                 ),
                             );
@@ -1543,9 +1632,9 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
                             xml_xptr_location_set_add(
                                 newset,
                                 xml_xptr_new_range(
-                                    start,
+                                    start.unwrap(),
                                     startindex as i32,
-                                    fend,
+                                    fend.unwrap(),
                                     fendindex as i32,
                                 ),
                             );
@@ -1833,7 +1922,10 @@ unsafe fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
 
     value_push(
         ctxt,
-        xml_xptr_new_location_set_nodes((*(*ctxt).context).here, null_mut()),
+        xml_xptr_new_location_set_nodes(
+            XmlGenericNodePtr::from_raw((*(*ctxt).context).here).unwrap(),
+            None,
+        ),
     );
 }
 
@@ -1850,7 +1942,10 @@ unsafe fn xml_xptr_origin_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
 
     value_push(
         ctxt,
-        xml_xptr_new_location_set_nodes((*(*ctxt).context).origin, null_mut()),
+        xml_xptr_new_location_set_nodes(
+            XmlGenericNodePtr::from_raw((*(*ctxt).context).origin).unwrap(),
+            None,
+        ),
     );
 }
 
@@ -2048,13 +2143,12 @@ unsafe fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: i32) {
         value_push(ctxt, xml_xpath_new_node_set(None));
         return;
     }
-    let cur: *mut XmlNode = xml_xptr_get_nth_child(oldset.node_tab[0].as_ptr(), indx as usize);
-    if cur.is_null() {
+    let Some(cur) = xml_xptr_get_nth_child(oldset.node_tab[0], indx as usize) else {
         xml_xpath_free_object(obj);
         value_push(ctxt, xml_xpath_new_node_set(None));
         return;
-    }
-    oldset.node_tab[0] = XmlGenericNodePtr::from_raw(cur).unwrap();
+    };
+    oldset.node_tab[0] = cur;
     value_push(ctxt, obj);
 }
 
@@ -2492,46 +2586,42 @@ pub(crate) unsafe fn xml_xptr_range_to_function(ctxt: XmlXPathParserContextPtr, 
 /// Returns an xmlNodePtr list or NULL. The caller has to free the node tree.
 #[doc(alias = "xmlXPtrBuildRangeNodeList")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNode {
-    /* pointers to generated nodes */
-
-    use crate::tree::{xml_copy_node, xml_new_text, xml_new_text_len, XmlGenericNodePtr};
-    let mut list: *mut XmlNode = null_mut();
-    let mut last: *mut XmlNode = null_mut();
-    let mut parent: *mut XmlNode = null_mut();
-    /* pointers to traversal nodes */
-    let mut cur: *mut XmlNode;
-    let mut end: *mut XmlNode;
-    let mut index1: i32;
-    let mut index2: i32;
+unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> Option<XmlGenericNodePtr> {
+    use crate::tree::{
+        xml_copy_node, xml_new_text, xml_new_text_len, XmlGenericNodePtr, XmlNodePtr,
+    };
+    let mut list = None;
+    let mut last: Option<XmlGenericNodePtr> = None;
+    let mut parent: Option<XmlGenericNodePtr> = None;
 
     if range.is_null() {
-        return null_mut();
+        return None;
     }
     if (*range).typ != XmlXPathObjectType::XPathRange {
-        return null_mut();
+        return None;
     }
-    let start: *mut XmlNode = (*range).user as *mut XmlNode;
+    let start = XmlGenericNodePtr::from_raw((*range).user as *mut XmlNode);
 
-    if start.is_null() || (*start).typ == XmlElementType::XmlNamespaceDecl {
-        return null_mut();
+    if start.map_or(true, |start| {
+        start.element_type() == XmlElementType::XmlNamespaceDecl
+    }) {
+        return None;
     }
-    end = (*range).user2 as _;
-    if end.is_null() {
-        return xml_copy_node(XmlGenericNodePtr::from_raw(start).unwrap(), 1)
-            .map_or(null_mut(), |node| node.as_ptr());
-    }
-    if (*end).typ == XmlElementType::XmlNamespaceDecl {
-        return null_mut();
+    let Some(mut end) = XmlGenericNodePtr::from_raw((*range).user2 as *mut XmlNode) else {
+        return xml_copy_node(start.unwrap(), 1);
+    };
+    if end.element_type() == XmlElementType::XmlNamespaceDecl {
+        return None;
     }
 
-    cur = start;
-    index1 = (*range).index;
-    index2 = (*range).index2;
-    while !cur.is_null() {
-        if cur == end {
-            if (*cur).typ == XmlElementType::XmlTextNode {
-                let mut content: *const XmlChar = (*cur).content;
+    let mut cur = start;
+    let mut index1 = (*range).index;
+    let mut index2 = (*range).index2;
+    while let Some(cur_node) = cur {
+        if cur_node == end {
+            if cur_node.element_type() == XmlElementType::XmlTextNode {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let mut content: *const XmlChar = cur_node.content;
                 let mut len: i32;
 
                 let tmp = if content.is_null() {
@@ -2548,52 +2638,53 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                     xml_new_text_len(content, len)
                 };
                 // single sub text node selection
-                if list.is_null() {
-                    return tmp.map_or(null_mut(), |node| node.as_ptr());
+                if list.is_none() {
+                    return tmp.map(|node| node.into());
                 }
                 // prune and return full set
-                if !last.is_null() {
-                    (*last).add_next_sibling(tmp.unwrap().into());
+                if let Some(last) = last {
+                    last.add_next_sibling(tmp.unwrap().into());
                 } else {
-                    (*parent).add_child(tmp.unwrap().into());
+                    parent.unwrap().add_child(tmp.unwrap().into());
                 }
                 return list;
             } else {
-                let tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 0);
-                if list.is_null() {
-                    list = tmp.map_or(null_mut(), |node| node.as_ptr());
-                    parent = tmp.map_or(null_mut(), |node| node.as_ptr());
-                } else if !last.is_null() {
-                    parent = (*last)
-                        .add_next_sibling(tmp.unwrap())
-                        .map_or(null_mut(), |node| node.as_ptr());
+                let tmp = xml_copy_node(cur_node, 0);
+                if list.is_some() {
+                    if let Some(last) = last {
+                        parent = last.add_next_sibling(tmp.unwrap());
+                    } else {
+                        parent = parent.unwrap().add_child(tmp.unwrap());
+                    }
                 } else {
-                    parent = (*parent)
-                        .add_child(tmp.unwrap())
-                        .map_or(null_mut(), |node| node.as_ptr());
+                    list = tmp;
+                    parent = tmp;
                 }
-                last = null_mut();
+                last = None;
 
                 if index2 > 1 {
-                    end = xml_xptr_get_nth_child(cur, index2 as usize - 1);
+                    end = xml_xptr_get_nth_child(cur_node, index2 as usize - 1).unwrap();
                     index2 = 0;
                 }
                 if cur == start && index1 > 1 {
-                    cur = xml_xptr_get_nth_child(cur, index1 as usize - 1);
+                    cur = xml_xptr_get_nth_child(cur_node, index1 as usize - 1);
                     index1 = 0;
                 } else {
-                    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+                    cur = cur_node
+                        .children()
+                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
                 }
                 // Now gather the remaining nodes from cur to end
                 continue; /* while */
             }
-        } else if cur == start && list.is_null() {
+        } else if cur == start && list.is_none() {
             // looks superfluous but ...
             if matches!(
-                (*cur).typ,
+                cur_node.element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
-                let mut content: *const XmlChar = (*cur).content;
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let mut content: *const XmlChar = cur_node.content;
 
                 let tmp = if content.is_null() {
                     xml_new_text_len(null_mut(), 0)
@@ -2603,27 +2694,27 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                     }
                     xml_new_text(content)
                 };
-                last = tmp.map_or(null_mut(), |node| node.as_ptr());
-                list = tmp.map_or(null_mut(), |node| node.as_ptr());
+                last = tmp.map(|tmp| tmp.into());
+                list = tmp.map(|tmp| tmp.into());
             } else {
                 if cur == start && index1 > 1 {
-                    let tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 0);
-                    list = tmp.map_or(null_mut(), |node| node.as_ptr());
-                    parent = tmp.map_or(null_mut(), |node| node.as_ptr());
-                    last = null_mut();
-                    cur = xml_xptr_get_nth_child(cur, index1 as usize - 1);
+                    let tmp = xml_copy_node(cur_node, 0);
+                    list = tmp;
+                    parent = tmp;
+                    last = None;
+                    cur = xml_xptr_get_nth_child(cur_node, index1 as usize - 1);
                     index1 = 0;
                     // Now gather the remaining nodes from cur to end
                     continue; /* while */
                 }
-                let tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 1);
-                list = tmp.map_or(null_mut(), |node| node.as_ptr());
-                parent = null_mut();
-                last = tmp.map_or(null_mut(), |node| node.as_ptr());
+                let tmp = xml_copy_node(cur_node, 1);
+                list = tmp;
+                parent = None;
+                last = tmp;
             }
         } else {
             let mut tmp = None;
-            match (*cur).typ {
+            match cur_node.element_type() {
                 XmlElementType::XmlDTDNode
                 | XmlElementType::XmlElementDecl
                 | XmlElementType::XmlAttributeDecl
@@ -2639,29 +2730,27 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
                     STRANGE!();
                 }
                 _ => {
-                    tmp = xml_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), 1);
+                    tmp = xml_copy_node(cur_node, 1);
                 }
             }
             if let Some(tmp) = tmp {
-                if list.is_null() || (last.is_null() && parent.is_null()) {
+                if list.is_none() || (last.is_none() && parent.is_none()) {
                     STRANGE!();
-                    return null_mut();
+                    return None;
                 }
-                if !last.is_null() {
-                    (*last).add_next_sibling(tmp);
+                if let Some(last) = last {
+                    last.add_next_sibling(tmp);
                 } else {
-                    last = (*parent)
-                        .add_child(tmp)
-                        .map_or(null_mut(), |node| node.as_ptr());
+                    last = parent.unwrap().add_child(tmp);
                 }
             }
         }
         // Skip to next node in document order
-        if list.is_null() || (last.is_null() && parent.is_null()) {
+        if list.is_none() || (last.is_none() && parent.is_none()) {
             STRANGE!();
-            return null_mut();
+            return None;
         }
-        cur = xml_xptr_advance_node(cur, null_mut());
+        cur = xml_xptr_advance_node(cur_node, null_mut());
     }
     list
 }
@@ -2672,22 +2761,20 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> *mut XmlNo
 /// Returns an xmlNodePtr list or NULL. The caller has to free the node tree.
 #[doc(alias = "xmlXPtrBuildNodeList")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut XmlNode {
+pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> Option<XmlGenericNodePtr> {
     use crate::tree::{xml_copy_node, XmlGenericNodePtr};
 
-    let mut list: *mut XmlNode = null_mut();
-    let mut last: *mut XmlNode = null_mut();
+    let mut list = None;
+    let mut last: Option<XmlGenericNodePtr> = None;
 
     if obj.is_null() {
-        return null_mut();
+        return None;
     }
     match (*obj).typ {
         XmlXPathObjectType::XPathNodeset => {
-            let Some(set) = (*obj).nodesetval.as_deref() else {
-                return null_mut();
-            };
+            let set = (*obj).nodesetval.as_deref()?;
             for &node in &set.node_tab {
-                match (*node).element_type() {
+                match node.element_type() {
                     XmlElementType::XmlTextNode
                     | XmlElementType::XmlCDATASectionNode
                     | XmlElementType::XmlElementNode
@@ -2710,35 +2797,40 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut Xm
                     | XmlElementType::XmlEntityDecl => continue,
                     _ => unreachable!(),
                 }
-                if last.is_null() {
-                    list = xml_copy_node(node, 1).map_or(null_mut(), |node| node.as_ptr());
-                    last = list;
-                } else {
-                    (*last).add_next_sibling(xml_copy_node(node, 1).unwrap());
-                    if let Some(next) = (*last).next() {
-                        last = next.as_ptr();
+                if let Some(l) = last {
+                    l.add_next_sibling(xml_copy_node(node, 1).unwrap());
+                    if let Some(next) = l
+                        .next()
+                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+                    {
+                        last = Some(next);
                     }
+                } else {
+                    list = xml_copy_node(node, 1);
+                    last = list;
                 }
             }
         }
         XmlXPathObjectType::XPathLocationset => {
             let set: XmlLocationSetPtr = (*obj).user as XmlLocationSetPtr;
             if set.is_null() {
-                return null_mut();
+                return None;
             }
             for &loc in &(*set).loc_tab {
-                if last.is_null() {
+                if let Some(last) = last {
+                    last.add_next_sibling(xml_xptr_build_node_list(loc).unwrap());
+                } else {
                     list = xml_xptr_build_node_list(loc);
                     last = list;
-                } else {
-                    (*last).add_next_sibling(
-                        XmlGenericNodePtr::from_raw(xml_xptr_build_node_list(loc)).unwrap(),
-                    );
                 }
-                if !last.is_null() {
-                    while let Some(next) = (*last).next() {
-                        last = next.as_ptr();
+                if let Some(mut l) = last {
+                    while let Some(next) = l
+                        .next()
+                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+                    {
+                        l = next;
                     }
+                    last = Some(l);
                 }
             }
         }
@@ -2748,7 +2840,6 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> *mut Xm
                 XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode).unwrap(),
                 0,
             )
-            .map_or(null_mut(), |node| node.as_ptr())
         }
         _ => {}
     }
@@ -2859,36 +2950,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_xml_xptr_build_node_list() {
-        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_obj in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                let mem_base = xml_mem_blocks();
-                let obj = gen_xml_xpath_object_ptr(n_obj, 0);
-
-                let ret_val = xml_xptr_build_node_list(obj);
-                desret_xml_node_ptr(ret_val);
-                des_xml_xpath_object_ptr(n_obj, obj, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPtrBuildNodeList",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPtrBuildNodeList()"
-                    );
-                    eprintln!(" {}", n_obj);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xptr_eval() {
         #[cfg(feature = "xpointer")]
         unsafe {
@@ -2950,42 +3011,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xptr_new_collapsed_range() {
-        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_start in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let start = gen_xml_node_ptr(n_start, 0);
-
-                let ret_val = xml_xptr_new_collapsed_range(start);
-                desret_xml_xpath_object_ptr(ret_val);
-                des_xml_node_ptr(n_start, start, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPtrNewCollapsedRange",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPtrNewCollapsedRange()"
-                    );
-                    eprintln!(" {}", n_start);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xptr_new_context() {
-
-        /* missing type support */
-    }
-
-    #[test]
     fn test_xml_xptr_new_location_set_node_set() {
         #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
@@ -3010,223 +3035,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlXPtrNewLocationSetNodeSet()"
                     );
                     eprintln!(" {}", n_set);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xptr_new_location_set_nodes() {
-        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_start in 0..GEN_NB_XML_NODE_PTR {
-                for n_end in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let start = gen_xml_node_ptr(n_start, 0);
-                    let end = gen_xml_node_ptr(n_end, 1);
-
-                    let ret_val = xml_xptr_new_location_set_nodes(start, end);
-                    desret_xml_xpath_object_ptr(ret_val);
-                    des_xml_node_ptr(n_start, start, 0);
-                    des_xml_node_ptr(n_end, end, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPtrNewLocationSetNodes",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPtrNewLocationSetNodes()"
-                        );
-                        eprint!(" {}", n_start);
-                        eprintln!(" {}", n_end);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xptr_new_range() {
-        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_start in 0..GEN_NB_XML_NODE_PTR {
-                for n_startindex in 0..GEN_NB_INT {
-                    for n_end in 0..GEN_NB_XML_NODE_PTR {
-                        for n_endindex in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let start = gen_xml_node_ptr(n_start, 0);
-                            let startindex = gen_int(n_startindex, 1);
-                            let end = gen_xml_node_ptr(n_end, 2);
-                            let endindex = gen_int(n_endindex, 3);
-
-                            let ret_val = xml_xptr_new_range(start, startindex, end, endindex);
-                            desret_xml_xpath_object_ptr(ret_val);
-                            des_xml_node_ptr(n_start, start, 0);
-                            des_int(n_startindex, startindex, 1);
-                            des_xml_node_ptr(n_end, end, 2);
-                            des_int(n_endindex, endindex, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlXPtrNewRange",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlXPtrNewRange()");
-                                eprint!(" {}", n_start);
-                                eprint!(" {}", n_startindex);
-                                eprint!(" {}", n_end);
-                                eprintln!(" {}", n_endindex);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xptr_new_range_node_object() {
-        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_start in 0..GEN_NB_XML_NODE_PTR {
-                for n_end in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let start = gen_xml_node_ptr(n_start, 0);
-                    let end = gen_xml_xpath_object_ptr(n_end, 1);
-
-                    let ret_val = xml_xptr_new_range_node_object(start, end);
-                    desret_xml_xpath_object_ptr(ret_val);
-                    des_xml_node_ptr(n_start, start, 0);
-                    des_xml_xpath_object_ptr(n_end, end, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPtrNewRangeNodeObject",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPtrNewRangeNodeObject()"
-                        );
-                        eprint!(" {}", n_start);
-                        eprintln!(" {}", n_end);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xptr_new_range_node_point() {
-        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_start in 0..GEN_NB_XML_NODE_PTR {
-                for n_end in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let start = gen_xml_node_ptr(n_start, 0);
-                    let end = gen_xml_xpath_object_ptr(n_end, 1);
-
-                    let ret_val = xml_xptr_new_range_node_point(start, end);
-                    desret_xml_xpath_object_ptr(ret_val);
-                    des_xml_node_ptr(n_start, start, 0);
-                    des_xml_xpath_object_ptr(n_end, end, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPtrNewRangeNodePoint",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPtrNewRangeNodePoint()"
-                        );
-                        eprint!(" {}", n_start);
-                        eprintln!(" {}", n_end);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xptr_new_range_nodes() {
-        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_start in 0..GEN_NB_XML_NODE_PTR {
-                for n_end in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let start = gen_xml_node_ptr(n_start, 0);
-                    let end = gen_xml_node_ptr(n_end, 1);
-
-                    let ret_val = xml_xptr_new_range_nodes(start, end);
-                    desret_xml_xpath_object_ptr(ret_val);
-                    des_xml_node_ptr(n_start, start, 0);
-                    des_xml_node_ptr(n_end, end, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPtrNewRangeNodes",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPtrNewRangeNodes()"
-                        );
-                        eprint!(" {}", n_start);
-                        eprintln!(" {}", n_end);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xptr_new_range_point_node() {
-        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_start in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                for n_end in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let start = gen_xml_xpath_object_ptr(n_start, 0);
-                    let end = gen_xml_node_ptr(n_end, 1);
-
-                    let ret_val = xml_xptr_new_range_point_node(start, end);
-                    desret_xml_xpath_object_ptr(ret_val);
-                    des_xml_xpath_object_ptr(n_start, start, 0);
-                    des_xml_node_ptr(n_end, end, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPtrNewRangePointNode",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPtrNewRangePointNode()"
-                        );
-                        eprint!(" {}", n_start);
-                        eprintln!(" {}", n_end);
-                    }
                 }
             }
         }
