@@ -266,9 +266,9 @@ pub struct XmlXPathContext {
     pub(crate) proximity_position: i32, /* the proximity position */
 
     // extra stuff for XPointer
-    pub(crate) xptr: i32,            /* is this an XPointer context? */
-    pub(crate) here: *mut XmlNode,   /* for here() */
-    pub(crate) origin: *mut XmlNode, /* for origin() */
+    pub(crate) xptr: i32, /* is this an XPointer context? */
+    pub(crate) here: Option<XmlGenericNodePtr>, /* for here() */
+    pub(crate) origin: Option<XmlGenericNodePtr>, /* for origin() */
 
     // the set of namespace declarations in scope for the expression
     pub(crate) ns_hash: Option<XmlHashTableRef<'static, *mut XmlChar>>, /* The namespaces hash table */
@@ -329,8 +329,8 @@ impl Default for XmlXPathContext {
             context_size: 0,
             proximity_position: 0,
             xptr: 0,
-            here: null_mut(),
-            origin: null_mut(),
+            here: None,
+            origin: None,
             ns_hash: None,
             var_lookup_func: None,
             var_lookup_data: null_mut(),

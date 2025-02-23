@@ -2564,7 +2564,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     if cfg!(feature = "xpointer") && xptr != 0 {
         #[cfg(feature = "xpointer")]
         {
-            ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), null_mut(), null_mut());
+            ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), None, None);
             res = xml_xptr_eval(str as _, ctxt);
         }
     } else {

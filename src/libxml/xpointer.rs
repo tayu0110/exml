@@ -276,8 +276,6 @@ unsafe fn xml_xptr_cmp_points(
 #[doc(alias = "xmlXPtrRangeCheckOrder")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_range_check_order(range: XmlXPathObjectPtr) {
-    let mut tmp: i32;
-    let tmp2: *mut XmlNode;
     if range.is_null() {
         return;
     }
@@ -287,19 +285,15 @@ unsafe fn xml_xptr_range_check_order(range: XmlXPathObjectPtr) {
     if (*range).user2.is_null() {
         return;
     }
-    tmp = xml_xptr_cmp_points(
+    let tmp = xml_xptr_cmp_points(
         XmlGenericNodePtr::from_raw((*range).user as *mut XmlNode).unwrap(),
         (*range).index,
         XmlGenericNodePtr::from_raw((*range).user2 as *mut XmlNode).unwrap(),
         (*range).index2,
     );
     if tmp == -1 {
-        tmp2 = (*range).user as _;
-        (*range).user = (*range).user2;
-        (*range).user2 = tmp2 as _;
-        tmp = (*range).index;
-        (*range).index = (*range).index2;
-        (*range).index2 = tmp;
+        std::mem::swap(&mut (*range).user, &mut (*range).user2);
+        std::mem::swap(&mut (*range).index, &mut (*range).index2);
     }
 }
 
@@ -1672,10 +1666,10 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewPoint")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_new_point(node: *mut XmlNode, indx: i32) -> XmlXPathObjectPtr {
-    if node.is_null() {
-        return null_mut();
-    }
+unsafe fn xml_xptr_new_point(node: XmlGenericNodePtr, indx: i32) -> XmlXPathObjectPtr {
+    // if node.is_null() {
+    //     return null_mut();
+    // }
     if indx < 0 {
         return null_mut();
     }
@@ -1687,7 +1681,7 @@ unsafe fn xml_xptr_new_point(node: *mut XmlNode, indx: i32) -> XmlXPathObjectPtr
     }
     std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathPoint;
-    (*ret).user = node as *mut c_void;
+    (*ret).user = node.as_ptr() as *mut c_void;
     (*ret).index = indx;
     ret
 }
@@ -1749,13 +1743,16 @@ unsafe fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPtr, nargs: i
             point = null_mut();
             match (*tmp).typ {
                 XmlXPathObjectType::XPathPoint => {
-                    point = xml_xptr_new_point((*tmp).user as _, (*tmp).index)
+                    point = xml_xptr_new_point(
+                        XmlGenericNodePtr::from_raw((*tmp).user as *mut XmlNode).unwrap(),
+                        (*tmp).index,
+                    )
                 }
                 XmlXPathObjectType::XPathRange => {
-                    let node: *mut XmlNode = (*tmp).user as _;
-                    if !node.is_null() {
+                    let node = XmlGenericNodePtr::from_raw((*tmp).user as *mut XmlNode);
+                    if let Some(node) = node {
                         if matches!(
-                            (*node).typ,
+                            node.element_type(),
                             XmlElementType::XmlAttributeNode | XmlElementType::XmlNamespaceDecl
                         ) {
                             xml_xpath_free_object(obj);
@@ -1788,21 +1785,27 @@ unsafe fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPtr, nargs: i
 /// Returns the number of location children
 #[doc(alias = "xmlXPtrNbLocChildren")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_nb_loc_children(node: *mut XmlNode) -> i32 {
+unsafe fn xml_xptr_nb_loc_children(node: XmlGenericNodePtr) -> i32 {
+    use crate::tree::XmlNodePtr;
+
     let mut ret: i32 = 0;
-    if node.is_null() {
-        return -1;
-    }
-    match (*node).typ {
+    // if node.is_null() {
+    //     return -1;
+    // }
+    match node.element_type() {
         XmlElementType::XmlHTMLDocumentNode
         | XmlElementType::XmlDocumentNode
         | XmlElementType::XmlElementNode => {
-            let mut node = (*node).children();
+            let mut node = node
+                .children()
+                .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
             while let Some(now) = node {
                 if now.element_type() == XmlElementType::XmlElementNode {
                     ret += 1;
                 }
-                node = now.next();
+                node = now
+                    .next()
+                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
             }
         }
         XmlElementType::XmlAttributeNode => return -1,
@@ -1810,7 +1813,10 @@ unsafe fn xml_xptr_nb_loc_children(node: *mut XmlNode) -> i32 {
         | XmlElementType::XmlCommentNode
         | XmlElementType::XmlTextNode
         | XmlElementType::XmlCDATASectionNode
-        | XmlElementType::XmlEntityRefNode => ret = xml_strlen((*node).content),
+        | XmlElementType::XmlEntityRefNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            ret = xml_strlen(node.content);
+        }
         _ => return -1,
     }
     ret
@@ -1876,13 +1882,16 @@ unsafe fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32
             point = null_mut();
             match (*tmp).typ {
                 XmlXPathObjectType::XPathPoint => {
-                    point = xml_xptr_new_point((*tmp).user as _, (*tmp).index)
+                    point = xml_xptr_new_point(
+                        XmlGenericNodePtr::from_raw((*tmp).user as *mut XmlNode).unwrap(),
+                        (*tmp).index,
+                    )
                 }
                 XmlXPathObjectType::XPathRange => {
-                    let node: *mut XmlNode = (*tmp).user2 as _;
-                    if !node.is_null() {
+                    let node = XmlGenericNodePtr::from_raw((*tmp).user2 as *mut XmlNode);
+                    if let Some(node) = node {
                         if matches!(
-                            (*node).typ,
+                            node.element_type(),
                             XmlElementType::XmlAttributeNode | XmlElementType::XmlNamespaceDecl
                         ) {
                             xml_xpath_free_object(obj);
@@ -1891,7 +1900,9 @@ unsafe fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32
                         }
                         point = xml_xptr_new_point(node, (*tmp).index2);
                     } else if (*tmp).user.is_null() {
-                        point = xml_xptr_new_point(node, xml_xptr_nb_loc_children(node));
+                        // The following code seems that always fails...
+                        // point = xml_xptr_new_point(node, xml_xptr_nb_loc_children(node));
+                        point = null_mut();
                     }
                 }
                 _ => {
@@ -1916,17 +1927,11 @@ unsafe fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32
 unsafe fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
 
-    if (*(*ctxt).context).here.is_null() {
+    let Some(here) = (*(*ctxt).context).here else {
         XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
-    }
+    };
 
-    value_push(
-        ctxt,
-        xml_xptr_new_location_set_nodes(
-            XmlGenericNodePtr::from_raw((*(*ctxt).context).here).unwrap(),
-            None,
-        ),
-    );
+    value_push(ctxt, xml_xptr_new_location_set_nodes(here, None));
 }
 
 /// Function implementing origin() operation
@@ -1936,17 +1941,11 @@ unsafe fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
 unsafe fn xml_xptr_origin_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
 
-    if (*(*ctxt).context).origin.is_null() {
+    let Some(origin) = (*(*ctxt).context).origin else {
         XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
-    }
+    };
 
-    value_push(
-        ctxt,
-        xml_xptr_new_location_set_nodes(
-            XmlGenericNodePtr::from_raw((*(*ctxt).context).origin).unwrap(),
-            None,
-        ),
-    );
+    value_push(ctxt, xml_xptr_new_location_set_nodes(origin, None));
 }
 
 /// Create a new XPointer context.  
@@ -1957,8 +1956,8 @@ unsafe fn xml_xptr_origin_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
 /// - If the context generation fails, this method may return null.
 pub unsafe fn xml_xptr_new_context(
     doc: Option<XmlDocPtr>,
-    _here: *mut XmlNode,
-    _origin: *mut XmlNode,
+    here: Option<XmlGenericNodePtr>,
+    origin: Option<XmlGenericNodePtr>,
 ) -> XmlXPathContextPtr {
     let ret: XmlXPathContextPtr = xml_xpath_new_context(doc);
     if ret.is_null() {
@@ -1967,8 +1966,8 @@ pub unsafe fn xml_xptr_new_context(
     #[cfg(feature = "libxml_xptr_locs")]
     {
         (*ret).xptr = 1;
-        (*ret).here = _here;
-        (*ret).origin = _origin;
+        (*ret).here = here;
+        (*ret).origin = origin;
 
         xml_xpath_register_func(ret, c"range".as_ptr() as _, xml_xptr_range_function);
         xml_xpath_register_func(
