@@ -429,16 +429,25 @@ pub unsafe fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronParserCtxtPtr) 
     xml_free(ctxt as _);
 }
 
-macro_rules! IS_SCHEMATRON {
-    ($node:expr, $elem:expr) => {
-        !$node.is_null()
-            && ((*$node).element_type() == XmlElementType::XmlElementNode)
-            && xml_str_equal((*$node).name, $elem)
-            && (*$node).ns.map_or(false, |ns| {
-                xml_str_equal(ns.href, XML_SCHEMATRON_NS.as_ptr() as _)
-                    || xml_str_equal(ns.href, XML_OLD_SCHEMATRON_NS.as_ptr() as _)
-            })
-    };
+// macro_rules! IS_SCHEMATRON {
+//     ($node:expr, $elem:expr) => {
+//         !$node.is_null()
+//             && ((*$node).element_type() == XmlElementType::XmlElementNode)
+//             && xml_str_equal((*$node).name, $elem)
+//             && (*$node).ns.map_or(false, |ns| {
+//                 xml_str_equal(ns.href, XML_SCHEMATRON_NS.as_ptr() as _)
+//                     || xml_str_equal(ns.href, XML_OLD_SCHEMATRON_NS.as_ptr() as _)
+//             })
+//     };
+// }
+
+unsafe fn is_schematron(node: XmlNodePtr, elem: &str) -> bool {
+    node.element_type() == XmlElementType::XmlElementNode
+        && node.name().as_deref() == Some(elem)
+        && node.ns.map_or(false, |ns| {
+            ns.href().as_deref() == Some(XML_SCHEMATRON_NS.to_str().unwrap())
+                || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS.to_str().unwrap())
+        })
 }
 
 macro_rules! NEXT_SCHEMATRON {
@@ -679,9 +688,9 @@ unsafe fn xml_schematron_parse_test_report_msg(ctxt: XmlSchematronParserCtxtPtr,
             || cur_node.element_type() == XmlElementType::XmlCDATASectionNode
         {
             // Do Nothing
-        } else if IS_SCHEMATRON!(cur_node.as_ptr(), c"name".as_ptr() as _) {
+        } else if is_schematron(cur_node, "name") {
             // Do Nothing
-        } else if IS_SCHEMATRON!(cur_node.as_ptr(), c"value-of".as_ptr() as _) {
+        } else if is_schematron(cur_node, "value-of") {
             if let Some(select) = cur_node.get_no_ns_prop("select") {
                 let cselect = CString::new(select.as_str()).unwrap();
                 // try first to compile the test expression
@@ -818,7 +827,7 @@ unsafe fn xml_schematron_parse_rule(
     let mut cur = rule.children().map_or(null_mut(), |c| c.as_ptr());
     NEXT_SCHEMATRON!(cur);
     while !cur.is_null() {
-        if IS_SCHEMATRON!(cur, c"let".as_ptr() as _) {
+        if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "let") {
             let name = match (*cur).get_no_ns_prop("name") {
                 Some(name) if name.is_empty() => {
                     xml_schematron_perr!(
@@ -889,7 +898,7 @@ unsafe fn xml_schematron_parse_rule(
                 (*letr).next = (*ruleptr).lets;
             }
             (*ruleptr).lets = letr;
-        } else if IS_SCHEMATRON!(cur, c"assert".as_ptr() as _) {
+        } else if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "assert") {
             let cur = XmlNodePtr::from_raw(cur).unwrap().unwrap();
             nb_checks += 1;
             match (*cur).get_no_ns_prop("test") {
@@ -929,7 +938,7 @@ unsafe fn xml_schematron_parse_rule(
                     );
                 }
             }
-        } else if IS_SCHEMATRON!(cur, c"report".as_ptr() as _) {
+        } else if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "report") {
             let cur = XmlNodePtr::from_raw(cur).unwrap().unwrap();
             nb_checks += 1;
             match (*cur).get_no_ns_prop("test") {
@@ -1018,7 +1027,7 @@ unsafe fn xml_schematron_parse_pattern(ctxt: XmlSchematronParserCtxtPtr, pat: Xm
     let mut cur = pat.children().map_or(null_mut(), |c| c.as_ptr());
     NEXT_SCHEMATRON!(cur);
     while !cur.is_null() {
-        if IS_SCHEMATRON!(cur, c"rule".as_ptr() as _) {
+        if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "rule") {
             let cur = XmlNodePtr::from_raw(cur).unwrap().unwrap();
             xml_schematron_parse_rule(ctxt, pattern, cur);
             nb_rules += 1;
@@ -1119,7 +1128,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
         return null_mut();
     };
 
-    if !IS_SCHEMATRON!(root.as_ptr(), c"schema".as_ptr() as _) {
+    if !is_schematron(root, "schema") {
         let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
         xml_schematron_perr!(
             ctxt,
@@ -1139,7 +1148,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
             // scan the schema elements
             cur = (*root).children().map_or(null_mut(), |c| c.as_ptr());
             NEXT_SCHEMATRON!(cur);
-            if IS_SCHEMATRON!(cur, c"title".as_ptr() as _) {
+            if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "title") {
                 if let Some(title) = (*cur).get_content() {
                     let title = CString::new(title).unwrap();
                     (*ret).title = xml_dict_lookup((*ret).dict, title.as_ptr() as *const u8, -1);
@@ -1147,7 +1156,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                 NEXT_SCHEMATRON!(cur);
             }
-            while IS_SCHEMATRON!(cur, c"ns".as_ptr() as _) {
+            while is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "ns") {
                 let prefix = (*cur).get_no_ns_prop("prefix");
                 let uri = (*cur).get_no_ns_prop("uri");
                 if uri.as_deref().map_or(true, |uri| uri.is_empty()) {
@@ -1185,7 +1194,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 NEXT_SCHEMATRON!(cur);
             }
             while !cur.is_null() {
-                if IS_SCHEMATRON!(cur, c"pattern".as_ptr() as _) {
+                if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "pattern") {
                     let cur = XmlNodePtr::from_raw(cur).unwrap().unwrap();
                     xml_schematron_parse_pattern(ctxt, cur);
                     (*ret).nb_pattern += 1;
@@ -1508,7 +1517,7 @@ unsafe fn xml_schematron_format_report(
             || cur_node.element_type() == XmlElementType::XmlCDATASectionNode
         {
             ret = xml_strcat(ret, cur_node.content);
-        } else if IS_SCHEMATRON!(cur_node.as_ptr(), c"name".as_ptr() as _) {
+        } else if is_schematron(cur_node, "name") {
             let path = cur_node.get_no_ns_prop("path");
 
             node = cur;
@@ -1531,7 +1540,7 @@ unsafe fn xml_schematron_format_report(
             } else {
                 ret = xml_strcat(ret, (*node).name);
             }
-        } else if IS_SCHEMATRON!(cur_node.as_ptr(), c"value-of".as_ptr() as _) {
+        } else if is_schematron(cur_node, "value-of") {
             let select = cur_node
                 .get_no_ns_prop("select")
                 .map(|s| CString::new(s).unwrap());
