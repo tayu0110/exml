@@ -286,11 +286,11 @@ const XML_STRON_CTXT_VALIDATOR: i32 = 2;
 
 const SCHEMATRON_PARSE_OPTIONS: XmlParserOption = XmlParserOption::XmlParseNoEnt;
 
-const SCT_OLD_NS: &CStr = c"http://www.ascc.net/xml/schematron";
+const SCT_OLD_NS: &str = "http://www.ascc.net/xml/schematron";
 
-const XML_SCHEMATRON_NS: &CStr = c"http://purl.oclc.org/dsdl/schematron";
+const XML_SCHEMATRON_NS: &str = "http://purl.oclc.org/dsdl/schematron";
 
-const XML_OLD_SCHEMATRON_NS: &CStr = SCT_OLD_NS;
+const XML_OLD_SCHEMATRON_NS: &str = SCT_OLD_NS;
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchematronPErrMemory")]
@@ -431,33 +431,17 @@ unsafe fn is_schematron(node: XmlNodePtr, elem: &str) -> bool {
     node.element_type() == XmlElementType::XmlElementNode
         && node.name().as_deref() == Some(elem)
         && node.ns.map_or(false, |ns| {
-            ns.href().as_deref() == Some(XML_SCHEMATRON_NS.to_str().unwrap())
-                || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS.to_str().unwrap())
+            ns.href().as_deref() == Some(XML_SCHEMATRON_NS)
+                || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS)
         })
 }
-
-// macro_rules! NEXT_SCHEMATRON {
-//     ($node:expr) => {
-//         while !$node.is_null() {
-//             if ((*$node).element_type() == XmlElementType::XmlElementNode)
-//                 && (*$node).ns.map_or(false, |ns| {
-//                     xml_str_equal(ns.href, XML_SCHEMATRON_NS.as_ptr() as _)
-//                         || xml_str_equal(ns.href, XML_OLD_SCHEMATRON_NS.as_ptr() as _)
-//                 })
-//             {
-//                 break;
-//             }
-//             $node = (*$node).next.map_or(null_mut(), |n| n.as_ptr());
-//         }
-//     };
-// }
 
 unsafe fn next_schematron(mut node: Option<XmlNodePtr>) -> Option<XmlNodePtr> {
     while let Some(cur) = node {
         if cur.element_type() == XmlElementType::XmlElementNode
             && cur.ns.map_or(false, |ns| {
-                ns.href().as_deref() == Some(XML_SCHEMATRON_NS.to_str().unwrap())
-                    || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS.to_str().unwrap())
+                ns.href().as_deref() == Some(XML_SCHEMATRON_NS)
+                    || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS)
             })
         {
             break;
