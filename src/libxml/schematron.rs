@@ -33,7 +33,6 @@ use crate::{
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
-    libxml::xmlstring::xml_str_equal,
     parser::{xml_read_file, xml_read_memory},
     tree::{
         xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr,
@@ -429,18 +428,6 @@ pub unsafe fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronParserCtxtPtr) 
     xml_free(ctxt as _);
 }
 
-// macro_rules! IS_SCHEMATRON {
-//     ($node:expr, $elem:expr) => {
-//         !$node.is_null()
-//             && ((*$node).element_type() == XmlElementType::XmlElementNode)
-//             && xml_str_equal((*$node).name, $elem)
-//             && (*$node).ns.map_or(false, |ns| {
-//                 xml_str_equal(ns.href, XML_SCHEMATRON_NS.as_ptr() as _)
-//                     || xml_str_equal(ns.href, XML_OLD_SCHEMATRON_NS.as_ptr() as _)
-//             })
-//     };
-// }
-
 unsafe fn is_schematron(node: XmlNodePtr, elem: &str) -> bool {
     node.element_type() == XmlElementType::XmlElementNode
         && node.name().as_deref() == Some(elem)
@@ -450,20 +437,37 @@ unsafe fn is_schematron(node: XmlNodePtr, elem: &str) -> bool {
         })
 }
 
-macro_rules! NEXT_SCHEMATRON {
-    ($node:expr) => {
-        while !$node.is_null() {
-            if ((*$node).element_type() == XmlElementType::XmlElementNode)
-                && (*$node).ns.map_or(false, |ns| {
-                    xml_str_equal(ns.href, XML_SCHEMATRON_NS.as_ptr() as _)
-                        || xml_str_equal(ns.href, XML_OLD_SCHEMATRON_NS.as_ptr() as _)
-                })
-            {
-                break;
-            }
-            $node = (*$node).next.map_or(null_mut(), |n| n.as_ptr());
+// macro_rules! NEXT_SCHEMATRON {
+//     ($node:expr) => {
+//         while !$node.is_null() {
+//             if ((*$node).element_type() == XmlElementType::XmlElementNode)
+//                 && (*$node).ns.map_or(false, |ns| {
+//                     xml_str_equal(ns.href, XML_SCHEMATRON_NS.as_ptr() as _)
+//                         || xml_str_equal(ns.href, XML_OLD_SCHEMATRON_NS.as_ptr() as _)
+//                 })
+//             {
+//                 break;
+//             }
+//             $node = (*$node).next.map_or(null_mut(), |n| n.as_ptr());
+//         }
+//     };
+// }
+
+unsafe fn next_schematron(mut node: Option<XmlNodePtr>) -> Option<XmlNodePtr> {
+    while let Some(cur) = node {
+        if cur.element_type() == XmlElementType::XmlElementNode
+            && cur.ns.map_or(false, |ns| {
+                ns.href().as_deref() == Some(XML_SCHEMATRON_NS.to_str().unwrap())
+                    || ns.href().as_deref() == Some(XML_OLD_SCHEMATRON_NS.to_str().unwrap())
+            })
+        {
+            break;
         }
-    };
+        node = cur
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+    }
+    node
 }
 
 /// Handle a parser error
@@ -824,15 +828,17 @@ unsafe fn xml_schematron_parse_rule(
         }
     }
 
-    let mut cur = rule.children().map_or(null_mut(), |c| c.as_ptr());
-    NEXT_SCHEMATRON!(cur);
-    while !cur.is_null() {
-        if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "let") {
-            let name = match (*cur).get_no_ns_prop("name") {
+    let mut cur = rule
+        .children()
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    cur = next_schematron(cur);
+    while let Some(cur_node) = cur {
+        if is_schematron(cur_node, "let") {
+            let name = match cur_node.get_no_ns_prop("name") {
                 Some(name) if name.is_empty() => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur,
+                        cur_node.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "let has an empty name attribute"
                     );
@@ -845,18 +851,18 @@ unsafe fn xml_schematron_parse_rule(
                 None => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur,
+                        cur_node.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "let has no name attribute"
                     );
                     return;
                 }
             };
-            let value = match (*cur).get_no_ns_prop("value") {
+            let value = match cur_node.get_no_ns_prop("value") {
                 Some(value) if value.is_empty() => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur,
+                        cur_node.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "let has an empty value attribute"
                     );
@@ -866,7 +872,7 @@ unsafe fn xml_schematron_parse_rule(
                 None => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur,
+                        cur_node.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "let has no value attribute"
                     );
@@ -879,7 +885,7 @@ unsafe fn xml_schematron_parse_rule(
             if var_comp.is_null() {
                 xml_schematron_perr!(
                     ctxt,
-                    cur,
+                    cur_node.as_ptr(),
                     XmlParserErrors::XmlSchemapNoroot,
                     "Failed to compile let expression {}",
                     value.to_string_lossy().into_owned()
@@ -898,21 +904,20 @@ unsafe fn xml_schematron_parse_rule(
                 (*letr).next = (*ruleptr).lets;
             }
             (*ruleptr).lets = letr;
-        } else if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "assert") {
-            let cur = XmlNodePtr::from_raw(cur).unwrap().unwrap();
+        } else if is_schematron(cur_node, "assert") {
             nb_checks += 1;
-            match (*cur).get_no_ns_prop("test") {
+            match cur_node.get_no_ns_prop("test") {
                 Some(test) if test.is_empty() => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur.as_ptr(),
+                        cur_node.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "assert has an empty test attribute"
                     );
                 }
                 Some(test) => {
-                    xml_schematron_parse_test_report_msg(ctxt, cur);
-                    let tmp = (*cur).get_content().map(|c| CString::new(c).unwrap());
+                    xml_schematron_parse_test_report_msg(ctxt, cur_node);
+                    let tmp = cur_node.get_content().map(|c| CString::new(c).unwrap());
                     report = tmp.map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
 
                     let test = CString::new(test).unwrap();
@@ -921,7 +926,7 @@ unsafe fn xml_schematron_parse_rule(
                         ctxt,
                         XmlSchematronTestType::XmlSchematronAssert,
                         ruleptr,
-                        cur,
+                        cur_node,
                         test,
                         report,
                     );
@@ -932,27 +937,26 @@ unsafe fn xml_schematron_parse_rule(
                 None => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur.as_ptr(),
+                        cur_node.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "assert has no test attribute"
                     );
                 }
             }
-        } else if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "report") {
-            let cur = XmlNodePtr::from_raw(cur).unwrap().unwrap();
+        } else if is_schematron(cur_node, "report") {
             nb_checks += 1;
-            match (*cur).get_no_ns_prop("test") {
+            match cur_node.get_no_ns_prop("test") {
                 Some(test) if test.is_empty() => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur.as_ptr(),
+                        cur_node.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "assert has an empty test attribute"
                     );
                 }
                 Some(test) => {
-                    xml_schematron_parse_test_report_msg(ctxt, cur);
-                    let tmp = (*cur).get_content().map(|c| CString::new(c).unwrap());
+                    xml_schematron_parse_test_report_msg(ctxt, cur_node);
+                    let tmp = cur_node.get_content().map(|c| CString::new(c).unwrap());
                     report = tmp.map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
 
                     let test = CString::new(test).unwrap();
@@ -961,7 +965,7 @@ unsafe fn xml_schematron_parse_rule(
                         ctxt,
                         XmlSchematronTestType::XmlSchematronReport,
                         ruleptr,
-                        cur,
+                        cur_node,
                         test,
                         report,
                     );
@@ -972,7 +976,7 @@ unsafe fn xml_schematron_parse_rule(
                 None => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur.as_ptr(),
+                        cur_node.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "assert has no test attribute"
                     );
@@ -981,14 +985,16 @@ unsafe fn xml_schematron_parse_rule(
         } else {
             xml_schematron_perr!(
                 ctxt,
-                cur,
+                cur_node.as_ptr(),
                 XmlParserErrors::XmlSchemapNoroot,
                 "Expecting an assert or a report element instead of {}",
-                (*cur).name().unwrap()
+                cur_node.name().unwrap().into_owned()
             );
         }
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-        NEXT_SCHEMATRON!(cur);
+        cur = cur_node
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        cur = next_schematron(cur);
     }
     if nb_checks == 0 {
         xml_schematron_perr!(
@@ -1024,24 +1030,27 @@ unsafe fn xml_schematron_parse_pattern(ctxt: XmlSchematronParserCtxtPtr, pat: Xm
         }
         return;
     }
-    let mut cur = pat.children().map_or(null_mut(), |c| c.as_ptr());
-    NEXT_SCHEMATRON!(cur);
-    while !cur.is_null() {
-        if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "rule") {
-            let cur = XmlNodePtr::from_raw(cur).unwrap().unwrap();
-            xml_schematron_parse_rule(ctxt, pattern, cur);
+    let mut cur = pat
+        .children()
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    cur = next_schematron(cur);
+    while let Some(cur_node) = cur {
+        if is_schematron(cur_node, "rule") {
+            xml_schematron_parse_rule(ctxt, pattern, cur_node);
             nb_rules += 1;
         } else {
             xml_schematron_perr!(
                 ctxt,
-                cur,
+                cur_node.as_ptr(),
                 XmlParserErrors::XmlSchemapNoroot,
                 "Expecting a rule element instead of {}",
-                (*cur).name().unwrap()
+                cur_node.name().unwrap().into_owned()
             );
         }
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-        NEXT_SCHEMATRON!(cur);
+        cur = cur_node
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        cur = next_schematron(cur);
     }
     if nb_rules == 0 {
         xml_schematron_perr!(
@@ -1060,7 +1069,6 @@ unsafe fn xml_schematron_parse_pattern(ctxt: XmlSchematronParserCtxtPtr, pat: Xm
 #[doc(alias = "xmlSchematronParse")]
 pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchematronPtr {
     let mut ret: XmlSchematronPtr = null_mut();
-    let mut cur: *mut XmlNode;
     let mut preserve: i32 = 0;
 
     if ctxt.is_null() {
@@ -1146,23 +1154,29 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
             (*ctxt).schema = ret;
 
             // scan the schema elements
-            cur = (*root).children().map_or(null_mut(), |c| c.as_ptr());
-            NEXT_SCHEMATRON!(cur);
-            if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "title") {
-                if let Some(title) = (*cur).get_content() {
+            let cur = root
+                .children()
+                .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+            let mut cur = next_schematron(cur).unwrap();
+            if is_schematron(cur, "title") {
+                if let Some(title) = cur.get_content() {
                     let title = CString::new(title).unwrap();
                     (*ret).title = xml_dict_lookup((*ret).dict, title.as_ptr() as *const u8, -1);
                 }
-                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-                NEXT_SCHEMATRON!(cur);
+                cur = next_schematron(
+                    cur.next
+                        .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap()),
+                )
+                .unwrap();
             }
-            while is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "ns") {
-                let prefix = (*cur).get_no_ns_prop("prefix");
-                let uri = (*cur).get_no_ns_prop("uri");
+            let mut next = Some(cur);
+            while is_schematron(cur, "ns") {
+                let prefix = cur.get_no_ns_prop("prefix");
+                let uri = cur.get_no_ns_prop("uri");
                 if uri.as_deref().map_or(true, |uri| uri.is_empty()) {
                     xml_schematron_perr!(
                         ctxt,
-                        cur,
+                        cur.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "ns element has no uri"
                     );
@@ -1170,7 +1184,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 if prefix.as_deref().map_or(true, |pre| pre.is_empty()) {
                     xml_schematron_perr!(
                         ctxt,
-                        cur,
+                        cur.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "ns element has no prefix"
                     );
@@ -1190,25 +1204,34 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                     );
                     (*ret).nb_ns += 1;
                 }
-                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-                NEXT_SCHEMATRON!(cur);
+                next = next_schematron(
+                    cur.next
+                        .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap()),
+                );
+                if let Some(next) = next {
+                    cur = next;
+                } else {
+                    break;
+                }
             }
-            while !cur.is_null() {
-                if is_schematron(XmlNodePtr::from_raw(cur).unwrap().unwrap(), "pattern") {
-                    let cur = XmlNodePtr::from_raw(cur).unwrap().unwrap();
-                    xml_schematron_parse_pattern(ctxt, cur);
+            let mut cur = next;
+            while let Some(cur_node) = cur {
+                if is_schematron(cur_node, "pattern") {
+                    xml_schematron_parse_pattern(ctxt, cur_node);
                     (*ret).nb_pattern += 1;
                 } else {
                     xml_schematron_perr!(
                         ctxt,
-                        cur,
+                        cur_node.as_ptr(),
                         XmlParserErrors::XmlSchemapNoroot,
                         "Expecting a pattern element instead of {}",
-                        (*cur).name().unwrap()
+                        cur_node.name().unwrap().into_owned()
                     );
                 }
-                cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-                NEXT_SCHEMATRON!(cur);
+                cur = cur_node
+                    .next
+                    .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                cur = next_schematron(cur);
             }
             if (*ret).nb_pattern == 0 {
                 let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
