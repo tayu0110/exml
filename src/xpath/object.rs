@@ -133,8 +133,6 @@ impl Default for XmlXPathObject {
     }
 }
 
-impl XmlXPathObject {}
-
 impl From<&str> for XmlXPathObject {
     fn from(value: &str) -> Self {
         Self {

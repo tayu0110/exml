@@ -1957,12 +1957,15 @@ unsafe fn test_sax(filename: &str) {
 
 #[cfg(feature = "libxml_reader")]
 unsafe fn process_node(reader: XmlTextReaderPtr) {
-    use exml::libxml::{
-        pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
-        xmlreader::{
-            xml_text_reader_const_local_name, xml_text_reader_const_name,
-            xml_text_reader_const_namespace_uri, xml_text_reader_const_value, XmlReaderTypes,
+    use exml::{
+        libxml::{
+            pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
+            xmlreader::{
+                xml_text_reader_const_local_name, xml_text_reader_const_name,
+                xml_text_reader_const_namespace_uri, xml_text_reader_const_value, XmlReaderTypes,
+            },
         },
+        tree::XmlGenericNodePtr,
     };
 
     let mut name: *const XmlChar;
@@ -2000,8 +2003,10 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
 
         if typ == XmlReaderTypes::XmlReaderTypeElement {
             // do the check only on element start
-            is_match =
-                xml_pattern_match(PATTERNC.load(Ordering::Relaxed), (*reader).current_node());
+            is_match = xml_pattern_match(
+                PATTERNC.load(Ordering::Relaxed),
+                XmlGenericNodePtr::from_raw((*reader).current_node()).unwrap(),
+            );
 
             if is_match != 0 {
                 let pattern = CMD_ARGS.pattern.as_deref().unwrap_or("(null)");

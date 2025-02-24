@@ -32,6 +32,7 @@ use std::{
 
 use libc::memset;
 
+use crate::tree::XmlAttrPtr;
 use crate::{
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
@@ -39,7 +40,7 @@ use crate::{
         parser_internals::{xml_is_letter, xml_string_current_char},
         xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
     },
-    tree::{NodeCommon, XmlElementType, XmlNode, XML_XML_NAMESPACE},
+    tree::{XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr, XML_XML_NAMESPACE},
 };
 
 const XML_STREAM_STEP_DESC: usize = 1;
@@ -1324,7 +1325,7 @@ pub type XmlStepStatePtr = *mut XmlStepState;
 #[repr(C)]
 pub struct XmlStepState {
     step: i32,
-    node: *mut XmlNode,
+    node: XmlGenericNodePtr,
 }
 
 pub type XmlStepStatesPtr = *mut XmlStepStates;
@@ -1335,7 +1336,11 @@ pub struct XmlStepStates {
     states: XmlStepStatePtr,
 }
 
-unsafe fn xml_pat_push_state(states: *mut XmlStepStates, step: i32, node: *mut XmlNode) -> i32 {
+unsafe fn xml_pat_push_state(
+    states: *mut XmlStepStates,
+    step: i32,
+    node: XmlGenericNodePtr,
+) -> i32 {
     if (*states).states.is_null() || (*states).maxstates <= 0 {
         (*states).maxstates = 4;
         (*states).nbstates = 0;
@@ -1361,7 +1366,7 @@ unsafe fn xml_pat_push_state(states: *mut XmlStepStates, step: i32, node: *mut X
 ///
 /// Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
 #[doc(alias = "xmlPatMatch")]
-unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
+unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32 {
     let mut i: i32;
     let mut step: XmlStepOpPtr;
     let mut states: XmlStepStates = XmlStepStates {
@@ -1371,7 +1376,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
     };
     // // may require backtrack
 
-    if comp.is_null() || node.is_null() {
+    if comp.is_null() {
         return -1;
     }
     i = 0;
@@ -1387,15 +1392,15 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                 break 'found;
                             }
                             XmlPatOp::XmlOpRoot => {
-                                if matches!(
-                                    (*node).element_type(),
-                                    XmlElementType::XmlNamespaceDecl
-                                ) {
+                                if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
                                     break 'rollback;
                                 }
-                                node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                                node = node
+                                    .parent()
+                                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                                    .unwrap();
                                 if matches!(
-                                    (*node).element_type(),
+                                    node.element_type(),
                                     XmlElementType::XmlDocumentNode
                                         | XmlElementType::XmlHTMLDocumentNode
                                 ) {
@@ -1404,22 +1409,22 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                 break 'rollback;
                             }
                             XmlPatOp::XmlOpElem => {
-                                if !matches!((*node).element_type(), XmlElementType::XmlElementNode)
-                                {
+                                if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
                                     break 'rollback;
                                 }
+                                let node = XmlNodePtr::try_from(node).unwrap();
                                 if (*step).value.is_null() {
                                     break 'to_continue;
                                 }
-                                if *(*step).value.add(0) != *(*node).name.add(0) {
+                                if *(*step).value.add(0) != *node.name.add(0) {
                                     break 'rollback;
                                 }
-                                if !xml_str_equal((*step).value, (*node).name) {
+                                if !xml_str_equal((*step).value, node.name) {
                                     break 'rollback;
                                 }
 
                                 // Namespace test
-                                if let Some(ns) = (*node).ns {
+                                if let Some(ns) = node.ns {
                                     if !ns.href.is_null() {
                                         if (*step).value2.is_null() {
                                             break 'rollback;
@@ -1434,10 +1439,8 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                 break 'to_continue;
                             }
                             XmlPatOp::XmlOpChild => {
-                                let mut lst: *mut XmlNode;
-
                                 if !matches!(
-                                    (*node).element_type(),
+                                    node.element_type(),
                                     XmlElementType::XmlElementNode
                                         | XmlElementType::XmlDocumentNode
                                         | XmlElementType::XmlHTMLDocumentNode
@@ -1445,43 +1448,49 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                     break 'rollback;
                                 }
 
-                                lst = (*node).children().map_or(null_mut(), |c| c.as_ptr());
+                                let mut lst = node
+                                    .children()
+                                    .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
 
                                 if !(*step).value.is_null() {
-                                    while !lst.is_null() {
+                                    while let Some(now) = lst {
                                         if matches!(
-                                            (*lst).element_type(),
+                                            now.element_type(),
                                             XmlElementType::XmlElementNode
-                                        ) && *(*step).value.add(0) == *(*lst).name.add(0)
-                                            && xml_str_equal((*step).value, (*lst).name)
-                                        {
-                                            break;
+                                        ) {
+                                            let now = XmlNodePtr::try_from(now).unwrap();
+                                            if *(*step).value.add(0) == *now.name.add(0)
+                                                && xml_str_equal((*step).value, now.name)
+                                            {
+                                                break;
+                                            }
                                         }
-                                        lst = (*lst).next.map_or(null_mut(), |n| n.as_ptr());
+                                        lst = now
+                                            .next()
+                                            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
                                     }
-                                    if !lst.is_null() {
+                                    if lst.is_some() {
                                         break 'to_continue;
                                     }
                                 }
                                 break 'rollback;
                             }
                             XmlPatOp::XmlOpAttr => {
-                                if !matches!(
-                                    (*node).element_type(),
-                                    XmlElementType::XmlAttributeNode
-                                ) {
+                                if !matches!(node.element_type(), XmlElementType::XmlAttributeNode)
+                                {
                                     break 'rollback;
                                 }
+                                let node = XmlAttrPtr::try_from(node).unwrap();
                                 if !(*step).value.is_null() {
-                                    if *(*step).value.add(0) != *(*node).name.add(0) {
+                                    if *(*step).value.add(0) != *node.name.add(0) {
                                         break 'rollback;
                                     }
-                                    if !xml_str_equal((*step).value, (*node).name) {
+                                    if !xml_str_equal((*step).value, node.name) {
                                         break 'rollback;
                                     }
                                 }
                                 // Namespace test
-                                if let Some(ns) = (*node).ns {
+                                if let Some(ns) = node.ns {
                                     if !(*step).value2.is_null()
                                         && !xml_str_equal((*step).value2, ns.href)
                                     {
@@ -1494,28 +1503,33 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                             }
                             XmlPatOp::XmlOpParent => {
                                 if matches!(
-                                    (*node).element_type(),
+                                    node.element_type(),
                                     XmlElementType::XmlDocumentNode
                                         | XmlElementType::XmlHTMLDocumentNode
                                         | XmlElementType::XmlNamespaceDecl
                                 ) {
                                     break 'rollback;
                                 }
-                                node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
-                                if node.is_null() {
+                                let Some(parent) = node
+                                    .parent()
+                                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                                else {
                                     break 'rollback;
-                                }
+                                };
+                                node = parent;
                                 if (*step).value.is_null() {
                                     break 'to_continue;
                                 }
-                                if *(*step).value.add(0) != *(*node).name.add(0) {
+                                // Is is correct ??????
+                                let node = XmlNodePtr::try_from(node).unwrap();
+                                if *(*step).value.add(0) != *node.name.add(0) {
                                     break 'rollback;
                                 }
-                                if !xml_str_equal((*step).value, (*node).name) {
+                                if !xml_str_equal((*step).value, node.name) {
                                     break 'rollback;
                                 }
                                 // Namespace test
-                                if let Some(ns) = (*node).ns {
+                                if let Some(ns) = node.ns {
                                     if !ns.href.is_null() {
                                         if (*step).value2.is_null() {
                                             break 'rollback;
@@ -1530,7 +1544,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                 break 'to_continue;
                             }
                             XmlPatOp::XmlOpAncestor => {
-                                /* TODO: implement coalescing of ANCESTOR/NODE ops */
+                                // TODO: implement coalescing of ANCESTOR/NODE ops
                                 if (*step).value.is_null() {
                                     i += 1;
                                     step = (*comp).steps.add(i as usize);
@@ -1544,42 +1558,51 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                         return -1;
                                     }
                                 }
-                                if node.is_null() {
-                                    break 'rollback;
-                                }
+                                // if node.is_null() {
+                                //     break 'rollback;
+                                // }
                                 if matches!(
-                                    (*node).element_type(),
+                                    node.element_type(),
                                     XmlElementType::XmlDocumentNode
                                         | XmlElementType::XmlHTMLDocumentNode
                                         | XmlElementType::XmlNamespaceDecl
                                 ) {
                                     break 'rollback;
                                 }
-                                node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
-                                while !node.is_null() {
+                                let mut cur = node
+                                    .parent()
+                                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                                while let Some(cur_node) = cur {
                                     if matches!(
-                                        (*node).element_type(),
+                                        cur_node.element_type(),
                                         XmlElementType::XmlElementNode
-                                    ) && *(*step).value.add(0) == *(*node).name.add(0)
-                                        && xml_str_equal((*step).value, (*node).name)
-                                    {
-                                        // Namespace test
-                                        if let Some(ns) = (*node).ns {
-                                            if !ns.href.is_null()
-                                                && (!(*step).value2.is_null()
-                                                    && xml_str_equal((*step).value2, ns.href))
-                                            {
+                                    ) {
+                                        let node = XmlNodePtr::try_from(cur_node).unwrap();
+
+                                        if *(*step).value.add(0) == *node.name.add(0)
+                                            && xml_str_equal((*step).value, node.name)
+                                        {
+                                            // Namespace test
+                                            if let Some(ns) = node.ns {
+                                                if !ns.href.is_null()
+                                                    && (!(*step).value2.is_null()
+                                                        && xml_str_equal((*step).value2, ns.href))
+                                                {
+                                                    break;
+                                                }
+                                            } else if (*step).value2.is_null() {
                                                 break;
                                             }
-                                        } else if (*step).value2.is_null() {
-                                            break;
                                         }
                                     }
-                                    node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                                    cur = cur_node
+                                        .parent()
+                                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
                                 }
-                                if node.is_null() {
+                                let Some(cur) = cur else {
                                     break 'rollback;
-                                }
+                                };
+                                node = cur;
                                 // prepare a potential rollback from here
                                 // for ancestors of that node.
                                 if matches!((*step).op, XmlPatOp::XmlOpAncestor) {
@@ -1590,11 +1613,11 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                 break 'to_continue;
                             }
                             XmlPatOp::XmlOpNs => {
-                                if !matches!((*node).element_type(), XmlElementType::XmlElementNode)
-                                {
+                                if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
                                     break 'rollback;
                                 }
-                                if let Some(ns) = (*node).ns {
+                                let node = XmlNodePtr::try_from(node).unwrap();
+                                if let Some(ns) = node.ns {
                                     if !ns.href.is_null() {
                                         if (*step).value.is_null() {
                                             break 'rollback;
@@ -1608,8 +1631,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
                                 }
                             }
                             XmlPatOp::XmlOpAll => {
-                                if !matches!((*node).element_type(), XmlElementType::XmlElementNode)
-                                {
+                                if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
                                     break 'rollback;
                                 }
                             }
@@ -1645,10 +1667,10 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: *mut XmlNode) -> i32 {
 ///
 /// Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
 #[doc(alias = "xmlPatternMatch")]
-pub unsafe fn xml_pattern_match(mut comp: XmlPatternPtr, node: *mut XmlNode) -> i32 {
+pub unsafe fn xml_pattern_match(mut comp: XmlPatternPtr, node: XmlGenericNodePtr) -> i32 {
     let mut ret: i32 = 0;
 
-    if comp.is_null() || node.is_null() {
+    if comp.is_null() {
         return -1;
     }
 
@@ -2327,44 +2349,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlPatternFromRoot()"
                     );
                     eprintln!(" {}", n_comp);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_pattern_get_stream_ctxt() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_pattern_match() {
-        #[cfg(feature = "libxml_pattern")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_comp in 0..GEN_NB_XML_PATTERN_PTR {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let comp = gen_xml_pattern_ptr(n_comp, 0);
-                    let node = gen_xml_node_ptr(n_node, 1);
-
-                    let ret_val = xml_pattern_match(comp, node);
-                    desret_int(ret_val);
-                    des_xml_pattern_ptr(n_comp, comp, 0);
-                    des_xml_node_ptr(n_node, node, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlPatternMatch",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlPatternMatch()");
-                        eprint!(" {}", n_comp);
-                        eprintln!(" {}", n_node);
-                    }
                 }
             }
         }

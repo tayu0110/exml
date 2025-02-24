@@ -755,9 +755,7 @@ impl XmlTextReader {
             )
         {
             for &pattern in &self.pattern_tab {
-                if xml_pattern_match(pattern, self.node.map_or(null_mut(), |node| node.as_ptr()))
-                    == 1
-                {
+                if xml_pattern_match(pattern, self.node.unwrap()) == 1 {
                     self.preserve();
                     break;
                 }

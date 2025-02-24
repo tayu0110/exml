@@ -3906,11 +3906,15 @@ unsafe fn pattern_node(
     patternc: XmlPatternPtr,
     mut patstream: XmlStreamCtxtPtr,
 ) {
-    use exml::libxml::{
-        pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
-        xmlreader::{
-            xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri, XmlReaderTypes,
+    use exml::{
+        libxml::{
+            pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
+            xmlreader::{
+                xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri,
+                XmlReaderTypes,
+            },
         },
+        tree::XmlGenericNodePtr,
     };
 
     let mut path = None;
@@ -3921,7 +3925,10 @@ unsafe fn pattern_node(
 
     if typ == XmlReaderTypes::XmlReaderTypeElement {
         /* do the check only on element start */
-        is_match = xml_pattern_match(patternc, (*reader).current_node());
+        is_match = xml_pattern_match(
+            patternc,
+            XmlGenericNodePtr::from_raw((*reader).current_node()).unwrap(),
+        );
 
         if is_match != 0 {
             path = (*(*reader).current_node()).get_node_path();
