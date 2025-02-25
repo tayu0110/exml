@@ -5757,7 +5757,7 @@ pub unsafe fn xml_schema_check_facet(
                         xml_schema_custom_err(
                             pctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapInternal,
-                            (*facet).node,
+                            XmlGenericNodePtr::from_raw((*facet).node),
                             null_mut(),
                             format!("Internal error: xmlSchemaCheckFacet, failed to validate the value '{value}' of the facet '{facet_type}' against the base type").as_str(),
                             Some(&value),
@@ -5785,7 +5785,7 @@ pub unsafe fn xml_schema_check_facet(
                     xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
-                        (*facet).node,
+                        XmlGenericNodePtr::from_raw((*facet).node),
                         facet as XmlSchemaBasicItemPtr,
                         format!("The value '{value}' of the facet does not validate against the base type '{qname}'").as_str(),
                         Some(&value),
@@ -5812,7 +5812,7 @@ pub unsafe fn xml_schema_check_facet(
                     xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
-                        (*facet).node,
+                        XmlGenericNodePtr::from_raw((*facet).node),
                         type_decl as XmlSchemaBasicItemPtr,
                         format!("The value '{value}' of the facet 'pattern' is not a valid regular expression").as_str(),
                         Some(&value),
@@ -5867,7 +5867,7 @@ pub unsafe fn xml_schema_check_facet(
                     xml_schema_custom_err4(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
-                        (*facet).node,
+                        XmlGenericNodePtr::from_raw((*facet).node),
                         type_decl as XmlSchemaBasicItemPtr,
                         format!(
                             "The value '{value}' of the facet '{facet_type}' is not a valid '{typename}'"
@@ -5897,7 +5897,7 @@ pub unsafe fn xml_schema_check_facet(
                     xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
-                        (*facet).node,
+                        XmlGenericNodePtr::from_raw((*facet).node),
                         type_decl as XmlSchemaBasicItemPtr,
                         format!("The value '{value}' of the facet 'whitespace' is not valid")
                             .as_str(),
