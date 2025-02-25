@@ -829,7 +829,7 @@ pub struct XmlSchemaAttributeUse {
     attr_decl: XmlSchemaAttributePtr,
 
     flags: i32,
-    node: *mut XmlNode,
+    node: XmlNodePtr,
     occurs: i32, /* required, optional */
     def_value: *const XmlChar,
     def_val: XmlSchemaValPtr,
@@ -842,7 +842,7 @@ pub type XmlSchemaAttributeUseProhibPtr = *mut XmlSchemaAttributeUseProhib;
 #[repr(C)]
 pub struct XmlSchemaAttributeUseProhib {
     typ: XmlSchemaTypeType, /* == XML_SCHEMA_EXTRA_ATTR_USE_PROHIB */
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
     name: *const XmlChar,
     target_namespace: *const XmlChar,
     is_ref: i32,
@@ -942,7 +942,7 @@ pub struct XmlSchemaQnameRef {
     item_type: XmlSchemaTypeType,
     name: *const XmlChar,
     target_namespace: *const XmlChar,
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
 }
 
 pub type XmlSchemaParticlePtr = *mut XmlSchemaParticle;
@@ -959,7 +959,7 @@ pub struct XmlSchemaParticle {
     pub(crate) children: XmlSchemaTreeItemPtr,
     pub(crate) min_occurs: i32,
     pub(crate) max_occurs: i32,
-    pub(crate) node: *mut XmlNode,
+    pub(crate) node: Option<XmlNodePtr>,
 }
 
 pub type XmlSchemaModelGroupPtr = *mut XmlSchemaModelGroup;
@@ -989,7 +989,7 @@ pub struct XmlSchemaModelGroupDef {
     children: XmlSchemaTreeItemPtr, /* the "model group" */
     name: *const XmlChar,
     target_namespace: *const XmlChar,
-    node: *mut XmlNode,
+    node: XmlNodePtr,
     flags: i32,
 }
 
@@ -1014,7 +1014,7 @@ pub struct XmlSchemaIDC {
     typ: XmlSchemaTypeType,
     annot: XmlSchemaAnnotPtr,
     next: XmlSchemaIDCPtr,
-    node: *mut XmlNode,
+    node: XmlNodePtr,
     name: *const XmlChar,
     target_namespace: *const XmlChar,
     selector: XmlSchemaIdcselectPtr,
@@ -1132,7 +1132,7 @@ pub type XmlSchemaNodeInfoPtr = *mut XmlSchemaNodeInfo;
 #[repr(C)]
 pub struct XmlSchemaNodeInfo {
     node_type: i32,
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
     node_line: i32,
     local_name: *const XmlChar,
     ns_name: *const XmlChar,
@@ -1342,7 +1342,7 @@ unsafe fn xml_schema_err4_line(
             // do not channel any node to the error function.
             if line == 0 {
                 if node.is_none() && (*vctxt).depth >= 0 && !(*vctxt).inode.is_null() {
-                    node = XmlGenericNodePtr::from_raw((*(*vctxt).inode).node);
+                    node = (*(*vctxt).inode).node.map(|node| node.into());
                 }
                 // Get filename and line if no node-tree.
                 if node.is_none()
@@ -1523,7 +1523,7 @@ unsafe fn xml_schema_item_list_add_size(
         }
         (*list).items = xml_malloc(initial_size as usize * size_of::<*mut c_void>()) as _;
         if (*list).items.is_null() {
-            xml_schema_perr_memory(null_mut(), "allocating new item list", null_mut());
+            xml_schema_perr_memory(null_mut(), "allocating new item list", None);
             return -1;
         }
         (*list).size_items = initial_size;
@@ -1534,7 +1534,7 @@ unsafe fn xml_schema_item_list_add_size(
             (*list).size_items as usize * size_of::<*mut c_void>(),
         ) as _;
         if tmp.is_null() {
-            xml_schema_perr_memory(null_mut(), "growing item list", null_mut());
+            xml_schema_perr_memory(null_mut(), "growing item list", None);
             (*list).size_items /= 2;
             return -1;
         }
@@ -2320,22 +2320,30 @@ unsafe fn xml_schema_get_component_node(item: XmlSchemaBasicItemPtr) -> *mut Xml
         XmlSchemaTypeType::XmlSchemaTypeAny | XmlSchemaTypeType::XmlSchemaTypeAnyAttribute => {
             (*(item as XmlSchemaWildcardPtr)).node
         }
-        XmlSchemaTypeType::XmlSchemaTypeParticle => (*(item as XmlSchemaParticlePtr)).node,
+        XmlSchemaTypeType::XmlSchemaTypeParticle => (*(item as XmlSchemaParticlePtr))
+            .node
+            .map_or(null_mut(), |node| node.as_ptr()),
         XmlSchemaTypeType::XmlSchemaTypeSequence
         | XmlSchemaTypeType::XmlSchemaTypeChoice
         | XmlSchemaTypeType::XmlSchemaTypeAll => (*(item as XmlSchemaModelGroupPtr)).node.as_ptr(),
-        XmlSchemaTypeType::XmlSchemaTypeGroup => (*(item as XmlSchemaModelGroupDefPtr)).node,
+        XmlSchemaTypeType::XmlSchemaTypeGroup => {
+            (*(item as XmlSchemaModelGroupDefPtr)).node.as_ptr()
+        }
         XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
             (*(item as XmlSchemaAttributeGroupPtr)).node
         }
         XmlSchemaTypeType::XmlSchemaTypeIDCUnique
         | XmlSchemaTypeType::XmlSchemaTypeIDCKey
-        | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => (*(item as XmlSchemaIDCPtr)).node,
-        XmlSchemaTypeType::XmlSchemaExtraQnameref => (*(item as XmlSchemaQnameRefPtr)).node,
+        | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => (*(item as XmlSchemaIDCPtr)).node.as_ptr(),
+        XmlSchemaTypeType::XmlSchemaExtraQnameref => (*(item as XmlSchemaQnameRefPtr))
+            .node
+            .map_or(null_mut(), |node| node.as_ptr()),
         // TODO: What to do with NOTATIONs?
         // XmlSchemaTypeType::XML_SCHEMA_TYPE_NOTATION:
         //     return ((*(item as xmlSchemaNotationPtr)).node);
-        XmlSchemaTypeType::XmlSchemaTypeAttributeUse => (*(item as XmlSchemaAttributeUsePtr)).node,
+        XmlSchemaTypeType::XmlSchemaTypeAttributeUse => {
+            (*(item as XmlSchemaAttributeUsePtr)).node.as_ptr()
+        }
         _ => null_mut(),
     }
 }
@@ -2386,16 +2394,17 @@ unsafe fn xml_schema_lookup_namespace(
             }
         }
     } else {
-        if (*(*vctxt).inode).node.is_null() || (*(*(*vctxt).inode).node).doc.is_none() {
+        let Some(mut node) = (*(*vctxt).inode).node.filter(|node| node.doc.is_some()) else {
             VERROR_INT!(
                 vctxt,
                 "xmlSchemaLookupNamespace",
                 "no node or node's doc available"
             );
             return null_mut();
-        }
-        let ns = (*(*(*vctxt).inode).node).search_ns(
-            (*(*(*vctxt).inode).node).doc,
+        };
+        let doc = node.doc;
+        let ns = node.search_ns(
+            doc,
             (!prefix.is_null())
                 .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                 .as_deref(),
@@ -4075,17 +4084,25 @@ pub(crate) fn xml_schema_facet_type_to_string(typ: XmlSchemaTypeType) -> &'stati
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchemaPErrMemory")]
-unsafe fn xml_schema_perr_memory(ctxt: XmlSchemaParserCtxtPtr, extra: &str, node: *mut XmlNode) {
+unsafe fn xml_schema_perr_memory(
+    ctxt: XmlSchemaParserCtxtPtr,
+    extra: &str,
+    node: Option<XmlGenericNodePtr>,
+) {
     if !ctxt.is_null() {
         (*ctxt).nberrors += 1;
     }
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
+    __xml_simple_oom_error(
+        XmlErrorDomain::XmlFromSchemasp,
+        node.map_or(null_mut(), |node| node.as_ptr()),
+        Some(extra),
+    );
 }
 
 unsafe fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
     let ret: XmlSchemaItemListPtr = xml_malloc(size_of::<XmlSchemaItemList>()) as _;
     if ret.is_null() {
-        xml_schema_perr_memory(null_mut(), "allocating an item list structure", null_mut());
+        xml_schema_perr_memory(null_mut(), "allocating an item list structure", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaItemList>());
@@ -4096,7 +4113,7 @@ unsafe fn xml_schema_parser_ctxt_create() -> XmlSchemaParserCtxtPtr {
     let ret: XmlSchemaParserCtxtPtr =
         xml_malloc(size_of::<XmlSchemaParserCtxt>()) as XmlSchemaParserCtxtPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(null_mut(), "allocating schema parser context", null_mut());
+        xml_schema_perr_memory(null_mut(), "allocating schema parser context", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaParserCtxt>());
@@ -4274,7 +4291,7 @@ pub unsafe fn xml_schema_is_valid(ctxt: XmlSchemaValidCtxtPtr) -> i32 {
 unsafe fn xml_schema_new_schema(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
     let ret: XmlSchemaPtr = xml_malloc(size_of::<XmlSchema>()) as _;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "allocating schema", null_mut());
+        xml_schema_perr_memory(ctxt, "allocating schema", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchema>());
@@ -4337,18 +4354,14 @@ unsafe fn xml_schema_construction_ctxt_create(dict: XmlDictPtr) -> XmlSchemaCons
     let ret: XmlSchemaConstructionCtxtPtr =
         xml_malloc(size_of::<XmlSchemaConstructionCtxt>()) as XmlSchemaConstructionCtxtPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(
-            null_mut(),
-            "allocating schema construction context",
-            null_mut(),
-        );
+        xml_schema_perr_memory(null_mut(), "allocating schema construction context", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaConstructionCtxt>());
 
     (*ret).buckets = xml_schema_item_list_create();
     if (*ret).buckets.is_null() {
-        xml_schema_perr_memory(null_mut(), "allocating list of schema buckets", null_mut());
+        xml_schema_perr_memory(null_mut(), "allocating list of schema buckets", None);
         xml_free(ret as _);
         return null_mut();
     }
@@ -4357,7 +4370,7 @@ unsafe fn xml_schema_construction_ctxt_create(dict: XmlDictPtr) -> XmlSchemaCons
         xml_schema_perr_memory(
             null_mut(),
             "allocating list of pending global components",
-            null_mut(),
+            None,
         );
         xml_schema_construction_ctxt_free(ret);
         return null_mut();
@@ -4396,7 +4409,7 @@ unsafe fn xml_schema_schema_relation_create() -> XmlSchemaSchemaRelationPtr {
     let ret: XmlSchemaSchemaRelationPtr =
         xml_malloc(size_of::<XmlSchemaSchemaRelation>()) as XmlSchemaSchemaRelationPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(null_mut(), "allocating schema relation", null_mut());
+        xml_schema_perr_memory(null_mut(), "allocating schema relation", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaSchemaRelation>());
@@ -4817,11 +4830,11 @@ unsafe fn xml_schema_free_qname_ref(item: XmlSchemaQnameRefPtr) {
     xml_free(item as _);
 }
 
-unsafe fn xml_schema_psimple_internal_err(node: *mut XmlNode, msg: &str) {
+unsafe fn xml_schema_psimple_internal_err(node: Option<XmlGenericNodePtr>, msg: &str) {
     __xml_simple_error!(
         XmlErrorDomain::XmlFromSchemasp,
         XmlParserErrors::XmlSchemapInternal,
-        node,
+        node.map_or(null_mut(), |node| node.as_ptr()),
         msg
     );
 }
@@ -4894,7 +4907,7 @@ unsafe fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) {
                         .then(|| CStr::from_ptr(name as *const i8).to_string_lossy());
                     // TODO: This should never be hit.
                     xml_schema_psimple_internal_err(
-                        null_mut(),
+                        None,
                         format!("Internal error: xmlSchemaComponentListFree, unexpected component type '{}'\n", name.expect("Internal Error")).as_str(),
                     );
                 }
@@ -4963,7 +4976,7 @@ unsafe fn xml_schema_item_list_add(list: XmlSchemaItemListPtr, item: *mut c_void
         let tmp: *mut *mut c_void =
             xml_realloc((*list).items as _, new_size * size_of::<*mut c_void>()) as _;
         if tmp.is_null() {
-            xml_schema_perr_memory(null_mut(), "growing item list", null_mut());
+            xml_schema_perr_memory(null_mut(), "growing item list", None);
             return -1;
         }
         (*list).items = tmp;
@@ -4996,7 +5009,7 @@ unsafe fn xml_schema_bucket_create(
     };
     let ret: XmlSchemaBucketPtr = xml_malloc(size) as _;
     if ret.is_null() {
-        xml_schema_perr_memory(null_mut(), "allocating schema bucket", null_mut());
+        xml_schema_perr_memory(null_mut(), "allocating schema bucket", None);
         return null_mut();
     }
     memset(ret as _, 0, size);
@@ -5382,7 +5395,7 @@ unsafe fn xml_schema_add_schema_doc(
                         xml_schema_perr_memory(
                             null_mut(),
                             "xmlSchemaGetDoc, allocating a parser context",
-                            null_mut(),
+                            None,
                         );
                         break 'exit_failure;
                     }
@@ -5911,11 +5924,7 @@ unsafe fn xml_schema_get_node_content(
     let val = CString::new(val).unwrap();
     let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, val.as_ptr() as *const u8, -1);
     if ret.is_null() {
-        xml_schema_perr_memory(
-            ctxt,
-            "getting node content",
-            node.map_or(null_mut(), |node| node.as_ptr()),
-        );
+        xml_schema_perr_memory(ctxt, "getting node content", node);
     }
     ret
 }
@@ -6332,7 +6341,7 @@ unsafe fn xml_schema_new_annot(
 ) -> XmlSchemaAnnotPtr {
     let ret: XmlSchemaAnnotPtr = xml_malloc(size_of::<XmlSchemaAnnot>()) as _;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "allocating annotation", node.as_ptr());
+        xml_schema_perr_memory(ctxt, "allocating annotation", Some(node.into()));
         return null_mut();
     }
     std::ptr::write(
@@ -7022,7 +7031,7 @@ unsafe fn xml_schema_add_redef(
 ) -> XmlSchemaRedefPtr {
     let ret: XmlSchemaRedefPtr = xml_malloc(size_of::<XmlSchemaRedef>()) as XmlSchemaRedefPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(pctxt, "allocating redefinition info", null_mut());
+        xml_schema_perr_memory(pctxt, "allocating redefinition info", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaRedef>());
@@ -7062,7 +7071,7 @@ unsafe fn xml_schema_add_type(
 
     ret = xml_malloc(size_of::<XmlSchemaType>()) as XmlSchemaTypePtr;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "allocating type", null_mut());
+        xml_schema_perr_memory(ctxt, "allocating type", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaType>());
@@ -7329,7 +7338,7 @@ unsafe fn xml_schema_add_model_group(
 
     ret = xml_malloc(size_of::<XmlSchemaModelGroup>()) as XmlSchemaModelGroupPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "allocating model group component", null_mut());
+        xml_schema_perr_memory(ctxt, "allocating model group component", None);
         return null_mut();
     }
     std::ptr::write(
@@ -7672,12 +7681,12 @@ unsafe fn xml_schema_add_particle(
 
     ret = xml_malloc(size_of::<XmlSchemaParticle>()) as XmlSchemaParticlePtr;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "allocating particle component", null_mut());
+        xml_schema_perr_memory(ctxt, "allocating particle component", None);
         return null_mut();
     }
     (*ret).typ = XmlSchemaTypeType::XmlSchemaTypeParticle;
     (*ret).annot = null_mut();
-    (*ret).node = node.map_or(null_mut(), |node| node.as_ptr());
+    (*ret).node = node;
     (*ret).min_occurs = min;
     (*ret).max_occurs = max;
     (*ret).next = null_mut();
@@ -7801,10 +7810,10 @@ unsafe fn xml_schema_new_qname_ref(
 
     ret = xml_malloc(size_of::<XmlSchemaQnameRef>()) as XmlSchemaQnameRefPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(pctxt, "allocating QName reference item", null_mut());
+        xml_schema_perr_memory(pctxt, "allocating QName reference item", None);
         return null_mut();
     }
-    (*ret).node = null_mut();
+    (*ret).node = None;
     (*ret).typ = XmlSchemaTypeType::XmlSchemaExtraQnameref;
     (*ret).name = ref_name;
     (*ret).target_namespace = ref_ns;
@@ -7835,7 +7844,7 @@ unsafe fn xml_schema_add_element(
 
     ret = xml_malloc(size_of::<XmlSchemaElement>()) as XmlSchemaElementPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "allocating element", null_mut());
+        xml_schema_perr_memory(ctxt, "allocating element", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaElement>());
@@ -8027,12 +8036,23 @@ unsafe fn xml_schema_add_attribute_use(
 
     ret = xml_malloc(size_of::<XmlSchemaAttributeUse>()) as XmlSchemaAttributeUsePtr;
     if ret.is_null() {
-        xml_schema_perr_memory(pctxt, "allocating attribute", null_mut());
+        xml_schema_perr_memory(pctxt, "allocating attribute", None);
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlSchemaAttributeUse>());
-    (*ret).typ = XmlSchemaTypeType::XmlSchemaTypeAttributeUse;
-    (*ret).node = node.into();
+    std::ptr::write(
+        &mut *ret,
+        XmlSchemaAttributeUse {
+            typ: XmlSchemaTypeType::XmlSchemaTypeAttributeUse,
+            node,
+            annot: null_mut(),
+            next: null_mut(),
+            attr_decl: null_mut(),
+            flags: 0,
+            occurs: 0,
+            def_val: null_mut(),
+            def_value: null(),
+        },
+    );
 
     WXS_ADD_LOCAL!(pctxt, ret);
     ret
@@ -8059,7 +8079,7 @@ unsafe fn xml_schema_add_attribute(
 
     ret = xml_malloc(size_of::<XmlSchemaAttribute>()) as XmlSchemaAttributePtr;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "allocating attribute", null_mut());
+        xml_schema_perr_memory(ctxt, "allocating attribute", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaAttribute>());
@@ -8084,7 +8104,7 @@ unsafe fn xml_schema_add_attribute_use_prohib(
 
     ret = xml_malloc(size_of::<XmlSchemaAttributeUseProhib>()) as XmlSchemaAttributeUseProhibPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(pctxt, "allocating attribute use prohibition", null_mut());
+        xml_schema_perr_memory(pctxt, "allocating attribute use prohibition", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaAttributeUseProhib>());
@@ -8804,7 +8824,7 @@ unsafe fn xml_schema_add_wildcard(
 
     ret = xml_malloc(size_of::<XmlSchemaWildcard>()) as XmlSchemaWildcardPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "adding wildcard", null_mut());
+        xml_schema_perr_memory(ctxt, "adding wildcard", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaWildcard>());
@@ -8824,7 +8844,7 @@ unsafe fn xml_schema_new_wildcard_ns_constraint(
     let ret: XmlSchemaWildcardNsPtr =
         xml_malloc(size_of::<XmlSchemaWildcardNs>()) as XmlSchemaWildcardNsPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "creating wildcard namespace constraint", null_mut());
+        xml_schema_perr_memory(ctxt, "creating wildcard namespace constraint", None);
         return null_mut();
     }
     (*ret).value = null_mut();
@@ -9910,19 +9930,24 @@ unsafe fn xml_schema_add_idc(
 
     ret = xml_malloc(size_of::<XmlSchemaIDC>()) as XmlSchemaIDCPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(
-            ctxt,
-            "allocating an identity-constraint definition",
-            null_mut(),
-        );
+        xml_schema_perr_memory(ctxt, "allocating an identity-constraint definition", None);
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlSchemaIDC>());
-    // The target namespace of the parent element declaration.
-    (*ret).target_namespace = ns_name;
-    (*ret).name = name;
-    (*ret).typ = category;
-    (*ret).node = node.into();
+    std::ptr::write(
+        &mut *ret,
+        XmlSchemaIDC {
+            typ: category,
+            annot: null_mut(),
+            next: null_mut(),
+            node,
+            name,
+            target_namespace: ns_name,
+            selector: null_mut(),
+            fields: null_mut(),
+            nb_fields: 0,
+            refe: null_mut(),
+        },
+    );
 
     WXS_ADD_GLOBAL!(ctxt, ret);
     // Only keyrefs need to be fixup up.
@@ -9947,7 +9972,7 @@ unsafe fn xml_schema_check_cselector_xpath(
     if selector.is_null() {
         xml_schema_perr(
             ctxt,
-            XmlGenericNodePtr::from_raw((*idc).node),
+            Some(XmlGenericNodePtr::from((*idc).node)),
             XmlParserErrors::XmlSchemapInternal,
             "Internal error: xmlSchemaCheckCSelectorXPath, the selector is not specified.\n",
             None,
@@ -9955,7 +9980,7 @@ unsafe fn xml_schema_check_cselector_xpath(
         );
         return -1;
     }
-    let node = attr.map_or(XmlGenericNodePtr::from_raw((*idc).node), |attr| {
+    let node = attr.map_or(Some(XmlGenericNodePtr::from((*idc).node)), |attr| {
         Some(attr.into())
     });
     if (*selector).xpath.is_null() {
@@ -10057,7 +10082,7 @@ unsafe fn xml_schema_parse_idcselector_and_field(
         xml_schema_perr_memory(
             ctxt,
             "allocating a 'selector' of an identity-constraint definition",
-            null_mut(),
+            None,
         );
         return null_mut();
     }
@@ -11304,7 +11329,7 @@ unsafe fn xml_schema_parse_facet(
 
     let facet: XmlSchemaFacetPtr = xml_schema_new_facet();
     if facet.is_null() {
-        xml_schema_perr_memory(ctxt, "allocating facet", node.into());
+        xml_schema_perr_memory(ctxt, "allocating facet", Some(node.into()));
         return null_mut();
     }
     (*facet).node = node.into();
@@ -11693,7 +11718,7 @@ unsafe fn xml_schema_parse_restriction(
             while {
                 facet_link = xml_malloc(size_of::<XmlSchemaFacetLink>()) as XmlSchemaFacetLinkPtr;
                 if facet_link.is_null() {
-                    xml_schema_perr_memory(ctxt, "allocating a facet link", null_mut());
+                    xml_schema_perr_memory(ctxt, "allocating a facet link", None);
                     xml_free(facet_link as _);
                     return null_mut();
                 }
@@ -11981,11 +12006,7 @@ unsafe fn xml_schema_parse_union(
             }
             tmp = xml_strndup(cur, end.offset_from(cur) as _);
             if tmp.is_null() {
-                xml_schema_perr_memory(
-                    ctxt,
-                    "xmlSchemaParseUnion, duplicating type name",
-                    null_mut(),
-                );
+                xml_schema_perr_memory(ctxt, "xmlSchemaParseUnion, duplicating type name", None);
                 return -1;
             }
             if xml_schema_pval_attr_node_qname_value(
@@ -12004,7 +12025,7 @@ unsafe fn xml_schema_parse_union(
                     xml_schema_perr_memory(
                         ctxt,
                         "xmlSchemaParseUnion, allocating a type link",
-                        null_mut(),
+                        None,
                     );
                     FREE_AND_NULL!(tmp);
                     return -1;
@@ -12411,14 +12432,22 @@ unsafe fn xml_schema_add_model_group_definition(
 
     ret = xml_malloc(size_of::<XmlSchemaModelGroupDef>()) as XmlSchemaModelGroupDefPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "adding group", null_mut());
+        xml_schema_perr_memory(ctxt, "adding group", None);
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlSchemaModelGroupDef>());
-    (*ret).name = name;
-    (*ret).typ = XmlSchemaTypeType::XmlSchemaTypeGroup;
-    (*ret).node = node.into();
-    (*ret).target_namespace = ns_name;
+    std::ptr::write(
+        &mut *ret,
+        XmlSchemaModelGroupDef {
+            typ: XmlSchemaTypeType::XmlSchemaTypeGroup,
+            annot: null_mut(),
+            next: null_mut(),
+            children: null_mut(),
+            name,
+            target_namespace: ns_name,
+            node,
+            flags: 0,
+        },
+    );
 
     if (*ctxt).is_redefine != 0 {
         (*ctxt).redef = xml_schema_add_redef(ctxt, (*ctxt).redefined, ret as _, name, ns_name);
@@ -12587,7 +12616,7 @@ unsafe fn xml_schema_add_attribute_group_definition(
 
     ret = xml_malloc(size_of::<XmlSchemaAttributeGroup>()) as XmlSchemaAttributeGroupPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(pctxt, "allocating attribute group", null_mut());
+        xml_schema_perr_memory(pctxt, "allocating attribute group", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaAttributeGroup>());
@@ -13414,7 +13443,7 @@ unsafe fn xml_schema_add_notation(
 
     ret = xml_malloc(size_of::<XmlSchemaNotation>()) as XmlSchemaNotationPtr;
     if ret.is_null() {
-        xml_schema_perr_memory(ctxt, "add annotation", null_mut());
+        xml_schema_perr_memory(ctxt, "add annotation", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaNotation>());
@@ -14162,7 +14191,7 @@ unsafe fn xml_schema_pres_comp_attr_err(
     error: XmlParserErrors,
     owner_item: XmlSchemaBasicItemPtr,
     owner_elem: Option<XmlGenericNodePtr>,
-    name: *const c_char,
+    name: &str,
     ref_name: *const XmlChar,
     ref_uri: *const XmlChar,
     ref_type: XmlSchemaTypeType,
@@ -14176,7 +14205,6 @@ unsafe fn xml_schema_pres_comp_attr_err(
         ref_type_str = xml_schema_item_type_to_str(ref_type) as _;
     }
     let d = CStr::from_ptr(des as *const i8).to_string_lossy();
-    let name = CStr::from_ptr(name).to_string_lossy();
     let qname = CStr::from_ptr(
         xml_schema_format_qname(addr_of_mut!(str_a), ref_uri, ref_name) as *const i8,
     )
@@ -14194,7 +14222,7 @@ unsafe fn xml_schema_pres_comp_attr_err(
         )
         .as_str(),
         Some(&d),
-        Some(&name),
+        Some(name),
         Some(&qname),
         Some(&ref_type_str),
         None,
@@ -14254,7 +14282,7 @@ unsafe fn xml_schema_resolve_element_references(
                 XmlParserErrors::XmlSchemapSrcResolve,
                 elem_decl as XmlSchemaBasicItemPtr,
                 XmlGenericNodePtr::from_raw((*elem_decl).node),
-                c"type".as_ptr() as _,
+                "type",
                 (*elem_decl).named_type,
                 (*elem_decl).named_type_ns,
                 XmlSchemaTypeType::XmlSchemaTypeBasic,
@@ -14277,7 +14305,7 @@ unsafe fn xml_schema_resolve_element_references(
                 XmlParserErrors::XmlSchemapSrcResolve,
                 elem_decl as XmlSchemaBasicItemPtr,
                 None,
-                c"substitutionGroup".as_ptr() as _,
+                "substitutionGroup",
                 (*elem_decl).subst_group,
                 (*elem_decl).subst_group_ns,
                 XmlSchemaTypeType::XmlSchemaTypeElement,
@@ -14350,7 +14378,7 @@ unsafe fn xml_schema_resolve_union_member_types(
                 XmlParserErrors::XmlSchemapSrcResolve,
                 typ as XmlSchemaBasicItemPtr,
                 (*typ).node.map(|node| node.into()),
-                c"memberTypes".as_ptr() as _,
+                "memberTypes",
                 name,
                 ns_name,
                 XmlSchemaTypeType::XmlSchemaTypeSimple,
@@ -14376,7 +14404,7 @@ unsafe fn xml_schema_resolve_union_member_types(
     while !member_type.is_null() {
         link = xml_malloc(size_of::<XmlSchemaTypeLink>()) as XmlSchemaTypeLinkPtr;
         if link.is_null() {
-            xml_schema_perr_memory(ctxt, "allocating a type link", null_mut());
+            xml_schema_perr_memory(ctxt, "allocating a type link", None);
             return -1;
         }
         (*link).typ = member_type;
@@ -14458,7 +14486,7 @@ unsafe fn xml_schema_resolve_type_references(
                 XmlParserErrors::XmlSchemapSrcResolve,
                 type_def as XmlSchemaBasicItemPtr,
                 (*type_def).node.map(|node| node.into()),
-                c"base".as_ptr() as _,
+                "base",
                 (*type_def).base,
                 (*type_def).base_ns,
                 XmlSchemaTypeType::XmlSchemaTypeSimple,
@@ -14484,7 +14512,7 @@ unsafe fn xml_schema_resolve_type_references(
                         XmlParserErrors::XmlSchemapSrcResolve,
                         type_def as XmlSchemaBasicItemPtr,
                         (*type_def).node.map(|node| node.into()),
-                        c"itemType".as_ptr() as _,
+                        "itemType",
                         (*type_def).base,
                         (*type_def).base_ns,
                         XmlSchemaTypeType::XmlSchemaTypeSimple,
@@ -14520,7 +14548,7 @@ unsafe fn xml_schema_resolve_type_references(
                 XmlParserErrors::XmlSchemapSrcResolve,
                 null_mut(),
                 XmlGenericNodePtr::from_raw(WXS_ITEM_NODE!(WXS_TYPE_PARTICLE!(type_def))),
-                c"ref".as_ptr() as _,
+                "ref",
                 (*refe).name,
                 (*refe).target_namespace,
                 (*refe).item_type,
@@ -14583,7 +14611,7 @@ unsafe fn xml_schema_resolve_attr_type_references(
                 XmlParserErrors::XmlSchemapSrcResolve,
                 item as XmlSchemaBasicItemPtr,
                 XmlGenericNodePtr::from_raw((*item).node),
-                c"type".as_ptr() as _,
+                "type",
                 (*item).type_name,
                 (*item).type_ns,
                 XmlSchemaTypeType::XmlSchemaTypeSimple,
@@ -14647,8 +14675,8 @@ unsafe fn xml_schema_resolve_attr_use_references(
                 ctxt,
                 XmlParserErrors::XmlSchemapSrcResolve,
                 ause as XmlSchemaBasicItemPtr,
-                XmlGenericNodePtr::from_raw((*ause).node),
-                c"ref".as_ptr() as _,
+                Some(XmlGenericNodePtr::from((*ause).node)),
+                "ref",
                 (*refe).name,
                 (*refe).target_namespace,
                 XmlSchemaTypeType::XmlSchemaTypeAttribute,
@@ -14703,8 +14731,8 @@ unsafe fn xml_schema_resolve_attr_group_references(
             ctxt,
             XmlParserErrors::XmlSchemapSrcResolve,
             null_mut(),
-            XmlGenericNodePtr::from_raw((*refe).node),
-            c"ref".as_ptr() as _,
+            (*refe).node.map(|node| node.into()),
+            "ref",
             (*refe).name,
             (*refe).target_namespace,
             (*refe).item_type,
@@ -14752,7 +14780,7 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
                     XmlParserErrors::XmlSchemapSrcResolve,
                     null_mut(),
                     XmlGenericNodePtr::from_raw(WXS_ITEM_NODE!(particle)),
-                    c"ref".as_ptr() as _,
+                    "ref",
                     (*refe).name,
                     (*refe).target_namespace,
                     (*refe).item_type,
@@ -14848,8 +14876,8 @@ unsafe fn xml_schema_resolve_idckey_references(
                 pctxt,
                 XmlParserErrors::XmlSchemapSrcResolve,
                 idc as XmlSchemaBasicItemPtr,
-                XmlGenericNodePtr::from_raw((*idc).node),
-                c"refer".as_ptr() as _,
+                Some(XmlGenericNodePtr::from((*idc).node)),
+                "refer",
                 (*(*idc).refe).name,
                 (*(*idc).refe).target_namespace,
                 XmlSchemaTypeType::XmlSchemaTypeIDCKey,
@@ -14910,8 +14938,8 @@ unsafe fn xml_schema_resolve_attr_use_prohib_references(
             pctxt,
             XmlParserErrors::XmlSchemapSrcResolve,
             null_mut(),
-            XmlGenericNodePtr::from_raw((*prohib).node),
-            c"ref".as_ptr() as _,
+            (*prohib).node.map(|node| node.into()),
+            "ref",
             (*prohib).name,
             (*prohib).target_namespace,
             XmlSchemaTypeType::XmlSchemaTypeAttribute,
@@ -15468,7 +15496,7 @@ unsafe fn xml_schema_item_list_insert(
         let tmp: *mut *mut c_void =
             xml_realloc((*list).items as _, new_size * size_of::<*mut c_void>()) as _;
         if tmp.is_null() {
-            xml_schema_perr_memory(null_mut(), "growing item list", null_mut());
+            xml_schema_perr_memory(null_mut(), "growing item list", None);
             return -1;
         }
         (*list).items = tmp;
@@ -15646,7 +15674,7 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                     xml_schema_custom_warning(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         XmlParserErrors::XmlSchemapWarnAttrPointlessProh,
-                        XmlGenericNodePtr::from_raw((*prohib).node),
+                        (*prohib).node.map(|node| node.into()),
                         null_mut(),
                         format!("Skipping pointless attribute use prohibition '{qname}', since a corresponding attribute use exists already in the type definition").as_str(),
                         Some(&qname),
@@ -18135,7 +18163,7 @@ unsafe fn xml_schema_finish_member_type_definitions_property(
                         new_link =
                             xml_malloc(size_of::<XmlSchemaTypeLink>()) as XmlSchemaTypeLinkPtr;
                         if new_link.is_null() {
-                            xml_schema_perr_memory(pctxt, "allocating a type link", null_mut());
+                            xml_schema_perr_memory(pctxt, "allocating a type link", None);
                             return -1;
                         }
                         (*new_link).typ = (*sub_link).typ;
@@ -19689,7 +19717,7 @@ unsafe fn xml_schema_derive_and_validate_facets(
                         xml_schema_perr_memory(
                             pctxt,
                             "deriving facets, creating a facet link",
-                            null_mut(),
+                            None,
                         );
                         return -1;
                     }
@@ -20010,7 +20038,7 @@ unsafe fn xml_schema_check_attr_use_props_correct(
 
         let ret: i32 = xml_schema_vcheck_cvc_simple_type(
             ctxt as XmlSchemaAbstractCtxtPtr,
-            XmlGenericNodePtr::from_raw((*using).node),
+            Some(XmlGenericNodePtr::from((*using).node)),
             WXS_ATTRUSE_TYPEDEF!(using),
             (*using).def_value,
             addr_of_mut!((*using).def_val),
@@ -20676,7 +20704,7 @@ unsafe fn xml_schema_subst_group_add(
         xml_schema_perr_memory(
             null_mut(),
             "allocating a substitution group container",
-            null_mut(),
+            None,
         );
         return null_mut();
     }
@@ -22686,7 +22714,7 @@ pub unsafe fn xml_schema_dump<'a>(output: &mut (impl Write + 'a), schema: XmlSch
             CStr::from_ptr((*schema).name as *const i8).to_string_lossy()
         );
     } else {
-        write!(output, "no name, c");
+        write!(output, "no name, ");
     }
     if !(*schema).target_namespace.is_null() {
         write!(
@@ -22840,12 +22868,20 @@ pub unsafe fn xml_schema_valid_ctxt_get_options(ctxt: XmlSchemaValidCtxtPtr) -> 
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchemaVTypeErrMemory")]
-unsafe fn xml_schema_verr_memory(ctxt: XmlSchemaValidCtxtPtr, extra: &str, node: *mut XmlNode) {
+unsafe fn xml_schema_verr_memory(
+    ctxt: XmlSchemaValidCtxtPtr,
+    extra: &str,
+    node: Option<XmlGenericNodePtr>,
+) {
     if !ctxt.is_null() {
         (*ctxt).nberrors += 1;
         (*ctxt).err = XmlParserErrors::XmlSchemavInternal as i32;
     }
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasv, node, Some(extra));
+    __xml_simple_oom_error(
+        XmlErrorDomain::XmlFromSchemasv,
+        node.map_or(null_mut(), |node| node.as_ptr()),
+        Some(extra),
+    );
 }
 
 /// Create an XML Schemas validation context based on the given schema.
@@ -22856,7 +22892,7 @@ pub unsafe fn xml_schema_new_valid_ctxt(schema: XmlSchemaPtr) -> XmlSchemaValidC
     let ret: XmlSchemaValidCtxtPtr =
         xml_malloc(size_of::<XmlSchemaValidCtxt>()) as XmlSchemaValidCtxtPtr;
     if ret.is_null() {
-        xml_schema_verr_memory(null_mut(), "allocating validation context", null_mut());
+        xml_schema_verr_memory(null_mut(), "allocating validation context", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaValidCtxt>());
@@ -23159,7 +23195,7 @@ extern "C" fn xml_schema_augment_idc(
             xml_schema_verr_memory(
                 vctxt,
                 "xmlSchemaAugmentIDC: allocating an augmented IDC definition",
-                null_mut(),
+                None,
             );
             return;
         }
@@ -23301,7 +23337,7 @@ unsafe fn xml_schema_get_fresh_elem_info(vctxt: XmlSchemaValidCtxtPtr) -> XmlSch
         (*vctxt).elem_infos =
             xml_malloc(10 * size_of::<XmlSchemaNodeInfoPtr>()) as *mut XmlSchemaNodeInfoPtr;
         if (*vctxt).elem_infos.is_null() {
-            xml_schema_verr_memory(vctxt, "allocating the element info array", null_mut());
+            xml_schema_verr_memory(vctxt, "allocating the element info array", None);
             return null_mut();
         }
         memset(
@@ -23319,7 +23355,7 @@ unsafe fn xml_schema_get_fresh_elem_info(vctxt: XmlSchemaValidCtxtPtr) -> XmlSch
             (*vctxt).size_elem_infos as usize * size_of::<XmlSchemaNodeInfoPtr>(),
         ) as *mut XmlSchemaNodeInfoPtr;
         if (*vctxt).elem_infos.is_null() {
-            xml_schema_verr_memory(vctxt, "re-allocating the element info array", null_mut());
+            xml_schema_verr_memory(vctxt, "re-allocating the element info array", None);
             return null_mut();
         }
         // We need the new memory to be NULLed.
@@ -23334,7 +23370,7 @@ unsafe fn xml_schema_get_fresh_elem_info(vctxt: XmlSchemaValidCtxtPtr) -> XmlSch
     if info.is_null() {
         info = xml_malloc(size_of::<XmlSchemaNodeInfo>()) as XmlSchemaNodeInfoPtr;
         if info.is_null() {
-            xml_schema_verr_memory(vctxt, "allocating an element info", null_mut());
+            xml_schema_verr_memory(vctxt, "allocating an element info", None);
             return null_mut();
         }
         *(*vctxt).elem_infos.add((*vctxt).depth as usize) = info;
@@ -23375,7 +23411,7 @@ unsafe fn xml_schema_get_fresh_attr_info(vctxt: XmlSchemaValidCtxtPtr) -> XmlSch
             xml_malloc(size_of::<XmlSchemaAttrInfoPtr>()) as *mut XmlSchemaAttrInfoPtr;
         (*vctxt).size_attr_infos = 1;
         if (*vctxt).attr_infos.is_null() {
-            xml_schema_verr_memory(vctxt, "allocating attribute info list", null_mut());
+            xml_schema_verr_memory(vctxt, "allocating attribute info list", None);
             return null_mut();
         }
     } else if (*vctxt).size_attr_infos <= (*vctxt).nb_attr_infos {
@@ -23385,7 +23421,7 @@ unsafe fn xml_schema_get_fresh_attr_info(vctxt: XmlSchemaValidCtxtPtr) -> XmlSch
             (*vctxt).size_attr_infos as usize * size_of::<XmlSchemaAttrInfoPtr>(),
         ) as *mut XmlSchemaAttrInfoPtr;
         if (*vctxt).attr_infos.is_null() {
-            xml_schema_verr_memory(vctxt, "re-allocating attribute info list", null_mut());
+            xml_schema_verr_memory(vctxt, "re-allocating attribute info list", None);
             return null_mut();
         }
     } else {
@@ -23401,7 +23437,7 @@ unsafe fn xml_schema_get_fresh_attr_info(vctxt: XmlSchemaValidCtxtPtr) -> XmlSch
     // Create an attribute info.
     iattr = xml_malloc(size_of::<XmlSchemaAttrInfo>()) as XmlSchemaAttrInfoPtr;
     if iattr.is_null() {
-        xml_schema_verr_memory(vctxt, "creating new attribute info", null_mut());
+        xml_schema_verr_memory(vctxt, "creating new attribute info", None);
         return null_mut();
     }
     memset(iattr as _, 0, size_of::<XmlSchemaAttrInfo>());
@@ -24363,7 +24399,7 @@ unsafe fn xml_schema_idc_add_state_object(
         // Create a new state object.
         sto = xml_malloc(size_of::<XmlSchemaIDCStateObj>()) as XmlSchemaIDCStateObjPtr;
         if sto.is_null() {
-            xml_schema_verr_memory(null_mut(), "allocating an IDC state object", null_mut());
+            xml_schema_verr_memory(null_mut(), "allocating an IDC state object", None);
             return -1;
         }
         memset(sto as _, 0, size_of::<XmlSchemaIDCStateObj>());
@@ -24483,7 +24519,7 @@ unsafe fn xml_schema_idc_register_matchers(
         } else {
             matcher = xml_malloc(size_of::<XmlSchemaIDCMatcher>()) as XmlSchemaIDCMatcherPtr;
             if matcher.is_null() {
-                xml_schema_verr_memory(vctxt, "allocating an IDC matcher", null_mut());
+                xml_schema_verr_memory(vctxt, "allocating an IDC matcher", None);
                 return -1;
             }
             memset(matcher as _, 0, size_of::<XmlSchemaIDCMatcher>());
@@ -24701,11 +24737,7 @@ unsafe fn xml_schema_xpath_evaluate(
             if (*sto).history.is_null() {
                 (*sto).history = xml_malloc(5 * size_of::<i32>()) as *mut i32;
                 if (*sto).history.is_null() {
-                    xml_schema_verr_memory(
-                        null_mut(),
-                        "allocating the state object history",
-                        null_mut(),
-                    );
+                    xml_schema_verr_memory(null_mut(), "allocating the state object history", None);
                     return -1;
                 }
                 (*sto).size_history = 5;
@@ -24719,7 +24751,7 @@ unsafe fn xml_schema_xpath_evaluate(
                     xml_schema_verr_memory(
                         null_mut(),
                         "re-allocating the state object history",
-                        null_mut(),
+                        None,
                     );
                     return -1;
                 }
@@ -24786,7 +24818,7 @@ unsafe fn xml_schema_idc_store_key(
         (*vctxt).idc_keys =
             xml_malloc(40 * size_of::<XmlSchemaPSVIIDCKeyPtr>()) as *mut XmlSchemaPSVIIDCKeyPtr;
         if (*vctxt).idc_keys.is_null() {
-            xml_schema_verr_memory(vctxt, "allocating the IDC key storage list", null_mut());
+            xml_schema_verr_memory(vctxt, "allocating the IDC key storage list", None);
             return -1;
         }
         (*vctxt).size_idc_keys = 40;
@@ -24797,7 +24829,7 @@ unsafe fn xml_schema_idc_store_key(
             (*vctxt).size_idc_keys as usize * size_of::<XmlSchemaPSVIIDCKeyPtr>(),
         ) as *mut XmlSchemaPSVIIDCKeyPtr;
         if (*vctxt).idc_keys.is_null() {
-            xml_schema_verr_memory(vctxt, "re-allocating the IDC key storage list", null_mut());
+            xml_schema_verr_memory(vctxt, "re-allocating the IDC key storage list", None);
             return -1;
         }
     }
@@ -24910,7 +24942,7 @@ unsafe fn xml_schema_idc_store_node_table_item(
         (*vctxt).idc_nodes =
             xml_malloc(20 * size_of::<XmlSchemaPSVIIDCNodePtr>()) as *mut XmlSchemaPSVIIDCNodePtr;
         if (*vctxt).idc_nodes.is_null() {
-            xml_schema_verr_memory(vctxt, "allocating the IDC node table item list", null_mut());
+            xml_schema_verr_memory(vctxt, "allocating the IDC node table item list", None);
             return -1;
         }
         (*vctxt).size_idc_nodes = 20;
@@ -24921,11 +24953,7 @@ unsafe fn xml_schema_idc_store_node_table_item(
             (*vctxt).size_idc_nodes as usize * size_of::<XmlSchemaPSVIIDCNodePtr>(),
         ) as *mut XmlSchemaPSVIIDCNodePtr;
         if (*vctxt).idc_nodes.is_null() {
-            xml_schema_verr_memory(
-                vctxt,
-                "re-allocating the IDC node table item list",
-                null_mut(),
-            );
+            xml_schema_verr_memory(vctxt, "re-allocating the IDC node table item list", None);
             return -1;
         }
     }
@@ -25101,7 +25129,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                             xml_schema_verr_memory(
                                 null_mut(),
                                 "allocating an array of key-sequences",
-                                null_mut(),
+                                None,
                             );
                             return -1;
                         }
@@ -25125,7 +25153,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                             xml_schema_verr_memory(
                                 null_mut(),
                                 "reallocating an array of key-sequences",
-                                null_mut(),
+                                None,
                             );
                             return -1;
                         }
@@ -25187,7 +25215,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                             xml_schema_verr_memory(
                                 null_mut(),
                                 "allocating an IDC key-sequence",
-                                null_mut(),
+                                None,
                             );
                             return -1;
                         }
@@ -25205,7 +25233,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                         key =
                             xml_malloc(size_of::<XmlSchemaPSVIIDCKey>()) as XmlSchemaPSVIIDCKeyPtr;
                         if key.is_null() {
-                            xml_schema_verr_memory(null_mut(), "allocating a IDC key", null_mut());
+                            xml_schema_verr_memory(null_mut(), "allocating a IDC key", None);
                             xml_free(key_seq as _);
                             *(*matcher).key_seqs.add(pos as usize) = null_mut();
                             return -1;
@@ -25371,7 +25399,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                             xml_schema_verr_memory(
                                 null_mut(),
                                 "allocating an IDC node-table item",
-                                null_mut(),
+                                None,
                             );
                             xml_free(*key_seq as _);
                             *key_seq = null_mut();
@@ -25606,7 +25634,6 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut res: i32;
     let mut wild_ids = 0;
     let mut fixed: i32;
-    let mut def_attr_owner_elem: *mut XmlNode = null_mut();
 
     // SPEC (cvc-attribute)
     // (1) "The declaration must not be `absent` (see Missing
@@ -25832,11 +25859,12 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
         return 0;
     }
 
+    let mut def_attr_owner_elem = None;
     // Get the owner element; needed for creation of default attributes.
     // This fixes bug #341337, reported by David Grohmann.
     if (*vctxt).options & XmlSchemaValidOption::XmlSchemaValVcICreate as i32 != 0 {
         let ielem: XmlSchemaNodeInfoPtr = *(*vctxt).elem_infos.add((*vctxt).depth as usize);
-        if !ielem.is_null() && !(*ielem).node.is_null() && (*(*ielem).node).doc.is_some() {
+        if !ielem.is_null() && (*ielem).node.map_or(false, |node| node.doc.is_some()) {
             def_attr_owner_elem = (*ielem).node;
         }
     }
@@ -25880,7 +25908,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     // Default/fixed attributes.
                     // We need the value only if we need to resolve IDCs or
                     // will create default attributes.
-                    if xpath_res != 0 || !def_attr_owner_elem.is_null() {
+                    if xpath_res != 0 || def_attr_owner_elem.is_some() {
                         if !(*(*iattr).using).def_value.is_null() {
                             (*iattr).value = (*(*iattr).using).def_value;
                             (*iattr).val = (*(*iattr).using).def_val;
@@ -25912,7 +25940,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     // VAL TODO: Should we use the *normalized* value? This currently
                     //   uses the *initial* value.
 
-                    if !def_attr_owner_elem.is_null() {
+                    if let Some(mut def_attr_owner_elem) = def_attr_owner_elem {
                         let mut value: *const XmlChar;
 
                         value = (*iattr).value;
@@ -25924,12 +25952,8 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         }
 
                         if (*iattr).ns_name.is_null() {
-                            if xml_new_prop(
-                                XmlNodePtr::from_raw(def_attr_owner_elem).unwrap(),
-                                (*iattr).local_name,
-                                value,
-                            )
-                            .is_none()
+                            if xml_new_prop(Some(def_attr_owner_elem), (*iattr).local_name, value)
+                                .is_none()
                             {
                                 VERROR_INT!(
                                     vctxt,
@@ -25942,8 +25966,9 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 break 'internal_error;
                             }
                         } else {
-                            let mut ns = (*def_attr_owner_elem).search_ns_by_href(
-                                (*def_attr_owner_elem).doc,
+                            let doc = def_attr_owner_elem.doc;
+                            let mut ns = def_attr_owner_elem.search_ns_by_href(
+                                doc,
                                 CStr::from_ptr((*iattr).ns_name as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
@@ -25963,10 +25988,8 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                     );
                                     prefix = format!("p{counter}");
                                     counter += 1;
-                                    ns = (*def_attr_owner_elem).search_ns(
-                                        (*def_attr_owner_elem).doc,
-                                        Some(prefix.as_str()),
-                                    );
+                                    let doc = def_attr_owner_elem.doc;
+                                    ns = def_attr_owner_elem.search_ns(doc, Some(prefix.as_str()));
                                     if counter > 1000 {
                                         VERROR_INT!(
                                             vctxt,
@@ -25992,7 +26015,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             // If we have QNames: do we need to ensure there's a
                             // prefix defined for the QName?
                             xml_new_ns_prop(
-                                XmlNodePtr::from_raw(def_attr_owner_elem).unwrap(),
+                                Some(def_attr_owner_elem),
                                 ns,
                                 &CStr::from_ptr((*iattr).local_name as *const i8).to_string_lossy(),
                                 value,
@@ -26704,7 +26727,7 @@ unsafe fn xml_schema_idc_new_binding(idc_def: XmlSchemaIDCPtr) -> XmlSchemaPSVII
     let ret: XmlSchemaPSVIIDCBindingPtr =
         xml_malloc(size_of::<XmlSchemaPSVIIDCBinding>()) as XmlSchemaPSVIIDCBindingPtr;
     if ret.is_null() {
-        xml_schema_verr_memory(null_mut(), "allocating a PSVI IDC binding item", null_mut());
+        xml_schema_verr_memory(null_mut(), "allocating a PSVI IDC binding item", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaPSVIIDCBinding>());
@@ -26768,7 +26791,7 @@ unsafe fn xml_schema_idc_append_node_table_item(
             xml_schema_verr_memory(
                 null_mut(),
                 "allocating an array of IDC node-table items",
-                null_mut(),
+                None,
             );
             return -1;
         }
@@ -26782,7 +26805,7 @@ unsafe fn xml_schema_idc_append_node_table_item(
             xml_schema_verr_memory(
                 null_mut(),
                 "re-allocating an array of IDC node-table items",
-                null_mut(),
+                None,
             );
             return -1;
         }
@@ -27409,7 +27432,7 @@ unsafe fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxtPtr) -> i32
                                     xml_schema_verr_memory(
                                         null_mut(),
                                         "allocating IDC list of node-table items",
-                                        null_mut(),
+                                        None,
                                     );
                                     // goto internal_error;
                                     return -1;
@@ -27427,7 +27450,7 @@ unsafe fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxtPtr) -> i32
                                     xml_schema_verr_memory(
                                         null_mut(),
                                         "re-allocating IDC list of node-table items",
-                                        null_mut(),
+                                        None,
                                     );
                                     // goto internal_error;
                                     return -1;
@@ -27472,7 +27495,7 @@ unsafe fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxtPtr) -> i32
                             xml_schema_verr_memory(
                                 null_mut(),
                                 "allocating an array of IDC node-table items",
-                                null_mut(),
+                                None,
                             );
                             xml_schema_idc_free_binding(par_bind);
                             // goto internal_error;
@@ -27738,28 +27761,28 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
 
                 // default_psvi:
                 // PSVI: Create a text node on the instance element.
-                if (*vctxt).options & XmlSchemaValidOption::XmlSchemaValVcICreate as i32 != 0
-                    && !(*inode).node.is_null()
-                {
-                    // VAL TODO: Normalize the value.
-                    let norm_value =
-                        xml_schema_normalize_value((*inode).type_def, (*(*inode).decl).value);
-                    let text_child = if !norm_value.is_null() {
-                        let text_child = xml_new_doc_text((*(*inode).node).doc, norm_value);
-                        xml_free(norm_value as _);
-                        text_child
-                    } else {
-                        xml_new_doc_text((*(*inode).node).doc, (*(*inode).decl).value)
-                    };
-                    if let Some(text_child) = text_child {
-                        (*(*inode).node).add_child(text_child.into());
-                    } else {
-                        VERROR_INT!(
-                            vctxt,
-                            "xmlSchemaValidatorPopElem",
-                            "calling xmlNewDocText()"
-                        );
-                        break 'internal_error;
+                if (*vctxt).options & XmlSchemaValidOption::XmlSchemaValVcICreate as i32 != 0 {
+                    if let Some(mut node) = (*inode).node {
+                        // VAL TODO: Normalize the value.
+                        let norm_value =
+                            xml_schema_normalize_value((*inode).type_def, (*(*inode).decl).value);
+                        let text_child = if !norm_value.is_null() {
+                            let text_child = xml_new_doc_text(node.doc, norm_value);
+                            xml_free(norm_value as _);
+                            text_child
+                        } else {
+                            xml_new_doc_text(node.doc, (*(*inode).decl).value)
+                        };
+                        if let Some(text_child) = text_child {
+                            node.add_child(text_child.into());
+                        } else {
+                            VERROR_INT!(
+                                vctxt,
+                                "xmlSchemaValidatorPopElem",
+                                "calling xmlNewDocText()"
+                            );
+                            break 'internal_error;
+                        }
                     }
                 }
             } else if !INODE_NILLED!(inode) {
@@ -28139,7 +28162,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
         'leave_node: while let Some(cur_node) = node {
             if cur_node.element_type() == XmlElementType::XmlElementNode {
                 // Leaving the scope of an element.
-                if Some(cur_node) != XmlNodePtr::from_raw((*(*vctxt).inode).node).unwrap() {
+                if Some(cur_node) != (*(*vctxt).inode).node {
                     VERROR_INT!(vctxt, "xmlSchemaVDocWalk", "element position mismatch");
                     // goto internal_error;
                     return -1;
@@ -28669,7 +28692,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                 xml_schema_verr_memory(
                     vctxt,
                     "allocating namespace bindings for SAX validation",
-                    null_mut(),
+                    None,
                 );
                 // goto internal_error;
                 (*vctxt).err = -1;
@@ -28688,7 +28711,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                 xml_schema_verr_memory(
                     vctxt,
                     "re-allocating namespace bindings for SAX validation",
-                    null_mut(),
+                    None,
                 );
                 // goto internal_error;
                 (*vctxt).err = -1;
