@@ -1230,7 +1230,7 @@ pub struct XmlSchemaValidCtxt {
     err: i32,
     nberrors: i32,
 
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
     cur: *mut XmlNode,
     /* typ: XmlSchemaTypePtr, */
     regexp: XmlRegExecCtxtPtr,
@@ -1238,7 +1238,7 @@ pub struct XmlSchemaValidCtxt {
 
     value_ws: i32,
     options: i32,
-    validation_root: *mut XmlNode,
+    validation_root: Option<XmlNodePtr>,
     pctxt: XmlSchemaParserCtxtPtr,
     xsi_assemble: i32,
 
@@ -25433,7 +25433,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                         }
                         // Init the node-table item: Save the node, position and
                         // consume the key-sequence.
-                        (*nt_item).node = (*vctxt).node;
+                        (*nt_item).node = (*vctxt).node.map_or(null_mut(), |node| node.as_ptr());
                         (*nt_item).node_line = (*(*vctxt).inode).node_line;
                         (*nt_item).keys = *key_seq;
                         *key_seq = null_mut();
@@ -26005,7 +26005,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                     ns.is_some()
                                 } {}
                                 ns = xml_new_ns(
-                                    XmlNodePtr::from_raw((*vctxt).validation_root).unwrap(),
+                                    (*vctxt).validation_root,
                                     (*iattr).ns_name,
                                     Some(&prefix),
                                 );
@@ -28001,15 +28001,14 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut ns_name: *const XmlChar;
 
     // DOC VAL TODO: Move this to the start function.
-    let val_root = if !(*vctxt).validation_root.is_null() {
-        (*vctxt).validation_root
+    let val_root = if let Some(validation_root) = (*vctxt).validation_root {
+        Some(validation_root)
     } else if let Some(doc) = (*vctxt).doc {
         doc.get_root_element()
-            .map_or(null_mut(), |node| node.as_ptr())
     } else {
-        null_mut()
+        None
     };
-    if val_root.is_null() {
+    if val_root.is_none() {
         // VAL TODO: Error code?
         VERROR!(
             vctxt,
@@ -28021,7 +28020,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     }
     (*vctxt).depth = -1;
     (*vctxt).validation_root = val_root;
-    let mut node = XmlNodePtr::from_raw(val_root).unwrap();
+    let mut node = val_root;
     'main: while let Some(cur_node) = node {
         'goto_leave_node: {
             if (*vctxt).skip_depth != -1 && (*vctxt).depth >= (*vctxt).skip_depth {
@@ -28177,7 +28176,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     // goto internal_error;
                     return -1;
                 }
-                if Some(cur_node) == XmlNodePtr::from_raw(val_root).unwrap() {
+                if Some(cur_node) == val_root {
                     break 'main;
                 }
             }
@@ -28263,7 +28262,7 @@ unsafe fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
     //   Might be problematic if one reuses the context
     //   and assumes that the options remain the same.
     (*vctxt).flags = 0;
-    (*vctxt).validation_root = null_mut();
+    (*vctxt).validation_root = None;
     (*vctxt).doc = None;
     #[cfg(feature = "libxml_reader")]
     {
@@ -28408,18 +28407,13 @@ unsafe fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
 /// number otherwise and -1 in case of internal or API error.
 #[doc(alias = "xmlSchemaValidateDoc")]
 pub unsafe fn xml_schema_validate_doc(ctxt: XmlSchemaValidCtxtPtr, doc: XmlDocPtr) -> i32 {
-    // if doc.is_null() {
-    //     return -1;
-    // }
     if ctxt.is_null() {
         return -1;
     }
 
     (*ctxt).doc = Some(doc);
-    (*ctxt).node = doc
-        .get_root_element()
-        .map_or(null_mut(), |node| node.as_ptr());
-    if (*ctxt).node.is_null() {
+    (*ctxt).node = doc.get_root_element();
+    if (*ctxt).node.is_none() {
         xml_schema_custom_err(
             ctxt as XmlSchemaAbstractCtxtPtr,
             XmlParserErrors::XmlSchemavDocumentElementMissing,
