@@ -5737,7 +5737,7 @@ pub unsafe fn xml_schema_check_facet(
             // of the facet.
             ret = xml_schema_vcheck_cvc_simple_type(
                 pctxt as XmlSchemaAbstractCtxtPtr,
-                (*facet).node,
+                XmlGenericNodePtr::from_raw((*facet).node),
                 base,
                 (*facet).value,
                 addr_of_mut!((*facet).val),

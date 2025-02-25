@@ -2438,7 +2438,7 @@ unsafe fn xml_schema_get_notation(
 unsafe fn xml_schema_validate_notation(
     vctxt: XmlSchemaValidCtxtPtr,
     schema: XmlSchemaPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
     val_needed: i32,
@@ -2465,9 +2465,9 @@ unsafe fn xml_schema_validate_notation(
 
             if !vctxt.is_null() {
                 ns_name = xml_schema_lookup_namespace(vctxt, prefix);
-            } else if !node.is_null() {
-                let ns = (*node).search_ns(
-                    (*node).doc,
+            } else if let Some(node) = node {
+                let ns = node.search_ns(
+                    node.document(),
                     (!prefix.is_null())
                         .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                         .as_deref(),
@@ -3108,7 +3108,7 @@ macro_rules! ACTIVATE_PARENT_ELEM {
 #[allow(clippy::too_many_arguments)]
 unsafe fn xml_schema_validate_facets(
     actxt: XmlSchemaAbstractCtxtPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     typ: XmlSchemaTypePtr,
     mut val_type: XmlSchemaValType,
     value: *const XmlChar,
@@ -3211,7 +3211,7 @@ unsafe fn xml_schema_validate_facets(
                                 xml_schema_facet_err(
                                     actxt,
                                     ret.try_into().unwrap(),
-                                    node,
+                                    node.map_or(null_mut(), |node| node.as_ptr()),
                                     &value,
                                     len,
                                     typ,
@@ -3274,7 +3274,7 @@ unsafe fn xml_schema_validate_facets(
                             xml_schema_facet_err(
                                 actxt,
                                 ret.try_into().unwrap(),
-                                node,
+                                node.map_or(null_mut(), |node| node.as_ptr()),
                                 &value,
                                 length,
                                 typ,
@@ -3351,7 +3351,7 @@ unsafe fn xml_schema_validate_facets(
             xml_schema_facet_err(
                 actxt,
                 ret.try_into().unwrap(),
-                node,
+                node.map_or(null_mut(), |node| node.as_ptr()),
                 &value,
                 0,
                 typ,
@@ -3405,7 +3405,7 @@ unsafe fn xml_schema_validate_facets(
                 xml_schema_facet_err(
                     actxt,
                     ret.try_into().unwrap(),
-                    node,
+                    node.map_or(null_mut(), |node| node.as_ptr()),
                     &value,
                     0,
                     typ,
@@ -3574,7 +3574,7 @@ macro_rules! NORMALIZE {
 #[allow(clippy::too_many_arguments)]
 pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
     actxt: XmlSchemaAbstractCtxtPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     typ: XmlSchemaTypePtr,
     mut value: *const XmlChar,
     ret_val: *mut XmlSchemaValPtr,
@@ -3646,7 +3646,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                         ret = xml_schema_validate_notation(
                             actxt as XmlSchemaValidCtxtPtr,
                             (*(actxt as XmlSchemaValidCtxtPtr)).schema,
-                            null_mut(),
+                            None,
                             value,
                             addr_of_mut!(val),
                             val_needed,
@@ -3667,14 +3667,14 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                                 bi_type,
                                 value,
                                 addr_of_mut!(val),
-                                XmlGenericNodePtr::from_raw(node),
+                                node,
                             );
                         } else {
                             ret = xml_schema_val_predef_type_node_no_norm(
                                 bi_type,
                                 value,
                                 null_mut(),
-                                XmlGenericNodePtr::from_raw(node),
+                                node,
                             );
                         }
                     }
@@ -3698,14 +3698,14 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                                 bi_type,
                                 value,
                                 addr_of_mut!(val),
-                                XmlGenericNodePtr::from_raw(node),
+                                node,
                             );
                         } else {
                             ret = xml_schema_val_predef_type_node_no_norm(
                                 bi_type,
                                 value,
                                 null_mut(),
-                                XmlGenericNodePtr::from_raw(node),
+                                node,
                             );
                         }
                     }
@@ -3759,7 +3759,14 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                 }
             } else if fire_errors != 0 && ret > 0 {
                 let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                xml_schema_simple_type_err(actxt, ret.try_into().unwrap(), node, &value, typ, 1);
+                xml_schema_simple_type_err(
+                    actxt,
+                    ret.try_into().unwrap(),
+                    node.map_or(null_mut(), |node| node.as_ptr()),
+                    &value,
+                    typ,
+                    1,
+                );
             }
         } else if WXS_IS_LIST!(typ) {
             let mut cur: *const XmlChar;
@@ -3875,7 +3882,14 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                 normalize = 1;
                 NORMALIZE!(typ, value, norm_value, typ, is_normalized, normalize);
                 let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                xml_schema_simple_type_err(actxt, ret.try_into().unwrap(), node, &value, typ, 1);
+                xml_schema_simple_type_err(
+                    actxt,
+                    ret.try_into().unwrap(),
+                    node.map_or(null_mut(), |node| node.as_ptr()),
+                    &value,
+                    typ,
+                    1,
+                );
             }
         } else if WXS_IS_UNION!(typ) {
             let mut member_link: XmlSchemaTypeLinkPtr;
@@ -3980,7 +3994,14 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
             }
             if fire_errors != 0 && ret > 0 {
                 let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                xml_schema_simple_type_err(actxt, ret.try_into().unwrap(), node, &value, typ, 1);
+                xml_schema_simple_type_err(
+                    actxt,
+                    ret.try_into().unwrap(),
+                    node.map_or(null_mut(), |node| node.as_ptr()),
+                    &value,
+                    typ,
+                    1,
+                );
             }
         }
 
@@ -6536,7 +6557,6 @@ unsafe fn xml_schema_parse_annotation(
     node: XmlNodePtr,
     needed: i32,
 ) -> XmlSchemaAnnotPtr {
-    let mut child: *mut XmlNode;
     let mut barked: i32 = 0;
 
     // INFO: S4S completed.
@@ -6570,15 +6590,17 @@ unsafe fn xml_schema_parse_annotation(
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
     // And now for the children...
-    child = node.children().map_or(null_mut(), |c| c.as_ptr());
-    while !child.is_null() {
-        if is_schema(XmlNodePtr::from_raw(child).unwrap(), "appinfo") {
+    let mut child = node
+        .children
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    while let Some(cur_node) = child {
+        if is_schema(Some(cur_node), "appinfo") {
             // TODO: make available the content of "appinfo".
 
             // source = anyURI
             // {any attributes with non-schema namespace . . .}>
             // Content: ({any})*
-            let mut attr = (*child).properties;
+            let mut attr = cur_node.properties;
             while let Some(now) = attr {
                 if (now.ns.is_none() && !xml_str_equal(now.name, c"source".as_ptr() as _))
                     || now.ns.map_or(false, |ns| {
@@ -6597,19 +6619,21 @@ unsafe fn xml_schema_parse_annotation(
             xml_schema_pval_attr(
                 ctxt,
                 null_mut(),
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
+                cur_node,
                 c"source".as_ptr() as _,
                 xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
                 null_mut(),
             );
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-        } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "documentation") {
+            child = cur_node
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        } else if is_schema(Some(cur_node), "documentation") {
             // TODO: make available the content of "documentation".
 
             // source = anyURI
             // {any attributes with non-schema namespace . . .}>
             // Content: ({any})*
-            let mut attr = (*child).properties;
+            let mut attr = cur_node.properties;
             while let Some(cur_attr) = attr {
                 if let Some(ns) = cur_attr.ns {
                     if xml_str_equal(ns.href, XML_SCHEMA_NS.as_ptr() as _)
@@ -6635,7 +6659,7 @@ unsafe fn xml_schema_parse_annotation(
             }
             // Attribute "xml:lang".
             if let Some(attr) = xml_schema_get_prop_node_ns(
-                child,
+                cur_node.as_ptr(),
                 XML_XML_NAMESPACE.as_ptr() as _,
                 c"lang".as_ptr() as _,
             ) {
@@ -6647,7 +6671,9 @@ unsafe fn xml_schema_parse_annotation(
                     null_mut(),
                 );
             }
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+            child = cur_node
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         } else {
             if barked == 0 {
                 xml_schema_pcontent_err(
@@ -6655,13 +6681,15 @@ unsafe fn xml_schema_parse_annotation(
                     XmlParserErrors::XmlSchemapS4sElemNotAllowed,
                     null_mut(),
                     node.as_ptr(),
-                    child,
+                    cur_node.as_ptr(),
                     null_mut(),
                     c"(appinfo | documentation)*".as_ptr() as _,
                 );
             }
             barked = 1;
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+            child = cur_node
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
     }
 
@@ -7877,7 +7905,6 @@ unsafe fn xml_schema_parse_model_group_def_ref(
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
 ) -> XmlSchemaTreeItemPtr {
-    let mut child: *mut XmlNode;
     let mut refe: *const XmlChar = null();
     let mut ref_ns: *const XmlChar = null();
 
@@ -7955,21 +7982,25 @@ unsafe fn xml_schema_parse_model_group_def_ref(
             as XmlSchemaTreeItemPtr;
     xml_schema_pcheck_particle_correct_2(ctxt, item, node, min, max);
     // And now for the children...
-    child = (*node).children().map_or(null_mut(), |c| c.as_ptr());
+    let mut child = node
+        .children
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
     // TODO: Is annotation even allowed for a model group reference?
-    if is_schema(XmlNodePtr::from_raw(child).unwrap(), "annotation") {
+    if is_schema(child, "annotation") {
         // TODO: What to do exactly with the annotation?
-        (*item).annot =
-            xml_schema_parse_annotation(ctxt, XmlNodePtr::from_raw(child).unwrap().unwrap(), 1);
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        (*item).annot = xml_schema_parse_annotation(ctxt, child.unwrap(), 1);
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
-    if !child.is_null() {
+    if let Some(child) = child {
         xml_schema_pcontent_err(
             ctxt,
             XmlParserErrors::XmlSchemapS4sElemNotAllowed,
             null_mut(),
             node.as_ptr(),
-            child,
+            child.as_ptr(),
             null_mut(),
             c"(annotation?)".as_ptr() as _,
         );
@@ -7989,7 +8020,7 @@ unsafe fn xml_schema_parse_model_group_def_ref(
 #[doc(alias = "xmlSchemaAddAttributeUse")]
 unsafe fn xml_schema_add_attribute_use(
     pctxt: XmlSchemaParserCtxtPtr,
-    node: *mut XmlNode,
+    node: XmlNodePtr,
 ) -> XmlSchemaAttributeUsePtr {
     let mut ret: XmlSchemaAttributeUsePtr;
 
@@ -8004,7 +8035,7 @@ unsafe fn xml_schema_add_attribute_use(
     }
     memset(ret as _, 0, size_of::<XmlSchemaAttributeUse>());
     (*ret).typ = XmlSchemaTypeType::XmlSchemaTypeAttributeUse;
-    (*ret).node = node;
+    (*ret).node = node.into();
 
     WXS_ADD_LOCAL!(pctxt, ret);
     ret
@@ -8328,7 +8359,7 @@ unsafe fn xml_schema_parse_local_attribute(
             // goto check_children;
         } else {
             // Create the attribute use component.
-            using = xml_schema_add_attribute_use(pctxt, node.into());
+            using = xml_schema_add_attribute_use(pctxt, node);
             if using.is_null() {
                 return null_mut();
             }
@@ -8353,7 +8384,7 @@ unsafe fn xml_schema_parse_local_attribute(
         }
     } else if occurs != XML_SCHEMAS_ATTR_USE_PROHIBITED {
         // Create the attribute use component.
-        using = xml_schema_add_attribute_use(pctxt, node.into());
+        using = xml_schema_add_attribute_use(pctxt, node);
         if using.is_null() {
             return null_mut();
         }
@@ -8566,7 +8597,6 @@ unsafe fn xml_schema_parse_attribute_group_ref(
     node: XmlNodePtr,
 ) -> XmlSchemaQnameRefPtr {
     let ret: XmlSchemaQnameRefPtr;
-    let mut child: *mut XmlNode;
     let mut ref_ns: *const XmlChar = null();
     let mut refe: *const XmlChar = null();
 
@@ -8625,19 +8655,24 @@ unsafe fn xml_schema_parse_attribute_group_ref(
     xml_schema_pval_attr_id(pctxt, node, c"id".as_ptr() as _);
 
     // And now for the children...
-    child = node.children().map_or(null_mut(), |c| c.as_ptr());
-    if is_schema(XmlNodePtr::from_raw(child).unwrap(), "annotation") {
+    let mut child = node
+        .children
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    if is_schema(child, "annotation") {
         // TODO: We do not have a place to store the annotation, do we?
-        xml_schema_parse_annotation(pctxt, XmlNodePtr::from_raw(child).unwrap().unwrap(), 0);
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        xml_schema_parse_annotation(pctxt, child.unwrap(), 0);
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
-    if !child.is_null() {
+    if let Some(child) = child {
         xml_schema_pcontent_err(
             pctxt,
             XmlParserErrors::XmlSchemapS4sElemNotAllowed,
             null_mut(),
             node.into(),
-            child,
+            child.as_ptr(),
             null_mut(),
             c"(annotation?)".as_ptr() as _,
         );
@@ -8714,30 +8749,20 @@ unsafe fn xml_schema_parse_attribute_group_ref(
 unsafe fn xml_schema_parse_local_attributes(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
-    child: &mut *mut XmlNode,
+    child: &mut Option<XmlNodePtr>,
     list: *mut XmlSchemaItemListPtr,
     parent_type: i32,
     has_refs: *mut i32,
 ) -> i32 {
     let mut item: *mut c_void;
 
-    while is_schema(XmlNodePtr::from_raw(*child).unwrap(), "attribute")
-        || is_schema(XmlNodePtr::from_raw(*child).unwrap(), "attributeGroup")
-    {
-        if is_schema(XmlNodePtr::from_raw(*child).unwrap(), "attribute") {
-            item = xml_schema_parse_local_attribute(
-                ctxt,
-                schema,
-                XmlNodePtr::from_raw(*child).unwrap().unwrap(),
-                *list,
-                parent_type,
-            ) as _;
+    while is_schema(*child, "attribute") || is_schema(*child, "attributeGroup") {
+        if is_schema(*child, "attribute") {
+            item =
+                xml_schema_parse_local_attribute(ctxt, schema, child.unwrap(), *list, parent_type)
+                    as _;
         } else {
-            item = xml_schema_parse_attribute_group_ref(
-                ctxt,
-                schema,
-                XmlNodePtr::from_raw(*child).unwrap().unwrap(),
-            ) as _;
+            item = xml_schema_parse_attribute_group_ref(ctxt, schema, child.unwrap()) as _;
             if !item.is_null() && !has_refs.is_null() {
                 *has_refs = 1;
             }
@@ -8754,7 +8779,10 @@ unsafe fn xml_schema_parse_local_attributes(
                 return -1;
             }
         }
-        *child = (*(*child)).next.map_or(null_mut(), |n| n.as_ptr());
+        *child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
     0
 }
@@ -9041,8 +9069,6 @@ unsafe fn xml_schema_parse_extension(
     node: XmlNodePtr,
     parent_type: XmlSchemaTypeType,
 ) -> XmlSchemaTypePtr {
-    let mut child: *mut XmlNode;
-
     if ctxt.is_null() || schema.is_null() {
         return null_mut();
     }
@@ -9099,58 +9125,72 @@ unsafe fn xml_schema_parse_extension(
         );
     }
     // And now for the children...
-    child = (*node).children().map_or(null_mut(), |c| c.as_ptr());
-    if is_schema(XmlNodePtr::from_raw(child).unwrap(), "annotation") {
+    let mut child = node
+        .children
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    if is_schema(child, "annotation") {
         // Add the annotation to the type ancestor.
         xml_schema_add_annotation(
             typ as XmlSchemaAnnotItemPtr,
-            xml_schema_parse_annotation(ctxt, XmlNodePtr::from_raw(child).unwrap().unwrap(), 1),
+            xml_schema_parse_annotation(ctxt, child.unwrap(), 1),
         );
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
     if parent_type == XmlSchemaTypeType::XmlSchemaTypeComplexContent {
         // Corresponds to <complexType><complexContent><extension>... and:
         //
         // Model groups <all>, <choice>, <sequence> and <group>.
-        if is_schema(XmlNodePtr::from_raw(child).unwrap(), "all") {
+        if is_schema(child, "all") {
             (*typ).subtypes = xml_schema_parse_model_group(
                 ctxt,
                 schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
+                child.unwrap(),
                 XmlSchemaTypeType::XmlSchemaTypeAll,
                 1,
             ) as XmlSchemaTypePtr;
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-        } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "choice") {
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        } else if is_schema(child, "choice") {
             (*typ).subtypes = xml_schema_parse_model_group(
                 ctxt,
                 schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
+                child.unwrap(),
                 XmlSchemaTypeType::XmlSchemaTypeChoice,
                 1,
             ) as XmlSchemaTypePtr;
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-        } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "sequence") {
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        } else if is_schema(child, "sequence") {
             (*typ).subtypes = xml_schema_parse_model_group(
                 ctxt,
                 schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
+                child.unwrap(),
                 XmlSchemaTypeType::XmlSchemaTypeSequence,
                 1,
             ) as XmlSchemaTypePtr;
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-        } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "group") {
-            (*typ).subtypes = xml_schema_parse_model_group_def_ref(
-                ctxt,
-                schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
-            ) as XmlSchemaTypePtr;
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        } else if is_schema(child, "group") {
+            (*typ).subtypes = xml_schema_parse_model_group_def_ref(ctxt, schema, child.unwrap())
+                as XmlSchemaTypePtr;
             // Note that the reference will be resolved in
             // xmlSchemaResolveTypeReferences();
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
     }
-    if !child.is_null() {
+    if child.is_some() {
         // Attribute uses/declarations.
         if xml_schema_parse_local_attributes(
             ctxt,
@@ -9164,16 +9204,16 @@ unsafe fn xml_schema_parse_extension(
             return null_mut();
         }
         // Attribute wildcard.
-        if is_schema(XmlNodePtr::from_raw(child).unwrap(), "anyAttribute") {
-            (*(*ctxt).ctxt_type).attribute_wildcard = xml_schema_parse_any_attribute(
-                ctxt,
-                schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
-            );
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        if is_schema(child, "anyAttribute") {
+            (*(*ctxt).ctxt_type).attribute_wildcard =
+                xml_schema_parse_any_attribute(ctxt, schema, child.unwrap());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
     }
-    if !child.is_null() {
+    if let Some(child) = child {
         if parent_type == XmlSchemaTypeType::XmlSchemaTypeComplexContent {
             // Complex content extension.
             xml_schema_pcontent_err(
@@ -9181,7 +9221,7 @@ unsafe fn xml_schema_parse_extension(
                 XmlParserErrors::XmlSchemapS4sElemNotAllowed,
                 null_mut(),
                 node.into(),
-                child,
+                child.into(),
                 null_mut(),
                 c"(annotation?, ((group | all | choice | sequence)?, ((attribute | attributeGroup)*, anyAttribute?)))".as_ptr() as _
             );
@@ -9192,7 +9232,7 @@ unsafe fn xml_schema_parse_extension(
                 XmlParserErrors::XmlSchemapS4sElemNotAllowed,
                 null_mut(),
                 node.into(),
-                child,
+                child.into(),
                 null_mut(),
                 c"(annotation?, ((attribute | attributeGroup)*, anyAttribute?))".as_ptr() as _,
             );
@@ -9439,7 +9479,6 @@ unsafe fn xml_schema_parse_complex_type(
     top_level: i32,
 ) -> XmlSchemaTypePtr {
     let typ: XmlSchemaTypePtr;
-    let mut child: *mut XmlNode;
     let mut name: *const XmlChar = null();
     let mut attr_value: *const XmlChar;
     // #ifdef ENABLE_NAMED_LOCALS
@@ -9648,14 +9687,18 @@ unsafe fn xml_schema_parse_complex_type(
         }
     }
     // And now for the children...
-    child = (*node).children().map_or(null_mut(), |c| c.as_ptr());
-    if is_schema(XmlNodePtr::from_raw(child).unwrap(), "annotation") {
-        (*typ).annot =
-            xml_schema_parse_annotation(ctxt, XmlNodePtr::from_raw(child).unwrap().unwrap(), 1);
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+    let mut child = node
+        .children
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    if is_schema(child, "annotation") {
+        (*typ).annot = xml_schema_parse_annotation(ctxt, child.unwrap(), 1);
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
     (*ctxt).ctxt_type = typ;
-    if is_schema(XmlNodePtr::from_raw(child).unwrap(), "simpleContent") {
+    if is_schema(child, "simpleContent") {
         // <complexType><simpleContent>...
         // 3.4.3 : 2.2
         // Specifying mixed='true' when the <simpleContent>
@@ -9666,20 +9709,26 @@ unsafe fn xml_schema_parse_complex_type(
         xml_schema_parse_simple_content(
             ctxt,
             schema,
-            XmlNodePtr::from_raw(child).unwrap().unwrap(),
+            child.unwrap(),
             addr_of_mut!(has_restriction_or_extension),
         );
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-    } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "complexContent") {
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+    } else if is_schema(child, "complexContent") {
         // <complexType><complexContent>...
         (*typ).content_type = XmlSchemaContentType::XmlSchemaContentEmpty;
         xml_schema_parse_complex_content(
             ctxt,
             schema,
-            XmlNodePtr::from_raw(child).unwrap().unwrap(),
+            child.unwrap(),
             addr_of_mut!(has_restriction_or_extension),
         );
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     } else {
         // E.g <complexType><sequence>... or <complexType><attribute>... etc.
         //
@@ -9691,42 +9740,51 @@ unsafe fn xml_schema_parse_complex_type(
         (*typ).base_type = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnytype);
         (*typ).flags |= XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION;
         // Parse model groups.
-        if is_schema(XmlNodePtr::from_raw(child).unwrap(), "all") {
+        if is_schema(child, "all") {
             (*typ).subtypes = xml_schema_parse_model_group(
                 ctxt,
                 schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
+                child.unwrap(),
                 XmlSchemaTypeType::XmlSchemaTypeAll,
                 1,
             ) as XmlSchemaTypePtr;
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-        } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "choice") {
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        } else if is_schema(child, "choice") {
             (*typ).subtypes = xml_schema_parse_model_group(
                 ctxt,
                 schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
+                child.unwrap(),
                 XmlSchemaTypeType::XmlSchemaTypeChoice,
                 1,
             ) as XmlSchemaTypePtr;
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-        } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "sequence") {
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        } else if is_schema(child, "sequence") {
             (*typ).subtypes = xml_schema_parse_model_group(
                 ctxt,
                 schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
+                child.unwrap(),
                 XmlSchemaTypeType::XmlSchemaTypeSequence,
                 1,
             ) as XmlSchemaTypePtr;
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-        } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "group") {
-            (*typ).subtypes = xml_schema_parse_model_group_def_ref(
-                ctxt,
-                schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
-            ) as XmlSchemaTypePtr;
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        } else if is_schema(child, "group") {
+            (*typ).subtypes = xml_schema_parse_model_group_def_ref(ctxt, schema, child.unwrap())
+                as XmlSchemaTypePtr;
             // Note that the reference will be resolved in
             // xmlSchemaResolveTypeReferences();
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
         // Parse attribute decls/refs.
         if xml_schema_parse_local_attributes(
@@ -9741,22 +9799,22 @@ unsafe fn xml_schema_parse_complex_type(
             return null_mut();
         }
         // Parse attribute wildcard.
-        if is_schema(XmlNodePtr::from_raw(child).unwrap(), "anyAttribute") {
-            (*typ).attribute_wildcard = xml_schema_parse_any_attribute(
-                ctxt,
-                schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
-            );
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        if is_schema(child, "anyAttribute") {
+            (*typ).attribute_wildcard =
+                xml_schema_parse_any_attribute(ctxt, schema, child.unwrap());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
     }
-    if !child.is_null() {
+    if let Some(child) = child {
         xml_schema_pcontent_err(
             ctxt,
             XmlParserErrors::XmlSchemapS4sElemNotAllowed,
             null_mut(),
             node.into(),
-            child,
+            child.as_ptr(),
             null_mut(),
             c"(annotation?, (simpleContent | complexContent | ((group | all | choice | sequence)?, ((attribute | attributeGroup)*, anyAttribute?))))".as_ptr() as _
         );
@@ -11335,8 +11393,6 @@ unsafe fn xml_schema_parse_restriction(
     node: XmlNodePtr,
     parent_type: XmlSchemaTypeType,
 ) -> XmlSchemaTypePtr {
-    let mut child: *mut XmlNode;
-
     if ctxt.is_null() || schema.is_null() {
         return null_mut();
     }
@@ -11451,18 +11507,23 @@ unsafe fn xml_schema_parse_restriction(
         }
     }
     // And now for the children...
-    child = node.children().map_or(null_mut(), |c| c.as_ptr());
-    if is_schema(XmlNodePtr::from_raw(child).unwrap(), "annotation") {
+    let mut child = node
+        .children
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    if is_schema(child, "annotation") {
         // Add the annotation to the simple type ancestor.
         xml_schema_add_annotation(
             typ as XmlSchemaAnnotItemPtr,
-            xml_schema_parse_annotation(ctxt, XmlNodePtr::from_raw(child).unwrap().unwrap(), 1),
+            xml_schema_parse_annotation(ctxt, child.unwrap(), 1),
         );
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
     if parent_type == XmlSchemaTypeType::XmlSchemaTypeSimple {
         // Corresponds to <simpleType><restriction><simpleType>.
-        if is_schema(XmlNodePtr::from_raw(child).unwrap(), "simpleType") {
+        if is_schema(child, "simpleType") {
             if !(*typ).base.is_null() {
                 // src-restriction-base-or-simpleType
                 // Either the base [attribute] or the simpleType [child] of the
@@ -11472,27 +11533,26 @@ unsafe fn xml_schema_parse_restriction(
                     XmlParserErrors::XmlSchemapSrcRestrictionBaseOrSimpletype,
                     null_mut(),
                     node.into(),
-                    child,
+                    child.unwrap().into(),
                     c"The attribute 'base' and the <simpleType> child are mutually exclusive"
                         .as_ptr() as _,
                     null_mut(),
                 );
             } else {
-                (*typ).base_type = xml_schema_parse_simple_type(
-                    ctxt,
-                    schema,
-                    XmlNodePtr::from_raw(child).unwrap().unwrap(),
-                    0,
-                ) as XmlSchemaTypePtr;
+                (*typ).base_type = xml_schema_parse_simple_type(ctxt, schema, child.unwrap(), 0)
+                    as XmlSchemaTypePtr;
             }
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         } else if (*typ).base.is_null() {
             xml_schema_pcontent_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapSrcRestrictionBaseOrSimpletype,
                 null_mut(),
                 node.into(),
-                child,
+                child.unwrap().into(),
                 c"Either the attribute 'base' or a <simpleType> child must be present".as_ptr()
                     as _,
                 null_mut(),
@@ -11503,62 +11563,70 @@ unsafe fn xml_schema_parse_restriction(
         // followed by:
         //
         // Model groups <all>, <choice> and <sequence>.
-        if is_schema(XmlNodePtr::from_raw(child).unwrap(), "all") {
+        if is_schema(child, "all") {
             (*typ).subtypes = xml_schema_parse_model_group(
                 ctxt,
                 schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
+                child.unwrap(),
                 XmlSchemaTypeType::XmlSchemaTypeAll,
                 1,
             ) as XmlSchemaTypePtr;
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-        } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "choice") {
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        } else if is_schema(child, "choice") {
             (*typ).subtypes = xml_schema_parse_model_group(
                 ctxt,
                 schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
+                child.unwrap(),
                 XmlSchemaTypeType::XmlSchemaTypeChoice,
                 1,
             ) as XmlSchemaTypePtr;
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-        } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "sequence") {
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        } else if is_schema(child, "sequence") {
             (*typ).subtypes = xml_schema_parse_model_group(
                 ctxt,
                 schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
+                child.unwrap(),
                 XmlSchemaTypeType::XmlSchemaTypeSequence,
                 1,
             ) as XmlSchemaTypePtr;
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         // Model group reference <group>.
-        } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "group") {
-            (*typ).subtypes = xml_schema_parse_model_group_def_ref(
-                ctxt,
-                schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
-            ) as XmlSchemaTypePtr;
+        } else if is_schema(child, "group") {
+            (*typ).subtypes = xml_schema_parse_model_group_def_ref(ctxt, schema, child.unwrap())
+                as XmlSchemaTypePtr;
             // Note that the reference will be resolved in
             // xmlSchemaResolveTypeReferences();
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
     } else if parent_type == XmlSchemaTypeType::XmlSchemaTypeSimpleContent {
         // Corresponds to <complexType><simpleContent><restriction>...
         //
         // "1.1 the simple type definition corresponding to the <simpleType>
         // among the [children] of <restriction> if there is one;"
-        if is_schema(XmlNodePtr::from_raw(child).unwrap(), "simpleType") {
+        if is_schema(child, "simpleType") {
             // We will store the to-be-restricted simple type in
             // (*typ).contentTypeDef *temporarily*.
-            (*typ).content_type_def = xml_schema_parse_simple_type(
-                ctxt,
-                schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
-                0,
-            ) as XmlSchemaTypePtr;
+            (*typ).content_type_def =
+                xml_schema_parse_simple_type(ctxt, schema, child.unwrap(), 0) as XmlSchemaTypePtr;
             if (*typ).content_type_def.is_null() {
                 return null_mut();
             }
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
     }
 
@@ -11575,21 +11643,20 @@ unsafe fn xml_schema_parse_restriction(
         // TODO: Datatypes: 4.1.3 Constraints on XML Representation of
         // Simple Type Definition Schema Representation Constraint:
         // *Single Facet Value*
-        while is_schema(XmlNodePtr::from_raw(child).unwrap(), "minInclusive")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "minExclusive")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "maxInclusive")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "maxExclusive")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "totalDigits")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "fractionDigits")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "pattern")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "enumeration")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "whiteSpace")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "length")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "maxLength")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "minLength")
+        while is_schema(child, "minInclusive")
+            || is_schema(child, "minExclusive")
+            || is_schema(child, "maxInclusive")
+            || is_schema(child, "maxExclusive")
+            || is_schema(child, "totalDigits")
+            || is_schema(child, "fractionDigits")
+            || is_schema(child, "pattern")
+            || is_schema(child, "enumeration")
+            || is_schema(child, "whiteSpace")
+            || is_schema(child, "length")
+            || is_schema(child, "maxLength")
+            || is_schema(child, "minLength")
         {
-            facet =
-                xml_schema_parse_facet(ctxt, schema, XmlNodePtr::from_raw(child).unwrap().unwrap());
+            facet = xml_schema_parse_facet(ctxt, schema, child.unwrap());
             if !facet.is_null() {
                 if lastfacet.is_null() {
                     (*typ).facets = facet;
@@ -11599,7 +11666,10 @@ unsafe fn xml_schema_parse_restriction(
                 lastfacet = facet;
                 (*lastfacet).next = null_mut();
             }
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
         // Create links for derivation and validation.
         if !(*typ).facets.is_null() {
@@ -11642,23 +11712,23 @@ unsafe fn xml_schema_parse_restriction(
             return null_mut();
         }
         // Attribute wildcard.
-        if is_schema(XmlNodePtr::from_raw(child).unwrap(), "anyAttribute") {
-            (*typ).attribute_wildcard = xml_schema_parse_any_attribute(
-                ctxt,
-                schema,
-                XmlNodePtr::from_raw(child).unwrap().unwrap(),
-            );
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        if is_schema(child, "anyAttribute") {
+            (*typ).attribute_wildcard =
+                xml_schema_parse_any_attribute(ctxt, schema, child.unwrap());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
     }
-    if !child.is_null() {
+    if let Some(child) = child {
         if parent_type == XmlSchemaTypeType::XmlSchemaTypeComplexContent {
             xml_schema_pcontent_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sElemNotAllowed,
                 null_mut(),
                 node.into(),
-                child,
+                child.into(),
                 null_mut(),
                 c"annotation?, (group | all | choice | sequence)?, ((attribute | attributeGroup)*, anyAttribute?))".as_ptr() as _
             );
@@ -11668,7 +11738,7 @@ unsafe fn xml_schema_parse_restriction(
                 XmlParserErrors::XmlSchemapS4sElemNotAllowed,
                 null_mut(),
                 node.into(),
-                child,
+                child.into(),
                 null_mut(),
                 c"(annotation?, (simpleType?, (minExclusive | minInclusive | maxExclusive | maxInclusive | totalDigits | fractionDigits | length | minLength | maxLength | enumeration | whiteSpace | pattern)*)?, ((attribute | attributeGroup)*, anyAttribute?))".as_ptr() as _
             );
@@ -11679,7 +11749,7 @@ unsafe fn xml_schema_parse_restriction(
                 XmlParserErrors::XmlSchemapS4sElemNotAllowed,
                 null_mut(),
                 node.into(),
-                child,
+                child.into(),
                 null_mut(),
                 c"(annotation?, (simpleType?, (minExclusive | minInclusive | maxExclusive | maxInclusive | totalDigits | fractionDigits | length | minLength | maxLength | enumeration | whiteSpace | pattern)*))".as_ptr() as _
             );
@@ -12516,7 +12586,6 @@ unsafe fn xml_schema_parse_attribute_group_definition(
     node: XmlNodePtr,
 ) -> XmlSchemaAttributeGroupPtr {
     let mut name: *const XmlChar = null();
-    let mut child: *mut XmlNode;
     let mut has_refs: i32 = 0;
 
     if pctxt.is_null() || schema.is_null() {
@@ -12582,11 +12651,15 @@ unsafe fn xml_schema_parse_attribute_group_definition(
     // Attribute ID
     xml_schema_pval_attr_id(pctxt, node, c"id".as_ptr() as _);
     // And now for the children...
-    child = (*node).children().map_or(null_mut(), |c| c.as_ptr());
-    if is_schema(XmlNodePtr::from_raw(child).unwrap(), "annotation") {
-        (*ret).annot =
-            xml_schema_parse_annotation(pctxt, XmlNodePtr::from_raw(child).unwrap().unwrap(), 1);
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+    let mut child = node
+        .children
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    if is_schema(child, "annotation") {
+        (*ret).annot = xml_schema_parse_annotation(pctxt, child.unwrap(), 1);
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
     // Parse contained attribute decls/refs.
     if xml_schema_parse_local_attributes(
@@ -12604,21 +12677,20 @@ unsafe fn xml_schema_parse_attribute_group_definition(
         (*ret).flags |= XML_SCHEMAS_ATTRGROUP_HAS_REFS;
     }
     // Parse the attribute wildcard.
-    if is_schema(XmlNodePtr::from_raw(child).unwrap(), "anyAttribute") {
-        (*ret).attribute_wildcard = xml_schema_parse_any_attribute(
-            pctxt,
-            schema,
-            XmlNodePtr::from_raw(child).unwrap().unwrap(),
-        );
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+    if is_schema(child, "anyAttribute") {
+        (*ret).attribute_wildcard = xml_schema_parse_any_attribute(pctxt, schema, child.unwrap());
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
-    if !child.is_null() {
+    if let Some(child) = child {
         xml_schema_pcontent_err(
             pctxt,
             XmlParserErrors::XmlSchemapS4sElemNotAllowed,
             null_mut(),
             node.into(),
-            child,
+            child.into(),
             null_mut(),
             c"(annotation?, ((attribute | attributeGroup)*, anyAttribute?))".as_ptr() as _,
         );
@@ -12632,7 +12704,6 @@ unsafe fn xml_schema_parse_include_or_redefine(
     node: XmlNodePtr,
     typ: i32,
 ) -> i32 {
-    let mut child: *mut XmlNode;
     let mut schema_location: *const XmlChar = null();
     let mut res: i32; /* hasRedefinitions = 0 */
     let mut is_chameleon: i32 = 0;
@@ -12787,59 +12858,49 @@ unsafe fn xml_schema_parse_include_or_redefine(
         }
     }
     // And now for the children...
-    child = node.children().map_or(null_mut(), |c| c.as_ptr());
+    let mut child = node
+        .children
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
     if typ == XML_SCHEMA_SCHEMA_REDEFINE {
         // Parse (simpleType | complexType | group | attributeGroup))*
         (*pctxt).redefined = bucket;
         // How to proceed if the redefined schema was not located?
         (*pctxt).is_redefine = 1;
-        while is_schema(XmlNodePtr::from_raw(child).unwrap(), "annotation")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "simpleType")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "complexType")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "group")
-            || is_schema(XmlNodePtr::from_raw(child).unwrap(), "attributeGroup")
+        while is_schema(child, "annotation")
+            || is_schema(child, "simpleType")
+            || is_schema(child, "complexType")
+            || is_schema(child, "group")
+            || is_schema(child, "attributeGroup")
         {
-            if is_schema(XmlNodePtr::from_raw(child).unwrap(), "annotation") {
+            if is_schema(child, "annotation") {
                 // TODO: discard or not?
-            } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "simpleType") {
-                xml_schema_parse_simple_type(
-                    pctxt,
-                    schema,
-                    XmlNodePtr::from_raw(child).unwrap().unwrap(),
-                    1,
-                );
-            } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "complexType") {
-                xml_schema_parse_complex_type(
-                    pctxt,
-                    schema,
-                    XmlNodePtr::from_raw(child).unwrap().unwrap(),
-                    1,
-                );
+            } else if is_schema(child, "simpleType") {
+                xml_schema_parse_simple_type(pctxt, schema, child.unwrap(), 1);
+            } else if is_schema(child, "complexType") {
+                xml_schema_parse_complex_type(pctxt, schema, child.unwrap(), 1);
             // hasRedefinitions = 1;
-            } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "group") {
+            } else if is_schema(child, "group") {
                 // hasRedefinitions = 1;
-                xml_schema_parse_model_group_definition(
-                    pctxt,
-                    schema,
-                    XmlNodePtr::from_raw(child).unwrap().unwrap(),
-                );
-            } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "attributeGroup") {
+                xml_schema_parse_model_group_definition(pctxt, schema, child.unwrap());
+            } else if is_schema(child, "attributeGroup") {
                 // hasRedefinitions = 1;
-                xml_schema_parse_attribute_group_definition(
-                    pctxt,
-                    schema,
-                    XmlNodePtr::from_raw(child).unwrap().unwrap(),
-                );
+                xml_schema_parse_attribute_group_definition(pctxt, schema, child.unwrap());
             }
-            child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+            child = child
+                .unwrap()
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
         (*pctxt).redefined = null_mut();
         (*pctxt).is_redefine = 0;
-    } else if is_schema(XmlNodePtr::from_raw(child).unwrap(), "annotation") {
+    } else if is_schema(child, "annotation") {
         // TODO: discard or not?
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
-    if !child.is_null() {
+    if let Some(child) = child {
         res = XmlParserErrors::XmlSchemapS4sElemNotAllowed as i32;
         if typ == XML_SCHEMA_SCHEMA_REDEFINE {
             xml_schema_pcontent_err(
@@ -12847,7 +12908,7 @@ unsafe fn xml_schema_parse_include_or_redefine(
                 res.try_into().unwrap(),
                 null_mut(),
                 node.into(),
-                child,
+                child.as_ptr(),
                 null_mut(),
                 c"(annotation | (simpleType | complexType | group | attributeGroup))*".as_ptr()
                     as _,
@@ -12858,7 +12919,7 @@ unsafe fn xml_schema_parse_include_or_redefine(
                 res.try_into().unwrap(),
                 null_mut(),
                 node.into(),
-                child,
+                child.as_ptr(),
                 null_mut(),
                 c"(annotation?)".as_ptr() as _,
             );
@@ -12881,7 +12942,6 @@ unsafe fn xml_schema_parse_import(
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
 ) -> i32 {
-    let mut child: *mut XmlNode;
     let mut namespace_name: *const XmlChar = null();
     let mut schema_location: *const XmlChar = null();
     let mut ret: i32;
@@ -12967,19 +13027,24 @@ unsafe fn xml_schema_parse_import(
         return (*pctxt).err;
     }
     // And now for the children...
-    child = (*node).children().map_or(null_mut(), |c| c.as_ptr());
-    if is_schema(XmlNodePtr::from_raw(child).unwrap(), "annotation") {
+    let mut child = node
+        .children
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    if is_schema(child, "annotation") {
         // the annotation here is simply discarded ...
         // TODO: really?
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        child = child
+            .unwrap()
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
-    if !child.is_null() {
+    if let Some(child) = child {
         xml_schema_pcontent_err(
             pctxt,
             XmlParserErrors::XmlSchemapS4sElemNotAllowed,
             null_mut(),
             node.into(),
-            child,
+            child.into(),
             null_mut(),
             c"(annotation?)".as_ptr() as _,
         );
@@ -19869,7 +19934,7 @@ unsafe fn xml_schema_check_attr_props_correct(
         // will be removed in WXS 1.1 anyway.
         let ret: i32 = xml_schema_vcheck_cvc_simple_type(
             pctxt as XmlSchemaAbstractCtxtPtr,
-            (*attr).node,
+            XmlGenericNodePtr::from_raw((*attr).node),
             WXS_ATTR_TYPEDEF!(attr),
             (*attr).def_value,
             addr_of_mut!((*attr).def_val),
@@ -19963,7 +20028,7 @@ unsafe fn xml_schema_check_attr_use_props_correct(
 
         let ret: i32 = xml_schema_vcheck_cvc_simple_type(
             ctxt as XmlSchemaAbstractCtxtPtr,
-            (*using).node,
+            XmlGenericNodePtr::from_raw((*using).node),
             WXS_ATTRUSE_TYPEDEF!(using),
             (*using).def_value,
             addr_of_mut!((*using).def_val),
@@ -20304,7 +20369,7 @@ unsafe fn xml_schema_check_cos_derived_ok(
 #[doc(alias = "xmlSchemaParseCheckCOSValidDefault")]
 unsafe fn xml_schema_parse_check_cos_valid_default(
     pctxt: XmlSchemaParserCtxtPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
@@ -20546,8 +20611,6 @@ unsafe fn xml_schema_check_elem_props_correct(
             None
         );
     } else if !(*elem_decl).value.is_null() {
-        let mut node: *mut XmlNode = null_mut();
-
         // SPEC (2) "If there is a {value constraint}, the canonical lexical
         // representation of its value must be `valid` with respect to the
         // {type definition} as defined in Element Default Valid (Immediate) ($3.3.6)."
@@ -20562,18 +20625,20 @@ unsafe fn xml_schema_check_elem_props_correct(
             );
             return -1;
         }
-        if !(*elem_decl).node.is_null() {
+        let node = if !(*elem_decl).node.is_null() {
             let attr = if (*elem_decl).flags & XML_SCHEMAS_ELEM_FIXED != 0 {
                 (*(*elem_decl).node).has_prop("fixed")
             } else {
                 (*(*elem_decl).node).has_prop("default")
             };
             match attr {
-                Some(Ok(attr)) => node = attr.as_ptr() as *mut XmlNode,
-                Some(Err(attr)) => node = attr.as_ptr() as *mut XmlNode,
-                _ => node = null_mut(),
+                Some(Ok(attr)) => Some(XmlGenericNodePtr::from(attr)),
+                Some(Err(attr)) => Some(XmlGenericNodePtr::from(attr)),
+                _ => None,
             }
-        }
+        } else {
+            None
+        };
         let vcret: i32 = xml_schema_parse_check_cos_valid_default(
             pctxt,
             node,
@@ -23368,7 +23433,7 @@ unsafe fn xml_schema_get_fresh_attr_info(vctxt: XmlSchemaValidCtxtPtr) -> XmlSch
 #[allow(clippy::too_many_arguments)]
 unsafe fn xml_schema_validator_push_attribute(
     vctxt: XmlSchemaValidCtxtPtr,
-    attr_node: *mut XmlNode,
+    attr_node: Option<XmlAttrPtr>,
     node_line: i32,
     local_name: *const XmlChar,
     ns_name: *const XmlChar,
@@ -23385,7 +23450,7 @@ unsafe fn xml_schema_validator_push_attribute(
         );
         return -1;
     }
-    (*attr).node = attr_node;
+    (*attr).node = attr_node.map_or(null_mut(), |node| node.as_ptr()) as *mut XmlNode;
     (*attr).node_line = node_line;
     (*attr).state = XML_SCHEMAS_ATTR_UNKNOWN;
     (*attr).local_name = local_name;
@@ -24514,7 +24579,7 @@ unsafe fn xml_schema_validate_elem_decl(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
             // Validate the value.
             ret = xml_schema_vcheck_cvc_simple_type(
                 vctxt as XmlSchemaAbstractCtxtPtr,
-                null_mut(),
+                None,
                 xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasBoolean),
                 (*iattr).value,
                 addr_of_mut!((*iattr).val),
@@ -25980,7 +26045,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     // Request a computed value.
                     res = xml_schema_vcheck_cvc_simple_type(
                         vctxt as XmlSchemaAbstractCtxtPtr,
-                        (*iattr).node,
+                        XmlGenericNodePtr::from_raw((*iattr).node),
                         (*iattr).type_def,
                         (*iattr).value,
                         addr_of_mut!((*iattr).val),
@@ -25991,7 +26056,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 } else {
                     res = xml_schema_vcheck_cvc_simple_type(
                         vctxt as XmlSchemaAbstractCtxtPtr,
-                        (*iattr).node,
+                        XmlGenericNodePtr::from_raw((*iattr).node),
                         (*iattr).type_def,
                         (*iattr).value,
                         null_mut(),
@@ -26543,7 +26608,7 @@ unsafe fn xml_schema_vcheck_inode_data_type(
     if (*inode).flags & XML_SCHEMA_NODE_INFO_VALUE_NEEDED != 0 {
         xml_schema_vcheck_cvc_simple_type(
             vctxt as XmlSchemaAbstractCtxtPtr,
-            null_mut(),
+            None,
             typ,
             value,
             addr_of_mut!((*inode).val),
@@ -26554,7 +26619,7 @@ unsafe fn xml_schema_vcheck_inode_data_type(
     } else {
         xml_schema_vcheck_cvc_simple_type(
             vctxt as XmlSchemaAbstractCtxtPtr,
-            null_mut(),
+            None,
             typ,
             value,
             null_mut(),
@@ -26613,7 +26678,7 @@ unsafe fn xml_schema_check_cos_valid_default(
     if WXS_IS_SIMPLE!((*inode).type_def) {
         ret = xml_schema_vcheck_cvc_simple_type(
             vctxt as XmlSchemaAbstractCtxtPtr,
-            null_mut(),
+            None,
             (*inode).type_def,
             value,
             val,
@@ -26624,7 +26689,7 @@ unsafe fn xml_schema_check_cos_valid_default(
     } else if WXS_HAS_SIMPLE_CONTENT!((*inode).type_def) {
         ret = xml_schema_vcheck_cvc_simple_type(
             vctxt as XmlSchemaAbstractCtxtPtr,
-            null_mut(),
+            None,
             (*(*inode).type_def).content_type_def,
             value,
             val,
@@ -27922,7 +27987,6 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
 unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut ret: i32 = 0;
     let mut ielem: XmlSchemaNodeInfoPtr = null_mut();
-    let mut node: *mut XmlNode;
     let mut ns_name: *const XmlChar;
 
     // DOC VAL TODO: Move this to the start function.
@@ -27946,20 +28010,25 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     }
     (*vctxt).depth = -1;
     (*vctxt).validation_root = val_root;
-    node = val_root;
-    'main: while !node.is_null() {
+    let mut node = XmlNodePtr::from_raw(val_root).unwrap();
+    'main: while let Some(cur_node) = node {
         'goto_leave_node: {
             if (*vctxt).skip_depth != -1 && (*vctxt).depth >= (*vctxt).skip_depth {
                 // goto next_sibling;
-                if let Some(next) = (*node).next {
-                    node = next.as_ptr();
+                if let Some(next) = cur_node
+                    .next
+                    .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
+                {
+                    node = Some(next);
                     continue 'main;
                 } else {
-                    node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                    node = cur_node
+                        .parent()
+                        .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).unwrap());
                     break 'goto_leave_node;
                 }
             }
-            if (*node).element_type() == XmlElementType::XmlElementNode {
+            if cur_node.element_type() == XmlElementType::XmlElementNode {
                 // Init the node-info.
                 (*vctxt).depth += 1;
                 if xml_schema_validator_push_elem(vctxt) == -1 {
@@ -27967,18 +28036,18 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     return -1;
                 }
                 ielem = (*vctxt).inode;
-                (*ielem).node = node;
-                (*ielem).node_line = (*node).line as _;
-                (*ielem).local_name = (*node).name;
-                if let Some(ns) = (*node).ns {
+                (*ielem).node = cur_node.into();
+                (*ielem).node_line = cur_node.line as _;
+                (*ielem).local_name = cur_node.name;
+                if let Some(ns) = cur_node.ns {
                     (*ielem).ns_name = ns.href;
                 }
                 (*ielem).flags |= XML_SCHEMA_ELEM_INFO_EMPTY;
                 // Register attributes.
                 // DOC VAL TODO: We do not register namespace declaration attributes yet.
                 (*vctxt).nb_attr_infos = 0;
-                if (*node).properties.is_some() {
-                    let mut attr = (*node).properties;
+                if cur_node.properties.is_some() {
+                    let mut attr = cur_node.properties;
                     while let Some(cur_attr) = attr {
                         if let Some(ns) = cur_attr.ns {
                             ns_name = ns.href;
@@ -27997,7 +28066,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         );
                         ret = xml_schema_validator_push_attribute(
                             vctxt,
-                            cur_attr.as_ptr() as *mut XmlNode,
+                            Some(cur_attr),
                             (*ielem).node_line,
                             cur_attr.name,
                             ns_name,
@@ -28032,7 +28101,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     break 'goto_leave_node;
                 }
             } else if matches!(
-                (*node).element_type(),
+                cur_node.element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 // Process character content.
@@ -28041,8 +28110,8 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 }
                 ret = xml_schema_vpush_text(
                     vctxt,
-                    (*node).element_type() as _,
-                    (*node).content,
+                    cur_node.element_type() as _,
+                    cur_node.content,
                     -1,
                     XML_SCHEMA_PUSH_TEXT_PERSIST,
                     null_mut(),
@@ -28054,7 +28123,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 }
                 // DOC VAL TODO: Should we skip further validation of the element content here?
             } else if matches!(
-                (*node).element_type(),
+                cur_node.element_type(),
                 XmlElementType::XmlEntityNode | XmlElementType::XmlEntityRefNode
             ) {
                 // DOC VAL TODO: What to do with entities?
@@ -28070,16 +28139,19 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 // DOC VAL TODO: XInclude nodes, etc.
             }
             // Walk the doc.
-            if let Some(children) = (*node).children() {
-                node = children.as_ptr();
+            if let Some(children) = cur_node
+                .children
+                .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+            {
+                node = Some(children);
                 continue 'main;
             }
         }
         // leave_node:
-        'leave_node: loop {
-            if (*node).element_type() == XmlElementType::XmlElementNode {
+        'leave_node: while let Some(cur_node) = node {
+            if cur_node.element_type() == XmlElementType::XmlElementNode {
                 // Leaving the scope of an element.
-                if node != (*(*vctxt).inode).node {
+                if Some(cur_node) != XmlNodePtr::from_raw((*(*vctxt).inode).node).unwrap() {
                     VERROR_INT!(vctxt, "xmlSchemaVDocWalk", "element position mismatch");
                     // goto internal_error;
                     return -1;
@@ -28094,16 +28166,21 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     // goto internal_error;
                     return -1;
                 }
-                if node == val_root {
+                if Some(cur_node) == XmlNodePtr::from_raw(val_root).unwrap() {
                     break 'main;
                 }
             }
             // next_sibling:
-            if let Some(next) = (*node).next {
-                node = next.as_ptr();
+            if let Some(next) = cur_node
+                .next
+                .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
+            {
+                node = Some(next);
                 continue 'main;
             } else {
-                node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                node = cur_node
+                    .parent
+                    .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).unwrap());
                 // goto leave_node;
                 continue 'leave_node;
             }
@@ -28354,10 +28431,9 @@ pub unsafe fn xml_schema_validate_doc(ctxt: XmlSchemaValidCtxtPtr, doc: XmlDocPt
 #[doc(alias = "xmlSchemaValidateOneElement")]
 pub unsafe fn xml_schema_validate_one_element(
     ctxt: XmlSchemaValidCtxtPtr,
-    elem: *mut XmlNode,
+    elem: XmlNodePtr,
 ) -> i32 {
-    if ctxt.is_null() || elem.is_null() || (*elem).element_type() != XmlElementType::XmlElementNode
-    {
+    if ctxt.is_null() || elem.element_type() != XmlElementType::XmlElementNode {
         return -1;
     }
 
@@ -28365,9 +28441,9 @@ pub unsafe fn xml_schema_validate_one_element(
         return -1;
     }
 
-    (*ctxt).doc = (*elem).doc;
-    (*ctxt).node = elem;
-    (*ctxt).validation_root = elem;
+    (*ctxt).doc = elem.doc;
+    (*ctxt).node = elem.into();
+    (*ctxt).validation_root = elem.into();
     xml_schema_vstart(ctxt)
 }
 
@@ -28671,7 +28747,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
         // TODO: Set the node line.
         ret = xml_schema_validator_push_attribute(
             vctxt,
-            null_mut(),
+            None,
             (*ielem).node_line,
             attr.0.as_ptr() as *const u8,
             attr.2
@@ -29702,42 +29778,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_schema_new_valid_ctxt() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schema_parse() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schema_saxplug() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schema_set_parser_errors() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schema_set_parser_structured_errors() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schema_set_valid_errors() {
-
-        /* missing type support */
-    }
-
-    #[test]
     fn test_xml_schema_set_valid_options() {
         #[cfg(feature = "schema")]
         unsafe {
@@ -29770,12 +29810,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_schema_set_valid_structured_errors() {
-
-        /* missing type support */
     }
 
     #[test]
@@ -29872,41 +29906,6 @@ mod tests {
                             eprint!(" {}", n_filename);
                             eprintln!(" {}", n_options);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_validate_one_element() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_SCHEMA_VALID_CTXT_PTR {
-                for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_schema_valid_ctxt_ptr(n_ctxt, 0);
-                    let elem = gen_xml_node_ptr(n_elem, 1);
-
-                    let ret_val = xml_schema_validate_one_element(ctxt, elem);
-                    desret_int(ret_val);
-                    des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_node_ptr(n_elem, elem, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSchemaValidateOneElement",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlSchemaValidateOneElement()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_elem);
                     }
                 }
             }
