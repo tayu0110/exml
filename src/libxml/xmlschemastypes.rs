@@ -5750,10 +5750,7 @@ pub unsafe fn xml_schema_check_facet(
                     // No error message for RelaxNG.
                     if ctxt_given != 0 {
                         let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
-                        let facet_type = CStr::from_ptr(xml_schema_facet_type_to_string(
-                            (*facet).typ,
-                        ) as *const i8)
-                        .to_string_lossy();
+                        let facet_type = xml_schema_facet_type_to_string((*facet).typ);
                         xml_schema_custom_err(
                             pctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapInternal,
@@ -5761,7 +5758,7 @@ pub unsafe fn xml_schema_check_facet(
                             null_mut(),
                             format!("Internal error: xmlSchemaCheckFacet, failed to validate the value '{value}' of the facet '{facet_type}' against the base type").as_str(),
                             Some(&value),
-                            Some(&facet_type),
+                            Some(facet_type),
                             );
                     }
                     // goto internal_error;
@@ -5855,9 +5852,7 @@ pub unsafe fn xml_schema_check_facet(
                 // No error message for RelaxNG.
                 if ctxt_given != 0 {
                     let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
-                    let facet_type =
-                        CStr::from_ptr(xml_schema_facet_type_to_string((*facet).typ) as *const i8)
-                            .to_string_lossy();
+                    let facet_type = xml_schema_facet_type_to_string((*facet).typ);
                     let typename = if (*facet).typ != XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
                         "nonNegativeInteger"
                     } else {
@@ -5874,7 +5869,7 @@ pub unsafe fn xml_schema_check_facet(
                         )
                         .as_str(),
                         Some(&value),
-                        Some(&facet_type),
+                        Some(facet_type),
                         Some(typename),
                         None,
                     );

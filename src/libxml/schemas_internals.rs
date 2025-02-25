@@ -496,7 +496,7 @@ pub struct XmlSchemaType {
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) subtypes: XmlSchemaTypePtr,
     pub(crate) attributes: XmlSchemaAttributePtr, /* Deprecated; not used */
-    pub(crate) node: *mut XmlNode,
+    pub(crate) node: Option<XmlNodePtr>,
     pub(crate) min_occurs: i32, /* Deprecated; not used */
     pub(crate) max_occurs: i32, /* Deprecated; not used */
 
