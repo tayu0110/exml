@@ -22,7 +22,7 @@
 
 use std::{any::type_name, os::raw::c_void};
 
-use crate::tree::XmlNode;
+use crate::tree::{XmlNode, XmlNodePtr};
 
 use super::{
     globals::xml_free,
@@ -260,7 +260,7 @@ pub type XmlSchemaAnnotPtr = *mut XmlSchemaAnnot;
 #[repr(C)]
 pub struct XmlSchemaAnnot {
     pub(crate) next: *mut XmlSchemaAnnot,
-    pub(crate) content: *mut XmlNode, /* the annotation */
+    pub(crate) content: XmlNodePtr, /* the annotation */
 }
 
 /// Skip unknown attribute from validation Obsolete, not used anymore.

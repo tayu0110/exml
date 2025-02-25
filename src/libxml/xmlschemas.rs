@@ -1189,7 +1189,7 @@ pub type XmlSchemaAttrInfoPtr = *mut XmlSchemaAttrInfo;
 #[repr(C)]
 pub struct XmlSchemaAttrInfo {
     node_type: i32,
-    node: *mut XmlNode,
+    node: Option<XmlAttrPtr>,
     node_line: i32,
     local_name: *const XmlChar,
     ns_name: *const XmlChar,
@@ -6360,8 +6360,13 @@ unsafe fn xml_schema_new_annot(
         xml_schema_perr_memory(ctxt, "allocating annotation", node.as_ptr());
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlSchemaAnnot>());
-    (*ret).content = node.as_ptr();
+    std::ptr::write(
+        &mut *ret,
+        XmlSchemaAnnot {
+            next: null_mut(),
+            content: node,
+        },
+    );
     ret
 }
 
@@ -22414,7 +22419,7 @@ unsafe fn xml_schema_annot_dump<'a>(output: &mut (impl Write + 'a), annot: XmlSc
         return;
     }
 
-    if let Some(content) = (*(*annot).content).get_content() {
+    if let Some(content) = (*annot).content.get_content() {
         writeln!(output, "  Annot: {content}");
     } else {
         writeln!(output, "  Annot: empty");
@@ -23484,7 +23489,7 @@ unsafe fn xml_schema_validator_push_attribute(
         );
         return -1;
     }
-    (*attr).node = attr_node.map_or(null_mut(), |node| node.as_ptr()) as *mut XmlNode;
+    (*attr).node = attr_node;
     (*attr).node_line = node_line;
     (*attr).state = XML_SCHEMAS_ATTR_UNKNOWN;
     (*attr).local_name = local_name;
@@ -23724,7 +23729,7 @@ unsafe fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 xml_schema_custom_warning(
                     vctxt as XmlSchemaAbstractCtxtPtr,
                     XmlParserErrors::XmlSchemavMisc,
-                    XmlGenericNodePtr::from_raw((*iattr).node),
+                    (*iattr).node.map(|attr| attr.into()),
                     null_mut(),
                     "The value must consist of tuples: the target namespace name and the document's URI",
                     None,
@@ -23740,7 +23745,7 @@ unsafe fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
         ret = xml_schema_assemble_by_location(
             vctxt,
             (*vctxt).schema,
-            XmlGenericNodePtr::from_raw((*iattr).node),
+            (*iattr).node.map(|attr| attr.into()),
             nsname,
             location,
         );
@@ -26085,7 +26090,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     // Request a computed value.
                     res = xml_schema_vcheck_cvc_simple_type(
                         vctxt as XmlSchemaAbstractCtxtPtr,
-                        XmlGenericNodePtr::from_raw((*iattr).node),
+                        (*iattr).node.map(|attr| attr.into()),
                         (*iattr).type_def,
                         (*iattr).value,
                         addr_of_mut!((*iattr).val),
@@ -26096,7 +26101,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 } else {
                     res = xml_schema_vcheck_cvc_simple_type(
                         vctxt as XmlSchemaAbstractCtxtPtr,
-                        XmlGenericNodePtr::from_raw((*iattr).node),
+                        (*iattr).node.map(|attr| attr.into()),
                         (*iattr).type_def,
                         (*iattr).value,
                         null_mut(),
