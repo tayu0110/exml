@@ -2005,14 +2005,14 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
             // do the check only on element start
             is_match = xml_pattern_match(
                 PATTERNC.load(Ordering::Relaxed),
-                XmlGenericNodePtr::from_raw((*reader).current_node()).unwrap(),
+                (*reader).current_node().unwrap(),
             );
 
             if is_match != 0 {
                 let pattern = CMD_ARGS.pattern.as_deref().unwrap_or("(null)");
                 #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
                 {
-                    path = (*(*reader).current_node()).get_node_path();
+                    path = (*reader).current_node().unwrap().get_node_path();
                     println!(
                         "Node {} matches pattern {pattern}",
                         path.as_deref().unwrap()
@@ -2043,7 +2043,7 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
                 } else if ret != is_match {
                     #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
                     if path.is_none() {
-                        path = (*(*reader).current_node()).get_node_path();
+                        path = (*reader).current_node().unwrap().get_node_path();
                     }
                     eprintln!("xmlPatternMatch and xmlStreamPush disagree");
                     let pattern = CMD_ARGS.pattern.as_deref().unwrap_or("(null)");

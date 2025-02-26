@@ -682,7 +682,7 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
             );
         }
     } else {
-        let prev = xml_get_doc_entity(Some(doc), &(*ent).name().unwrap());
+        let prev = xml_get_doc_entity(Some(doc), &ent.name().unwrap());
         if let Some(prev) = prev {
             let error = || {
                 match ent.etype {
@@ -972,17 +972,16 @@ unsafe fn xml_xinclude_copy_node(
 /// Returns the @n'th element child of @cur or NULL
 #[doc(alias = "xmlXIncludeGetNthChild")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xinclude_get_nth_child(cur: *mut XmlNode, no: i32) -> *mut XmlNode {
-    let mut i: i32;
-    if cur.is_null() || (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
-        return null_mut();
+unsafe fn xml_xinclude_get_nth_child(cur: XmlGenericNodePtr, no: i32) -> Option<XmlGenericNodePtr> {
+    if cur.element_type() == XmlElementType::XmlNamespaceDecl {
+        return None;
     }
-    let mut cur = (*cur).children();
-    i = 0;
+    let mut cur = cur
+        .children()
+        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
+    let mut i = 0;
     while i <= no {
-        let Some(now) = cur else {
-            return null_mut();
-        };
+        let now = cur?;
         if matches!(
             now.element_type(),
             XmlElementType::XmlElementNode
@@ -995,9 +994,11 @@ unsafe fn xml_xinclude_get_nth_child(cur: *mut XmlNode, no: i32) -> *mut XmlNode
             }
         }
 
-        cur = now.next();
+        cur = now
+            .next()
+            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
     }
-    cur.map_or(null_mut(), |c| c.as_ptr())
+    cur
 }
 
 /// Build a node list tree copy of the XPointer result.
@@ -1009,71 +1010,58 @@ unsafe fn xml_xinclude_get_nth_child(cur: *mut XmlNode, no: i32) -> *mut XmlNode
 unsafe fn xml_xinclude_copy_range(
     ctxt: XmlXIncludeCtxtPtr,
     range: XmlXPathObjectPtr,
-) -> *mut XmlNode {
+) -> Option<XmlGenericNodePtr> {
     use crate::{
         libxml::xpointer::xml_xptr_advance_node,
         tree::{xml_new_doc_text, xml_new_doc_text_len},
     };
 
     /* pointers to generated nodes */
-    let mut list: *mut XmlNode = null_mut();
-    let mut last: *mut XmlNode = null_mut();
-    let mut list_parent: *mut XmlNode = null_mut();
-    let mut tmp: *mut XmlNode;
-    let mut tmp2: *mut XmlNode;
-    /* pointers to traversal nodes */
-    let mut cur: *mut XmlNode;
-    let mut end: *mut XmlNode;
-    let mut index1: i32;
-    let mut index2: i32;
+    let mut list = None;
+    let mut last = None;
+    let mut list_parent = None;
     let mut level: i32 = 0;
     let mut last_level: i32 = 0;
     let mut end_level: i32 = 0;
     let mut end_flag: i32 = 0;
 
     if ctxt.is_null() || range.is_null() {
-        return null_mut();
+        return None;
     }
     if (*range).typ != XmlXPathObjectType::XPathRange {
-        return null_mut();
+        return None;
     }
-    let start: *mut XmlNode = (*range).user as *mut XmlNode;
+    let start = XmlGenericNodePtr::from_raw((*range).user as *mut XmlNode)
+        .filter(|node| node.element_type() != XmlElementType::XmlNamespaceDecl)?;
 
-    if start.is_null() || (*start).typ == XmlElementType::XmlNamespaceDecl {
-        return null_mut();
-    }
-    end = (*range).user2 as _;
-    if end.is_null() {
-        return xml_doc_copy_node(XmlGenericNodePtr::from_raw(start).unwrap(), (*ctxt).doc, 1)
-            .map_or(null_mut(), |node| node.as_ptr());
-    }
-    if (*end).typ == XmlElementType::XmlNamespaceDecl {
-        return null_mut();
+    let Some(mut end) = XmlGenericNodePtr::from_raw((*range).user2 as *mut XmlNode) else {
+        return xml_doc_copy_node(start, (*ctxt).doc, 1);
+    };
+    if end.element_type() == XmlElementType::XmlNamespaceDecl {
+        return None;
     }
 
-    cur = start;
-    index1 = (*range).index;
-    index2 = (*range).index2;
+    let mut cur = Some(start);
+    let mut index1 = (*range).index;
+    let mut index2 = (*range).index2;
     // level is depth of the current node under consideration
     // list is the pointer to the root of the output tree
     // listParent is a pointer to the parent of output tree (within
     // the included file) in case we need to add another level
     // last is a pointer to the last node added to the output tree
     // lastLevel is the depth of last (relative to the root)
-    while !cur.is_null() {
+    while let Some(cur_node) = cur {
         // Check if our output tree needs a parent
         if level < 0 {
             while level < 0 {
                 // copy must include namespaces and properties
-                tmp2 = xml_doc_copy_node(
-                    XmlGenericNodePtr::from_raw(list_parent).unwrap(),
-                    (*ctxt).doc,
-                    2,
-                )
-                .map_or(null_mut(), |node| node.as_ptr());
-                (*tmp2).add_child(XmlGenericNodePtr::from_raw(list).unwrap());
-                list = tmp2;
-                list_parent = (*list_parent).parent().map_or(null_mut(), |n| n.as_ptr());
+                let mut tmp2 = xml_doc_copy_node(list_parent.unwrap(), (*ctxt).doc, 2).unwrap();
+                tmp2.add_child(list.unwrap());
+                list = Some(tmp2);
+                list_parent = list_parent
+                    .unwrap()
+                    .parent()
+                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
                 level += 1;
             }
             last = list;
@@ -1081,20 +1069,24 @@ unsafe fn xml_xinclude_copy_range(
         }
         // Check whether we need to change our insertion point
         while level < last_level {
-            last = (*last).parent().map_or(null_mut(), |p| p.as_ptr());
+            last = last
+                .unwrap()
+                .parent()
+                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
             last_level -= 1;
         }
-        if cur == end {
+        if cur_node == end {
             // Are we at the end of the range?
-            if (*cur).element_type() == XmlElementType::XmlTextNode {
-                let mut content: *const XmlChar = (*cur).content;
+            if cur_node.element_type() == XmlElementType::XmlTextNode {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let mut content: *const XmlChar = cur_node.content;
                 let mut len: i32;
 
                 let tmp = if content.is_null() {
                     xml_new_doc_text_len((*ctxt).doc, null_mut(), 0)
                 } else {
                     len = index2;
-                    if cur == start && index1 > 1 {
+                    if start == cur_node.into() && index1 > 1 {
                         content = content.add(index1 as usize - 1);
                         len -= index1 - 1;
                     } else {
@@ -1103,16 +1095,16 @@ unsafe fn xml_xinclude_copy_range(
                     xml_new_doc_text_len((*ctxt).doc, content, len)
                 };
                 // single sub text node selection
-                if list.is_null() {
-                    return tmp.map_or(null_mut(), |node| node.as_ptr());
+                if list.is_none() {
+                    return tmp.map(|node| node.into());
                 }
                 // prune and return full set
                 if level == last_level {
-                    (*last)
+                    last.unwrap()
                         .add_next_sibling(tmp.unwrap().into())
                         .map_or(null_mut(), |node| node.as_ptr());
                 } else {
-                    (*last).add_child(tmp.unwrap().into());
+                    last.unwrap().add_child(tmp.unwrap().into());
                 }
                 return list;
             } else {
@@ -1120,45 +1112,45 @@ unsafe fn xml_xinclude_copy_range(
                 end_level = level; /* remember the level of the end node */
                 end_flag = 1;
                 // last node - need to take care of properties + namespaces
-                let tmp =
-                    xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), (*ctxt).doc, 2);
-                if list.is_null() {
-                    list = tmp.map_or(null_mut(), |node| node.as_ptr());
-                    list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-                    last = tmp.map_or(null_mut(), |node| node.as_ptr());
+                let tmp = xml_doc_copy_node(cur_node, (*ctxt).doc, 2);
+                if list.is_none() {
+                    list = tmp;
+                    list_parent = cur_node
+                        .parent()
+                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                    last = tmp;
                 } else if level == last_level {
-                    last = (*last)
-                        .add_next_sibling(tmp.unwrap())
-                        .map_or(null_mut(), |node| node.as_ptr());
+                    last = last.unwrap().add_next_sibling(tmp.unwrap());
                 } else {
-                    last = (*last)
-                        .add_child(tmp.unwrap())
-                        .map_or(null_mut(), |node| node.as_ptr());
+                    last = last.unwrap().add_child(tmp.unwrap());
                     last_level = level;
                 }
 
                 if index2 > 1 {
-                    end = xml_xinclude_get_nth_child(cur, index2 - 1);
+                    end = xml_xinclude_get_nth_child(cur_node, index2 - 1).unwrap();
                     index2 = 0;
                 }
-                if cur == start && index1 > 1 {
-                    cur = xml_xinclude_get_nth_child(cur, index1 - 1);
+                if cur_node == start && index1 > 1 {
+                    cur = xml_xinclude_get_nth_child(cur_node, index1 - 1);
                     index1 = 0;
                 } else {
-                    cur = (*cur).children().map_or(null_mut(), |p| p.as_ptr());
+                    cur = cur_node
+                        .children()
+                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
                 }
                 // increment level to show change
                 level += 1;
                 // Now gather the remaining nodes from cur to end
                 continue; /* while */
             }
-        } else if cur == start {
+        } else if cur_node == start {
             // Not at the end, are we at start?
             if matches!(
-                (*cur).element_type(),
+                cur_node.element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
-                let mut content: *const XmlChar = (*cur).content;
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let mut content: *const XmlChar = cur_node.content;
 
                 let tmp = if content.is_null() {
                     xml_new_doc_text_len((*ctxt).doc, null_mut(), 0)
@@ -1169,22 +1161,25 @@ unsafe fn xml_xinclude_copy_range(
                     }
                     xml_new_doc_text((*ctxt).doc, content)
                 };
-                last = tmp.map_or(null_mut(), |node| node.as_ptr());
-                list = tmp.map_or(null_mut(), |node| node.as_ptr());
-                list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+                last = tmp.map(|node| node.into());
+                list = tmp.map(|node| node.into());
+                list_parent = cur_node
+                    .parent()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
             } else {
                 // Not text node
 
                 // start of the range - need to take care of
                 // properties and namespaces
-                tmp = xml_doc_copy_node(XmlGenericNodePtr::from_raw(cur).unwrap(), (*ctxt).doc, 2)
-                    .map_or(null_mut(), |node| node.as_ptr());
+                let tmp = xml_doc_copy_node(cur_node, (*ctxt).doc, 2);
                 list = tmp;
                 last = tmp;
-                list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+                list_parent = cur_node
+                    .parent()
+                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
                 if index1 > 1 {
                     // Do we need to position?
-                    cur = xml_xinclude_get_nth_child(cur, index1 - 1);
+                    cur = xml_xinclude_get_nth_child(cur_node, index1 - 1);
                     level = 1;
                     last_level = 1;
                     index1 = 0;
@@ -1194,7 +1189,7 @@ unsafe fn xml_xinclude_copy_range(
             }
         } else {
             let mut tmp = None;
-            match (*cur).typ {
+            match cur_node.element_type() {
                 XmlElementType::XmlDTDNode
                 | XmlElementType::XmlElementDecl
                 | XmlElementType::XmlAttributeDecl
@@ -1207,32 +1202,20 @@ unsafe fn xml_xinclude_copy_range(
                 _ => {
                     // Middle of the range - need to take care of
                     // properties and namespaces
-                    tmp = xml_doc_copy_node(
-                        XmlGenericNodePtr::from_raw(cur).unwrap(),
-                        (*ctxt).doc,
-                        2,
-                    );
+                    tmp = xml_doc_copy_node(cur_node, (*ctxt).doc, 2);
                 }
             }
             if let Some(tmp) = tmp {
                 if level == last_level {
-                    last = (*last)
-                        .add_next_sibling(tmp)
-                        .map_or(null_mut(), |node| node.as_ptr());
+                    last = last.unwrap().add_next_sibling(tmp);
                 } else {
-                    last = (*last)
-                        .add_child(tmp)
-                        .map_or(null_mut(), |node| node.as_ptr());
+                    last = last.unwrap().add_child(tmp);
                     last_level = level;
                 }
             }
         }
         // Skip to next node in document order
-        cur = xml_xptr_advance_node(
-            XmlGenericNodePtr::from_raw(cur).unwrap(),
-            addr_of_mut!(level),
-        )
-        .map_or(null_mut(), |node| node.as_ptr());
+        cur = xml_xptr_advance_node(cur_node, addr_of_mut!(level));
         if end_flag != 0 && level >= end_level {
             break;
         }
@@ -1338,7 +1321,8 @@ unsafe fn xml_xinclude_copy_xpointer(
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathRange => {
-            return XmlNodePtr::from_raw(xml_xinclude_copy_range(ctxt, obj)).unwrap()
+            return xml_xinclude_copy_range(ctxt, obj)
+                .map(|node| XmlNodePtr::try_from(node).unwrap());
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathPoint => { /* points are ignored in XInclude */ }
