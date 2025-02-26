@@ -665,7 +665,7 @@ impl XmlTextReader {
                     }
                     xml_xinclude_process_node(
                         self.xincctxt,
-                        self.node.map_or(null_mut(), |node| node.as_ptr()),
+                        XmlNodePtr::try_from(self.node.unwrap()).unwrap(),
                     );
                 }
                 if self.node.map_or(false, |node| {

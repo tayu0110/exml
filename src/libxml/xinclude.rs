@@ -202,7 +202,7 @@ pub unsafe fn xml_xinclude_process_flags_data(
     let Some(tree) = doc.get_root_element() else {
         return -1;
     };
-    xml_xinclude_process_tree_flags_data(tree.as_ptr(), flags, data)
+    xml_xinclude_process_tree_flags_data(tree, flags, data)
 }
 
 /// Handle an XInclude error
@@ -245,53 +245,56 @@ macro_rules! xml_xinclude_err {
 ///
 /// Returns 1 true, 0 otherwise
 #[doc(alias = "xmlXIncludeTestNode")]
-unsafe fn xml_xinclude_test_node(ctxt: XmlXIncludeCtxtPtr, node: *mut XmlNode) -> i32 {
-    if node.is_null() {
+unsafe fn xml_xinclude_test_node(ctxt: XmlXIncludeCtxtPtr, node: XmlNodePtr) -> i32 {
+    if node.element_type() != XmlElementType::XmlElementNode {
         return 0;
     }
-    if (*node).element_type() != XmlElementType::XmlElementNode {
-        return 0;
-    }
-    let Some(node_ns) = (*node).ns else {
+    let Some(node_ns) = node.ns else {
         return 0;
     };
-    if xml_str_equal(node_ns.href, XINCLUDE_NS.as_ptr() as _)
-        || xml_str_equal(node_ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+    if node_ns.href().as_deref() == Some(XINCLUDE_NS.to_str().unwrap())
+        || node_ns.href().as_deref() == Some(XINCLUDE_OLD_NS.to_str().unwrap())
     {
-        if xml_str_equal(node_ns.href, XINCLUDE_OLD_NS.as_ptr() as _) && (*ctxt).legacy == 0 {
+        if node_ns.href().as_deref() == Some(XINCLUDE_OLD_NS.to_str().unwrap())
+            && (*ctxt).legacy == 0
+        {
             (*ctxt).legacy = 1;
         }
-        if (*node).name().as_deref() == Some(XINCLUDE_NODE) {
-            let mut child: *mut XmlNode = (*node).children().map_or(null_mut(), |c| c.as_ptr());
+        if node.name().as_deref() == Some(XINCLUDE_NODE) {
+            let mut child = node
+                .children
+                .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
             let mut nb_fallback: i32 = 0;
 
-            while !child.is_null() {
-                if (*child).element_type() == XmlElementType::XmlElementNode
-                    && (*child).ns.map_or(false, |ns| {
-                        xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
-                            || xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+            while let Some(cur_node) = child {
+                if cur_node.element_type() == XmlElementType::XmlElementNode
+                    && cur_node.ns.map_or(false, |ns| {
+                        ns.href().as_deref() == Some(XINCLUDE_NS.to_str().unwrap())
+                            || ns.href().as_deref() == Some(XINCLUDE_OLD_NS.to_str().unwrap())
                     })
                 {
-                    if (*child).name().as_deref() == Some(XINCLUDE_NODE) {
+                    if cur_node.name().as_deref() == Some(XINCLUDE_NODE) {
                         xml_xinclude_err!(
                             ctxt,
-                            node,
+                            node.as_ptr(),
                             XmlParserErrors::XmlXIncludeIncludeInInclude,
                             "{} has an 'include' child\n",
                             XINCLUDE_NODE
                         );
                         return 0;
                     }
-                    if (*child).name().as_deref() == Some(XINCLUDE_FALLBACK) {
+                    if cur_node.name().as_deref() == Some(XINCLUDE_FALLBACK) {
                         nb_fallback += 1;
                     }
                 }
-                child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+                child = cur_node
+                    .next
+                    .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
             }
             if nb_fallback > 1 {
                 xml_xinclude_err!(
                     ctxt,
-                    node,
+                    node.as_ptr(),
                     XmlParserErrors::XmlXIncludeFallbacksInInclude,
                     "{} has multiple fallback children\n",
                     XINCLUDE_NODE
@@ -300,18 +303,18 @@ unsafe fn xml_xinclude_test_node(ctxt: XmlXIncludeCtxtPtr, node: *mut XmlNode) -
             }
             return 1;
         }
-        if (*node).name().as_deref() == Some(XINCLUDE_FALLBACK)
-            && ((*node).parent().is_none()
-                || (*node).parent().unwrap().element_type() != XmlElementType::XmlElementNode
-                || (*node).parent().unwrap().ns.map_or(true, |ns| {
-                    !xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
-                        && !xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+        if node.name().as_deref() == Some(XINCLUDE_FALLBACK)
+            && (node.parent().is_none()
+                || node.parent().unwrap().element_type() != XmlElementType::XmlElementNode
+                || node.parent().unwrap().ns.map_or(true, |ns| {
+                    ns.href().as_deref() != Some(XINCLUDE_NS.to_str().unwrap())
+                        && ns.href().as_deref() != Some(XINCLUDE_OLD_NS.to_str().unwrap())
                 })
-                || (*node).parent().unwrap().name().as_deref() != Some(XINCLUDE_NODE))
+                || node.parent().unwrap().name().as_deref() != Some(XINCLUDE_NODE))
         {
             xml_xinclude_err!(
                 ctxt,
-                node,
+                node.as_ptr(),
                 XmlParserErrors::XmlXIncludeFallbackNotInInclude,
                 "{} is not the child of an 'include'\n",
                 XINCLUDE_FALLBACK
@@ -824,11 +827,7 @@ unsafe fn xml_xinclude_recurse_doc(ctxt: XmlXIncludeCtxtPtr, doc: XmlDocPtr, _ur
     (*ctxt).doc = Some(doc);
     (*ctxt).is_stream = 0;
 
-    xml_xinclude_do_process(
-        ctxt,
-        doc.get_root_element()
-            .map_or(null_mut(), |node| node.as_ptr()),
-    );
+    xml_xinclude_do_process(ctxt, doc.get_root_element().unwrap());
 
     for &inc in &(*ctxt).inc_tab {
         xml_xinclude_free_ref(inc);
@@ -2296,12 +2295,11 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeDoProcess")]
-unsafe fn xml_xinclude_do_process(ctxt: XmlXIncludeCtxtPtr, tree: *mut XmlNode) -> i32 {
+unsafe fn xml_xinclude_do_process(ctxt: XmlXIncludeCtxtPtr, tree: XmlNodePtr) -> i32 {
     let mut refe: XmlXIncludeRefPtr;
-    let mut cur: *mut XmlNode;
     let mut ret: i32 = 0;
 
-    if tree.is_null() || (*tree).element_type() == XmlElementType::XmlNamespaceDecl {
+    if tree.element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
     if ctxt.is_null() {
@@ -2310,40 +2308,52 @@ unsafe fn xml_xinclude_do_process(ctxt: XmlXIncludeCtxtPtr, tree: *mut XmlNode) 
 
     // First phase: lookup the elements in the document
     let start = (*ctxt).inc_tab.len();
-    cur = tree;
-    while {
+    let mut cur = tree;
+    'main: while {
         'inner: {
             // TODO: need to work on entities -> stack
             if xml_xinclude_test_node(ctxt, cur) == 1 {
-                refe = xml_xinclude_expand_node(ctxt, XmlNodePtr::from_raw(cur).unwrap().unwrap());
+                refe = xml_xinclude_expand_node(ctxt, cur);
                 // Mark direct includes.
                 if !refe.is_null() {
                     (*refe).replace = 1;
                 }
-            } else if let Some(children) = (*cur).children().filter(|_| {
-                matches!(
-                    (*cur).element_type(),
-                    XmlElementType::XmlDocumentNode | XmlElementType::XmlElementNode
-                )
-            }) {
-                cur = children.as_ptr();
+            } else if let Some(children) = cur
+                .children()
+                .filter(|_| {
+                    matches!(
+                        cur.element_type(),
+                        XmlElementType::XmlDocumentNode | XmlElementType::XmlElementNode
+                    )
+                })
+                .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+            {
+                cur = children;
                 break 'inner;
             }
-            'b: while {
+            'b: loop {
                 if cur == tree {
+                    break 'main;
+                }
+                if let Some(next) = cur
+                    .next
+                    .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
+                {
+                    cur = next;
                     break 'b;
                 }
-                if let Some(next) = (*cur).next {
-                    cur = next.as_ptr();
-                    break 'b;
-                }
-                cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+                let Some(next) = cur
+                    .parent
+                    .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).unwrap())
+                else {
+                    break 'main;
+                };
 
-                !cur.is_null()
-            } {}
+                cur = next;
+            }
         }
 
-        !cur.is_null() && cur != tree
+        cur != tree
     } {}
 
     // Second phase: extend the original document infoset.
@@ -2382,16 +2392,14 @@ unsafe fn xml_xinclude_do_process(ctxt: XmlXIncludeCtxtPtr, tree: *mut XmlNode) 
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessTreeFlagsData")]
 pub unsafe fn xml_xinclude_process_tree_flags_data(
-    tree: *mut XmlNode,
+    tree: XmlNodePtr,
     flags: i32,
     data: *mut c_void,
 ) -> i32 {
-    let mut ret: i32;
-
-    if tree.is_null() || (*tree).element_type() == XmlElementType::XmlNamespaceDecl {
+    if tree.element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
-    let Some(doc) = (*tree).doc else {
+    let Some(doc) = tree.doc else {
         return -1;
     };
 
@@ -2403,7 +2411,7 @@ pub unsafe fn xml_xinclude_process_tree_flags_data(
     let url = doc.url.as_deref().map(|u| CString::new(u).unwrap());
     (*ctxt).base = xml_strdup(url.as_ref().map_or(null(), |u| u.as_ptr() as *const u8));
     xml_xinclude_set_flags(ctxt, flags);
-    ret = xml_xinclude_do_process(ctxt, tree);
+    let mut ret = xml_xinclude_do_process(ctxt, tree);
     if ret >= 0 && (*ctxt).nb_errors > 0 {
         ret = -1;
     }
@@ -2417,7 +2425,7 @@ pub unsafe fn xml_xinclude_process_tree_flags_data(
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessTree")]
-pub unsafe fn xml_xinclude_process_tree(tree: *mut XmlNode) -> i32 {
+pub unsafe fn xml_xinclude_process_tree(tree: XmlNodePtr) -> i32 {
     xml_xinclude_process_tree_flags(tree, 0)
 }
 
@@ -2426,27 +2434,23 @@ pub unsafe fn xml_xinclude_process_tree(tree: *mut XmlNode) -> i32 {
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessTreeFlags")]
-pub unsafe fn xml_xinclude_process_tree_flags(tree: *mut XmlNode, flags: i32) -> i32 {
-    let mut ret: i32;
-
-    if tree.is_null() || (*tree).element_type() == XmlElementType::XmlNamespaceDecl {
+pub unsafe fn xml_xinclude_process_tree_flags(tree: XmlNodePtr, flags: i32) -> i32 {
+    if tree.element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
-    let Some(doc) = (*tree).doc else {
+    let Some(doc) = tree.doc else {
         return -1;
     };
     let ctxt: XmlXIncludeCtxtPtr = xml_xinclude_new_context(doc);
     if ctxt.is_null() {
         return -1;
     }
-    let tmp = (*tree)
-        .get_base(Some(doc))
-        .map(|c| CString::new(c).unwrap());
+    let tmp = tree.get_base(Some(doc)).map(|c| CString::new(c).unwrap());
     (*ctxt).base = tmp
         .as_ref()
         .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
     xml_xinclude_set_flags(ctxt, flags);
-    ret = xml_xinclude_do_process(ctxt, tree);
+    let mut ret = xml_xinclude_do_process(ctxt, tree);
     if ret >= 0 && (*ctxt).nb_errors > 0 {
         ret = -1;
     }
@@ -2521,17 +2525,14 @@ pub unsafe fn xml_xinclude_free_context(ctxt: XmlXIncludeCtxtPtr) {
 /// Returns 0 if no substitution were done, -1 if some processing failed
 /// or the number of substitutions done.
 #[doc(alias = "xmlXIncludeProcessNode")]
-pub unsafe fn xml_xinclude_process_node(ctxt: XmlXIncludeCtxtPtr, node: *mut XmlNode) -> i32 {
-    let mut ret: i32;
-
-    if node.is_null()
-        || (*node).element_type() == XmlElementType::XmlNamespaceDecl
-        || (*node).doc.is_none()
+pub unsafe fn xml_xinclude_process_node(ctxt: XmlXIncludeCtxtPtr, node: XmlNodePtr) -> i32 {
+    if node.element_type() == XmlElementType::XmlNamespaceDecl
+        || node.doc.is_none()
         || ctxt.is_null()
     {
         return -1;
     }
-    ret = xml_xinclude_do_process(ctxt, node);
+    let mut ret = xml_xinclude_do_process(ctxt, node);
     if ret >= 0 && (*ctxt).nb_errors > 0 {
         ret = -1;
     }
@@ -2555,146 +2556,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_xinclude_process_node() {
-        #[cfg(feature = "xinclude")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XINCLUDE_CTXT_PTR {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_xinclude_ctxt_ptr(n_ctxt, 0);
-                    let node = gen_xml_node_ptr(n_node, 1);
-
-                    let ret_val = xml_xinclude_process_node(ctxt, node);
-                    desret_int(ret_val);
-                    des_xml_xinclude_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_node_ptr(n_node, node, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXIncludeProcessNode",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXIncludeProcessNode()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_node);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xinclude_process_tree() {
-        #[cfg(feature = "xinclude")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_tree in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let tree = gen_xml_node_ptr(n_tree, 0);
-
-                let ret_val = xml_xinclude_process_tree(tree);
-                desret_int(ret_val);
-                des_xml_node_ptr(n_tree, tree, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXIncludeProcessTree",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXIncludeProcessTree()"
-                    );
-                    eprintln!(" {}", n_tree);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xinclude_process_tree_flags() {
-        #[cfg(feature = "xinclude")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_tree in 0..GEN_NB_XML_NODE_PTR {
-                for n_flags in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let tree = gen_xml_node_ptr(n_tree, 0);
-                    let flags = gen_int(n_flags, 1);
-
-                    let ret_val = xml_xinclude_process_tree_flags(tree, flags);
-                    desret_int(ret_val);
-                    des_xml_node_ptr(n_tree, tree, 0);
-                    des_int(n_flags, flags, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXIncludeProcessTreeFlags",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXIncludeProcessTreeFlags()"
-                        );
-                        eprint!(" {}", n_tree);
-                        eprintln!(" {}", n_flags);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xinclude_process_tree_flags_data() {
-        #[cfg(feature = "xinclude")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_tree in 0..GEN_NB_XML_NODE_PTR {
-                for n_flags in 0..GEN_NB_INT {
-                    for n_data in 0..GEN_NB_USERDATA {
-                        let mem_base = xml_mem_blocks();
-                        let tree = gen_xml_node_ptr(n_tree, 0);
-                        let flags = gen_int(n_flags, 1);
-                        let data = gen_userdata(n_data, 2);
-
-                        let ret_val = xml_xinclude_process_tree_flags_data(tree, flags, data);
-                        desret_int(ret_val);
-                        des_xml_node_ptr(n_tree, tree, 0);
-                        des_int(n_flags, flags, 1);
-                        des_userdata(n_data, data, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlXIncludeProcessTreeFlagsData",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlXIncludeProcessTreeFlagsData()"
-                            );
-                            eprint!(" {}", n_tree);
-                            eprint!(" {}", n_flags);
-                            eprintln!(" {}", n_data);
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_xinclude_set_flags() {
