@@ -122,8 +122,8 @@ pub struct XmlValidCtxt {
     pub warning: Option<GenericError>,                 /* the callback in case of warning */
 
     /* Node analysis stack used when validating within entities */
-    pub(crate) node: *mut XmlNode,          /* Current parsed Node */
-    pub(crate) node_tab: Vec<*mut XmlNode>, /* array of nodes */
+    pub(crate) node: Option<XmlNodePtr>, /* Current parsed Node */
+    pub(crate) node_tab: Vec<XmlNodePtr>, /* array of nodes */
 
     pub(crate) flags: u32,             /* internal flags */
     pub(crate) doc: Option<XmlDocPtr>, /* the document */
@@ -148,9 +148,7 @@ impl Default for XmlValidCtxt {
             user_data: None,
             error: None,
             warning: None,
-            node: null_mut(),
-            // node_nr: 0,
-            // node_max: 0,
+            node: None,
             node_tab: vec![],
             flags: 0,
             doc: None,
@@ -1507,7 +1505,7 @@ macro_rules! xml_err_valid_warning {
             channel,
             data,
             pctxt as _,
-            $node as _,
+            $node.as_ptr() as _,
             XmlErrorDomain::XmlFromValid,
             $error,
             XmlErrorLevel::XmlErrWarning,
@@ -1756,7 +1754,7 @@ pub unsafe fn xml_add_attribute_decl(
             // The attribute is already defined in this DTD.
             xml_err_valid_warning!(
                 ctxt,
-                dtd.as_ptr() as *mut XmlNode,
+                dtd,
                 XmlParserErrors::XmlDTDAttributeRedefined,
                 "Attribute {} of element {}: already defined\n",
                 name,
@@ -2846,7 +2844,7 @@ macro_rules! xml_err_valid_node_nr {
             channel,
             data,
             pctxt as _,
-            $node as _,
+            $node.map_or(null_mut(), |node| node.as_ptr()) as _,
             XmlErrorDomain::XmlFromValid,
             $error,
             XmlErrorLevel::XmlErrError,
@@ -2964,7 +2962,7 @@ pub unsafe fn xml_validate_attribute_decl(
         if nb_id > 1 {
             xml_err_valid_node_nr!(
                 ctxt,
-                attr.as_ptr() as *mut XmlNode,
+                Some(attr),
                 XmlParserErrors::XmlDTDIDSubset,
                 "Element {} has {} ID attribute defined in the internal subset : {}\n",
                 attr_elem.as_deref().unwrap().to_string_lossy().into_owned(),
@@ -2985,7 +2983,7 @@ pub unsafe fn xml_validate_attribute_decl(
             if ext_id > 1 {
                 xml_err_valid_node_nr!(
                     ctxt,
-                    attr.as_ptr() as *mut XmlNode,
+                    Some(attr),
                     XmlParserErrors::XmlDTDIDSubset,
                     "Element {} has {} ID attribute defined in the external subset : {}\n",
                     attr_elem.as_deref().unwrap().to_string_lossy().into_owned(),
@@ -3684,18 +3682,16 @@ unsafe fn xml_valid_get_elem_decl(
     elem_decl
 }
 
-unsafe fn node_vpush(ctxt: XmlValidCtxtPtr, value: *mut XmlNode) -> i32 {
+unsafe fn node_vpush(ctxt: XmlValidCtxtPtr, value: XmlNodePtr) -> i32 {
     (*ctxt).node_tab.push(value);
-    (*ctxt).node = value;
+    (*ctxt).node = Some(value);
     (*ctxt).node_tab.len() as i32 - 1
 }
 
-unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> *mut XmlNode {
-    let Some(res) = (*ctxt).node_tab.pop() else {
-        return null_mut();
-    };
-    (*ctxt).node = (*ctxt).node_tab.last().cloned().unwrap_or(null_mut());
-    res
+unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> Option<XmlNodePtr> {
+    let res = (*ctxt).node_tab.pop()?;
+    (*ctxt).node = (*ctxt).node_tab.last().cloned();
+    Some(res)
 }
 
 /// Check that an element follows #CDATA
@@ -3709,11 +3705,7 @@ unsafe fn xml_validate_one_cdata_element(
 ) -> i32 {
     let mut ret: i32 = 1;
 
-    if ctxt.is_null()
-        // || doc.is_null()
-        // || elem.is_null()
-        || !matches!(elem.element_type(), XmlElementType::XmlElementNode)
-    {
+    if ctxt.is_null() || !matches!(elem.element_type(), XmlElementType::XmlElementNode) {
         return 0;
     }
 
@@ -3733,7 +3725,7 @@ unsafe fn xml_validate_one_cdata_element(
                     .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
                     .filter(|children| children.children().is_some())
                 {
-                    node_vpush(ctxt, now.as_ptr());
+                    node_vpush(ctxt, now);
                     cur = children
                         .children()
                         .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
@@ -3755,7 +3747,7 @@ unsafe fn xml_validate_one_cdata_element(
             .next()
             .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
         while cur.is_none() {
-            cur = XmlGenericNodePtr::from_raw(node_vpop(ctxt));
+            cur = node_vpop(ctxt).map(|node| node.into());
             let Some(now) = cur else {
                 break;
             };
@@ -3886,7 +3878,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
     let mut ret: i32 = -1;
     let mut determinist: i32 = 1;
 
-    (*(*ctxt).vstate).node = xmlValidateSkipIgnorable((*(*ctxt).vstate).node);
+    (*(*ctxt).vstate).node = xml_validate_skip_ignorable((*(*ctxt).vstate).node);
     if (*(*ctxt).vstate).node.is_null() && (*(*ctxt).vstate).cont.is_null() {
         return 1;
     }
@@ -3968,7 +3960,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                             loop {
                                 (*(*ctxt).vstate).node = (*(*(*ctxt).vstate).node).next;
                                 (*(*ctxt).vstate).node =
-                                    xmlValidateSkipIgnorable((*(*ctxt).vstate).node);
+                                    xml_validate_skip_ignorable((*(*ctxt).vstate).node);
                                 if !(*(*ctxt).vstate).node.is_null()
                                     && matches!(
                                         (*(*(*ctxt).vstate).node).typ,
@@ -4042,7 +4034,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                             loop {
                                 (*(*ctxt).vstate).node = (*(*(*ctxt).vstate).node).next;
                                 (*(*ctxt).vstate).node =
-                                    xmlValidateSkipIgnorable((*(*ctxt).vstate).node);
+                                    xml_validate_skip_ignorable((*(*ctxt).vstate).node);
                                 if !(*(*ctxt).vstate).node.is_null()
                                     && matches!(
                                         (*(*(*ctxt).vstate).node).typ,
@@ -4198,10 +4190,9 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
         while !(*(*ctxt).vstate).cont.is_null() {
             // First do the analysis depending on the occurrence model at this level.
             if ret == 0 {
-                let cur: *mut XmlNode;
                 match (*(*(*ctxt).vstate).cont).ocur {
                     XmlElementContentOccur::XmlElementContentOnce => {
-                        cur = (*(*ctxt).vstate).node;
+                        let cur = (*(*ctxt).vstate).node;
                         DEBUG_VALID_MSG!(c"Once branch failed, rollback".as_ptr());
                         if vstate_vpop(ctxt) < 0 {
                             DEBUG_VALID_MSG!(c"exhaustion, failed".as_ptr());
@@ -4215,7 +4206,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                     }
                     XmlElementContentOccur::XmlElementContentPlus => {
                         if ((*(*ctxt).vstate).occurs & (1 << (*(*ctxt).vstate).depth)) == 0 {
-                            cur = (*(*ctxt).vstate).node;
+                            let cur = (*(*ctxt).vstate).node;
                             DEBUG_VALID_MSG!(c"Plus branch failed, rollback".as_ptr());
                             if vstate_vpop(ctxt) < 0 {
                                 DEBUG_VALID_MSG!(c"exhaustion, failed".as_ptr());
@@ -4335,9 +4326,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
             }
         }
         if !(*(*ctxt).vstate).node.is_null() {
-            let cur: *mut XmlNode;
-
-            cur = (*(*ctxt).vstate).node;
+            let cur = (*(*ctxt).vstate).node;
             DEBUG_VALID_MSG!(c"Failed, remaining input, rollback".as_ptr());
             if vstate_vpop(ctxt) < 0 {
                 DEBUG_VALID_MSG!(c"exhaustion, failed".as_ptr());
@@ -4350,9 +4339,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
             continue 'cont;
         }
         if ret == 0 {
-            let cur: *mut XmlNode;
-
-            cur = (*(*ctxt).vstate).node;
+            let cur = (*(*ctxt).vstate).node;
             DEBUG_VALID_MSG!(c"Failure, rollback".as_ptr());
             if vstate_vpop(ctxt) < 0 {
                 DEBUG_VALID_MSG!(c"exhaustion, failed".as_ptr());
@@ -4376,17 +4363,17 @@ unsafe fn xml_validate_element_content(
     child: Option<XmlGenericNodePtr>,
     elem_decl: XmlElementPtr,
     warn: i32,
-    parent: *mut XmlNode,
+    parent: XmlNodePtr,
 ) -> i32 {
     let mut ret: i32 = 1;
     #[cfg(not(feature = "libxml_regexp"))]
-    let mut repl: *mut XmlNode = null_mut();
+    let mut repl: Option<XmlGenericNodePtr> = None;
     #[cfg(not(feature = "libxml_regexp"))]
-    let mut last: *mut XmlNode = null_mut();
+    let mut last: Option<XmlGenericNodePtr> = None;
     #[cfg(not(feature = "libxml_regexp"))]
-    let mut tmp: *mut XmlNode;
+    let mut tmp: Option<XmlGenericNodePtr>;
 
-    if parent.is_null() || ctxt.is_null() {
+    if ctxt.is_null() {
         return -1;
     }
     let cont: XmlElementContentPtr = elem_decl.content;
@@ -4426,7 +4413,7 @@ unsafe fn xml_validate_element_content(
                                     })
                                     .filter(|children| children.children().is_some())
                                 {
-                                    node_vpush(ctxt, cur_node.as_ptr());
+                                    node_vpush(ctxt, cur_node);
                                     cur = children
                                         .children()
                                         .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
@@ -4483,7 +4470,7 @@ unsafe fn xml_validate_element_content(
                             .next()
                             .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
                         while cur.is_none() {
-                            cur = XmlGenericNodePtr::from_raw(node_vpop(ctxt));
+                            cur = node_vpop(ctxt).map(|node| node.into());
                             if cur.is_none() {
                                 break;
                             }
@@ -4533,7 +4520,7 @@ unsafe fn xml_validate_element_content(
                 xml_snprintf_element_content(expr.as_mut_ptr() as _, 5000, (*elem_decl).content, 1);
                 xml_err_valid_node(
                     ctxt,
-                    elem_decl as *mut XmlNode,
+                    Some(elem_decl.into()),
                     XmlParserErrors::XmlDTDContentNotDeterminist,
                     c"Content model of %s is not deterministic: %s\n".as_ptr() as _,
                     name,
@@ -4651,7 +4638,7 @@ unsafe fn xml_validate_element_content(
                     let list = CStr::from_ptr(list.as_ptr()).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
-                        XmlGenericNodePtr::from_raw(parent),
+                        Some(parent.into()),
                         XmlParserErrors::XmlDTDContentModel,
                         format!(
                             "Element {name} content does not follow the DTD, expecting {expr}, got {list}\n"
@@ -4666,7 +4653,7 @@ unsafe fn xml_validate_element_content(
                     let list = CStr::from_ptr(list.as_ptr()).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
-                        XmlGenericNodePtr::from_raw(parent),
+                        Some(parent.into()),
                         XmlParserErrors::XmlDTDContentModel,
                         format!("Element content does not follow the DTD, expecting {expr}, got {list}\n")
                             .as_str(),
@@ -4679,7 +4666,7 @@ unsafe fn xml_validate_element_content(
                 let name = name.to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
-                    XmlGenericNodePtr::from_raw(parent),
+                    Some(parent.into()),
                     XmlParserErrors::XmlDTDContentModel,
                     format!("Element {name} content does not follow the DTD\n").as_str(),
                     Some(&name),
@@ -4689,7 +4676,7 @@ unsafe fn xml_validate_element_content(
             } else {
                 xml_err_valid_node(
                     ctxt,
-                    XmlGenericNodePtr::from_raw(parent),
+                    Some(parent.into()),
                     XmlParserErrors::XmlDTDContentModel,
                     "Element content does not follow the DTD\n",
                     None,
@@ -5119,7 +5106,7 @@ pub unsafe fn xml_validate_one_element(
                     .children
                     .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
                 // cont = (*elem_decl).content;
-                tmp = xml_validate_element_content(ctxt, child, elem_decl, 1, elem.as_ptr());
+                tmp = xml_validate_element_content(ctxt, child, elem_decl, 1, elem);
                 if tmp <= 0 {
                     ret = tmp;
                 }
@@ -5215,7 +5202,7 @@ pub unsafe fn xml_validate_one_element(
                 } else if qualified == 0 {
                     xml_err_valid_warning!(
                         ctxt,
-                        elem.as_ptr(),
+                        elem,
                         XmlParserErrors::XmlDTDNoPrefix,
                         "Element {} required attribute {}:{} has no prefix\n",
                         elem.name().unwrap().into_owned(),
@@ -5225,7 +5212,7 @@ pub unsafe fn xml_validate_one_element(
                 } else if qualified == 1 {
                     xml_err_valid_warning!(
                         ctxt,
-                        elem.as_ptr(),
+                        elem,
                         XmlParserErrors::XmlDTDDifferentPrefix,
                         "Element {} required attribute {}:{} has different prefix\n",
                         elem.name().unwrap().into_owned(),
@@ -6117,7 +6104,7 @@ unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const Xm
             if xml_get_id((*ctxt).doc.unwrap(), str).is_none() {
                 xml_err_valid_node_nr!(
                     ctxt,
-                    null_mut(),
+                    None::<XmlGenericNodePtr>,
                     XmlParserErrors::XmlDTDUnknownID,
                     "attribute {} line {} references an unknown ID \"{}\"\n",
                     refe.name.as_deref().unwrap(),
@@ -7291,19 +7278,27 @@ pub unsafe fn xml_validate_pop_element(
 /// Returns the first element to consider for validation of the content model
 #[doc(alias = "xmlValidateSkipIgnorable")]
 #[cfg(not(feature = "libxml_regexp"))]
-unsafe fn xmlValidateSkipIgnorable(mut child: *mut XmlNode) -> *mut XmlNode {
-    while !child.is_null() {
-        match (*child).typ {
+unsafe fn xml_validate_skip_ignorable(
+    mut child: Option<XmlGenericNodePtr>,
+) -> Option<XmlGenericNodePtr> {
+    while let Some(cur_node) = child {
+        match cur_node.element_type() {
             // These things are ignored (skipped) during validation.
             XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd => {
-                child = (*child).next;
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                child = cur_node
+                    .next
+                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
             }
             XmlElementType::XmlTextNode => {
-                if xml_is_blank_node(child) != 0 {
-                    child = (*child).next;
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if cur_node.is_text_node() {
+                    child = cur_node
+                        .next
+                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
                 } else {
                     return child;
                 }
@@ -7314,7 +7309,7 @@ unsafe fn xmlValidateSkipIgnorable(mut child: *mut XmlNode) -> *mut XmlNode {
             }
         }
     }
-    return child;
+    child
 }
 
 #[cfg(test)]
