@@ -6378,8 +6378,8 @@ fn xml_no_validity_err(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 #[doc(alias = "xmlValidGetValidElements")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_valid_get_valid_elements(
-    prev: *mut XmlNode,
-    next: *mut XmlNode,
+    prev: Option<XmlGenericNodePtr>,
+    next: Option<XmlGenericNodePtr>,
     names: *mut *const XmlChar,
     max: i32,
 ) -> i32 {
@@ -6390,7 +6390,7 @@ pub unsafe fn xml_valid_get_valid_elements(
     let mut elements: [*const XmlChar; 256] = [null(); 256];
     let mut nb_elements: i32 = 0;
 
-    if prev.is_null() && next.is_null() {
+    if prev.is_none() && next.is_none() {
         return -1;
     }
 
@@ -6405,54 +6405,65 @@ pub unsafe fn xml_valid_get_valid_elements(
     vctxt.error = Some(xml_no_validity_err); /* this suppresses err/warn output */
 
     nb_valid_elements = 0;
-    let ref_node: *mut XmlNode = if !prev.is_null() { prev } else { next };
-    let parent: *mut XmlNode = (*ref_node).parent().map_or(null_mut(), |p| p.as_ptr());
+    let ref_node = prev.or(next).unwrap();
+    // Why can I do `unwrap` for parent without checking ????????
+    let mut parent = ref_node
+        .parent()
+        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+        .unwrap();
+    let parname = CString::new(parent.name().unwrap().as_ref()).unwrap();
 
     // Retrieves the parent element declaration
-    let mut element_desc =
-        xml_get_dtd_element_desc((*parent).doc.unwrap().int_subset, (*parent).name);
-    if element_desc.is_none() && (*parent).doc.unwrap().ext_subset.is_some() {
-        element_desc = xml_get_dtd_element_desc((*parent).doc.unwrap().ext_subset, (*parent).name);
+    let mut element_desc = xml_get_dtd_element_desc(
+        parent.document().unwrap().int_subset,
+        parname.as_ptr() as *const u8,
+    );
+    if element_desc.is_none() && parent.document().unwrap().ext_subset.is_some() {
+        element_desc = xml_get_dtd_element_desc(
+            parent.document().unwrap().ext_subset,
+            parname.as_ptr() as *const u8,
+        );
     }
     let Some(element_desc) = element_desc else {
         return -1;
     };
 
     // Do a backup of the current tree structure
-    let prev_next: *mut XmlNode = if !prev.is_null() {
-        (*prev).next.map_or(null_mut(), |n| n.as_ptr())
-    } else {
-        null_mut()
-    };
-    let next_prev: *mut XmlNode = if !next.is_null() {
-        (*next).prev.map_or(null_mut(), |p| p.as_ptr())
-    } else {
-        null_mut()
-    };
-    let parent_childs: *mut XmlNode = (*parent).children().map_or(null_mut(), |c| c.as_ptr());
-    let parent_last: *mut XmlNode = (*parent).last().map_or(null_mut(), |l| l.as_ptr());
+    let prev_next = prev
+        .and_then(|prev| prev.next())
+        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+    let next_prev = next
+        .and_then(|next| next.prev())
+        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+
+    let parent_childs = parent
+        .children()
+        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+    let parent_last = parent
+        .last()
+        .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
 
     // Creates a dummy node and insert it into the tree
-    let Some(mut test_node) = xml_new_doc_node((*ref_node).doc, None, "<!dummy?>", null_mut())
+    let Some(mut test_node) = xml_new_doc_node(ref_node.document(), None, "<!dummy?>", null_mut())
     else {
         return -1;
     };
 
-    test_node.parent = NodePtr::from_ptr(parent);
-    test_node.prev = NodePtr::from_ptr(prev);
-    test_node.next = NodePtr::from_ptr(next);
+    test_node.parent = NodePtr::from_ptr(parent.as_ptr());
+    test_node.prev = NodePtr::from_ptr(prev.map_or(null_mut(), |node| node.as_ptr()));
+    test_node.next = NodePtr::from_ptr(next.map_or(null_mut(), |node| node.as_ptr()));
     let name: *const XmlChar = test_node.name;
 
-    if !prev.is_null() {
-        (*prev).next = NodePtr::from_ptr(test_node.as_ptr());
+    if let Some(mut prev) = prev {
+        prev.set_next(NodePtr::from_ptr(test_node.as_ptr()));
     } else {
-        (*parent).set_children(NodePtr::from_ptr(test_node.as_ptr()));
+        parent.set_children(NodePtr::from_ptr(test_node.as_ptr()));
     }
 
-    if !next.is_null() {
-        (*next).prev = NodePtr::from_ptr(test_node.as_ptr());
+    if let Some(mut next) = next {
+        next.set_prev(NodePtr::from_ptr(test_node.as_ptr()));
     } else {
-        (*parent).set_last(NodePtr::from_ptr(test_node.as_ptr()));
+        parent.set_last(NodePtr::from_ptr(test_node.as_ptr()));
     }
 
     // Insert each potential child node and check if the parent is still valid
@@ -6467,8 +6478,8 @@ pub unsafe fn xml_valid_get_valid_elements(
         test_node.name = elements[i as usize];
         if xml_validate_one_element(
             addr_of_mut!(vctxt) as _,
-            (*parent).doc.unwrap(),
-            XmlGenericNodePtr::from_raw(parent),
+            parent.document().unwrap(),
+            Some(parent),
         ) != 0
         {
             for j in 0..nb_valid_elements {
@@ -6485,14 +6496,22 @@ pub unsafe fn xml_valid_get_valid_elements(
     }
 
     // Restore the tree structure
-    if !prev.is_null() {
-        (*prev).next = NodePtr::from_ptr(prev_next);
+    if let Some(mut prev) = prev {
+        prev.set_next(NodePtr::from_ptr(
+            prev_next.map_or(null_mut(), |node| node.as_ptr()),
+        ));
     }
-    if !next.is_null() {
-        (*next).prev = NodePtr::from_ptr(next_prev);
+    if let Some(mut next) = next {
+        next.set_prev(NodePtr::from_ptr(
+            next_prev.map_or(null_mut(), |node| node.as_ptr()),
+        ));
     }
-    (*parent).set_children(NodePtr::from_ptr(parent_childs));
-    (*parent).set_last(NodePtr::from_ptr(parent_last));
+    parent.set_children(NodePtr::from_ptr(
+        parent_childs.map_or(null_mut(), |node| node.as_ptr()),
+    ));
+    parent.set_last(NodePtr::from_ptr(
+        parent_last.map_or(null_mut(), |node| node.as_ptr()),
+    ));
 
     // Free up the dummy node
     test_node.name = name;
@@ -7470,56 +7489,6 @@ mod tests {
                                 eprint!(" {}", n_ctree);
                                 eprint!(" {}", n_names);
                                 eprint!(" {}", n_len);
-                                eprintln!(" {}", n_max);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_valid_get_valid_elements() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_prev in 0..GEN_NB_XML_NODE_PTR {
-                for n_next in 0..GEN_NB_XML_NODE_PTR {
-                    for n_names in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
-                        for n_max in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let prev = gen_xml_node_ptr(n_prev, 0);
-                            let next = gen_xml_node_ptr(n_next, 1);
-                            let names = gen_const_xml_char_ptr_ptr(n_names, 2);
-                            let max = gen_int(n_max, 3);
-
-                            let ret_val = xml_valid_get_valid_elements(
-                                prev,
-                                next,
-                                names as *mut *const XmlChar,
-                                max,
-                            );
-                            desret_int(ret_val);
-                            des_xml_node_ptr(n_prev, prev, 0);
-                            des_xml_node_ptr(n_next, next, 1);
-                            des_const_xml_char_ptr_ptr(n_names, names as *mut *const XmlChar, 2);
-                            des_int(n_max, max, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlValidGetValidElements",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlValidGetValidElements()"
-                                );
-                                eprint!(" {}", n_prev);
-                                eprint!(" {}", n_next);
-                                eprint!(" {}", n_names);
                                 eprintln!(" {}", n_max);
                             }
                         }

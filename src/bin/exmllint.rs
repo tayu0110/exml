@@ -98,7 +98,7 @@ use exml::{
         xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc,
         xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
         XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlNode,
+        XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
 };
@@ -2850,8 +2850,9 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 }
                 if let Some(node) = node {
                     let nb = xml_valid_get_valid_elements(
-                        node.last().map_or(null_mut(), |l| l.as_ptr()),
-                        null_mut(),
+                        node.last()
+                            .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr())),
+                        None,
                         list.as_mut_ptr(),
                         256,
                     );
