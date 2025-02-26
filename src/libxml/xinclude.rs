@@ -77,9 +77,9 @@ pub const XINCLUDE_NODE: &str = "include";
 /// A constant defining "fallback"
 pub const XINCLUDE_FALLBACK: &str = "fallback";
 /// A constant defining "href"
-pub const XINCLUDE_HREF: &CStr = c"href";
+pub const XINCLUDE_HREF: &str = "href";
 /// A constant defining "parse"
-pub const XINCLUDE_PARSE: &CStr = c"parse";
+pub const XINCLUDE_PARSE: &str = "parse";
 /// A constant defining "xml"
 pub const XINCLUDE_PARSE_XML: &str = "xml";
 /// A constant defining "text"
@@ -350,7 +350,7 @@ unsafe fn xml_xinclude_get_prop(
 #[doc(alias = "xmlXIncludeErrMemory")]
 unsafe fn xml_xinclude_err_memory(
     ctxt: XmlXIncludeCtxtPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     extra: Option<&str>,
 ) {
     if !ctxt.is_null() {
@@ -362,7 +362,7 @@ unsafe fn xml_xinclude_err_memory(
             None,
             None,
             ctxt as _,
-            node as _,
+            node.map_or(null_mut(), |node| node.as_ptr()) as _,
             XmlErrorDomain::XmlFromXInclude,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrError,
@@ -382,7 +382,7 @@ unsafe fn xml_xinclude_err_memory(
             None,
             None,
             ctxt as _,
-            node as _,
+            node.map_or(null_mut(), |node| node.as_ptr()) as _,
             XmlErrorDomain::XmlFromXInclude,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrError,
@@ -424,7 +424,7 @@ unsafe fn xml_xinclude_new_ref(
 ) -> XmlXIncludeRefPtr {
     let ret: XmlXIncludeRefPtr = xml_malloc(size_of::<XmlXIncludeRef>()) as XmlXIncludeRefPtr;
     if ret.is_null() {
-        xml_xinclude_err_memory(ctxt, elem.as_ptr(), Some("growing XInclude context"));
+        xml_xinclude_err_memory(ctxt, Some(elem.into()), Some("growing XInclude context"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXIncludeRef>());
@@ -450,14 +450,10 @@ unsafe fn xml_xinclude_add_node(ctxt: XmlXIncludeCtxtPtr, cur: XmlNodePtr) -> Xm
     if ctxt.is_null() {
         return null_mut();
     }
-    // if cur.is_null() {
-    //     return null_mut();
-    // }
 
     // read the attributes
-    let href =
-        xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF.to_str().unwrap()).unwrap_or("".to_owned());
-    let parse = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.to_str().unwrap());
+    let href = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF).unwrap_or("".to_owned());
+    let parse = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE);
     if let Some(parse) = parse {
         if parse == XINCLUDE_PARSE_XML {
             xml = 1;
@@ -574,7 +570,7 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXIncludeCtxtPtr, mut url: &str) -> Op
 
     let pctxt = xml_new_parser_ctxt();
     if pctxt.is_null() {
-        xml_xinclude_err_memory(ctxt, null_mut(), Some("cannot allocate parser context"));
+        xml_xinclude_err_memory(ctxt, None, Some("cannot allocate parser context"));
         return None;
     }
 
@@ -844,98 +840,98 @@ unsafe fn xml_xinclude_recurse_doc(ctxt: XmlXIncludeCtxtPtr, doc: XmlDocPtr, _ur
 #[doc(alias = "xmlXIncludeCopyNode")]
 unsafe fn xml_xinclude_copy_node(
     ctxt: XmlXIncludeCtxtPtr,
-    elem: *mut XmlNode,
+    elem: XmlNodePtr,
     copy_children: i32,
-) -> *mut XmlNode {
-    let mut result: *mut XmlNode = null_mut();
-    let mut insert_parent: *mut XmlNode = null_mut();
-    let mut insert_last: *mut XmlNode = null_mut();
-    let mut cur: *mut XmlNode;
+) -> Option<XmlNodePtr> {
+    let mut result: Option<XmlNodePtr> = None;
+    let mut insert_parent: Option<XmlNodePtr> = None;
+    let mut insert_last: Option<XmlNodePtr> = None;
 
-    if copy_children != 0 {
-        cur = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
-        if cur.is_null() {
-            return null_mut();
-        }
+    let mut cur = if copy_children != 0 {
+        elem.children
+            .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap())?
     } else {
-        cur = elem;
-    }
+        elem
+    };
 
     loop {
-        let mut copy: *mut XmlNode = null_mut();
+        let mut copy = None;
         let mut recurse: i32 = 0;
 
         if matches!(
-            (*cur).element_type(),
+            cur.element_type(),
             XmlElementType::XmlDocumentNode | XmlElementType::XmlDTDNode
         ) {
-        } else if (*cur).element_type() == XmlElementType::XmlElementNode
-            && (*cur).name().as_deref() == Some(XINCLUDE_NODE)
-            && (*cur).ns.map_or(false, |ns| {
-                xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
-                    || xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+        } else if cur.element_type() == XmlElementType::XmlElementNode
+            && cur.name().as_deref() == Some(XINCLUDE_NODE)
+            && cur.ns.map_or(false, |ns| {
+                ns.href().as_deref() == Some(XINCLUDE_NS.to_str().unwrap())
+                    || ns.href().as_deref() == Some(XINCLUDE_OLD_NS.to_str().unwrap())
             })
         {
-            let refe: XmlXIncludeRefPtr =
-                xml_xinclude_expand_node(ctxt, XmlNodePtr::from_raw(cur).unwrap().unwrap());
+            let refe: XmlXIncludeRefPtr = xml_xinclude_expand_node(ctxt, cur);
 
             if refe.is_null() {
                 // goto error;
-                xml_free_node_list(result);
-                return null_mut();
+                xml_free_node_list(result.map_or(null_mut(), |node| node.as_ptr()));
+                return None;
             }
             // TODO: Insert xmlElementType::XML_XINCLUDE_START and xmlElementType::XML_XINCLUDE_END nodes
             if let Some(inc) = (*refe).inc {
-                copy = xml_static_copy_node_list(
+                let Some(res) = xml_static_copy_node_list(
                     Some(XmlGenericNodePtr::from(inc)),
                     (*ctxt).doc,
-                    XmlGenericNodePtr::from_raw(insert_parent),
-                )
-                .map_or(null_mut(), |node| node.as_ptr());
-                if copy.is_null() {
+                    insert_parent.map(|parent| parent.into()),
+                ) else {
                     // goto error;
-                    xml_free_node_list(result);
-                    return null_mut();
-                }
+                    xml_free_node_list(result.map_or(null_mut(), |node| node.as_ptr()));
+                    return None;
+                };
+                copy = Some(XmlNodePtr::try_from(res).unwrap());
             }
         } else {
-            copy = xml_static_copy_node(
-                XmlGenericNodePtr::from_raw(cur).unwrap(),
+            let Some(res) = xml_static_copy_node(
+                XmlGenericNodePtr::from(cur),
                 (*ctxt).doc,
-                XmlGenericNodePtr::from_raw(insert_parent),
+                insert_parent.map(|parent| parent.into()),
                 2,
-            )
-            .map_or(null_mut(), |node| node.as_ptr());
-            if copy.is_null() {
+            ) else {
                 // goto error;
-                xml_free_node_list(result);
-                return null_mut();
-            }
+                xml_free_node_list(result.map_or(null_mut(), |node| node.as_ptr()));
+                return None;
+            };
+            copy = Some(XmlNodePtr::try_from(res).unwrap());
 
-            recurse = ((*cur).element_type() != XmlElementType::XmlEntityRefNode
-                && (*cur).children().is_some()) as i32;
+            recurse = (cur.element_type() != XmlElementType::XmlEntityRefNode
+                && cur.children().is_some()) as i32;
         }
 
-        if !copy.is_null() {
-            if result.is_null() {
-                result = copy;
+        if let Some(mut copy) = copy {
+            if result.is_none() {
+                result = Some(copy);
             }
-            if !insert_last.is_null() {
-                (*insert_last).next = NodePtr::from_ptr(copy);
-                (*copy).prev = NodePtr::from_ptr(insert_last);
-            } else if !insert_parent.is_null() {
-                (*insert_parent).set_children(NodePtr::from_ptr(copy));
+            if let Some(mut insert_last) = insert_last {
+                insert_last.next = NodePtr::from_ptr(copy.as_ptr());
+                copy.prev = NodePtr::from_ptr(insert_last.as_ptr());
+            } else if let Some(mut insert_parent) = insert_parent {
+                insert_parent.children = NodePtr::from_ptr(copy.as_ptr());
             }
-            insert_last = copy;
-            while let Some(next) = (*insert_last).next {
-                insert_last = next.as_ptr();
+            let mut now = copy;
+            while let Some(next) = now
+                .next
+                .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
+            {
+                now = next;
             }
+            insert_last = Some(now);
         }
 
         if recurse != 0 {
-            cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-            insert_parent = insert_last;
-            insert_last = null_mut();
+            cur = cur
+                .children
+                .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap())
+                .unwrap();
+            insert_parent = insert_last.take();
             continue;
         }
 
@@ -943,19 +939,29 @@ unsafe fn xml_xinclude_copy_node(
             return result;
         }
 
-        while (*cur).next.is_none() {
-            if !insert_parent.is_null() {
-                (*insert_parent).set_last(NodePtr::from_ptr(insert_last));
+        while cur.next.is_none() {
+            if let Some(mut insert_parent) = insert_parent {
+                insert_parent.last =
+                    NodePtr::from_ptr(insert_last.map_or(null_mut(), |node| node.as_ptr()));
             }
-            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+            cur = cur
+                .parent
+                .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).unwrap())
+                .unwrap();
             if cur == elem {
                 return result;
             }
             insert_last = insert_parent;
-            insert_parent = (*insert_parent).parent().map_or(null_mut(), |p| p.as_ptr());
+            insert_parent = insert_parent
+                .unwrap()
+                .parent
+                .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).unwrap());
         }
 
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+        cur = cur
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap())
+            .unwrap();
     }
 
     // error:
@@ -1243,21 +1249,18 @@ unsafe fn xml_xinclude_copy_range(
 unsafe fn xml_xinclude_copy_xpointer(
     ctxt: XmlXIncludeCtxtPtr,
     obj: XmlXPathObjectPtr,
-) -> *mut XmlNode {
-    let mut list: *mut XmlNode = null_mut();
-    let mut last: *mut XmlNode = null_mut();
-    let mut copy: *mut XmlNode;
+) -> Option<XmlNodePtr> {
+    let mut list: Option<XmlNodePtr> = None;
 
     if ctxt.is_null() || obj.is_null() {
-        return null_mut();
+        return None;
     }
     match (*obj).typ {
         XmlXPathObjectType::XPathNodeset => {
-            let Some(set) = (*obj).nodesetval.as_deref() else {
-                return null_mut();
-            };
+            let set = (*obj).nodesetval.as_deref()?;
+            let mut last: Option<XmlNodePtr> = None;
             for &now in &set.node_tab {
-                let node = match (*now).element_type() {
+                let node = match now.element_type() {
                     XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                         let Some(node) = XmlDocPtr::try_from(now).unwrap().get_root_element()
                         else {
@@ -1283,53 +1286,60 @@ unsafe fn xml_xinclude_copy_xpointer(
                             XmlParserErrors::XmlXIncludeXPtrResult,
                             "invalid node type in XPtr result\n"
                         );
-                        continue; /* for */
+                        continue;
                     }
                 };
                 // OPTIMIZE TODO: External documents should already be
                 // expanded, so xmlDocCopyNode should work as well.
                 // xmlXIncludeCopyNode is only required for the initial document.
-                copy = xml_xinclude_copy_node(ctxt, node.as_ptr(), 0);
-                if copy.is_null() {
-                    xml_free_node_list(list);
-                    return null_mut();
-                }
-                if last.is_null() {
-                    list = copy;
-                } else {
-                    while let Some(next) = (*last).next {
-                        last = next.as_ptr();
+                let Some(mut copy) = xml_xinclude_copy_node(ctxt, node, 0) else {
+                    xml_free_node_list(list.map_or(null_mut(), |node| node.as_ptr()));
+                    return None;
+                };
+                if let Some(mut last) = last {
+                    while let Some(next) = last
+                        .next
+                        .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
+                    {
+                        last = next;
                     }
-                    (*copy).prev = NodePtr::from_ptr(last);
-                    (*last).next = NodePtr::from_ptr(copy);
+                    copy.prev = NodePtr::from_ptr(last.as_ptr());
+                    last.next = NodePtr::from_ptr(copy.as_ptr());
+                } else {
+                    list = Some(copy);
                 }
-                last = copy;
+                last = Some(copy);
             }
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathLocationset => {
             let set: XmlLocationSetPtr = (*obj).user as XmlLocationSetPtr;
             if set.is_null() {
-                return null_mut();
+                return None;
             }
+            let mut last: Option<XmlNodePtr> = None;
             for &loc in &(*set).loc_tab {
-                if last.is_null() {
+                if let Some(mut last) = last {
+                    last.add_next_sibling(xml_xinclude_copy_xpointer(ctxt, loc).unwrap().into());
+                } else {
                     list = xml_xinclude_copy_xpointer(ctxt, loc);
                     last = list;
-                } else {
-                    (*last).add_next_sibling(
-                        XmlGenericNodePtr::from_raw(xml_xinclude_copy_xpointer(ctxt, loc)).unwrap(),
-                    );
                 }
-                if !last.is_null() {
-                    while let Some(next) = (*last).next() {
-                        last = next.as_ptr();
+                if let Some(mut l) = last {
+                    while let Some(next) = l
+                        .next
+                        .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
+                    {
+                        l = next;
                     }
+                    last = Some(l);
                 }
             }
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        XmlXPathObjectType::XPathRange => return xml_xinclude_copy_range(ctxt, obj),
+        XmlXPathObjectType::XPathRange => {
+            return XmlNodePtr::from_raw(xml_xinclude_copy_range(ctxt, obj)).unwrap()
+        }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathPoint => { /* points are ignored in XInclude */ }
         _ => {}
@@ -1652,7 +1662,7 @@ unsafe fn xml_xinclude_load_doc(
                         i += 1;
                     }
                 }
-                (*refe).inc = XmlNodePtr::from_raw(xml_xinclude_copy_xpointer(ctxt, xptr)).unwrap();
+                (*refe).inc = xml_xinclude_copy_xpointer(ctxt, xptr);
                 xml_xpath_free_object(xptr);
                 xml_xpath_free_context(xptrctxt);
             }
@@ -1921,11 +1931,7 @@ unsafe fn xml_xinclude_load_txt(
     };
     buf.borrow_mut().encoder = get_encoding_handler(enc);
     let Some(mut node) = xml_new_doc_text((*ctxt).doc, null_mut()) else {
-        xml_xinclude_err_memory(
-            ctxt,
-            (*refe).elem.map_or(null_mut(), |node| node.as_ptr()),
-            None,
-        );
+        xml_xinclude_err_memory(ctxt, (*refe).elem.map(|node| node.into()), None);
         // goto error;
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
@@ -1998,23 +2004,20 @@ unsafe fn xml_xinclude_load_txt(
 #[doc(alias = "xmlXIncludeLoadFallback")]
 unsafe fn xml_xinclude_load_fallback(
     ctxt: XmlXIncludeCtxtPtr,
-    fallback: *mut XmlNode,
+    fallback: XmlNodePtr,
     refe: XmlXIncludeRefPtr,
 ) -> i32 {
     let mut ret: i32 = 0;
     let old_nb_errors: i32;
 
-    if fallback.is_null()
-        || (*fallback).element_type() == XmlElementType::XmlNamespaceDecl
-        || ctxt.is_null()
-    {
+    if fallback.element_type() == XmlElementType::XmlNamespaceDecl || ctxt.is_null() {
         return -1;
     }
-    if (*fallback).children().is_some() {
+    if fallback.children().is_some() {
         // It's possible that the fallback also has 'includes'
         // (Bug 129969), so we re-process the fallback just in case
         old_nb_errors = (*ctxt).nb_errors;
-        (*refe).inc = XmlNodePtr::from_raw(xml_xinclude_copy_node(ctxt, fallback, 1)).unwrap();
+        (*refe).inc = xml_xinclude_copy_node(ctxt, fallback, 1);
         if (*ctxt).nb_errors > old_nb_errors {
             ret = -1;
         } else if (*refe).inc.is_none() {
@@ -2044,9 +2047,8 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeRefP
     };
 
     // read the attributes
-    let href =
-        xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF.to_str().unwrap()).unwrap_or("".to_owned());
-    let parse = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.to_str().unwrap());
+    let href = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF).unwrap_or("".to_owned());
+    let parse = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE);
     if let Some(parse) = parse {
         if parse == XINCLUDE_PARSE_XML {
             xml = 1;
@@ -2067,7 +2069,7 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeRefP
     // compute the URI
     let mut base = None;
     let mut uri = (*ctxt).doc.and_then(|doc| {
-        if let Some(b) = (*cur).get_base(Some(doc)) {
+        if let Some(b) = cur.get_base(Some(doc)) {
             base = Some(b);
             build_uri(&href, base.as_deref().unwrap())
         } else {
@@ -2112,19 +2114,23 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeRefP
 
     if ret < 0 {
         // Time to try a fallback if available
-        let mut children = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-        while !children.is_null() {
-            if (*children).element_type() == XmlElementType::XmlElementNode
-                && (*children).name().as_deref() == Some(XINCLUDE_FALLBACK)
-                && (*children).ns.map_or(false, |ns| {
-                    xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
-                        || xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+        let mut children = cur
+            .children
+            .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+        while let Some(cur_node) = children {
+            if cur_node.element_type() == XmlElementType::XmlElementNode
+                && cur_node.name().as_deref() == Some(XINCLUDE_FALLBACK)
+                && cur_node.ns.map_or(false, |ns| {
+                    ns.href().as_deref() == Some(XINCLUDE_NS.to_str().unwrap())
+                        || ns.href().as_deref() == Some(XINCLUDE_OLD_NS.to_str().unwrap())
                 })
             {
-                ret = xml_xinclude_load_fallback(ctxt, children, refe);
+                ret = xml_xinclude_load_fallback(ctxt, cur_node, refe);
                 break;
             }
-            children = (*children).next.map_or(null_mut(), |n| n.as_ptr());
+            children = cur_node
+                .next
+                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         }
     }
     if ret < 0 {
@@ -2468,7 +2474,7 @@ pub unsafe fn xml_xinclude_new_context(doc: XmlDocPtr) -> XmlXIncludeCtxtPtr {
     if ret.is_null() {
         xml_xinclude_err_memory(
             null_mut(),
-            doc.as_ptr() as *mut XmlNode,
+            Some(doc.into()),
             Some("creating XInclude context"),
         );
         return null_mut();
