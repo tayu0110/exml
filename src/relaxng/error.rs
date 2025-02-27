@@ -13,7 +13,7 @@ use crate::{
         },
         xmlstring::{xml_char_strdup, xml_escape_format_string, xml_str_equal, xml_strdup},
     },
-    tree::XmlNode,
+    tree::{XmlGenericNodePtr, XmlNode},
 };
 
 const ERROR_IS_DUP: i32 = 1;
@@ -422,7 +422,10 @@ unsafe fn xml_relaxng_valid_error_push(
 ) -> i32 {
     if let Some(last_error) = (*ctxt).err_tab.last() {
         if !(*ctxt).state.is_null()
-            && last_error.node == (*(*ctxt).state).node
+            && last_error.node
+                == (*(*ctxt).state)
+                    .node
+                    .map_or(null_mut(), |node| node.as_ptr())
             && last_error.err == err
         {
             return (*ctxt).err_tab.len() as i32 - 1;
@@ -442,7 +445,9 @@ unsafe fn xml_relaxng_valid_error_push(
         cur.flags = 0;
     }
     if !(*ctxt).state.is_null() {
-        cur.node = (*(*ctxt).state).node;
+        cur.node = (*(*ctxt).state)
+            .node
+            .map_or(null_mut(), |node| node.as_ptr());
         cur.seq = (*(*ctxt).state).seq.map_or(null_mut(), |seq| seq.as_ptr());
     } else {
         cur.node = null_mut();
@@ -515,15 +520,15 @@ pub(crate) unsafe fn xml_relaxng_add_valid_error(
         let (mut node, seq) = if !(*ctxt).state.is_null() {
             ((*(*ctxt).state).node, (*(*ctxt).state).seq)
         } else {
-            (null_mut(), None)
+            (None, None)
         };
-        if node.is_null() && seq.is_none() {
-            node = (*ctxt).pnode;
+        if node.is_none() && seq.is_none() {
+            node = (*ctxt).pnode.map(|node| node.into());
         }
         xml_relaxng_show_valid_error(
             ctxt,
             err,
-            node,
+            node.map_or(null_mut(), |node| node.as_ptr()),
             seq.map_or(null_mut(), |seq| seq.as_ptr()),
             arg1,
             arg2,
@@ -631,7 +636,7 @@ pub(crate) unsafe fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: O
 
 pub(crate) unsafe fn xml_rng_err_internal(
     ctxt: *mut XmlRelaxNGParserCtxt,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     error: XmlParserErrors,
     msg: &str,
     str1: Option<Cow<'static, str>>,
@@ -655,7 +660,7 @@ pub(crate) unsafe fn xml_rng_err_internal(
         channel,
         data,
         null_mut(),
-        node as _,
+        node.map_or(null_mut(), |node| node.as_ptr()) as _,
         XmlErrorDomain::XmlFromRelaxngp,
         error,
         XmlErrorLevel::XmlErrError,

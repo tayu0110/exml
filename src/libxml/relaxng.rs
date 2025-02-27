@@ -938,7 +938,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
                     if ret == 0 {
                         xml_rng_perr!(
                             ctxt,
-                            (*def).node,
+                            XmlGenericNodePtr::from_raw((*def).node),
                             XmlParserErrors::XmlRngpElemTextConflict,
                             "Element or text conflicts in interleave\n"
                         );
@@ -951,7 +951,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
                     if ret == 0 {
                         xml_rng_perr!(
                             ctxt,
-                            (*def).node,
+                            XmlGenericNodePtr::from_raw((*def).node),
                             XmlParserErrors::XmlRngpAttrConflict,
                             "Attributes conflicts in interleave\n"
                         );
@@ -1123,7 +1123,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                 {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpForbiddenAttribute,
                         "Attribute {} is not allowed on {}\n",
                         cur_attr.name().unwrap().into_owned(),
@@ -1135,7 +1135,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                 {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpForbiddenAttribute,
                         "Attribute {} is not allowed on {}\n",
                         cur_attr.name().unwrap().into_owned(),
@@ -1148,7 +1148,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                 {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpForbiddenAttribute,
                         "Attribute {} is not allowed on {}\n",
                         cur_attr.name().unwrap().into_owned(),
@@ -1161,7 +1161,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                 {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpForbiddenAttribute,
                         "Attribute {} is not allowed on {}\n",
                         cur_attr.name().unwrap().into_owned(),
@@ -1175,7 +1175,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                             if uri.scheme.is_none() {
                                 xml_rng_perr!(
                                     ctxt,
-                                    node.as_ptr(),
+                                    Some(node.into()),
                                     XmlParserErrors::XmlRngpURINotAbsolute,
                                     "Attribute {} URI {} is not absolute\n",
                                     cur_attr.name().unwrap().into_owned(),
@@ -1185,7 +1185,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                             if uri.fragment.is_some() {
                                 xml_rng_perr!(
                                     ctxt,
-                                    node.as_ptr(),
+                                    Some(node.into()),
                                     XmlParserErrors::XmlRngpURIFragment,
                                     "Attribute {} URI {} has a fragment ID\n",
                                     cur_attr.name().unwrap().into_owned(),
@@ -1195,7 +1195,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                         } else {
                             xml_rng_perr!(
                                 ctxt,
-                                node.as_ptr(),
+                                Some(node.into()),
                                 XmlParserErrors::XmlRngpInvalidURI,
                                 "Attribute {} contains invalid URI {}\n",
                                 cur_attr.name().unwrap().into_owned(),
@@ -1207,7 +1207,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
             } else if cur_attr.name().as_deref() != Some("ns") {
                 xml_rng_perr!(
                     ctxt,
-                    node.as_ptr(),
+                    Some(node.into()),
                     XmlParserErrors::XmlRngpUnknownAttribute,
                     "Unknown attribute {} on {}\n",
                     cur_attr.name().unwrap().into_owned(),
@@ -1236,7 +1236,7 @@ unsafe fn xml_relaxng_load_external_ref(
         if xml_str_equal((*doc).href, curl.as_ptr() as *const u8) {
             xml_rng_perr!(
                 ctxt,
-                null_mut(),
+                None,
                 XmlParserErrors::XmlRngpExternalRefRecurse,
                 "Detected an externalRef recursion for {}\n",
                 url
@@ -1249,7 +1249,7 @@ unsafe fn xml_relaxng_load_external_ref(
     let Some(doc) = xml_read_file(url, None, 0) else {
         xml_rng_perr!(
             ctxt,
-            null_mut(),
+            None,
             XmlParserErrors::XmlRngpParseError,
             "xmlRelaxNG: could not load {}\n",
             url
@@ -1262,7 +1262,7 @@ unsafe fn xml_relaxng_load_external_ref(
     if ret.is_null() {
         xml_rng_perr!(
             ctxt,
-            doc.as_ptr(),
+            Some(doc.into()),
             XmlParserErrors::XmlErrNoMemory,
             "xmlRelaxNG: allocate memory for doc {}\n",
             url
@@ -1383,7 +1383,7 @@ unsafe fn xml_relaxng_load_include(
         if xml_str_equal((*inc).href, curl.as_ptr() as *const u8) {
             xml_rng_perr!(
                 ctxt,
-                null_mut(),
+                None,
                 XmlParserErrors::XmlRngpIncludeRecurse,
                 "Detected an Include recursion for {}\n",
                 url
@@ -1396,7 +1396,7 @@ unsafe fn xml_relaxng_load_include(
     let Some(doc) = xml_read_file(url, None, 0) else {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpParseError,
             "xmlRelaxNG: could not load {}\n",
             url
@@ -1446,7 +1446,7 @@ unsafe fn xml_relaxng_load_include(
     let Some(root) = doc.get_root_element() else {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpEmpty,
             "xmlRelaxNG: included document is empty {}\n",
             url
@@ -1456,7 +1456,7 @@ unsafe fn xml_relaxng_load_include(
     if !is_relaxng(root, "grammar") {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpGrammarMissing,
             "xmlRelaxNG: included document {} root is not a grammar\n",
             url
@@ -1480,7 +1480,7 @@ unsafe fn xml_relaxng_load_include(
             if found == 0 {
                 xml_rng_perr!(
                     ctxt,
-                    node.as_ptr(),
+                    Some(node.into()),
                     XmlParserErrors::XmlRngpStartMissing,
                     "xmlRelaxNG: include {} has a start but not the included grammar\n",
                     url
@@ -1500,7 +1500,7 @@ unsafe fn xml_relaxng_load_include(
                 if found == 0 {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpDefineMissing,
                         "xmlRelaxNG: include {} has a define {} but not the included grammar\n",
                         url,
@@ -1510,7 +1510,7 @@ unsafe fn xml_relaxng_load_include(
             } else {
                 xml_rng_perr!(
                     ctxt,
-                    node.as_ptr(),
+                    Some(node.into()),
                     XmlParserErrors::XmlRngpNameMissing,
                     "xmlRelaxNG: include {} has define without name\n",
                     url
@@ -1588,7 +1588,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                         }) {
                             xml_rng_perr!(
                                 ctxt,
-                                now.as_ptr(),
+                                Some(now.into()),
                                 XmlParserErrors::XmlRngpForeignElement,
                                 "element {} doesn't allow foreign elements\n",
                                 parent.name().unwrap().into_owned()
@@ -1619,7 +1619,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             let Some(href) = now.get_prop("href") else {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpMissingHref,
                                     "xmlRelaxNGParse: externalRef has no href attribute\n"
                                 );
@@ -1629,7 +1629,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             let Some(uri) = XmlURI::parse(&href) else {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpHrefError,
                                     "Incorrect URI for externalRef {}\n",
                                     href
@@ -1640,7 +1640,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             if uri.fragment.is_some() {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpHrefError,
                                     "Fragment forbidden in URI for externalRef {}\n",
                                     href
@@ -1654,7 +1654,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             else {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpHrefError,
                                     "Failed to compute URL for externalRef {}\n",
                                     href
@@ -1667,7 +1667,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             if docu.is_null() {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpExternalRefFailure,
                                     "Failed to load externalRef {}\n",
                                     url
@@ -1680,7 +1680,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             let Some(href) = now.get_prop("href") else {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpMissingHref,
                                     "xmlRelaxNGParse: include has no href attribute\n"
                                 );
@@ -1694,7 +1694,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             else {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpHrefError,
                                     "Failed to compute URL for include {}\n",
                                     href
@@ -1724,7 +1724,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             if incl.is_null() {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpIncludeFailure,
                                     "Failed to load include {}\n",
                                     url
@@ -1763,7 +1763,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                 if text.is_none() {
                                     xml_rng_perr!(
                                         ctxt,
-                                        now.as_ptr(),
+                                        Some(now.into()),
                                         XmlParserErrors::XmlRngpCreateFailure,
                                         "Failed to create a name {} element\n",
                                         name
@@ -1818,7 +1818,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                         } else {
                                             xml_rng_perr!(
                                                 ctxt,
-                                                now.as_ptr(),
+                                                Some(now.into()),
                                                 XmlParserErrors::XmlRngpPrefixUndefined,
                                                 "xmlRelaxNGParse: no namespace for prefix {}\n",
                                                 prefix
@@ -1833,7 +1833,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpPatNsNameExceptNsName,
                                     "Found nsName/except//nsName forbidden construct\n"
                                 );
@@ -1866,14 +1866,14 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             if (*ctxt).flags & XML_RELAXNG_IN_ANYEXCEPT != 0 {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpPatAnynameExceptAnyname,
                                     "Found anyName/except//anyName forbidden construct\n"
                                 );
                             } else if (*ctxt).flags & XML_RELAXNG_IN_NSEXCEPT != 0 {
                                 xml_rng_perr!(
                                     ctxt,
-                                    now.as_ptr(),
+                                    Some(now.into()),
                                     XmlParserErrors::XmlRngpPatNsNameExceptAnyName,
                                     "Found nsName/except//anyName forbidden construct\n"
                                 );
@@ -2020,7 +2020,7 @@ unsafe fn xml_relaxng_cleanup_doc(
     let Some(root) = doc.get_root_element() else {
         xml_rng_perr!(
             ctxt,
-            doc.as_ptr(),
+            Some(doc.into()),
             XmlParserErrors::XmlRngpEmpty,
             "xmlRelaxNGParse: {} is empty\n",
             (*ctxt).url.as_deref().unwrap()
@@ -2073,7 +2073,7 @@ unsafe fn xml_relaxng_check_combine(
                 } else if choice_or_interleave == 0 {
                     xml_rng_perr!(
                         ctxt,
-                        (*define).node,
+                        XmlGenericNodePtr::from_raw((*define).node),
                         XmlParserErrors::XmlRngpDefChoiceAndInterleave,
                         "Defines for {} use both 'choice' and 'interleave'\n",
                         name
@@ -2085,7 +2085,7 @@ unsafe fn xml_relaxng_check_combine(
                 } else if choice_or_interleave == 1 {
                     xml_rng_perr!(
                         ctxt,
-                        (*define).node,
+                        XmlGenericNodePtr::from_raw((*define).node),
                         XmlParserErrors::XmlRngpDefChoiceAndInterleave,
                         "Defines for {} use both 'choice' and 'interleave'\n",
                         name
@@ -2094,7 +2094,7 @@ unsafe fn xml_relaxng_check_combine(
             } else {
                 xml_rng_perr!(
                     ctxt,
-                    (*define).node,
+                    XmlGenericNodePtr::from_raw((*define).node),
                     XmlParserErrors::XmlRngpUnknownCombine,
                     "Defines for {} use unknown combine value '{}''\n",
                     name,
@@ -2106,7 +2106,7 @@ unsafe fn xml_relaxng_check_combine(
         } else {
             xml_rng_perr!(
                 ctxt,
-                (*define).node,
+                XmlGenericNodePtr::from_raw((*define).node),
                 XmlParserErrors::XmlRngpNeedCombine,
                 "Some defines for {} needs the combine attribute\n",
                 name
@@ -2180,7 +2180,7 @@ unsafe fn xml_relaxng_check_combine(
                 let tmpname = CStr::from_ptr(tmpname.as_ptr()).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    (*define).node,
+                    XmlGenericNodePtr::from_raw((*define).node),
                     XmlParserErrors::XmlRngpInterleaveCreateFailed,
                     "Failed to add {} to hash table\n",
                     tmpname
@@ -2189,7 +2189,7 @@ unsafe fn xml_relaxng_check_combine(
         } else {
             xml_rng_perr!(
                 ctxt,
-                (*define).node,
+                XmlGenericNodePtr::from_raw((*define).node),
                 XmlParserErrors::XmlRngpInterleaveCreateFailed,
                 "Failed to create interleaves hash table\n"
             );
@@ -2218,7 +2218,7 @@ extern "C" fn xml_relaxng_check_reference(
             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                (*refe).node,
+                XmlGenericNodePtr::from_raw((*refe).node),
                 XmlParserErrors::XmlErrInternalError,
                 "Internal error: no grammar in CheckReference {}\n",
                 name
@@ -2229,7 +2229,7 @@ extern "C" fn xml_relaxng_check_reference(
             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                (*refe).node,
+                XmlGenericNodePtr::from_raw((*refe).node),
                 XmlParserErrors::XmlErrInternalError,
                 "Internal error: reference has content in CheckReference {}\n",
                 name
@@ -2251,7 +2251,7 @@ extern "C" fn xml_relaxng_check_reference(
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    (*refe).node,
+                    XmlGenericNodePtr::from_raw((*refe).node),
                     XmlParserErrors::XmlRngpRefNoDef,
                     "Reference {} has no matching definition\n",
                     name
@@ -2261,7 +2261,7 @@ extern "C" fn xml_relaxng_check_reference(
             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                (*refe).node,
+                XmlGenericNodePtr::from_raw((*refe).node),
                 XmlParserErrors::XmlRngpRefNoDef,
                 "Reference {} has no matching definition\n",
                 name
@@ -2300,7 +2300,7 @@ unsafe fn xml_relaxng_parse_except_name_class(
     if !is_relaxng(node, "except") {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpExceptMissing,
             "Expecting an except node\n"
         );
@@ -2309,7 +2309,7 @@ unsafe fn xml_relaxng_parse_except_name_class(
     if node.next.is_some() {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpExceptMultiple,
             "exceptNameClass allows only a single except node\n"
         );
@@ -2317,7 +2317,7 @@ unsafe fn xml_relaxng_parse_except_name_class(
     let Some(children) = node.children() else {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpExceptEmpty,
             "except has no content\n"
         );
@@ -2395,7 +2395,7 @@ unsafe fn xml_relaxng_parse_name_class(
                 if let Some(parent) = (*node).parent() {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpElementName,
                         "Element {} name '{}' is not an NCName\n",
                         parent.name().unwrap().into_owned(),
@@ -2404,7 +2404,7 @@ unsafe fn xml_relaxng_parse_name_class(
                 } else {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpElementName,
                         "name '{}' is not an NCName\n",
                         val
@@ -2425,7 +2425,7 @@ unsafe fn xml_relaxng_parse_name_class(
             let val = CStr::from_ptr(val as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpXmlNs,
                 "Attribute with namespace '{}' is not allowed\n",
                 val
@@ -2442,7 +2442,7 @@ unsafe fn xml_relaxng_parse_name_class(
             // there is no problem to insert a format specifier where appropriate.
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpXmlNsName,
                 "Attribute with QName 'xmlns{}' is not allowed\n",
                 val
@@ -2467,7 +2467,7 @@ unsafe fn xml_relaxng_parse_name_class(
         if (*ret).ns.is_null() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpNsNameNoNs,
                 "nsName has no ns attribute\n"
             );
@@ -2479,7 +2479,7 @@ unsafe fn xml_relaxng_parse_name_class(
             let ns = CStr::from_ptr((*ret).ns as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpXmlNs,
                 "Attribute with namespace '{}' is not allowed\n",
                 ns
@@ -2527,7 +2527,7 @@ unsafe fn xml_relaxng_parse_name_class(
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpChoiceEmpty,
                 "Element choice is empty\n"
             );
@@ -2535,7 +2535,7 @@ unsafe fn xml_relaxng_parse_name_class(
     } else {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpChoiceContent,
             "expecting name, anyName, nsName or choice : got {}\n",
             node.name().unwrap().into_owned()
@@ -2615,7 +2615,7 @@ unsafe fn xml_relaxng_parse_data(
     let Some(typ) = node.get_prop("type") else {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpTypeMissing,
             "data has no type\n"
         );
@@ -2626,7 +2626,7 @@ unsafe fn xml_relaxng_parse_data(
     if xml_validate_ncname(ctyp, 0) != 0 {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpTypeValue,
             "data type '{}' is not an NCName\n",
             typ
@@ -2663,7 +2663,7 @@ unsafe fn xml_relaxng_parse_data(
         let library = CStr::from_ptr(library as *const i8).to_string_lossy();
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpUnknownTypeLib,
             "Use of unregistered type library '{}'\n",
             library
@@ -2683,7 +2683,7 @@ unsafe fn xml_relaxng_parse_data(
                 let library = CStr::from_ptr(library as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    node.as_ptr(),
+                    Some(node.into()),
                     XmlParserErrors::XmlRngpTypeNotFound,
                     "Error type '{}' is not exported by type library '{}'\n",
                     name,
@@ -2701,7 +2701,7 @@ unsafe fn xml_relaxng_parse_data(
             let library = CStr::from_ptr(library as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpErrorTypeLib,
                 "Internal error with type library '{}': no 'have'\n",
                 library
@@ -2724,7 +2724,7 @@ unsafe fn xml_relaxng_parse_data(
             let library = CStr::from_ptr(library as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpParamForbidden,
                 "Type library '{}' does not allow type parameters\n",
                 library
@@ -2750,7 +2750,7 @@ unsafe fn xml_relaxng_parse_data(
                 if (*param).name.is_null() {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpParamNameMissing,
                         "param has no name\n"
                     );
@@ -2791,7 +2791,7 @@ unsafe fn xml_relaxng_parse_data(
         if child.is_none() {
             xml_rng_perr!(
                 ctxt,
-                cur_node.as_ptr(),
+                Some(cur_node),
                 XmlParserErrors::XmlRngpExceptNoContent,
                 "except has no content\n"
             );
@@ -2820,7 +2820,7 @@ unsafe fn xml_relaxng_parse_data(
         let name = content.name().unwrap().into_owned();
         xml_rng_perr!(
             ctxt,
-            content.as_ptr(),
+            Some(content),
             XmlParserErrors::XmlRngpDataContent,
             "Element data has unexpected content {}\n",
             name
@@ -2846,25 +2846,31 @@ unsafe fn xml_relaxng_parse_attribute(
     }
     (*ret).typ = XmlRelaxNGType::Attribute;
     (*ret).parent = (*ctxt).def;
-    let mut child = (*node).children().map_or(null_mut(), |c| c.as_ptr());
-    if child.is_null() {
+    let Some(child) = node
+        .children
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap())
+    else {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpAttributeEmpty,
             "xmlRelaxNGParseattribute: attribute has no children\n"
         );
         return ret;
-    }
+    };
     let old_flags: i32 = (*ctxt).flags;
     (*ctxt).flags |= XML_RELAXNG_IN_ATTRIBUTE;
-    cur = xml_relaxng_parse_name_class(ctxt, XmlNodePtr::from_raw(child).unwrap().unwrap(), ret);
-    if !cur.is_null() {
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
-    }
+    cur = xml_relaxng_parse_name_class(ctxt, child, ret);
+    let mut child = if !cur.is_null() {
+        child
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap())
+    } else {
+        Some(child)
+    };
 
-    if !child.is_null() {
-        cur = xml_relaxng_parse_pattern(ctxt, XmlNodePtr::from_raw(child).unwrap().unwrap());
+    if let Some(cur_node) = child {
+        cur = xml_relaxng_parse_pattern(ctxt, cur_node);
         if !cur.is_null() {
             match (*cur).typ {
                 XmlRelaxNGType::Empty
@@ -2891,7 +2897,7 @@ unsafe fn xml_relaxng_parse_attribute(
                 XmlRelaxNGType::Start | XmlRelaxNGType::Param | XmlRelaxNGType::Except => {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpAttributeContent,
                         "attribute has invalid content\n"
                     );
@@ -2899,19 +2905,21 @@ unsafe fn xml_relaxng_parse_attribute(
                 XmlRelaxNGType::Noop => {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpAttributeNoop,
                         "RNG Internal error, noop found in attribute\n"
                     );
                 }
             }
         }
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        child = cur_node
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
-    if !child.is_null() {
+    if child.is_some() {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpAttributeChildren,
             "attribute has multiple children\n"
         );
@@ -2944,7 +2952,7 @@ unsafe fn xml_relaxng_parse_value(
         if xml_validate_ncname(ctyp, 0) != 0 {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpTypeValue,
                 "value typ '{}' is not an NCName\n",
                 typ
@@ -2974,7 +2982,7 @@ unsafe fn xml_relaxng_parse_value(
             let library = CStr::from_ptr(library as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpUnknownTypeLib,
                 "Use of unregistered type library '{}'\n",
                 library
@@ -2994,7 +3002,7 @@ unsafe fn xml_relaxng_parse_value(
                     let library = CStr::from_ptr(library as *const i8).to_string_lossy();
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpTypeNotFound,
                         "Error type '{}' is not exported by type library '{}'\n",
                         name,
@@ -3005,7 +3013,7 @@ unsafe fn xml_relaxng_parse_value(
                 let library = CStr::from_ptr(library as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    node.as_ptr(),
+                    Some(node.into()),
                     XmlParserErrors::XmlRngpErrorTypeLib,
                     "Internal error with type library '{}': no 'have'\n",
                     library
@@ -3013,8 +3021,8 @@ unsafe fn xml_relaxng_parse_value(
             }
         }
     }
-    if (*node)
-        .children()
+    if node
+        .children
         .filter(|children| {
             !matches!(
                 children.element_type(),
@@ -3025,21 +3033,21 @@ unsafe fn xml_relaxng_parse_value(
     {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpTextExpected,
             "Expecting a single text value for <value>content\n"
         );
-    } else if (*node).children().is_none() {
+    } else if node.children.is_none() {
         (*def).value = xml_strdup(c"".as_ptr() as _);
     } else if !def.is_null() {
-        let tmp = (*node).get_content().map(|c| CString::new(c).unwrap());
+        let tmp = node.get_content().map(|c| CString::new(c).unwrap());
         (*def).value = tmp
             .as_ref()
             .map_or(null_mut(), |t| xml_strdup(t.as_ptr() as *const u8));
         if (*def).value.is_null() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpValueNoContent,
                 "Element <value> has no content\n"
             );
@@ -3060,7 +3068,7 @@ unsafe fn xml_relaxng_parse_value(
                 let name = CStr::from_ptr((*def).name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    node.as_ptr(),
+                    Some(node.into()),
                     XmlParserErrors::XmlRngpInvalidValue,
                     "Value '{}' is not acceptable for type '{}'\n",
                     value,
@@ -3114,7 +3122,7 @@ unsafe fn xml_relaxng_parse_interleave(
             let name = CStr::from_ptr(name.as_ptr()).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpInterleaveAdd,
                 "Failed to add {} to hash table\n",
                 name
@@ -3123,13 +3131,13 @@ unsafe fn xml_relaxng_parse_interleave(
     } else {
         xml_rng_perr_memory(ctxt, Some("create interleaves\n"));
     }
-    let mut child = (*node)
-        .children()
+    let mut child = node
+        .children
         .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
     if child.is_none() {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpInterleaveNoContent,
             "Element interleave is empty\n"
         );
@@ -3197,7 +3205,7 @@ extern "C" fn xml_relaxng_parse_import_ref(
                     let name = CStr::from_ptr((*def).name as *const i8).to_string_lossy();
                     xml_rng_perr!(
                         ctxt,
-                        null_mut(),
+                        None,
                         XmlParserErrors::XmlRngpRefCreateFailed,
                         "Error refs definitions '{}'\n",
                         name
@@ -3205,7 +3213,7 @@ extern "C" fn xml_relaxng_parse_import_ref(
                 } else {
                     xml_rng_perr!(
                         ctxt,
-                        null_mut(),
+                        None,
                         XmlParserErrors::XmlRngpRefCreateFailed,
                         "Error refs definitions\n"
                     );
@@ -3239,7 +3247,7 @@ unsafe fn xml_relaxng_parse_import_refs(
     let Some(refs) = (*(*ctxt).grammar).refs else {
         xml_rng_perr!(
             ctxt,
-            null_mut(),
+            None,
             XmlParserErrors::XmlRngpRefCreateFailed,
             "Could not create references hash\n"
         );
@@ -3283,7 +3291,7 @@ unsafe fn xml_relaxng_process_external_ref(
                 let url = (*ctxt).url.as_deref().unwrap();
                 xml_rng_perr!(
                     ctxt,
-                    node.as_ptr(),
+                    Some(node.into()),
                     XmlParserErrors::XmlRngpExternalRefEmtpy,
                     "xmlRelaxNGParse: {} is empty\n",
                     url
@@ -3345,9 +3353,6 @@ unsafe fn xml_relaxng_parse_pattern(
 ) -> XmlRelaxNGDefinePtr {
     let mut def: XmlRelaxNGDefinePtr;
 
-    // if node.is_null() {
-    //     return null_mut();
-    // }
     if is_relaxng(node, "element") {
         def = xml_relaxng_parse_element(ctxt, node);
     } else if is_relaxng(node, "attribute") {
@@ -3358,10 +3363,10 @@ unsafe fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::Empty;
-        if (*node).children().is_some() {
+        if node.children.is_some() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpEmptyNotEmpty,
                 "empty: had a child node\n"
             );
@@ -3372,10 +3377,10 @@ unsafe fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::Text;
-        if (*node).children().is_some() {
+        if node.children.is_some() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpTextHasChild,
                 "text: had a child node\n"
             );
@@ -3386,16 +3391,15 @@ unsafe fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::Zeroormore;
-        if let Some(children) = (*node).children() {
-            (*def).content = xml_relaxng_parse_patterns(
-                ctxt,
-                XmlNodePtr::from_raw(children.as_ptr()).unwrap().unwrap(),
-                1,
-            );
+        if let Some(children) = node
+            .children
+            .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+        {
+            (*def).content = xml_relaxng_parse_patterns(ctxt, children, 1);
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpEmptyConstruct,
                 "Element {} is empty\n",
                 node.name().unwrap().into_owned()
@@ -3407,16 +3411,15 @@ unsafe fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::Oneormore;
-        if let Some(children) = (*node).children() {
-            (*def).content = xml_relaxng_parse_patterns(
-                ctxt,
-                XmlNodePtr::from_raw(children.as_ptr()).unwrap().unwrap(),
-                1,
-            );
+        if let Some(children) = node
+            .children
+            .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+        {
+            (*def).content = xml_relaxng_parse_patterns(ctxt, children, 1);
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpEmptyConstruct,
                 "Element {} is empty\n",
                 node.name().unwrap().into_owned()
@@ -3428,16 +3431,15 @@ unsafe fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::Optional;
-        if let Some(children) = (*node).children() {
-            (*def).content = xml_relaxng_parse_patterns(
-                ctxt,
-                XmlNodePtr::from_raw(children.as_ptr()).unwrap().unwrap(),
-                1,
-            );
+        if let Some(children) = node
+            .children
+            .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+        {
+            (*def).content = xml_relaxng_parse_patterns(ctxt, children, 1);
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpEmptyConstruct,
                 "Element {} is empty\n",
                 node.name().unwrap().into_owned()
@@ -3449,16 +3451,15 @@ unsafe fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::Choice;
-        if let Some(children) = (*node).children() {
-            (*def).content = xml_relaxng_parse_patterns(
-                ctxt,
-                XmlNodePtr::from_raw(children.as_ptr()).unwrap().unwrap(),
-                0,
-            );
+        if let Some(children) = node
+            .children
+            .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+        {
+            (*def).content = xml_relaxng_parse_patterns(ctxt, children, 0);
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpEmptyConstruct,
                 "Element {} is empty\n",
                 node.name().unwrap().into_owned()
@@ -3470,16 +3471,15 @@ unsafe fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::Group;
-        if let Some(children) = (*node).children() {
-            (*def).content = xml_relaxng_parse_patterns(
-                ctxt,
-                XmlNodePtr::from_raw(children.as_ptr()).unwrap().unwrap(),
-                0,
-            );
+        if let Some(children) = node
+            .children
+            .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+        {
+            (*def).content = xml_relaxng_parse_patterns(ctxt, children, 0);
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpEmptyConstruct,
                 "Element {} is empty\n",
                 node.name().unwrap().into_owned()
@@ -3500,7 +3500,7 @@ unsafe fn xml_relaxng_parse_pattern(
         if (*def).name.is_null() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpRefNoName,
                 "ref has no name\n"
             );
@@ -3508,16 +3508,16 @@ unsafe fn xml_relaxng_parse_pattern(
             let name = CStr::from_ptr((*def).name as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpRefNameInvalid,
                 "ref name '{}' is not an NCName\n",
                 name
             );
         }
-        if (*node).children().is_some() {
+        if node.children().is_some() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpRefNotEmpty,
                 "ref is not empty\n"
             );
@@ -3549,7 +3549,7 @@ unsafe fn xml_relaxng_parse_pattern(
                     if !(*def).name.is_null() {
                         xml_rng_perr!(
                             ctxt,
-                            node.as_ptr(),
+                            Some(node.into()),
                             XmlParserErrors::XmlRngpRefCreateFailed,
                             "Error refs definitions '{}'\n",
                             name
@@ -3557,7 +3557,7 @@ unsafe fn xml_relaxng_parse_pattern(
                     } else {
                         xml_rng_perr!(
                             ctxt,
-                            node.as_ptr(),
+                            Some(node.into()),
                             XmlParserErrors::XmlRngpRefCreateFailed,
                             "Error refs definitions\n"
                         );
@@ -3571,7 +3571,7 @@ unsafe fn xml_relaxng_parse_pattern(
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpRefCreateFailed,
                 "Could not create references hash\n"
             );
@@ -3587,16 +3587,15 @@ unsafe fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::List;
-        if let Some(children) = (*node).children() {
-            (*def).content = xml_relaxng_parse_patterns(
-                ctxt,
-                XmlNodePtr::from_raw(children.as_ptr()).unwrap().unwrap(),
-                0,
-            );
+        if let Some(children) = node
+            .children
+            .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+        {
+            (*def).content = xml_relaxng_parse_patterns(ctxt, children, 0);
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpEmptyConstruct,
                 "Element {} is empty\n",
                 node.name().unwrap().into_owned()
@@ -3612,10 +3611,10 @@ unsafe fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::NotAllowed;
-        if (*node).children().is_some() {
+        if node.children().is_some() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpNotAllowedNotEmpty,
                 "xmlRelaxNGParse: notAllowed element is not empty\n"
             );
@@ -3642,7 +3641,7 @@ unsafe fn xml_relaxng_parse_pattern(
         if (*ctxt).parentgrammar.is_null() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpParentRefNoParent,
                 "Use of parentRef without a parent grammar\n"
             );
@@ -3653,7 +3652,7 @@ unsafe fn xml_relaxng_parse_pattern(
             return null_mut();
         }
         (*def).typ = XmlRelaxNGType::Parentref;
-        let tmp = (*node)
+        let tmp = node
             .get_prop("name")
             .map(|n| CString::new(normalize_external_space(&n)).unwrap());
         (*def).name = tmp
@@ -3662,7 +3661,7 @@ unsafe fn xml_relaxng_parse_pattern(
         if (*def).name.is_null() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpParentRefNoName,
                 "parentRef has no name\n"
             );
@@ -3670,16 +3669,16 @@ unsafe fn xml_relaxng_parse_pattern(
             let name = CStr::from_ptr((*def).name as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpParentRefNameInvalid,
                 "parentRef name '{}' is not an NCName\n",
                 name
             );
         }
-        if (*node).children().is_some() {
+        if node.children.is_some() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpParentRefNotEmpty,
                 "parentRef is not empty\n"
             );
@@ -3710,7 +3709,7 @@ unsafe fn xml_relaxng_parse_pattern(
                     let name = CStr::from_ptr((*def).name as *const i8).to_string_lossy();
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpParentRefCreateFailed,
                         "Internal error parentRef definitions '{}'\n",
                         name
@@ -3724,17 +3723,17 @@ unsafe fn xml_relaxng_parse_pattern(
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpParentRefCreateFailed,
                 "Could not create references hash\n"
             );
             def = null_mut();
         }
     } else if is_relaxng(node, "mixed") {
-        if node.children().is_none() {
+        if node.children.is_none() {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpEmptyConstruct,
                 "Mixed is empty\n"
             );
@@ -3765,7 +3764,7 @@ unsafe fn xml_relaxng_parse_pattern(
     } else {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpUnknownConstruct,
             "Unexpected node {} is not a pattern\n",
             node.name().unwrap().into_owned()
@@ -3792,34 +3791,41 @@ unsafe fn xml_relaxng_parse_element(
     }
     (*ret).typ = XmlRelaxNGType::Element;
     (*ret).parent = (*ctxt).def;
-    let Some(mut child) = node.children().map(|c| c.as_ptr()) else {
+    let Some(mut child) = node
+        .children()
+        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap())
+    else {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpElementEmpty,
             "xmlRelaxNGParseElement: element has no children\n"
         );
         return ret;
     };
-    cur = xml_relaxng_parse_name_class(ctxt, XmlNodePtr::from_raw(child).unwrap().unwrap(), ret);
+    cur = xml_relaxng_parse_name_class(ctxt, child, ret);
     if !cur.is_null() {
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        let Some(next) = child
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap())
+        else {
+            xml_rng_perr!(
+                ctxt,
+                Some(node.into()),
+                XmlParserErrors::XmlRngpElementNoContent,
+                "xmlRelaxNGParseElement: element has no content\n"
+            );
+            return ret;
+        };
+        child = next;
     }
 
-    if child.is_null() {
-        xml_rng_perr!(
-            ctxt,
-            node.as_ptr(),
-            XmlParserErrors::XmlRngpElementNoContent,
-            "xmlRelaxNGParseElement: element has no content\n"
-        );
-        return ret;
-    }
     let olddefine: *const XmlChar = (*ctxt).define;
     (*ctxt).define = null_mut();
     last = null_mut();
-    while !child.is_null() {
-        cur = xml_relaxng_parse_pattern(ctxt, XmlNodePtr::from_raw(child).unwrap().unwrap());
+    let mut child = Some(child);
+    while let Some(cur_node) = child {
+        cur = xml_relaxng_parse_pattern(ctxt, cur_node);
         if !cur.is_null() {
             (*cur).parent = ret;
             match (*cur).typ {
@@ -3864,7 +3870,7 @@ unsafe fn xml_relaxng_parse_element(
                 XmlRelaxNGType::Start => {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpElementContent,
                         "RNG Internal error, start found in element\n"
                     );
@@ -3872,7 +3878,7 @@ unsafe fn xml_relaxng_parse_element(
                 XmlRelaxNGType::Param => {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpElementContent,
                         "RNG Internal error, param found in element\n"
                     );
@@ -3880,7 +3886,7 @@ unsafe fn xml_relaxng_parse_element(
                 XmlRelaxNGType::Except => {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpElementContent,
                         "RNG Internal error, except found in element\n"
                     );
@@ -3888,14 +3894,16 @@ unsafe fn xml_relaxng_parse_element(
                 XmlRelaxNGType::Noop => {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpElementContent,
                         "RNG Internal error, noop found in element\n"
                     );
                 }
             }
         }
-        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+        child = cur_node
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
     }
     (*ctxt).define = olddefine;
     ret
@@ -3966,25 +3974,16 @@ unsafe fn xml_relaxng_parse_start(ctxt: XmlRelaxNGParserCtxtPtr, nodes: XmlNodeP
     let def: XmlRelaxNGDefinePtr;
     let mut last: XmlRelaxNGDefinePtr;
 
-    // if nodes.is_null() {
-    //     xml_rng_perr!(
-    //         ctxt,
-    //         nodes,
-    //         XmlParserErrors::XmlRngpStartEmpty,
-    //         "start has no children\n"
-    //     );
-    //     return -1;
-    // }
     if is_relaxng(nodes, "empty") {
         def = xml_relaxng_new_define(ctxt, Some(nodes));
         if def.is_null() {
             return -1;
         }
         (*def).typ = XmlRelaxNGType::Empty;
-        if (*nodes).children().is_some() {
+        if nodes.children.is_some() {
             xml_rng_perr!(
                 ctxt,
-                nodes.as_ptr(),
+                Some(nodes.into()),
                 XmlParserErrors::XmlRngpEmptyContent,
                 "element empty is not empty\n"
             );
@@ -3995,10 +3994,10 @@ unsafe fn xml_relaxng_parse_start(ctxt: XmlRelaxNGParserCtxtPtr, nodes: XmlNodeP
             return -1;
         }
         (*def).typ = XmlRelaxNGType::NotAllowed;
-        if (*nodes).children().is_some() {
+        if nodes.children.is_some() {
             xml_rng_perr!(
                 ctxt,
-                nodes.as_ptr(),
+                Some(nodes.into()),
                 XmlParserErrors::XmlRngpNotAllowedNotEmpty,
                 "element notAllowed is not empty\n"
             );
@@ -4015,8 +4014,10 @@ unsafe fn xml_relaxng_parse_start(ctxt: XmlRelaxNGParserCtxtPtr, nodes: XmlNodeP
     } else {
         (*(*ctxt).grammar).start = def;
     }
-    let nodes = nodes.next.map_or(null_mut(), |n| n.as_ptr());
-    if !nodes.is_null() {
+    let nodes = nodes
+        .next
+        .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+    if nodes.is_some() {
         xml_rng_perr!(
             ctxt,
             nodes,
@@ -4043,7 +4044,7 @@ unsafe fn xml_relaxng_parse_define(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNodeP
         if xml_validate_ncname(cname, 0) != 0 {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpInvalidDefineName,
                 "define name '{}' is not an NCName\n",
                 name
@@ -4056,19 +4057,18 @@ unsafe fn xml_relaxng_parse_define(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNodeP
         }
         (*def).typ = XmlRelaxNGType::Def;
         (*def).name = cname;
-        if let Some(children) = node.children() {
+        if let Some(children) = node
+            .children
+            .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+        {
             olddefine = (*ctxt).define;
             (*ctxt).define = cname;
-            (*def).content = xml_relaxng_parse_patterns(
-                ctxt,
-                XmlNodePtr::from_raw(children.as_ptr()).unwrap().unwrap(),
-                0,
-            );
+            (*def).content = xml_relaxng_parse_patterns(ctxt, children, 0);
             (*ctxt).define = olddefine;
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpDefineEmpty,
                 "define has no children\n"
             );
@@ -4088,7 +4088,7 @@ unsafe fn xml_relaxng_parse_define(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNodeP
                 if prev.is_null() {
                     xml_rng_perr!(
                         ctxt,
-                        node.as_ptr(),
+                        Some(node.into()),
                         XmlParserErrors::XmlRngpDefineCreateFailed,
                         "Internal error on define aggregation of {}\n",
                         name
@@ -4104,7 +4104,7 @@ unsafe fn xml_relaxng_parse_define(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNodeP
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpDefineCreateFailed,
                 "Could not create definition hash\n"
             );
@@ -4113,7 +4113,7 @@ unsafe fn xml_relaxng_parse_define(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNodeP
     } else {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpDefineNameMissing,
             "define has no name\n"
         );
@@ -4133,7 +4133,7 @@ unsafe fn xml_relaxng_parse_include(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNode
     if incl.is_null() {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpIncludeEmpty,
             "Include node has no data\n"
         );
@@ -4142,7 +4142,7 @@ unsafe fn xml_relaxng_parse_include(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNode
     let Some(root) = (*incl).doc.and_then(|doc| doc.get_root_element()) else {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpEmpty,
             "Include document is empty\n"
         );
@@ -4151,7 +4151,7 @@ unsafe fn xml_relaxng_parse_include(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNode
     if !xml_str_equal(root.name, c"grammar".as_ptr() as _) {
         xml_rng_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node.into()),
             XmlParserErrors::XmlRngpGrammarMissing,
             "Include document root is not a grammar\n"
         );
@@ -4159,20 +4159,20 @@ unsafe fn xml_relaxng_parse_include(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNode
     }
 
     // Merge the definition from both the include and the internal list
-    if let Some(children) = root.children() {
-        tmp = xml_relaxng_parse_grammar_content(
-            ctxt,
-            XmlNodePtr::from_raw(children.as_ptr()).unwrap(),
-        );
+    if let Some(children) = root
+        .children
+        .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+    {
+        tmp = xml_relaxng_parse_grammar_content(ctxt, Some(children));
         if tmp != 0 {
             ret = -1;
         }
     }
-    if let Some(children) = (*node).children() {
-        tmp = xml_relaxng_parse_grammar_content(
-            ctxt,
-            XmlNodePtr::from_raw(children.as_ptr()).unwrap(),
-        );
+    if let Some(children) = node
+        .children
+        .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+    {
+        tmp = xml_relaxng_parse_grammar_content(ctxt, Some(children));
         if tmp != 0 {
             ret = -1;
         }
@@ -4194,7 +4194,7 @@ unsafe fn xml_relaxng_parse_grammar_content(
     if nodes.is_none() {
         xml_rng_perr!(
             ctxt,
-            null_mut(),
+            None,
             XmlParserErrors::XmlRngpGrammarEmpty,
             "grammar has no children\n"
         );
@@ -4202,18 +4202,18 @@ unsafe fn xml_relaxng_parse_grammar_content(
     }
     while let Some(node) = nodes {
         if is_relaxng(node, "start") {
-            if let Some(children) = node.children() {
-                tmp = xml_relaxng_parse_start(
-                    ctxt,
-                    XmlNodePtr::from_raw(children.as_ptr()).unwrap().unwrap(),
-                );
+            if let Some(children) = node
+                .children
+                .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+            {
+                tmp = xml_relaxng_parse_start(ctxt, children);
                 if tmp != 0 {
                     ret = -1;
                 }
             } else {
                 xml_rng_perr!(
                     ctxt,
-                    node.as_ptr(),
+                    Some(node.into()),
                     XmlParserErrors::XmlRngpStartEmpty,
                     "start has no children\n"
                 );
@@ -4231,7 +4231,7 @@ unsafe fn xml_relaxng_parse_grammar_content(
         } else {
             xml_rng_perr!(
                 ctxt,
-                node.as_ptr(),
+                Some(node.into()),
                 XmlParserErrors::XmlRngpGrammarContent,
                 "grammar has unexpected child {}\n",
                 node.name().unwrap().into_owned()
@@ -4266,7 +4266,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
             ) {
             xml_rng_perr!(
                 ctxt,
-                (*cur).node,
+                XmlGenericNodePtr::from_raw((*cur).node),
                 XmlParserErrors::XmlRngpStartMissing,
                 "Internal error: start element not found\n"
             );
@@ -4282,7 +4282,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
                 } else if choice_or_interleave == 0 {
                     xml_rng_perr!(
                         ctxt,
-                        (*cur).node,
+                        XmlGenericNodePtr::from_raw((*cur).node),
                         XmlParserErrors::XmlRngpStartChoiceAndInterleave,
                         "<start> use both 'choice' and 'interleave'\n"
                     );
@@ -4293,7 +4293,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
                 } else if choice_or_interleave == 1 {
                     xml_rng_perr!(
                         ctxt,
-                        (*cur).node,
+                        XmlGenericNodePtr::from_raw((*cur).node),
                         XmlParserErrors::XmlRngpStartChoiceAndInterleave,
                         "<start> use both 'choice' and 'interleave'\n"
                     );
@@ -4301,7 +4301,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
             } else {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpUnknownCombine,
                     "<start> uses unknown combine value '{}''\n",
                     combine
@@ -4312,7 +4312,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
         } else {
             xml_rng_perr!(
                 ctxt,
-                (*cur).node,
+                XmlGenericNodePtr::from_raw((*cur).node),
                 XmlParserErrors::XmlRngpNeedCombine,
                 "Some <start> element miss the combine attribute\n"
             );
@@ -4358,7 +4358,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
                 let tmpname = CStr::from_ptr(tmpname.as_ptr()).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpInterleaveCreateFailed,
                     "Failed to add {} to hash table\n",
                     tmpname
@@ -4367,7 +4367,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
         } else {
             xml_rng_perr!(
                 ctxt,
-                (*cur).node,
+                XmlGenericNodePtr::from_raw((*cur).node),
                 XmlParserErrors::XmlRngpInterleaveCreateFailed,
                 "Failed to create interleaves hash table\n"
             );
@@ -4411,14 +4411,14 @@ unsafe fn xml_relaxng_parse_grammar(
     if (*ctxt).grammar.is_null() {
         xml_rng_perr!(
             ctxt,
-            nodes.map_or(null_mut(), |nodes| nodes.as_ptr()),
+            nodes.map(|nodes| nodes.into()),
             XmlParserErrors::XmlRngpGrammarContent,
             "Failed to parse <grammar> content\n"
         );
     } else if (*(*ctxt).grammar).start.is_null() {
         xml_rng_perr!(
             ctxt,
-            nodes.map_or(null_mut(), |nodes| nodes.as_ptr()),
+            nodes.map(|nodes| nodes.into()),
             XmlParserErrors::XmlRngpGrammarNoStart,
             "Element <grammar> has no <start>\n"
         );
@@ -4442,8 +4442,6 @@ unsafe fn xml_relaxng_parse_grammar(
             )
         });
     }
-
-    /* @@@@ */
 
     (*ctxt).grammar = old;
     ret
@@ -4470,7 +4468,7 @@ unsafe fn xml_relaxng_check_cycles(
                 let name = CStr::from_ptr((*cur).name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpRefCycle,
                     "Detected a cycle in {} references\n",
                     name
@@ -4839,7 +4837,7 @@ unsafe fn xml_relaxng_check_group_attrs(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlR
             if ret == 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*def).node,
+                    XmlGenericNodePtr::from_raw((*def).node),
                     XmlParserErrors::XmlRngpGroupAttrConflict,
                     "Attributes conflicts in group\n"
                 );
@@ -5131,7 +5129,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatDataExceptRef,
                     "Found forbidden pattern data/except//ref\n"
                 );
@@ -5140,14 +5138,14 @@ unsafe fn xml_relaxng_check_rules(
                 if (*cur).typ == XmlRelaxNGType::Parentref {
                     xml_rng_perr!(
                         ctxt,
-                        (*cur).node,
+                        XmlGenericNodePtr::from_raw((*cur).node),
                         XmlParserErrors::XmlRngpRefNoDef,
                         "Internal found no define for parent refs\n"
                     );
                 } else {
                     xml_rng_perr!(
                         ctxt,
-                        (*cur).node,
+                        XmlGenericNodePtr::from_raw((*cur).node),
                         XmlParserErrors::XmlRngpRefNoDef,
                         "Internal found no define for ref {}\n",
                         if !(*cur).name.is_null() {
@@ -5179,7 +5177,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatDataExceptElem,
                     "Found forbidden pattern data/except//element(ref)\n"
                 );
@@ -5187,7 +5185,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_LIST != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatListElem,
                     "Found forbidden pattern list//element(ref)\n"
                 );
@@ -5195,7 +5193,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_ATTRIBUTE != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatAttrElem,
                     "Found forbidden pattern attribute//element(ref)\n"
                 );
@@ -5203,7 +5201,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_ATTRIBUTE != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatAttrElem,
                     "Found forbidden pattern attribute//element(ref)\n"
                 );
@@ -5215,7 +5213,7 @@ unsafe fn xml_relaxng_check_rules(
                 let name = CStr::from_ptr((*cur).name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpElemContentEmpty,
                     "Element {} attributes have a content type error\n",
                     name
@@ -5226,7 +5224,7 @@ unsafe fn xml_relaxng_check_rules(
                 let name = CStr::from_ptr((*cur).name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpElemContentError,
                     "Element {} has a content type error\n",
                     name
@@ -5238,7 +5236,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_ATTRIBUTE != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatAttrAttr,
                     "Found forbidden pattern attribute//attribute\n"
                 );
@@ -5246,7 +5244,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_LIST != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatListAttr,
                     "Found forbidden pattern list//attribute\n"
                 );
@@ -5254,7 +5252,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_OOMGROUP != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatOnemoreGroupAttr,
                     "Found forbidden pattern oneOrMore//group//attribute\n"
                 );
@@ -5262,7 +5260,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_OOMINTERLEAVE != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatOnemoreInterleaveAttr,
                     "Found forbidden pattern oneOrMore//interleave//attribute\n"
                 );
@@ -5270,7 +5268,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatDataExceptAttr,
                     "Found forbidden pattern data/except//attribute\n"
                 );
@@ -5278,7 +5276,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatStartAttr,
                     "Found forbidden pattern start//attribute\n"
                 );
@@ -5292,14 +5290,14 @@ unsafe fn xml_relaxng_check_rules(
                 if (*cur).ns.is_null() {
                     xml_rng_perr!(
                         ctxt,
-                        (*cur).node,
+                        XmlGenericNodePtr::from_raw((*cur).node),
                         XmlParserErrors::XmlRngpAnynameAttrAncestor,
                         "Found anyName attribute without oneOrMore ancestor\n"
                     );
                 } else {
                     xml_rng_perr!(
                         ctxt,
-                        (*cur).node,
+                        XmlGenericNodePtr::from_raw((*cur).node),
                         XmlParserErrors::XmlRngpNsNameAttrAncestor,
                         "Found nsName attribute without oneOrMore ancestor\n"
                     );
@@ -5315,7 +5313,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatDataExceptOnemore,
                     "Found forbidden pattern data/except//oneOrMore\n"
                 );
@@ -5323,7 +5321,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatStartOnemore,
                     "Found forbidden pattern start//oneOrMore\n"
                 );
@@ -5335,7 +5333,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_LIST != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatListList,
                     "Found forbidden pattern list//list\n"
                 );
@@ -5343,7 +5341,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatDataExceptList,
                     "Found forbidden pattern data/except//list\n"
                 );
@@ -5351,7 +5349,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatStartList,
                     "Found forbidden pattern start//list\n"
                 );
@@ -5362,7 +5360,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatDataExceptGroup,
                     "Found forbidden pattern data/except//group\n"
                 );
@@ -5370,7 +5368,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatStartGroup,
                     "Found forbidden pattern start//group\n"
                 );
@@ -5387,7 +5385,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_LIST != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatListInterleave,
                     "Found forbidden pattern list//interleave\n"
                 );
@@ -5395,7 +5393,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatDataExceptInterleave,
                     "Found forbidden pattern data/except//interleave\n"
                 );
@@ -5403,7 +5401,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatDataExceptInterleave,
                     "Found forbidden pattern start//interleave\n"
                 );
@@ -5425,7 +5423,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatStartData,
                     "Found forbidden pattern start//data\n"
                 );
@@ -5436,7 +5434,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatStartValue,
                     "Found forbidden pattern start//value\n"
                 );
@@ -5447,7 +5445,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_LIST != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatListText,
                     "Found forbidden pattern list//text\n"
                 );
@@ -5455,7 +5453,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatDataExceptText,
                     "Found forbidden pattern data/except//text\n"
                 );
@@ -5463,7 +5461,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatStartText,
                     "Found forbidden pattern start//text\n"
                 );
@@ -5473,7 +5471,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatDataExceptEmpty,
                     "Found forbidden pattern data/except//empty\n"
                 );
@@ -5481,7 +5479,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    (*cur).node,
+                    XmlGenericNodePtr::from_raw((*cur).node),
                     XmlParserErrors::XmlRngpPatStartEmpty,
                     "Found forbidden pattern start//empty\n"
                 );
@@ -5995,7 +5993,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
         let Some(doc) = xml_read_file(url, None, 0) else {
             xml_rng_perr!(
                 ctxt,
-                null_mut(),
+                None,
                 XmlParserErrors::XmlRngpParseError,
                 "xmlRelaxNGParse: could not load {}\n",
                 url
@@ -6008,7 +6006,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
         let Some(mut doc) = xml_read_memory(mem, None, None, 0) else {
             xml_rng_perr!(
                 ctxt,
-                null_mut(),
+                None,
                 XmlParserErrors::XmlRngpParseError,
                 "xmlRelaxNGParse: could not parse schemas\n"
             );
@@ -6022,7 +6020,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
     } else {
         xml_rng_perr!(
             ctxt,
-            null_mut(),
+            None,
             XmlParserErrors::XmlRngpEmpty,
             "xmlRelaxNGParse: nothing to parse\n"
         );
@@ -6042,7 +6040,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
     let Some(root) = doc.get_root_element() else {
         xml_rng_perr!(
             ctxt,
-            doc.as_ptr(),
+            Some(doc.into()),
             XmlParserErrors::XmlRngpEmpty,
             "xmlRelaxNGParse: {} is empty\n",
             (*ctxt).url.as_deref().unwrap_or("schemas")
@@ -6655,7 +6653,7 @@ unsafe fn xml_relaxng_validate_value(
                             XmlGenericNodePtr::from_raw((*define).node),
                             (*define).attrs as _,
                             value,
-                            XmlGenericNodePtr::from_raw((*(*ctxt).state).node),
+                            (*(*ctxt).state).node,
                         );
                     } else {
                         ret = -1;
@@ -7257,7 +7255,11 @@ unsafe fn xml_relaxng_validate_element_end(ctxt: XmlRelaxNGValidCtxtPtr, dolog: 
                 VALID_ERR3!(
                     ctxt,
                     XmlRelaxNGValidErr::XmlRelaxngErrExtracontent,
-                    (*(*state).node).name,
+                    (*state)
+                        .node
+                        .unwrap()
+                        .name()
+                        .map_or(null_mut(), |name| name.as_ptr()),
                     seq.name
                 );
             }
@@ -7271,7 +7273,11 @@ unsafe fn xml_relaxng_validate_element_end(ctxt: XmlRelaxNGValidCtxtPtr, dolog: 
                     ctxt,
                     XmlRelaxNGValidErr::XmlRelaxngErrInvalidattr,
                     attr.name,
-                    (*(*state).node).name
+                    (*state)
+                        .node
+                        .unwrap()
+                        .name()
+                        .map_or(null_mut(), |name| name.as_ptr())
                 );
             }
             return -1 - i as i32;
@@ -7947,7 +7953,7 @@ unsafe fn xml_relaxng_validate_state(
             if (*ctxt).flags & FLAGS_MIXED_CONTENT != 0 {
                 (*ctxt).flags -= FLAGS_MIXED_CONTENT;
             }
-            state = xml_relaxng_new_valid_state(ctxt, node.as_ptr());
+            state = xml_relaxng_new_valid_state(ctxt, Some(node.into()));
             if state.is_null() {
                 ret = -1;
                 if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
@@ -7969,7 +7975,7 @@ unsafe fn xml_relaxng_validate_state(
                 let tmpstates: XmlRelaxNGStatesPtr = (*ctxt).states;
 
                 let nstate: XmlRelaxNGValidStatePtr =
-                    xml_relaxng_new_valid_state(ctxt, node.as_ptr());
+                    xml_relaxng_new_valid_state(ctxt, Some(node.into()));
                 (*ctxt).state = nstate;
                 (*ctxt).states = null_mut();
 
@@ -8698,7 +8704,7 @@ unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDo
         VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrNogrammar);
         return -1;
     }
-    state = xml_relaxng_new_valid_state(ctxt, null_mut());
+    state = xml_relaxng_new_valid_state(ctxt, None);
     (*ctxt).state = state;
     ret = xml_relaxng_validate_definition(ctxt, (*grammar).start);
     if !(*ctxt).state.is_null() && (*state).seq.is_some() {
@@ -8868,7 +8874,7 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
         eprintln!("callback on {token} missing context");
         return;
     }
-    let node: *mut XmlNode = (*ctxt).pnode;
+    let node = (*ctxt).pnode.unwrap();
     (*ctxt).pstate = 1;
     if define.is_null() {
         if token.starts_with('#') {
@@ -8896,7 +8902,7 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
         (*ctxt).pstate = -1;
         return;
     }
-    if !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
+    if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
         VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrNotelem);
         if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
             xml_relaxng_dump_valid_error(ctxt);
@@ -8922,7 +8928,7 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
     (*ctxt).elem_push(exec);
 
     // Validate the attributes part of the content.
-    let state = xml_relaxng_new_valid_state(ctxt, node);
+    let state = xml_relaxng_new_valid_state(ctxt, Some(node.into()));
     if state.is_null() {
         (*ctxt).pstate = -1;
         return;
@@ -8933,11 +8939,7 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
         ret = xml_relaxng_validate_attribute_list(ctxt, (*define).attrs);
         if ret != 0 {
             (*ctxt).pstate = -1;
-            VALID_ERR2!(
-                ctxt,
-                XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid,
-                (*node).name
-            );
+            VALID_ERR2!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid, node.name);
         }
     }
     if !(*ctxt).state.is_null() {
@@ -9033,8 +9035,11 @@ pub unsafe fn xml_relaxng_validate_full_element(
     if ctxt.is_null() || (*ctxt).pdef.is_null() {
         return -1;
     }
-    let state: XmlRelaxNGValidStatePtr =
-        xml_relaxng_new_valid_state(ctxt, elem.parent().map_or(null_mut(), |p| p.as_ptr()));
+    let state: XmlRelaxNGValidStatePtr = xml_relaxng_new_valid_state(
+        ctxt,
+        elem.parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
+    );
     if state.is_null() {
         return -1;
     }

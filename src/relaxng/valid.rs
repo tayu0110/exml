@@ -18,7 +18,7 @@ use crate::{
         },
     },
     relaxng::{VALID_ERR, VALID_ERR2},
-    tree::{NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode},
+    tree::{XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr},
 };
 
 use super::{xml_rng_verr_memory, XmlRelaxNGDefinePtr};
@@ -42,18 +42,18 @@ pub type XmlRelaxNGValidStatePtr = *mut XmlRelaxNGValidState;
 #[doc(alias = "xmlRelaxNGValidState")]
 #[repr(C)]
 pub struct XmlRelaxNGValidState {
-    pub(crate) node: *mut XmlNode,             // the current node
-    pub(crate) seq: Option<XmlGenericNodePtr>, // the sequence of children left to validate
-    pub(crate) nb_attr_left: i32,              // the number of attributes left to validate
-    pub(crate) value: *mut u8,                 // the value when operating on string
-    pub(crate) endvalue: *mut u8,              // the end value when operating on string
-    pub(crate) attrs: Vec<Option<XmlAttrPtr>>, // the array of attributes
+    pub(crate) node: Option<XmlGenericNodePtr>, // the current node
+    pub(crate) seq: Option<XmlGenericNodePtr>,  // the sequence of children left to validate
+    pub(crate) nb_attr_left: i32,               // the number of attributes left to validate
+    pub(crate) value: *mut u8,                  // the value when operating on string
+    pub(crate) endvalue: *mut u8,               // the end value when operating on string
+    pub(crate) attrs: Vec<Option<XmlAttrPtr>>,  // the array of attributes
 }
 
 impl Default for XmlRelaxNGValidState {
     fn default() -> Self {
         Self {
-            node: null_mut(),
+            node: None,
             seq: None,
             nb_attr_left: 0,
             value: null_mut(),
@@ -99,7 +99,7 @@ pub struct XmlRelaxNGValidCtxt {
     pub(crate) elem: XmlRegExecCtxtPtr, // the current element regexp
     pub(crate) elem_tab: Vec<XmlRegExecCtxtPtr>, // the stack of regexp runtime
     pub(crate) pstate: i32,             // progressive state
-    pub(crate) pnode: *mut XmlNode,     // the current node
+    pub(crate) pnode: Option<XmlNodePtr>, // the current node
     pub(crate) pdef: XmlRelaxNGDefinePtr, // the non-streamable definition
     pub(crate) perr: i32,               // signal error in content model outside the regexp
 }
@@ -132,12 +132,8 @@ impl XmlRelaxNGValidCtxt {
     /// returns 1 if no validation problem was found or 0 if validating the
     /// element requires a full node, and -1 in case of error.
     #[doc(alias = "xmlRelaxNGValidatePushElement")]
-    pub unsafe fn push_element(&mut self, _doc: Option<XmlDocPtr>, elem: *mut XmlNode) -> i32 {
+    pub unsafe fn push_element(&mut self, _doc: Option<XmlDocPtr>, elem: XmlNodePtr) -> i32 {
         let mut ret: i32;
-
-        if elem.is_null() {
-            return -1;
-        }
 
         if self.elem.is_null() {
             let schema: XmlRelaxNGPtr = self.schema;
@@ -165,20 +161,15 @@ impl XmlRelaxNGValidCtxt {
             }
             self.elem_push(exec);
         }
-        self.pnode = elem;
+        self.pnode = Some(elem);
         self.pstate = 0;
-        if let Some(ns) = (*elem).ns {
-            ret =
-                xml_reg_exec_push_string2(self.elem, (*elem).name, ns.href, self as *mut Self as _);
+        if let Some(ns) = elem.ns {
+            ret = xml_reg_exec_push_string2(self.elem, elem.name, ns.href, self as *mut Self as _);
         } else {
-            ret = xml_reg_exec_push_string(self.elem, (*elem).name, self as *mut Self as _);
+            ret = xml_reg_exec_push_string(self.elem, elem.name, self as *mut Self as _);
         }
         if ret < 0 {
-            VALID_ERR2!(
-                self,
-                XmlRelaxNGValidErr::XmlRelaxngErrElemwrong,
-                (*elem).name
-            );
+            VALID_ERR2!(self, XmlRelaxNGValidErr::XmlRelaxngErrElemwrong, elem.name);
         } else if self.pstate == 0 {
             ret = 0;
         } else if self.pstate < 0 {
@@ -193,10 +184,10 @@ impl XmlRelaxNGValidCtxt {
     ///
     /// returns 1 if no validation problem was found or 0 otherwise
     #[doc(alias = "xmlRelaxNGValidatePopElement")]
-    pub unsafe fn pop_element(&mut self, _doc: Option<XmlDocPtr>, elem: *mut XmlNode) -> i32 {
+    pub unsafe fn pop_element(&mut self, _doc: Option<XmlDocPtr>, _elem: XmlNodePtr) -> i32 {
         let mut ret: i32;
 
-        if self.elem.is_null() || elem.is_null() {
+        if self.elem.is_null() {
             return -1;
         }
         // verify that we reached a terminal state of the content model.
@@ -238,22 +229,15 @@ impl Default for XmlRelaxNGValidCtxt {
             depth: 0,
             idref: 0,
             err_no: 0,
-            // err: null_mut(),
-            // err_nr: 0,
-            // err_max: 0,
             err_tab: vec![],
             state: null_mut(),
             states: null_mut(),
             free_state: null_mut(),
-            // free_states_nr: 0,
-            // free_states_max: 0,
             free_states: vec![],
             elem: null_mut(),
-            // elem_nr: 0,
-            // elem_max: 0,
             elem_tab: vec![],
             pstate: 0,
-            pnode: null_mut(),
+            pnode: None,
             pdef: null_mut(),
             perr: 0,
         }
@@ -366,34 +350,37 @@ pub(crate) unsafe fn xml_relaxng_free_states(
 #[doc(alias = "xmlRelaxNGNewValidState")]
 pub(crate) unsafe fn xml_relaxng_new_valid_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
 ) -> XmlRelaxNGValidStatePtr {
     let ret: XmlRelaxNGValidStatePtr;
     let mut attrs: [Option<XmlAttrPtr>; MAX_ATTR] = [None; MAX_ATTR];
     let mut nb_attrs: usize = 0;
     let mut root = None;
 
-    if node.is_null() {
+    if let Some(node) = node {
+        if node.element_type() != XmlElementType::XmlDocumentNode {
+            // In original libxml2, `node` is treats as truly `XmlNode`,
+            // but it may actually be `XmlDoc`.
+            // If the `node` is `XmlDoc`,
+            // this may be a misbehavior because it erroneously collects an external subset.
+            // Therefore, insert a check to see if the `node` is an `XmlNode`.
+
+            let node = XmlNodePtr::try_from(node).unwrap();
+            let mut attr = node.properties;
+            while let Some(now) = attr {
+                if nb_attrs < MAX_ATTR {
+                    attrs[nb_attrs] = Some(now);
+                    nb_attrs += 1;
+                } else {
+                    nb_attrs += 1;
+                }
+                attr = now.next;
+            }
+        }
+    } else {
         root = (*ctxt).doc.and_then(|doc| doc.get_root_element());
         if root.is_none() {
             return null_mut();
-        }
-    } else if (*node).element_type() != XmlElementType::XmlDocumentNode {
-        // In original libxml2, `node` is treats as truly `XmlNode`,
-        // but it may actually be `XmlDoc`.
-        // If the `node` is `XmlDoc`,
-        // this may be a misbehavior because it erroneously collects an external subset.
-        // Therefore, insert a check to see if the `node` is an `XmlNode`.
-
-        let mut attr = (*node).properties;
-        while let Some(now) = attr {
-            if nb_attrs < MAX_ATTR {
-                attrs[nb_attrs] = Some(now);
-                nb_attrs += 1;
-            } else {
-                nb_attrs += 1;
-            }
-            attr = now.next;
         }
     }
     if !(*ctxt).free_state.is_null() && !(*(*ctxt).free_state).tab_state.is_empty() {
@@ -408,21 +395,22 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     }
     (*ret).value = null_mut();
     (*ret).endvalue = null_mut();
-    if node.is_null() {
-        (*ret).node = (*ctxt).doc.map_or(null_mut(), |doc| doc.as_ptr()) as _;
-        (*ret).seq = root.map(|root| root.into());
-    } else {
-        (*ret).node = node;
-        (*ret).seq = (*node)
+    if let Some(node) = node {
+        (*ret).node = Some(node);
+        (*ret).seq = node
             .children()
             .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+    } else {
+        (*ret).node = (*ctxt).doc.map(|doc| doc.into());
+        (*ret).seq = root.map(|root| root.into());
     }
     (*ret).attrs.clear();
     if nb_attrs > 0 {
         if nb_attrs < MAX_ATTR {
             (*ret).attrs.extend(attrs.iter().copied().take(nb_attrs));
         } else {
-            let mut attr = (*node).properties;
+            let node = XmlNodePtr::try_from(node.unwrap()).unwrap();
+            let mut attr = node.properties;
             while let Some(now) = attr {
                 (*ret).attrs.push(Some(now));
                 attr = now.next;

@@ -36,7 +36,7 @@ use crate::{
     parser::{xml_read_file, xml_read_memory},
     tree::{
         xml_free_doc, NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr,
-        XmlNode, XmlNodePtr,
+        XmlNodePtr,
     },
     xpath::{
         internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
@@ -297,12 +297,16 @@ const XML_OLD_SCHEMATRON_NS: &str = SCT_OLD_NS;
 unsafe fn xml_schematron_perr_memory(
     ctxt: XmlSchematronParserCtxtPtr,
     extra: &str,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
 ) {
     if !ctxt.is_null() {
         (*ctxt).nberrors += 1;
     }
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
+    __xml_simple_oom_error(
+        XmlErrorDomain::XmlFromSchemasp,
+        node.map_or(null_mut(), |node| node.as_ptr()),
+        Some(extra),
+    );
 }
 
 /// Create an XML Schematrons parse context for that file/resource expected
@@ -318,7 +322,7 @@ pub unsafe fn xml_schematron_new_parser_ctxt(url: *const c_char) -> XmlSchematro
     let ret: XmlSchematronParserCtxtPtr =
         xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(null_mut(), "allocating schema parser context", null_mut());
+        xml_schematron_perr_memory(null_mut(), "allocating schema parser context", None);
         return null_mut();
     }
     std::ptr::write(&mut *ret, XmlSchematronParserCtxt::default());
@@ -327,11 +331,7 @@ pub unsafe fn xml_schematron_new_parser_ctxt(url: *const c_char) -> XmlSchematro
     (*ret).url = xml_dict_lookup((*ret).dict, url as _, -1);
     (*ret).xctxt = xml_xpath_new_context(None);
     if (*ret).xctxt.is_null() {
-        xml_schematron_perr_memory(
-            null_mut(),
-            "allocating schema parser XPath context",
-            null_mut(),
-        );
+        xml_schematron_perr_memory(null_mut(), "allocating schema parser XPath context", None);
         xml_schematron_free_parser_ctxt(ret);
         return null_mut();
     }
@@ -355,7 +355,7 @@ pub unsafe fn xml_schematron_new_mem_parser_ctxt(
     let ret: XmlSchematronParserCtxtPtr =
         xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(null_mut(), "allocating schema parser context", null_mut());
+        xml_schematron_perr_memory(null_mut(), "allocating schema parser context", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
@@ -364,11 +364,7 @@ pub unsafe fn xml_schematron_new_mem_parser_ctxt(
     (*ret).dict = xml_dict_create();
     (*ret).xctxt = xml_xpath_new_context(None);
     if (*ret).xctxt.is_null() {
-        xml_schematron_perr_memory(
-            null_mut(),
-            "allocating schema parser XPath context",
-            null_mut(),
-        );
+        xml_schematron_perr_memory(null_mut(), "allocating schema parser XPath context", None);
         xml_schematron_free_parser_ctxt(ret);
         return null_mut();
     }
@@ -388,7 +384,7 @@ pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchematro
     let ret: XmlSchematronParserCtxtPtr =
         xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(null_mut(), "allocating schema parser context", null_mut());
+        xml_schematron_perr_memory(null_mut(), "allocating schema parser context", None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
@@ -398,11 +394,7 @@ pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchematro
     (*ret).preserve = 1;
     (*ret).xctxt = xml_xpath_new_context(Some(doc));
     if (*ret).xctxt.is_null() {
-        xml_schematron_perr_memory(
-            null_mut(),
-            "allocating schema parser XPath context",
-            null_mut(),
-        );
+        xml_schematron_perr_memory(null_mut(), "allocating schema parser XPath context", None);
         xml_schematron_free_parser_ctxt(ret);
         return null_mut();
     }
@@ -508,7 +500,7 @@ macro_rules! xml_schematron_perr {
             channel,
             data,
             ctxt as _,
-            $node as _,
+            $node.map_or(null_mut(), |node| node.as_ptr()) as _,
             XmlErrorDomain::XmlFromSchemasp,
             $error,
             XmlErrorLevel::XmlErrError,
@@ -531,7 +523,7 @@ macro_rules! xml_schematron_perr {
 unsafe fn xml_schematron_new_schematron(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchematronPtr {
     let ret: XmlSchematronPtr = xml_malloc(size_of::<XmlSchematron>()) as XmlSchematronPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(ctxt, "allocating schema", null_mut());
+        xml_schematron_perr_memory(ctxt, "allocating schema", None);
         return null_mut();
     }
     std::ptr::write(&mut *ret, XmlSchematron::default());
@@ -572,7 +564,7 @@ unsafe fn xml_schematron_add_pattern(
     let ret: XmlSchematronPatternPtr =
         xml_malloc(size_of::<XmlSchematronPattern>()) as XmlSchematronPatternPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(ctxt, "allocating schema pattern", node.as_ptr());
+        xml_schematron_perr_memory(ctxt, "allocating schema pattern", Some(node.into()));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronPattern>());
@@ -617,7 +609,7 @@ unsafe fn xml_schematron_add_rule(
         let context = CStr::from_ptr(context as *const i8).to_string_lossy();
         xml_schematron_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node),
             XmlParserErrors::XmlSchemapNoroot,
             "Failed to compile context expression {}",
             context
@@ -627,7 +619,7 @@ unsafe fn xml_schematron_add_rule(
     let ret: XmlSchematronRulePtr =
         xml_malloc(size_of::<XmlSchematronRule>()) as XmlSchematronRulePtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(ctxt, "allocating schema rule", node.as_ptr());
+        xml_schematron_perr_memory(ctxt, "allocating schema rule", Some(node.into()));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronRule>());
@@ -685,7 +677,7 @@ unsafe fn xml_schematron_parse_test_report_msg(ctxt: XmlSchematronParserCtxtPtr,
                 if comp.is_null() {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemavAttrInvalid,
                         "Failed to compile select expression {}",
                         select
@@ -693,7 +685,7 @@ unsafe fn xml_schematron_parse_test_report_msg(ctxt: XmlSchematronParserCtxtPtr,
                 } else {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemavAttrInvalid,
                         "value-of has no select attribute"
                     );
@@ -730,7 +722,7 @@ unsafe fn xml_schematron_add_test(
         let test = CStr::from_ptr(test as *const i8).to_string_lossy();
         xml_schematron_perr!(
             ctxt,
-            node.as_ptr(),
+            Some(node),
             XmlParserErrors::XmlSchemapNoroot,
             "Failed to compile test expression {}",
             test
@@ -741,7 +733,7 @@ unsafe fn xml_schematron_add_test(
     let ret: XmlSchematronTestPtr =
         xml_malloc(size_of::<XmlSchematronTest>()) as XmlSchematronTestPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(ctxt, "allocating schema test", node.as_ptr());
+        xml_schematron_perr_memory(ctxt, "allocating schema test", Some(node.into()));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronTest>());
@@ -784,7 +776,7 @@ unsafe fn xml_schematron_parse_rule(
         Some(context) if context.is_empty() => {
             xml_schematron_perr!(
                 ctxt,
-                rule.as_ptr(),
+                Some(rule),
                 XmlParserErrors::XmlSchemapNoroot,
                 "rule has an empty context attribute"
             );
@@ -803,7 +795,7 @@ unsafe fn xml_schematron_parse_rule(
         None => {
             xml_schematron_perr!(
                 ctxt,
-                rule.as_ptr(),
+                Some(rule),
                 XmlParserErrors::XmlSchemapNoroot,
                 "rule has no context attribute"
             );
@@ -821,7 +813,7 @@ unsafe fn xml_schematron_parse_rule(
                 Some(name) if name.is_empty() => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemapNoroot,
                         "let has an empty name attribute"
                     );
@@ -834,7 +826,7 @@ unsafe fn xml_schematron_parse_rule(
                 None => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemapNoroot,
                         "let has no name attribute"
                     );
@@ -845,7 +837,7 @@ unsafe fn xml_schematron_parse_rule(
                 Some(value) if value.is_empty() => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemapNoroot,
                         "let has an empty value attribute"
                     );
@@ -855,7 +847,7 @@ unsafe fn xml_schematron_parse_rule(
                 None => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemapNoroot,
                         "let has no value attribute"
                     );
@@ -868,7 +860,7 @@ unsafe fn xml_schematron_parse_rule(
             if var_comp.is_null() {
                 xml_schematron_perr!(
                     ctxt,
-                    cur_node.as_ptr(),
+                    Some(cur_node),
                     XmlParserErrors::XmlSchemapNoroot,
                     "Failed to compile let expression {}",
                     value.to_string_lossy().into_owned()
@@ -893,7 +885,7 @@ unsafe fn xml_schematron_parse_rule(
                 Some(test) if test.is_empty() => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemapNoroot,
                         "assert has an empty test attribute"
                     );
@@ -920,7 +912,7 @@ unsafe fn xml_schematron_parse_rule(
                 None => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemapNoroot,
                         "assert has no test attribute"
                     );
@@ -932,7 +924,7 @@ unsafe fn xml_schematron_parse_rule(
                 Some(test) if test.is_empty() => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemapNoroot,
                         "assert has an empty test attribute"
                     );
@@ -959,7 +951,7 @@ unsafe fn xml_schematron_parse_rule(
                 None => {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemapNoroot,
                         "assert has no test attribute"
                     );
@@ -968,7 +960,7 @@ unsafe fn xml_schematron_parse_rule(
         } else {
             xml_schematron_perr!(
                 ctxt,
-                cur_node.as_ptr(),
+                Some(cur_node),
                 XmlParserErrors::XmlSchemapNoroot,
                 "Expecting an assert or a report element instead of {}",
                 cur_node.name().unwrap().into_owned()
@@ -982,7 +974,7 @@ unsafe fn xml_schematron_parse_rule(
     if nb_checks == 0 {
         xml_schematron_perr!(
             ctxt,
-            rule.as_ptr(),
+            Some(rule),
             XmlParserErrors::XmlSchemapNoroot,
             "rule has no assert nor report element"
         );
@@ -1024,7 +1016,7 @@ unsafe fn xml_schematron_parse_pattern(ctxt: XmlSchematronParserCtxtPtr, pat: Xm
         } else {
             xml_schematron_perr!(
                 ctxt,
-                cur_node.as_ptr(),
+                Some(cur_node),
                 XmlParserErrors::XmlSchemapNoroot,
                 "Expecting a rule element instead of {}",
                 cur_node.name().unwrap().into_owned()
@@ -1038,7 +1030,7 @@ unsafe fn xml_schematron_parse_pattern(ctxt: XmlSchematronParserCtxtPtr, pat: Xm
     if nb_rules == 0 {
         xml_schematron_perr!(
             ctxt,
-            pat.as_ptr(),
+            Some(pat),
             XmlParserErrors::XmlSchemapNoroot,
             "Pattern has no rule element"
         );
@@ -1066,7 +1058,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
         let Some(doc) = xml_read_file(&url, None, SCHEMATRON_PARSE_OPTIONS as i32) else {
             xml_schematron_perr!(
                 ctxt,
-                null_mut(),
+                None::<XmlGenericNodePtr>,
                 XmlParserErrors::XmlSchemapFailedLoad,
                 "xmlSchematronParse: could not load '{}'.\n",
                 url
@@ -1081,7 +1073,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
         else {
             xml_schematron_perr!(
                 ctxt,
-                null_mut(),
+                None::<XmlGenericNodePtr>,
                 XmlParserErrors::XmlSchemapFailedParse,
                 "xmlSchematronParse: could not parse.\n"
             );
@@ -1098,7 +1090,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
     } else {
         xml_schematron_perr!(
             ctxt,
-            null_mut(),
+            None::<XmlGenericNodePtr>,
             XmlParserErrors::XmlSchemapNothingToParse,
             "xmlSchematronParse: could not parse.\n"
         );
@@ -1109,7 +1101,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
     let Some(root) = doc.get_root_element() else {
         xml_schematron_perr!(
             ctxt,
-            doc.as_ptr() as *mut XmlNode,
+            Some(doc),
             XmlParserErrors::XmlSchemapNoroot,
             "The schema has no document element.\n"
         );
@@ -1123,7 +1115,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
         let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
         xml_schematron_perr!(
             ctxt,
-            root.as_ptr(),
+            Some(root),
             XmlParserErrors::XmlSchemapNoroot,
             "The XML document '{}' is not a XML schematron document",
             url
@@ -1159,7 +1151,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 if uri.as_deref().map_or(true, |uri| uri.is_empty()) {
                     xml_schematron_perr!(
                         ctxt,
-                        cur.as_ptr(),
+                        Some(cur),
                         XmlParserErrors::XmlSchemapNoroot,
                         "ns element has no uri"
                     );
@@ -1167,7 +1159,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 if prefix.as_deref().map_or(true, |pre| pre.is_empty()) {
                     xml_schematron_perr!(
                         ctxt,
-                        cur.as_ptr(),
+                        Some(cur),
                         XmlParserErrors::XmlSchemapNoroot,
                         "ns element has no prefix"
                     );
@@ -1205,7 +1197,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 } else {
                     xml_schematron_perr!(
                         ctxt,
-                        cur_node.as_ptr(),
+                        Some(cur_node),
                         XmlParserErrors::XmlSchemapNoroot,
                         "Expecting a pattern element instead of {}",
                         cur_node.name().unwrap().into_owned()
@@ -1220,7 +1212,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
                 xml_schematron_perr!(
                     ctxt,
-                    root.as_ptr(),
+                    Some(root),
                     XmlParserErrors::XmlSchemapNoroot,
                     "The schematron document '{}' has no pattern",
                     url
@@ -1373,13 +1365,17 @@ pub unsafe fn xml_schematron_set_valid_structured_errors(
 unsafe fn xml_schematron_verr_memory(
     ctxt: XmlSchematronValidCtxtPtr,
     extra: &str,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
 ) {
     if !ctxt.is_null() {
         (*ctxt).nberrors += 1;
         (*ctxt).err = XmlParserErrors::XmlSchemavInternal as i32;
     }
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasv, node, Some(extra));
+    __xml_simple_oom_error(
+        XmlErrorDomain::XmlFromSchemasv,
+        node.map_or(null_mut(), |node| node.as_ptr()),
+        Some(extra),
+    );
 }
 
 /// Create an XML Schematrons validation context based on the given schema.
@@ -1393,7 +1389,7 @@ pub unsafe fn xml_schematron_new_valid_ctxt(
     let ret: XmlSchematronValidCtxtPtr =
         xml_malloc(size_of::<XmlSchematronValidCtxt>()) as XmlSchematronValidCtxtPtr;
     if ret.is_null() {
-        xml_schematron_verr_memory(null_mut(), "allocating validation context", null_mut());
+        xml_schematron_verr_memory(null_mut(), "allocating validation context", None);
         return null_mut();
     }
     std::ptr::write(&mut *ret, XmlSchematronValidCtxt::default());
@@ -1402,11 +1398,7 @@ pub unsafe fn xml_schematron_new_valid_ctxt(
     (*ret).xctxt = xml_xpath_new_context(None);
     (*ret).flags = options;
     if (*ret).xctxt.is_null() {
-        xml_schematron_perr_memory(
-            null_mut(),
-            "allocating schema parser XPath context",
-            null_mut(),
-        );
+        xml_schematron_perr_memory(null_mut(), "allocating schema parser XPath context", None);
         xml_schematron_free_valid_ctxt(ret);
         return null_mut();
     }

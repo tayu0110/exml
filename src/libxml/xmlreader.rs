@@ -1271,7 +1271,7 @@ impl XmlTextReader {
             if self.rng_full_node.is_some() {
                 return;
             }
-            ret = (*self.rng_valid_ctxt).push_element((*self.ctxt).my_doc, node.as_ptr());
+            ret = (*self.rng_valid_ctxt).push_element((*self.ctxt).my_doc, node);
             if ret == 0 {
                 // this element requires a full tree
                 if let Some(node) = self.expand() {
@@ -1339,7 +1339,7 @@ impl XmlTextReader {
                 }
                 return;
             }
-            let ret: i32 = (*self.rng_valid_ctxt).pop_element((*self.ctxt).my_doc, node.as_ptr());
+            let ret: i32 = (*self.rng_valid_ctxt).pop_element((*self.ctxt).my_doc, node);
             if ret != 1 {
                 self.rng_valid_errors += 1;
             }

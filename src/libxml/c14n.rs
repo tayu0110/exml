@@ -1542,7 +1542,7 @@ pub unsafe fn xml_c14n_doc_save(
 #[doc(alias = "xmlC14NErr")]
 unsafe fn xml_c14n_err<T>(
     ctxt: XmlC14NCtxPtr<'_, T>,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     error: XmlParserErrors,
     msg: &str,
 ) {
@@ -1554,7 +1554,7 @@ unsafe fn xml_c14n_err<T>(
         None,
         None,
         ctxt as _,
-        node as _,
+        node.map_or(null_mut(), |node| node.as_ptr()) as _,
         XmlErrorDomain::XmlFromC14N,
         error,
         XmlErrorLevel::XmlErrError,
@@ -1607,7 +1607,7 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
     if buf.borrow().encoder.is_some() {
         xml_c14n_err::<T>(
             null_mut(),
-            doc as *mut XmlDoc as _,
+            Some(XmlDocPtr::from_raw(doc).unwrap().unwrap().into()),
             XmlParserErrors::XmlC14NRequiresUtf8,
             "xmlC14NNewCtx: output buffer encoder != NULL but C14N requires UTF8 output\n",
         );
@@ -2009,7 +2009,7 @@ pub unsafe fn xml_c14n_execute<'a, T>(
     if buf.borrow().encoder.is_some() {
         xml_c14n_err::<T>(
             null_mut(),
-            doc as *mut XmlDoc as *mut XmlNode,
+            Some(XmlDocPtr::from_raw(doc).unwrap().unwrap().into()),
             XmlParserErrors::XmlC14NRequiresUtf8,
             "xmlC14NExecute: output buffer encoder != NULL but C14N requires UTF8 output\n",
         );
