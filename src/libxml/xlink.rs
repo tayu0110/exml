@@ -20,15 +20,14 @@
 // daniel@veillard.com
 
 use std::{
-    ffi::CStr,
     os::raw::c_void,
     ptr::null_mut,
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use crate::tree::{XmlDocPtr, XmlElementType, XmlNode};
+use crate::tree::{XmlDocPtr, XmlElementType, XmlNodePtr};
 
-use super::xmlstring::{xml_str_equal, XmlChar};
+use super::xmlstring::XmlChar;
 
 // Various defines for the various Link properties.
 //
@@ -72,13 +71,13 @@ pub enum XlinkActuate {
 /// This is the prototype for the link detection routine.
 /// It calls the default link detection callbacks upon link detection.
 #[doc(alias = "xlinkNodeDetectFunc")]
-pub type XlinkNodeDetectFunc = unsafe fn(ctx: *mut c_void, node: *mut XmlNode);
+pub type XlinkNodeDetectFunc = unsafe fn(ctx: *mut c_void, node: XmlNodePtr);
 
 /// This is the prototype for a simple link detection callback.
 #[doc(alias = "xlinkSimpleLinkFunk")]
 pub type XlinkSimpleLinkFunk = unsafe fn(
     ctx: *mut c_void,
-    node: *mut XmlNode,
+    node: XmlNodePtr,
     href: *const XmlChar,
     role: *const XmlChar,
     title: *const XmlChar,
@@ -88,7 +87,7 @@ pub type XlinkSimpleLinkFunk = unsafe fn(
 #[doc(alias = "xlinkExtendedLinkFunk")]
 pub type XlinkExtendedLinkFunk = unsafe fn(
     ctx: *mut c_void,
-    node: *mut XmlNode,
+    node: XmlNodePtr,
     nbLocators: i32,
     hrefs: *mut *const XmlChar,
     roles: *mut *const XmlChar,
@@ -106,7 +105,7 @@ pub type XlinkExtendedLinkFunk = unsafe fn(
 #[doc(alias = "xlinkExtendedLinkSetFunk")]
 pub type XlinkExtendedLinkSetFunk = unsafe fn(
     ctx: *mut c_void,
-    node: *mut XmlNode,
+    node: XmlNodePtr,
     nbLocators: i32,
     hrefs: *mut *const XmlChar,
     roles: *mut *const XmlChar,
@@ -159,7 +158,7 @@ pub unsafe fn xlink_set_default_handler(handler: XlinkHandlerPtr) {
 }
 
 const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink/namespace/";
-const XHTML_NAMESPACE: &CStr = c"http://www.w3.org/1999/xhtml/";
+const XHTML_NAMESPACE: &str = "http://www.w3.org/1999/xhtml/";
 
 /// Check whether the given node carries the attributes needed
 /// to be a link element (or is one of the linking elements issued
@@ -169,18 +168,16 @@ const XHTML_NAMESPACE: &CStr = c"http://www.w3.org/1999/xhtml/";
 ///
 /// Returns the xlinkType of the node (XLINK_TYPE_NONE if there is no link detected.
 #[doc(alias = "xlinkIsLink")]
-pub unsafe fn xlink_is_link(doc: Option<XmlDocPtr>, node: *mut XmlNode) -> XlinkType {
+pub unsafe fn xlink_is_link(doc: Option<XmlDocPtr>, mut node: XmlNodePtr) -> XlinkType {
     let mut ret: XlinkType = XlinkType::XlinkTypeNone;
 
-    if node.is_null() {
-        return XlinkType::XlinkTypeNone;
-    }
-    let doc = doc.or((*node).doc);
+    let doc = doc.or(node.doc);
     if let Some(_doc) = doc.filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode) {
         // This is an HTML document.
-    } else if (*node).ns.map_or(false, |ns| {
-        xml_str_equal(ns.href, XHTML_NAMESPACE.as_ptr() as _)
-    }) {
+    } else if node
+        .ns
+        .map_or(false, |ns| ns.href().as_deref() == Some(XHTML_NAMESPACE))
+    {
         // !!!! We really need an IS_XHTML_ELEMENT function from HTMLtree.h @@@
         // This is an XHTML element within an XML document
         // Check whether it's one of the element able to carry links
@@ -188,12 +185,12 @@ pub unsafe fn xlink_is_link(doc: Option<XmlDocPtr>, node: *mut XmlNode) -> Xlink
     }
 
     // We don't prevent a-priori having XML Linking constructs on XHTML elements
-    if let Some(typ) = (*node).get_ns_prop("type", Some(XLINK_NAMESPACE)) {
+    if let Some(typ) = node.get_ns_prop("type", Some(XLINK_NAMESPACE)) {
         if typ == "simple" {
             ret = XlinkType::XlinkTypeSimple;
         } else if typ == "extended" {
-            if let Some(role) = (*node).get_ns_prop("role", Some(XLINK_NAMESPACE)) {
-                if let Some(xlink) = (*node).search_ns(doc, Some(XLINK_NAMESPACE)) {
+            if let Some(role) = node.get_ns_prop("role", Some(XLINK_NAMESPACE)) {
+                if let Some(xlink) = node.search_ns(doc, Some(XLINK_NAMESPACE)) {
                     let buf = format!("{}:external-linkset", (*xlink).prefix().unwrap());
                     if role == buf {
                         // ret = XlinkType::XlinkTypeExtendedSet;

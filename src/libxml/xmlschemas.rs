@@ -2311,14 +2311,20 @@ unsafe fn xml_schema_normalize_value(typ: XmlSchemaTypePtr, value: *const XmlCha
 /// the component representation.
 unsafe fn xml_schema_get_component_node(item: XmlSchemaBasicItemPtr) -> *mut XmlNode {
     match (*item).typ {
-        XmlSchemaTypeType::XmlSchemaTypeElement => (*(item as XmlSchemaElementPtr)).node,
-        XmlSchemaTypeType::XmlSchemaTypeAttribute => (*(item as XmlSchemaAttributePtr)).node,
+        XmlSchemaTypeType::XmlSchemaTypeElement => (*(item as XmlSchemaElementPtr))
+            .node
+            .map_or(null_mut(), |node| node.as_ptr()),
+        XmlSchemaTypeType::XmlSchemaTypeAttribute => (*(item as XmlSchemaAttributePtr))
+            .node
+            .map_or(null_mut(), |node| node.as_ptr()),
         XmlSchemaTypeType::XmlSchemaTypeComplex | XmlSchemaTypeType::XmlSchemaTypeSimple => (*(item
             as XmlSchemaTypePtr))
             .node
             .map_or(null_mut(), |node| node.as_ptr()),
         XmlSchemaTypeType::XmlSchemaTypeAny | XmlSchemaTypeType::XmlSchemaTypeAnyAttribute => {
-            (*(item as XmlSchemaWildcardPtr)).node
+            (*(item as XmlSchemaWildcardPtr))
+                .node
+                .map_or(null_mut(), |node| node.as_ptr())
         }
         XmlSchemaTypeType::XmlSchemaTypeParticle => (*(item as XmlSchemaParticlePtr))
             .node
@@ -2329,9 +2335,9 @@ unsafe fn xml_schema_get_component_node(item: XmlSchemaBasicItemPtr) -> *mut Xml
         XmlSchemaTypeType::XmlSchemaTypeGroup => {
             (*(item as XmlSchemaModelGroupDefPtr)).node.as_ptr()
         }
-        XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
-            (*(item as XmlSchemaAttributeGroupPtr)).node
-        }
+        XmlSchemaTypeType::XmlSchemaTypeAttributegroup => (*(item as XmlSchemaAttributeGroupPtr))
+            .node
+            .map_or(null_mut(), |node| node.as_ptr()),
         XmlSchemaTypeType::XmlSchemaTypeIDCUnique
         | XmlSchemaTypeType::XmlSchemaTypeIDCKey
         | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => (*(item as XmlSchemaIDCPtr)).node.as_ptr(),
@@ -8829,7 +8835,7 @@ unsafe fn xml_schema_add_wildcard(
     }
     memset(ret as _, 0, size_of::<XmlSchemaWildcard>());
     (*ret).typ = typ;
-    (*ret).node = node.map_or(null_mut(), |node| node.as_ptr());
+    (*ret).node = node;
     WXS_ADD_LOCAL!(ctxt, ret);
     ret
 }
@@ -14281,7 +14287,7 @@ unsafe fn xml_schema_resolve_element_references(
                 ctxt,
                 XmlParserErrors::XmlSchemapSrcResolve,
                 elem_decl as XmlSchemaBasicItemPtr,
-                XmlGenericNodePtr::from_raw((*elem_decl).node),
+                (*elem_decl).node.map(|node| node.into()),
                 "type",
                 (*elem_decl).named_type,
                 (*elem_decl).named_type_ns,
@@ -14610,7 +14616,7 @@ unsafe fn xml_schema_resolve_attr_type_references(
                 ctxt,
                 XmlParserErrors::XmlSchemapSrcResolve,
                 item as XmlSchemaBasicItemPtr,
-                XmlGenericNodePtr::from_raw((*item).node),
+                (*item).node.map(|node| node.into()),
                 "type",
                 (*item).type_name,
                 (*item).type_ns,
@@ -15460,7 +15466,7 @@ unsafe fn xml_schema_intersect_wildcards(
     {
         xml_schema_perr(
             ctxt,
-            XmlGenericNodePtr::from_raw((*complete_wild).node),
+            (*complete_wild).node.map(|node| node.into()),
             XmlParserErrors::XmlSchemapIntersectionNotExpressible,
             "The intersection of the wildcard is not expressible.\n",
             None,
@@ -16022,7 +16028,7 @@ unsafe fn xml_schema_union_wildcards(
             // namespace name, then the union is not expressible.
             xml_schema_perr(
                 ctxt,
-                XmlGenericNodePtr::from_raw((*complete_wild).node),
+                (*complete_wild).node.map(|node| node.into()),
                 XmlParserErrors::XmlSchemapUnionNotExpressible,
                 "The union of the wildcard is not expressible.\n",
                 None,
@@ -19091,7 +19097,7 @@ macro_rules! FACET_RESTR_MUTUAL_ERR {
             $pctxt,
             XmlParserErrors::XmlSchemapInvalidFacetValue,
             $fac1 as XmlSchemaBasicItemPtr,
-            XmlGenericNodePtr::from_raw((*$fac1).node),
+            (*$fac1).node.map(|node| node.into()),
             format!("It is an error for both '{ft1}' and '{ft2}' to be specified on the same type definition").as_str(),
             Some(ft1),
             Some(ft2),
@@ -19106,7 +19112,7 @@ macro_rules! FACET_RESTR_ERR {
             $pctxt,
             XmlParserErrors::XmlSchemapInvalidFacetValue,
             $fac1 as XmlSchemaBasicItemPtr,
-            XmlGenericNodePtr::from_raw((*$fac1).node),
+            (*$fac1).node.map(|node| node.into()),
             $msg,
             None,
         );
@@ -19119,7 +19125,7 @@ macro_rules! FACET_RESTR_FIXED_ERR {
             $pctxt,
             XmlParserErrors::XmlSchemapInvalidFacetValue,
             $fac as XmlSchemaBasicItemPtr,
-            XmlGenericNodePtr::from_raw((*$fac).node),
+            (*$fac).node.map(|node| node.into()),
             "The base type's facet is 'fixed', thus the value must not differ",
             None,
         )
@@ -19944,7 +19950,7 @@ unsafe fn xml_schema_check_attr_props_correct(
         // will be removed in WXS 1.1 anyway.
         let ret: i32 = xml_schema_vcheck_cvc_simple_type(
             pctxt as XmlSchemaAbstractCtxtPtr,
-            XmlGenericNodePtr::from_raw((*attr).node),
+            (*attr).node.map(|node| node.into()),
             WXS_ATTR_TYPEDEF!(attr),
             (*attr).def_value,
             addr_of_mut!((*attr).def_val),
@@ -20138,7 +20144,7 @@ unsafe fn xml_schema_check_agprops_correct(
                         xml_schema_custom_err(
                             pctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapAgPropsCorrect,
-                            XmlGenericNodePtr::from_raw((*attr_gr).node),
+                            (*attr_gr).node.map(|node| node.into()),
                             attr_gr as XmlSchemaBasicItemPtr,
                             format!("Duplicate {str1}").as_str(),
                             Some(&str1),
@@ -20176,7 +20182,7 @@ unsafe fn xml_schema_check_agprops_correct(
                     xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         XmlParserErrors::XmlSchemapAgPropsCorrect,
-                        XmlGenericNodePtr::from_raw((*attr_gr).node),
+                        (*attr_gr).node.map(|node| node.into()  ),
                         attr_gr as XmlSchemaBasicItemPtr,
                         format!("There must not exist more than one attribute declaration of type 'xs:ID' (or derived from 'xs:ID'). The {str1} violates this constraint").as_str(),
                         Some(&str1),
@@ -20627,7 +20633,7 @@ unsafe fn xml_schema_check_elem_props_correct(
         if type_def.is_null() {
             xml_schema_perr(
                 pctxt,
-                XmlGenericNodePtr::from_raw((*elem_decl).node),
+                (*elem_decl).node.map(|node| node.into()),
                 XmlParserErrors::XmlSchemapInternal,
                 "Internal error: xmlSchemaCheckElemPropsCorrect, type is missing... skipping validation of the value constraint",
                 None,
@@ -20635,11 +20641,11 @@ unsafe fn xml_schema_check_elem_props_correct(
             );
             return -1;
         }
-        let node = if !(*elem_decl).node.is_null() {
+        let node = if let Some(node) = (*elem_decl).node {
             let attr = if (*elem_decl).flags & XML_SCHEMAS_ELEM_FIXED != 0 {
-                (*(*elem_decl).node).has_prop("fixed")
+                node.has_prop("fixed")
             } else {
-                (*(*elem_decl).node).has_prop("default")
+                node.has_prop("default")
             };
             match attr {
                 Some(Ok(attr)) => Some(XmlGenericNodePtr::from(attr)),

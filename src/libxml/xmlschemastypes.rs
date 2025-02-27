@@ -63,7 +63,7 @@ use crate::{
     tree::{
         xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
         xml_validate_nmtoken, xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlEntityType,
-        XmlGenericNodePtr, XmlNode,
+        XmlGenericNodePtr,
     },
     xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };
@@ -419,8 +419,12 @@ unsafe fn xml_schema_cleanup_types_internal() {
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchemaTypeErrMemory")]
-unsafe fn xml_schema_type_err_memory(node: *mut XmlNode, extra: Option<&str>) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromDatatype, node, extra);
+unsafe fn xml_schema_type_err_memory(node: Option<XmlGenericNodePtr>, extra: Option<&str>) {
+    __xml_simple_oom_error(
+        XmlErrorDomain::XmlFromDatatype,
+        node.map_or(null_mut(), |node| node.as_ptr()),
+        extra,
+    );
 }
 
 /// Allocate a new simple type value
@@ -461,7 +465,7 @@ unsafe fn xml_schema_init_basic_type(
 ) -> XmlSchemaTypePtr {
     let ret: XmlSchemaTypePtr = xml_malloc(size_of::<XmlSchemaType>()) as XmlSchemaTypePtr;
     if ret.is_null() {
-        xml_schema_type_err_memory(null_mut(), Some("could not initialize basic types"));
+        xml_schema_type_err_memory(None, Some("could not initialize basic types"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaType>());
@@ -523,7 +527,7 @@ unsafe fn xml_schema_add_particle() -> XmlSchemaParticlePtr {
     let ret: XmlSchemaParticlePtr =
         xml_malloc(size_of::<XmlSchemaParticle>()) as XmlSchemaParticlePtr;
     if ret.is_null() {
-        xml_schema_type_err_memory(null_mut(), Some("allocating particle component"));
+        xml_schema_type_err_memory(None, Some("allocating particle component"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaParticle>());
@@ -545,7 +549,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
     'error: {
         XML_SCHEMA_TYPES_BANK.set(xml_hash_create(40));
         if XML_SCHEMA_TYPES_BANK.get().is_null() {
-            xml_schema_type_err_memory(null_mut(), None);
+            xml_schema_type_err_memory(None, None);
             break 'error;
         }
 
@@ -575,7 +579,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             let sequence: XmlSchemaModelGroupPtr =
                 xml_malloc(size_of::<XmlSchemaModelGroup>()) as XmlSchemaModelGroupPtr;
             if sequence.is_null() {
-                xml_schema_type_err_memory(null_mut(), Some("allocating model group component"));
+                xml_schema_type_err_memory(None, Some("allocating model group component"));
                 break 'error;
             }
             memset(sequence as _, 0, size_of::<XmlSchemaModelGroup>());
@@ -592,7 +596,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             // The wildcard
             wild = xml_malloc(size_of::<XmlSchemaWildcard>()) as XmlSchemaWildcardPtr;
             if wild.is_null() {
-                xml_schema_type_err_memory(null_mut(), Some("allocating wildcard component"));
+                xml_schema_type_err_memory(None, Some("allocating wildcard component"));
                 break 'error;
             }
             memset(wild as _, 0, size_of::<XmlSchemaWildcard>());
@@ -604,7 +608,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             wild = xml_malloc(size_of::<XmlSchemaWildcard>()) as XmlSchemaWildcardPtr;
             if wild.is_null() {
                 xml_schema_type_err_memory(
-                    null_mut(),
+                    None,
                     Some("could not create an attribute wildcard on anyType"),
                 );
                 break 'error;
@@ -3131,7 +3135,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     cur = xml_strndup(start, i);
                                     if cur.is_null() {
                                         xml_schema_type_err_memory(
-                                            node.map_or(null_mut(), |node| node.as_ptr()),
+                                            node,
                                             Some("allocating hexbin data"),
                                         );
                                         xml_free(v as _);
@@ -3277,7 +3281,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     base = xml_malloc_atomic(i as usize + pad as usize + 1) as _;
                                     if base.is_null() {
                                         xml_schema_type_err_memory(
-                                            node.map_or(null_mut(), |node| node.as_ptr()),
+                                            node,
                                             Some("allocating base64 data"),
                                         );
                                         xml_free(v as _);
@@ -5737,7 +5741,7 @@ pub unsafe fn xml_schema_check_facet(
             // of the facet.
             ret = xml_schema_vcheck_cvc_simple_type(
                 pctxt as XmlSchemaAbstractCtxtPtr,
-                XmlGenericNodePtr::from_raw((*facet).node),
+                (*facet).node.map(|node| node.into()),
                 base,
                 (*facet).value,
                 addr_of_mut!((*facet).val),
@@ -5754,7 +5758,7 @@ pub unsafe fn xml_schema_check_facet(
                         xml_schema_custom_err(
                             pctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapInternal,
-                            XmlGenericNodePtr::from_raw((*facet).node),
+                            (*facet).node.map(|node| node.into()),
                             null_mut(),
                             format!("Internal error: xmlSchemaCheckFacet, failed to validate the value '{value}' of the facet '{facet_type}' against the base type").as_str(),
                             Some(&value),
@@ -5782,7 +5786,7 @@ pub unsafe fn xml_schema_check_facet(
                     xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
-                        XmlGenericNodePtr::from_raw((*facet).node),
+                        (*facet).node.map(|node| node.into()),
                         facet as XmlSchemaBasicItemPtr,
                         format!("The value '{value}' of the facet does not validate against the base type '{qname}'").as_str(),
                         Some(&value),
@@ -5809,7 +5813,7 @@ pub unsafe fn xml_schema_check_facet(
                     xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
-                        XmlGenericNodePtr::from_raw((*facet).node),
+                        (*facet).node.map(|node| node.into()),
                         type_decl as XmlSchemaBasicItemPtr,
                         format!("The value '{value}' of the facet 'pattern' is not a valid regular expression").as_str(),
                         Some(&value),
@@ -5862,7 +5866,7 @@ pub unsafe fn xml_schema_check_facet(
                     xml_schema_custom_err4(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
-                        XmlGenericNodePtr::from_raw((*facet).node),
+                        (*facet).node.map(|node| node.into()),
                         type_decl as XmlSchemaBasicItemPtr,
                         format!(
                             "The value '{value}' of the facet '{facet_type}' is not a valid '{typename}'"
@@ -5892,7 +5896,7 @@ pub unsafe fn xml_schema_check_facet(
                     xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
-                        XmlGenericNodePtr::from_raw((*facet).node),
+                        (*facet).node.map(|node| node.into()),
                         type_decl as XmlSchemaBasicItemPtr,
                         format!("The value '{value}' of the facet 'whitespace' is not valid")
                             .as_str(),
