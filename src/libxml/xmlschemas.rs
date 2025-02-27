@@ -1048,7 +1048,7 @@ pub type XmlSchemaPSVIIDCNodePtr = *mut XmlSchemaPSVIIDCNode;
 #[doc(alias = "xmlSchemaPSVIIDCNode")]
 #[repr(C)]
 pub struct XmlSchemaPSVIIDCNode {
-    node: *mut XmlNode,
+    node: Option<XmlNodePtr>,
     keys: *mut XmlSchemaPSVIIDCKeyPtr,
     node_line: i32,
     node_qname_id: i32,
@@ -1231,7 +1231,7 @@ pub struct XmlSchemaValidCtxt {
     nberrors: i32,
 
     node: Option<XmlNodePtr>,
-    cur: *mut XmlNode,
+    cur: Option<XmlNodePtr>,
     /* typ: XmlSchemaTypePtr, */
     regexp: XmlRegExecCtxtPtr,
     value: XmlSchemaValPtr,
@@ -25439,7 +25439,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                         }
                         // Init the node-table item: Save the node, position and
                         // consume the key-sequence.
-                        (*nt_item).node = (*vctxt).node.map_or(null_mut(), |node| node.as_ptr());
+                        (*nt_item).node = (*vctxt).node;
                         (*nt_item).node_line = (*(*vctxt).inode).node_line;
                         (*nt_item).keys = *key_seq;
                         *key_seq = null_mut();

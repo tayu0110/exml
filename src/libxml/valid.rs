@@ -89,14 +89,14 @@ pub type XmlValidStatePtr = *mut XmlValidState;
 #[repr(C)]
 pub struct XmlValidState {
     elem_decl: Option<XmlElementPtr>, /* pointer to the content model */
-    node: *mut XmlNode,               /* pointer to the current node */
+    node: XmlNodePtr,                 /* pointer to the current node */
     exec: XmlRegExecCtxtPtr,          /* regexp runtime */
 }
 #[cfg(not(feature = "libxml_regexp"))]
 #[repr(C)]
 pub struct XmlValidState {
     cont: XmlElementContentPtr, /* pointer to the content model subtree */
-    node: *mut XmlNode,         /* pointer to the current node in the list */
+    node: XmlNodePtr,           /* pointer to the current node in the list */
     occurs: i64,                /* bitfield for multiple occurrences */
     depth: u8,                  /* current depth in the overall tree */
     state: u8,                  /* ROLLBACK_XXX */
@@ -6936,7 +6936,7 @@ unsafe fn vstate_vpush(
     // (*ctxt).vstate = (*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize);
     (*ctxt).vstate_tab.push(XmlValidState {
         elem_decl,
-        node: node.as_ptr(),
+        node,
         exec: null_mut(),
     });
     if let Some(elem_decl) =
@@ -7057,7 +7057,7 @@ pub unsafe fn xml_validate_push_element(
                     let name = (*state.node).name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        XmlGenericNodePtr::from_raw(state.node),
+                        Some(state.node.into()),
                         XmlParserErrors::XmlDTDNotEmpty,
                         format!("Element {name} was declared EMPTY this one has content\n")
                             .as_str(),
@@ -7079,7 +7079,7 @@ pub unsafe fn xml_validate_push_element(
                         let name = (*state.node).name().unwrap();
                         xml_err_valid_node(
                             ctxt,
-                            XmlGenericNodePtr::from_raw(state.node),
+                            Some(state.node.into()),
                             XmlParserErrors::XmlDTDNotPCDATA,
                             format!(
                                 "Element {name} was declared #PCDATA but contains non text nodes\n"
@@ -7097,7 +7097,7 @@ pub unsafe fn xml_validate_push_element(
                             let name = (*state.node).name().unwrap();
                             xml_err_valid_node(
                                 ctxt,
-                                XmlGenericNodePtr::from_raw(state.node),
+                                Some(state.node.into()),
                                 XmlParserErrors::XmlDTDInvalidChild,
                                 format!("Element {qname} is not declared in {name} list of possible children\n").as_str(),
                                 Some(&qname),
@@ -7119,7 +7119,7 @@ pub unsafe fn xml_validate_push_element(
                             let qname = CStr::from_ptr(qname as *const i8).to_string_lossy();
                             xml_err_valid_node(
                                 ctxt,
-                                XmlGenericNodePtr::from_raw(state.node),
+                                Some(state.node.into()),
                                 XmlParserErrors::XmlDTDContentModel,
                                 format!("Element {name} content does not follow the DTD, Misplaced {qname}\n").as_str(),
                                 Some(&name),
@@ -7170,7 +7170,7 @@ pub unsafe fn xml_validate_push_cdata(
                     let name = (*state.node).name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        XmlGenericNodePtr::from_raw(state.node),
+                        Some(state.node.into()),
                         XmlParserErrors::XmlDTDNotEmpty,
                         format!("Element {name} was declared EMPTY this one has content\n")
                             .as_str(),
@@ -7188,7 +7188,7 @@ pub unsafe fn xml_validate_push_cdata(
                             let name = (*state.node).name().unwrap();
                             xml_err_valid_node(
                                 ctxt,
-                                XmlGenericNodePtr::from_raw(state.node),
+                                Some(state.node.into()),
                                 XmlParserErrors::XmlDTDContentModel,
                                 format!("Element {name} content does not follow the DTD, Text not allowed\n").as_str(),
                                 Some(&name),
@@ -7270,7 +7270,7 @@ pub unsafe fn xml_validate_pop_element(
                     let name = (*state.node).name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        XmlGenericNodePtr::from_raw(state.node),
+                        Some(state.node.into()),
                         XmlParserErrors::XmlDTDContentModel,
                         format!(
                             "Element {name} content does not follow the DTD, Expecting more children\n"

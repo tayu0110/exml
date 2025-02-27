@@ -83,7 +83,7 @@ impl XmlDoc {
             let Some(handler) = find_encoding_handler(encoding) else {
                 xml_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding,
-                    self as *mut XmlDoc as *mut XmlNode,
+                    XmlGenericNodePtr::from_raw(self),
                     Some(encoding),
                 );
                 return;

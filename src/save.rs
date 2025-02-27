@@ -48,7 +48,7 @@ use crate::{
         valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
     },
     tree::{
-        is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributePtr,
+        is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttrPtr, XmlAttributePtr,
         XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr,
         XmlNodePtr, XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
@@ -103,11 +103,7 @@ impl<'a> XmlSaveCtxt<'a> {
             ret.handler = find_encoding_handler(enc).map(|e| Rc::new(RefCell::new(e)));
             if ret.handler.is_none() {
                 unsafe {
-                    xml_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding,
-                        null_mut(),
-                        encoding,
-                    );
+                    xml_save_err(XmlParserErrors::XmlSaveUnknownEncoding, None, encoding);
                 }
                 return None;
             }
@@ -201,7 +197,7 @@ impl<'a> XmlSaveCtxt<'a> {
             if buf.encoder.is_none() {
                 xml_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding,
-                    null_mut(),
+                    None,
                     Some(encoding),
                 );
                 return -1;
@@ -550,7 +546,11 @@ impl Drop for XmlSaveCtxt<'_> {
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErr")]
-pub(crate) unsafe fn xml_save_err(code: XmlParserErrors, node: *mut XmlNode, extra: Option<&str>) {
+pub(crate) unsafe fn xml_save_err(
+    code: XmlParserErrors,
+    node: Option<XmlGenericNodePtr>,
+    extra: Option<&str>,
+) {
     let msg: Cow<'static, str> = match code {
         XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n".into(),
         XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n".into(),
@@ -560,7 +560,12 @@ pub(crate) unsafe fn xml_save_err(code: XmlParserErrors, node: *mut XmlNode, ext
         XmlParserErrors::XmlSaveNoDoctype => "document has no DOCTYPE\n".into(),
         _ => "unexpected error number\n".into(),
     };
-    __xml_simple_error!(XmlErrorDomain::XmlFromOutput, code, node, msg.as_ref());
+    __xml_simple_error!(
+        XmlErrorDomain::XmlFromOutput,
+        code,
+        node.map_or(null_mut(), |node| node.as_ptr()),
+        msg.as_ref()
+    );
 }
 
 /// Handle an out of memory condition
@@ -710,7 +715,7 @@ unsafe fn xml_ns_list_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, mut cur: Option<X
 
 /// Serialize the attribute in the buffer
 #[doc(alias = "xmlAttrSerializeContent")]
-unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: &XmlAttr) {
+unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: XmlAttrPtr) {
     let mut children = attr.children;
     while let Some(now) = children {
         match now.element_type() {
@@ -741,7 +746,7 @@ unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: &XmlAttr) 
 
 /// Dump an XML attribute
 #[doc(alias = "xmlAttrDumpOutput")]
-unsafe fn xml_attr_dump_output(ctxt: &mut XmlSaveCtxt, cur: &XmlAttr) {
+unsafe fn xml_attr_dump_output(ctxt: &mut XmlSaveCtxt, cur: XmlAttrPtr) {
     if ctxt.format == 2 {
         ctxt.write_ws_non_sig(2);
     } else {
@@ -848,7 +853,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
                     }
                     let mut attr = node.properties;
                     while let Some(now) = attr {
-                        xml_attr_dump_output(ctxt, &now);
+                        xml_attr_dump_output(ctxt, now);
                         attr = now.next;
                     }
 
@@ -1032,7 +1037,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
             }
             XmlElementType::XmlAttributeNode => {
                 let attr = XmlAttrPtr::try_from(cur).unwrap();
-                xml_attr_dump_output(ctxt, &attr);
+                xml_attr_dump_output(ctxt, attr);
             }
             XmlElementType::XmlNamespaceDecl => {
                 let ns = XmlNsPtr::try_from(cur).unwrap();
@@ -1222,7 +1227,7 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
                 children.set_parent(NodePtr::from_ptr(now.as_ptr() as *mut XmlNode));
             }
         }
-        xml_attr_dump_output(ctxt, &now);
+        xml_attr_dump_output(ctxt, now);
         cur = now.next;
     }
     let mut buf = ctxt.buf.borrow_mut();
@@ -1245,19 +1250,19 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
                 .is_some()
     }) {
         buf.write_bytes(b" id=\"");
-        xml_attr_serialize_content(&mut buf, &name);
+        xml_attr_serialize_content(&mut buf, name);
         buf.write_bytes(b"\"");
     }
     // C.7.
     match (lang, xml_lang) {
         (Some(lang), None) => {
             buf.write_bytes(b" xml:lang=\"");
-            xml_attr_serialize_content(&mut buf, &lang);
+            xml_attr_serialize_content(&mut buf, lang);
             buf.write_bytes(b"\"");
         }
         (None, Some(xml_lang)) => {
             buf.write_bytes(b" lang=\"");
-            xml_attr_serialize_content(&mut buf, &xml_lang);
+            xml_attr_serialize_content(&mut buf, xml_lang);
             buf.write_bytes(b"\"");
         }
         _ => {}
@@ -1650,7 +1655,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
             }
             XmlElementType::XmlAttributeNode => {
                 let attr = XmlAttrPtr::try_from(cur).unwrap();
-                xml_attr_dump_output(ctxt, &attr);
+                xml_attr_dump_output(ctxt, attr);
             }
             _ => {}
         }
@@ -1777,7 +1782,7 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlGeneric
 pub(crate) unsafe fn attr_serialize_text_content<'a>(
     buf: &mut (impl Write + 'a),
     doc: Option<XmlDocPtr>,
-    attr: Option<&XmlAttr>,
+    attr: Option<XmlAttrPtr>,
     string: &str,
 ) {
     let mut base = string;
@@ -1816,7 +1821,7 @@ pub(crate) unsafe fn attr_serialize_text_content<'a>(
             if cur.as_bytes()[0] < 0xC0 {
                 xml_save_err(
                     XmlParserErrors::XmlSaveNotUTF8 as _,
-                    attr.map_or(null_mut(), |attr| attr as *const XmlAttr as _),
+                    attr.map(|attr| attr.into()),
                     None,
                 );
                 buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32));
@@ -1828,7 +1833,7 @@ pub(crate) unsafe fn attr_serialize_text_content<'a>(
             if val.len_utf8() == 1 || !xml_is_char(val as u32) {
                 xml_save_err(
                     XmlParserErrors::XmlSaveCharInvalid as _,
-                    attr.map_or(null_mut(), |attr| attr as *const XmlAttr as _),
+                    attr.map(|attr| attr.into()),
                     None,
                 );
                 buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32));
