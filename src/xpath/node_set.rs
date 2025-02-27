@@ -151,7 +151,7 @@ impl XmlNodeSet {
             if let Ok(ns) = XmlNsPtr::try_from(node) {
                 xml_xpath_node_set_free_ns(ns);
             } else if free_actual_tree {
-                xml_free_node_list(node.as_ptr());
+                xml_free_node_list(Some(node));
             }
         }
     }

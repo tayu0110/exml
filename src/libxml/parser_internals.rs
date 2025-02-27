@@ -2033,7 +2033,12 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         }
     }
     if let Some(mut my_doc) = (*ctxt).my_doc {
-        xml_free_node(my_doc.children.map_or(null_mut(), |c| c.as_ptr()));
+        xml_free_node(
+            my_doc
+                .children
+                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
+                .unwrap(),
+        );
         my_doc.children = NodePtr::from_ptr(content.map_or(null_mut(), |node| node.as_ptr()));
         my_doc.last = NodePtr::from_ptr(last.map_or(null_mut(), |node| node.as_ptr()));
     }
@@ -2255,11 +2260,11 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         ent.expanded_size = (*ctxt).sizeentcopy;
         if matches!(ret, XmlParserErrors::XmlErrEntityLoop) {
             (*ctxt).halt();
-            xml_free_node_list(list.map_or(null_mut(), |list| list.as_ptr()));
+            xml_free_node_list(list);
             return;
         }
         if xml_parser_entity_check(ctxt, oldsizeentcopy) != 0 {
-            xml_free_node_list(list.map_or(null_mut(), |list| list.as_ptr()));
+            xml_free_node_list(list);
             return;
         }
 
@@ -2320,7 +2325,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 *ent.content.load(Ordering::Relaxed).add(0) = 0;
             }
         } else if let Some(list) = list.take() {
-            xml_free_node_list(list.as_ptr());
+            xml_free_node_list(Some(list));
         }
 
         // Prevent entity from being parsed and expanded twice (Bug 760367).

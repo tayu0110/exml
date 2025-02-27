@@ -1315,18 +1315,20 @@ unsafe fn xml_relaxng_remove_redefine(
     let mut found: i32 = 0;
     let mut tmp = target;
     while let Some(mut now) = tmp {
-        let tmp2 = now.next.map_or(null_mut(), |n| n.as_ptr());
+        let tmp2 = now
+            .next
+            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
         if name.is_null() && is_relaxng(now, "start") {
             found = 1;
             now.unlink();
-            xml_free_node(now.as_ptr());
+            xml_free_node(now);
         } else if !name.is_null() && is_relaxng(now, "define") {
             if let Some(name2) = now.get_prop("name") {
                 let name2 = normalize_external_space(&name2);
                 if CStr::from_ptr(name as *const i8).to_string_lossy().as_ref() == name2 {
                     found = 1;
                     now.unlink();
-                    xml_free_node(now.as_ptr());
+                    xml_free_node(now);
                 }
             }
         } else if is_relaxng(now, "include") {
@@ -1360,7 +1362,7 @@ unsafe fn xml_relaxng_remove_redefine(
                 found = 1;
             }
         }
-        tmp = XmlNodePtr::from_raw(tmp2).unwrap();
+        tmp = tmp2;
     }
     found
 }
@@ -1569,7 +1571,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
     'main: while let Some(now) = cur {
         if let Some(mut delete) = delete.take() {
             delete.unlink();
-            xml_free_node(delete.as_ptr());
+            xml_free_node(delete);
         }
 
         'skip_children: {
@@ -2003,7 +2005,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
     }
     if let Some(mut delete) = delete.take() {
         delete.unlink();
-        xml_free_node(delete.as_ptr());
+        xml_free_node(delete);
     }
 }
 

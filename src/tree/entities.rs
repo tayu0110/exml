@@ -436,7 +436,9 @@ unsafe fn xml_free_entity(entity: XmlEntityPtr) {
                 .parent()
                 .map_or(null_mut(), |p| p.as_ptr())
     {
-        xml_free_node_list(entity.children.load(Ordering::Relaxed));
+        xml_free_node_list(XmlGenericNodePtr::from_raw(
+            entity.children.load(Ordering::Relaxed),
+        ));
         entity.children.store(null_mut(), Ordering::Relaxed);
     }
     if !entity.name.load(Ordering::Relaxed).is_null() {

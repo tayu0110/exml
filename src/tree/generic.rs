@@ -286,7 +286,7 @@ pub trait NodeCommon {
                     && self.name() == cur.name()
             }) {
                 cur_node.add_content(cur.content);
-                xml_free_node(cur.as_ptr());
+                xml_free_node(cur);
                 return Some(cur_node.into());
             }
             if let Some(mut last) = self.last().filter(|l| {
@@ -298,7 +298,7 @@ pub trait NodeCommon {
                         != Some(cur.into())
             }) {
                 last.add_content(cur.content);
-                xml_free_node(cur.as_ptr());
+                xml_free_node(cur);
                 return self
                     .last()
                     .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
@@ -326,7 +326,7 @@ pub trait NodeCommon {
                 && cur != cur_node.into()
         }) {
             cur_node.add_content(XmlNodePtr::try_from(cur).unwrap().content);
-            xml_free_node(cur.as_ptr());
+            xml_free_node(cur);
             return Some(cur_node.into());
         }
         if let Ok(mut cur) = XmlAttrPtr::try_from(cur) {
@@ -1378,15 +1378,18 @@ impl XmlGenericNodePtr {
             }) {
                 self.last().unwrap().add_content(node.content);
                 // if it's the only child, nothing more to be done.
-                let Some(next) = node.next() else {
-                    xml_free_node(node.as_ptr());
+                let Some(next) = node
+                    .next()
+                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+                else {
+                    xml_free_node(node);
                     return self
                         .last()
                         .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
                 };
                 let prev = node;
                 cur = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
-                xml_free_node(prev.as_ptr());
+                xml_free_node(prev);
             }
             let prev: *mut XmlNode = self.last().map_or(null_mut(), |l| l.as_ptr());
             (*prev).set_next(NodePtr::from_ptr(cur.as_ptr()));
@@ -1461,7 +1464,7 @@ impl XmlGenericNodePtr {
             .filter(|(cur, elem)| cur.name() == elem.name())
         {
             cur.add_content(elem.content);
-            xml_free_node(elem.as_ptr());
+            xml_free_node(elem);
             return Some(cur.into());
         }
         if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {
@@ -1537,7 +1540,7 @@ impl XmlGenericNodePtr {
                 tmp = xml_strcat(tmp, node.content);
                 node.set_content(tmp);
                 xml_free(tmp as _);
-                xml_free_node(elem.as_ptr());
+                xml_free_node(elem);
                 return Some(self);
             }
             if let Some(mut prev) = self
@@ -1549,7 +1552,7 @@ impl XmlGenericNodePtr {
                 .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
             {
                 prev.add_content(elem.content);
-                xml_free_node(elem.as_ptr());
+                xml_free_node(elem);
                 return Some(prev);
             }
         } else if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {
@@ -1617,7 +1620,7 @@ impl XmlGenericNodePtr {
             let elem = XmlNodePtr::try_from(elem).unwrap();
             if matches!(self.element_type(), XmlElementType::XmlTextNode) {
                 self.add_content(elem.content);
-                xml_free_node(elem.as_ptr());
+                xml_free_node(elem);
                 return Some(self);
             }
             if let Some(mut next) = self
@@ -1632,7 +1635,7 @@ impl XmlGenericNodePtr {
                 tmp = xml_strcat(tmp, next.content);
                 next.set_content(tmp);
                 xml_free(tmp as _);
-                xml_free_node(elem.as_ptr());
+                xml_free_node(elem);
                 return Some(next.into());
             }
         } else if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {

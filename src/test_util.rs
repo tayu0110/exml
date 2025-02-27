@@ -52,7 +52,8 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, NodeCommon, XmlAttr,
         XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDOMWrapCtxtPtr, XmlDoc, XmlDocPtr,
         XmlDtd, XmlDtdPtr, XmlElement, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntitiesTablePtr, XmlEntity, XmlGenericNodePtr, XmlNode, XmlNs,
+        XmlElementTypeVal, XmlEntitiesTablePtr, XmlEntity, XmlEntityPtr, XmlGenericNodePtr,
+        XmlNode, XmlNs,
     },
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
@@ -760,7 +761,7 @@ pub(crate) unsafe fn des_xml_dtd_ptr(no: i32, val: *mut XmlDtd, _nr: i32) {
         free_api_doc();
     } else if !val.is_null() {
         (*val).unlink();
-        xml_free_node(val as *mut XmlNode);
+        xml_free_node(XmlGenericNodePtr::from_raw(val).unwrap());
     }
 }
 
@@ -939,13 +940,13 @@ pub(crate) fn des_xml_char(_no: i32, _val: XmlChar, _nr: i32) {}
 pub(crate) unsafe fn desret_xml_node_ptr(val: *mut XmlNode) {
     if !val.is_null() && val != API_ROOT.get() && val != API_DOC.get() as *mut XmlNode {
         (*val).unlink();
-        xml_free_node(val);
+        xml_free_node(XmlGenericNodePtr::from_raw(val).unwrap());
     }
 }
 pub(crate) unsafe fn desret_xml_attr_ptr(val: *mut XmlAttr) {
     if !val.is_null() {
         (*val).unlink();
-        xml_free_node(val as *mut XmlNode);
+        xml_free_node(XmlGenericNodePtr::from_raw(val).unwrap());
     }
 }
 
@@ -1182,7 +1183,7 @@ pub(crate) unsafe fn desret_xml_parser_input_ptr(val: XmlParserInputPtr) {
 pub(crate) unsafe fn desret_xml_entity_ptr(val: *mut XmlEntity) {
     if !val.is_null() {
         (*val).unlink();
-        xml_free_node(val as *mut XmlNode);
+        xml_free_node(XmlEntityPtr::from_raw(val).unwrap().unwrap());
     }
 }
 
@@ -1269,7 +1270,7 @@ pub(crate) unsafe fn des_xml_node_ptr(no: i32, val: *mut XmlNode, _nr: i32) {
         free_api_doc();
     } else if !val.is_null() {
         (*val).unlink();
-        xml_free_node(val);
+        xml_free_node(XmlGenericNodePtr::from_raw(val).unwrap());
     }
 }
 

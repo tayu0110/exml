@@ -6515,7 +6515,7 @@ pub unsafe fn xml_valid_get_valid_elements(
 
     // Free up the dummy node
     test_node.name = name;
-    xml_free_node(test_node.as_ptr());
+    xml_free_node(test_node);
 
     nb_valid_elements
 }

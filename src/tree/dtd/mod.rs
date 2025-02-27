@@ -460,12 +460,17 @@ pub unsafe fn xml_free_dtd(mut cur: XmlDtdPtr) {
         xml_deregister_node_default_value(cur.as_ptr() as _);
     }
 
-    if let Some(children) = (*cur).children() {
+    if let Some(children) = (*cur)
+        .children()
+        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+    {
         // Cleanup all nodes which are not part of the specific lists
         // of notations, elements, attributes and entities.
         let mut c = Some(children);
         while let Some(mut now) = c {
-            let next = now.next;
+            let next = now
+                .next()
+                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
             if !matches!(
                 now.element_type(),
                 XmlElementType::XmlNotationNode
@@ -474,7 +479,7 @@ pub unsafe fn xml_free_dtd(mut cur: XmlDtdPtr) {
                     | XmlElementType::XmlEntityDecl
             ) {
                 now.unlink();
-                xml_free_node(now.as_ptr());
+                xml_free_node(now);
             }
             c = next;
         }

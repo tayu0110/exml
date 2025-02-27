@@ -353,7 +353,7 @@ impl XmlDoc {
                             xml_free(val as _);
                         }
                         if let Some(head) = head {
-                            xml_free_node_list(head.as_ptr());
+                            xml_free_node_list(Some(head));
                         }
                         return ret;
                     }
@@ -384,7 +384,7 @@ impl XmlDoc {
                                         xml_free(val as _);
                                     }
                                     if let Some(head) = head {
-                                        xml_free_node_list(head.as_ptr());
+                                        xml_free_node_list(Some(head));
                                     }
                                     return ret;
                                 };
@@ -411,7 +411,7 @@ impl XmlDoc {
                                     xml_free(val as _);
                                 }
                                 if let Some(head) = head {
-                                    xml_free_node_list(head.as_ptr());
+                                    xml_free_node_list(Some(head));
                                 }
                                 return ret;
                             };
@@ -478,7 +478,7 @@ impl XmlDoc {
                     xml_free(val as _);
                 }
                 if let Some(head) = head {
-                    xml_free_node_list(head.as_ptr());
+                    xml_free_node_list(Some(head));
                 }
                 return ret;
             };
@@ -1166,8 +1166,11 @@ pub unsafe fn xml_free_doc(mut cur: XmlDocPtr) {
         xml_free_dtd(int_subset);
     }
 
-    if let Some(children) = cur.children() {
-        xml_free_node_list(children.as_ptr());
+    if let Some(children) = cur
+        .children()
+        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+    {
+        xml_free_node_list(Some(children));
     }
     if let Some(old_ns) = cur.old_ns.take() {
         xml_free_ns_list(old_ns);

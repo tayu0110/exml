@@ -442,7 +442,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
         // remove the meta tag if NULL is passed
         if encoding.is_none() {
             meta.unlink();
-            xml_free_node(meta.as_ptr());
+            xml_free_node(meta);
         }
         // change the document only if there is a real encoding change
         else if content.map_or(true, |c| {

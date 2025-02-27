@@ -2729,7 +2729,7 @@ unsafe fn xml_shell_set_content(
             .children()
             .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
         {
-            xml_free_node_list(children.as_ptr());
+            xml_free_node_list(Some(children));
             node.set_children(None);
             node.set_last(None);
         }

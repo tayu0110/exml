@@ -1195,7 +1195,7 @@ pub(crate) unsafe fn xml_static_copy_node(
         let mut insert = XmlGenericNodePtr::from(ret);
         while let Some(mut now) = cur {
             let Some(mut copy) = xml_static_copy_node(now, doc, Some(insert), 2) else {
-                xml_free_node(ret.as_ptr());
+                xml_free_node(ret);
                 return None;
             };
 
@@ -1278,9 +1278,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
             } else {
                 let Some(mut new) = xml_copy_dtd(XmlDtdPtr::try_from(cur_node).unwrap()) else {
                     // goto error;
-                    xml_free_node_list(
-                        ret.map_or(null_mut(), |node: XmlGenericNodePtr| node.as_ptr()),
-                    );
+                    xml_free_node_list(ret);
                     return None;
                 };
                 new.doc = Some(doc);
@@ -1296,7 +1294,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
         let q = xml_static_copy_node(node, doc, parent, 1);
         let Some(mut q) = q else {
             // goto error;
-            xml_free_node_list(ret.map_or(null_mut(), |node| node.as_ptr()));
+            xml_free_node_list(ret);
             return None;
         };
         if ret.is_none() {
@@ -2174,7 +2172,7 @@ pub unsafe fn xml_text_merge(
             }
             first.add_content(second.content);
             second.unlink();
-            xml_free_node(second.as_ptr());
+            xml_free_node(second);
             Some(first)
         }
         (Some(first), Some(_)) => Some(first),
@@ -2211,64 +2209,70 @@ pub unsafe fn xml_text_concat(mut node: XmlNodePtr, content: &str) -> i32 {
 /// Free a node and all its siblings, this is a recursive behaviour, all
 /// the children are freed too.
 #[doc(alias = "xmlFreeNodeList")]
-pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
-    let mut parent: *mut XmlNode;
+pub unsafe fn xml_free_node_list(cur: Option<impl Into<XmlGenericNodePtr>>) {
     let mut depth: usize = 0;
 
-    if cur.is_null() {
+    let Some(mut cur) = cur.map(|cur| cur.into()) else {
         return;
-    }
-    if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-        xml_free_ns_list(XmlNsPtr::from_raw(cur as _).unwrap().unwrap());
+    };
+    if let Ok(ns) = XmlNsPtr::try_from(cur) {
+        xml_free_ns_list(ns);
         return;
     }
     loop {
-        while let Some(children) = (*cur).children().filter(|_| {
-            !matches!(
-                (*cur).element_type(),
-                XmlElementType::XmlDocumentNode
-                    | XmlElementType::XmlHTMLDocumentNode
-                    | XmlElementType::XmlDTDNode
-                    | XmlElementType::XmlEntityRefNode
-            )
-        }) {
-            cur = children.as_ptr();
+        while let Some(children) = cur
+            .children()
+            .filter(|_| {
+                !matches!(
+                    cur.element_type(),
+                    XmlElementType::XmlDocumentNode
+                        | XmlElementType::XmlHTMLDocumentNode
+                        | XmlElementType::XmlDTDNode
+                        | XmlElementType::XmlEntityRefNode
+                )
+            })
+            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+        {
+            cur = children;
             depth += 1;
         }
 
-        let next = (*cur).next.map_or(null_mut(), |c| c.as_ptr());
-        parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-        if matches!((*cur).element_type(), XmlElementType::XmlDocumentNode)
-            || matches!((*cur).element_type(), XmlElementType::XmlHTMLDocumentNode)
-        {
-            xml_free_doc(XmlDocPtr::from_raw(cur as _).unwrap().unwrap());
-        } else if !matches!((*cur).element_type(), XmlElementType::XmlDTDNode) {
+        let next = cur
+            .next()
+            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        let parent = cur
+            .parent()
+            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        if let Ok(doc) = XmlDocPtr::try_from(cur) {
+            xml_free_doc(doc);
+        } else if !matches!(cur.element_type(), XmlElementType::XmlDTDNode) {
+            let cur = XmlNodePtr::try_from(cur).unwrap();
             if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
             // && xmlDeregisterNodeDefaultValue.is_some()
             {
-                xml_deregister_node_default_value(cur as _);
+                xml_deregister_node_default_value(cur.as_ptr());
             }
 
-            if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                || matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
-                || matches!((*cur).element_type(), XmlElementType::XmlXIncludeEnd))
-                && (*cur).properties.is_some()
+            if (matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                || matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
+                || matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd))
+                && cur.properties.is_some()
             {
-                xml_free_prop_list((*cur).properties);
+                xml_free_prop_list(cur.properties);
             }
-            if !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                && !matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
-                && !matches!((*cur).element_type(), XmlElementType::XmlXIncludeEnd)
-                && !matches!((*cur).element_type(), XmlElementType::XmlEntityRefNode)
-                && !(*cur).content.is_null()
+            if !matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                && !matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
+                && !matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
+                && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
+                && !cur.content.is_null()
             {
-                xml_free((*cur).content as _);
+                xml_free(cur.content as _);
             }
-            if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                || matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
-                || matches!((*cur).element_type(), XmlElementType::XmlXIncludeEnd)
+            if matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                || matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
+                || matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
             {
-                if let Some(ns_def) = (*cur).ns_def {
+                if let Some(ns_def) = cur.ns_def {
                     xml_free_ns_list(ns_def);
                 }
             }
@@ -2277,24 +2281,27 @@ pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
             // variable for the name of the node.
             // Otherwise the node name might come from the document's
             // dictionary
-            if !(*cur).name.is_null()
-                && !matches!((*cur).element_type(), XmlElementType::XmlTextNode)
-                && !matches!((*cur).element_type(), XmlElementType::XmlCommentNode)
+            if !cur.name.is_null()
+                && !matches!(cur.element_type(), XmlElementType::XmlTextNode)
+                && !matches!(cur.element_type(), XmlElementType::XmlCommentNode)
             {
-                xml_free((*cur).name as _);
+                xml_free(cur.name as _);
             }
-            XmlNodePtr::from_raw(cur).unwrap().unwrap().free();
+            cur.free();
         }
 
-        if !next.is_null() {
+        if let Some(next) = next {
             cur = next;
         } else {
-            if depth == 0 || parent.is_null() {
+            if depth == 0 {
                 break;
             }
+            let Some(parent) = parent else {
+                break;
+            };
             depth -= 1;
             cur = parent;
-            (*cur).set_children(None);
+            cur.set_children(None);
         }
     }
 }
@@ -2302,81 +2309,95 @@ pub unsafe fn xml_free_node_list(mut cur: *mut XmlNode) {
 /// Free a node, this is a recursive behaviour, all the children are freed too.
 /// This doesn't unlink the child from the list, use xmlUnlinkNode() first.
 #[doc(alias = "xmlFreeNode")]
-pub unsafe fn xml_free_node(cur: *mut XmlNode) {
-    if cur.is_null() {
-        return;
-    }
-
+pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
+    let cur = cur.into();
     // use xmlFreeDtd for DTD nodes
-    if matches!((*cur).element_type(), XmlElementType::XmlDTDNode) {
-        xml_free_dtd(XmlDtdPtr::from_raw(cur as *mut XmlDtd).unwrap().unwrap());
+    if let Ok(dtd) = XmlDtdPtr::try_from(cur) {
+        xml_free_dtd(dtd);
         return;
     }
-    if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-        xml_free_ns(XmlNsPtr::from_raw(cur as *mut XmlNs).unwrap().unwrap());
+    if let Ok(ns) = XmlNsPtr::try_from(cur) {
+        xml_free_ns(ns);
         return;
     }
-    if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
-        xml_free_prop(XmlAttrPtr::from_raw(cur as _).unwrap().unwrap());
+    if let Ok(attr) = XmlAttrPtr::try_from(cur) {
+        xml_free_prop(attr);
         return;
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
     {
-        xml_deregister_node_default_value(cur as _);
+        xml_deregister_node_default_value(cur.as_ptr());
     }
 
-    if matches!((*cur).element_type(), XmlElementType::XmlEntityDecl) {
-        let ent: *mut XmlEntity = cur as _;
-        let system_id = (*ent).system_id.load(Ordering::Relaxed);
+    if let Ok(ent) = XmlEntityPtr::try_from(cur) {
+        let system_id = ent.system_id.load(Ordering::Relaxed);
         if !system_id.is_null() {
             xml_free(system_id as _);
         }
-        (*ent).system_id.store(null_mut(), Ordering::Relaxed);
-        let external_id = (*ent).external_id.load(Ordering::Relaxed);
+        ent.system_id.store(null_mut(), Ordering::Relaxed);
+        let external_id = ent.external_id.load(Ordering::Relaxed);
         if !external_id.is_null() {
             xml_free(external_id as _);
         }
-        (*ent).external_id.store(null_mut(), Ordering::Relaxed);
+        ent.external_id.store(null_mut(), Ordering::Relaxed);
     }
-    if let Some(children) = (*cur)
+    if let Some(children) = cur
         .children()
-        .filter(|_| !matches!((*cur).element_type(), XmlElementType::XmlEntityRefNode))
+        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+        .filter(|_| !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode))
     {
-        xml_free_node_list(children.as_ptr());
+        xml_free_node_list(Some(children));
     }
 
-    if matches!(
-        (*cur).element_type(),
-        XmlElementType::XmlElementNode
-            | XmlElementType::XmlXIncludeStart
-            | XmlElementType::XmlXIncludeEnd
-    ) {
-        if (*cur).properties.is_some() {
-            xml_free_prop_list((*cur).properties);
+    if let Ok(mut cur) = XmlNodePtr::try_from(cur) {
+        if matches!(
+            cur.element_type(),
+            XmlElementType::XmlElementNode
+                | XmlElementType::XmlXIncludeStart
+                | XmlElementType::XmlXIncludeEnd
+        ) {
+            if cur.properties.is_some() {
+                xml_free_prop_list(cur.properties);
+            }
+            if let Some(ns_def) = cur.ns_def.take() {
+                xml_free_ns_list(ns_def);
+            }
+        } else if !cur.content.is_null()
+            && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
+            && !cur.content.is_null()
+        {
+            xml_free(cur.content as _);
         }
-        if let Some(ns_def) = (*cur).ns_def.take() {
-            xml_free_ns_list(ns_def);
+
+        // When a node is a text node or a comment, it uses a global static
+        // variable for the name of the node.
+        // Otherwise the node name might come from the document's dictionary
+        if !cur.name.is_null()
+            && !matches!(cur.element_type(), XmlElementType::XmlTextNode)
+            && !matches!(cur.element_type(), XmlElementType::XmlCommentNode)
+        {
+            xml_free(cur.name as _);
         }
-    } else if !(*cur).content.is_null()
-        && !matches!((*cur).element_type(), XmlElementType::XmlEntityRefNode)
-        && !(*cur).content.is_null()
-    {
-        xml_free((*cur).content as _);
-    }
 
-    // When a node is a text node or a comment, it uses a global static
-    // variable for the name of the node.
-    // Otherwise the node name might come from the document's dictionary
-    if !(*cur).name.is_null()
-        && !matches!((*cur).element_type(), XmlElementType::XmlTextNode)
-        && !matches!((*cur).element_type(), XmlElementType::XmlCommentNode)
-    {
-        xml_free((*cur).name as _);
+        cur.free();
+    } else if let Ok(cur) = XmlEntityPtr::try_from(cur) {
+        let content = cur.content.load(Ordering::Relaxed);
+        if !content.is_null() {
+            xml_free(content as _);
+        }
+        // When a node is a text node or a comment, it uses a global static
+        // variable for the name of the node.
+        // Otherwise the node name might come from the document's dictionary
+        let name = cur.name.load(Ordering::Relaxed);
+        if !name.is_null() {
+            xml_free(name as _);
+        }
+    } else {
+        // Does this pattern occur ???
+        todo!()
     }
-
-    XmlNodePtr::from_raw(cur).unwrap().unwrap().free();
 }
 
 /// Verify that the given namespace held on @ancestor is still in scope on node.

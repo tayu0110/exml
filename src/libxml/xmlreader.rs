@@ -813,11 +813,11 @@ impl XmlTextReader {
             // XXX: Why do we need a second buffer?
             let mut buff2 = vec![];
             if node.dump_memory(&mut buff2, doc, 0, 0) == 0 {
-                xml_free_node(node.as_ptr());
+                xml_free_node(node);
                 return null_mut();
             }
             buff.extend(buff2);
-            xml_free_node(node.as_ptr());
+            xml_free_node(node);
             cur = cur_node
                 .next()
                 .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
@@ -847,10 +847,10 @@ impl XmlTextReader {
         }
         let mut buff = vec![];
         if node.dump_memory(&mut buff, doc, 0, 0) == 0 {
-            xml_free_node(node.as_ptr());
+            xml_free_node(node);
             return null_mut();
         }
-        xml_free_node(node.as_ptr());
+        xml_free_node(node);
         xml_strndup(buff.as_ptr(), buff.len() as i32)
     }
 
@@ -4182,7 +4182,7 @@ pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
     reader.curnode = None;
     reader.mode = XmlTextReaderMode::XmlTextreaderModeClosed;
     if let Some(faketext) = reader.faketext.take() {
-        xml_free_node(faketext.as_ptr());
+        xml_free_node(faketext);
     }
     if !reader.ctxt.is_null() {
         #[cfg(all(feature = "libxml_regexp", feature = "libxml_valid"))]

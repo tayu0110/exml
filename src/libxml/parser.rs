@@ -2212,11 +2212,10 @@ pub unsafe fn xml_parse_in_node_context(
     }
 
     fake.unlink();
-    xml_free_node(fake.as_ptr());
+    xml_free_node(fake);
 
     if !matches!(ret, XmlParserErrors::XmlErrOK) {
-        xml_free_node_list(lst.map_or(null_mut(), |node| node.as_ptr()));
-        *lst = None;
+        xml_free_node_list(lst.take());
     }
 
     xml_free_parser_ctxt(ctxt);

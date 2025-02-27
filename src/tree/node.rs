@@ -1185,8 +1185,11 @@ impl XmlNode {
                 xml_remove_id(self.document().unwrap(), prop);
                 prop.atype = Some(XmlAttributeType::XmlAttributeID);
             }
-            if let Some(children) = prop.children() {
-                xml_free_node_list(children.as_ptr());
+            if let Some(children) = prop
+                .children
+                .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+            {
+                xml_free_node_list(Some(children));
             }
             prop.set_children(None);
             prop.set_last(None);
@@ -1394,8 +1397,11 @@ impl XmlNode {
             XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlElementNode
             | XmlElementType::XmlAttributeNode => {
-                if let Some(children) = self.children() {
-                    xml_free_node_list(children.as_ptr());
+                if let Some(children) = self
+                    .children()
+                    .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+                {
+                    xml_free_node_list(Some(children));
                 }
                 self.children = self.document().and_then(|doc| {
                     NodePtr::from_ptr(
@@ -1423,8 +1429,11 @@ impl XmlNode {
                 if !self.content.is_null() {
                     xml_free(self.content as _);
                 }
-                if let Some(children) = self.children() {
-                    xml_free_node_list(children.as_ptr());
+                if let Some(children) = self
+                    .children()
+                    .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+                {
+                    xml_free_node_list(Some(children));
                 }
                 self.set_last(None);
                 self.set_children(None);
@@ -1467,8 +1476,11 @@ impl XmlNode {
             XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlElementNode
             | XmlElementType::XmlAttributeNode => {
-                if let Some(children) = self.children() {
-                    xml_free_node_list(children.as_ptr());
+                if let Some(children) = self
+                    .children()
+                    .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+                {
+                    xml_free_node_list(Some(children));
                 }
                 self.children = self.document().and_then(|doc| {
                     NodePtr::from_ptr(
@@ -1497,8 +1509,11 @@ impl XmlNode {
                 if !self.content.is_null() {
                     xml_free(self.content as _);
                 }
-                if let Some(children) = self.children() {
-                    xml_free_node_list(children.as_ptr());
+                if let Some(children) = self
+                    .children()
+                    .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+                {
+                    xml_free_node_list(Some(children));
                 }
                 self.set_children(None);
                 self.set_last(None);
@@ -1702,7 +1717,7 @@ impl XmlNode {
             let mut cur = XmlNodePtr::try_from(cur).unwrap();
             let elem = XmlNodePtr::try_from(elem).unwrap();
             cur.add_content(elem.content);
-            xml_free_node(elem.as_ptr());
+            xml_free_node(elem);
             return Some(cur.into());
         } else if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {
             return Some(
@@ -1776,7 +1791,7 @@ impl XmlNode {
                 tmp = xml_strcat(tmp, self.content);
                 self.set_content(tmp);
                 xml_free(tmp as _);
-                xml_free_node(elem.as_ptr());
+                xml_free_node(elem);
                 return XmlGenericNodePtr::from_raw(self);
             }
             if let Some(mut prev) = self
@@ -1787,7 +1802,7 @@ impl XmlNode {
                 .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
             {
                 prev.add_content(elem.content);
-                xml_free_node(elem.as_ptr());
+                xml_free_node(elem);
                 return Some(prev);
             }
         } else if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {
@@ -1855,7 +1870,7 @@ impl XmlNode {
             let elem = XmlNodePtr::try_from(elem).unwrap();
             if matches!(self.element_type(), XmlElementType::XmlTextNode) {
                 self.add_content(elem.content);
-                xml_free_node(elem.as_ptr());
+                xml_free_node(elem);
                 return XmlGenericNodePtr::from_raw(self);
             }
             if let Some(mut next) = self
@@ -1870,7 +1885,7 @@ impl XmlNode {
                 tmp = xml_strcat(tmp, next.content);
                 next.set_content(tmp);
                 xml_free(tmp as _);
-                xml_free_node(elem.as_ptr());
+                xml_free_node(elem);
                 return Some(next.into());
             }
         } else if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {
@@ -1949,14 +1964,14 @@ impl XmlNode {
                     .next()
                     .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
                 else {
-                    xml_free_node(node.as_ptr());
+                    xml_free_node(node);
                     return self
                         .last()
                         .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
                 };
                 let prev = node;
                 cur = next;
-                xml_free_node(prev.as_ptr());
+                xml_free_node(prev);
             }
             let mut prev = self
                 .last()

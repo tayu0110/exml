@@ -870,7 +870,7 @@ unsafe fn xml_xinclude_copy_node(
 
             if refe.is_null() {
                 // goto error;
-                xml_free_node_list(result.map_or(null_mut(), |node| node.as_ptr()));
+                xml_free_node_list(result);
                 return None;
             }
             // TODO: Insert xmlElementType::XML_XINCLUDE_START and xmlElementType::XML_XINCLUDE_END nodes
@@ -881,7 +881,7 @@ unsafe fn xml_xinclude_copy_node(
                     insert_parent.map(|parent| parent.into()),
                 ) else {
                     // goto error;
-                    xml_free_node_list(result.map_or(null_mut(), |node| node.as_ptr()));
+                    xml_free_node_list(result);
                     return None;
                 };
                 copy = Some(XmlNodePtr::try_from(res).unwrap());
@@ -894,7 +894,7 @@ unsafe fn xml_xinclude_copy_node(
                 2,
             ) else {
                 // goto error;
-                xml_free_node_list(result.map_or(null_mut(), |node| node.as_ptr()));
+                xml_free_node_list(result);
                 return None;
             };
             copy = Some(XmlNodePtr::try_from(res).unwrap());
@@ -1273,7 +1273,7 @@ unsafe fn xml_xinclude_copy_xpointer(
                 // expanded, so xmlDocCopyNode should work as well.
                 // xmlXIncludeCopyNode is only required for the initial document.
                 let Some(mut copy) = xml_xinclude_copy_node(ctxt, node, 0) else {
-                    xml_free_node_list(list.map_or(null_mut(), |node| node.as_ptr()));
+                    xml_free_node_list(list);
                     return None;
                 };
                 if let Some(mut last) = last {
@@ -1948,7 +1948,7 @@ unsafe fn xml_xinclude_load_txt(
                 u
             );
             // goto error;
-            xml_free_node(node.as_ptr());
+            xml_free_node(node);
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
             xml_free_uri(uri);
@@ -2219,7 +2219,7 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
                 XmlParserErrors::XmlXIncludeMultipleRoot,
                 "XInclude error: would result in multiple root nodes\n"
             );
-            xml_free_node_list(list.map_or(null_mut(), |node| node.as_ptr()));
+            xml_free_node_list(list);
             return -1;
         }
     }
@@ -2235,7 +2235,7 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
         }
         // FIXME: xmlUnlinkNode doesn't coalesce text nodes.
         cur.unlink();
-        xml_free_node(cur.as_ptr());
+        xml_free_node(cur);
     } else {
         // Change the current node as an XInclude start one, and add an XInclude end one
         if (*refe).fallback != 0 {
@@ -2243,11 +2243,15 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
         }
         cur.typ = XmlElementType::XmlXIncludeStart;
         // Remove fallback children
-        let mut child = cur.children();
+        let mut child = cur
+            .children()
+            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
         while let Some(mut now) = child {
-            let next = now.next;
+            let next = now
+                .next()
+                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
             now.unlink();
-            xml_free_node(now.as_ptr());
+            xml_free_node(now);
             child = next;
         }
         let Some(mut end) = xml_new_doc_node(cur.doc, cur.ns, &cur.name().unwrap(), null_mut())
@@ -2258,7 +2262,7 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
                 XmlParserErrors::XmlXIncludeBuildFailed,
                 "failed to build node\n"
             );
-            xml_free_node_list(list.map_or(null_mut(), |node| node.as_ptr()));
+            xml_free_node_list(list);
             return -1;
         };
         end.typ = XmlElementType::XmlXIncludeEnd;
@@ -2355,7 +2359,7 @@ unsafe fn xml_xinclude_do_process(ctxt: XmlXIncludeCtxtPtr, tree: XmlNodePtr) ->
             // Ignore includes which were added indirectly, for example
             // inside xi:fallback elements.
             if let Some(inc) = (*inc).inc.take() {
-                xml_free_node_list(inc.as_ptr());
+                xml_free_node_list(Some(inc));
             }
         }
         ret += 1;

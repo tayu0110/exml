@@ -1945,7 +1945,7 @@ pub unsafe fn xml_sax2_start_element(
     // We are parsing a new node.
     if (*ctxt).node_push(ret) < 0 {
         ret.unlink();
-        xml_free_node(ret.as_ptr());
+        xml_free_node(ret);
         return;
     }
 
@@ -2197,7 +2197,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     // We are parsing a new node.
     if (*ctxt).node_push(ret) < 0 {
         ret.unlink();
-        xml_free_node(ret.as_ptr());
+        xml_free_node(ret);
         return;
     }
 
@@ -2698,7 +2698,7 @@ pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: &str) {
         node.add_child(ret.unwrap().into()).is_none()
     }) {
         if let Some(ret) = ret {
-            xml_free_node(ret.as_ptr());
+            xml_free_node(ret);
         }
     }
 }

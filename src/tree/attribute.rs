@@ -773,8 +773,11 @@ pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
     {
         xml_remove_id(doc, cur);
     }
-    if let Some(children) = cur.children() {
-        xml_free_node_list(children.as_ptr());
+    if let Some(children) = cur
+        .children()
+        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+    {
+        xml_free_node_list(Some(children));
     }
     if !cur.name.is_null() {
         xml_free(cur.name as _);

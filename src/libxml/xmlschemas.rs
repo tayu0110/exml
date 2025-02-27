@@ -4627,7 +4627,7 @@ unsafe fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: XmlNodePtr)
     'main: while let Some(cur_node) = cur {
         if let Some(mut delete) = delete.take() {
             delete.unlink();
-            xml_free_node(delete.as_ptr());
+            xml_free_node(delete);
         }
         'skip_children: {
             if cur_node.element_type() == XmlElementType::XmlTextNode {
@@ -4691,7 +4691,7 @@ unsafe fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: XmlNodePtr)
     }
     if let Some(mut delete) = delete {
         delete.unlink();
-        xml_free_node(delete.as_ptr());
+        xml_free_node(delete);
     }
 }
 

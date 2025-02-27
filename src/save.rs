@@ -1209,8 +1209,11 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
                 .map_or(true, |c| c.content.is_null() || *c.content.add(0) == 0)
             && html_is_boolean_attr(now.name) != 0
         {
-            if let Some(children) = now.children {
-                xml_free_node(children.as_ptr());
+            if let Some(children) = now
+                .children
+                .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+            {
+                xml_free_node(children);
             }
             now.children = NodePtr::from_ptr(
                 xml_new_doc_text(now.doc, now.name).map_or(null_mut(), |node| node.as_ptr()),
