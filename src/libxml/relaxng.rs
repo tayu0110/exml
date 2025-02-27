@@ -313,12 +313,12 @@ pub type XmlRelaxNGValidErrorPtr = *mut XmlRelaxNGValidError;
 #[doc(alias = "xmlRelaxNGValidError")]
 #[repr(C)]
 pub struct XmlRelaxNGValidError {
-    pub(crate) err: XmlRelaxNGValidErr, // the error number
-    pub(crate) flags: i32,              // flags
-    pub(crate) node: *mut XmlNode,      // the current node
-    pub(crate) seq: *mut XmlNode,       // the current child
-    pub(crate) arg1: *const XmlChar,    // first arg
-    pub(crate) arg2: *const XmlChar,    // second arg
+    pub(crate) err: XmlRelaxNGValidErr,         // the error number
+    pub(crate) flags: i32,                      // flags
+    pub(crate) node: Option<XmlGenericNodePtr>, // the current node
+    pub(crate) seq: Option<XmlGenericNodePtr>,  // the current child
+    pub(crate) arg1: *const XmlChar,            // first arg
+    pub(crate) arg2: *const XmlChar,            // second arg
 }
 
 impl Default for XmlRelaxNGValidError {
@@ -326,8 +326,8 @@ impl Default for XmlRelaxNGValidError {
         Self {
             err: XmlRelaxNGValidErr::default(),
             flags: 0,
-            node: null_mut(),
-            seq: null_mut(),
+            node: None,
+            seq: None,
             arg1: null(),
             arg2: null(),
         }
@@ -938,7 +938,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
                     if ret == 0 {
                         xml_rng_perr!(
                             ctxt,
-                            XmlGenericNodePtr::from_raw((*def).node),
+                            (*def).node.map(|node| node.into()),
                             XmlParserErrors::XmlRngpElemTextConflict,
                             "Element or text conflicts in interleave\n"
                         );
@@ -951,7 +951,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
                     if ret == 0 {
                         xml_rng_perr!(
                             ctxt,
-                            XmlGenericNodePtr::from_raw((*def).node),
+                            (*def).node.map(|node| node.into()),
                             XmlParserErrors::XmlRngpAttrConflict,
                             "Attributes conflicts in interleave\n"
                         );
@@ -2066,14 +2066,14 @@ unsafe fn xml_relaxng_check_combine(
     }
     cur = define;
     while !cur.is_null() {
-        if let Some(combine) = (*(*cur).node).get_prop("combine") {
+        if let Some(combine) = (*cur).node.unwrap().get_prop("combine") {
             if combine == "choice" {
                 if choice_or_interleave == -1 {
                     choice_or_interleave = 1;
                 } else if choice_or_interleave == 0 {
                     xml_rng_perr!(
                         ctxt,
-                        XmlGenericNodePtr::from_raw((*define).node),
+                        (*define).node.map(|node| node.into()),
                         XmlParserErrors::XmlRngpDefChoiceAndInterleave,
                         "Defines for {} use both 'choice' and 'interleave'\n",
                         name
@@ -2085,7 +2085,7 @@ unsafe fn xml_relaxng_check_combine(
                 } else if choice_or_interleave == 1 {
                     xml_rng_perr!(
                         ctxt,
-                        XmlGenericNodePtr::from_raw((*define).node),
+                        (*define).node.map(|node| node.into()),
                         XmlParserErrors::XmlRngpDefChoiceAndInterleave,
                         "Defines for {} use both 'choice' and 'interleave'\n",
                         name
@@ -2094,7 +2094,7 @@ unsafe fn xml_relaxng_check_combine(
             } else {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*define).node),
+                    (*define).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpUnknownCombine,
                     "Defines for {} use unknown combine value '{}''\n",
                     name,
@@ -2106,7 +2106,7 @@ unsafe fn xml_relaxng_check_combine(
         } else {
             xml_rng_perr!(
                 ctxt,
-                XmlGenericNodePtr::from_raw((*define).node),
+                (*define).node.map(|node| node.into()),
                 XmlParserErrors::XmlRngpNeedCombine,
                 "Some defines for {} needs the combine attribute\n",
                 name
@@ -2118,7 +2118,7 @@ unsafe fn xml_relaxng_check_combine(
     if choice_or_interleave == -1 {
         choice_or_interleave = 0;
     }
-    cur = xml_relaxng_new_define(ctxt, XmlNodePtr::from_raw((*define).node).unwrap());
+    cur = xml_relaxng_new_define(ctxt, (*define).node);
     if cur.is_null() {
         return;
     }
@@ -2133,10 +2133,7 @@ unsafe fn xml_relaxng_check_combine(
         if !(*tmp).content.is_null() {
             if !(*(*tmp).content).next.is_null() {
                 // we need first to create a wrapper.
-                tmp2 = xml_relaxng_new_define(
-                    ctxt,
-                    XmlNodePtr::from_raw((*(*tmp).content).node).unwrap(),
-                );
+                tmp2 = xml_relaxng_new_define(ctxt, (*(*tmp).content).node);
                 if tmp2.is_null() {
                     break;
                 }
@@ -2180,7 +2177,7 @@ unsafe fn xml_relaxng_check_combine(
                 let tmpname = CStr::from_ptr(tmpname.as_ptr()).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*define).node),
+                    (*define).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpInterleaveCreateFailed,
                     "Failed to add {} to hash table\n",
                     tmpname
@@ -2189,7 +2186,7 @@ unsafe fn xml_relaxng_check_combine(
         } else {
             xml_rng_perr!(
                 ctxt,
-                XmlGenericNodePtr::from_raw((*define).node),
+                (*define).node.map(|node| node.into()),
                 XmlParserErrors::XmlRngpInterleaveCreateFailed,
                 "Failed to create interleaves hash table\n"
             );
@@ -2218,7 +2215,7 @@ extern "C" fn xml_relaxng_check_reference(
             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                XmlGenericNodePtr::from_raw((*refe).node),
+                (*refe).node.map(|node| node.into()),
                 XmlParserErrors::XmlErrInternalError,
                 "Internal error: no grammar in CheckReference {}\n",
                 name
@@ -2229,7 +2226,7 @@ extern "C" fn xml_relaxng_check_reference(
             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                XmlGenericNodePtr::from_raw((*refe).node),
+                (*refe).node.map(|node| node.into()),
                 XmlParserErrors::XmlErrInternalError,
                 "Internal error: reference has content in CheckReference {}\n",
                 name
@@ -2251,7 +2248,7 @@ extern "C" fn xml_relaxng_check_reference(
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*refe).node),
+                    (*refe).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpRefNoDef,
                     "Reference {} has no matching definition\n",
                     name
@@ -2261,7 +2258,7 @@ extern "C" fn xml_relaxng_check_reference(
             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
-                XmlGenericNodePtr::from_raw((*refe).node),
+                (*refe).node.map(|node| node.into()),
                 XmlParserErrors::XmlRngpRefNoDef,
                 "Reference {} has no matching definition\n",
                 name
@@ -4258,21 +4255,21 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
     }
     cur = starts;
     while !cur.is_null() {
-        let combine = if (*cur).node.is_null()
-            || (*(*cur).node).parent().is_none()
-            || !xml_str_equal(
-                (*(*cur).node).parent().unwrap().name,
-                c"start".as_ptr() as _,
-            ) {
+        let combine = if let Some(parent) = (*cur)
+            .node
+            .and_then(|node| node.parent)
+            .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+            .filter(|parent| parent.name().as_deref() == Some("start"))
+        {
+            parent.get_prop("combine")
+        } else {
             xml_rng_perr!(
                 ctxt,
-                XmlGenericNodePtr::from_raw((*cur).node),
+                (*cur).node.map(|node| node.into()),
                 XmlParserErrors::XmlRngpStartMissing,
                 "Internal error: start element not found\n"
             );
             None
-        } else {
-            (*(*cur).node).parent().unwrap().get_prop("combine")
         };
 
         if let Some(combine) = combine {
@@ -4282,7 +4279,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
                 } else if choice_or_interleave == 0 {
                     xml_rng_perr!(
                         ctxt,
-                        XmlGenericNodePtr::from_raw((*cur).node),
+                        (*cur).node.map(|node| node.into()),
                         XmlParserErrors::XmlRngpStartChoiceAndInterleave,
                         "<start> use both 'choice' and 'interleave'\n"
                     );
@@ -4293,7 +4290,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
                 } else if choice_or_interleave == 1 {
                     xml_rng_perr!(
                         ctxt,
-                        XmlGenericNodePtr::from_raw((*cur).node),
+                        (*cur).node.map(|node| node.into()),
                         XmlParserErrors::XmlRngpStartChoiceAndInterleave,
                         "<start> use both 'choice' and 'interleave'\n"
                     );
@@ -4301,7 +4298,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
             } else {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpUnknownCombine,
                     "<start> uses unknown combine value '{}''\n",
                     combine
@@ -4312,7 +4309,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
         } else {
             xml_rng_perr!(
                 ctxt,
-                XmlGenericNodePtr::from_raw((*cur).node),
+                (*cur).node.map(|node| node.into()),
                 XmlParserErrors::XmlRngpNeedCombine,
                 "Some <start> element miss the combine attribute\n"
             );
@@ -4323,7 +4320,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
     if choice_or_interleave == -1 {
         choice_or_interleave = 0;
     }
-    cur = xml_relaxng_new_define(ctxt, XmlNodePtr::from_raw((*starts).node).unwrap());
+    cur = xml_relaxng_new_define(ctxt, (*starts).node);
     if cur.is_null() {
         return;
     }
@@ -4358,7 +4355,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
                 let tmpname = CStr::from_ptr(tmpname.as_ptr()).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpInterleaveCreateFailed,
                     "Failed to add {} to hash table\n",
                     tmpname
@@ -4367,7 +4364,7 @@ unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlR
         } else {
             xml_rng_perr!(
                 ctxt,
-                XmlGenericNodePtr::from_raw((*cur).node),
+                (*cur).node.map(|node| node.into()),
                 XmlParserErrors::XmlRngpInterleaveCreateFailed,
                 "Failed to create interleaves hash table\n"
             );
@@ -4468,7 +4465,7 @@ unsafe fn xml_relaxng_check_cycles(
                 let name = CStr::from_ptr((*cur).name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpRefCycle,
                     "Detected a cycle in {} references\n",
                     name
@@ -4837,7 +4834,7 @@ unsafe fn xml_relaxng_check_group_attrs(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlR
             if ret == 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*def).node),
+                    (*def).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpGroupAttrConflict,
                     "Attributes conflicts in group\n"
                 );
@@ -5129,7 +5126,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatDataExceptRef,
                     "Found forbidden pattern data/except//ref\n"
                 );
@@ -5138,14 +5135,14 @@ unsafe fn xml_relaxng_check_rules(
                 if (*cur).typ == XmlRelaxNGType::Parentref {
                     xml_rng_perr!(
                         ctxt,
-                        XmlGenericNodePtr::from_raw((*cur).node),
+                        (*cur).node.map(|node| node.into()),
                         XmlParserErrors::XmlRngpRefNoDef,
                         "Internal found no define for parent refs\n"
                     );
                 } else {
                     xml_rng_perr!(
                         ctxt,
-                        XmlGenericNodePtr::from_raw((*cur).node),
+                        (*cur).node.map(|node| node.into()),
                         XmlParserErrors::XmlRngpRefNoDef,
                         "Internal found no define for ref {}\n",
                         if !(*cur).name.is_null() {
@@ -5177,7 +5174,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatDataExceptElem,
                     "Found forbidden pattern data/except//element(ref)\n"
                 );
@@ -5185,7 +5182,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_LIST != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatListElem,
                     "Found forbidden pattern list//element(ref)\n"
                 );
@@ -5193,7 +5190,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_ATTRIBUTE != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatAttrElem,
                     "Found forbidden pattern attribute//element(ref)\n"
                 );
@@ -5201,7 +5198,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_ATTRIBUTE != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatAttrElem,
                     "Found forbidden pattern attribute//element(ref)\n"
                 );
@@ -5213,7 +5210,7 @@ unsafe fn xml_relaxng_check_rules(
                 let name = CStr::from_ptr((*cur).name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpElemContentEmpty,
                     "Element {} attributes have a content type error\n",
                     name
@@ -5224,7 +5221,7 @@ unsafe fn xml_relaxng_check_rules(
                 let name = CStr::from_ptr((*cur).name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpElemContentError,
                     "Element {} has a content type error\n",
                     name
@@ -5236,7 +5233,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_ATTRIBUTE != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatAttrAttr,
                     "Found forbidden pattern attribute//attribute\n"
                 );
@@ -5244,7 +5241,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_LIST != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatListAttr,
                     "Found forbidden pattern list//attribute\n"
                 );
@@ -5252,7 +5249,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_OOMGROUP != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatOnemoreGroupAttr,
                     "Found forbidden pattern oneOrMore//group//attribute\n"
                 );
@@ -5260,7 +5257,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_OOMINTERLEAVE != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatOnemoreInterleaveAttr,
                     "Found forbidden pattern oneOrMore//interleave//attribute\n"
                 );
@@ -5268,7 +5265,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatDataExceptAttr,
                     "Found forbidden pattern data/except//attribute\n"
                 );
@@ -5276,7 +5273,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatStartAttr,
                     "Found forbidden pattern start//attribute\n"
                 );
@@ -5290,14 +5287,14 @@ unsafe fn xml_relaxng_check_rules(
                 if (*cur).ns.is_null() {
                     xml_rng_perr!(
                         ctxt,
-                        XmlGenericNodePtr::from_raw((*cur).node),
+                        (*cur).node.map(|node| node.into()),
                         XmlParserErrors::XmlRngpAnynameAttrAncestor,
                         "Found anyName attribute without oneOrMore ancestor\n"
                     );
                 } else {
                     xml_rng_perr!(
                         ctxt,
-                        XmlGenericNodePtr::from_raw((*cur).node),
+                        (*cur).node.map(|node| node.into()),
                         XmlParserErrors::XmlRngpNsNameAttrAncestor,
                         "Found nsName attribute without oneOrMore ancestor\n"
                     );
@@ -5313,7 +5310,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatDataExceptOnemore,
                     "Found forbidden pattern data/except//oneOrMore\n"
                 );
@@ -5321,7 +5318,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatStartOnemore,
                     "Found forbidden pattern start//oneOrMore\n"
                 );
@@ -5333,7 +5330,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_LIST != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatListList,
                     "Found forbidden pattern list//list\n"
                 );
@@ -5341,7 +5338,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatDataExceptList,
                     "Found forbidden pattern data/except//list\n"
                 );
@@ -5349,7 +5346,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatStartList,
                     "Found forbidden pattern start//list\n"
                 );
@@ -5360,7 +5357,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatDataExceptGroup,
                     "Found forbidden pattern data/except//group\n"
                 );
@@ -5368,7 +5365,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatStartGroup,
                     "Found forbidden pattern start//group\n"
                 );
@@ -5385,7 +5382,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_LIST != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatListInterleave,
                     "Found forbidden pattern list//interleave\n"
                 );
@@ -5393,7 +5390,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatDataExceptInterleave,
                     "Found forbidden pattern data/except//interleave\n"
                 );
@@ -5401,7 +5398,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatDataExceptInterleave,
                     "Found forbidden pattern start//interleave\n"
                 );
@@ -5423,7 +5420,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatStartData,
                     "Found forbidden pattern start//data\n"
                 );
@@ -5434,7 +5431,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatStartValue,
                     "Found forbidden pattern start//value\n"
                 );
@@ -5445,7 +5442,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_LIST != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatListText,
                     "Found forbidden pattern list//text\n"
                 );
@@ -5453,7 +5450,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatDataExceptText,
                     "Found forbidden pattern data/except//text\n"
                 );
@@ -5461,7 +5458,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatStartText,
                     "Found forbidden pattern start//text\n"
                 );
@@ -5471,7 +5468,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_DATAEXCEPT != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatDataExceptEmpty,
                     "Found forbidden pattern data/except//empty\n"
                 );
@@ -5479,7 +5476,7 @@ unsafe fn xml_relaxng_check_rules(
             if flags & XML_RELAXNG_IN_START != 0 {
                 xml_rng_perr!(
                     ctxt,
-                    XmlGenericNodePtr::from_raw((*cur).node),
+                    (*cur).node.map(|node| node.into()),
                     XmlParserErrors::XmlRngpPatStartEmpty,
                     "Found forbidden pattern start//empty\n"
                 );
@@ -6650,7 +6647,7 @@ unsafe fn xml_relaxng_validate_value(
                                 .to_string_lossy()
                                 .as_ref(),
                             (*define).value,
-                            XmlGenericNodePtr::from_raw((*define).node),
+                            (*define).node.map(|node| node.into()),
                             (*define).attrs as _,
                             value,
                             (*(*ctxt).state).node,

@@ -13,7 +13,7 @@ use crate::{
         },
         xmlstring::{xml_char_strdup, xml_escape_format_string, xml_str_equal, xml_strdup},
     },
-    tree::{XmlGenericNodePtr, XmlNode},
+    tree::XmlGenericNodePtr,
 };
 
 const ERROR_IS_DUP: i32 = 1;
@@ -294,7 +294,7 @@ unsafe fn xml_relaxng_get_error_string(
 #[doc(alias = "xmlRngVErr")]
 unsafe fn xml_rng_verr(
     ctxt: XmlRelaxNGValidCtxtPtr,
-    node: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
     error: i32,
     msg: &str,
     str1: Option<&str>,
@@ -319,7 +319,7 @@ unsafe fn xml_rng_verr(
         channel,
         data,
         null_mut(),
-        node as _,
+        node.map_or(null_mut(), |node| node.as_ptr()) as _,
         XmlErrorDomain::XmlFromRelaxngv,
         error,
         XmlErrorLevel::XmlErrError,
@@ -339,8 +339,8 @@ unsafe fn xml_rng_verr(
 unsafe fn xml_relaxng_show_valid_error(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: XmlRelaxNGValidErr,
-    node: *mut XmlNode,
-    child: *mut XmlNode,
+    node: Option<XmlGenericNodePtr>,
+    child: Option<XmlGenericNodePtr>,
     arg1: *const u8,
     arg2: *const u8,
 ) {
@@ -362,7 +362,7 @@ unsafe fn xml_relaxng_show_valid_error(
     }
     xml_rng_verr(
         ctxt,
-        if child.is_null() { node } else { child },
+        child.or(node),
         err as _,
         message.as_str(),
         (!arg1.is_null())
@@ -422,10 +422,7 @@ unsafe fn xml_relaxng_valid_error_push(
 ) -> i32 {
     if let Some(last_error) = (*ctxt).err_tab.last() {
         if !(*ctxt).state.is_null()
-            && last_error.node
-                == (*(*ctxt).state)
-                    .node
-                    .map_or(null_mut(), |node| node.as_ptr())
+            && last_error.node == (*(*ctxt).state).node
             && last_error.err == err
         {
             return (*ctxt).err_tab.len() as i32 - 1;
@@ -445,13 +442,11 @@ unsafe fn xml_relaxng_valid_error_push(
         cur.flags = 0;
     }
     if !(*ctxt).state.is_null() {
-        cur.node = (*(*ctxt).state)
-            .node
-            .map_or(null_mut(), |node| node.as_ptr());
-        cur.seq = (*(*ctxt).state).seq.map_or(null_mut(), |seq| seq.as_ptr());
+        cur.node = (*(*ctxt).state).node;
+        cur.seq = (*(*ctxt).state).seq;
     } else {
-        cur.node = null_mut();
-        cur.seq = null_mut();
+        cur.node = None;
+        cur.seq = None;
     }
     (*ctxt).err_tab.push(cur);
     (*ctxt).err_tab.len() as i32 - 1
@@ -525,14 +520,7 @@ pub(crate) unsafe fn xml_relaxng_add_valid_error(
         if node.is_none() && seq.is_none() {
             node = (*ctxt).pnode.map(|node| node.into());
         }
-        xml_relaxng_show_valid_error(
-            ctxt,
-            err,
-            node.map_or(null_mut(), |node| node.as_ptr()),
-            seq.map_or(null_mut(), |seq| seq.as_ptr()),
-            arg1,
-            arg2,
-        );
+        xml_relaxng_show_valid_error(ctxt, err, node, seq, arg1, arg2);
     } else {
         // Stack the error for later processing if needed
         xml_relaxng_valid_error_push(ctxt, err, arg1, arg2, dup);
