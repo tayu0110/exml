@@ -54,9 +54,7 @@ use crate::{
     list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
     save::attr_serialize_text_content,
-    tree::{
-        xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDoc, XmlDocPtr, XmlNode, XmlNodePtr,
-    },
+    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDoc, XmlDocPtr, XmlNodePtr},
     uri::canonic_path,
 };
 
@@ -277,7 +275,7 @@ impl<'a> XmlTextWriter<'a> {
     #[doc(alias = "xmlNewTextWriterTree")]
     pub unsafe fn with_tree(
         mut doc: XmlDocPtr,
-        node: *mut XmlNode,
+        node: XmlNodePtr,
         compression: i32,
     ) -> Option<Self> {
         let mut sax_handler = XmlSAXHandler::default();
@@ -310,7 +308,7 @@ impl<'a> XmlTextWriter<'a> {
         };
 
         (*ctxt).my_doc = Some(doc);
-        (*ctxt).node = XmlNodePtr::from_raw(node).unwrap();
+        (*ctxt).node = Some(node);
         ret.no_doc_free = 1;
 
         doc.set_compress_mode(compression);
