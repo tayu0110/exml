@@ -1943,7 +1943,7 @@ pub unsafe fn xml_sax2_start_element(
     }
 
     // We are parsing a new node.
-    if (*ctxt).node_push(ret.as_ptr()) < 0 {
+    if (*ctxt).node_push(ret) < 0 {
         ret.unlink();
         xml_free_node(ret.as_ptr());
         return;
@@ -2195,7 +2195,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     (*ctxt).nodemem = -1;
 
     // We are parsing a new node.
-    if (*ctxt).node_push(ret.as_ptr()) < 0 {
+    if (*ctxt).node_push(ret) < 0 {
         ret.unlink();
         xml_free_node(ret.as_ptr());
         return;

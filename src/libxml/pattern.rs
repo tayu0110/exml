@@ -40,7 +40,7 @@ use crate::{
         parser_internals::{xml_is_letter, xml_string_current_char},
         xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
     },
-    tree::{XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr, XML_XML_NAMESPACE},
+    tree::{XmlElementType, XmlGenericNodePtr, XmlNodePtr, XML_XML_NAMESPACE},
 };
 
 const XML_STREAM_STEP_DESC: usize = 1;
@@ -191,11 +191,11 @@ pub unsafe fn xml_free_pattern_list(mut comp: XmlPatternPtr) {
 pub type XmlPatParserContextPtr = *mut XmlPatParserContext;
 #[repr(C)]
 pub struct XmlPatParserContext {
-    cur: *const XmlChar,  /* the current char being parsed */
-    base: *const XmlChar, /* the full expression */
-    error: i32,           /* error code */
-    comp: XmlPatternPtr,  /* the result */
-    elem: *mut XmlNode,   /* the current node if any */
+    cur: *const XmlChar,      /* the current char being parsed */
+    base: *const XmlChar,     /* the full expression */
+    error: i32,               /* error code */
+    comp: XmlPatternPtr,      /* the result */
+    elem: Option<XmlNodePtr>, /* the current node if any */
     namespaces: Option<Vec<(*const u8, *const u8)>>, /* the namespaces definitions */
 }
 
@@ -206,7 +206,7 @@ impl Default for XmlPatParserContext {
             base: null(),
             error: 0,
             comp: null_mut(),
-            elem: null_mut(),
+            elem: None,
             namespaces: None,
         }
     }

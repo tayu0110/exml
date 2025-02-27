@@ -2094,7 +2094,7 @@ macro_rules! xml_xptr_err {
                     .into()
             });
             (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
-            (*(*ctxt).context).last_error.node = NonNull::new((*(*ctxt).context).debug_node as _);
+            (*(*ctxt).context).last_error.node = NonNull::new((*(*ctxt).context).debug_node.map_or(null_mut(), |node| node.as_ptr()) as _);
             if let Some(error) = (*(*ctxt).context).error {
                 error(
                     (*(*ctxt).context).user_data.clone(),
@@ -2106,7 +2106,7 @@ macro_rules! xml_xptr_err {
                     None,
                     None,
                     null_mut(),
-                    (*(*ctxt).context).debug_node as _,
+                    (*(*ctxt).context).debug_node.map_or(null_mut(), |node| node.as_ptr()) as _,
                     XmlErrorDomain::XmlFromXPointer,
                     error,
                     XmlErrorLevel::XmlErrError,

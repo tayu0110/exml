@@ -2129,7 +2129,7 @@ pub unsafe fn xml_parse_in_node_context(
 
     // At this point, `node.element_type()` is ElementNode, DocumentNode or HTMLDocumentNode.
     if let Ok(node) = XmlNodePtr::try_from(node) {
-        (*ctxt).node_push(node.as_ptr());
+        (*ctxt).node_push(node);
         // initialize the SAX2 namespaces stack
         let mut cur = Some(node);
         while let Some(now) = cur.filter(|cur| cur.element_type() == XmlElementType::XmlElementNode)
@@ -2298,7 +2298,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         return -1;
     };
     new_doc.add_child(new_root.into());
-    (*ctxt).node_push(new_root.as_ptr());
+    (*ctxt).node_push(new_root);
     // doc.is_null() is only supported for historic reasons
     if let Some(mut doc) = doc {
         (*ctxt).my_doc = Some(new_doc);
@@ -2452,7 +2452,12 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         return (sax, XmlParserErrors::XmlErrInternalError);
     };
     new_doc.add_child(new_root.into());
-    (*ctxt).node_push(new_doc.children.map_or(null_mut(), |c| c.as_ptr()));
+    (*ctxt).node_push(
+        new_doc
+            .children
+            .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap())
+            .unwrap(),
+    );
     (*ctxt).my_doc = Some(doc);
     new_root.doc = Some(doc);
 

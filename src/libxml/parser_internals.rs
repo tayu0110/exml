@@ -1965,7 +1965,12 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     my_doc.children = None;
     my_doc.last = None;
     my_doc.add_child(new_root.into());
-    (*ctxt).node_push(my_doc.children.map_or(null_mut(), |c| c.as_ptr()));
+    (*ctxt).node_push(
+        my_doc
+            .children
+            .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap())
+            .unwrap(),
+    );
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
     (*ctxt).depth = (*oldctxt).depth;
 

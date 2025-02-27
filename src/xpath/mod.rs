@@ -63,9 +63,7 @@ use crate::{
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, XmlChar},
     },
-    tree::{
-        NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNsPtr,
-    },
+    tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr},
 };
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
@@ -294,7 +292,7 @@ pub struct XmlXPathContext {
     pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
     pub(crate) error: Option<StructuredError>,         /* the callback in case of errors */
     pub(crate) last_error: XmlError,                   /* the last error */
-    pub(crate) debug_node: *mut XmlNode,               /* the source node XSLT */
+    pub(crate) debug_node: Option<XmlGenericNodePtr>,  /* the source node XSLT */
 
     pub(crate) flags: i32, /* flags to control compilation */
 
@@ -344,7 +342,7 @@ impl Default for XmlXPathContext {
             user_data: None,
             error: None,
             last_error: XmlError::default(),
-            debug_node: null_mut(),
+            debug_node: None,
             flags: 0,
             cache: null_mut(),
             op_limit: 0,
