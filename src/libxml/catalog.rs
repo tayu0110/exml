@@ -1952,7 +1952,7 @@ impl XmlCatalogEntry {
             Some("http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd"),
         );
 
-        (*doc).add_child(dtd.unwrap().into());
+        doc.add_child(dtd.unwrap().into());
 
         let Some(ns) = xml_new_ns(None, XML_CATALOGS_NAMESPACE.as_ptr() as _, None) else {
             xml_free_doc(doc);
@@ -1964,7 +1964,7 @@ impl XmlCatalogEntry {
             return -1;
         };
         catalog.ns_def = Some(ns);
-        (*doc).add_child(catalog.into());
+        doc.add_child(catalog.into());
 
         self.dump_xml_catalog_node(catalog, Some(doc), Some(ns), None);
 
@@ -1973,7 +1973,7 @@ impl XmlCatalogEntry {
             xml_free_doc(doc);
             return -1;
         };
-        let ret: i32 = (*doc).save_format_file_to(buf, None, 1);
+        let ret: i32 = doc.save_format_file_to(buf, None, 1);
 
         // Free it
         xml_free_doc(doc);

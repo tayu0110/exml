@@ -2210,29 +2210,23 @@ pub unsafe fn xml_free_node_list(cur: Option<impl Into<XmlGenericNodePtr>>) {
         return;
     }
     loop {
-        while let Some(children) = cur
-            .children()
-            .filter(|_| {
-                !matches!(
-                    cur.element_type(),
-                    XmlElementType::XmlDocumentNode
-                        | XmlElementType::XmlHTMLDocumentNode
-                        | XmlElementType::XmlDTDNode
-                        | XmlElementType::XmlEntityRefNode
-                )
-            })
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+        // This conditional statement cannot be replaced by `let Some`.
+        // Calling `children()` when `cur` type is `XmlEntityRefNode` will not work correctly.
+        // Cause unknown for now...
+        while !matches!(
+            cur.element_type(),
+            XmlElementType::XmlDocumentNode
+                | XmlElementType::XmlHTMLDocumentNode
+                | XmlElementType::XmlDTDNode
+                | XmlElementType::XmlEntityRefNode
+        ) && cur.children().is_some()
         {
-            cur = children;
+            cur = cur.children().unwrap();
             depth += 1;
         }
 
-        let next = cur
-            .next()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
-        let parent = cur
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        let next = cur.next();
+        let parent = cur.parent();
         if let Ok(doc) = XmlDocPtr::try_from(cur) {
             xml_free_doc(doc);
         } else if !matches!(cur.element_type(), XmlElementType::XmlDTDNode) {

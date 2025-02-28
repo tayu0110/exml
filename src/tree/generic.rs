@@ -19,8 +19,8 @@ use super::{
     add_prop_sibling, xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node,
     xml_free_prop, xml_get_doc_entity, xml_new_doc_text_len, xml_text_merge, xml_tree_err_memory,
     XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtd,
-    XmlDtdPtr, XmlElementType, XmlEntity, XmlEntityPtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
-    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    XmlDtdPtr, XmlElementPtr, XmlElementType, XmlEntity, XmlEntityPtr, XmlNode, XmlNodePtr, XmlNs,
+    XmlNsPtr, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -655,7 +655,18 @@ impl XmlGenericNodePtr {
 
     // Temporary workaround
     pub fn from_raw<T: NodeCommon>(ptr: *mut T) -> Option<Self> {
-        NonNull::new(ptr as *mut dyn NodeCommon).map(Self)
+        let res = NonNull::new(ptr as *mut dyn NodeCommon).map(Self)?;
+        let res = XmlNodePtr::try_from(res)
+            .map(|node| node.into())
+            .or_else(|_| XmlDocPtr::try_from(res).map(|node| node.into()))
+            .or_else(|_| XmlAttrPtr::try_from(res).map(|node| node.into()))
+            .or_else(|_| XmlNsPtr::try_from(res).map(|node| node.into()))
+            .or_else(|_| XmlEntityPtr::try_from(res).map(|node| node.into()))
+            .or_else(|_| XmlDtdPtr::try_from(res).map(|node| node.into()))
+            .or_else(|_| XmlAttributePtr::try_from(res).map(|node| node.into()))
+            .or_else(|_| XmlElementPtr::try_from(res).map(|node| node.into()))
+            .unwrap_or_else(|_| panic!("Unknown Node Type: {:?}", res.element_type()));
+        Some(res)
     }
 
     // Temporary workaround

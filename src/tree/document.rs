@@ -1170,10 +1170,7 @@ pub unsafe fn xml_free_doc(mut cur: XmlDocPtr) {
         xml_free_dtd(int_subset);
     }
 
-    if let Some(children) = cur
-        .children()
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-    {
+    if let Some(children) = cur.children() {
         xml_free_node_list(Some(children));
     }
     if let Some(old_ns) = cur.old_ns.take() {
