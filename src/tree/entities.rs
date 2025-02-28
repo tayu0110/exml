@@ -317,7 +317,7 @@ pub type XmlEntitiesTablePtr = *mut XmlEntitiesTable;
 /// Handle an out of memory condition
 #[doc(alias = "xmlEntitiesErrMemory")]
 unsafe fn xml_entities_err_memory(extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, null_mut(), Some(extra));
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, None, Some(extra));
 }
 
 /// internal routine doing the entity node structures allocations
@@ -391,7 +391,7 @@ pub unsafe fn xml_new_entity(
 /// Raise an error.
 #[doc(alias = "xmlEntitiesErr")]
 unsafe fn xml_entities_err(code: XmlParserErrors, msg: &str) {
-    __xml_simple_error!(XmlErrorDomain::XmlFromTree, code, null_mut(), msg);
+    __xml_simple_error!(XmlErrorDomain::XmlFromTree, code, None, msg);
 }
 
 /// Raise a warning.
@@ -410,7 +410,7 @@ macro_rules! xml_entities_warn {
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromTree,
             $code,
             XmlErrorLevel::XmlErrWarning,

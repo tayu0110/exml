@@ -68,9 +68,9 @@ use exml::{
     },
     relaxng::xml_relaxng_init_types,
     tree::{
-        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
-        XmlEnumeration, XmlNode,
+        xml_free_doc, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
+        XmlNodePtr,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
     xpath::XmlXPathObjectPtr,
@@ -201,10 +201,9 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 
     unsafe {
-        if let Some(node) =
-            node.filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
-        {
-            name = node.as_ref().name;
+        if let Some(node) = node.filter(|n| n.element_type() == XmlElementType::XmlElementNode) {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            name = node.name;
         }
 
         // Maintain the compatibility with the legacy error handling
@@ -4384,9 +4383,7 @@ unsafe fn c14n_run_test(
     result_file: *const c_char,
 ) -> i32 {
     use exml::{
-        globals::{
-            get_last_error, set_load_ext_dtd_default_value, set_substitute_entities_default_value,
-        },
+        globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
         libxml::{
             c14n::xml_c14n_doc_dump_memory,
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
@@ -4410,8 +4407,8 @@ unsafe fn c14n_run_test(
         None,
         XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
     ) else {
-        let last_error = get_last_error();
-        eprintln!("last_error: {last_error:?}");
+        // let last_error = get_last_error();
+        // eprintln!("last_error: {last_error:?}");
         eprintln!("Error: unable to parse file \"{xml_filename}\"");
         return -1;
     };

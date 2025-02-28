@@ -31,8 +31,7 @@ use crate::{
     encoding::XmlCharEncoding,
     tree::{
         xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop, NodeCommon, XmlAttr,
-        XmlAttrPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNode,
-        __XML_REGISTER_CALLBACKS,
+        XmlAttrPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, __XML_REGISTER_CALLBACKS,
     },
 };
 #[cfg(feature = "libxml_output")]
@@ -485,7 +484,11 @@ pub unsafe fn html_doc_dump_memory(cur: XmlDocPtr, mem: *mut *mut XmlChar, size:
 /// Handle an out of memory condition
 #[doc(alias = "htmlSaveErr")]
 #[cfg(feature = "libxml_output")]
-unsafe fn html_save_err(code: XmlParserErrors, node: *mut XmlNode, extra: Option<&str>) {
+unsafe fn html_save_err(
+    code: XmlParserErrors,
+    node: Option<XmlGenericNodePtr>,
+    extra: Option<&str>,
+) {
     use std::borrow::Cow;
 
     use crate::error::__xml_simple_error;
@@ -535,11 +538,7 @@ pub unsafe fn html_doc_dump_memory_format(
         if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
             let handler = find_encoding_handler(&enc);
             if handler.is_none() {
-                html_save_err(
-                    XmlParserErrors::XmlSaveUnknownEncoding,
-                    null_mut(),
-                    Some(&enc),
-                );
+                html_save_err(XmlParserErrors::XmlSaveUnknownEncoding, None, Some(&enc));
             }
             handler
         } else {
@@ -610,11 +609,7 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i3
         if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
             let handler = find_encoding_handler(&enc);
             if handler.is_none() {
-                html_save_err(
-                    XmlParserErrors::XmlSaveUnknownEncoding,
-                    null_mut(),
-                    Some(&enc),
-                );
+                html_save_err(XmlParserErrors::XmlSaveUnknownEncoding, None, Some(&enc));
             }
             handler
         } else {
@@ -666,11 +661,7 @@ pub unsafe fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
         if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
             let handler = find_encoding_handler(&enc);
             if handler.is_none() {
-                html_save_err(
-                    XmlParserErrors::XmlSaveUnknownEncoding,
-                    null_mut(),
-                    Some(&enc),
-                );
+                html_save_err(XmlParserErrors::XmlSaveUnknownEncoding, None, Some(&enc));
             }
             handler
         } else {
@@ -708,7 +699,7 @@ pub unsafe fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
 unsafe fn html_save_err_memory(extra: &str) {
     use crate::error::{XmlErrorDomain, __xml_simple_oom_error};
 
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, null_mut(), Some(extra));
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, None, Some(extra));
 }
 
 /// Dump an HTML node, recursive behaviour,children are printed too.
@@ -790,11 +781,7 @@ pub unsafe fn html_node_dump_file_format<'a>(
             if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
                 let handler = find_encoding_handler(enc);
                 if handler.is_none() {
-                    html_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding,
-                        null_mut(),
-                        Some(enc),
-                    );
+                    html_save_err(XmlParserErrors::XmlSaveUnknownEncoding, None, Some(enc));
                 }
                 handler
             } else {
@@ -859,11 +846,7 @@ pub unsafe fn html_save_file_format(
         let handler = if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
             let handler = find_encoding_handler(enc);
             if handler.is_none() {
-                html_save_err(
-                    XmlParserErrors::XmlSaveUnknownEncoding,
-                    null_mut(),
-                    Some(enc),
-                );
+                html_save_err(XmlParserErrors::XmlSaveUnknownEncoding, None, Some(enc));
             }
             handler
         } else {
@@ -910,7 +893,7 @@ unsafe fn html_dtd_dump_output(
     use std::ffi::CStr;
 
     let Some(cur) = doc.int_subset else {
-        html_save_err(XmlParserErrors::XmlSaveNoDoctype, doc.as_ptr() as _, None);
+        html_save_err(XmlParserErrors::XmlSaveNoDoctype, Some(doc.into()), None);
         return;
     };
 

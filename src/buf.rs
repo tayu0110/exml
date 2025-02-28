@@ -17,7 +17,7 @@ use std::{
     io::{ErrorKind, Write},
     mem::take,
     ops::{Deref, DerefMut},
-    ptr::{null_mut, NonNull},
+    ptr::NonNull,
 };
 
 use anyhow::{bail, ensure};
@@ -30,7 +30,7 @@ use crate::{
 };
 
 unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromBuffer, null_mut(), Some(extra));
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromBuffer, None, Some(extra));
     if buf.error.is_ok() {
         buf.error = XmlParserErrors::XmlErrNoMemory;
     }
@@ -43,7 +43,7 @@ pub(crate) unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
     __xml_simple_error!(
         XmlErrorDomain::XmlFromBuffer,
         XmlParserErrors::XmlBufOverflow,
-        null_mut(),
+        None,
         None,
         extra
     );

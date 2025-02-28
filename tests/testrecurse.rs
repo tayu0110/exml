@@ -36,7 +36,7 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_parser_ctxt, XmlParserCtxtPtr,
         XmlParserInputPtr,
     },
-    tree::{xml_free_doc, xml_get_doc_entity, NodeCommon, XmlElementType},
+    tree::{xml_free_doc, xml_get_doc_entity, XmlElementType, XmlNodePtr},
 };
 use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};
 
@@ -245,10 +245,9 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 
     unsafe {
-        if let Some(node) =
-            node.filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
-        {
-            name = node.as_ref().name;
+        if let Some(node) = node.filter(|n| n.element_type() == XmlElementType::XmlElementNode) {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            name = node.name;
         }
 
         // Maintain the compatibility with the legacy error handling

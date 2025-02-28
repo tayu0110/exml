@@ -813,7 +813,7 @@ pub unsafe fn xml_validate_nmtoken(value: *const XmlChar, space: i32) -> i32 {
 /// Handle an out of memory condition
 #[doc(alias = "xmlTreeErrMemory")]
 unsafe fn xml_tree_err_memory(extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, null_mut(), Some(extra));
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, None, Some(extra));
 }
 
 /// Builds the QName @prefix:@ncname in @memory if there is enough space
@@ -2491,7 +2491,11 @@ static XML_CHECK_DTD: AtomicBool = AtomicBool::new(true);
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlTreeErr")]
-unsafe fn xml_tree_err(code: XmlParserErrors, node: *mut XmlNode, extra: Option<&str>) {
+unsafe fn xml_tree_err(
+    code: XmlParserErrors,
+    node: Option<XmlGenericNodePtr>,
+    extra: Option<&str>,
+) {
     let msg: Cow<'static, str> = match code {
         XmlParserErrors::XmlTreeInvalidHex => "invalid hexadecimal character value\n".into(),
         XmlParserErrors::XmlTreeInvalidDec => "invalid decimal character value\n".into(),

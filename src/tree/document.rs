@@ -296,7 +296,7 @@ impl XmlDoc {
                         } else {
                             xml_tree_err(
                                 XmlParserErrors::XmlTreeInvalidHex,
-                                self as *const XmlDoc as _,
+                                XmlGenericNodePtr::from_raw(self as *const XmlDoc as *mut XmlDoc),
                                 None,
                             );
                             charval = 0;
@@ -320,7 +320,7 @@ impl XmlDoc {
                         } else {
                             xml_tree_err(
                                 XmlParserErrors::XmlTreeInvalidDec,
-                                self as *const XmlDoc as _,
+                                XmlGenericNodePtr::from_raw(self as *const XmlDoc as *mut XmlDoc),
                                 None,
                             );
                             charval = 0;
@@ -345,7 +345,7 @@ impl XmlDoc {
                             .then(|| CStr::from_ptr(q as *const i8).to_string_lossy());
                         xml_tree_err(
                             XmlParserErrors::XmlTreeUnterminatedEntity,
-                            self as *const XmlDoc as _,
+                            XmlGenericNodePtr::from_raw(self as *const XmlDoc as *mut XmlDoc),
                             q.as_deref(),
                         );
                         // goto out;
@@ -562,7 +562,7 @@ impl XmlDoc {
                         } else {
                             xml_tree_err(
                                 XmlParserErrors::XmlTreeInvalidHex,
-                                self as *const XmlDoc as _,
+                                XmlGenericNodePtr::from_raw(self as *const XmlDoc as *mut XmlDoc),
                                 None,
                             );
                             charval = 0;
@@ -594,7 +594,7 @@ impl XmlDoc {
                         } else {
                             xml_tree_err(
                                 XmlParserErrors::XmlTreeInvalidDec,
-                                self as *const XmlDoc as _,
+                                XmlGenericNodePtr::from_raw(self as *const XmlDoc as *mut XmlDoc),
                                 None,
                             );
                             charval = 0;
@@ -623,7 +623,7 @@ impl XmlDoc {
                             .then(|| CStr::from_ptr(q as *const i8).to_string_lossy());
                         xml_tree_err(
                             XmlParserErrors::XmlTreeUnterminatedEntity,
-                            self as *const XmlDoc as _,
+                            XmlGenericNodePtr::from_raw(self as *const XmlDoc as *mut XmlDoc),
                             q.as_deref(),
                         );
                         // goto out;

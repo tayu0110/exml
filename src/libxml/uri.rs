@@ -67,7 +67,7 @@ unsafe fn xml_uri_err_memory(extra: &str) {
         None,
         None,
         null_mut(),
-        null_mut(),
+        None,
         XmlErrorDomain::XmlFromURI,
         XmlParserErrors::XmlErrNoMemory,
         XmlErrorLevel::XmlErrFatal,

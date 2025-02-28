@@ -14,7 +14,7 @@ use std::{
 use exml::{
     encoding::XmlCharEncoding,
     error::{XmlError, XmlParserErrors},
-    globals::{get_last_error, set_structured_error, GenericErrorContext},
+    globals::{set_structured_error, GenericErrorContext},
     io::XmlParserInputBuffer,
     libxml::{
         globals::{xml_free, xml_malloc},
@@ -678,8 +678,8 @@ unsafe fn test_user_encoding() -> c_int {
 
     let buffer = from_raw_parts(buf, 2 * total_size as usize).to_vec();
     let Some(doc) = xml_read_memory(buffer, None, Some("UTF-16LE"), 0) else {
-        let error = get_last_error();
-        eprintln!("error: {error:?}");
+        // let error = get_last_error();
+        // eprintln!("error: {error:?}");
         // goto error;
         xml_free(buf as _);
         panic!("failed to parse document");

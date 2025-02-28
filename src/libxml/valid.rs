@@ -196,7 +196,7 @@ macro_rules! xml_err_valid {
             channel,
             data,
             pctxt as _,
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromValid,
             $error,
             XmlErrorLevel::XmlErrError,
@@ -240,7 +240,7 @@ pub(crate) unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>)
             channel,
             data,
             pctxt as _,
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromValid,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
@@ -260,7 +260,7 @@ pub(crate) unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>)
             channel,
             data,
             pctxt as _,
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromValid,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
@@ -743,7 +743,7 @@ unsafe fn xml_err_valid_node(
         channel,
         data,
         pctxt as _,
-        node.map_or(null_mut(), |node| node.as_ptr()) as _,
+        node,
         XmlErrorDomain::XmlFromValid,
         error,
         XmlErrorLevel::XmlErrError,
@@ -1505,7 +1505,7 @@ macro_rules! xml_err_valid_warning {
             channel,
             data,
             pctxt as _,
-            $node.as_ptr() as _,
+            $node,
             XmlErrorDomain::XmlFromValid,
             $error,
             XmlErrorLevel::XmlErrWarning,
@@ -1754,7 +1754,7 @@ pub unsafe fn xml_add_attribute_decl(
             // The attribute is already defined in this DTD.
             xml_err_valid_warning!(
                 ctxt,
-                dtd,
+                Some(dtd.into()),
                 XmlParserErrors::XmlDTDAttributeRedefined,
                 "Attribute {} of element {}: already defined\n",
                 name,
@@ -2844,7 +2844,7 @@ macro_rules! xml_err_valid_node_nr {
             channel,
             data,
             pctxt as _,
-            $node.map_or(null_mut(), |node| node.as_ptr()) as _,
+            $node,
             XmlErrorDomain::XmlFromValid,
             $error,
             XmlErrorLevel::XmlErrError,
@@ -2962,7 +2962,7 @@ pub unsafe fn xml_validate_attribute_decl(
         if nb_id > 1 {
             xml_err_valid_node_nr!(
                 ctxt,
-                Some(attr),
+                Some(attr.into()),
                 XmlParserErrors::XmlDTDIDSubset,
                 "Element {} has {} ID attribute defined in the internal subset : {}\n",
                 attr_elem.as_deref().unwrap().to_string_lossy().into_owned(),
@@ -2983,7 +2983,7 @@ pub unsafe fn xml_validate_attribute_decl(
             if ext_id > 1 {
                 xml_err_valid_node_nr!(
                     ctxt,
-                    Some(attr),
+                    Some(attr.into()),
                     XmlParserErrors::XmlDTDIDSubset,
                     "Element {} has {} ID attribute defined in the external subset : {}\n",
                     attr_elem.as_deref().unwrap().to_string_lossy().into_owned(),
@@ -5202,7 +5202,7 @@ pub unsafe fn xml_validate_one_element(
                 } else if qualified == 0 {
                     xml_err_valid_warning!(
                         ctxt,
-                        elem,
+                        Some(elem.into()),
                         XmlParserErrors::XmlDTDNoPrefix,
                         "Element {} required attribute {}:{} has no prefix\n",
                         elem.name().unwrap().into_owned(),
@@ -5212,7 +5212,7 @@ pub unsafe fn xml_validate_one_element(
                 } else if qualified == 1 {
                     xml_err_valid_warning!(
                         ctxt,
-                        elem,
+                        Some(elem.into()),
                         XmlParserErrors::XmlDTDDifferentPrefix,
                         "Element {} required attribute {}:{} has different prefix\n",
                         elem.name().unwrap().into_owned(),

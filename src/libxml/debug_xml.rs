@@ -61,7 +61,7 @@ macro_rules! xml_debug_err {
             None,
             None,
             null_mut(),
-            (*$ctxt).node.map_or(null_mut(), |node| node.as_ptr()) as _,
+            (*$ctxt).node,
             XmlErrorDomain::XmlFromCheck,
             $error,
             XmlErrorLevel::XmlErrError,

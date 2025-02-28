@@ -71,7 +71,7 @@ use crate::{
     parser::{xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt, XmlParserInputPtr},
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
-        NodeCommon, XmlDocPtr, XmlGenericNodePtr, XmlNodePtr, XML_XML_NAMESPACE,
+        NodeCommon, XmlDocPtr, XmlNodePtr, XML_XML_NAMESPACE,
     },
     uri::{build_uri, canonic_path},
     SYSCONFDIR,
@@ -87,7 +87,7 @@ unsafe fn xml_catalog_err_memory(extra: &str) {
         None,
         None,
         null_mut(),
-        null_mut(),
+        None,
         XmlErrorDomain::XmlFromCatalog,
         XmlParserErrors::XmlErrNoMemory,
         XmlErrorLevel::XmlErrError,
@@ -163,7 +163,7 @@ macro_rules! xml_catalog_err {
             None,
             None,
             $catal as _,
-            $node.map_or(null_mut(), |node| node.as_ptr()) as _,
+            $node,
             XmlErrorDomain::XmlFromCatalog,
             $error,
             XmlErrorLevel::XmlErrError,
@@ -2332,7 +2332,7 @@ unsafe fn xml_parse_xml_catalog_one_node(
         if name_value.is_none() {
             xml_catalog_err!(
                 null_mut(),
-                Some(cur),
+                Some(cur.into()),
                 XmlParserErrors::XmlCatalogMissingAttr,
                 "{} entry lacks '{}'\n",
                 name,
@@ -2344,7 +2344,7 @@ unsafe fn xml_parse_xml_catalog_one_node(
     let Some(uri_value) = cur.get_prop(uri_attr_name) else {
         xml_catalog_err!(
             null_mut(),
-            Some(cur),
+            Some(cur.into()),
             XmlParserErrors::XmlCatalogMissingAttr,
             "{} entry lacks '{}'\n",
             name,
@@ -2378,7 +2378,7 @@ unsafe fn xml_parse_xml_catalog_one_node(
     } else {
         xml_catalog_err!(
             null_mut(),
-            Some(cur),
+            Some(cur.into()),
             XmlParserErrors::XmlCatalogEntryBroken,
             "{} entry '{}' broken ?: {}\n",
             name,
@@ -2410,7 +2410,7 @@ unsafe fn xml_parse_xml_catalog_node(
                 xml_catalog_err!(
                     parent.as_ref().map_or(null(), |p| Arc::as_ptr(&p.node))
                         as *mut RwLock<CatalogEntryListNode>,
-                    Some(cur),
+                    Some(cur.into()),
                     XmlParserErrors::XmlCatalogPreferValue,
                     "Invalid value for prefer: '{}'\n",
                     prop,
@@ -2617,7 +2617,7 @@ unsafe fn xml_parse_xml_catalog_file(
             } else {
                 xml_catalog_err!(
                     null_mut(),
-                    Some(cur),
+                    Some(cur.into()),
                     XmlParserErrors::XmlCatalogPreferValue,
                     "Invalid value for prefer: '{}'\n",
                     prop,
@@ -2633,7 +2633,7 @@ unsafe fn xml_parse_xml_catalog_file(
     } else {
         xml_catalog_err!(
             null_mut(),
-            Some(doc),
+            Some(doc.into()),
             XmlParserErrors::XmlCatalogNotCatalog,
             "File {} is not an XML Catalog\n",
             filename,

@@ -35,8 +35,8 @@ use exml::{
         XmlParserInputPtr,
     },
     tree::{
-        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration,
+        xml_free_doc, XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr, XmlElementType,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr,
     },
 };
 use libc::{memcpy, strlen, strncmp};
@@ -437,10 +437,9 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 
     unsafe {
-        if let Some(node) =
-            node.filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
-        {
-            name = node.as_ref().name;
+        if let Some(node) = node.filter(|n| n.element_type() == XmlElementType::XmlElementNode) {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            name = node.name;
         }
 
         // Maintain the compatibility with the legacy error handling

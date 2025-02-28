@@ -32,7 +32,7 @@ use std::{
     iter::repeat,
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null, null_mut, NonNull},
+    ptr::{addr_of_mut, drop_in_place, null, null_mut},
 };
 
 use libc::{memcpy, memset, INT_MAX, INT_MIN};
@@ -898,7 +898,7 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromXPath,
             code,
             XmlErrorLevel::XmlErrError,
@@ -927,7 +927,7 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromXPath,
             code,
             XmlErrorLevel::XmlErrError,
@@ -964,11 +964,7 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
     });
     // (*(*ctxt).context).last_error.str1 = xml_strdup((*ctxt).base) as *mut c_char;
     (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
-    (*(*ctxt).context).last_error.node = NonNull::new(
-        (*(*ctxt).context)
-            .debug_node
-            .map_or(null_mut(), |node| node.as_ptr()) as _,
-    );
+    (*(*ctxt).context).last_error.node = (*(*ctxt).context).debug_node;
     if let Some(error) = (*(*ctxt).context).error {
         error(
             (*(*ctxt).context).user_data.clone(),
@@ -983,9 +979,7 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
             None,
             None,
             null_mut(),
-            (*(*ctxt).context)
-                .debug_node
-                .map_or(null_mut(), |node| node.as_ptr()) as _,
+            (*(*ctxt).context).debug_node,
             XmlErrorDomain::XmlFromXPath,
             code,
             XmlErrorLevel::XmlErrError,
@@ -1394,7 +1388,7 @@ pub unsafe fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: Option<&str>
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromXPath,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
@@ -1414,7 +1408,7 @@ pub unsafe fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: Option<&str>
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromXPath,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,

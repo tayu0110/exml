@@ -1398,7 +1398,7 @@ unsafe fn xml_schema_err4_line(
                 channel,
                 data,
                 ctxt as _,
-                node.map_or(null_mut(), |node| node.as_ptr()) as _,
+                node,
                 XmlErrorDomain::XmlFromSchemasv,
                 error,
                 error_level,
@@ -1428,7 +1428,7 @@ unsafe fn xml_schema_err4_line(
                 channel,
                 data,
                 ctxt as _,
-                node.map_or(null_mut(), |node| node.as_ptr()) as _,
+                node,
                 XmlErrorDomain::XmlFromSchemasp,
                 error,
                 error_level,
@@ -4098,11 +4098,7 @@ unsafe fn xml_schema_perr_memory(
     if !ctxt.is_null() {
         (*ctxt).nberrors += 1;
     }
-    __xml_simple_oom_error(
-        XmlErrorDomain::XmlFromSchemasp,
-        node.map_or(null_mut(), |node| node.as_ptr()),
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
 }
 
 unsafe fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
@@ -4565,7 +4561,7 @@ unsafe fn xml_schema_perr(
         channel,
         data,
         ctxt as _,
-        node.map_or(null_mut(), |node| node.as_ptr()) as _,
+        node,
         XmlErrorDomain::XmlFromSchemasp,
         error,
         XmlErrorLevel::XmlErrError,
@@ -4840,7 +4836,7 @@ unsafe fn xml_schema_psimple_internal_err(node: Option<XmlGenericNodePtr>, msg: 
     __xml_simple_error!(
         XmlErrorDomain::XmlFromSchemasp,
         XmlParserErrors::XmlSchemapInternal,
-        node.map_or(null_mut(), |node| node.as_ptr()),
+        node,
         msg
     );
 }
@@ -5683,7 +5679,7 @@ unsafe fn xml_schema_perr_ext(
         channel,
         data,
         ctxt as _,
-        node.map_or(null_mut(), |node| node.as_ptr()) as _,
+        node,
         XmlErrorDomain::XmlFromSchemasp,
         error,
         XmlErrorLevel::XmlErrError,
@@ -15240,7 +15236,7 @@ unsafe fn xml_schema_model_group_to_model_group_def_fixup(
 }
 
 unsafe fn xml_schema_psimple_err(msg: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, null_mut(), Some(msg));
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, None, Some(msg));
 }
 
 unsafe fn xml_schema_item_list_remove(list: XmlSchemaItemListPtr, idx: i32) -> i32 {
@@ -22883,11 +22879,7 @@ unsafe fn xml_schema_verr_memory(
         (*ctxt).nberrors += 1;
         (*ctxt).err = XmlParserErrors::XmlSchemavInternal as i32;
     }
-    __xml_simple_oom_error(
-        XmlErrorDomain::XmlFromSchemasv,
-        node.map_or(null_mut(), |node| node.as_ptr()),
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasv, node, Some(extra));
 }
 
 /// Create an XML Schemas validation context based on the given schema.

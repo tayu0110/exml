@@ -1947,7 +1947,7 @@ unsafe fn xml_writer_err_msg(ctxt: Option<&XmlTextWriter>, error: XmlParserError
             None,
             None,
             ctxt.ctxt as _,
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromWriter,
             error,
             XmlErrorLevel::XmlErrFatal,
@@ -1966,7 +1966,7 @@ unsafe fn xml_writer_err_msg(ctxt: Option<&XmlTextWriter>, error: XmlParserError
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromWriter,
             error,
             XmlErrorLevel::XmlErrFatal,
@@ -1996,7 +1996,7 @@ macro_rules! xml_writer_err_msg_int {
             } else {
                 null_mut()
             },
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromWriter,
             $error,
             XmlErrorLevel::XmlErrFatal,

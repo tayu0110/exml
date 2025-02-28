@@ -33,11 +33,7 @@
 //
 // daniel@veillard.com
 
-use std::{
-    ffi::CStr,
-    mem::size_of,
-    ptr::{null_mut, NonNull},
-};
+use std::{ffi::CStr, mem::size_of, ptr::null_mut};
 
 #[cfg(feature = "libxml_xptr_locs")]
 use libc::c_void;
@@ -101,7 +97,7 @@ unsafe fn xml_xptr_err_memory(extra: &str) {
         None,
         None,
         null_mut(),
-        null_mut(),
+        None,
         XmlErrorDomain::XmlFromXPointer,
         XmlParserErrors::XmlErrNoMemory,
         XmlErrorLevel::XmlErrError,
@@ -2067,7 +2063,7 @@ macro_rules! xml_xptr_err {
                 None,
                 None,
                 null_mut(),
-                null_mut(),
+                None,
                 XmlErrorDomain::XmlFromXPointer,
                 error,
                 XmlErrorLevel::XmlErrError,
@@ -2094,7 +2090,7 @@ macro_rules! xml_xptr_err {
                     .into()
             });
             (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
-            (*(*ctxt).context).last_error.node = NonNull::new((*(*ctxt).context).debug_node.map_or(null_mut(), |node| node.as_ptr()) as _);
+            (*(*ctxt).context).last_error.node = (*(*ctxt).context).debug_node;
             if let Some(error) = (*(*ctxt).context).error {
                 error(
                     (*(*ctxt).context).user_data.clone(),
@@ -2106,7 +2102,7 @@ macro_rules! xml_xptr_err {
                     None,
                     None,
                     null_mut(),
-                    (*(*ctxt).context).debug_node.map_or(null_mut(), |node| node.as_ptr()) as _,
+                    (*(*ctxt).context).debug_node,
                     XmlErrorDomain::XmlFromXPointer,
                     error,
                     XmlErrorLevel::XmlErrError,

@@ -560,18 +560,13 @@ pub(crate) unsafe fn xml_save_err(
         XmlParserErrors::XmlSaveNoDoctype => "document has no DOCTYPE\n".into(),
         _ => "unexpected error number\n".into(),
     };
-    __xml_simple_error!(
-        XmlErrorDomain::XmlFromOutput,
-        code,
-        node.map_or(null_mut(), |node| node.as_ptr()),
-        msg.as_ref()
-    );
+    __xml_simple_error!(XmlErrorDomain::XmlFromOutput, code, node, msg.as_ref());
 }
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErrMemory")]
 pub(crate) unsafe fn xml_save_err_memory(extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, null_mut(), Some(extra));
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, None, Some(extra));
 }
 
 /// # Panics
