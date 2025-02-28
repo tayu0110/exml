@@ -1178,9 +1178,8 @@ pub(crate) unsafe fn xml_static_copy_node(
             // to avoid dangling references to the ENTITY_DECL node
             // we cannot keep the reference. Try to find it in the
             // target document.
-            let children = xml_get_doc_entity(doc, &ret.name().unwrap())
-                .map_or(null_mut(), |e| e.as_ptr()) as *mut XmlNode;
-            ret.set_children(NodePtr::from_ptr(children));
+            let children = xml_get_doc_entity(doc, &ret.name().unwrap());
+            ret.set_children(children.map(|children| children.into()));
         } else {
             ret.set_children(node.children());
         }
@@ -1200,14 +1199,14 @@ pub(crate) unsafe fn xml_static_copy_node(
             };
 
             // Check for coalesced text nodes
-            if insert.last() != NodePtr::from_ptr(copy.as_ptr()) {
+            if insert.last() != Some(copy) {
                 if let Some(mut last) = insert.last() {
                     copy.set_prev(Some(last));
-                    last.next = NodePtr::from_ptr(copy.as_ptr());
+                    last.set_next(Some(copy));
                 } else {
-                    insert.set_children(NodePtr::from_ptr(copy.as_ptr()));
+                    insert.set_children(Some(copy));
                 }
-                insert.set_last(NodePtr::from_ptr(copy.as_ptr()));
+                insert.set_last(Some(copy));
             }
 
             if let Some(children) = now
@@ -1282,7 +1281,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
                     return None;
                 };
                 new.doc = Some(doc);
-                new.set_parent(NodePtr::from_ptr(parent.map_or(null_mut(), |p| p.as_ptr())));
+                new.set_parent(parent);
                 doc.int_subset = Some(new);
                 parent.unwrap().add_child(new.into());
                 Some(new.into())
@@ -1303,8 +1302,8 @@ pub(crate) unsafe fn xml_static_copy_node_list(
             p = Some(q);
         } else if let Some(mut pr) = p.filter(|&p| p != q) {
             // the test is required if xmlStaticCopyNode coalesced 2 text nodes
-            pr.set_next(NodePtr::from_ptr(q.as_ptr()));
-            q.set_prev(NodePtr::from_ptr(pr.as_ptr()));
+            pr.set_next(Some(q));
+            q.set_prev(Some(pr));
             p = Some(q);
         }
         node = cur_node
@@ -1404,15 +1403,13 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
         };
 
         if let Some(mut p) = p {
-            p.set_next(NodePtr::from_ptr(q.as_ptr()));
+            p.set_next(Some(q));
         } else {
             ret.children = NodePtr::from_ptr(q.as_ptr());
         }
 
-        q.set_prev(NodePtr::from_ptr(
-            p.map_or(null_mut(), |node| node.as_ptr()),
-        ));
-        q.set_parent(NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode));
+        q.set_prev(p);
+        q.set_parent(Some(ret.into()));
         q.set_next(None);
         ret.last = NodePtr::from_ptr(q.as_ptr());
         p = Some(q);
@@ -1461,18 +1458,15 @@ pub unsafe fn xml_new_doc_node(
     if let Some(mut cur) = cur {
         cur.doc = doc;
         if !content.is_null() {
-            cur.set_children(doc.and_then(|doc| {
-                NodePtr::from_ptr(
-                    doc.get_node_list(content)
-                        .map_or(null_mut(), |node| node.as_ptr()),
-                )
-            }));
+            cur.set_children(
+                doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
+            );
             if let Some(mut ulccur) = cur.children() {
-                while let Some(next) = ulccur.next {
-                    ulccur.set_parent(NodePtr::from_ptr(cur.as_ptr()));
+                while let Some(next) = ulccur.next() {
+                    ulccur.set_parent(Some(cur.into()));
                     ulccur = next;
                 }
-                (*ulccur).set_parent(NodePtr::from_ptr(cur.as_ptr()));
+                (*ulccur).set_parent(Some(cur.into()));
                 cur.set_last(Some(ulccur));
             } else {
                 cur.set_last(None);
@@ -1502,18 +1496,15 @@ pub unsafe fn xml_new_doc_node_eat_name(
     if let Some(mut cur) = cur {
         cur.doc = doc;
         if !content.is_null() {
-            cur.set_children(doc.and_then(|doc| {
-                NodePtr::from_ptr(
-                    doc.get_node_list(content)
-                        .map_or(null_mut(), |node| node.as_ptr()),
-                )
-            }));
+            cur.set_children(
+                doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
+            );
             if let Some(mut ulccur) = cur.children() {
-                while let Some(next) = ulccur.next {
-                    ulccur.set_parent(NodePtr::from_ptr(cur.as_ptr()));
+                while let Some(next) = ulccur.next() {
+                    ulccur.set_parent(Some(cur.into()));
                     ulccur = next;
                 }
-                (*ulccur).set_parent(NodePtr::from_ptr(cur.as_ptr()));
+                (*ulccur).set_parent(Some(cur.into()));
                 cur.set_last(Some(ulccur));
             } else {
                 cur.set_last(None);
@@ -1639,19 +1630,19 @@ pub unsafe fn xml_new_child(
 
     // add the new element at the end of the children list.
     cur.typ = XmlElementType::XmlElementNode;
-    cur.set_parent(NodePtr::from_ptr(parent.as_ptr()));
+    cur.set_parent(Some(parent));
     cur.doc = parent.document();
     if parent.children().is_none() {
-        parent.set_children(NodePtr::from_ptr(cur.as_ptr()));
-        parent.set_last(NodePtr::from_ptr(cur.as_ptr()));
+        parent.set_children(Some(cur.into()));
+        parent.set_last(Some(cur.into()));
     } else {
         let mut prev = parent
             .last()
             .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
             .unwrap();
-        prev.set_next(NodePtr::from_ptr(cur.as_ptr()));
+        prev.set_next(Some(cur.into()));
         cur.prev = NodePtr::from_ptr(prev.as_ptr());
-        parent.set_last(NodePtr::from_ptr(cur.as_ptr()));
+        parent.set_last(Some(cur.into()));
     }
 
     Some(cur)
@@ -1906,8 +1897,8 @@ pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<Xm
         // The parent pointer in entity is a DTD pointer and thus is NOT
         // updated.  Not sure if this is 100% correct.
         //  -George
-        cur.set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
-        cur.set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+        cur.set_children(Some(ent.into()));
+        cur.set_last(Some(ent.into()));
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -2005,19 +1996,19 @@ pub unsafe fn xml_new_text_child(
 
     // add the new element at the end of the children list.
     cur.typ = XmlElementType::XmlElementNode;
-    cur.set_parent(NodePtr::from_ptr(parent.as_ptr()));
+    cur.set_parent(Some(parent));
     cur.doc = parent.document();
     if parent.children().is_none() {
-        parent.set_children(NodePtr::from_ptr(cur.as_ptr()));
-        parent.set_last(NodePtr::from_ptr(cur.as_ptr()));
+        parent.set_children(Some(cur.into()));
+        parent.set_last(Some(cur.into()));
     } else {
         let mut prev = parent
             .last()
             .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
             .unwrap();
-        prev.set_next(NodePtr::from_ptr(cur.as_ptr()));
+        prev.set_next(Some(cur.into()));
         cur.prev = NodePtr::from_ptr(prev.as_ptr());
-        parent.set_last(NodePtr::from_ptr(cur.as_ptr()));
+        parent.set_last(Some(cur.into()));
     }
 
     Some(cur)
@@ -2039,15 +2030,13 @@ pub unsafe fn xml_new_doc_raw_node(
     if let Some(mut cur) = cur {
         cur.doc = doc;
         if !content.is_null() {
-            cur.set_children(NodePtr::from_ptr(
-                xml_new_doc_text(doc, content).map_or(null_mut(), |node| node.as_ptr()),
-            ));
+            cur.set_children(xml_new_doc_text(doc, content).map(|node| node.into()));
             if let Some(mut ulccur) = cur.children() {
-                while let Some(next) = ulccur.next {
-                    ulccur.set_parent(NodePtr::from_ptr(cur.as_ptr()));
+                while let Some(next) = ulccur.next() {
+                    ulccur.set_parent(Some(cur.into()));
                     ulccur = next;
                 }
-                (*ulccur).set_parent(NodePtr::from_ptr(cur.as_ptr()));
+                (*ulccur).set_parent(Some(cur.into()));
                 cur.set_last(Some(ulccur));
             } else {
                 cur.set_last(None);
@@ -2126,26 +2115,27 @@ pub unsafe fn xml_replace_node(
         .next()
         .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
     {
-        next.set_prev(NodePtr::from_ptr(cur.as_ptr()));
+        next.set_prev(Some(cur));
     }
     cur.set_prev(old.prev());
     if let Some(mut prev) = cur
         .prev()
         .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
     {
-        prev.set_next(NodePtr::from_ptr(cur.as_ptr()));
+        prev.set_next(Some(cur));
     }
     if let Some(mut parent) = cur.parent() {
         if matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
+            let mut parent = XmlNodePtr::try_from(parent).unwrap();
             if parent.properties.map(|prop| prop.into()) == Some(old) {
                 parent.properties = Some(XmlAttrPtr::try_from(cur).unwrap());
             }
         } else {
-            if parent.children() == NodePtr::from_ptr(old.as_ptr()) {
-                parent.set_children(NodePtr::from_ptr(cur.as_ptr()));
+            if parent.children() == Some(old) {
+                parent.set_children(Some(cur));
             }
-            if parent.last() == NodePtr::from_ptr(old.as_ptr()) {
-                parent.set_last(NodePtr::from_ptr(cur.as_ptr()));
+            if parent.last() == Some(old) {
+                parent.set_last(Some(cur));
             }
         }
     }

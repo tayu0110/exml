@@ -1536,7 +1536,7 @@ unsafe fn xml_relaxng_load_include(
                 .parent()
                 .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
                 != Some(node.into())
-                && cur_node.parent().unwrap().next.is_none()
+                && cur_node.parent().unwrap().next().is_none()
             {
                 cur_node = cur_node
                     .parent()
@@ -1551,8 +1551,8 @@ unsafe fn xml_relaxng_load_include(
                 cur_node
                     .parent()
                     .unwrap()
-                    .next
-                    .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap())
+                    .next()
+                    .map(|n| XmlNodePtr::try_from(n).unwrap())
             } else {
                 None
             };
@@ -1742,7 +1742,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             // and attribute elements
                             if let Some(name) = now.get_prop("name") {
                                 let cname = CString::new(name.as_str()).unwrap();
-                                let text = if let Some(mut children) = now.children() {
+                                let text = if let Some(children) = now.children() {
                                     xml_new_doc_node(now.doc, now.ns, "name", null_mut()).map(
                                         |mut node| {
                                             children.add_prev_sibling(node.into());
@@ -1913,7 +1913,10 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             // children we just moved).  We'll just stick it on to the end
                             // of now.parent's list, since it's never going to be re-serialized
                             // (bug 143738).
-                            if let Some(mut parent) = now.parent() {
+                            if let Some(mut parent) = now
+                                .parent()
+                                .map(|parent| XmlNodePtr::try_from(parent).unwrap())
+                            {
                                 if let Some(ns_def) = now.ns_def.take() {
                                     if let Some(par_def) = parent.ns_def {
                                         let mut last = par_def;
@@ -2505,8 +2508,8 @@ unsafe fn xml_relaxng_parse_name_class(
             (*ret).typ = XmlRelaxNGType::Choice;
         }
 
-        if (*node).children().is_some() {
-            let mut child = (*node).children();
+        if node.children().is_some() {
+            let mut child = node.children();
             while let Some(now) = child {
                 tmp = xml_relaxng_parse_name_class(
                     ctxt,
@@ -2521,7 +2524,7 @@ unsafe fn xml_relaxng_parse_name_class(
                         last = tmp;
                     }
                 }
-                child = now.next;
+                child = now.next();
             }
         } else {
             xml_rng_perr!(
@@ -7186,7 +7189,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
                         VALID_ERR2!(
                             ctxt,
                             XmlRelaxNGValidErr::XmlRelaxngErrTextwrong,
-                            now.parent().unwrap().name
+                            now.parent.unwrap().name
                         );
                     }
                 }
@@ -8403,7 +8406,7 @@ unsafe fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrDataelem,
-                        node.unwrap().parent().unwrap().name
+                        node.unwrap().parent.unwrap().name
                     );
                     ret = -1;
                     break;
@@ -8454,7 +8457,7 @@ unsafe fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrValelem,
-                        node.unwrap().parent().unwrap().name
+                        node.unwrap().parent.unwrap().name
                     );
                     ret = -1;
                     break;
@@ -8505,7 +8508,7 @@ unsafe fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrListelem,
-                        node.unwrap().parent().unwrap().name
+                        node.unwrap().parent.unwrap().name
                     );
                     ret = -1;
                     break;

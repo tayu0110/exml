@@ -430,7 +430,7 @@ impl XmlTextReader {
                                         .children()
                                         .filter(|children| {
                                             children.element_type() == XmlElementType::XmlTextNode
-                                                && children.next.is_none()
+                                                && children.next().is_none()
                                         })
                                         .is_some()
                                     || matches!(
@@ -612,7 +612,11 @@ impl XmlTextReader {
                         && f
                         && self.ent_tab.is_empty()
                         && self.node.unwrap().last().is_some()
-                        && self.node.unwrap().last().unwrap().extra & NODE_IS_PRESERVED as u16 == 0
+                        && XmlNodePtr::try_from(self.node.unwrap().last().unwrap())
+                            .unwrap()
+                            .extra
+                            & NODE_IS_PRESERVED as u16
+                            == 0
                     {
                         let mut tmp = self
                             .node
@@ -862,8 +866,6 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadTree")]
     #[cfg(feature = "libxml_reader")]
     unsafe fn read_tree(&mut self) -> i32 {
-        use crate::tree::NodeCommon;
-
         if self.state == XmlTextReaderState::End {
             return 0;
         }
@@ -2284,8 +2286,6 @@ impl XmlTextReader {
 
     #[cfg(feature = "libxml_reader")]
     unsafe fn next_tree(&mut self) -> i32 {
-        use crate::tree::NodeCommon;
-
         if self.state == XmlTextReaderState::End {
             return 0;
         }

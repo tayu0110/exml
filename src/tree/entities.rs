@@ -151,40 +151,40 @@ impl NodeCommon for XmlEntity {
         let name = self.name.load(Ordering::Relaxed);
         (!name.is_null()).then(|| unsafe { CStr::from_ptr(name as *const i8).to_string_lossy() })
     }
-    fn children(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.children.load(Ordering::Relaxed))
+    fn children(&self) -> Option<XmlGenericNodePtr> {
+        XmlGenericNodePtr::from_raw(self.children.load(Ordering::Relaxed))
     }
-    fn set_children(&mut self, children: Option<NodePtr>) {
+    fn set_children(&mut self, children: Option<XmlGenericNodePtr>) {
         self.children.store(
             children.map_or(null_mut(), |c| c.as_ptr()),
             Ordering::Relaxed,
         );
     }
-    fn last(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.last.load(Ordering::Relaxed))
+    fn last(&self) -> Option<XmlGenericNodePtr> {
+        XmlGenericNodePtr::from_raw(self.last.load(Ordering::Relaxed))
     }
-    fn set_last(&mut self, last: Option<NodePtr>) {
+    fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
         self.last
             .store(last.map_or(null_mut(), |l| l.as_ptr()), Ordering::Relaxed);
     }
-    fn next(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.next.load(Ordering::Relaxed))
+    fn next(&self) -> Option<XmlGenericNodePtr> {
+        XmlGenericNodePtr::from_raw(self.next.load(Ordering::Relaxed))
     }
-    fn set_next(&mut self, next: Option<NodePtr>) {
+    fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
         self.next
             .store(next.map_or(null_mut(), |n| n.as_ptr()), Ordering::Relaxed);
     }
-    fn prev(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.prev.load(Ordering::Relaxed))
+    fn prev(&self) -> Option<XmlGenericNodePtr> {
+        XmlGenericNodePtr::from_raw(self.prev.load(Ordering::Relaxed))
     }
-    fn set_prev(&mut self, prev: Option<NodePtr>) {
+    fn set_prev(&mut self, prev: Option<XmlGenericNodePtr>) {
         self.prev
             .store(prev.map_or(null_mut(), |p| p.as_ptr()), Ordering::Relaxed);
     }
-    fn parent(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.parent.load(Ordering::Relaxed) as *mut XmlNode)
+    fn parent(&self) -> Option<XmlGenericNodePtr> {
+        XmlGenericNodePtr::from_raw(self.parent.load(Ordering::Relaxed) as *mut XmlNode)
     }
-    fn set_parent(&mut self, parent: Option<NodePtr>) {
+    fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>) {
         self.parent.store(
             parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlDtd,
             Ordering::Relaxed,

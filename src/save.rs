@@ -1178,7 +1178,7 @@ unsafe fn xml_ns_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, cur: XmlNsPtr) {
 unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<XmlAttrPtr>) {
     use crate::{
         libxml::htmltree::html_is_boolean_attr,
-        tree::{xml_free_node, xml_new_doc_text, XmlNode},
+        tree::{xml_free_node, xml_new_doc_text},
     };
 
     if cur.is_none() {
@@ -1219,7 +1219,7 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
                 xml_new_doc_text(now.doc, now.name).map_or(null_mut(), |node| node.as_ptr()),
             );
             if let Some(mut children) = now.children {
-                children.set_parent(NodePtr::from_ptr(now.as_ptr() as *mut XmlNode));
+                children.set_parent(Some(now.into()));
             }
         }
         xml_attr_dump_output(ctxt, now);

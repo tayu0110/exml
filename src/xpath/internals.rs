@@ -8640,9 +8640,13 @@ pub unsafe fn xml_xpath_next_parent(
                 let Some(parent) = node.parent() else {
                     return (*(*ctxt).context).doc.map(|doc| doc.into());
                 };
-                if matches!(parent.element_type(), XmlElementType::XmlElementNode)
-                    && (*parent.name.add(0) == b' '
-                        || xml_str_equal(parent.name, c"fake node libxslt".as_ptr() as _))
+                if XmlNodePtr::try_from(parent)
+                    .ok()
+                    .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+                    .as_deref()
+                    .and_then(|node| node.name())
+                    .filter(|name| name.starts_with(' ') || name == "fake node libxslt")
+                    .is_some()
                 {
                     return None;
                 }
@@ -9021,9 +9025,13 @@ pub unsafe fn xml_xpath_next_ancestor(
                 let Some(parent) = node.parent() else {
                     return (*(*ctxt).context).doc.map(|doc| doc.into());
                 };
-                if matches!(parent.element_type(), XmlElementType::XmlElementNode)
-                    && (*parent.name.add(0) == b' '
-                        || xml_str_equal(parent.name, c"fake node libxslt".as_ptr() as _))
+                if XmlNodePtr::try_from(parent)
+                    .ok()
+                    .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+                    .as_deref()
+                    .and_then(|node| node.name())
+                    .filter(|name| name.starts_with(' ') || name == "fake node libxslt")
+                    .is_some()
                 {
                     return None;
                 }
@@ -9083,9 +9091,14 @@ pub unsafe fn xml_xpath_next_ancestor(
         | XmlElementType::XmlXIncludeStart
         | XmlElementType::XmlXIncludeEnd => {
             let parent = (*cur).parent()?;
-            if matches!(parent.element_type(), XmlElementType::XmlElementNode)
-                && (*parent.name.add(0) == b' '
-                    || xml_str_equal(parent.name, c"fake node libxslt".as_ptr() as _))
+
+            if XmlNodePtr::try_from(parent)
+                .ok()
+                .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+                .as_deref()
+                .and_then(|node| node.name())
+                .filter(|name| name.starts_with(' ') || name == "fake node libxslt")
+                .is_some()
             {
                 return None;
             }

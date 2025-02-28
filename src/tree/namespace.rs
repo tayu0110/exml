@@ -33,9 +33,8 @@ use crate::libxml::{
 };
 
 use super::{
-    xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDocPtr,
-    XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNsType, XML_LOCAL_NAMESPACE,
-    XML_XML_NAMESPACE,
+    xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementType,
+    XmlGenericNodePtr, XmlNodePtr, XmlNsType, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 #[repr(C)]
@@ -128,30 +127,30 @@ impl NodeCommon for XmlNs {
         (!self.href.is_null())
             .then(|| unsafe { CStr::from_ptr(self.href as *const i8).to_string_lossy() })
     }
-    fn children(&self) -> Option<NodePtr> {
+    fn children(&self) -> Option<XmlGenericNodePtr> {
         None
     }
-    fn set_children(&mut self, _children: Option<NodePtr>) {}
-    fn last(&self) -> Option<NodePtr> {
+    fn set_children(&mut self, _children: Option<XmlGenericNodePtr>) {}
+    fn last(&self) -> Option<XmlGenericNodePtr> {
         None
     }
-    fn set_last(&mut self, _last: Option<NodePtr>) {}
-    fn next(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.next.map_or(null_mut(), |ns| ns.as_ptr()) as *mut XmlNode)
+    fn set_last(&mut self, _last: Option<XmlGenericNodePtr>) {}
+    fn next(&self) -> Option<XmlGenericNodePtr> {
+        self.next.map(|ns| ns.into())
     }
-    fn set_next(&mut self, next: Option<NodePtr>) {
+    fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
         unsafe {
             self.next = next.and_then(|p| XmlNsPtr::from_raw(p.as_ptr() as *mut XmlNs).unwrap());
         }
     }
-    fn prev(&self) -> Option<NodePtr> {
+    fn prev(&self) -> Option<XmlGenericNodePtr> {
         None
     }
-    fn set_prev(&mut self, _prev: Option<NodePtr>) {}
-    fn parent(&self) -> Option<NodePtr> {
+    fn set_prev(&mut self, _prev: Option<XmlGenericNodePtr>) {}
+    fn parent(&self) -> Option<XmlGenericNodePtr> {
         None
     }
-    fn set_parent(&mut self, _parent: Option<NodePtr>) {}
+    fn set_parent(&mut self, _parent: Option<XmlGenericNodePtr>) {}
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]

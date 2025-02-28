@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    ffi::CStr,
+    ffi::{CStr, CString},
     ops::{Deref, DerefMut},
     ptr::{null_mut, NonNull},
     sync::atomic::Ordering,
@@ -16,25 +16,26 @@ use crate::{
 };
 
 use super::{
-    add_prop_sibling, xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge,
-    xml_tree_err_memory, NodePtr, XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributePtr,
-    XmlAttributeType, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementType, XmlEntity, XmlEntityPtr,
-    XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    add_prop_sibling, xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node,
+    xml_free_prop, xml_get_doc_entity, xml_new_doc_text_len, xml_text_merge, xml_tree_err_memory,
+    XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtd,
+    XmlDtdPtr, XmlElementType, XmlEntity, XmlEntityPtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
     fn element_type(&self) -> XmlElementType;
     fn name(&self) -> Option<Cow<'_, str>>;
-    fn children(&self) -> Option<NodePtr>;
-    fn set_children(&mut self, children: Option<NodePtr>);
-    fn last(&self) -> Option<NodePtr>;
-    fn set_last(&mut self, last: Option<NodePtr>);
-    fn parent(&self) -> Option<NodePtr>;
-    fn set_parent(&mut self, parent: Option<NodePtr>);
-    fn next(&self) -> Option<NodePtr>;
-    fn set_next(&mut self, next: Option<NodePtr>);
-    fn prev(&self) -> Option<NodePtr>;
-    fn set_prev(&mut self, prev: Option<NodePtr>);
+    fn children(&self) -> Option<XmlGenericNodePtr>;
+    fn set_children(&mut self, children: Option<XmlGenericNodePtr>);
+    fn last(&self) -> Option<XmlGenericNodePtr>;
+    fn set_last(&mut self, last: Option<XmlGenericNodePtr>);
+    fn parent(&self) -> Option<XmlGenericNodePtr>;
+    fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>);
+    fn next(&self) -> Option<XmlGenericNodePtr>;
+    fn set_next(&mut self, next: Option<XmlGenericNodePtr>);
+    fn prev(&self) -> Option<XmlGenericNodePtr>;
+    fn set_prev(&mut self, prev: Option<XmlGenericNodePtr>);
     fn document(&self) -> Option<XmlDocPtr>;
     fn set_document(&mut self, doc: Option<XmlDocPtr>);
 
@@ -58,11 +59,11 @@ pub trait NodeCommon {
             return None;
         }
         let doc = doc.or(self.document());
-        let mut cur = NodePtr::from_ptr(self as *const Self as *mut XmlNode);
+        let mut cur = XmlGenericNodePtr::from_raw(self as *const Self as *mut XmlNode);
         if let Some(doc) =
             doc.filter(|doc| matches!(doc.element_type(), XmlElementType::XmlHTMLDocumentNode))
         {
-            cur = doc.children;
+            cur = doc.children();
             while let Some(now) = cur.filter(|cur| cur.name().is_some()) {
                 if !matches!(now.element_type(), XmlElementType::XmlElementNode) {
                     cur = now.next();
@@ -142,6 +143,7 @@ pub trait NodeCommon {
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                     )
                 {
+                    let children = XmlNodePtr::try_from(children).unwrap();
                     // Optimization for the common case: only 1 text node.
                     return (!children.content.is_null()).then(|| {
                         CStr::from_ptr(children.content as *const i8)
@@ -211,9 +213,7 @@ pub trait NodeCommon {
                     if tmp != Some(new_node.into()) {
                         return;
                     }
-                    if let Some(last) =
-                        last.filter(|l| l.next() == NodePtr::from_ptr(new_node.as_ptr()))
-                    {
+                    if let Some(last) = last.filter(|l| l.next() == Some(new_node.into())) {
                         xml_text_merge(
                             XmlNodePtr::from_raw(last.as_ptr()).unwrap(),
                             Some(new_node),
@@ -290,8 +290,8 @@ pub trait NodeCommon {
                 return Some(cur_node.into());
             }
             if let Some(mut last) = self.last().filter(|l| {
-                matches!(l.typ, XmlElementType::XmlTextNode)
-                    && l.name == cur.name
+                matches!(l.element_type(), XmlElementType::XmlTextNode)
+                    && l.name() == cur.name()
                     && self
                         .last()
                         .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
@@ -306,10 +306,8 @@ pub trait NodeCommon {
         }
 
         // add the new element at the end of the children list.
-        let prev = cur
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
-        cur.set_parent(NodePtr::from_ptr(cur_node.as_ptr()));
+        let prev = cur.parent();
+        cur.set_parent(Some(cur_node));
         if cur.document() != self.document() {
             cur.set_doc(self.document());
         }
@@ -379,16 +377,13 @@ pub trait NodeCommon {
                 cur_node.properties = Some(cur);
             }
         } else if cur_node.children().is_none() {
-            cur_node.set_children(NodePtr::from_ptr(cur.as_ptr()));
-            cur_node.set_last(NodePtr::from_ptr(cur.as_ptr()));
+            cur_node.set_children(Some(cur));
+            cur_node.set_last(Some(cur));
         } else {
-            let mut prev = cur_node
-                .last()
-                .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
-                .unwrap();
-            prev.set_next(NodePtr::from_ptr(cur.as_ptr()));
-            cur.set_prev(NodePtr::from_ptr(prev.as_ptr()));
-            cur_node.set_last(NodePtr::from_ptr(cur.as_ptr()));
+            let mut prev = cur_node.last().unwrap();
+            prev.set_next(Some(cur));
+            cur.set_prev(Some(prev));
+            cur_node.set_last(Some(cur));
         }
         Some(cur)
     }
@@ -617,26 +612,29 @@ pub trait NodeCommon {
         }
         if let Some(mut parent) = self.parent() {
             if matches!(self.element_type(), XmlElementType::XmlAttributeNode) {
+                let mut parent = XmlNodePtr::try_from(parent).unwrap();
                 if parent.properties.map_or(null_mut(), |prop| prop.as_ptr())
                     == self as *mut Self as *mut XmlAttr
                 {
                     parent.properties = (*(self as *mut Self as *mut XmlAttr)).next;
                 }
             } else {
-                if parent.children() == NodePtr::from_ptr(self as *mut Self as *mut XmlNode) {
+                if parent.children()
+                    == XmlGenericNodePtr::from_raw(self as *mut Self as *mut XmlNode)
+                {
                     parent.set_children(self.next());
                 }
-                if parent.last() == NodePtr::from_ptr(self as *mut Self as *mut XmlNode) {
+                if parent.last() == XmlGenericNodePtr::from_raw(self as *mut Self as *mut XmlNode) {
                     parent.set_last(self.prev());
                 }
             }
             self.set_parent(None);
         }
         if let Some(mut next) = self.next() {
-            next.prev = self.prev();
+            next.set_prev(self.prev());
         }
         if let Some(mut prev) = self.prev() {
-            prev.next = self.next();
+            prev.set_next(self.next());
         }
         self.set_next(None);
         self.set_prev(None);
@@ -924,7 +922,7 @@ impl XmlGenericNodePtr {
     ///
     /// Returns the line number if successful, -1 otherwise
     #[doc(alias = "xmlGetLineNoInternal")]
-    unsafe fn get_line_no_internal(self, depth: i32) -> i64 {
+    pub(super) unsafe fn get_line_no_internal(self, depth: i32) -> i64 {
         let mut result = -1;
 
         if depth >= 5 {
@@ -1261,6 +1259,157 @@ impl XmlGenericNodePtr {
         Some(buffer)
     }
 
+    /// Build the string equivalent to the text contained in the Node list
+    /// made of TEXTs and ENTITY_REFs.
+    ///
+    /// Returns a pointer to the string copy.
+    #[doc(alias = "xmlNodeListGetString")]
+    pub unsafe fn get_string(self, doc: Option<XmlDocPtr>, in_line: i32) -> Option<String> {
+        let mut node = Some(self);
+        let mut ret: *mut XmlChar = null_mut();
+
+        let attr = self
+            .parent()
+            .filter(|p| matches!(p.element_type(), XmlElementType::XmlAttributeNode))
+            .is_some();
+
+        while let Some(cur_node) = node {
+            if matches!(
+                cur_node.element_type(),
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+            ) {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if in_line != 0 {
+                    ret = xml_strcat(ret, cur_node.content);
+                } else {
+                    let buffer = if attr {
+                        xml_encode_attribute_entities(doc, cur_node.content)
+                    } else {
+                        xml_encode_entities_reentrant(doc, cur_node.content)
+                    };
+                    if !buffer.is_null() {
+                        ret = xml_strcat(ret, buffer);
+                        xml_free(buffer as _);
+                    }
+                }
+            } else if matches!(cur_node.element_type(), XmlElementType::XmlEntityRefNode) {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if in_line != 0 {
+                    let ent = xml_get_doc_entity(doc, &cur_node.name().unwrap());
+                    if let Some(ent) = ent {
+                        // an entity content can be any "well balanced chunk",
+                        // i.e. the result of the content [43] production:
+                        // http://www.w3.org/TR/REC-xml#NT-content.
+                        // So it can contain text, CDATA section or nested
+                        // entity reference nodes (among others).
+                        // -> we recursive  call xmlNodeListGetString()
+                        // which handles these types
+                        let children = ent.children();
+                        if let Some(buffer) = children.and_then(|c| c.get_string(doc, 1)) {
+                            let buffer = CString::new(buffer).unwrap();
+                            ret = xml_strcat(ret, buffer.as_ptr() as *const u8);
+                        }
+                    } else {
+                        ret = xml_strcat(ret, cur_node.content);
+                    }
+                } else {
+                    let mut buf: [XmlChar; 2] = [0; 2];
+
+                    buf[0] = b'&';
+                    buf[1] = 0;
+                    ret = xml_strncat(ret, buf.as_ptr() as _, 1);
+                    ret = xml_strcat(ret, cur_node.name);
+                    buf[0] = b';';
+                    buf[1] = 0;
+                    ret = xml_strncat(ret, buf.as_ptr() as _, 1);
+                }
+            }
+            node = cur_node
+                .next()
+                .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        }
+        let r = (!ret.is_null()).then(|| {
+            CStr::from_ptr(ret as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
+        xml_free(ret as _);
+        r
+    }
+
+    /// Builds the string equivalent to the text contained in the Node list
+    /// made of TEXTs and ENTITY_REFs, contrary to `xmlNodeListGetString()`
+    /// this function doesn't do any character encoding handling.
+    ///
+    /// Returns a pointer to the string copy
+    #[doc(alias = "xmlNodeListGetRawString")]
+    #[cfg(feature = "libxml_tree")]
+    pub unsafe fn get_raw_string(self, doc: Option<XmlDocPtr>, in_line: i32) -> Option<String> {
+        use super::xml_encode_special_chars;
+
+        let mut node = Some(self);
+        let mut ret: *mut XmlChar = null_mut();
+
+        while let Some(cur_node) = node {
+            if matches!(
+                cur_node.element_type(),
+                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+            ) {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if in_line != 0 {
+                    ret = xml_strcat(ret, cur_node.content);
+                } else {
+                    let buffer: *mut XmlChar = xml_encode_special_chars(doc, cur_node.content);
+                    if !buffer.is_null() {
+                        ret = xml_strcat(ret, buffer);
+                        xml_free(buffer as _);
+                    }
+                }
+            } else if matches!(cur_node.element_type(), XmlElementType::XmlEntityRefNode) {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if in_line != 0 {
+                    let ent = xml_get_doc_entity(doc, &cur_node.name().unwrap());
+                    if let Some(ent) = ent {
+                        // an entity content can be any "well balanced chunk",
+                        // i.e. the result of the content [43] production:
+                        // http://www.w3.org/TR/REC-xml#NT-content.
+                        // So it can contain text, CDATA section or nested
+                        // entity reference nodes (among others).
+                        // -> we recursive  call xmlNodeListGetRawString()
+                        // which handles these types
+                        let children = ent.children();
+                        let buffer = children.and_then(|c| c.get_raw_string(doc, 1));
+                        if let Some(buffer) = buffer.map(|b| CString::new(b).unwrap()) {
+                            ret = xml_strcat(ret, buffer.as_ptr() as *const u8);
+                        }
+                    } else {
+                        ret = xml_strcat(ret, cur_node.content);
+                    }
+                } else {
+                    let mut buf: [u8; 2] = [0; 2];
+
+                    buf[0] = b'&';
+                    buf[1] = 0;
+                    ret = xml_strncat(ret, buf.as_ptr(), 1);
+                    ret = xml_strcat(ret, cur_node.name);
+                    buf[0] = b';';
+                    buf[1] = 0;
+                    ret = xml_strncat(ret, buf.as_ptr(), 1);
+                }
+            }
+            node = cur_node
+                .next()
+                .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        }
+        let r = (!ret.is_null()).then(|| {
+            CStr::from_ptr(ret as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
+        xml_free(ret as _);
+        r
+    }
+
     /// Set (or reset) an attribute carried by a node.
     ///
     /// If `name` has a prefix, then the corresponding namespace-binding will be used,
@@ -1302,7 +1451,7 @@ impl XmlGenericNodePtr {
                     if now.document() != doc {
                         now.set_document(doc);
                     }
-                    if let Some(mut children) = now.children() {
+                    if let Some(children) = now.children() {
                         children.set_doc_all_sibling(doc);
                     }
 
@@ -1322,12 +1471,30 @@ impl XmlGenericNodePtr {
                 // Clear 'children' which points to the entity declaration
                 // from the original document.
                 self.set_children(None);
-            } else if let Some(mut children) = self.children() {
+            } else if let Some(children) = self.children() {
                 children.set_doc_all_sibling(doc);
             }
 
             // FIXME: self.ns should be updated as in xmlStaticCopyNode().
             self.set_document(doc);
+        }
+    }
+
+    /// update all nodes in the list to point to the right document
+    #[doc(alias = "xmlSetListDoc")]
+    pub unsafe fn set_doc_all_sibling(self, doc: Option<XmlDocPtr>) {
+        if self.element_type() == XmlElementType::XmlNamespaceDecl {
+            return;
+        }
+        if self.document() != doc {
+            self.set_doc(doc);
+        }
+        let mut cur = self.next();
+        while let Some(now) = cur {
+            if now.document() != doc {
+                now.set_doc(doc);
+            }
+            cur = now.next();
         }
     }
 
@@ -1365,7 +1532,7 @@ impl XmlGenericNodePtr {
 
         // add the first element at the end of the children list.
         if self.children().is_none() {
-            self.set_children(NodePtr::from_ptr(cur.as_ptr()));
+            self.set_children(Some(cur));
         } else {
             // If cur and self.last both are TEXT nodes, then merge them.
             if let Some(node) = XmlNodePtr::try_from(cur).ok().filter(|cur| {
@@ -1391,23 +1558,23 @@ impl XmlGenericNodePtr {
                 cur = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
                 xml_free_node(prev);
             }
-            let prev: *mut XmlNode = self.last().map_or(null_mut(), |l| l.as_ptr());
-            (*prev).set_next(NodePtr::from_ptr(cur.as_ptr()));
-            cur.set_prev(NodePtr::from_ptr(prev));
+            let mut prev = self.last().unwrap();
+            prev.set_next(Some(cur));
+            cur.set_prev(Some(prev));
         }
         while let Some(next) = cur.next() {
-            cur.set_parent(NodePtr::from_ptr(self.as_ptr()));
+            cur.set_parent(Some(self));
             if cur.document() != self.document() {
                 cur.set_doc(self.document());
             }
-            cur = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+            cur = next;
         }
-        cur.set_parent(NodePtr::from_ptr(self.as_ptr()));
+        cur.set_parent(Some(self));
         // the parent may not be linked to a doc !
         if cur.document() != self.document() {
             cur.set_doc(self.document());
         }
-        self.set_last(NodePtr::from_ptr(cur.as_ptr()));
+        self.set_last(Some(cur));
 
         Some(cur)
     }
@@ -1482,12 +1649,12 @@ impl XmlGenericNodePtr {
             elem.set_doc(cur.document());
         }
         let parent = cur.parent();
-        elem.set_prev(NodePtr::from_ptr(cur.as_ptr()));
+        elem.set_prev(Some(cur));
         elem.set_next(None);
         elem.set_parent(parent);
-        cur.set_next(NodePtr::from_ptr(elem.as_ptr()));
+        cur.set_next(Some(elem));
         if let Some(mut parent) = parent {
-            parent.set_last(NodePtr::from_ptr(elem.as_ptr()));
+            parent.set_last(Some(elem));
         }
 
         Some(elem)
@@ -1543,14 +1710,9 @@ impl XmlGenericNodePtr {
                 xml_free_node(elem);
                 return Some(self);
             }
-            if let Some(mut prev) = self
-                .prev()
-                .filter(|p| {
-                    matches!(p.element_type(), XmlElementType::XmlTextNode)
-                        && self.name() == p.name()
-                })
-                .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
-            {
+            if let Some(mut prev) = self.prev().filter(|p| {
+                matches!(p.element_type(), XmlElementType::XmlTextNode) && self.name() == p.name()
+            }) {
                 prev.add_content(elem.content);
                 xml_free_node(elem);
                 return Some(prev);
@@ -1573,17 +1735,13 @@ impl XmlGenericNodePtr {
         }
         elem.set_parent(self.parent());
         elem.set_prev(self.prev());
-        self.set_prev(NodePtr::from_ptr(elem.as_ptr()));
-        elem.set_next(NodePtr::from_ptr(self.as_ptr()));
+        self.set_prev(Some(elem));
+        elem.set_next(Some(self));
         if let Some(mut prev) = elem.prev() {
-            prev.set_next(NodePtr::from_ptr(elem.as_ptr()));
+            prev.set_next(Some(elem));
         }
-        if let Some(mut parent) = elem
-            .parent()
-            .filter(|p| p.children() == elem.next())
-            .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
-        {
-            parent.set_children(NodePtr::from_ptr(elem.as_ptr()));
+        if let Some(mut parent) = elem.parent().filter(|p| p.children() == elem.next()) {
+            parent.set_children(Some(elem));
         }
         Some(elem)
     }
@@ -1653,14 +1811,14 @@ impl XmlGenericNodePtr {
             elem.set_doc(self.document());
         }
         elem.set_parent(self.parent());
-        elem.set_prev(NodePtr::from_ptr(self.as_ptr()));
+        elem.set_prev(Some(self));
         elem.set_next(self.next());
-        self.set_next(NodePtr::from_ptr(elem.as_ptr()));
+        self.set_next(Some(elem));
         if let Some(mut next) = elem
             .next()
             .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
         {
-            next.set_prev(NodePtr::from_ptr(elem.as_ptr()));
+            next.set_prev(Some(elem));
         }
         if let Some(mut parent) = elem
             .parent()
@@ -1671,7 +1829,7 @@ impl XmlGenericNodePtr {
                     == Some(self)
             })
         {
-            parent.set_last(NodePtr::from_ptr(elem.as_ptr()));
+            parent.set_last(Some(elem));
         }
         Some(elem)
     }

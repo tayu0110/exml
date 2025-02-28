@@ -251,13 +251,8 @@ impl XmlDebugCtxt<'_> {
             );
         }
         if node.prev().is_none() {
-            if node.element_type() == XmlElementType::XmlAttributeNode {
-                let attr = XmlAttrPtr::try_from(node).unwrap();
-                if node
-                    .parent()
-                    .filter(|p| Some(attr) != p.properties)
-                    .is_some()
-                {
+            if let Ok(attr) = XmlAttrPtr::try_from(node) {
+                if attr.parent.filter(|p| Some(attr) != p.properties).is_some() {
                     xml_debug_err!(
                         self,
                         XmlParserErrors::XmlCheckNoPrev,
@@ -275,13 +270,7 @@ impl XmlDebugCtxt<'_> {
                     "Node has no prev and not first of parent list\n",
                 );
             }
-        } else if node
-            .prev()
-            .unwrap()
-            .next
-            .map_or(null_mut(), |node| node.as_ptr())
-            != node.as_ptr()
-        {
+        } else if node.prev().unwrap().next() != Some(node) {
             xml_debug_err!(
                 self,
                 XmlParserErrors::XmlCheckWrongPrev,
@@ -289,7 +278,7 @@ impl XmlDebugCtxt<'_> {
             );
         }
         if let Some(next) = node.next() {
-            if next.prev.map_or(null_mut(), |prev| prev.as_ptr()) != node.as_ptr() {
+            if next.prev() != Some(node) {
                 xml_debug_err!(
                     self,
                     XmlParserErrors::XmlCheckWrongNext,
@@ -1800,9 +1789,15 @@ pub unsafe fn xml_ls_count_node(node: Option<XmlGenericNodePtr>) -> usize {
     let mut list = match node.element_type() {
         XmlElementType::XmlElementNode => node.children(),
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-            XmlDocPtr::try_from(node).unwrap().children
+            XmlDocPtr::try_from(node)
+                .unwrap()
+                .children
+                .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
         }
-        XmlElementType::XmlAttributeNode => XmlAttrPtr::try_from(node).unwrap().children,
+        XmlElementType::XmlAttributeNode => XmlAttrPtr::try_from(node)
+            .unwrap()
+            .children
+            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr())),
         XmlElementType::XmlTextNode
         | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlPINode

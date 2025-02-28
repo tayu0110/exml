@@ -74,7 +74,7 @@ use crate::{
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon,
         NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr,
         XmlNodePtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
@@ -2279,7 +2279,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 ent.owner = 1;
                 let mut cur = Some(l);
                 while let Some(mut now) = cur {
-                    now.set_parent(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                    now.set_parent(Some(ent.into()));
                     if now.document().map_or(null_mut(), |doc| doc.as_ptr())
                         != ent.doc.load(Ordering::Relaxed) as _
                     {
@@ -2296,9 +2296,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             } else {
                 ent.owner = 0;
                 while let Some(mut now) = list {
-                    now.set_parent(NodePtr::from_ptr(
-                        (*ctxt).node.map_or(null_mut(), |node| node.as_ptr()),
-                    ));
+                    now.set_parent((*ctxt).node.map(|node| node.into()));
                     now.set_document((*ctxt).my_doc);
                     if now.next().is_none() {
                         ent.last.store(now.as_ptr(), Ordering::Relaxed);

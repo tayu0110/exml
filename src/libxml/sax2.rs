@@ -1602,13 +1602,13 @@ unsafe fn xml_sax2_attribute_internal(
                     .map_or(null_mut(), |node| node.as_ptr()),
             )
         });
-        let mut tmp = ret.children;
+        let mut tmp = ret.children();
         while let Some(mut now) = tmp {
-            now.set_parent(NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode));
-            if now.next.is_none() {
-                ret.last = Some(now);
+            now.set_parent(Some(ret.into()));
+            if now.next().is_none() {
+                ret.set_last(Some(now));
             }
-            tmp = now.next;
+            tmp = now.next();
         }
     } else if !value.is_null() {
         ret.children = NodePtr::from_ptr(
@@ -1616,7 +1616,7 @@ unsafe fn xml_sax2_attribute_internal(
         );
         ret.last = ret.children;
         if let Some(mut children) = ret.children {
-            children.set_parent(NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode));
+            children.set_parent(Some(ret.into()));
         }
     }
 
@@ -2470,7 +2470,7 @@ unsafe fn xml_sax2_attribute_ns(
         let mut tmp = ret.children;
         while let Some(mut now) = tmp {
             now.doc = ret.doc;
-            now.set_parent(NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode));
+            now.set_parent(Some(ret.into()));
             if now.next.is_none() {
                 ret.last = Some(now);
             }
@@ -2485,7 +2485,7 @@ unsafe fn xml_sax2_attribute_ns(
         ret.last = NodePtr::from_ptr(tmp.map_or(null_mut(), |node| node.as_ptr()));
         if let Some(mut tmp) = tmp {
             tmp.doc = ret.doc;
-            tmp.set_parent(NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode));
+            tmp.set_parent(Some(ret.into()));
         }
     }
 
@@ -2730,14 +2730,8 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
             xml_new_cdata_block((*ctxt).my_doc, ch)
         };
         if let Some(mut last_child) = last_child {
-            (*ctxt)
-                .node
-                .unwrap()
-                .set_children(NodePtr::from_ptr(last_child.as_ptr()));
-            (*ctxt)
-                .node
-                .unwrap()
-                .set_last(NodePtr::from_ptr(last_child.as_ptr()));
+            (*ctxt).node.unwrap().set_children(Some(last_child.into()));
+            (*ctxt).node.unwrap().set_last(Some(last_child.into()));
             last_child.parent =
                 NodePtr::from_ptr((*ctxt).node.map_or(null_mut(), |node| node.as_ptr()));
             last_child.doc = (*ctxt).node.unwrap().doc;

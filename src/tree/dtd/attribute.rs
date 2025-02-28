@@ -31,7 +31,7 @@ use crate::{
     libxml::{globals::xml_free, xmlstring::XmlChar},
     tree::{
         InvalidNodePointerCastError, NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType,
-        XmlDocPtr, XmlDtd, XmlElementType, XmlGenericNodePtr, XmlNode,
+        XmlDocPtr, XmlElementType, XmlGenericNodePtr,
     },
 };
 
@@ -96,37 +96,39 @@ impl NodeCommon for XmlAttribute {
         (!self.name.is_null())
             .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
     }
-    fn children(&self) -> Option<NodePtr> {
+    fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children
+            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
-    fn set_children(&mut self, children: Option<NodePtr>) {
-        self.children = children;
+    fn set_children(&mut self, children: Option<XmlGenericNodePtr>) {
+        self.children = children.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
     }
-    fn last(&self) -> Option<NodePtr> {
+    fn last(&self) -> Option<XmlGenericNodePtr> {
         self.last
+            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
-    fn set_last(&mut self, last: Option<NodePtr>) {
-        self.last = last;
+    fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
+        self.last = last.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
     }
-    fn next(&self) -> Option<NodePtr> {
+    fn next(&self) -> Option<XmlGenericNodePtr> {
         self.next
+            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
-    fn set_next(&mut self, next: Option<NodePtr>) {
-        self.next = next;
+    fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
+        self.next = next.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
     }
-    fn prev(&self) -> Option<NodePtr> {
+    fn prev(&self) -> Option<XmlGenericNodePtr> {
         self.prev
+            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
-    fn set_prev(&mut self, prev: Option<NodePtr>) {
-        self.prev = prev;
+    fn set_prev(&mut self, prev: Option<XmlGenericNodePtr>) {
+        self.prev = prev.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
     }
-    fn parent(&self) -> Option<NodePtr> {
-        self.parent
-            .and_then(|p| NodePtr::from_ptr(p.as_ptr() as *mut XmlNode))
+    fn parent(&self) -> Option<XmlGenericNodePtr> {
+        self.parent.map(|node| node.into())
     }
-    fn set_parent(&mut self, parent: Option<NodePtr>) {
-        self.parent =
-            parent.and_then(|p| unsafe { XmlDtdPtr::from_raw(p.as_ptr() as *mut XmlDtd).unwrap() });
+    fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>) {
+        self.parent = parent.map(|p| XmlDtdPtr::try_from(p).unwrap());
     }
 }
 

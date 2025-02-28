@@ -6455,15 +6455,15 @@ pub unsafe fn xml_valid_get_valid_elements(
     let name: *const XmlChar = test_node.name;
 
     if let Some(mut prev) = prev {
-        prev.set_next(NodePtr::from_ptr(test_node.as_ptr()));
+        prev.set_next(Some(test_node.into()));
     } else {
-        parent.set_children(NodePtr::from_ptr(test_node.as_ptr()));
+        parent.set_children(Some(test_node.into()));
     }
 
     if let Some(mut next) = next {
-        next.set_prev(NodePtr::from_ptr(test_node.as_ptr()));
+        next.set_prev(Some(test_node.into()));
     } else {
-        parent.set_last(NodePtr::from_ptr(test_node.as_ptr()));
+        parent.set_last(Some(test_node.into()));
     }
 
     // Insert each potential child node and check if the parent is still valid
@@ -6497,21 +6497,13 @@ pub unsafe fn xml_valid_get_valid_elements(
 
     // Restore the tree structure
     if let Some(mut prev) = prev {
-        prev.set_next(NodePtr::from_ptr(
-            prev_next.map_or(null_mut(), |node| node.as_ptr()),
-        ));
+        prev.set_next(prev_next);
     }
     if let Some(mut next) = next {
-        next.set_prev(NodePtr::from_ptr(
-            next_prev.map_or(null_mut(), |node| node.as_ptr()),
-        ));
+        next.set_prev(next_prev);
     }
-    parent.set_children(NodePtr::from_ptr(
-        parent_childs.map_or(null_mut(), |node| node.as_ptr()),
-    ));
-    parent.set_last(NodePtr::from_ptr(
-        parent_last.map_or(null_mut(), |node| node.as_ptr()),
-    ));
+    parent.set_children(parent_childs);
+    parent.set_last(parent_last);
 
     // Free up the dummy node
     test_node.name = name;

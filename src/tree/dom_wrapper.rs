@@ -32,7 +32,7 @@ use crate::libxml::{
 use super::{
     xml_free_ns, xml_get_doc_entity, xml_new_ns, xml_search_ns_by_namespace_strict,
     xml_search_ns_by_prefix_strict, xml_tree_err_memory, xml_tree_nslist_lookup_by_prefix,
-    NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType,
+    NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlElementType,
     XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE,
 };
 
@@ -429,8 +429,8 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
             if check_shadow != 0
                 && elem
                     .parent()
-                    .filter(|p| {
-                        p.doc.map_or(null_mut(), |doc| doc.as_ptr()) != p.as_ptr() as *mut XmlDoc
+                    .filter(|&p| {
+                        Some(p) != p.document().map(|doc| doc.into())
                             && xml_search_ns_by_prefix_strict(
                                 doc,
                                 XmlGenericNodePtr::from_raw(p.as_ptr()).unwrap(),
@@ -651,10 +651,10 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                             let mut ns = cur_node.ns_def;
                             'b: while let Some(cur_ns) = ns {
                                 if parnsdone == 0 {
-                                    if let Some(parent) = elem.parent().filter(|p| {
-                                        p.doc.map_or(null_mut(), |doc| doc.as_ptr())
-                                            != p.as_ptr() as *mut XmlDoc
-                                    }) {
+                                    if let Some(parent) = elem
+                                        .parent()
+                                        .filter(|&p| Some(p) != p.document().map(|doc| doc.into()))
+                                    {
                                         // Gather ancestor in-scope ns-decls.
                                         if xml_dom_wrap_ns_norm_gather_in_scope_ns(
                                             &raw mut ns_map,
@@ -763,9 +763,8 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         if parnsdone == 0 {
                             if (*elem)
                                 .parent()
-                                .filter(|p| {
-                                    p.doc.map_or(null_mut(), |doc| doc.as_ptr())
-                                        != p.as_ptr() as *mut XmlDoc
+                                .filter(|&p| {
+                                    Some(p) != p.document().map(|doc| doc.into())
                                         && xml_dom_wrap_ns_norm_gather_in_scope_ns(
                                             &raw mut ns_map,
                                             XmlGenericNodePtr::from_raw(p.as_ptr()),
@@ -833,9 +832,8 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                         if parnsdone == 0 {
                             if elem
                                 .parent()
-                                .filter(|p| {
-                                    p.doc.map_or(null_mut(), |doc| doc.as_ptr())
-                                        != p.as_ptr() as *mut XmlDoc
+                                .filter(|&p| {
+                                    Some(p) != p.document().map(|doc| doc.into())
                                         && xml_dom_wrap_ns_norm_gather_in_scope_ns(
                                             &raw mut ns_map,
                                             XmlGenericNodePtr::from_raw(p.as_ptr()),
@@ -1067,10 +1065,10 @@ unsafe fn xml_dom_wrap_adopt_branch(
                         let mut next = cur_node.next();
                         while let Some(now) = next.filter(|now| {
                             !matches!(now.element_type(), XmlElementType::XmlXIncludeEnd)
-                                && now.doc != node.doc
+                                && now.document() != node.doc
                         }) {
                             cur_node = XmlGenericNodePtr::from_raw(now.as_ptr()).unwrap();
-                            next = now.next;
+                            next = now.next();
                         }
 
                         if cur_node.document() != node.doc {
@@ -1334,10 +1332,8 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                 let ent = xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
                                 if let Some(ent) = ent {
                                     cur.content = ent.content.load(Ordering::Relaxed);
-                                    cur.set_children(NodePtr::from_ptr(
-                                        ent.as_ptr() as *mut XmlNode
-                                    ));
-                                    cur.set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                                    cur.set_children(Some(ent.into()));
+                                    cur.set_last(Some(ent.into()));
                                 }
                             }
                             // goto leave_node;
@@ -1513,8 +1509,8 @@ unsafe fn xml_dom_wrap_adopt_attr(
                     let ent = xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
                     if let Some(ent) = ent {
                         cur.content = ent.content.load(Ordering::Relaxed);
-                        cur.set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
-                        cur.set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                        cur.set_children(Some(ent.into()));
+                        cur.set_last(Some(ent.into()));
                     }
                 }
             }
@@ -1642,8 +1638,8 @@ pub unsafe fn xml_dom_wrap_adopt_node(
                     let ent = xml_get_doc_entity(Some(dest_doc), &node.name().unwrap());
                     if let Some(ent) = ent {
                         node.content = ent.content.load(Ordering::Relaxed);
-                        node.set_children(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
-                        node.set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                        node.set_children(Some(ent.into()));
+                        node.set_last(Some(ent.into()));
                     }
                 }
             }
@@ -2013,14 +2009,12 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         new.typ = cur_node.element_type();
                         // Set hierarchical links.
                         if result_clone.is_some() {
-                            new.set_parent(NodePtr::from_ptr(parent_clone.unwrap().as_ptr()));
+                            new.set_parent(parent_clone);
                             if let Some(mut prev_clone) = prev_clone {
-                                prev_clone.set_next(NodePtr::from_ptr(new.as_ptr()));
-                                new.prev = NodePtr::from_ptr(prev_clone.as_ptr());
+                                prev_clone.set_next(Some(new.into()));
+                                new.set_prev(Some(prev_clone));
                             } else {
-                                parent_clone
-                                    .unwrap()
-                                    .set_children(NodePtr::from_ptr(new.as_ptr()));
+                                parent_clone.unwrap().set_children(Some(new.into()));
                             }
                         } else {
                             result_clone = Some(XmlGenericNodePtr::from(new));
@@ -2052,10 +2046,9 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         // Set hierarchical links.
                         // TODO: Change this to add to the end of attributes.
                         if result_clone.is_some() {
-                            new.set_parent(NodePtr::from_ptr(parent_clone.unwrap().as_ptr()));
+                            new.set_parent(parent_clone);
                             if let Some(mut prev_clone) = prev_clone {
-                                prev_clone
-                                    .set_next(NodePtr::from_ptr(new.as_ptr() as *mut XmlNode));
+                                prev_clone.set_next(Some(new.into()));
                                 new.prev = XmlAttrPtr::try_from(prev_clone).ok();
                             } else {
                                 XmlNodePtr::try_from(parent_clone.unwrap())
@@ -2203,10 +2196,8 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 if let Some(ent) = ent {
                                     XmlNodePtr::try_from(clone).unwrap().content =
                                         ent.content.load(Ordering::Relaxed);
-                                    clone.set_children(NodePtr::from_ptr(
-                                        ent.as_ptr() as *mut XmlNode
-                                    ));
-                                    clone.set_last(NodePtr::from_ptr(ent.as_ptr() as *mut XmlNode));
+                                    clone.set_children(Some(ent.into()));
+                                    clone.set_last(Some(ent.into()));
                                 }
                             }
                         } else {
@@ -2409,34 +2400,20 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     } else if !matches!(cur_node.element_type(), XmlElementType::XmlAttributeNode) {
                         // Set clone.last.
                         if let Some(mut parent) = clone.parent() {
-                            parent.set_last(NodePtr::from_ptr(clone.as_ptr()));
+                            parent.set_last(Some(clone));
                         }
-                        clone = clone
-                            .parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                            .unwrap();
-                        parent_clone = clone
-                            .parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                        clone = clone.parent().unwrap();
+                        parent_clone = clone.parent();
                         // Process parent --> next;
-                        cur = cur_node
-                            .parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                        cur = cur_node.parent();
                         // goto leave_node;
                         continue 'leave_node;
                     } else {
                         // This is for attributes only.
-                        clone = clone
-                            .parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                            .unwrap();
-                        parent_clone = clone
-                            .parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                        clone = clone.parent().unwrap();
+                        parent_clone = clone.parent();
                         // Process parent-element --> children.
-                        cur = cur_node
-                            .parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                        cur = cur_node.parent();
                         // goto into_content;
                         // Descend into child-nodes.
                         if let Some(children) = cur_node.children().filter(|_| {

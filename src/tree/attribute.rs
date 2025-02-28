@@ -37,8 +37,8 @@ use crate::libxml::{
 use super::{
     xml_free_node_list, xml_new_doc_text, xml_new_ns, xml_new_reconciled_ns, xml_ns_in_scope,
     xml_static_copy_node_list, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
-    NodePtr, XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr,
-    XmlNsPtr, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
+    NodePtr, XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr,
+    XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
 #[repr(C)]
@@ -188,7 +188,7 @@ impl XmlAttr {
     #[doc(alias = "xmlSetTreeDoc")]
     pub unsafe fn set_doc(&mut self, doc: Option<XmlDocPtr>) {
         if self.document() != doc {
-            if let Some(mut children) = self.children() {
+            if let Some(children) = self.children() {
                 children.set_doc_all_sibling(doc);
             }
 
@@ -231,41 +231,38 @@ impl NodeCommon for XmlAttr {
         (!self.name.is_null())
             .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
     }
-    fn children(&self) -> Option<NodePtr> {
+    fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children
+            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
     }
-    fn set_children(&mut self, children: Option<NodePtr>) {
-        self.children = children;
+    fn set_children(&mut self, children: Option<XmlGenericNodePtr>) {
+        self.children = children.and_then(|children| NodePtr::from_ptr(children.as_ptr()));
     }
-    fn last(&self) -> Option<NodePtr> {
+    fn last(&self) -> Option<XmlGenericNodePtr> {
         self.last
+            .and_then(|last| XmlGenericNodePtr::from_raw(last.as_ptr()))
     }
-    fn set_last(&mut self, last: Option<NodePtr>) {
-        self.last = last;
+    fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
+        self.last = last.and_then(|children| NodePtr::from_ptr(children.as_ptr()));
     }
-    fn next(&self) -> Option<NodePtr> {
-        self.next
-            .and_then(|next| NodePtr::from_ptr(next.as_ptr() as *mut XmlNode))
+    fn next(&self) -> Option<XmlGenericNodePtr> {
+        self.next.map(|next| next.into())
     }
-    fn set_next(&mut self, next: Option<NodePtr>) {
-        self.next = next.and_then(|next| unsafe {
-            XmlAttrPtr::from_raw(next.as_ptr() as *mut XmlAttr).unwrap()
-        })
+    fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
+        self.next = next.map(|next| XmlAttrPtr::try_from(next).unwrap())
     }
-    fn prev(&self) -> Option<NodePtr> {
-        self.prev
-            .and_then(|prev| NodePtr::from_ptr(prev.as_ptr() as *mut XmlNode))
+    fn prev(&self) -> Option<XmlGenericNodePtr> {
+        self.prev.map(|prev| prev.into())
     }
-    fn set_prev(&mut self, prev: Option<NodePtr>) {
-        self.prev = prev.and_then(|prev| unsafe {
-            XmlAttrPtr::from_raw(prev.as_ptr() as *mut XmlAttr).unwrap()
-        })
+    fn set_prev(&mut self, prev: Option<XmlGenericNodePtr>) {
+        self.prev = prev.map(|prev| XmlAttrPtr::try_from(prev).unwrap())
     }
-    fn parent(&self) -> Option<NodePtr> {
+    fn parent(&self) -> Option<XmlGenericNodePtr> {
         self.parent
+            .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
     }
-    fn set_parent(&mut self, parent: Option<NodePtr>) {
-        self.parent = parent;
+    fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>) {
+        self.parent = parent.and_then(|children| NodePtr::from_ptr(children.as_ptr()));
     }
 }
 
@@ -457,8 +454,8 @@ pub unsafe fn xml_new_doc_prop(
 
         let mut tmp = cur.children();
         while let Some(mut now) = tmp {
-            now.set_parent(NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode));
-            if now.next.is_none() {
+            now.set_parent(Some(cur.into()));
+            if now.next().is_none() {
                 cur.set_last(Some(now));
             }
             tmp = now.next();
@@ -510,7 +507,7 @@ pub(super) unsafe fn xml_new_prop_internal(
         cur.set_last(None);
         let mut tmp = cur.children;
         while let Some(mut now) = tmp {
-            now.set_parent(NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode));
+            now.set_parent(Some(cur.into()));
             if now.next.is_none() {
                 cur.last = Some(now);
             }
@@ -617,9 +614,9 @@ pub(super) unsafe fn xml_copy_prop_internal(
     } else if let Some(doc) = doc {
         xml_new_doc_prop(Some(doc), cur.name, null_mut())
     } else if let Some(parent) = cur.parent() {
-        xml_new_doc_prop(parent.doc, cur.name, null_mut())
+        xml_new_doc_prop(parent.document(), cur.name, null_mut())
     } else if let Some(children) = cur.children() {
-        xml_new_doc_prop(children.doc, cur.name, null_mut())
+        xml_new_doc_prop(children.document(), cur.name, null_mut())
     } else {
         xml_new_doc_prop(None, cur.name, null_mut())
     }?;

@@ -2196,7 +2196,7 @@ pub unsafe fn xml_parse_in_node_context(
         .next
         .take()
         .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
-    node.set_last(NodePtr::from_ptr(fake.as_ptr()));
+    node.set_last(Some(fake.into()));
 
     if let Some(mut cur) = cur {
         cur.set_prev(None);
