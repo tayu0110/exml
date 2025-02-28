@@ -91,7 +91,7 @@ impl TryFrom<i32> for XmlEntityType {
 #[derive(Default)]
 pub struct XmlEntity {
     // application data
-    pub(crate) _private: AtomicPtr<c_void>,
+    pub _private: AtomicPtr<c_void>,
     // XML_ENTITY_DECL, must be second !
     pub(crate) typ: XmlElementType,
     // Entity name

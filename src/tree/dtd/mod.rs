@@ -56,7 +56,7 @@ pub use notation::*;
 
 #[repr(C)]
 pub struct XmlDtd {
-    pub(crate) _private: *mut c_void,     /* application data */
+    pub _private: *mut c_void,            /* application data */
     pub(crate) typ: XmlElementType,       /* XML_DTD_NODE, must be second ! */
     pub(crate) name: *const XmlChar,      /* Name of the DTD */
     pub(crate) children: Option<NodePtr>, /* the value of the property link */
@@ -283,7 +283,7 @@ pub unsafe fn xml_create_int_subset(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -325,7 +325,7 @@ pub unsafe fn xml_new_dtd(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -457,7 +457,7 @@ pub unsafe fn xml_free_dtd(mut cur: XmlDtdPtr) {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
     {
-        xml_deregister_node_default_value(cur.as_ptr() as _);
+        xml_deregister_node_default_value(cur.into());
     }
 
     if let Some(children) = (*cur)

@@ -40,7 +40,7 @@ use super::{XmlDtdPtr, XmlEnumeration};
 #[repr(C)]
 #[derive(Clone)]
 pub struct XmlAttribute {
-    pub(crate) _private: *mut c_void,     /* application data */
+    pub _private: *mut c_void,            /* application data */
     pub(crate) typ: XmlElementType,       /* XML_ATTRIBUTE_DECL, must be second ! */
     pub(crate) name: *const XmlChar,      /* Attribute name */
     pub(crate) children: Option<NodePtr>, /* NULL */

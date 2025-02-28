@@ -40,8 +40,8 @@ use super::{XmlAttributePtr, XmlDtdPtr};
 
 #[repr(C)]
 pub struct XmlElement {
-    pub(crate) _private: *mut c_void, /* application data */
-    pub(crate) typ: XmlElementType,   /* XML_ELEMENT_DECL, must be second ! */
+    pub _private: *mut c_void,      /* application data */
+    pub(crate) typ: XmlElementType, /* XML_ELEMENT_DECL, must be second ! */
     // In current implementation, this field may be used as `XmlNode::name`,
     // so the size of string type must be equal to pointer size.
     // `Option<Box<T>>` is equal to pointer size by NULL pointer optimization if `T` is `Sized`.

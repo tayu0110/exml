@@ -3511,13 +3511,13 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
             .parent()
             .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
 
-        /* unroll to speed up freeing the document */
+        // unroll to speed up freeing the document
         if cur.element_type() != XmlElementType::XmlDTDNode {
             if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
                 // if let Some(f) = xmlDeregisterNodeDefaultValue {
                 //     f(cur as _);
                 // }
-                xml_deregister_node_default_value(cur.as_ptr() as _);
+                xml_deregister_node_default_value(cur);
             }
 
             let mut cur = XmlNodePtr::try_from(cur).unwrap();
@@ -3606,7 +3606,7 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPt
         // if let Some(f) = xmlDeregisterNodeDefaultValue {
         //     f(cur as _);
         // }
-        xml_deregister_node_default_value(cur.as_ptr() as _);
+        xml_deregister_node_default_value(cur.into());
     }
 
     if let Some(children) = cur
@@ -3673,7 +3673,7 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
         // if let Some(f) = xmlDeregisterNodeDefaultValue {
         //     f(cur);
         // }
-        xml_deregister_node_default_value(cur.as_ptr());
+        xml_deregister_node_default_value(cur);
     }
 
     let mut cur = XmlNodePtr::try_from(cur).unwrap();
@@ -4132,7 +4132,7 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, mut cur: XmlDocPt
         // if let Some(f) = xmlDeregisterNodeDefaultValue {
         //     f(cur as _);
         // }
-        xml_deregister_node_default_value(cur.as_ptr() as _);
+        xml_deregister_node_default_value(cur.into());
     }
 
     // Do this before freeing the children list to avoid ID lookups

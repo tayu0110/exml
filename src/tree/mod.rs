@@ -1102,7 +1102,7 @@ pub(crate) unsafe fn xml_static_copy_node(
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xml_register_node_default_value(ret.as_ptr() as _);
+            xml_register_node_default_value(ret.into());
         }
 
         // Note that since (*ret).parent is already set, xmlAddChild will
@@ -1124,7 +1124,7 @@ pub(crate) unsafe fn xml_static_copy_node(
         if parent.is_none() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xml_register_node_default_value(ret.as_ptr() as _);
+            xml_register_node_default_value(ret.into());
         }
 
         return Some(ret.into());
@@ -1248,7 +1248,7 @@ pub(crate) unsafe fn xml_static_copy_node(
     if parent.is_none() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(ret.as_ptr() as _);
+        xml_register_node_default_value(ret.into());
     }
 
     Some(ret.into())
@@ -1553,7 +1553,7 @@ pub unsafe fn xml_new_node(ns: Option<XmlNsPtr>, name: *const XmlChar) -> Option
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -1589,7 +1589,7 @@ pub unsafe fn xml_new_node_eat_name(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -1694,7 +1694,7 @@ pub unsafe fn xml_new_text(content: *const XmlChar) -> Option<XmlNodePtr> {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -1725,7 +1725,7 @@ pub unsafe fn xml_new_doc_pi(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -1778,7 +1778,7 @@ pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> Option<XmlN
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -1814,7 +1814,7 @@ pub unsafe fn xml_new_comment(content: &str) -> Option<XmlNodePtr> {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -1837,7 +1837,7 @@ pub unsafe fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> Opti
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -1870,7 +1870,7 @@ pub unsafe fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> Option<Xml
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -1913,7 +1913,7 @@ pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<Xm
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -2075,7 +2075,7 @@ pub unsafe fn xml_new_doc_fragment(doc: Option<XmlDocPtr>) -> Option<XmlNodePtr>
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -2250,7 +2250,7 @@ pub unsafe fn xml_free_node_list(cur: Option<impl Into<XmlGenericNodePtr>>) {
             if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
             // && xmlDeregisterNodeDefaultValue.is_some()
             {
-                xml_deregister_node_default_value(cur.as_ptr());
+                xml_deregister_node_default_value(cur.into());
             }
 
             if (matches!(cur.element_type(), XmlElementType::XmlElementNode)
@@ -2328,7 +2328,7 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
     {
-        xml_deregister_node_default_value(cur.as_ptr());
+        xml_deregister_node_default_value(cur);
     }
 
     if let Ok(ent) = XmlEntityPtr::try_from(cur) {

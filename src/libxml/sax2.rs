@@ -2128,7 +2128,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xml_register_node_default_value(ret.as_ptr());
+            xml_register_node_default_value(ret.into());
         }
         ret
     } else {
@@ -2347,7 +2347,7 @@ unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodeP
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(ret.as_ptr());
+        xml_register_node_default_value(ret.into());
     }
     Some(ret)
 }
@@ -2440,7 +2440,7 @@ unsafe fn xml_sax2_attribute_ns(
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
-            xml_register_node_default_value(ret.as_ptr() as *mut XmlNode);
+            xml_register_node_default_value(ret.into());
         }
         ret
     } else {

@@ -43,7 +43,7 @@ use super::{
 
 #[repr(C)]
 pub struct XmlAttr {
-    pub(crate) _private: *mut c_void,           /* application data */
+    pub _private: *mut c_void,                  /* application data */
     pub(crate) typ: XmlElementType,             /* XML_ATTRIBUTE_NODE, must be second ! */
     pub(crate) name: *const XmlChar,            /* the name of the property */
     pub(crate) children: Option<NodePtr>,       /* the value of the property */
@@ -468,7 +468,7 @@ pub unsafe fn xml_new_doc_prop(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -549,7 +549,7 @@ pub(super) unsafe fn xml_new_prop_internal(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -763,7 +763,7 @@ pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
     {
-        xml_deregister_node_default_value(cur.as_ptr() as _);
+        xml_deregister_node_default_value(cur.into());
     }
 
     // Check for ID removal -> leading to invalid references !

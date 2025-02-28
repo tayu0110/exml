@@ -53,7 +53,7 @@ use super::{
 
 #[repr(C)]
 pub struct XmlDoc {
-    pub(crate) _private: *mut c_void,   /* application data */
+    pub _private: *mut c_void,          /* application data */
     pub(crate) typ: XmlElementType,     /* XML_DOCUMENT_NODE, must be second ! */
     pub(crate) name: *mut i8,           /* name/filename/URI of the document */
     pub children: Option<NodePtr>,      /* the document tree */
@@ -1071,7 +1071,7 @@ pub unsafe fn xml_new_doc(version: Option<&str>) -> Option<XmlDocPtr> {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
     {
-        xml_register_node_default_value(cur.as_ptr() as _);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
@@ -1146,7 +1146,7 @@ pub unsafe fn xml_free_doc(mut cur: XmlDocPtr) {
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
     {
-        xml_deregister_node_default_value(cur.as_ptr() as _);
+        xml_deregister_node_default_value(cur.into());
     }
 
     // Do this before freeing the children list to avoid ID lookups

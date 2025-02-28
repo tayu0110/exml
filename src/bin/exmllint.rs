@@ -96,9 +96,10 @@ use exml::{
     save::{XmlSaveCtxt, XmlSaveOption},
     tree::{
         xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc,
-        xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
-        XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementTypeVal, XmlEntity, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
+        xml_new_doc_node, NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
+        XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr,
+        XmlElementPtr, XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType, XmlEnumeration,
+        XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNsPtr,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
 };
@@ -3305,20 +3306,58 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
 // Usage and Main
 
-unsafe extern "C" fn register_node(node: *mut XmlNode) {
-    (*node)._private = malloc(size_of::<c_long>());
-    if (*node)._private.is_null() {
+unsafe fn register_node(node: XmlGenericNodePtr) {
+    let private = malloc(size_of::<c_long>());
+    if private.is_null() {
         eprintln!("Out of memory in xmllint:registerNode()");
         exit(ERR_MEM);
     }
-    *((*node)._private as *mut u64) = 0x81726354;
+    *(private as *mut u64) = 0x81726354;
     NBREGISTER.fetch_add(1, Ordering::Relaxed);
+    if let Ok(mut node) = XmlNodePtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlAttrPtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlDocPtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
+        node._private.store(private, Ordering::Relaxed);
+    } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {
+        node._private = private;
+    } else if let Ok(mut node) = XmlElementPtr::try_from(node) {
+        node._private = private;
+    } else {
+        panic!("Unknown Node Type");
+    }
 }
 
-unsafe extern "C" fn deregister_node(node: *mut XmlNode) {
-    assert!(!(*node)._private.is_null());
-    assert!(*((*node)._private as *mut c_long) == 0x81726354);
-    free((*node)._private);
+unsafe fn deregister_node(node: XmlGenericNodePtr) {
+    let private = if let Ok(mut node) = XmlNodePtr::try_from(node) {
+        node._private
+    } else if let Ok(mut node) = XmlAttrPtr::try_from(node) {
+        node._private
+    } else if let Ok(mut node) = XmlDocPtr::try_from(node) {
+        node._private
+    } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
+        node._private
+    } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
+        node._private.load(Ordering::Relaxed)
+    } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
+        node._private
+    } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {
+        node._private
+    } else if let Ok(mut node) = XmlElementPtr::try_from(node) {
+        node._private
+    } else {
+        panic!("Unknown Node Type");
+    };
+    assert!(!private.is_null());
+    assert!(*(private as *mut c_long) == 0x81726354);
+    free(private);
     NBREGISTER.fetch_sub(1, Ordering::Relaxed);
 }
 

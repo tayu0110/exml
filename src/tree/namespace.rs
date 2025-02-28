@@ -44,7 +44,7 @@ pub struct XmlNs {
     pub(crate) typ: XmlNsType,             /* global or local */
     pub href: *const XmlChar,              /* URL for the namespace */
     pub prefix: *const XmlChar,            /* prefix for the namespace */
-    pub(crate) _private: *mut c_void,      /* application data */
+    pub _private: *mut c_void,             /* application data */
     pub(crate) context: Option<XmlDocPtr>, /* normally an xmlDoc */
     /// For XPath. Not used except for XPath.
     /// In the original libxml2, in order to handle namespaces and nodes as a set,

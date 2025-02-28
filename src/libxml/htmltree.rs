@@ -121,7 +121,7 @@ pub unsafe fn html_new_doc_no_dtd(
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     /* && xmlRegisterNodeDefaultValue() */
     {
-        xml_register_node_default_value(cur.as_ptr() as *mut XmlNode);
+        xml_register_node_default_value(cur.into());
     }
     Some(cur)
 }
