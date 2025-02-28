@@ -63,7 +63,7 @@ use crate::libxml::catalog::xml_catalog_cleanup;
 #[cfg(feature = "schema")]
 use crate::relaxng::xml_relaxng_cleanup_types;
 #[cfg(feature = "libxml_valid")]
-use crate::tree::{XmlDtd, XmlDtdPtr};
+use crate::tree::XmlDtdPtr;
 use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{XmlError, XmlParserErrors},
@@ -1853,10 +1853,10 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
             ret = my_doc.ext_subset.take();
             if let Some(mut ret) = ret {
                 ret.doc = None;
-                let mut tmp = ret.children;
+                let mut tmp = ret.children();
                 while let Some(mut now) = tmp {
-                    now.doc = None;
-                    tmp = now.next;
+                    now.set_document(None);
+                    tmp = now.next();
                 }
             }
         } else {
@@ -1891,14 +1891,13 @@ pub unsafe fn xml_io_parse_dtd(
     sax: Option<Box<XmlSAXHandler>>,
     input: XmlParserInputBuffer,
     mut enc: XmlCharEncoding,
-) -> *mut XmlDtd {
+) -> Option<XmlDtdPtr> {
     use crate::parser::xml_new_sax_parser_ctxt;
 
-    let mut ret: *mut XmlDtd = null_mut();
     let mut start: [XmlChar; 4] = [0; 4];
 
     let Ok(ctxt) = xml_new_sax_parser_ctxt(sax, None) else {
-        return null_mut();
+        return None;
     };
 
     // We are loading a DTD
@@ -1911,13 +1910,13 @@ pub unsafe fn xml_io_parse_dtd(
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if pinput.is_null() {
         xml_free_parser_ctxt(ctxt);
-        return null_mut();
+        return None;
     }
 
     // plug some encoding conversion routines here.
     if (*ctxt).push_input(pinput) < 0 {
         xml_free_parser_ctxt(ctxt);
-        return null_mut();
+        return None;
     }
     if !matches!(enc, XmlCharEncoding::None) {
         (*ctxt).switch_encoding(enc);
@@ -1935,7 +1934,7 @@ pub unsafe fn xml_io_parse_dtd(
     (*ctxt).my_doc = xml_new_doc(Some("1.0"));
     let Some(mut my_doc) = (*ctxt).my_doc else {
         xml_err_memory(ctxt, Some("New Doc failed"));
-        return null_mut();
+        return None;
     };
     my_doc.properties = XmlDocProperties::XmlDocInternal as i32;
     my_doc.ext_subset = xml_new_dtd((*ctxt).my_doc, Some("none"), Some("none"), Some("none"));
@@ -1956,19 +1955,18 @@ pub unsafe fn xml_io_parse_dtd(
 
     xml_parse_external_subset(ctxt, Some("none"), Some("none"));
 
+    let mut ret = None;
     if let Some(mut my_doc) = (*ctxt).my_doc.take() {
         if (*ctxt).well_formed != 0 {
-            ret = my_doc.ext_subset.take().map_or(null_mut(), |p| p.as_ptr());
-            if !ret.is_null() {
-                (*ret).doc = None;
-                let mut tmp = (*ret).children;
+            ret = my_doc.ext_subset.take();
+            if let Some(mut ret) = ret {
+                ret.doc = None;
+                let mut tmp = ret.children();
                 while let Some(mut now) = tmp {
-                    now.doc = None;
-                    tmp = now.next;
+                    now.set_document(None);
+                    tmp = now.next();
                 }
             }
-        } else {
-            ret = null_mut();
         }
         xml_free_doc(my_doc);
     }
@@ -2301,7 +2299,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     // doc.is_null() is only supported for historic reasons
     if let Some(mut doc) = doc {
         (*ctxt).my_doc = Some(new_doc);
-        new_doc.children.unwrap().doc = Some(doc);
+        new_doc.children().unwrap().set_document(Some(doc));
         // Ensure that doc has XML spec namespace
         let d = doc;
         doc.search_ns_by_href(Some(d), XML_XML_NAMESPACE.to_str().unwrap());
@@ -2352,11 +2350,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         if ret == 0 || recover == 1 {
             // Return the newly created nodeset after unlinking it from
             // they pseudo parent.
-            let mut cur = new_doc
-                .children
-                .unwrap()
-                .children()
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+            let mut cur = new_doc.children().unwrap().children();
             *lst = cur;
             while let Some(mut now) = cur {
                 now.set_doc(doc);
@@ -2365,7 +2359,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
                     .next()
                     .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
             }
-            new_doc.children.unwrap().set_children(None);
+            new_doc.children().unwrap().set_children(None);
         }
     }
 
@@ -2562,7 +2556,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
                     .next()
                     .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
             }
-            new_doc.children.unwrap().set_children(None);
+            new_doc.children().unwrap().set_children(None);
         }
         ret = XmlParserErrors::XmlErrOK;
     }

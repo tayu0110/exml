@@ -2007,11 +2007,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         if matches!(ret, XmlParserErrors::XmlErrOK) {
             // Return the newly created nodeset after unlinking it from
             // they pseudo parent.
-            let mut cur = my_doc
-                .children()
-                .unwrap()
-                .children()
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+            let mut cur = my_doc.children().unwrap().children();
             *lst = cur;
             while let Some(mut now) = cur {
                 #[cfg(feature = "libxml_valid")]
@@ -2029,16 +2025,11 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
                     .next()
                     .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
             }
-            my_doc.children.unwrap().set_children(None);
+            my_doc.children().unwrap().set_children(None);
         }
     }
     if let Some(mut my_doc) = (*ctxt).my_doc {
-        xml_free_node(
-            my_doc
-                .children
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
-                .unwrap(),
-        );
+        xml_free_node(my_doc.children().unwrap());
         my_doc.children = NodePtr::from_ptr(content.map_or(null_mut(), |node| node.as_ptr()));
         my_doc.last = NodePtr::from_ptr(last.map_or(null_mut(), |node| node.as_ptr()));
     }

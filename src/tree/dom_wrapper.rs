@@ -1486,14 +1486,14 @@ unsafe fn xml_dom_wrap_adopt_attr(
     attr.atype = None;
     attr.psvi = null_mut();
     // Walk content.
-    let Some(children) = attr.children else {
+    let Some(children) = attr.children() else {
         return 0;
     };
     if matches!(children.element_type(), XmlElementType::XmlNamespaceDecl) {
         // goto internal_error;
         return -1;
     }
-    let mut cur = XmlGenericNodePtr::from_raw(children.as_ptr());
+    let mut cur = Some(children);
     'main: while let Some(mut cur_node) = cur {
         cur_node.set_document(Some(dest_doc));
         match cur_node.element_type() {

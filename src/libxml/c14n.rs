@@ -1187,10 +1187,10 @@ impl<T> XmlC14NCtx<'_, T> {
                     // get attr value
                     let Some(mut tmp_str) = (match attr {
                         Ok(attr) => attr
-                            .children
+                            .children()
                             .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1)),
                         Err(attr) => attr
-                            .children
+                            .children()
                             .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1)),
                     }) else {
                         xml_c14n_err_internal(

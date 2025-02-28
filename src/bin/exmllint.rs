@@ -2844,19 +2844,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         {
             let mut list: [*const XmlChar; 256] = [null(); 256];
 
-            if let Some(children) = doc.children {
+            if let Some(children) = doc.children() {
                 let mut node = Some(children);
                 while let Some(now) = node.filter(|n| n.last().is_none()) {
-                    node = now.next;
+                    node = now.next();
                 }
                 if let Some(node) = node {
-                    let nb = xml_valid_get_valid_elements(
-                        node.last()
-                            .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr())),
-                        None,
-                        list.as_mut_ptr(),
-                        256,
-                    );
+                    let nb =
+                        xml_valid_get_valid_elements(node.last(), None, list.as_mut_ptr(), 256);
                     match nb.cmp(&0) {
                         std::cmp::Ordering::Less => {
                             eprintln!("could not get valid list of elements")

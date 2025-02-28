@@ -48,9 +48,9 @@ use crate::{
         valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
     },
     tree::{
-        is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttrPtr, XmlAttributePtr,
-        XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr,
-        XmlNodePtr, XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
+        is_xhtml, xml_dump_entity_decl, NodeCommon, XmlAttrPtr, XmlAttributePtr, XmlDocPtr,
+        XmlDtdPtr, XmlElementPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr, XmlNodePtr,
+        XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -711,10 +711,11 @@ unsafe fn xml_ns_list_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, mut cur: Option<X
 /// Serialize the attribute in the buffer
 #[doc(alias = "xmlAttrSerializeContent")]
 unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: XmlAttrPtr) {
-    let mut children = attr.children;
+    let mut children = attr.children();
     while let Some(now) = children {
         match now.element_type() {
             XmlElementType::XmlTextNode => {
+                let now = XmlNodePtr::try_from(now).unwrap();
                 let mut out = vec![];
                 attr_serialize_text_content(
                     &mut out,
@@ -727,6 +728,7 @@ unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: XmlAttrPtr
                 buf.write_bytes(&out);
             }
             XmlElementType::XmlEntityRefNode => {
+                let now = XmlNodePtr::try_from(now).unwrap();
                 if let Some(mut buf) = buf.buffer {
                     buf.push_bytes(b"&");
                     buf.push_cstr(CStr::from_ptr(now.name as *const i8));
@@ -735,7 +737,7 @@ unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: XmlAttrPtr
             }
             _ => { /* should not happen unless we have a badly built tree */ }
         }
-        children = now.next;
+        children = now.next();
     }
 }
 
@@ -1189,7 +1191,7 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
     let mut lang = None;
     let mut name = None;
     let mut id = None;
-    let parent = cur.unwrap().parent;
+    let parent = cur.unwrap().parent();
     while let Some(mut now) = cur {
         if now.ns.is_none() && now.name().as_deref() == Some("id") {
             id = cur;
@@ -1205,20 +1207,18 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
             xml_lang = cur;
         } else if now.ns.is_none()
             && now
-                .children
+                .children()
+                .map(|children| XmlNodePtr::try_from(children).unwrap())
                 .map_or(true, |c| c.content.is_null() || *c.content.add(0) == 0)
             && html_is_boolean_attr(now.name) != 0
         {
-            if let Some(children) = now
-                .children
-                .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-            {
+            if let Some(children) = now.children() {
                 xml_free_node(children);
             }
-            now.children = NodePtr::from_ptr(
-                xml_new_doc_text(now.doc, now.name).map_or(null_mut(), |node| node.as_ptr()),
-            );
-            if let Some(mut children) = now.children {
+            let doc = now.doc;
+            let name = now.name;
+            now.set_children(xml_new_doc_text(doc, name).map(|node| node.into()));
+            if let Some(mut children) = now.children() {
                 children.set_parent(Some(now.into()));
             }
         }
@@ -1230,17 +1230,18 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
     if let Some(name) = name.filter(|_| {
         id.is_none()
             && parent
-                .filter(|p| {
-                    !p.name.is_null()
-                        && (p.name().as_deref() == Some("a")
-                            || p.name().as_deref() == Some("p")
-                            || p.name().as_deref() == Some("div")
-                            || p.name().as_deref() == Some("img")
-                            || p.name().as_deref() == Some("map")
-                            || p.name().as_deref() == Some("applet")
-                            || p.name().as_deref() == Some("form")
-                            || p.name().as_deref() == Some("frame")
-                            || p.name().as_deref() == Some("iframe"))
+                .as_deref()
+                .and_then(|parent| parent.name())
+                .filter(|name| {
+                    name == "a"
+                        || name == "p"
+                        || name == "div"
+                        || name == "img"
+                        || name == "map"
+                        || name == "applet"
+                        || name == "form"
+                        || name == "frame"
+                        || name == "iframe"
                 })
                 .is_some()
     }) {

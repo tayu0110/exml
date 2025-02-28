@@ -1941,7 +1941,7 @@ impl XmlNode {
                     self.last().unwrap().element_type(),
                     XmlElementType::XmlTextNode
                 )
-                && cur.name() == self.last.unwrap().name()
+                && cur.name() == self.last().unwrap().name()
             {
                 let node = XmlNodePtr::try_from(cur).unwrap();
                 self.last().unwrap().add_content(node.content);
@@ -2520,20 +2520,6 @@ impl PartialEq for NodePtr {
     }
 }
 
-impl Deref for NodePtr {
-    type Target = XmlNode;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { self.0.as_ref() }
-    }
-}
-
-impl DerefMut for NodePtr {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { self.0.as_mut() }
-    }
-}
-
 impl From<&XmlNode> for NodePtr {
     fn from(value: &XmlNode) -> Self {
         // Safety
@@ -2577,11 +2563,13 @@ pub(super) unsafe fn add_prop_sibling(
     // check if an attribute with the same name exists
     let attr = if let Some(ns) = prop.ns {
         let href = ns.href();
-        cur.parent
+        cur.parent()
+            .map(|parent| XmlNodePtr::try_from(parent).unwrap())
             .expect("Internal Error")
             .has_ns_prop(&prop.name().unwrap(), href.as_deref())
     } else {
-        cur.parent
+        cur.parent()
+            .map(|parent| XmlNodePtr::try_from(parent).unwrap())
             .expect("Internal Error")
             .has_ns_prop(&prop.name().unwrap(), None)
     };
@@ -2601,7 +2589,11 @@ pub(super) unsafe fn add_prop_sibling(
         prop.next = Some(cur);
         cur.prev = Some(prop);
     }
-    if let Some(mut parent) = prop.parent.filter(|_| prop.prev.is_none()) {
+    if let Some(mut parent) = prop
+        .parent()
+        .filter(|_| prop.prev.is_none())
+        .map(|parent| XmlNodePtr::try_from(parent).unwrap())
+    {
         parent.properties = Some(prop);
     }
     if let Some(Ok(mut attr)) = attr {

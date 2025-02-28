@@ -1133,12 +1133,12 @@ pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> Option<XmlDocPtr> 
             .map_or(null_mut(), |node| node.as_ptr()),
         );
         ret.last = None;
-        let mut tmp = ret.children;
+        let mut tmp = ret.children();
         while let Some(now) = tmp {
-            if now.next.is_none() {
-                ret.last = Some(now);
+            if now.next().is_none() {
+                ret.set_last(Some(now));
             }
-            tmp = now.next;
+            tmp = now.next();
         }
     }
     Some(ret)

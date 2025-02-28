@@ -31,7 +31,8 @@ use crate::{
     encoding::XmlCharEncoding,
     tree::{
         xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop, NodeCommon, XmlAttr,
-        XmlAttrPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, __XML_REGISTER_CALLBACKS,
+        XmlAttrPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
+        __XML_REGISTER_CALLBACKS,
     },
 };
 #[cfg(feature = "libxml_output")]
@@ -202,9 +203,14 @@ pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
 
                 content = null_mut();
                 while let Some(now) = attr {
-                    if let Some(children) = now.children.filter(|c| {
-                        matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none()
-                    }) {
+                    if let Some(children) = now
+                        .children()
+                        .filter(|c| {
+                            matches!(c.element_type(), XmlElementType::XmlTextNode)
+                                && c.next().is_none()
+                        })
+                        .map(|children| XmlNodePtr::try_from(children).unwrap())
+                    {
                         value = children.content;
                         if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
                             && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
@@ -403,9 +409,14 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
 
                 content = None;
                 while let Some(now) = attr {
-                    if let Some(children) = now.children.filter(|c| {
-                        matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none()
-                    }) {
+                    if let Some(children) = now
+                        .children()
+                        .filter(|c| {
+                            matches!(c.element_type(), XmlElementType::XmlTextNode)
+                                && c.next().is_none()
+                        })
+                        .map(|children| XmlNodePtr::try_from(children).unwrap())
+                    {
                         value = children.content;
                         if xml_strcasecmp(now.name, c"http-equiv".as_ptr() as _) == 0
                             && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
@@ -947,14 +958,15 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr
 
     buf.write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
     if let Some(children) = cur
-        .children
+        .children()
         .filter(|_| html_is_boolean_attr(cur.name as _) == 0)
     {
         if let Some(value) = children.get_string(doc, 0) {
             buf.write_str("=");
             if cur.ns.is_none()
                 && cur
-                    .parent
+                    .parent()
+                    .map(|parent| XmlNodePtr::try_from(parent).unwrap())
                     .filter(|p| {
                         p.ns.is_none()
                             && (xml_strcasecmp(cur.name, c"href".as_ptr() as _) == 0
@@ -1117,10 +1129,10 @@ pub unsafe fn html_node_dump_format_output(
                 }
 
                 if format != 0
-                    && node.next.is_some()
+                    && node.next().is_some()
                     && info.map_or(false, |info| info.isinline == 0)
                     && !matches!(
-                        node.next.unwrap().element_type(),
+                        node.next().unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                     )
                     && parent
@@ -1237,7 +1249,7 @@ pub unsafe fn html_node_dump_format_output(
                     && !node.name.is_null()
                     && *node.name.add(0) != b'p'
                 {
-                    /* p, pre, param */
+                    // p, pre, param
                     buf.write_str("\n");
                 }
 
@@ -1252,9 +1264,9 @@ pub unsafe fn html_node_dump_format_output(
 
                 if format != 0
                     && info.map_or(false, |info| info.isinline == 0)
-                    && node.next.is_some()
+                    && node.next().is_some()
                     && !matches!(
-                        node.next.unwrap().element_type(),
+                        node.next().unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                     )
                     && parent

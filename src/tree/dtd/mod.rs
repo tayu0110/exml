@@ -127,7 +127,7 @@ impl XmlDtd {
     #[doc(alias = "xmlSetTreeDoc")]
     pub unsafe fn set_doc(&mut self, doc: Option<XmlDocPtr>) {
         if self.doc != doc {
-            if let Some(mut children) = self.children {
+            if let Some(children) = self.children() {
                 children.set_doc_all_sibling(doc);
             }
 
@@ -246,33 +246,33 @@ pub unsafe fn xml_create_int_subset(
         doc.int_subset = Some(cur);
         cur.parent = Some(doc);
         cur.doc = Some(doc);
-        if let Some(children) = doc.children {
+        if let Some(children) = doc.children() {
             if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
                 let mut prev = children;
-                prev.prev = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
-                cur.next = Some(prev);
-                doc.children = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+                prev.set_prev(Some(cur.into()));
+                cur.set_next(Some(prev));
+                doc.set_children(Some(cur.into()));
             } else {
                 let mut next = Some(children);
                 while let Some(now) =
                     next.filter(|n| !matches!(n.element_type(), XmlElementType::XmlElementNode))
                 {
-                    next = now.next;
+                    next = now.next();
                 }
                 if let Some(mut next) = next {
-                    cur.next = Some(next);
-                    cur.prev = next.prev;
-                    if let Some(mut prev) = cur.prev {
-                        prev.next = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+                    cur.set_next(Some(next));
+                    cur.set_prev(next.prev());
+                    if let Some(mut prev) = cur.prev() {
+                        prev.set_next(Some(cur.into()));
                     } else {
-                        doc.children = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+                        doc.set_children(Some(cur.into()));
                     }
-                    next.prev = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+                    next.set_prev(Some(cur.into()));
                 } else {
-                    cur.prev = doc.last;
-                    cur.prev.unwrap().next = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
-                    cur.next = None;
-                    doc.last = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+                    cur.set_prev(doc.last());
+                    cur.prev().unwrap().set_next(Some(cur.into()));
+                    cur.set_next(None);
+                    doc.set_last(Some(cur.into()));
                 }
             }
         } else {

@@ -306,10 +306,13 @@ unsafe fn xml_xinclude_test_node(ctxt: XmlXIncludeCtxtPtr, node: XmlNodePtr) -> 
         if node.name().as_deref() == Some(XINCLUDE_FALLBACK)
             && (node.parent().is_none()
                 || node.parent().unwrap().element_type() != XmlElementType::XmlElementNode
-                || node.parent.unwrap().ns.map_or(true, |ns| {
-                    ns.href().as_deref() != Some(XINCLUDE_NS.to_str().unwrap())
-                        && ns.href().as_deref() != Some(XINCLUDE_OLD_NS.to_str().unwrap())
-                })
+                || XmlNodePtr::try_from(node.parent().unwrap())
+                    .unwrap()
+                    .ns
+                    .map_or(true, |ns| {
+                        ns.href().as_deref() != Some(XINCLUDE_NS.to_str().unwrap())
+                            && ns.href().as_deref() != Some(XINCLUDE_OLD_NS.to_str().unwrap())
+                    })
                 || node.parent().unwrap().name().as_deref() != Some(XINCLUDE_NODE))
         {
             xml_xinclude_err!(

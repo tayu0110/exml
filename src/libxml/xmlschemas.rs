@@ -4641,7 +4641,7 @@ unsafe fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: XmlNodePtr)
 
             // Skip to next node
             if let Some(children) = cur_node
-                .children
+                .children()
                 .filter(|children| {
                     !matches!(
                         children.element_type(),
@@ -7144,7 +7144,7 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
     }
 
     if strchr(value as *mut c_char, b':' as _).is_null() {
-        let ns = attr.parent.unwrap().search_ns(attr.doc, None);
+        let ns = attr.parent().unwrap().search_ns(attr.doc, None);
         if let Some(ns) = ns.filter(|ns| !ns.href.is_null() && *ns.href.add(0) != 0) {
             *uri = xml_dict_lookup((*ctxt).dict, ns.href, -1);
         } else if (*schema).flags & XML_SCHEMAS_INCLUDING_CONVERT_NS != 0 {
@@ -7160,7 +7160,7 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
     *local = xml_split_qname3(value, addr_of_mut!(len));
     *local = xml_dict_lookup((*ctxt).dict, *local, -1);
     let pref: *const XmlChar = xml_dict_lookup((*ctxt).dict, value, len);
-    let Some(ns) = attr.parent.unwrap().search_ns(
+    let Some(ns) = attr.parent().unwrap().search_ns(
         attr.doc,
         Some(CStr::from_ptr(pref as *const i8).to_string_lossy()).as_deref(),
     ) else {
@@ -10000,7 +10000,7 @@ unsafe fn xml_schema_check_cselector_xpath(
         // Compile the XPath expression.
         // TODO: We need the array of in-scope namespaces for compilation.
         // TODO: Call xmlPatterncompile with different options for selector/field.
-        let ns_list = attr.and_then(|attr| attr.parent.unwrap().get_ns_list(attr.doc));
+        let ns_list = attr.and_then(|attr| attr.parent().unwrap().get_ns_list(attr.doc));
         // Build an array of prefixes and namespaces.
         let mut ns_array = None;
         if let Some(ns_list) = ns_list {
@@ -28064,7 +28064,7 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         }
                         // Note that we give it the line number of the parent element.
                         let value = cur_attr
-                            .children
+                            .children()
                             .and_then(|c| c.get_string(cur_attr.doc, 1))
                             .map(|c| CString::new(c).unwrap());
                         let value = xml_strdup(

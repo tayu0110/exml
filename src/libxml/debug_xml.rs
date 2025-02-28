@@ -252,7 +252,12 @@ impl XmlDebugCtxt<'_> {
         }
         if node.prev().is_none() {
             if let Ok(attr) = XmlAttrPtr::try_from(node) {
-                if attr.parent.filter(|p| Some(attr) != p.properties).is_some() {
+                if attr
+                    .parent()
+                    .map(|parent| XmlNodePtr::try_from(parent).unwrap())
+                    .filter(|p| Some(attr) != p.properties)
+                    .is_some()
+                {
                     xml_debug_err!(
                         self,
                         XmlParserErrors::XmlCheckNoPrev,

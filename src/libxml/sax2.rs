@@ -1615,7 +1615,7 @@ unsafe fn xml_sax2_attribute_internal(
             xml_new_doc_text((*ctxt).my_doc, value).map_or(null_mut(), |node| node.as_ptr()),
         );
         ret.last = ret.children;
-        if let Some(mut children) = ret.children {
+        if let Some(mut children) = ret.children() {
             children.set_parent(Some(ret.into()));
         }
     }
@@ -1685,11 +1685,13 @@ unsafe fn xml_sax2_attribute_internal(
             || ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0))
             // Don't create IDs containing entity references
         && ret
-            .children
-            .filter(|c| matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none())
+            .children()
+            .filter(|c| matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next().is_none())
             .is_some()
             {
-                let content: *mut XmlChar = ret.children.unwrap().content;
+                let content: *mut XmlChar = XmlNodePtr::try_from(ret.children().unwrap())
+                    .unwrap()
+                    .content;
                 // when validating, the ID registration is done at the attribute
                 // validation level. Otherwise we have to do specific handling here.
                 if fullname == "xml:id" {
@@ -2467,14 +2469,14 @@ unsafe fn xml_sax2_attribute_ns(
                     .map_or(null_mut(), |node| node.as_ptr()),
             )
         });
-        let mut tmp = ret.children;
+        let mut tmp = ret.children();
         while let Some(mut now) = tmp {
-            now.doc = ret.doc;
+            now.set_document(ret.doc);
             now.set_parent(Some(ret.into()));
-            if now.next.is_none() {
-                ret.last = Some(now);
+            if now.next().is_none() {
+                ret.set_last(Some(now));
             }
-            tmp = now.next;
+            tmp = now.next();
         }
     } else if !value.is_null() {
         let value = CStr::from_ptr(value as *const i8)
@@ -2577,11 +2579,13 @@ unsafe fn xml_sax2_attribute_ns(
                 || ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0))
                 // Don't create IDs containing entity references
             && ret
-                .children
-                .filter(|c| matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none())
+                .children()
+                .filter(|c| matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next().is_none())
                 .is_some()
             {
-                let content: *mut XmlChar = ret.children.unwrap().content;
+                let content: *mut XmlChar = XmlNodePtr::try_from(ret.children().unwrap())
+                    .unwrap()
+                    .content;
                 // when validating, the ID registration is done at the attribute
                 // validation level. Otherwise we have to do specific handling here.
                 if (!prefix.is_null())

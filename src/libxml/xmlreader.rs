@@ -705,7 +705,7 @@ impl XmlTextReader {
                 .filter(|node| node.element_type() == XmlElementType::XmlEntityRefNode)
                 .filter(|_| !self.ctxt.is_null() && (*self.ctxt).replace_entities == 1)
             {
-                if let Some(children) = node.children.filter(|children| {
+                if let Some(children) = node.children().filter(|children| {
                     children.element_type() == XmlElementType::XmlEntityDecl
                         && children.children().is_some()
                 }) {
@@ -713,9 +713,7 @@ impl XmlTextReader {
                         // goto get_next_node;
                         continue 'get_next_node;
                     }
-                    self.node = children
-                        .children()
-                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                    self.node = children.children();
                 }
             } else {
                 #[cfg(feature = "libxml_regexp")]
@@ -1365,7 +1363,7 @@ impl XmlTextReader {
                     if node.element_type() == XmlElementType::XmlEntityRefNode {
                         let entity_ref = XmlNodePtr::try_from(node).unwrap();
                         if let Some(children) = entity_ref
-                            .children
+                            .children()
                             .filter(|children| {
                                 children.element_type() == XmlElementType::XmlEntityDecl
                                     && children.children().is_some()
@@ -1784,7 +1782,7 @@ impl XmlTextReader {
         }
         // TODO walk the DTD if present
 
-        cur.children
+        cur.children()
             .and_then(|c| c.get_string(self.node.unwrap().document(), 1))
             .or_else(|| Some("".to_owned()))
     }
@@ -2728,7 +2726,7 @@ impl XmlTextReader {
     pub unsafe fn text_value(&self) -> Option<String> {
         use std::ffi::CStr;
 
-        use crate::tree::{XmlAttrPtr, XmlNsPtr};
+        use crate::tree::{NodeCommon, XmlAttrPtr, XmlNsPtr};
 
         let current_node = self.node?;
         let node = self.curnode.unwrap_or(current_node);
@@ -2740,10 +2738,11 @@ impl XmlTextReader {
             XmlElementType::XmlAttributeNode => {
                 let attr = XmlAttrPtr::try_from(node).unwrap();
 
-                return if let Some(parent) = attr.parent {
-                    attr.children.and_then(|c| c.get_string(parent.doc, 1))
+                return if let Some(parent) = attr.parent() {
+                    attr.children()
+                        .and_then(|c| c.get_string(parent.document(), 1))
                 } else {
-                    attr.children.and_then(|c| c.get_string(None, 1))
+                    attr.children().and_then(|c| c.get_string(None, 1))
                 };
             }
             XmlElementType::XmlTextNode
@@ -4098,8 +4097,9 @@ pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const 
             let attr = XmlAttrPtr::try_from(node).unwrap();
 
             if let Some(children) = attr
-                .children
-                .filter(|c| c.element_type() == XmlElementType::XmlTextNode && c.next.is_none())
+                .children()
+                .filter(|c| c.element_type() == XmlElementType::XmlTextNode && c.next().is_none())
+                .map(|children| XmlNodePtr::try_from(children).unwrap())
             {
                 return children.content;
             } else {

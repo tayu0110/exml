@@ -1169,7 +1169,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                     );
                 }
             } else if cur_attr.name().as_deref() == Some("datatypeLibrary") {
-                if let Some(val) = cur_attr.children.and_then(|c| c.get_string(node.doc, 1)) {
+                if let Some(val) = cur_attr.children().and_then(|c| c.get_string(node.doc, 1)) {
                     if !val.is_empty() {
                         if let Some(uri) = XmlURI::parse(&val) {
                             if uri.scheme.is_none() {
@@ -1338,7 +1338,7 @@ unsafe fn xml_relaxng_remove_redefine(
             if !inc.is_null()
                 && (*inc).doc.map_or(false, |doc| {
                     doc.children.is_some()
-                        && xml_str_equal(doc.children.unwrap().name, c"grammar".as_ptr() as _)
+                        && doc.children().unwrap().name().as_deref() == Some("grammar")
                         && xml_relaxng_remove_redefine(
                             _ctxt,
                             href,
@@ -3024,12 +3024,12 @@ unsafe fn xml_relaxng_parse_value(
         }
     }
     if node
-        .children
+        .children()
         .filter(|children| {
             !matches!(
                 children.element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
-            ) || children.next.is_some()
+            ) || children.next().is_some()
         })
         .is_some()
     {
@@ -7001,7 +7001,7 @@ unsafe fn xml_relaxng_validate_attribute(
             })
         {
             let value = prop
-                .children
+                .children()
                 .and_then(|c| c.get_string(prop.doc, 1))
                 .map(|c| CString::new(c).unwrap());
             let mut value = value
@@ -7038,7 +7038,7 @@ unsafe fn xml_relaxng_validate_attribute(
         .find(|&(_, tmp)| xml_relaxng_attribute_match(ctxt, define, tmp) == 1)
     {
         let value = prop
-            .children
+            .children()
             .and_then(|c| c.get_string(prop.doc, 1))
             .map(|c| CString::new(c).unwrap());
         let mut value = value
@@ -7189,7 +7189,7 @@ unsafe fn xml_relaxng_validate_compiled_content(
                         VALID_ERR2!(
                             ctxt,
                             XmlRelaxNGValidErr::XmlRelaxngErrTextwrong,
-                            now.parent.unwrap().name
+                            now.parent().unwrap().name().as_deref().unwrap().as_ptr()
                         );
                     }
                 }
@@ -8406,7 +8406,7 @@ unsafe fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrDataelem,
-                        node.unwrap().parent.unwrap().name
+                        node.unwrap().parent().unwrap().name().unwrap().as_ptr()
                     );
                     ret = -1;
                     break;
@@ -8457,7 +8457,7 @@ unsafe fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrValelem,
-                        node.unwrap().parent.unwrap().name
+                        node.unwrap().parent().unwrap().name().unwrap().as_ptr()
                     );
                     ret = -1;
                     break;
@@ -8508,7 +8508,7 @@ unsafe fn xml_relaxng_validate_state(
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrListelem,
-                        node.unwrap().parent.unwrap().name
+                        node.unwrap().parent().unwrap().name().unwrap().as_ptr()
                     );
                     ret = -1;
                     break;

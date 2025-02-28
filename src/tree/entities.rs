@@ -45,7 +45,7 @@ use crate::{
         hash::{xml_hash_create, XmlHashTable},
         xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
     },
-    tree::{xml_free_node_list, NodeCommon, NodePtr, XmlDoc, XmlDtd, XmlElementType, XmlNode},
+    tree::{xml_free_node_list, NodeCommon, XmlDoc, XmlDtd, XmlElementType, XmlNode},
 };
 
 use super::{InvalidNodePointerCastError, XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr};
@@ -565,13 +565,6 @@ pub unsafe fn xml_add_doc_entity(
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    // if doc.is_null() {
-    //     xml_entities_err(
-    //         XmlParserErrors::XmlDTDNoDoc,
-    //         "xmlAddDocEntity: document is NULL",
-    //     );
-    //     return None;
-    // }
     let Some(mut dtd) = doc.int_subset else {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDTD,
@@ -579,21 +572,18 @@ pub unsafe fn xml_add_doc_entity(
         );
         return None;
     };
-    let ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
+    let mut ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
 
     // Link it to the DTD
-    ret.parent.store(dtd.as_ptr(), Ordering::Relaxed);
-    ret.doc.store(
-        dtd.doc.map_or(null_mut(), |doc| doc.as_ptr()),
-        Ordering::Relaxed,
-    );
-    if let Some(mut last) = dtd.last {
-        last.next = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
-        ret.prev.store(last.as_ptr(), Ordering::Relaxed);
-        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+    ret.set_parent(Some(dtd.into()));
+    ret.set_document(dtd.doc);
+    if let Some(mut last) = dtd.last() {
+        last.set_next(Some(ret.into()));
+        ret.set_prev(Some(last));
+        dtd.set_last(Some(ret.into()));
     } else {
-        dtd.children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
-        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        dtd.set_children(Some(ret.into()));
+        dtd.set_last(Some(ret.into()));
     }
     Some(ret)
 }
@@ -624,20 +614,17 @@ pub unsafe fn xml_add_dtd_entity(
         );
         return None;
     };
-    let ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
+    let mut ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
     // Link it to the DTD
-    ret.parent.store(dtd.as_ptr(), Ordering::Relaxed);
-    ret.doc.store(
-        dtd.doc.map_or(null_mut(), |doc| doc.as_ptr()),
-        Ordering::Release,
-    );
-    if let Some(mut last) = dtd.last {
-        last.next = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
-        ret.prev.store(last.as_ptr(), Ordering::Relaxed);
-        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+    ret.set_parent(Some(dtd.into()));
+    ret.set_document(dtd.doc);
+    if let Some(mut last) = dtd.last() {
+        last.set_next(Some(ret.into()));
+        ret.set_prev(Some(last));
+        dtd.set_last(Some(ret.into()));
     } else {
-        dtd.children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
-        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        dtd.set_children(Some(ret.into()));
+        dtd.set_last(Some(ret.into()));
     }
     Some(ret)
 }

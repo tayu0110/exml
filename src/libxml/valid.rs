@@ -67,12 +67,11 @@ use crate::{
     parser::{split_qname2, XmlParserCtxtPtr},
     tree::{
         xml_build_qname, xml_free_attribute, xml_free_element, xml_free_node, xml_get_doc_entity,
-        xml_new_doc_node, xml_split_qname2, xml_split_qname3, NodeCommon, NodePtr, XmlAttrPtr,
-        XmlAttribute, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
-        XmlDocProperties, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement, XmlElementContent,
-        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNodePtr,
-        XmlNotation, XmlRef,
+        xml_new_doc_node, xml_split_qname2, xml_split_qname3, NodeCommon, XmlAttrPtr, XmlAttribute,
+        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocProperties,
+        XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur,
+        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
+        XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID, XmlNodePtr, XmlNotation, XmlRef,
     },
 };
 
@@ -924,13 +923,14 @@ pub unsafe fn xml_add_element_decl(
     // Link it to the DTD
     ret.parent = Some(dtd);
     ret.doc = dtd.doc;
-    if let Some(mut last) = dtd.last {
-        last.next = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
-        ret.prev = Some(last);
-        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+    if let Some(mut last) = dtd.last() {
+        last.set_next(Some(ret.into()));
+        ret.set_prev(Some(last));
+        dtd.set_last(Some(ret.into()));
     } else {
-        dtd.children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
-        dtd.last = dtd.children;
+        dtd.set_children(Some(ret.into()));
+        let children = dtd.children();
+        dtd.set_last(children);
     }
     Some(ret)
 }
@@ -1817,13 +1817,13 @@ pub unsafe fn xml_add_attribute_decl(
 
     // Link it to the DTD
     ret.parent = Some(dtd);
-    if let Some(mut last) = dtd.last {
-        last.next = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
-        ret.prev = Some(last);
-        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+    if let Some(mut last) = dtd.last() {
+        last.set_next(Some(ret.into()));
+        ret.set_prev(Some(last));
+        dtd.set_last(Some(ret.into()));
     } else {
-        dtd.children = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
-        dtd.last = NodePtr::from_ptr(ret.as_ptr() as *mut XmlNode);
+        dtd.set_children(Some(ret.into()));
+        dtd.set_last(Some(ret.into()));
     }
     Some(ret)
 }
@@ -1973,7 +1973,7 @@ pub unsafe fn xml_add_id(
         ret.attr = Some(attr);
         ret.name = None;
     }
-    ret.lineno = attr.parent.map_or(-1, |p| p.get_line_no() as i32);
+    ret.lineno = attr.parent().map_or(-1, |p| p.get_line_no() as i32);
 
     // Create the ID table if needed.
     doc.ids
@@ -1985,8 +1985,7 @@ pub unsafe fn xml_add_id(
         if !ctxt.is_null() {
             xml_err_valid_node(
                 ctxt,
-                attr.parent
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
+                attr.parent(),
                 XmlParserErrors::XmlDTDIDRedefined,
                 format!("ID {value} already defined\n").as_str(),
                 Some(value),
@@ -2166,7 +2165,7 @@ pub unsafe fn xml_remove_id(mut doc: XmlDocPtr, mut attr: XmlAttrPtr) -> i32 {
     if doc.ids.is_none() {
         return -1;
     }
-    let Some(id) = attr.children.and_then(|c| c.get_string(Some(doc), 1)) else {
+    let Some(id) = attr.children().and_then(|c| c.get_string(Some(doc), 1)) else {
         return -1;
     };
     let id = CString::new(id).unwrap();
@@ -2222,7 +2221,7 @@ pub(crate) unsafe fn xml_add_ref(
         ret.name = None;
         ret.attr = Some(attr);
     }
-    ret.lineno = attr.parent.map_or(-1, |p| p.get_line_no() as i32);
+    ret.lineno = attr.parent().map_or(-1, |p| p.get_line_no() as i32);
 
     // To add a reference :-
     // References are maintained as a list of references,
@@ -2299,7 +2298,7 @@ pub(crate) unsafe fn xml_remove_ref(mut doc: XmlDocPtr, attr: XmlAttrPtr) -> i32
         return -1;
     }
 
-    let Some(id) = attr.children.and_then(|c| c.get_string(Some(doc), 1)) else {
+    let Some(id) = attr.children().and_then(|c| c.get_string(Some(doc), 1)) else {
         return -1;
     };
 
@@ -3560,7 +3559,7 @@ pub unsafe fn xml_validate_element(
             let mut attr = node.properties;
             while let Some(now) = attr {
                 let value = now
-                    .children
+                    .children()
                     .and_then(|c| c.get_string(Some(doc), 0))
                     .map(|c| CString::new(c).unwrap());
                 ret &= xml_validate_one_attribute(
