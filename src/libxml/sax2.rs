@@ -1596,12 +1596,7 @@ unsafe fn xml_sax2_attribute_internal(
     };
 
     if (*ctxt).replace_entities == 0 && (*ctxt).html == 0 {
-        ret.children = (*ctxt).my_doc.and_then(|doc| {
-            NodePtr::from_ptr(
-                doc.get_node_list(value)
-                    .map_or(null_mut(), |node| node.as_ptr()),
-            )
-        });
+        ret.children = (*ctxt).my_doc.and_then(|doc| doc.get_node_list(value));
         let mut tmp = ret.children();
         while let Some(mut now) = tmp {
             now.set_parent(Some(ret.into()));
@@ -1611,9 +1606,7 @@ unsafe fn xml_sax2_attribute_internal(
             tmp = now.next();
         }
     } else if !value.is_null() {
-        ret.children = NodePtr::from_ptr(
-            xml_new_doc_text((*ctxt).my_doc, value).map_or(null_mut(), |node| node.as_ptr()),
-        );
+        ret.children = xml_new_doc_text((*ctxt).my_doc, value);
         ret.last = ret.children;
         if let Some(mut children) = ret.children() {
             children.set_parent(Some(ret.into()));
@@ -2423,7 +2416,7 @@ unsafe fn xml_sax2_attribute_ns(
         (*ctxt).free_attrs_nr -= 1;
         std::ptr::write(&mut *ret, XmlAttr::default());
         ret.typ = XmlElementType::XmlAttributeNode;
-        ret.parent = NodePtr::from_ptr((*ctxt).node.map_or(null_mut(), |node| node.as_ptr()));
+        ret.parent = (*ctxt).node;
         ret.doc = (*ctxt).my_doc;
         ret.ns = namespace;
         ret.name = xml_strdup(localname);
@@ -2464,10 +2457,7 @@ unsafe fn xml_sax2_attribute_ns(
         // otherwise with ' or "
         ret.children = (*ctxt).my_doc.and_then(|doc| {
             let len = CStr::from_ptr(value as *const i8).to_bytes().len();
-            NodePtr::from_ptr(
-                doc.get_node_list_with_strlen(value, len as i32)
-                    .map_or(null_mut(), |node| node.as_ptr()),
-            )
+            doc.get_node_list_with_strlen(value, len as i32)
         });
         let mut tmp = ret.children();
         while let Some(mut now) = tmp {
@@ -2483,8 +2473,8 @@ unsafe fn xml_sax2_attribute_ns(
             .to_string_lossy()
             .into_owned();
         let tmp = xml_sax2_text_node(ctxt, &value);
-        ret.children = NodePtr::from_ptr(tmp.map_or(null_mut(), |node| node.as_ptr()));
-        ret.last = NodePtr::from_ptr(tmp.map_or(null_mut(), |node| node.as_ptr()));
+        ret.children = tmp;
+        ret.last = tmp;
         if let Some(mut tmp) = tmp {
             tmp.doc = ret.doc;
             tmp.set_parent(Some(ret.into()));

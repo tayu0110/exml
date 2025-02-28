@@ -37,7 +37,7 @@ use crate::libxml::{
 use super::{
     xml_free_node_list, xml_new_doc_text, xml_new_ns, xml_new_reconciled_ns, xml_ns_in_scope,
     xml_static_copy_node_list, xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon,
-    NodePtr, XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr,
+    XmlAttributeType, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr,
     XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
@@ -46,9 +46,9 @@ pub struct XmlAttr {
     pub _private: *mut c_void,                  /* application data */
     pub(crate) typ: XmlElementType,             /* XML_ATTRIBUTE_NODE, must be second ! */
     pub(crate) name: *const XmlChar,            /* the name of the property */
-    pub(crate) children: Option<NodePtr>,       /* the value of the property */
-    pub(crate) last: Option<NodePtr>,           /* NULL */
-    pub(crate) parent: Option<NodePtr>,         /* child->parent link */
+    pub(crate) children: Option<XmlNodePtr>,    /* the value of the property */
+    pub(crate) last: Option<XmlNodePtr>,        /* NULL */
+    pub(crate) parent: Option<XmlNodePtr>,      /* child->parent link */
     pub(crate) next: Option<XmlAttrPtr>,        /* next sibling link  */
     pub(crate) prev: Option<XmlAttrPtr>,        /* previous sibling link  */
     pub(crate) doc: Option<XmlDocPtr>,          /* the containing document */
@@ -233,18 +233,17 @@ impl NodeCommon for XmlAttr {
             .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
-        self.children
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+        self.children.map(|children| children.into())
     }
     fn set_children(&mut self, children: Option<XmlGenericNodePtr>) {
-        self.children = children.and_then(|children| NodePtr::from_ptr(children.as_ptr()));
+        self.children = children.map(|children| XmlNodePtr::try_from(children).unwrap());
     }
     fn last(&self) -> Option<XmlGenericNodePtr> {
         self.last
             .and_then(|last| XmlGenericNodePtr::from_raw(last.as_ptr()))
     }
     fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
-        self.last = last.and_then(|children| NodePtr::from_ptr(children.as_ptr()));
+        self.last = last.map(|children| XmlNodePtr::try_from(children).unwrap());
     }
     fn next(&self) -> Option<XmlGenericNodePtr> {
         self.next.map(|next| next.into())
@@ -259,11 +258,10 @@ impl NodeCommon for XmlAttr {
         self.prev = prev.map(|prev| XmlAttrPtr::try_from(prev).unwrap())
     }
     fn parent(&self) -> Option<XmlGenericNodePtr> {
-        self.parent
-            .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+        self.parent.map(|parent| parent.into())
     }
     fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>) {
-        self.parent = parent.and_then(|children| NodePtr::from_ptr(children.as_ptr()));
+        self.parent = parent.map(|children| XmlNodePtr::try_from(children).unwrap());
     }
 }
 
@@ -448,12 +446,7 @@ pub unsafe fn xml_new_doc_prop(
         return None;
     };
     if !value.is_null() {
-        cur.children = doc.and_then(|doc| {
-            NodePtr::from_ptr(
-                doc.get_node_list(value)
-                    .map_or(null_mut(), |node| node.as_ptr()),
-            )
-        });
+        cur.children = doc.and_then(|doc| doc.get_node_list(value));
         cur.last = None;
 
         let mut tmp = cur.children();
@@ -489,7 +482,7 @@ pub(super) unsafe fn xml_new_prop_internal(
     // Allocate a new property and fill the fields.
     let Some(mut cur) = XmlAttrPtr::new(XmlAttr {
         typ: XmlElementType::XmlAttributeNode,
-        parent: NodePtr::from_ptr(node.map_or(null_mut(), |node| node.as_ptr())),
+        parent: node,
         ns,
         name: xml_strndup(name.as_ptr(), name.len() as i32),
         ..Default::default()
@@ -622,7 +615,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
     } else {
         xml_new_doc_prop(None, cur.name, null_mut())
     }?;
-    ret.parent = NodePtr::from_ptr(target.map_or(null_mut(), |target| target.as_ptr()));
+    ret.parent = target;
 
     if let Some((cur_ns, mut target)) = cur.ns.zip(target) {
         let prefix = cur_ns.prefix();
