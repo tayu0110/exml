@@ -28,7 +28,6 @@ use std::{
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{null_mut, NonNull},
-    sync::atomic::{AtomicPtr, Ordering},
 };
 
 use libc::{size_t, snprintf, strchr};
@@ -45,7 +44,7 @@ use crate::{
         hash::{xml_hash_create, XmlHashTable},
         xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
     },
-    tree::{xml_free_node_list, NodeCommon, XmlElementType, XmlNode},
+    tree::{xml_free_node_list, NodeCommon, XmlElementType},
 };
 
 use super::{InvalidNodePointerCastError, XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr, XmlNodePtr};
@@ -102,9 +101,9 @@ pub struct XmlEntity {
     // -> DTD
     pub(crate) parent: Option<XmlDtdPtr>,
     // next sibling link
-    pub(crate) next: AtomicPtr<XmlNode>,
+    pub(crate) next: Option<XmlGenericNodePtr>,
     // previous sibling link
-    pub(crate) prev: AtomicPtr<XmlNode>,
+    pub(crate) prev: Option<XmlGenericNodePtr>,
     // the containing document
     pub(crate) doc: Option<XmlDocPtr>,
 
@@ -160,18 +159,16 @@ impl NodeCommon for XmlEntity {
         self.last = last.map(|l| XmlNodePtr::try_from(l).unwrap());
     }
     fn next(&self) -> Option<XmlGenericNodePtr> {
-        XmlGenericNodePtr::from_raw(self.next.load(Ordering::Relaxed))
+        self.next
     }
     fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
-        self.next
-            .store(next.map_or(null_mut(), |n| n.as_ptr()), Ordering::Relaxed);
+        self.next = next;
     }
     fn prev(&self) -> Option<XmlGenericNodePtr> {
-        XmlGenericNodePtr::from_raw(self.prev.load(Ordering::Relaxed))
+        self.prev
     }
     fn set_prev(&mut self, prev: Option<XmlGenericNodePtr>) {
-        self.prev
-            .store(prev.map_or(null_mut(), |p| p.as_ptr()), Ordering::Relaxed);
+        self.prev = prev;
     }
     fn parent(&self) -> Option<XmlGenericNodePtr> {
         self.parent.map(|node| node.into())
@@ -641,8 +638,8 @@ thread_local! {
         children: None,
         last: None,
         parent: None,
-        next: AtomicPtr::new(null_mut()),
-        prev: AtomicPtr::new(null_mut()),
+        next: None,
+        prev: None,
         doc: None,
         orig: c"<".as_ptr() as _,
         content: c"<".as_ptr() as _,
@@ -663,8 +660,8 @@ thread_local! {
         children: None,
         last: None,
         parent: None,
-        next: AtomicPtr::new(null_mut()),
-        prev: AtomicPtr::new(null_mut()),
+        next: None,
+        prev: None,
         doc: None,
         orig: c">".as_ptr() as _,
         content: c">".as_ptr() as _,
@@ -685,8 +682,8 @@ thread_local! {
         children: None,
         last: None,
         parent: None,
-        next: AtomicPtr::new(null_mut()),
-        prev: AtomicPtr::new(null_mut()),
+        next: None,
+        prev: None,
         doc: None,
         orig: c"&".as_ptr() as _,
         content: c"&".as_ptr() as _,
@@ -707,8 +704,8 @@ thread_local! {
         children: None,
         last: None,
         parent: None,
-        next: AtomicPtr::new(null_mut()),
-        prev: AtomicPtr::new(null_mut()),
+        next: None,
+        prev: None,
         doc: None,
         orig: c"\"".as_ptr() as _,
         content: c"\"".as_ptr() as _,
@@ -729,8 +726,8 @@ thread_local! {
         children: None,
         last: None,
         parent: None,
-        next: AtomicPtr::new(null_mut()),
-        prev: AtomicPtr::new(null_mut()),
+        next: None,
+        prev: None,
         doc: None,
         orig: c"'".as_ptr() as _,
         content: c"'".as_ptr() as _,

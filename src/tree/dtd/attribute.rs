@@ -30,8 +30,8 @@ use std::{
 use crate::{
     libxml::{globals::xml_free, xmlstring::XmlChar},
     tree::{
-        InvalidNodePointerCastError, NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType,
-        XmlDocPtr, XmlElementType, XmlGenericNodePtr,
+        InvalidNodePointerCastError, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
+        XmlElementType, XmlGenericNodePtr,
     },
 };
 
@@ -40,15 +40,15 @@ use super::{XmlDtdPtr, XmlEnumeration};
 #[repr(C)]
 #[derive(Clone)]
 pub struct XmlAttribute {
-    pub _private: *mut c_void,            /* application data */
-    pub(crate) typ: XmlElementType,       /* XML_ATTRIBUTE_DECL, must be second ! */
-    pub(crate) name: *const XmlChar,      /* Attribute name */
-    pub(crate) children: Option<NodePtr>, /* NULL */
-    pub(crate) last: Option<NodePtr>,     /* NULL */
-    pub(crate) parent: Option<XmlDtdPtr>, /* -> DTD */
-    pub(crate) next: Option<NodePtr>,     /* next sibling link  */
-    pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
-    pub(crate) doc: Option<XmlDocPtr>,    /* the containing document */
+    pub _private: *mut c_void,                      /* application data */
+    pub(crate) typ: XmlElementType,                 /* XML_ATTRIBUTE_DECL, must be second ! */
+    pub(crate) name: *const XmlChar,                /* Attribute name */
+    pub(crate) children: Option<XmlGenericNodePtr>, /* NULL */
+    pub(crate) last: Option<XmlGenericNodePtr>,     /* NULL */
+    pub(crate) parent: Option<XmlDtdPtr>,           /* -> DTD */
+    pub(crate) next: Option<XmlGenericNodePtr>,     /* next sibling link  */
+    pub(crate) prev: Option<XmlGenericNodePtr>,     /* previous sibling link  */
+    pub(crate) doc: Option<XmlDocPtr>,              /* the containing document */
 
     pub(crate) nexth: Option<XmlAttributePtr>, /* next in hash table */
     pub(crate) atype: XmlAttributeType,        /* The attribute type */
@@ -98,31 +98,27 @@ impl NodeCommon for XmlAttribute {
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_children(&mut self, children: Option<XmlGenericNodePtr>) {
-        self.children = children.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.children = children;
     }
     fn last(&self) -> Option<XmlGenericNodePtr> {
         self.last
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
-        self.last = last.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.last = last;
     }
     fn next(&self) -> Option<XmlGenericNodePtr> {
         self.next
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
-        self.next = next.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.next = next;
     }
     fn prev(&self) -> Option<XmlGenericNodePtr> {
         self.prev
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_prev(&mut self, prev: Option<XmlGenericNodePtr>) {
-        self.prev = prev.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.prev = prev;
     }
     fn parent(&self) -> Option<XmlGenericNodePtr> {
         self.parent.map(|node| node.into())

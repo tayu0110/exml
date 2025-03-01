@@ -31,8 +31,8 @@ use crate::libxml::xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr};
 use crate::{
     libxml::valid::xml_free_doc_element_content,
     tree::{
-        InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDocPtr, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlGenericNodePtr,
+        InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementContentPtr, XmlElementType,
+        XmlElementTypeVal, XmlGenericNodePtr,
     },
 };
 
@@ -48,12 +48,12 @@ pub struct XmlElement {
     // ref: https://doc.rust-lang.org/std/option/index.html#representation
     #[allow(clippy::box_collection)]
     pub(crate) name: Option<Box<String>>, /* Element name */
-    pub(crate) children: Option<NodePtr>, /* NULL */
-    pub(crate) last: Option<NodePtr>,     /* NULL */
-    pub(crate) parent: Option<XmlDtdPtr>, /* -> DTD */
-    pub(crate) next: Option<NodePtr>,     /* next sibling link  */
-    pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
-    pub(crate) doc: Option<XmlDocPtr>,    /* the containing document */
+    pub(crate) children: Option<XmlGenericNodePtr>, /* NULL */
+    pub(crate) last: Option<XmlGenericNodePtr>,     /* NULL */
+    pub(crate) parent: Option<XmlDtdPtr>,           /* -> DTD */
+    pub(crate) next: Option<XmlGenericNodePtr>,     /* next sibling link  */
+    pub(crate) prev: Option<XmlGenericNodePtr>,     /* previous sibling link  */
+    pub(crate) doc: Option<XmlDocPtr>,              /* the containing document */
 
     pub(crate) etype: XmlElementTypeVal,            /* The type */
     pub(crate) content: XmlElementContentPtr,       /* the allowed element content */
@@ -101,31 +101,27 @@ impl NodeCommon for XmlElement {
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_children(&mut self, children: Option<XmlGenericNodePtr>) {
-        self.children = children.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.children = children;
     }
     fn last(&self) -> Option<XmlGenericNodePtr> {
         self.last
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
-        self.last = last.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.last = last;
     }
     fn next(&self) -> Option<XmlGenericNodePtr> {
         self.next
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
-        self.next = next.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.next = next;
     }
     fn prev(&self) -> Option<XmlGenericNodePtr> {
         self.prev
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_prev(&mut self, prev: Option<XmlGenericNodePtr>) {
-        self.prev = prev.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.prev = prev;
     }
     fn parent(&self) -> Option<XmlGenericNodePtr> {
         self.parent.map(|node| node.into())
