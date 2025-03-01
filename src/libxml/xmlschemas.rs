@@ -1780,150 +1780,171 @@ fn xml_schema_wildcard_pcto_string(pc: i32) -> &'static str {
 /// If the itemNode is an attribute node, the name of the attribute
 /// will be appended to the result.
 ///
-/// Returns the formatted string and sets @buf to the resulting value.
+/// Returns the formatted string.
+///
+/// # Note
+/// In the original libxml2, this function returns a string with escaped characters
+/// that could be recognized as format specifiers ('%').
+///
+/// However, this operation is unnecessary in Rust
+/// because string formatting is not performed at runtime,
+/// and in fact, no such operation is performed.
 #[doc(alias = "xmlSchemaFormatItemForReport")]
 unsafe fn xml_schema_format_item_for_report(
-    buf: *mut *mut XmlChar,
     item_des: Option<&str>,
     item: XmlSchemaBasicItemPtr,
     item_node: Option<XmlGenericNodePtr>,
-) -> *mut XmlChar {
+) -> String {
     unsafe {
         let mut str: *mut XmlChar = null_mut();
         let mut named: i32 = 1;
 
-        if !(*buf).is_null() {
-            xml_free(*buf as _);
-            *buf = null_mut();
-        }
+        let mut res = String::new();
 
         if let Some(item_des) = item_des {
-            *buf = xml_strndup(item_des.as_ptr(), item_des.len() as i32);
+            res.push_str(item_des);
         } else if !item.is_null() {
             match (*item).typ {
                 XmlSchemaTypeType::XmlSchemaTypeBasic => {
                     let typ: XmlSchemaTypePtr = item as XmlSchemaTypePtr;
 
                     if WXS_IS_ATOMIC!(typ) {
-                        *buf = xml_strdup(c"atomic type 'xs:".as_ptr() as _);
+                        res.push_str("atomic type 'xs:");
                     } else if WXS_IS_LIST!(typ) {
-                        *buf = xml_strdup(c"list type 'xs:".as_ptr() as _);
+                        res.push_str("list type 'xs:");
                     } else if WXS_IS_UNION!(typ) {
-                        *buf = xml_strdup(c"union type 'xs:".as_ptr() as _);
+                        res.push_str("union type 'xs:");
                     } else {
-                        *buf = xml_strdup(c"simple type 'xs:".as_ptr() as _);
+                        res.push_str("simple type 'xs:");
                     }
-                    *buf = xml_strcat(*buf, (*typ).name);
-                    *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+                    res.push_str(
+                        CStr::from_ptr((*typ).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                    res.push('\'');
                 }
                 XmlSchemaTypeType::XmlSchemaTypeSimple => {
                     let typ: XmlSchemaTypePtr = item as XmlSchemaTypePtr;
 
-                    if (*typ).flags & XML_SCHEMAS_TYPE_GLOBAL != 0 {
-                        *buf = xml_strdup(c"".as_ptr() as _);
-                    } else {
-                        *buf = xml_strdup(c"local ".as_ptr() as _);
+                    if (*typ).flags & XML_SCHEMAS_TYPE_GLOBAL == 0 {
+                        res.push_str("local ");
                     }
                     if WXS_IS_ATOMIC!(typ) {
-                        *buf = xml_strcat(*buf, c"atomic type".as_ptr() as _);
+                        res.push_str("atomic type");
                     } else if WXS_IS_LIST!(typ) {
-                        *buf = xml_strcat(*buf, c"list type".as_ptr() as _);
+                        res.push_str("list type");
                     } else if WXS_IS_UNION!(typ) {
-                        *buf = xml_strcat(*buf, c"union type".as_ptr() as _);
+                        res.push_str("union type");
                     } else {
-                        *buf = xml_strcat(*buf, c"simple type".as_ptr() as _);
+                        res.push_str("simple type");
                     }
                     if (*typ).flags & XML_SCHEMAS_TYPE_GLOBAL != 0 {
-                        *buf = xml_strcat(*buf, c" '".as_ptr() as _);
-                        *buf = xml_strcat(*buf, (*typ).name);
-                        *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+                        res.push_str(" '");
+                        res.push_str(
+                            CStr::from_ptr((*typ).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        );
+                        res.push('\'');
                     }
                 }
                 XmlSchemaTypeType::XmlSchemaTypeComplex => {
                     let typ: XmlSchemaTypePtr = item as XmlSchemaTypePtr;
 
-                    if (*typ).flags & XML_SCHEMAS_TYPE_GLOBAL != 0 {
-                        *buf = xml_strdup(c"".as_ptr() as _);
-                    } else {
-                        *buf = xml_strdup(c"local ".as_ptr() as _);
+                    if (*typ).flags & XML_SCHEMAS_TYPE_GLOBAL == 0 {
+                        res.push_str("local ");
                     }
-                    *buf = xml_strcat(*buf, c"complex type".as_ptr() as _);
+                    res.push_str("complex type");
                     if (*typ).flags & XML_SCHEMAS_TYPE_GLOBAL != 0 {
-                        *buf = xml_strcat(*buf, c" '".as_ptr() as _);
-                        *buf = xml_strcat(*buf, (*typ).name);
-                        *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+                        res.push_str(" '");
+                        res.push_str(
+                            CStr::from_ptr((*typ).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        );
+                        res.push('\'');
                     }
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAttributeUse => {
                     let ause: XmlSchemaAttributeUsePtr = item as XmlSchemaAttributeUsePtr;
-                    *buf = xml_strdup(c"attribute use ".as_ptr() as _);
+                    res.push_str("attribute use ");
                     if !WXS_ATTRUSE_DECL!(ause).is_null() {
-                        *buf = xml_strcat(*buf, c"'".as_ptr() as _);
-                        *buf = xml_strcat(
-                            *buf,
-                            xml_schema_get_component_qname(
+                        res.push('\'');
+                        res.push_str(
+                            CStr::from_ptr(xml_schema_get_component_qname(
                                 addr_of_mut!(str),
                                 WXS_ATTRUSE_DECL!(ause) as _,
-                            ),
+                            ) as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
                         );
+                        res.push('\'');
                         FREE_AND_NULL!(str);
-                        *buf = xml_strcat(*buf, c"'".as_ptr() as _);
                     } else {
-                        *buf = xml_strcat(*buf, c"(unknown)".as_ptr() as _);
+                        res.push_str("(unknown)");
                     }
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAttribute => {
                     let attr: XmlSchemaAttributePtr = item as XmlSchemaAttributePtr;
-                    *buf = xml_strdup(c"attribute decl.".as_ptr() as _);
-                    *buf = xml_strcat(*buf, c" '".as_ptr() as _);
-                    *buf = xml_strcat(
-                        *buf,
-                        xml_schema_format_qname(
+                    res.push_str("attribute decl.");
+                    res.push_str(" '");
+                    res.push_str(
+                        CStr::from_ptr(xml_schema_format_qname(
                             addr_of_mut!(str),
                             (*attr).target_namespace,
                             (*attr).name,
-                        ),
+                        ) as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
                     );
+                    res.push('\'');
                     FREE_AND_NULL!(str);
-                    *buf = xml_strcat(*buf, c"'".as_ptr() as _);
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
-                    xml_schema_get_component_designation(buf, item as _);
+                    let mut buf = null_mut();
+                    xml_schema_get_component_designation(&raw mut buf, item as _);
+                    res.push_str(CStr::from_ptr(buf as *const i8).to_string_lossy().as_ref());
                 }
                 XmlSchemaTypeType::XmlSchemaTypeElement => {
                     let elem: XmlSchemaElementPtr = item as XmlSchemaElementPtr;
-                    *buf = xml_strdup(c"element decl.".as_ptr() as _);
-                    *buf = xml_strcat(*buf, c" '".as_ptr() as _);
-                    *buf = xml_strcat(
-                        *buf,
-                        xml_schema_format_qname(
+                    res.push_str("element decl.");
+                    res.push_str(" '");
+                    res.push_str(
+                        CStr::from_ptr(xml_schema_format_qname(
                             addr_of_mut!(str),
                             (*elem).target_namespace,
                             (*elem).name,
-                        ),
+                        ) as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
                     );
-                    *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+                    res.push('\'');
                 }
                 XmlSchemaTypeType::XmlSchemaTypeIDCUnique
                 | XmlSchemaTypeType::XmlSchemaTypeIDCKey
                 | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
                     if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeIDCUnique {
-                        *buf = xml_strdup(c"unique '".as_ptr() as _);
+                        res.push_str("unique '");
                     } else if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKey {
-                        *buf = xml_strdup(c"key '".as_ptr() as _);
+                        res.push_str("key '");
                     } else {
-                        *buf = xml_strdup(c"keyRef '".as_ptr() as _);
+                        res.push_str("keyRef '");
                     }
-                    *buf = xml_strcat(*buf, (*(item as XmlSchemaIDCPtr)).name);
-                    *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+                    res.push_str(
+                        CStr::from_ptr((*(item as XmlSchemaIDCPtr)).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                    res.push('\'');
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAny
                 | XmlSchemaTypeType::XmlSchemaTypeAnyAttribute => {
                     let s = xml_schema_wildcard_pcto_string(
                         (*(item as XmlSchemaWildcardPtr)).process_contents,
                     );
-                    *buf = xml_strndup(s.as_ptr(), s.len() as i32);
-                    *buf = xml_strcat(*buf, c" wildcard".as_ptr() as _);
+                    res.push_str(s);
+                    res.push_str(" wildcard");
                 }
                 XmlSchemaTypeType::XmlSchemaFacetMininclusive
                 | XmlSchemaTypeType::XmlSchemaFacetMinexclusive
@@ -1937,19 +1958,23 @@ unsafe fn xml_schema_format_item_for_report(
                 | XmlSchemaTypeType::XmlSchemaFacetLength
                 | XmlSchemaTypeType::XmlSchemaFacetMaxlength
                 | XmlSchemaTypeType::XmlSchemaFacetMinlength => {
-                    *buf = xml_strdup(c"facet '".as_ptr() as _);
+                    res.push_str("facet '");
                     let s = xml_schema_facet_type_to_string((*item).typ);
-                    *buf = xml_strncat(*buf, s.as_ptr(), s.len() as i32);
-                    *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+                    res.push_str(s);
+                    res.push('\'');
                 }
                 XmlSchemaTypeType::XmlSchemaTypeGroup => {
-                    *buf = xml_strdup(c"model group def.".as_ptr() as _);
-                    *buf = xml_strcat(*buf, c" '".as_ptr() as _);
-                    *buf = xml_strcat(
-                        *buf,
-                        xml_schema_get_component_qname(addr_of_mut!(str), item as _),
+                    res.push_str("model group def.");
+                    res.push_str(" '");
+                    res.push_str(
+                        CStr::from_ptr(
+                            xml_schema_get_component_qname(addr_of_mut!(str), item as _)
+                                as *const i8,
+                        )
+                        .to_string_lossy()
+                        .as_ref(),
                     );
-                    *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+                    res.push('\'');
                     FREE_AND_NULL!(str);
                 }
                 XmlSchemaTypeType::XmlSchemaTypeSequence
@@ -1957,17 +1982,21 @@ unsafe fn xml_schema_format_item_for_report(
                 | XmlSchemaTypeType::XmlSchemaTypeAll
                 | XmlSchemaTypeType::XmlSchemaTypeParticle => {
                     let typestr = xml_schema_get_component_type_str(item as _);
-                    *buf = xml_strndup(typestr.as_ptr(), typestr.len() as i32);
+                    res.push_str(typestr);
                 }
                 XmlSchemaTypeType::XmlSchemaTypeNotation => {
                     let typestr = xml_schema_get_component_type_str(item as _);
-                    *buf = xml_strndup(typestr.as_ptr(), typestr.len() as i32);
-                    *buf = xml_strcat(*buf, c" '".as_ptr() as _);
-                    *buf = xml_strcat(
-                        *buf,
-                        xml_schema_get_component_qname(addr_of_mut!(str), item as _),
+                    res.push_str(typestr);
+                    res.push_str(" '");
+                    res.push_str(
+                        CStr::from_ptr(
+                            xml_schema_get_component_qname(addr_of_mut!(str), item as _)
+                                as *const i8,
+                        )
+                        .to_string_lossy()
+                        .as_ref(),
                     );
-                    *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+                    res.push('\'');
                     FREE_AND_NULL!(str);
                     named = 0;
                 }
@@ -1986,35 +2015,51 @@ unsafe fn xml_schema_format_item_for_report(
                 } else {
                     XmlNodePtr::try_from(item_node).unwrap()
                 };
-                *buf = xml_strdup(c"Element '".as_ptr() as _);
+                res.push_str("Element '");
                 if let Some(ns) = elem.ns {
-                    *buf = xml_strcat(
-                        *buf,
-                        xml_schema_format_qname(addr_of_mut!(str), ns.href, elem.name),
+                    res.push_str(
+                        CStr::from_ptr(xml_schema_format_qname(
+                            addr_of_mut!(str),
+                            ns.href,
+                            elem.name,
+                        ) as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
                     );
                     FREE_AND_NULL!(str);
                 } else {
-                    *buf = xml_strcat(*buf, elem.name);
+                    res.push_str(
+                        CStr::from_ptr(elem.name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
                 }
-                *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+                res.push('\'');
             }
         }
         if let Some(attr) = item_node.and_then(|node| XmlAttrPtr::try_from(node).ok()) {
-            *buf = xml_strcat(*buf, c", attribute '".as_ptr() as _);
+            res.push_str(", attribute '");
             if let Some(ns) = attr.ns {
-                *buf = xml_strcat(
-                    *buf,
-                    xml_schema_format_qname(addr_of_mut!(str), ns.href, attr.name),
+                res.push_str(
+                    CStr::from_ptr(
+                        xml_schema_format_qname(addr_of_mut!(str), ns.href, attr.name) as *const i8,
+                    )
+                    .to_string_lossy()
+                    .as_ref(),
                 );
                 FREE_AND_NULL!(str);
             } else {
-                *buf = xml_strcat(*buf, attr.name);
+                res.push_str(
+                    CStr::from_ptr(attr.name as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             }
-            *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+            res.push('\'');
         }
         FREE_AND_NULL!(str);
 
-        xml_escape_format_string(buf)
+        res
     }
 }
 
@@ -2183,7 +2228,8 @@ pub(crate) unsafe fn xml_schema_custom_err4(
 
         if node.is_none() && !item.is_null() && (*actxt).typ == XML_SCHEMA_CTXT_PARSER {
             node = WXS_ITEM_NODE!(item).map(|node| node.into());
-            xml_schema_format_item_for_report(addr_of_mut!(msg), None, item, None);
+            let res = xml_schema_format_item_for_report(None, item, None);
+            msg = xml_strndup(res.as_ptr(), res.len() as i32);
             msg = xml_strcat(msg, c": ".as_ptr() as _);
         } else {
             xml_schema_format_node_for_error(addr_of_mut!(msg), actxt, node);
@@ -6723,16 +6769,8 @@ unsafe fn xml_schema_pcontent_err(
     content: Option<&str>,
 ) {
     unsafe {
-        let mut des: *mut XmlChar = null_mut();
-
-        xml_schema_format_item_for_report(
-            addr_of_mut!(des),
-            None,
-            owner_item,
-            Some(owner_elem.into()),
-        );
+        let des = xml_schema_format_item_for_report(None, owner_item, Some(owner_elem.into()));
         if let Some(message) = message {
-            let des = CStr::from_ptr(des as *const i8).to_string_lossy();
             xml_schema_perr2(
                 ctxt,
                 Some(owner_elem.into()),
@@ -6743,7 +6781,6 @@ unsafe fn xml_schema_pcontent_err(
                 Some(message),
             );
         } else if let Some(content) = content {
-            let des = CStr::from_ptr(des as *const i8).to_string_lossy();
             xml_schema_perr2(
                 ctxt,
                 Some(owner_elem.into()),
@@ -6754,7 +6791,6 @@ unsafe fn xml_schema_pcontent_err(
                 Some(content),
             );
         } else {
-            let des = CStr::from_ptr(des as *const i8).to_string_lossy();
             xml_schema_perr2(
                 ctxt,
                 Some(owner_elem.into()),
@@ -6765,7 +6801,6 @@ unsafe fn xml_schema_pcontent_err(
                 None,
             );
         }
-        FREE_AND_NULL!(des)
     }
 }
 
@@ -6932,11 +6967,8 @@ unsafe fn xml_schema_pcustom_err_ext(
     str3: Option<&str>,
 ) {
     unsafe {
-        let mut des: *mut XmlChar = null_mut();
-
-        xml_schema_format_item_for_report(addr_of_mut!(des), None, item, item_elem);
-        let d = CStr::from_ptr(des as *const i8).to_string_lossy();
-        let msg = format!("{d}: {message}.\n");
+        let des = xml_schema_format_item_for_report(None, item, item_elem);
+        let msg = format!("{des}: {message}.\n");
         if item_elem.is_none() && !item.is_null() {
             item_elem = WXS_ITEM_NODE!(item).map(|node| node.into());
         }
@@ -6948,13 +6980,12 @@ unsafe fn xml_schema_pcustom_err_ext(
             None,
             None,
             &msg,
-            Some(&d),
+            Some(&des),
             str1,
             str2,
             str3,
             None,
         );
-        FREE_AND_NULL!(des);
     }
 }
 
@@ -7101,17 +7132,14 @@ unsafe fn xml_schema_pmissing_attr_err(
     message: Option<&str>,
 ) {
     unsafe {
-        let mut des: *mut XmlChar = null_mut();
-
-        xml_schema_format_item_for_report(addr_of_mut!(des), None, owner_item, owner_elem);
-        let d = CStr::from_ptr(des as *const i8).to_string_lossy();
+        let des = xml_schema_format_item_for_report(None, owner_item, owner_elem);
         if let Some(message) = message {
             xml_schema_perr(
                 ctxt,
                 owner_elem,
                 error,
-                format!("{d}: {message}.\n").as_str(),
-                Some(&d),
+                format!("{des}: {message}.\n").as_str(),
+                Some(&des),
                 Some(message),
             );
         } else {
@@ -7120,15 +7148,14 @@ unsafe fn xml_schema_pmissing_attr_err(
                 owner_elem,
                 error,
                 format!(
-                    "{d}: The attribute '{}' is required but missing.\n",
+                    "{des}: The attribute '{}' is required but missing.\n",
                     name.unwrap()
                 )
                 .as_str(),
-                Some(&d),
+                Some(&des),
                 name,
             );
         }
-        FREE_AND_NULL!(des);
     }
 }
 
@@ -7823,28 +7850,26 @@ unsafe fn xml_schema_pcustom_attr_err(
     msg: &str,
 ) {
     unsafe {
-        let mut des: *mut XmlChar = null_mut();
-
-        if owner_des.is_null() {
+        let des = if owner_des.is_null() {
             xml_schema_format_item_for_report(
-                addr_of_mut!(des),
                 None,
                 owner_item,
                 attr.unwrap().parent.map(|p| p.into()),
-            );
+            )
         } else if (*owner_des).is_null() {
-            xml_schema_format_item_for_report(
-                owner_des,
+            let des = xml_schema_format_item_for_report(
                 None,
                 owner_item,
                 attr.unwrap().parent.map(|p| p.into()),
             );
-            des = *owner_des;
+            *owner_des = xml_strndup(des.as_ptr(), des.len() as i32);
+            des
         } else {
-            des = *owner_des;
-        }
+            CStr::from_ptr((*owner_des) as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        };
         if let Some(attr) = attr {
-            let des = CStr::from_ptr(des as *const i8).to_string_lossy();
             let name = (*attr).name().unwrap();
             xml_schema_perr_ext(
                 ctxt,
@@ -7861,7 +7886,6 @@ unsafe fn xml_schema_pcustom_attr_err(
                 None,
             );
         } else {
-            let des = CStr::from_ptr(des as *const i8).to_string_lossy();
             xml_schema_perr_ext(
                 ctxt,
                 None,
@@ -7876,9 +7900,6 @@ unsafe fn xml_schema_pcustom_attr_err(
                 None,
                 None,
             );
-        }
-        if owner_des.is_null() {
-            FREE_AND_NULL!(des);
         }
     }
 }
@@ -8041,15 +8062,11 @@ unsafe fn xml_schema_pmutual_excl_attr_err(
     name2: *const c_char,
 ) {
     unsafe {
-        let mut des: *mut XmlChar = null_mut();
-
-        xml_schema_format_item_for_report(
-            addr_of_mut!(des),
+        let des = xml_schema_format_item_for_report(
             None,
             owner_item as XmlSchemaBasicItemPtr,
             attr.parent.map(|p| p.into()),
         );
-        let d = CStr::from_ptr(des as *const i8).to_string_lossy();
         let name1 = CStr::from_ptr(name1).to_string_lossy();
         let name2 = CStr::from_ptr(name2).to_string_lossy();
         xml_schema_perr_ext(
@@ -8059,15 +8076,14 @@ unsafe fn xml_schema_pmutual_excl_attr_err(
             None,
             None,
             None,
-            format!("{d}: The attributes '{name1}' and '{name2}' are mutually exclusive.\n")
+            format!("{des}: The attributes '{name1}' and '{name2}' are mutually exclusive.\n")
                 .as_str(),
-            Some(&d),
+            Some(&des),
             Some(&name1),
             Some(&name2),
             None,
             None,
         );
-        FREE_AND_NULL!(des);
     }
 }
 
@@ -14580,34 +14596,32 @@ unsafe fn xml_schema_pres_comp_attr_err(
     ref_type_str: Option<&str>,
 ) {
     unsafe {
-        let mut des: *mut XmlChar = null_mut();
         let mut str_a: *mut XmlChar = null_mut();
 
-        xml_schema_format_item_for_report(addr_of_mut!(des), None, owner_item, owner_elem);
+        let des = xml_schema_format_item_for_report(None, owner_item, owner_elem);
         let ref_type_str = ref_type_str.unwrap_or_else(|| xml_schema_item_type_to_str(ref_type));
-        let d = CStr::from_ptr(des as *const i8).to_string_lossy();
         let qname = CStr::from_ptr(
             xml_schema_format_qname(addr_of_mut!(str_a), ref_uri, ref_name) as *const i8,
         )
         .to_string_lossy();
         xml_schema_perr_ext(
-        ctxt,
-        owner_elem,
-        error as _,
-        None,
-        None,
-        None,
-        format!(
-            "{d}, attribute '{name}': The QName value '{qname}' does not resolve to a(n) {ref_type_str}.\n"
-        )
-        .as_str(),
-        Some(&d),
-        Some(name),
-        Some(&qname),
-        Some(ref_type_str),
-        None,
-    );
-        FREE_AND_NULL!(des);
+            ctxt,
+            owner_elem,
+            error as _,
+            None,
+            None,
+            None,
+            format!(
+                "{des}, attribute '{name}': The QName value '{qname}' does not resolve to a(n) {ref_type_str}.\n"
+            )
+            .as_str(),
+            Some(&des),
+            Some(name),
+            Some(&qname),
+            Some(ref_type_str),
+            None,
+        );
+
         FREE_AND_NULL!(str_a);
     }
 }
@@ -17325,28 +17339,12 @@ unsafe fn xml_schema_pattr_use_err4(
 ) {
     unsafe {
         let mut str: *mut XmlChar = null_mut();
-        let mut msg: *mut XmlChar = null_mut();
 
-        xml_schema_format_item_for_report(addr_of_mut!(msg), None, owner_item, None);
-        let mut msg = if msg.is_null() {
-            String::new()
-        } else {
-            let ret = CStr::from_ptr(msg as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            xml_free(msg as _);
-            ret
-        };
+        let mut msg = xml_schema_format_item_for_report(None, owner_item, None);
         writeln!(
             msg,
             ", {}: {message}.",
-            CStr::from_ptr(xml_schema_format_item_for_report(
-                addr_of_mut!(str),
-                None,
-                attruse as XmlSchemaBasicItemPtr,
-                None,
-            ) as *const i8)
-            .to_string_lossy()
+            xml_schema_format_item_for_report(None, attruse as XmlSchemaBasicItemPtr, None,)
         )
         .ok();
         FREE_AND_NULL!(str);
@@ -18828,43 +18826,31 @@ unsafe fn xml_schema_pillegal_facet_atomic_err(
     facet: XmlSchemaFacetPtr,
 ) {
     unsafe {
-        let mut des: *mut XmlChar = null_mut();
-        let mut str_t: *mut XmlChar = null_mut();
-
-        xml_schema_format_item_for_report(
-            addr_of_mut!(des),
+        let des = xml_schema_format_item_for_report(
             None,
             typ as XmlSchemaBasicItemPtr,
             (*typ).node.map(|node| node.into()),
         );
-        let d = CStr::from_ptr(des as *const i8).to_string_lossy();
         let facet_type = xml_schema_facet_type_to_string((*facet).typ);
-        let item = CStr::from_ptr(xml_schema_format_item_for_report(
-            addr_of_mut!(str_t),
-            None,
-            base_type as XmlSchemaBasicItemPtr,
-            None,
-        ) as *const i8)
-        .to_string_lossy();
+        let item =
+            xml_schema_format_item_for_report(None, base_type as XmlSchemaBasicItemPtr, None);
         xml_schema_perr_ext(
-        ctxt,
-        (*typ).node.map(|node| node.into()),
-        error,
-        None,
-        None,
-        None,
-        format!(
-            "{d}: The facet '{facet_type}' is not allowed on types derived from the type {item}.\n"
-        )
-        .as_str(),
-        Some(&d),
-        Some(facet_type),
-        Some(&item),
-        None,
-        None,
-    );
-        FREE_AND_NULL!(des);
-        FREE_AND_NULL!(str_t);
+            ctxt,
+            (*typ).node.map(|node| node.into()),
+            error,
+            None,
+            None,
+            None,
+            format!(
+                "{des}: The facet '{facet_type}' is not allowed on types derived from the type {item}.\n"
+            )
+            .as_str(),
+            Some(&des),
+            Some(facet_type),
+            Some(&item),
+            None,
+            None,
+        );
     }
 }
 
@@ -18877,25 +18863,20 @@ unsafe fn xml_schema_pillegal_facet_list_union_err(
     facet: XmlSchemaFacetPtr,
 ) {
     unsafe {
-        let mut des: *mut XmlChar = null_mut();
-
-        xml_schema_format_item_for_report(
-            addr_of_mut!(des),
+        let des = xml_schema_format_item_for_report(
             None,
             typ as XmlSchemaBasicItemPtr,
             (*typ).node.map(|node| node.into()),
         );
-        let d = CStr::from_ptr(des as *const i8).to_string_lossy();
         let facet_type = xml_schema_facet_type_to_string((*facet).typ);
         xml_schema_perr(
             ctxt,
             (*typ).node.map(|node| node.into()),
             error,
-            format!("{d}: The facet '{facet_type}' is not allowed.\n").as_str(),
-            Some(&d),
+            format!("{des}: The facet '{facet_type}' is not allowed.\n").as_str(),
+            Some(&des),
             Some(facet_type),
         );
-        FREE_AND_NULL!(des);
     }
 }
 
