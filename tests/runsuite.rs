@@ -45,7 +45,7 @@ use exml::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_init_types,
         xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
     },
-    tree::{xml_free_doc, XmlDocPtr, XmlNodePtr},
+    tree::{xml_free_doc, XmlGenericNodePtr, XmlNode},
     uri::build_uri,
     xpath::{
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,
@@ -216,7 +216,7 @@ unsafe fn initialize_libxml2() {
     );
     xml_init_parser();
     xml_set_external_entity_loader(test_external_entity_loader);
-    CTXT_XPATH.store(xml_xpath_new_context(null_mut()), Ordering::Relaxed);
+    CTXT_XPATH.store(xml_xpath_new_context(None), Ordering::Relaxed);
     // Deactivate the cache if created; otherwise we have to create/free it
     // for every test, since it will confuse the memory leak detection.
     // Note that normally this need not be done, since the cache is not
@@ -245,14 +245,15 @@ unsafe fn initialize_libxml2() {
     }
 }
 
-unsafe fn get_next(cur: XmlNodePtr, xpath: *const c_char) -> XmlNodePtr {
-    let mut ret: XmlNodePtr = null_mut();
-
-    if cur.is_null() || (*cur).doc.is_null() || xpath.is_null() {
+unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
+    if cur.is_null() || xpath.is_null() {
         return null_mut();
     }
-    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = (*cur).doc;
-    (*CTXT_XPATH.load(Ordering::Relaxed)).node = cur;
+    let Some(cur_doc) = (*cur).doc else {
+        return null_mut();
+    };
+    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
+    (*CTXT_XPATH.load(Ordering::Relaxed)).node = XmlGenericNodePtr::from_raw(cur);
     let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath as _);
     if comp.is_null() {
         eprintln!(
@@ -266,25 +267,29 @@ unsafe fn get_next(cur: XmlNodePtr, xpath: *const c_char) -> XmlNodePtr {
     if res.is_null() {
         return null_mut();
     }
+    let mut ret = None;
     if (*res).typ == XmlXPathObjectType::XPathNodeset {
         if let Some(nodeset) = (*res).nodesetval.as_deref() {
             if !nodeset.node_tab.is_empty() {
-                ret = nodeset.node_tab[0];
+                ret = Some(nodeset.node_tab[0]);
             }
         }
     }
     xml_xpath_free_object(res);
-    ret
+    ret.map_or(null_mut(), |node| node.as_ptr())
 }
 
-unsafe fn get_string(cur: XmlNodePtr, xpath: *const c_char) -> *mut XmlChar {
+unsafe fn get_string(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlChar {
     let mut ret: *mut XmlChar = null_mut();
 
-    if cur.is_null() || (*cur).doc.is_null() || xpath.is_null() {
+    if cur.is_null() || xpath.is_null() {
         return null_mut();
     }
-    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = (*cur).doc;
-    (*CTXT_XPATH.load(Ordering::Relaxed)).node = cur;
+    let Some(cur_doc) = (*cur).doc else {
+        return null_mut();
+    };
+    (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
+    (*CTXT_XPATH.load(Ordering::Relaxed)).node = XmlGenericNodePtr::from_raw(cur);
     let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath as _);
     if comp.is_null() {
         eprintln!(
@@ -308,7 +313,7 @@ unsafe fn get_string(cur: XmlNodePtr, xpath: *const c_char) -> *mut XmlChar {
     ret
 }
 
-unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
+unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
     let mut ret: c_int = 0;
 
     cur = get_next(cur, c"./incorrect[1]".as_ptr() as _);
@@ -316,7 +321,7 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: XmlNodePt
         return 0;
     }
 
-    let test: XmlNodePtr = get_next(cur, c"./*".as_ptr() as _);
+    let test: *mut XmlNode = get_next(cur, c"./*".as_ptr() as _);
     if test.is_null() {
         test_log!(
             logfile,
@@ -366,8 +371,8 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: XmlNodePt
     ret
 }
 
-unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
-    let mut test: XmlNodePtr;
+unsafe fn install_resources(mut tst: *mut XmlNode, base: *const XmlChar) {
+    let mut test: *mut XmlNode;
     let mut name: *mut XmlChar;
     let mut content: *mut XmlChar;
     let mut res: *mut XmlChar;
@@ -399,8 +404,8 @@ unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
     }
 }
 
-unsafe fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
-    let mut test: XmlNodePtr;
+unsafe fn install_dirs(tst: *mut XmlNode, base: *const XmlChar) {
+    let mut test: *mut XmlNode;
 
     let name: *mut XmlChar = get_string(tst, c"string(@name)".as_ptr() as _);
     if name.is_null() {
@@ -424,10 +429,9 @@ unsafe fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
     xml_free(res as _);
 }
 
-unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
-    let mut test: XmlNodePtr;
-    let mut tmp: XmlNodePtr;
-    let mut doc: XmlDocPtr;
+unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int {
+    let mut test: *mut XmlNode;
+    let mut tmp: *mut XmlNode;
     let mut ctxt: XmlRelaxNGValidCtxtPtr;
     let mut ret: c_int = 0;
     let mut mem: c_int;
@@ -446,7 +450,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
         install_resources(tmp, null_mut());
     }
 
-    let cur: XmlNodePtr = get_next(tst, c"./correct[1]".as_ptr() as _);
+    let cur: *mut XmlNode = get_next(tst, c"./correct[1]".as_ptr() as _);
     if cur.is_null() {
         return xsd_incorrect_test_case(logfile, tst);
     }
@@ -521,15 +525,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
             let buffer = buf.clone();
-            doc = xml_read_memory(buffer, Some("test"), None, 0);
-            if doc.is_null() {
-                test_log!(
-                    logfile,
-                    "Failed to parse valid instance line {}\n",
-                    (*tmp).get_line_no()
-                );
-                NB_ERRORS += 1;
-            } else {
+            if let Some(doc) = xml_read_memory(buffer, Some("test"), None, 0) {
                 NB_TESTS += 1;
                 ctxt = xml_relaxng_new_valid_ctxt(rng);
                 xml_relaxng_set_valid_errors(
@@ -560,6 +556,13 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
                     _ => {}
                 }
                 xml_free_doc(doc);
+            } else {
+                test_log!(
+                    logfile,
+                    "Failed to parse valid instance line {}\n",
+                    (*tmp).get_line_no()
+                );
+                NB_ERRORS += 1;
             }
             reset_last_error();
             if mem != xml_mem_used() && EXTRA_MEMORY_FROM_RESOLVER == 0 {
@@ -592,15 +595,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
             let buffer = buf.clone();
-            doc = xml_read_memory(buffer, Some("test"), None, 0);
-            if doc.is_null() {
-                test_log!(
-                    logfile,
-                    "Failed to parse valid instance line {}\n",
-                    (*tmp).get_line_no()
-                );
-                NB_ERRORS += 1;
-            } else {
+            if let Some(doc) = xml_read_memory(buffer, Some("test"), None, 0) {
                 NB_TESTS += 1;
                 ctxt = xml_relaxng_new_valid_ctxt(rng);
                 xml_relaxng_set_valid_errors(
@@ -631,6 +626,13 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
                     _ => {}
                 }
                 xml_free_doc(doc);
+            } else {
+                test_log!(
+                    logfile,
+                    "Failed to parse valid instance line {}\n",
+                    (*tmp).get_line_no()
+                );
+                NB_ERRORS += 1;
             }
             reset_last_error();
             if mem != xml_mem_used() && EXTRA_MEMORY_FROM_RESOLVER == 0 {
@@ -663,7 +665,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
     ret
 }
 
-unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
+unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
     if VERBOSE != 0 {
         let doc: *mut XmlChar = get_string(cur, c"string(documentation)".as_ptr() as _);
 
@@ -682,35 +684,31 @@ unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_i
 }
 
 unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
-    let mut cur: XmlNodePtr;
     let filename = "test/xsdtest/xsdtestsuite.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
-    if doc.is_null() {
+    let Some(doc) = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _) else {
         eprintln!("Failed to parse {}", filename);
         return -1;
-    }
+    };
     println!("## XML Schemas datatypes test suite from James Clark");
     test_log!(logfile, "filename: {}\n", filename);
 
-    cur = (*doc).get_root_element();
-    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
+    let Some(cur) = doc
+        .get_root_element()
+        .filter(|cur| xml_str_equal(cur.name, c"testSuite".as_ptr() as _))
+    else {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
-        if !doc.is_null() {
-            xml_free_doc(doc);
-        }
+        xml_free_doc(doc);
         return ret;
-    }
+    };
 
-    cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
+    let mut cur = get_next(cur.into(), c"./testSuite[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
-        if !doc.is_null() {
-            xml_free_doc(doc);
-        }
+        xml_free_doc(doc);
         return ret;
     }
     while !cur.is_null() {
@@ -718,13 +716,11 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
         cur = get_next(cur, c"following-sibling::testSuite[1]".as_ptr() as _);
     }
 
-    if !doc.is_null() {
-        xml_free_doc(doc);
-    }
+    xml_free_doc(doc);
     ret
 }
 
-unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
+unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
     if VERBOSE != 0 {
         let mut doc: *mut XmlChar = get_string(cur, c"string(documentation)".as_ptr() as _);
 
@@ -749,35 +745,31 @@ unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_i
 }
 
 unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
-    let mut cur: XmlNodePtr;
     let filename = "test/relaxng/OASIS/spectest.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
-    if doc.is_null() {
+    let Some(doc) = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _) else {
         eprintln!("Failed to parse {}", filename);
         return -1;
-    }
+    };
     println!("## Relax NG test suite from James Clark");
     test_log!(logfile, "filename: {}\n", filename);
 
-    cur = (*doc).get_root_element();
-    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
+    let Some(cur) = doc
+        .get_root_element()
+        .filter(|cur| xml_str_equal(cur.name, c"testSuite".as_ptr() as _))
+    else {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
-        if !doc.is_null() {
-            xml_free_doc(doc);
-        }
+        xml_free_doc(doc);
         return ret;
-    }
+    };
 
-    cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
+    let mut cur = get_next(cur.into(), c"./testSuite[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
-        if !doc.is_null() {
-            xml_free_doc(doc);
-        }
+        xml_free_doc(doc);
         return ret;
     }
     while !cur.is_null() {
@@ -785,42 +777,36 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
         cur = get_next(cur, c"following-sibling::testSuite[1]".as_ptr() as _);
     }
 
-    if !doc.is_null() {
-        xml_free_doc(doc);
-    }
+    xml_free_doc(doc);
     ret
 }
 
 unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
-    let mut cur: XmlNodePtr;
     let filename = "test/relaxng/testsuite.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
-    if doc.is_null() {
+    let Some(doc) = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _) else {
         eprintln!("Failed to parse {}", filename);
         return -1;
-    }
+    };
     println!("## Relax NG test suite for libxml2");
     test_log!(logfile, "filename: {}\n", filename);
 
-    cur = (*doc).get_root_element();
-    if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
+    let Some(cur) = doc
+        .get_root_element()
+        .filter(|cur| xml_str_equal(cur.name, c"testSuite".as_ptr() as _))
+    else {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
-        if !doc.is_null() {
-            xml_free_doc(doc);
-        }
+        xml_free_doc(doc);
         return ret;
-    }
+    };
 
-    cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
+    let mut cur = get_next(cur.into(), c"./testSuite[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
         eprintln!("Unexpected format {}", filename);
         ret = -1;
-        if !doc.is_null() {
-            xml_free_doc(doc);
-        }
+        xml_free_doc(doc);
         return ret;
     }
     while !cur.is_null() {
@@ -828,22 +814,19 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
         cur = get_next(cur, c"following-sibling::testSuite[1]".as_ptr() as _);
     }
 
-    if !doc.is_null() {
-        xml_free_doc(doc);
-    }
+    xml_free_doc(doc);
     ret
 }
 
 unsafe fn xstc_test_instance(
     logfile: &mut Option<File>,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
     schemas: XmlSchemaPtr,
     spath: *const XmlChar,
     base: *const c_char,
 ) -> c_int {
     let mut validity: *mut XmlChar = null_mut();
     let mut ctxt: XmlSchemaValidCtxtPtr = null_mut();
-    let mut doc: XmlDocPtr = null_mut();
     let mut ret: c_int;
 
     reset_last_error();
@@ -886,13 +869,8 @@ unsafe fn xstc_test_instance(
                 // goto done;
             } else {
                 NB_TESTS += 1;
-                doc = xml_read_file(&path, None, XmlParserOption::XmlParseNoEnt as i32);
-                if doc.is_null() {
-                    eprintln!("instance {} fails to parse", path);
-                    ret = -1;
-                    NB_ERRORS += 1;
-                    // goto done;
-                } else {
+                if let Some(doc) = xml_read_file(&path, None, XmlParserOption::XmlParseNoEnt as i32)
+                {
                     ctxt = xml_schema_new_valid_ctxt(schemas);
                     xml_schema_set_valid_errors(
                         ctxt,
@@ -945,6 +923,12 @@ unsafe fn xstc_test_instance(
                         ret = -1;
                         // goto done;
                     }
+                    xml_free_doc(doc);
+                } else {
+                    eprintln!("instance {} fails to parse", path);
+                    ret = -1;
+                    NB_ERRORS += 1;
+                    // goto done;
                 }
             }
         }
@@ -967,9 +951,6 @@ unsafe fn xstc_test_instance(
     if !ctxt.is_null() {
         xml_schema_free_valid_ctxt(ctxt);
     }
-    if !doc.is_null() {
-        xml_free_doc(doc);
-    }
     reset_last_error();
     if mem != xml_mem_used() {
         test_log!(
@@ -985,14 +966,14 @@ unsafe fn xstc_test_instance(
 
 unsafe fn xstc_test_group(
     logfile: &mut Option<File>,
-    cur: XmlNodePtr,
+    cur: *mut XmlNode,
     base: *const c_char,
 ) -> c_int {
     let mut p = None::<String>;
     let mut validity: *mut XmlChar = null_mut();
     let mut schemas: XmlSchemaPtr = null_mut();
     let ctxt: XmlSchemaParserCtxtPtr;
-    let mut instance: XmlNodePtr;
+    let mut instance: *mut XmlNode;
     let mut ret: c_int = 0;
 
     reset_last_error();
@@ -1165,27 +1146,25 @@ unsafe fn xstc_test_group(
 }
 
 unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const c_char) -> c_int {
-    let mut cur: XmlNodePtr;
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(metadata, None, XmlParserOption::XmlParseNoEnt as _);
-    if doc.is_null() {
+    let Some(doc) = xml_read_file(metadata, None, XmlParserOption::XmlParseNoEnt as _) else {
         eprintln!("Failed to parse {metadata}");
         return -1;
-    }
+    };
 
-    cur = (*doc).get_root_element();
-    if cur.is_null() || !xml_str_equal((*cur).name, c"testSet".as_ptr() as _) {
+    let Some(cur) = doc
+        .get_root_element()
+        .filter(|cur| xml_str_equal(cur.name, c"testSet".as_ptr() as _))
+    else {
         eprintln!("Unexpected format {metadata}");
         return -1;
-    }
-    let contributor = (*cur)
-        .get_prop("contributor")
-        .unwrap_or("Unknown".to_owned());
+    };
+    let contributor = cur.get_prop("contributor").unwrap_or("Unknown".to_owned());
     let name = (*cur).get_prop("name").unwrap_or("Unknown".to_owned());
     println!("## {contributor} test suite for Schemas version {name}");
 
-    cur = get_next(cur, c"./ts:testGroup[1]".as_ptr() as _);
+    let mut cur = get_next(cur.into(), c"./ts:testGroup[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testGroup".as_ptr() as _) {
         eprintln!("Unexpected format {metadata}");
         ret = -1;

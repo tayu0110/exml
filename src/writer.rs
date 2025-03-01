@@ -113,7 +113,7 @@ pub struct XmlTextWriter<'a> {
     qchar: u8,
     ctxt: XmlParserCtxtPtr,
     no_doc_free: i32,
-    doc: XmlDocPtr,
+    doc: Option<XmlDocPtr>,
 }
 
 impl<'a> XmlTextWriter<'a> {
@@ -217,7 +217,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterDoc")]
-    pub unsafe fn with_doc(doc: *mut XmlDocPtr, compression: i32) -> Option<Self> {
+    pub unsafe fn with_doc(doc: Option<&mut Option<XmlDocPtr>>, compression: i32) -> Option<Self> {
         let mut sax_handler = XmlSAXHandler::default();
         xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
         sax_handler.start_document = Some(xml_text_writer_start_document_callback);
@@ -238,7 +238,7 @@ impl<'a> XmlTextWriter<'a> {
         (*ctxt).dict_names = 0;
 
         (*ctxt).my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
-        if (*ctxt).my_doc.is_null() {
+        let Some(mut my_doc) = (*ctxt).my_doc else {
             xml_free_parser_ctxt(ctxt);
             xml_writer_err_msg(
                 None,
@@ -246,10 +246,10 @@ impl<'a> XmlTextWriter<'a> {
                 "xmlNewTextWriterDoc : error at xmlNewDoc!\n",
             );
             return None;
-        }
+        };
 
         let Some(mut ret) = XmlTextWriter::from_push_parser(ctxt, compression) else {
-            xml_free_doc((*ctxt).my_doc);
+            xml_free_doc(my_doc);
             xml_free_parser_ctxt(ctxt);
             xml_writer_err_msg(
                 None,
@@ -259,10 +259,10 @@ impl<'a> XmlTextWriter<'a> {
             return None;
         };
 
-        (*(*ctxt).my_doc).set_compress_mode(compression);
+        my_doc.set_compress_mode(compression);
 
-        if !doc.is_null() {
-            *doc = (*ctxt).my_doc;
+        if let Some(doc) = doc {
+            *doc = Some(my_doc);
             ret.no_doc_free = 1;
         }
 
@@ -273,16 +273,11 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterTree")]
-    pub unsafe fn with_tree(doc: XmlDocPtr, node: XmlNodePtr, compression: i32) -> Option<Self> {
-        if doc.is_null() {
-            xml_writer_err_msg(
-                None,
-                XmlParserErrors::XmlErrInternalError,
-                "xmlNewTextWriterTree : invalid document tree!\n",
-            );
-            return None;
-        }
-
+    pub unsafe fn with_tree(
+        mut doc: XmlDocPtr,
+        node: XmlNodePtr,
+        compression: i32,
+    ) -> Option<Self> {
         let mut sax_handler = XmlSAXHandler::default();
         xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
         sax_handler.start_document = Some(xml_text_writer_start_document_callback);
@@ -312,11 +307,11 @@ impl<'a> XmlTextWriter<'a> {
             return None;
         };
 
-        (*ctxt).my_doc = doc;
-        (*ctxt).node = node;
+        (*ctxt).my_doc = Some(doc);
+        (*ctxt).node = Some(node);
         ret.no_doc_free = 1;
 
-        (*doc).set_compress_mode(compression);
+        doc.set_compress_mode(compression);
 
         Some(ret)
     }
@@ -439,7 +434,7 @@ impl<'a> XmlTextWriter<'a> {
             match lk.state.get() {
                 XmlTextWriterState::XmlTextwriterName | XmlTextWriterState::XmlTextwriterText => {
                     let content = xml_strndup(content.as_ptr(), content.len() as i32);
-                    let buf = xml_encode_special_chars(null_mut(), content);
+                    let buf = xml_encode_special_chars(None, content);
                     if !buf.is_null() {
                         sum += self.write_bytes(CStr::from_ptr(buf as *const i8).to_bytes())?;
                         if buf != content {
@@ -556,9 +551,9 @@ impl<'a> XmlTextWriter<'a> {
                 self.out.conv = XmlBufRef::with_capacity(4000);
             }
             self.out.encode(true);
-            if !self.doc.is_null() && (*self.doc).encoding.is_none() {
+            if let Some(mut doc) = self.doc.filter(|doc| doc.encoding.is_none()) {
                 let encoder = self.out.encoder.as_ref().unwrap().borrow();
-                (*self.doc).encoding = Some(encoder.name().to_owned());
+                doc.encoding = Some(encoder.name().to_owned());
             }
         } else {
             self.out.conv = None;
@@ -1917,7 +1912,7 @@ impl Default for XmlTextWriter<'_> {
             qchar: b'"',
             ctxt: null_mut(),
             no_doc_free: 0,
-            doc: null_mut(),
+            doc: None,
         }
     }
 }
@@ -1930,15 +1925,14 @@ impl Drop for XmlTextWriter<'_> {
 
         unsafe {
             if !self.ctxt.is_null() {
-                if !(*self.ctxt).my_doc.is_null() && self.no_doc_free == 0 {
-                    xml_free_doc((*self.ctxt).my_doc);
-                    (*self.ctxt).my_doc = null_mut();
+                if let Some(my_doc) = (*self.ctxt).my_doc.take_if(|_| self.no_doc_free == 0) {
+                    xml_free_doc(my_doc);
                 }
                 xml_free_parser_ctxt(self.ctxt);
             }
 
-            if !self.doc.is_null() {
-                xml_free_doc(self.doc);
+            if let Some(doc) = self.doc.take() {
+                xml_free_doc(doc);
             }
         }
     }
@@ -1953,7 +1947,7 @@ unsafe fn xml_writer_err_msg(ctxt: Option<&XmlTextWriter>, error: XmlParserError
             None,
             None,
             ctxt.ctxt as _,
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromWriter,
             error,
             XmlErrorLevel::XmlErrFatal,
@@ -1972,7 +1966,7 @@ unsafe fn xml_writer_err_msg(ctxt: Option<&XmlTextWriter>, error: XmlParserError
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromWriter,
             error,
             XmlErrorLevel::XmlErrFatal,
@@ -2002,7 +1996,7 @@ macro_rules! xml_writer_err_msg_int {
             } else {
                 null_mut()
             },
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromWriter,
             $error,
             XmlErrorLevel::XmlErrFatal,
@@ -2104,15 +2098,14 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
-    let mut doc: XmlDocPtr;
 
     if (*ctxt).html != 0 {
         #[cfg(feature = "html")]
         {
-            if (*ctxt).my_doc.is_null() {
+            if (*ctxt).my_doc.is_none() {
                 (*ctxt).my_doc = html_new_doc_no_dtd(null_mut(), null_mut());
             }
-            if (*ctxt).my_doc.is_null() {
+            if (*ctxt).my_doc.is_none() {
                 if let Some(error) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.error) {
                     error(
                         (*ctxt).user_data.clone(),
@@ -2130,23 +2123,22 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
             xml_writer_err_msg(
                 None,
                 XmlParserErrors::XmlErrInternalError,
-                c"libxml2 built without HTML support\n".as_ptr() as _,
+                "libxml2 built without HTML support\n",
             );
-            (*ctxt).errNo = XmlParserErrors::XmlErrInternalError as i32;
+            (*ctxt).err_no = XmlParserErrors::XmlErrInternalError as i32;
             (*ctxt).instate = XmlParserInputState::XmlParserEOF;
-            (*ctxt).disableSAX = 1;
+            (*ctxt).disable_sax = 1;
             return;
         }
     } else {
-        doc = (*ctxt).my_doc;
-        if doc.is_null() {
-            doc = xml_new_doc((*ctxt).version.as_deref());
-            (*ctxt).my_doc = doc;
-        }
-        if !doc.is_null() {
-            if (*doc).children.is_none() {
-                (*doc).encoding = (*ctxt).encoding().map(|e| e.to_owned());
-                (*doc).standalone = (*ctxt).standalone;
+        let doc = (*ctxt).my_doc.or_else(|| {
+            (*ctxt).my_doc = xml_new_doc((*ctxt).version.as_deref());
+            (*ctxt).my_doc
+        });
+        if let Some(mut doc) = doc {
+            if doc.children.is_none() {
+                doc.encoding = (*ctxt).encoding().map(|e| e.to_owned());
+                doc.standalone = (*ctxt).standalone;
             }
         } else {
             if let Some(error) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.error) {
@@ -2161,15 +2153,13 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
             return;
         }
     }
-    if !(*ctxt).my_doc.is_null()
-        && (*(*ctxt).my_doc).url.is_none()
-        && !(*ctxt).input.is_null()
-        && (*(*ctxt).input).filename.is_some()
-    {
-        let url = canonic_path((*(*ctxt).input).filename.as_deref().unwrap());
-        (*(*ctxt).my_doc).url = Some(url.into_owned());
-        if (*(*ctxt).my_doc).url.is_none() {
-            (*(*ctxt).my_doc).url = (*(*ctxt).input).filename.clone()
+    if !(*ctxt).input.is_null() && (*(*ctxt).input).filename.is_some() {
+        if let Some(mut my_doc) = (*ctxt).my_doc.filter(|doc| doc.url.is_none()) {
+            let url = canonic_path((*(*ctxt).input).filename.as_deref().unwrap());
+            my_doc.url = Some(url.into_owned());
+            if my_doc.url.is_none() {
+                my_doc.url = (*(*ctxt).input).filename.clone()
+            }
         }
     }
 }

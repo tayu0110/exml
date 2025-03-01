@@ -20,15 +20,14 @@
 // daniel@veillard.com
 
 use std::{
-    ffi::CStr,
     os::raw::c_void,
     ptr::null_mut,
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use crate::tree::{XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr};
+use crate::tree::{XmlDocPtr, XmlElementType, XmlNodePtr};
 
-use super::xmlstring::{xml_str_equal, XmlChar};
+use super::xmlstring::XmlChar;
 
 // Various defines for the various Link properties.
 //
@@ -72,11 +71,11 @@ pub enum XlinkActuate {
 /// This is the prototype for the link detection routine.
 /// It calls the default link detection callbacks upon link detection.
 #[doc(alias = "xlinkNodeDetectFunc")]
-pub type XlinkNodeDetectFunc = unsafe extern "C" fn(ctx: *mut c_void, node: XmlNodePtr);
+pub type XlinkNodeDetectFunc = unsafe fn(ctx: *mut c_void, node: XmlNodePtr);
 
 /// This is the prototype for a simple link detection callback.
 #[doc(alias = "xlinkSimpleLinkFunk")]
-pub type XlinkSimpleLinkFunk = unsafe extern "C" fn(
+pub type XlinkSimpleLinkFunk = unsafe fn(
     ctx: *mut c_void,
     node: XmlNodePtr,
     href: *const XmlChar,
@@ -86,7 +85,7 @@ pub type XlinkSimpleLinkFunk = unsafe extern "C" fn(
 
 /// This is the prototype for a extended link detection callback.
 #[doc(alias = "xlinkExtendedLinkFunk")]
-pub type XlinkExtendedLinkFunk = unsafe extern "C" fn(
+pub type XlinkExtendedLinkFunk = unsafe fn(
     ctx: *mut c_void,
     node: XmlNodePtr,
     nbLocators: i32,
@@ -104,7 +103,7 @@ pub type XlinkExtendedLinkFunk = unsafe extern "C" fn(
 
 /// This is the prototype for a extended link set detection callback.
 #[doc(alias = "xlinkExtendedLinkSetFunk")]
-pub type XlinkExtendedLinkSetFunk = unsafe extern "C" fn(
+pub type XlinkExtendedLinkSetFunk = unsafe fn(
     ctx: *mut c_void,
     node: XmlNodePtr,
     nbLocators: i32,
@@ -134,13 +133,13 @@ static mut XLINK_DEFAULT_DETECT: Option<XlinkNodeDetectFunc> = None;
 ///
 /// Returns the current function or NULL;
 #[doc(alias = "xlinkGetDefaultDetect")]
-pub unsafe extern "C" fn xlink_get_default_detect() -> Option<XlinkNodeDetectFunc> {
+pub unsafe fn xlink_get_default_detect() -> Option<XlinkNodeDetectFunc> {
     XLINK_DEFAULT_DETECT
 }
 
 /// Set the default xlink detection routine
 #[doc(alias = "xlinkSetDefaultDetect")]
-pub unsafe extern "C" fn xlink_set_default_detect(func: Option<XlinkNodeDetectFunc>) {
+pub unsafe fn xlink_set_default_detect(func: Option<XlinkNodeDetectFunc>) {
     XLINK_DEFAULT_DETECT = func;
 }
 
@@ -148,18 +147,18 @@ pub unsafe extern "C" fn xlink_set_default_detect(func: Option<XlinkNodeDetectFu
 ///
 /// Returns the current xlinkHandlerPtr value.
 #[doc(alias = "xlinkGetDefaultHandler")]
-pub unsafe extern "C" fn xlink_get_default_handler() -> XlinkHandlerPtr {
+pub unsafe fn xlink_get_default_handler() -> XlinkHandlerPtr {
     XLINK_DEFAULT_HANDLER.load(Ordering::Acquire)
 }
 
 /// Set the default xlink handlers
 #[doc(alias = "xlinkSetDefaultHandler")]
-pub unsafe extern "C" fn xlink_set_default_handler(handler: XlinkHandlerPtr) {
+pub unsafe fn xlink_set_default_handler(handler: XlinkHandlerPtr) {
     XLINK_DEFAULT_HANDLER.store(handler, Ordering::Release);
 }
 
 const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink/namespace/";
-const XHTML_NAMESPACE: &CStr = c"http://www.w3.org/1999/xhtml/";
+const XHTML_NAMESPACE: &str = "http://www.w3.org/1999/xhtml/";
 
 /// Check whether the given node carries the attributes needed
 /// to be a link element (or is one of the linking elements issued
@@ -169,19 +168,15 @@ const XHTML_NAMESPACE: &CStr = c"http://www.w3.org/1999/xhtml/";
 ///
 /// Returns the xlinkType of the node (XLINK_TYPE_NONE if there is no link detected.
 #[doc(alias = "xlinkIsLink")]
-pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> XlinkType {
+pub unsafe fn xlink_is_link(doc: Option<XmlDocPtr>, mut node: XmlNodePtr) -> XlinkType {
     let mut ret: XlinkType = XlinkType::XlinkTypeNone;
 
-    if node.is_null() {
-        return XlinkType::XlinkTypeNone;
-    }
-    if doc.is_null() {
-        doc = (*node).doc;
-    }
-    if !doc.is_null() && (*doc).typ == XmlElementType::XmlHTMLDocumentNode {
+    let doc = doc.or(node.doc);
+    if let Some(_doc) = doc.filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode) {
         // This is an HTML document.
-    } else if !(*node).ns.is_null()
-        && xml_str_equal((*(*node).ns).href, XHTML_NAMESPACE.as_ptr() as _)
+    } else if node
+        .ns
+        .map_or(false, |ns| ns.href().as_deref() == Some(XHTML_NAMESPACE))
     {
         // !!!! We really need an IS_XHTML_ELEMENT function from HTMLtree.h @@@
         // This is an XHTML element within an XML document
@@ -190,20 +185,19 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
     }
 
     // We don't prevent a-priori having XML Linking constructs on XHTML elements
-    if let Some(typ) = (*node).get_ns_prop("type", Some(XLINK_NAMESPACE)) {
+    if let Some(typ) = node.get_ns_prop("type", Some(XLINK_NAMESPACE)) {
         if typ == "simple" {
             ret = XlinkType::XlinkTypeSimple;
         } else if typ == "extended" {
-            if let Some(role) = (*node).get_ns_prop("role", Some(XLINK_NAMESPACE)) {
-                let xlink: XmlNsPtr = (*node).search_ns(doc, Some(XLINK_NAMESPACE));
-                if xlink.is_null() {
-                    /* Humm, fallback method */
-                    if role == "xlink:external-linkset" {
+            if let Some(role) = node.get_ns_prop("role", Some(XLINK_NAMESPACE)) {
+                if let Some(xlink) = node.search_ns(doc, Some(XLINK_NAMESPACE)) {
+                    let buf = format!("{}:external-linkset", (*xlink).prefix().unwrap());
+                    if role == buf {
                         // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 } else {
-                    let buf = format!("{}:external-linkset", (*xlink).prefix().unwrap());
-                    if role == buf {
+                    // Humm, fallback method
+                    if role == "xlink:external-linkset" {
                         // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 }

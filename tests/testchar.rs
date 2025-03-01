@@ -14,7 +14,7 @@ use std::{
 use exml::{
     encoding::XmlCharEncoding,
     error::{XmlError, XmlParserErrors},
-    globals::{get_last_error, set_structured_error, GenericErrorContext},
+    globals::{set_structured_error, GenericErrorContext},
     io::XmlParserInputBuffer,
     libxml::{
         globals::{xml_free, xml_malloc},
@@ -26,7 +26,7 @@ use exml::{
         xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt, xml_read_memory,
         XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{xml_free_doc, NodeCommon, XmlDocPtr},
+    tree::{xml_free_doc, NodeCommon, XmlNodePtr},
 };
 use libc::{memset, strlen};
 
@@ -87,29 +87,29 @@ unsafe fn test_document_range_byte1(
 
         if i as i32 == forbid1 || i as i32 == forbid2 {
             assert!(
-                !last_error.is_ok() && res.is_null(),
+                !last_error.is_ok() && res.is_none(),
                 "Failed to detect invalid char for Byte 0x{i:02X}: {}",
                 i as char
             );
         } else if i == b'<' || i == b'&' {
             assert!(
-                !last_error.is_ok() && res.is_null(),
+                !last_error.is_ok() && res.is_none(),
                 "Failed to detect illegal char {} for Byte 0x{i:02X}",
                 i as char
             );
         } else if !(0x20..0x80).contains(&i) && i != 0x9 && i != 0xA && i != 0xD {
             assert!(
-                *last_error == XmlParserErrors::XmlErrInvalidChar || res.is_null(),
+                *last_error == XmlParserErrors::XmlErrInvalidChar || res.is_none(),
                 "Failed to detect invalid char for Byte 0x{i:02X}"
             );
         } else {
             assert!(
-                !res.is_null(),
+                res.is_some(),
                 "Failed to parse valid char for Byte 0x{i:02X} : {}",
                 i as char
             );
         }
-        if !res.is_null() {
+        if let Some(res) = res {
             xml_free_doc(res);
         }
     }
@@ -138,38 +138,38 @@ unsafe fn test_document_range_byte2(
             if i & 0x80 != 0 && i & 0x40 == 0 {
                 // if first bit of first c_char is set, then second bit must too
                 assert!(
-                    !last_error.is_ok() && res.is_null(),
+                    !last_error.is_ok() && res.is_none(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 );
             } else if i & 0x80 != 0 && j & 0xC0 != 0x80 {
                 // if first bit of first c_char is set, then second c_char first
                 // bits must be 10
                 assert!(
-                    !last_error.is_ok() && res.is_null(),
+                    !last_error.is_ok() && res.is_none(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 );
             } else if i & 0x80 != 0 && i & 0x1E == 0 {
                 // if using a 2 byte encoding then the value must be greater
                 // than 0x80, i.e. one of bits 5 to 1 of i must be set
                 assert!(
-                    !last_error.is_ok() && res.is_null(),
+                    !last_error.is_ok() && res.is_none(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 )
             } else if i & 0xE0 == 0xE0 {
                 // if third bit of first c_char is set, then the sequence would need
                 // at least 3 bytes, but we give only 2 !
                 assert!(
-                    !last_error.is_ok() && res.is_null(),
+                    !last_error.is_ok() && res.is_none(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 );
             } else {
                 // We should see no error in remaining cases
                 assert!(
-                    last_error.is_ok() && !res.is_null(),
+                    last_error.is_ok() && res.is_some(),
                     "Failed to parse document for Bytes 0x{i:02X} 0x{j:02X}"
                 );
             }
-            if !res.is_null() {
+            if let Some(res) = res {
                 xml_free_doc(res);
             }
         }
@@ -677,17 +677,17 @@ unsafe fn test_user_encoding() -> c_int {
     }
 
     let buffer = from_raw_parts(buf, 2 * total_size as usize).to_vec();
-    let doc: XmlDocPtr = xml_read_memory(buffer, None, Some("UTF-16LE"), 0);
-    if doc.is_null() {
-        let error = get_last_error();
-        eprintln!("error: {error:?}");
+    let Some(doc) = xml_read_memory(buffer, None, Some("UTF-16LE"), 0) else {
+        // let error = get_last_error();
+        // eprintln!("error: {error:?}");
         // goto error;
-        xml_free_doc(doc);
         xml_free(buf as _);
         panic!("failed to parse document");
-    }
+    };
 
-    let text: *mut XmlChar = (*doc).children().unwrap().children().unwrap().content;
+    let text: *mut XmlChar = XmlNodePtr::try_from(doc.children().unwrap().children().unwrap())
+        .unwrap()
+        .content;
     eprintln!(
         "text: {}",
         std::str::from_utf8_unchecked(std::slice::from_raw_parts(text, text_size as usize))

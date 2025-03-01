@@ -48,9 +48,9 @@ use crate::{
         valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
     },
     tree::{
-        is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributePtr,
-        XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlEntityPtr, XmlNodePtr, XmlNotation,
-        XmlNsPtr, XML_LOCAL_NAMESPACE,
+        is_xhtml, xml_dump_entity_decl, NodeCommon, XmlAttrPtr, XmlAttributePtr, XmlDocPtr,
+        XmlDtdPtr, XmlElementPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr, XmlNodePtr,
+        XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -103,11 +103,7 @@ impl<'a> XmlSaveCtxt<'a> {
             ret.handler = find_encoding_handler(enc).map(|e| Rc::new(RefCell::new(e)));
             if ret.handler.is_none() {
                 unsafe {
-                    xml_save_err(
-                        XmlParserErrors::XmlSaveUnknownEncoding,
-                        null_mut(),
-                        encoding,
-                    );
+                    xml_save_err(XmlParserErrors::XmlSaveUnknownEncoding, None, encoding);
                 }
                 return None;
             }
@@ -201,7 +197,7 @@ impl<'a> XmlSaveCtxt<'a> {
             if buf.encoder.is_none() {
                 xml_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding,
-                    null_mut(),
+                    None,
                     Some(encoding),
                 );
                 return -1;
@@ -269,9 +265,6 @@ impl<'a> XmlSaveCtxt<'a> {
     pub unsafe fn save_doc(&mut self, doc: XmlDocPtr) -> i64 {
         let ret: i64 = 0;
 
-        if doc.is_null() {
-            return -1;
-        }
         if self.doc_content_dump_output(doc) < 0 {
             return -1;
         }
@@ -284,21 +277,19 @@ impl<'a> XmlSaveCtxt<'a> {
     ///
     /// Returns the number of byte written or -1 in case of error
     #[doc(alias = "xmlSaveTree")]
-    pub unsafe fn save_tree(&mut self, node: XmlNodePtr) -> i64 {
+    pub unsafe fn save_tree(&mut self, node: XmlGenericNodePtr) -> i64 {
         let ret: i64 = 0;
 
-        if node.is_null() {
-            return -1;
-        }
         #[cfg(feature = "html")]
         {
             if self.options & XmlSaveOption::XmlSaveXHTML as i32 != 0 {
                 xhtml_node_dump_output(self, node);
                 return ret;
             }
-            if (!matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-                && !(*node).doc.is_null()
-                && matches!((*(*node).doc).typ, XmlElementType::XmlHTMLDocumentNode)
+            if (!matches!(node.element_type(), XmlElementType::XmlNamespaceDecl)
+                && node.document().map_or(false, |doc| {
+                    matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode)
+                })
                 && self.options & XmlSaveOption::XmlSaveAsXML as i32 == 0)
                 || self.options & XmlSaveOption::XmlSaveAsHTML as i32 != 0
             {
@@ -329,12 +320,10 @@ impl<'a> XmlSaveCtxt<'a> {
 
     /// Dump an XML document.
     #[doc(alias = "xmlDocContentDumpOutput")]
-    pub(crate) unsafe fn doc_content_dump_output(&mut self, cur: XmlDocPtr) -> i32 {
-        #[cfg(feature = "html")]
-        let dtd: XmlDtdPtr;
+    pub(crate) unsafe fn doc_content_dump_output(&mut self, mut cur: XmlDocPtr) -> i32 {
         #[cfg(feature = "html")]
         let mut is_html = false;
-        let oldenc = (*cur).encoding.clone();
+        let oldenc = cur.encoding.clone();
         let oldctxtenc = self.encoding.clone();
         let oldescape = self.escape;
         let oldescape_attr = self.escape_attr;
@@ -343,7 +332,7 @@ impl<'a> XmlSaveCtxt<'a> {
         xml_init_parser();
 
         if !matches!(
-            (*cur).element_type(),
+            cur.element_type(),
             XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode
         ) {
             return -1;
@@ -351,12 +340,12 @@ impl<'a> XmlSaveCtxt<'a> {
 
         let mut encoding = self.encoding.clone();
         if let Some(enc) = self.encoding.as_deref() {
-            (*cur).encoding = Some(enc.to_owned());
-        } else if let Some(enc) = (*cur).encoding.as_deref() {
+            cur.encoding = Some(enc.to_owned());
+        } else if let Some(enc) = cur.encoding.as_deref() {
             encoding = Some(enc.to_owned());
         }
 
-        if (matches!((*cur).element_type(), XmlElementType::XmlHTMLDocumentNode)
+        if (matches!(cur.element_type(), XmlElementType::XmlHTMLDocumentNode)
             && (self.options & XmlSaveOption::XmlSaveAsXML as i32) == 0
             && (self.options & XmlSaveOption::XmlSaveXHTML as i32) == 0)
             || self.options & XmlSaveOption::XmlSaveAsHTML as i32 != 0
@@ -378,26 +367,26 @@ impl<'a> XmlSaveCtxt<'a> {
                     && self.buf.borrow().conv.is_none())
                     && self.switch_encoding(encoding.as_deref().unwrap()) < 0
                 {
-                    (*cur).encoding = oldenc;
+                    cur.encoding = oldenc;
                     return -1;
                 }
                 if self.options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
                     html_doc_content_dump_format_output(
                         &mut self.buf.borrow_mut(),
-                        cur,
+                        Some(cur),
                         encoding.as_deref(),
                         1,
                     );
                 } else {
                     html_doc_content_dump_format_output(
                         &mut self.buf.borrow_mut(),
-                        cur,
+                        Some(cur),
                         encoding.as_deref(),
                         0,
                     );
                 }
                 if self.encoding.is_some() {
-                    (*cur).encoding = oldenc;
+                    cur.encoding = oldenc;
                 }
                 return 0;
             }
@@ -405,7 +394,7 @@ impl<'a> XmlSaveCtxt<'a> {
             {
                 return -1;
             }
-        } else if matches!((*cur).element_type(), XmlElementType::XmlDocumentNode)
+        } else if matches!(cur.element_type(), XmlElementType::XmlDocumentNode)
             || self.options & XmlSaveOption::XmlSaveAsXML as i32 != 0
             || self.options & XmlSaveOption::XmlSaveXHTML as i32 != 0
         {
@@ -430,7 +419,7 @@ impl<'a> XmlSaveCtxt<'a> {
                     // document since we output the XMLDecl the conversion
                     // must be done to not generate not well formed documents.
                     if self.switch_encoding(encoding.as_deref().unwrap()) < 0 {
-                        (*cur).encoding = oldenc;
+                        cur.encoding = oldenc;
                         return -1;
                     }
                     switched_encoding = 1;
@@ -446,7 +435,7 @@ impl<'a> XmlSaveCtxt<'a> {
             // Save the XML declaration
             if self.options & XmlSaveOption::XmlSaveNoDecl as i32 == 0 {
                 self.buf.borrow_mut().write_bytes(b"<?xml version=");
-                if let Some(version) = (*cur).version.as_deref() {
+                if let Some(version) = cur.version.as_deref() {
                     if let Some(mut buf) = self.buf.borrow().buffer {
                         let version = CString::new(version).unwrap();
                         buf.push_quoted_cstr(&version);
@@ -461,7 +450,7 @@ impl<'a> XmlSaveCtxt<'a> {
                         buf.push_quoted_cstr(enc.as_c_str());
                     }
                 }
-                match (*cur).standalone {
+                match cur.standalone {
                     0 => {
                         self.buf.borrow_mut().write_bytes(b" standalone=\"no\"");
                     }
@@ -479,29 +468,26 @@ impl<'a> XmlSaveCtxt<'a> {
                     is_html = true;
                 }
                 if self.options & XmlSaveOption::XmlSaveNoXHTML as i32 == 0 {
-                    dtd = (*cur).get_int_subset();
-                    if !dtd.is_null() {
-                        is_html =
-                            is_xhtml((*dtd).system_id.as_deref(), (*dtd).external_id.as_deref());
+                    let dtd = cur.get_int_subset();
+                    if let Some(dtd) = dtd {
+                        is_html = is_xhtml(dtd.system_id.as_deref(), dtd.external_id.as_deref());
                     }
                 }
             }
-            if let Some(children) = (*cur).children {
+            if let Some(children) = cur.children {
                 let mut child = Some(children);
 
                 while let Some(now) = child {
                     self.level = 0;
                     #[cfg(feature = "html")]
-                    {
-                        if is_html {
-                            xhtml_node_dump_output(self, now.as_ptr());
-                        } else {
-                            xml_node_dump_output_internal(self, now.as_ptr());
-                        }
+                    if is_html {
+                        xhtml_node_dump_output(self, now);
+                    } else {
+                        xml_node_dump_output_internal(self, now);
                     }
                     #[cfg(not(feature = "html"))]
                     {
-                        xml_node_dump_output_internal(self, now.as_ptr());
+                        xml_node_dump_output_internal(self, now);
                     }
                     if !matches!(
                         now.element_type(),
@@ -509,7 +495,7 @@ impl<'a> XmlSaveCtxt<'a> {
                     ) {
                         self.buf.borrow_mut().write_bytes(b"\n");
                     }
-                    child = now.next;
+                    child = now.next();
                 }
             }
         }
@@ -520,7 +506,7 @@ impl<'a> XmlSaveCtxt<'a> {
             self.escape = oldescape;
             self.escape_attr = oldescape_attr;
         }
-        (*cur).encoding = oldenc;
+        cur.encoding = oldenc;
         0
     }
 }
@@ -555,7 +541,11 @@ impl Drop for XmlSaveCtxt<'_> {
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErr")]
-pub(crate) unsafe fn xml_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&str>) {
+pub(crate) unsafe fn xml_save_err(
+    code: XmlParserErrors,
+    node: Option<XmlGenericNodePtr>,
+    extra: Option<&str>,
+) {
     let msg: Cow<'static, str> = match code {
         XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n".into(),
         XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n".into(),
@@ -571,7 +561,7 @@ pub(crate) unsafe fn xml_save_err(code: XmlParserErrors, node: XmlNodePtr, extra
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErrMemory")]
 pub(crate) unsafe fn xml_save_err_memory(extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, null_mut(), Some(extra));
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, None, Some(extra));
 }
 
 /// # Panics
@@ -637,13 +627,10 @@ unsafe fn xml_ns_dump_output(
     cur: XmlNsPtr,
     mut ctxt: Option<&mut XmlSaveCtxt>,
 ) {
-    if cur.is_null() {
-        return;
-    }
     if buf.is_none() && ctxt.is_none() {
         return;
     };
-    if matches!((*cur).element_type(), XML_LOCAL_NAMESPACE) && !(*cur).href.is_null() {
+    if matches!(cur.element_type(), XML_LOCAL_NAMESPACE) && !cur.href.is_null() {
         if (*cur).prefix().as_deref() == Some("xml") {
             return;
         }
@@ -659,7 +646,7 @@ unsafe fn xml_ns_dump_output(
 
         let write = |buf: &mut XmlOutputBuffer| {
             // Within the context of an element attributes
-            if let Some(prefix) = (*cur).prefix() {
+            if let Some(prefix) = cur.prefix() {
                 buf.write_bytes(b"xmlns:");
                 buf.write_str(&prefix);
             } else {
@@ -667,7 +654,7 @@ unsafe fn xml_ns_dump_output(
             }
             buf.write_bytes(b"=");
             if let Some(mut buf) = buf.buffer {
-                buf.push_quoted_cstr(CStr::from_ptr((*cur).href as *const i8));
+                buf.push_quoted_cstr(CStr::from_ptr(cur.href as *const i8));
             }
         };
         if let Some(buf) = buf {
@@ -709,20 +696,21 @@ unsafe fn xml_buf_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
 /// Dump a list of local namespace definitions to a save context.
 /// Should be called in the context of attribute dumps.
 #[doc(alias = "xmlNsListDumpOutputCtxt")]
-unsafe fn xml_ns_list_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, mut cur: XmlNsPtr) {
-    while !cur.is_null() {
-        xml_ns_dump_output(None, cur, Some(ctxt));
-        cur = (*cur).next;
+unsafe fn xml_ns_list_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, mut cur: Option<XmlNsPtr>) {
+    while let Some(now) = cur {
+        xml_ns_dump_output(None, now, Some(ctxt));
+        cur = now.next;
     }
 }
 
 /// Serialize the attribute in the buffer
 #[doc(alias = "xmlAttrSerializeContent")]
-unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: &XmlAttr) {
-    let mut children = attr.children;
+unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: XmlAttrPtr) {
+    let mut children = attr.children();
     while let Some(now) = children {
         match now.element_type() {
             XmlElementType::XmlTextNode => {
+                let now = XmlNodePtr::try_from(now).unwrap();
                 let mut out = vec![];
                 attr_serialize_text_content(
                     &mut out,
@@ -735,6 +723,7 @@ unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: &XmlAttr) 
                 buf.write_bytes(&out);
             }
             XmlElementType::XmlEntityRefNode => {
+                let now = XmlNodePtr::try_from(now).unwrap();
                 if let Some(mut buf) = buf.buffer {
                     buf.push_bytes(b"&");
                     buf.push_cstr(CStr::from_ptr(now.name as *const i8));
@@ -743,24 +732,22 @@ unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: &XmlAttr) 
             }
             _ => { /* should not happen unless we have a badly built tree */ }
         }
-        children = now.next;
+        children = now.next();
     }
 }
 
 /// Dump an XML attribute
 #[doc(alias = "xmlAttrDumpOutput")]
-unsafe fn xml_attr_dump_output(ctxt: &mut XmlSaveCtxt, cur: &XmlAttr) {
+unsafe fn xml_attr_dump_output(ctxt: &mut XmlSaveCtxt, cur: XmlAttrPtr) {
     if ctxt.format == 2 {
         ctxt.write_ws_non_sig(2);
     } else {
         ctxt.buf.borrow_mut().write_bytes(b" ");
     }
     let mut buf = ctxt.buf.borrow_mut();
-    if !cur.ns.is_null() {
-        if let Some(prefix) = (*cur.ns).prefix() {
-            buf.write_str(&prefix);
-            buf.write_bytes(b":");
-        }
+    if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
+        buf.write_str(&prefix);
+        buf.write_bytes(b":");
     }
 
     buf.write_str(&cur.name().unwrap());
@@ -771,51 +758,49 @@ unsafe fn xml_attr_dump_output(ctxt: &mut XmlSaveCtxt, cur: &XmlAttr) {
 
 /// Dump an XML node, recursive behaviour, children are printed too.
 #[doc(alias = "xmlNodeDumpOutputInternal")]
-pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut cur: XmlNodePtr) {
+pub(crate) unsafe fn xml_node_dump_output_internal(
+    ctxt: &mut XmlSaveCtxt,
+    mut cur: XmlGenericNodePtr,
+) {
     let format: i32 = ctxt.format;
-    let mut tmp: XmlNodePtr;
-
-    let mut unformatted_node: XmlNodePtr = null_mut();
-    let mut parent: XmlNodePtr;
-    let mut attr: XmlAttrPtr;
+    let mut unformatted_node = None;
     let mut start: *mut u8;
     let mut end: *mut u8;
 
-    if cur.is_null() {
-        return;
-    }
-
-    let root: XmlNodePtr = cur;
-    parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+    let root = cur;
+    let mut parent = cur.parent();
     loop {
-        match (*cur).element_type() {
+        match cur.element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                ctxt.doc_content_dump_output(cur as _);
+                let doc = XmlDocPtr::try_from(cur).unwrap();
+                ctxt.doc_content_dump_output(doc);
             }
             XmlElementType::XmlDTDNode => {
-                xml_dtd_dump_output(ctxt, cur as _);
+                let dtd = XmlDtdPtr::try_from(cur).unwrap();
+                xml_dtd_dump_output(ctxt, dtd);
             }
             XmlElementType::XmlDocumentFragNode => {
-                // Always validate (*cur).parent when descending.
-                if let Some(children) = (*cur)
-                    .children()
-                    .filter(|_| (*cur).parent() == NodePtr::from_ptr(parent))
-                {
-                    parent = cur;
-                    cur = children.as_ptr();
+                // Always validate cur.parent when descending.
+                if let Some(children) = cur.children().filter(|_| cur.parent() == parent) {
+                    parent = Some(cur);
+                    cur = children;
                     continue;
                 }
             }
             XmlElementType::XmlElementDecl => {
-                xml_buf_dump_element_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
+                let elem_decl = XmlElementPtr::try_from(cur).unwrap();
+                xml_buf_dump_element_decl(&mut *ctxt.buf.borrow_mut(), elem_decl);
             }
             XmlElementType::XmlAttributeDecl => {
-                xml_buf_dump_attribute_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
+                let attr_decl = XmlAttributePtr::try_from(cur).unwrap();
+                xml_buf_dump_attribute_decl(&mut *ctxt.buf.borrow_mut(), attr_decl);
             }
             XmlElementType::XmlEntityDecl => {
-                xml_buf_dump_entity_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
+                let ent = XmlEntityPtr::try_from(cur).unwrap();
+                xml_buf_dump_entity_decl(&mut *ctxt.buf.borrow_mut(), ent);
             }
             XmlElementType::XmlElementNode => {
+                let node = XmlNodePtr::try_from(cur).unwrap();
                 if cur != root && ctxt.format == 1 && get_indent_tree_output() != 0 {
                     let len = ctxt.indent_size
                         * if ctxt.level > ctxt.indent_nr as i32 {
@@ -828,44 +813,42 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
 
                 // Some users like lxml are known to pass nodes with a corrupted
                 // tree structure. Fall back to a recursive call to handle this case.
-                if (*cur).parent() != NodePtr::from_ptr(parent) && (*cur).children().is_some() {
+                if cur.parent() != parent && cur.children().is_some() {
                     xml_node_dump_output_internal(ctxt, cur);
                 } else {
                     ctxt.buf.borrow_mut().write_bytes(b"<");
-                    if !(*cur).ns.is_null() {
-                        if let Some(prefix) = (*(*cur).ns).prefix() {
-                            ctxt.buf.borrow_mut().write_str(&prefix);
-                            ctxt.buf.borrow_mut().write_bytes(b":");
-                        }
+                    if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                        ctxt.buf.borrow_mut().write_str(&prefix);
+                        ctxt.buf.borrow_mut().write_bytes(b":");
                     }
 
                     ctxt.buf
                         .borrow_mut()
-                        .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-                    if !(*cur).ns_def.is_null() {
-                        xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
+                        .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
+                    if let Some(ns_def) = node.ns_def {
+                        xml_ns_list_dump_output_ctxt(ctxt, Some(ns_def));
                     }
-                    attr = (*cur).properties;
-                    while !attr.is_null() {
-                        xml_attr_dump_output(ctxt, &*attr);
-                        attr = (*attr).next;
+                    let mut attr = node.properties;
+                    while let Some(now) = attr {
+                        xml_attr_dump_output(ctxt, now);
+                        attr = now.next;
                     }
 
-                    if let Some(children) = (*cur).children() {
+                    if let Some(children) = cur.children() {
                         if ctxt.format == 1 {
-                            tmp = children.as_ptr();
-                            while !tmp.is_null() {
+                            let mut tmp = Some(children);
+                            while let Some(now) = tmp {
                                 if matches!(
-                                    (*tmp).element_type(),
+                                    now.element_type(),
                                     XmlElementType::XmlTextNode
                                         | XmlElementType::XmlCDATASectionNode
                                         | XmlElementType::XmlEntityRefNode
                                 ) {
                                     ctxt.format = 0;
-                                    unformatted_node = cur;
+                                    unformatted_node = Some(cur);
                                     break;
                                 }
-                                tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                                tmp = now.next();
                             }
                         }
                         if ctxt.format == 2 {
@@ -878,8 +861,8 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                         if ctxt.level >= 0 {
                             ctxt.level += 1;
                         }
-                        parent = cur;
-                        cur = children.as_ptr();
+                        parent = Some(cur);
+                        cur = children;
                         continue;
                     } else if ctxt.options & XmlSaveOption::XmlSaveNoEmpty as i32 == 0 {
                         if ctxt.format == 2 {
@@ -891,16 +874,14 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                             ctxt.write_ws_non_sig(1);
                         }
                         ctxt.buf.borrow_mut().write_bytes(b"></");
-                        if !(*cur).ns.is_null() {
-                            if let Some(prefix) = (*(*cur).ns).prefix() {
-                                ctxt.buf.borrow_mut().write_str(&prefix);
-                                ctxt.buf.borrow_mut().write_bytes(b":");
-                            }
+                        if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                            ctxt.buf.borrow_mut().write_str(&prefix);
+                            ctxt.buf.borrow_mut().write_bytes(b":");
                         }
 
                         ctxt.buf
                             .borrow_mut()
-                            .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                            .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
                         if ctxt.format == 2 {
                             ctxt.write_ws_non_sig(0);
                         }
@@ -909,10 +890,11 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                 }
             }
             XmlElementType::XmlTextNode => {
-                if !(*cur).content.is_null() {
-                    if (*cur).name != XML_STRING_TEXT_NOENC.as_ptr() as _ {
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                if !node.content.is_null() {
+                    if node.name != XML_STRING_TEXT_NOENC.as_ptr() as _ {
                         ctxt.buf.borrow_mut().write_str_with_escape(
-                            CStr::from_ptr((*cur).content as *const i8)
+                            CStr::from_ptr(node.content as *const i8)
                                 .to_string_lossy()
                                 .as_ref(),
                             ctxt.escape,
@@ -921,14 +903,13 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                         // Disable escaping, needed for XSLT
 
                         ctxt.buf.borrow_mut().write_str(
-                            CStr::from_ptr((*cur).content as _)
-                                .to_string_lossy()
-                                .as_ref(),
+                            CStr::from_ptr(node.content as _).to_string_lossy().as_ref(),
                         );
                     }
                 }
             }
             XmlElementType::XmlPINode => {
+                let node = XmlNodePtr::try_from(cur).unwrap();
                 if cur != root && ctxt.format == 1 && get_indent_tree_output() != 0 {
                     let len = ctxt.indent_size
                         * if ctxt.level > ctxt.indent_nr as i32 {
@@ -939,13 +920,13 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                     ctxt.buf.borrow_mut().write_bytes(&ctxt.indent[..len]);
                 }
 
-                if !(*cur).content.is_null() {
+                if !node.content.is_null() {
                     ctxt.buf.borrow_mut().write_bytes(b"<?");
 
                     ctxt.buf
                         .borrow_mut()
-                        .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-                    if !(*cur).content.is_null() {
+                        .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
+                    if !node.content.is_null() {
                         if ctxt.format == 2 {
                             ctxt.write_ws_non_sig(0);
                         } else {
@@ -953,9 +934,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                         }
 
                         ctxt.buf.borrow_mut().write_str(
-                            CStr::from_ptr((*cur).content as _)
-                                .to_string_lossy()
-                                .as_ref(),
+                            CStr::from_ptr(node.content as _).to_string_lossy().as_ref(),
                         );
                     }
                     ctxt.buf.borrow_mut().write_bytes(b"?>");
@@ -964,7 +943,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
 
                     ctxt.buf
                         .borrow_mut()
-                        .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                        .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
                     if ctxt.format == 2 {
                         ctxt.write_ws_non_sig(0);
                     }
@@ -972,6 +951,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                 }
             }
             XmlElementType::XmlCommentNode => {
+                let node = XmlNodePtr::try_from(cur).unwrap();
                 if cur != root && ctxt.format == 1 && get_indent_tree_output() != 0 {
                     let len = ctxt.indent_size
                         * if ctxt.level > ctxt.indent_nr as i32 {
@@ -982,29 +962,29 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                     ctxt.buf.borrow_mut().write_bytes(&ctxt.indent[..len]);
                 }
 
-                if !(*cur).content.is_null() {
+                if !node.content.is_null() {
                     ctxt.buf.borrow_mut().write_bytes(b"<!--");
-                    ctxt.buf.borrow_mut().write_str(
-                        CStr::from_ptr((*cur).content as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+                    ctxt.buf
+                        .borrow_mut()
+                        .write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref());
                     ctxt.buf.borrow_mut().write_bytes(b"-->");
                 }
             }
             XmlElementType::XmlEntityRefNode => {
+                let node = XmlNodePtr::try_from(cur).unwrap();
                 ctxt.buf.borrow_mut().write_bytes(b"&");
                 ctxt.buf
                     .borrow_mut()
-                    .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                    .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
                 ctxt.buf.borrow_mut().write_bytes(b";");
             }
             XmlElementType::XmlCDATASectionNode => {
-                if (*cur).content.is_null() || *(*cur).content == b'\0' {
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                if node.content.is_null() || *node.content == b'\0' {
                     ctxt.buf.borrow_mut().write_bytes(b"<![CDATA[]]>");
                 } else {
-                    start = (*cur).content;
-                    end = (*cur).content;
+                    start = node.content;
+                    end = node.content;
                     while *end != b'\0' {
                         if *end == b']' && *end.add(1) == b']' && *end.add(2) == b'>' {
                             end = end.add(2);
@@ -1028,10 +1008,12 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                xml_attr_dump_output(ctxt, &*(cur as *const XmlAttr));
+                let attr = XmlAttrPtr::try_from(cur).unwrap();
+                xml_attr_dump_output(ctxt, attr);
             }
             XmlElementType::XmlNamespaceDecl => {
-                xml_ns_dump_output_ctxt(ctxt, cur as _);
+                let ns = XmlNsPtr::try_from(cur).unwrap();
+                xml_ns_dump_output_ctxt(ctxt, ns);
             }
             _ => {}
         }
@@ -1042,22 +1024,23 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
             }
             if ctxt.format == 1
                 && !matches!(
-                    (*cur).element_type(),
+                    cur.element_type(),
                     XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
                 )
             {
                 ctxt.buf.borrow_mut().write_bytes(b"\n");
             }
-            if let Some(next) = (*cur).next {
-                cur = next.as_ptr();
+            if let Some(next) = cur.next() {
+                cur = next;
                 break;
             }
 
-            cur = parent;
-            /* (*cur).parent was validated when descending. */
-            parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+            cur = parent.unwrap();
+            // cur.parent was validated when descending.
+            parent = cur.parent();
 
-            if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+            if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
+                let cur = XmlNodePtr::try_from(cur).unwrap();
                 if ctxt.level > 0 {
                     ctxt.level -= 1;
                 }
@@ -1072,24 +1055,22 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                 }
 
                 ctxt.buf.borrow_mut().write_bytes(b"</");
-                if !(*cur).ns.is_null() {
-                    if let Some(prefix) = (*(*cur).ns).prefix() {
-                        ctxt.buf.borrow_mut().write_str(&prefix);
-                        ctxt.buf.borrow_mut().write_bytes(b":");
-                    }
+                if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
+                    ctxt.buf.borrow_mut().write_str(&prefix);
+                    ctxt.buf.borrow_mut().write_bytes(b":");
                 }
 
                 ctxt.buf
                     .borrow_mut()
-                    .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                    .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
                 if ctxt.format == 2 {
                     ctxt.write_ws_non_sig(0);
                 }
                 ctxt.buf.borrow_mut().write_bytes(b">");
 
-                if cur == unformatted_node {
+                if Some(cur.into()) == unformatted_node {
                     ctxt.format = format;
-                    unformatted_node = null_mut();
+                    unformatted_node = None;
                 }
             }
         }
@@ -1099,17 +1080,11 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
 /// Dump the XML document DTD, if any.
 #[doc(alias = "xmlDtdDumpOutput")]
 unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
-    let mut cur: XmlNodePtr;
-
-    if dtd.is_null() {
-        return;
-    }
     ctxt.buf.borrow_mut().write_bytes(b"<!DOCTYPE ");
-
     ctxt.buf
         .borrow_mut()
-        .write_str(CStr::from_ptr((*dtd).name as _).to_string_lossy().as_ref());
-    if let Some(external_id) = (*dtd).external_id.as_deref() {
+        .write_str(CStr::from_ptr(dtd.name as _).to_string_lossy().as_ref());
+    if let Some(external_id) = dtd.external_id.as_deref() {
         ctxt.buf.borrow_mut().write_bytes(b" PUBLIC ");
         if let Some(mut buf) = ctxt.buf.borrow().buffer {
             let external_id = CString::new(external_id).unwrap();
@@ -1117,21 +1092,21 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
         }
         ctxt.buf.borrow_mut().write_bytes(b" ");
         if let Some(mut buf) = ctxt.buf.borrow().buffer {
-            let system_id = CString::new((*dtd).system_id.as_deref().unwrap()).unwrap();
+            let system_id = CString::new(dtd.system_id.as_deref().unwrap()).unwrap();
             buf.push_quoted_cstr(&system_id);
         }
-    } else if let Some(system_id) = (*dtd).system_id.as_deref() {
+    } else if let Some(system_id) = dtd.system_id.as_deref() {
         ctxt.buf.borrow_mut().write_bytes(b" SYSTEM ");
         if let Some(mut buf) = ctxt.buf.borrow().buffer {
             let system_id = CString::new(system_id).unwrap();
             buf.push_quoted_cstr(&system_id);
         }
     }
-    if (*dtd).entities.is_none()
-        && (*dtd).elements.is_null()
-        && (*dtd).attributes.is_none()
-        && (*dtd).notations.is_none()
-        && (*dtd).pentities.is_none()
+    if dtd.entities.is_none()
+        && dtd.elements.is_none()
+        && dtd.attributes.is_none()
+        && dtd.notations.is_none()
+        && dtd.pentities.is_none()
     {
         ctxt.buf.borrow_mut().write_bytes(b">");
         return;
@@ -1139,8 +1114,8 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
     ctxt.buf.borrow_mut().write_bytes(b" [\n");
     // Dump the notations first they are not in the DTD children list
     // Do this only on a standalone DTD or on the internal subset though.
-    if (*dtd).doc.is_null() || (*(*dtd).doc).int_subset == dtd {
-        if let Some(table) = (*dtd).notations.as_deref() {
+    if dtd.doc.map_or(true, |doc| doc.int_subset == Some(dtd)) {
+        if let Some(table) = dtd.notations.as_deref() {
             xml_buf_dump_notation_table(&mut *ctxt.buf.borrow_mut(), table);
         }
     }
@@ -1148,10 +1123,10 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
     let level: i32 = ctxt.level;
     ctxt.format = 0;
     ctxt.level = -1;
-    cur = (*dtd).children.map_or(null_mut(), |c| c.as_ptr());
-    while !cur.is_null() {
-        xml_node_dump_output_internal(ctxt, cur);
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+    let mut cur = dtd.children;
+    while let Some(now) = cur {
+        xml_node_dump_output_internal(ctxt, now);
+        cur = now.next();
     }
     ctxt.format = format;
     ctxt.level = level;
@@ -1168,82 +1143,91 @@ unsafe fn xml_ns_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, cur: XmlNsPtr) {
 /// Dump a list of XML attributes
 #[doc(alias = "xhtmlAttrListDumpOutput")]
 #[cfg(feature = "html")]
-unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: XmlAttrPtr) {
+unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<XmlAttrPtr>) {
     use crate::{
         libxml::htmltree::html_is_boolean_attr,
-        tree::{xml_free_node, xml_new_doc_text, XmlNode},
+        tree::{xml_free_node, xml_new_doc_text},
     };
 
-    let mut xml_lang: XmlAttrPtr = null_mut();
-    let mut lang: XmlAttrPtr = null_mut();
-    let mut name: XmlAttrPtr = null_mut();
-    let mut id: XmlAttrPtr = null_mut();
-
-    if cur.is_null() {
+    if cur.is_none() {
         return;
     }
 
-    let parent = (*cur).parent;
-    while !cur.is_null() {
-        if (*cur).ns.is_null() && (*cur).name().as_deref() == Some("id") {
+    let mut xml_lang = None;
+    let mut lang = None;
+    let mut name = None;
+    let mut id = None;
+    let parent = cur.unwrap().parent();
+    while let Some(mut now) = cur {
+        if now.ns.is_none() && now.name().as_deref() == Some("id") {
             id = cur;
-        } else if (*cur).ns.is_null() && (*cur).name().as_deref() == Some("name") {
+        } else if now.ns.is_none() && now.name().as_deref() == Some("name") {
             name = cur;
-        } else if (*cur).ns.is_null() && (*cur).name().as_deref() == Some("lang") {
+        } else if now.ns.is_none() && now.name().as_deref() == Some("lang") {
             lang = cur;
-        } else if !(*cur).ns.is_null()
-            && (*cur).name().as_deref() == Some("lang")
-            && (*(*cur).ns).prefix().as_deref() == Some("xml")
+        } else if now.name().as_deref() == Some("lang")
+            && now
+                .ns
+                .map_or(false, |ns| ns.prefix().as_deref() == Some("xml"))
         {
             xml_lang = cur;
-        } else if (*cur).ns.is_null()
-            && (*cur)
-                .children
+        } else if now.ns.is_none()
+            && now
+                .children()
+                .map(|children| XmlNodePtr::try_from(children).unwrap())
                 .map_or(true, |c| c.content.is_null() || *c.content.add(0) == 0)
-            && html_is_boolean_attr((*cur).name) != 0
+            && html_is_boolean_attr(now.name) != 0
         {
-            if let Some(children) = (*cur).children {
-                xml_free_node(children.as_ptr());
+            if let Some(children) = now.children() {
+                xml_free_node(children);
             }
-            (*cur).children = NodePtr::from_ptr(xml_new_doc_text((*cur).doc, (*cur).name));
-            if let Some(mut children) = (*cur).children {
-                children.set_parent(NodePtr::from_ptr(cur as *mut XmlNode));
+            let doc = now.doc;
+            let name = now.name;
+            now.set_children(xml_new_doc_text(doc, name).map(|node| node.into()));
+            if let Some(mut children) = now.children() {
+                children.set_parent(Some(now.into()));
             }
         }
-        xml_attr_dump_output(ctxt, &*cur);
-        cur = (*cur).next;
+        xml_attr_dump_output(ctxt, now);
+        cur = now.next;
     }
     let mut buf = ctxt.buf.borrow_mut();
     // C.8
-    if (!name.is_null() && id.is_null())
-        && parent
-            .filter(|p| {
-                !p.name.is_null()
-                    && (p.name().as_deref() == Some("a")
-                        || p.name().as_deref() == Some("p")
-                        || p.name().as_deref() == Some("div")
-                        || p.name().as_deref() == Some("img")
-                        || p.name().as_deref() == Some("map")
-                        || p.name().as_deref() == Some("applet")
-                        || p.name().as_deref() == Some("form")
-                        || p.name().as_deref() == Some("frame")
-                        || p.name().as_deref() == Some("iframe"))
-            })
-            .is_some()
-    {
+    if let Some(name) = name.filter(|_| {
+        id.is_none()
+            && parent
+                .as_deref()
+                .and_then(|parent| parent.name())
+                .filter(|name| {
+                    name == "a"
+                        || name == "p"
+                        || name == "div"
+                        || name == "img"
+                        || name == "map"
+                        || name == "applet"
+                        || name == "form"
+                        || name == "frame"
+                        || name == "iframe"
+                })
+                .is_some()
+    }) {
         buf.write_bytes(b" id=\"");
-        xml_attr_serialize_content(&mut buf, &*name);
+        xml_attr_serialize_content(&mut buf, name);
         buf.write_bytes(b"\"");
     }
     // C.7.
-    if !lang.is_null() && xml_lang.is_null() {
-        buf.write_bytes(b" xml:lang=\"");
-        xml_attr_serialize_content(&mut buf, &*lang);
-        buf.write_bytes(b"\"");
-    } else if !xml_lang.is_null() && lang.is_null() {
-        buf.write_bytes(b" lang=\"");
-        xml_attr_serialize_content(&mut buf, &*xml_lang);
-        buf.write_bytes(b"\"");
+    match (lang, xml_lang) {
+        (Some(lang), None) => {
+            buf.write_bytes(b" xml:lang=\"");
+            xml_attr_serialize_content(&mut buf, lang);
+            buf.write_bytes(b"\"");
+        }
+        (None, Some(xml_lang)) => {
+            buf.write_bytes(b" lang=\"");
+            xml_attr_serialize_content(&mut buf, xml_lang);
+            buf.write_bytes(b"\"");
+        }
+        _ => {}
     }
 }
 
@@ -1258,7 +1242,10 @@ unsafe fn xhtml_is_empty(node: &XmlNode) -> bool {
     if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
         return false;
     }
-    if !node.ns.is_null() && (*node.ns).href().as_deref() != Some(XHTML_NS_NAME) {
+    if node
+        .ns
+        .map_or(false, |ns| ns.href().as_deref() != Some(XHTML_NS_NAME))
+    {
         return false;
     }
     if node.children().is_some() {
@@ -1289,56 +1276,56 @@ unsafe fn xhtml_is_empty(node: &XmlNode) -> bool {
 /// Dump an XHTML node, recursive behaviour, children are printed too.
 #[doc(alias = "xhtmlNodeDumpOutput")]
 #[cfg(feature = "html")]
-pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: XmlNodePtr) {
-    use crate::{libxml::parser_internals::XML_STRING_TEXT, tree::XmlNode};
+pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: XmlGenericNodePtr) {
+    use crate::{
+        libxml::parser_internals::XML_STRING_TEXT,
+        tree::{XmlEntityPtr, XmlNodePtr},
+    };
 
     let format: i32 = ctxt.format;
-    let mut addmeta: i32;
-    let mut tmp: XmlNodePtr;
-    let mut unformatted_node: XmlNodePtr = null_mut();
-    let mut parent: XmlNodePtr;
+    let mut unformatted_node = None;
     let mut start: *mut u8;
     let mut end: *mut u8;
 
-    if cur.is_null() {
-        return;
-    }
-
-    let root: XmlNodePtr = cur;
-    parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+    let root = cur;
+    let mut parent = cur.parent();
     loop {
-        match (*cur).element_type() {
+        match cur.element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                ctxt.doc_content_dump_output(cur as _);
+                let doc = XmlDocPtr::try_from(cur).unwrap();
+                ctxt.doc_content_dump_output(doc);
             }
             XmlElementType::XmlNamespaceDecl => {
-                xml_ns_dump_output_ctxt(ctxt, cur as _);
+                let ns = XmlNsPtr::try_from(cur).unwrap();
+                xml_ns_dump_output_ctxt(ctxt, ns);
             }
             XmlElementType::XmlDTDNode => {
-                xml_dtd_dump_output(ctxt, cur as _);
+                let dtd = XmlDtdPtr::try_from(cur).unwrap();
+                xml_dtd_dump_output(ctxt, dtd);
             }
             XmlElementType::XmlDocumentFragNode => {
-                // Always validate (*cur).parent when descending.
-                if let Some(children) = (*cur)
-                    .children()
-                    .filter(|_| (*cur).parent() == NodePtr::from_ptr(parent))
-                {
-                    parent = cur;
-                    cur = children.as_ptr();
+                // Always validate cur.parent when descending.
+                if let Some(children) = cur.children().filter(|_| cur.parent() == parent) {
+                    parent = Some(cur);
+                    cur = children;
                     continue;
                 }
             }
             XmlElementType::XmlElementDecl => {
-                xml_buf_dump_element_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
+                let elem_decl = XmlElementPtr::try_from(cur).unwrap();
+                xml_buf_dump_element_decl(&mut *ctxt.buf.borrow_mut(), elem_decl);
             }
             XmlElementType::XmlAttributeDecl => {
-                xml_buf_dump_attribute_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
+                let attr_decl = XmlAttributePtr::try_from(cur).unwrap();
+                xml_buf_dump_attribute_decl(&mut *ctxt.buf.borrow_mut(), attr_decl);
             }
             XmlElementType::XmlEntityDecl => {
-                xml_buf_dump_entity_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
+                let ent = XmlEntityPtr::try_from(cur).unwrap();
+                xml_buf_dump_entity_decl(&mut *ctxt.buf.borrow_mut(), ent);
             }
             XmlElementType::XmlElementNode => {
-                addmeta = 0;
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                let mut addmeta = 0;
 
                 if cur != root && ctxt.format == 1 && get_indent_tree_output() != 0 {
                     let len = ctxt.indent_size
@@ -1352,28 +1339,26 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
 
                 // Some users like lxml are known to pass nodes with a corrupted
                 // tree structure. Fall back to a recursive call to handle this case.
-                if (*cur).parent() != NodePtr::from_ptr(parent) && (*cur).children().is_some() {
+                if cur.parent() != parent && cur.children().is_some() {
                     xhtml_node_dump_output(ctxt, cur);
                     break;
                 }
 
                 ctxt.buf.borrow_mut().write_bytes(b"<");
-                if !(*cur).ns.is_null() {
-                    if let Some(prefix) = (*(*cur).ns).prefix() {
-                        ctxt.buf.borrow_mut().write_str(&prefix);
-                        ctxt.buf.borrow_mut().write_bytes(b":");
-                    }
+                if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                    ctxt.buf.borrow_mut().write_str(&prefix);
+                    ctxt.buf.borrow_mut().write_bytes(b":");
                 }
 
                 ctxt.buf
                     .borrow_mut()
-                    .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-                if !(*cur).ns_def.is_null() {
-                    xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
+                    .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
+                if let Some(ns_def) = node.ns_def {
+                    xml_ns_list_dump_output_ctxt(ctxt, Some(ns_def));
                 }
-                if (*cur).name().as_deref() == Some("html")
-                    && (*cur).ns.is_null()
-                    && (*cur).ns_def.is_null()
+                if cur.name().as_deref() == Some("html")
+                    && node.ns.is_none()
+                    && node.ns_def.is_none()
                 {
                     // 3.1.1. Strictly Conforming Documents A.3.1.1 3/
 
@@ -1381,32 +1366,32 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                         .borrow_mut()
                         .write_str(" xmlns=\"http://www.w3.org/1999/xhtml\"");
                 }
-                if !(*cur).properties.is_null() {
-                    xhtml_attr_list_dump_output(ctxt, (*cur).properties);
+                if node.properties.is_some() {
+                    xhtml_attr_list_dump_output(ctxt, node.properties);
                 }
 
-                if !parent.is_null()
-                    && ((*parent).parent() == NodePtr::from_ptr((*cur).doc as *mut XmlNode))
-                    && (*cur).name().as_deref() == Some("head")
-                    && (*parent).name().as_deref() == Some("html")
+                if parent.map_or(false, |parent| {
+                    parent.parent() == node.doc.map(|doc| doc.into())
+                        && (*parent).name().as_deref() == Some("html")
+                }) && cur.name().as_deref() == Some("head")
                 {
-                    tmp = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-                    while !tmp.is_null() {
-                        if (*tmp).name().as_deref() == Some("meta") {
-                            if let Some(httpequiv) = (*tmp).get_prop("http-equiv") {
+                    let mut tmp = cur.children();
+                    while let Some(now) = tmp {
+                        if now.name().as_deref() == Some("meta") {
+                            if let Some(httpequiv) = now.get_prop("http-equiv") {
                                 if httpequiv.eq_ignore_ascii_case("Content-Type") {
                                     break;
                                 }
                             }
                         }
-                        tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                        tmp = now.next();
                     }
-                    if tmp.is_null() {
+                    if tmp.is_none() {
                         addmeta = 1;
                     }
                 }
 
-                if let Some(children) = (*cur).children() {
+                if let Some(children) = cur.children() {
                     ctxt.buf.borrow_mut().write_bytes(b">");
                     if addmeta == 1 {
                         if ctxt.format == 1 {
@@ -1434,19 +1419,16 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                     }
 
                     if ctxt.format == 1 {
-                        tmp = children.as_ptr();
-                        while !tmp.is_null() {
-                            if (matches!((*tmp).element_type(), XmlElementType::XmlTextNode)
-                                || matches!(
-                                    (*tmp).element_type(),
-                                    XmlElementType::XmlEntityRefNode
-                                ))
+                        let mut tmp = Some(children);
+                        while let Some(now) = tmp {
+                            if matches!(now.element_type(), XmlElementType::XmlTextNode)
+                                || matches!(now.element_type(), XmlElementType::XmlEntityRefNode)
                             {
-                                unformatted_node = cur;
+                                unformatted_node = Some(cur);
                                 ctxt.format = 0;
                                 break;
                             }
-                            tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                            tmp = now.next();
                         }
                     }
 
@@ -1456,11 +1438,12 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                     if ctxt.level >= 0 {
                         ctxt.level += 1;
                     }
-                    parent = cur;
-                    cur = children.as_ptr();
+                    parent = Some(cur);
+                    cur = children;
                     continue;
-                } else if ((*cur).ns.is_null() || (*(*cur).ns).prefix().is_none())
-                    && (xhtml_is_empty(&*cur) && addmeta == 0)
+                } else if node.ns.map_or(true, |ns| ns.prefix().is_none())
+                    && xhtml_is_empty(&node)
+                    && addmeta == 0
                 {
                     // C.2. Empty Elements
                     ctxt.buf.borrow_mut().write_bytes(b" />");
@@ -1497,28 +1480,27 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                     }
                     // C.3. Element Minimization and Empty Element Content
                     ctxt.buf.borrow_mut().write_bytes(b"</");
-                    if !(*cur).ns.is_null() {
-                        if let Some(prefix) = (*(*cur).ns).prefix() {
-                            ctxt.buf.borrow_mut().write_str(&prefix);
-                            ctxt.buf.borrow_mut().write_bytes(b":");
-                        }
+                    if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                        ctxt.buf.borrow_mut().write_str(&prefix);
+                        ctxt.buf.borrow_mut().write_bytes(b":");
                     }
 
                     ctxt.buf
                         .borrow_mut()
-                        .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                        .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
                     ctxt.buf.borrow_mut().write_bytes(b">");
                 }
             }
             XmlElementType::XmlTextNode => {
-                if (*cur).content.is_null() {
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                if node.content.is_null() {
                     break;
                 }
-                if (*cur).name == XML_STRING_TEXT.as_ptr() as _
-                    || (*cur).name != XML_STRING_TEXT_NOENC.as_ptr() as _
+                if node.name == XML_STRING_TEXT.as_ptr() as _
+                    || node.name != XML_STRING_TEXT_NOENC.as_ptr() as _
                 {
                     ctxt.buf.borrow_mut().write_str_with_escape(
-                        CStr::from_ptr((*cur).content as *const i8)
+                        CStr::from_ptr(node.content as *const i8)
                             .to_string_lossy()
                             .as_ref(),
                         ctxt.escape,
@@ -1526,27 +1508,24 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                 } else {
                     // Disable escaping, needed for XSLT
 
-                    ctxt.buf.borrow_mut().write_str(
-                        CStr::from_ptr((*cur).content as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+                    ctxt.buf
+                        .borrow_mut()
+                        .write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref());
                 }
             }
             XmlElementType::XmlPINode => {
-                if !(*cur).content.is_null() {
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                if !node.content.is_null() {
                     ctxt.buf.borrow_mut().write_bytes(b"<?");
 
                     ctxt.buf
                         .borrow_mut()
-                        .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
-                    if !(*cur).content.is_null() {
+                        .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
+                    if !node.content.is_null() {
                         ctxt.buf.borrow_mut().write_bytes(b" ");
 
                         ctxt.buf.borrow_mut().write_str(
-                            CStr::from_ptr((*cur).content as _)
-                                .to_string_lossy()
-                                .as_ref(),
+                            CStr::from_ptr(node.content as _).to_string_lossy().as_ref(),
                         );
                     }
                     ctxt.buf.borrow_mut().write_bytes(b"?>");
@@ -1555,36 +1534,36 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
 
                     ctxt.buf
                         .borrow_mut()
-                        .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                        .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
                     ctxt.buf.borrow_mut().write_bytes(b"?>");
                 }
             }
             XmlElementType::XmlCommentNode => {
-                if !(*cur).content.is_null() {
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                if !node.content.is_null() {
                     ctxt.buf.borrow_mut().write_bytes(b"<!--");
 
-                    ctxt.buf.borrow_mut().write_str(
-                        CStr::from_ptr((*cur).content as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+                    ctxt.buf
+                        .borrow_mut()
+                        .write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref());
                     ctxt.buf.borrow_mut().write_bytes(b"-->");
                 }
             }
             XmlElementType::XmlEntityRefNode => {
+                let node = XmlNodePtr::try_from(cur).unwrap();
                 ctxt.buf.borrow_mut().write_bytes(b"&");
-
                 ctxt.buf
                     .borrow_mut()
-                    .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                    .write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
                 ctxt.buf.borrow_mut().write_bytes(b";");
             }
             XmlElementType::XmlCDATASectionNode => {
-                if (*cur).content.is_null() || *(*cur).content == b'\0' {
+                let node = XmlNodePtr::try_from(cur).unwrap();
+                if node.content.is_null() || *node.content == b'\0' {
                     ctxt.buf.borrow_mut().write_bytes(b"<![CDATA[]]>");
                 } else {
-                    start = (*cur).content;
-                    end = (*cur).content;
+                    start = node.content;
+                    end = node.content;
                     while *end != b'\0' {
                         if *end == b']' && *end.add(1) == b']' && *end.add(2) == b'>' {
                             end = end.add(2);
@@ -1610,7 +1589,8 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                xml_attr_dump_output(ctxt, &*(cur as *const XmlAttr));
+                let attr = XmlAttrPtr::try_from(cur).unwrap();
+                xml_attr_dump_output(ctxt, attr);
             }
             _ => {}
         }
@@ -1622,16 +1602,17 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
             if ctxt.format == 1 {
                 ctxt.buf.borrow_mut().write_bytes(b"\n");
             }
-            if let Some(next) = (*cur).next {
-                cur = next.as_ptr();
+            if let Some(next) = cur.next() {
+                cur = next;
                 break;
             }
 
-            cur = parent;
-            // (*cur).parent was validated when descending.
-            parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+            cur = parent.unwrap();
+            // cur.parent was validated when descending.
+            parent = cur.parent();
 
-            if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+            if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
+                let cur = XmlNodePtr::try_from(cur).unwrap();
                 if ctxt.level > 0 {
                     ctxt.level -= 1;
                 }
@@ -1646,21 +1627,19 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                 }
 
                 ctxt.buf.borrow_mut().write_bytes(b"</");
-                if !(*cur).ns.is_null() {
-                    if let Some(prefix) = (*(*cur).ns).prefix() {
-                        ctxt.buf.borrow_mut().write_str(&prefix);
-                        ctxt.buf.borrow_mut().write_bytes(b":");
-                    }
+                if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
+                    ctxt.buf.borrow_mut().write_str(&prefix);
+                    ctxt.buf.borrow_mut().write_bytes(b":");
                 }
 
                 ctxt.buf
                     .borrow_mut()
-                    .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+                    .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
                 ctxt.buf.borrow_mut().write_bytes(b">");
 
-                if cur == unformatted_node {
+                if Some(cur.into()) == unformatted_node {
                     ctxt.format = format;
-                    unformatted_node = null_mut();
+                    unformatted_node = None;
                 }
             }
         }
@@ -1670,31 +1649,29 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
 /// Dump an HTML node, recursive behaviour, children are printed too.
 #[doc(alias = "htmlNodeDumpOutputInternal")]
 #[cfg(feature = "html")]
-unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlNodePtr) -> i32 {
+unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlGenericNodePtr) -> i32 {
     use crate::libxml::htmltree::html_node_dump_format_output;
 
     let mut oldenc = None;
     let oldctxtenc = ctxt.encoding.clone();
     let mut encoding = ctxt.encoding.clone();
-
     let mut switched_encoding: i32 = 0;
 
     xml_init_parser();
 
-    let doc: XmlDocPtr = (*cur).doc;
-    if !doc.is_null() {
-        oldenc = (*doc).encoding.clone();
+    let doc = cur.document();
+    if let Some(mut doc) = doc {
+        oldenc = doc.encoding.clone();
         if let Some(encoding) = ctxt.encoding.as_deref() {
-            (*doc).encoding = Some(encoding.to_owned());
-        } else if let Some(enc) = (*doc).encoding.as_deref() {
+            doc.encoding = Some(encoding.to_owned());
+        } else if let Some(enc) = doc.encoding.as_deref() {
             encoding = Some(enc.to_owned());
         }
     }
 
-    if encoding.is_some() && !doc.is_null() {
-        html_set_meta_encoding(doc, encoding.as_deref());
-    }
-    if encoding.is_none() && !doc.is_null() {
+    if let (Some(encoding), Some(doc)) = (encoding.as_deref(), doc) {
+        html_set_meta_encoding(doc, Some(encoding));
+    } else if let Some(doc) = doc {
         encoding = html_get_meta_encoding(doc);
     }
     if encoding.is_none() {
@@ -1706,24 +1683,26 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlNodePtr
         && ctxt.buf.borrow().conv.is_none()
     {
         if ctxt.switch_encoding(encoding.as_deref().unwrap()) < 0 {
-            (*doc).encoding = oldenc;
+            if let Some(mut doc) = doc {
+                doc.encoding = oldenc;
+            }
             return -1;
         }
         switched_encoding = 1;
     }
     let mut buf = ctxt.buf.borrow_mut();
     if ctxt.options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
-        html_node_dump_format_output(&mut buf, doc, cur, encoding.as_deref(), 1);
+        html_node_dump_format_output(&mut buf, doc, Some(cur), encoding.as_deref(), 1);
     } else {
-        html_node_dump_format_output(&mut buf, doc, cur, encoding.as_deref(), 0);
+        html_node_dump_format_output(&mut buf, doc, Some(cur), encoding.as_deref(), 0);
     }
     drop(buf);
     // Restore the state of the saving context at the end of the document
     if switched_encoding != 0 && oldctxtenc.is_none() {
         ctxt.clear_encoding();
     }
-    if !doc.is_null() {
-        (*doc).encoding = oldenc;
+    if let Some(mut doc) = doc {
+        doc.encoding = oldenc;
     }
     0
 }
@@ -1732,8 +1711,8 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlNodePtr
 #[doc(alias = "xmlBufAttrSerializeTxtContent")]
 pub(crate) unsafe fn attr_serialize_text_content<'a>(
     buf: &mut (impl Write + 'a),
-    doc: XmlDocPtr,
-    attr: Option<&XmlAttr>,
+    doc: Option<XmlDocPtr>,
+    attr: Option<XmlAttrPtr>,
     string: &str,
 ) {
     let mut base = string;
@@ -1761,7 +1740,7 @@ pub(crate) unsafe fn attr_serialize_text_content<'a>(
             base = rem;
         } else if cur.len() > 1
             && cur.as_bytes()[0] >= 0x80
-            && (doc.is_null() || (*doc).encoding.is_none())
+            && doc.map_or(true, |doc| doc.encoding.is_none())
         {
             // We assume we have UTF-8 content.
             let mut tmp = [0; 12];
@@ -1772,7 +1751,7 @@ pub(crate) unsafe fn attr_serialize_text_content<'a>(
             if cur.as_bytes()[0] < 0xC0 {
                 xml_save_err(
                     XmlParserErrors::XmlSaveNotUTF8 as _,
-                    attr.map_or(null_mut(), |attr| attr as *const XmlAttr as _),
+                    attr.map(|attr| attr.into()),
                     None,
                 );
                 buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32));
@@ -1784,7 +1763,7 @@ pub(crate) unsafe fn attr_serialize_text_content<'a>(
             if val.len_utf8() == 1 || !xml_is_char(val as u32) {
                 xml_save_err(
                     XmlParserErrors::XmlSaveCharInvalid as _,
-                    attr.map_or(null_mut(), |attr| attr as *const XmlAttr as _),
+                    attr.map(|attr| attr.into()),
                     None,
                 );
                 buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32));
@@ -1809,9 +1788,9 @@ pub(crate) unsafe fn attr_serialize_text_content<'a>(
 /// Dump a list of local Namespace definitions.
 /// Should be called in the context of attributes dumps.
 #[doc(alias = "xmlNsListDumpOutput")]
-pub(crate) unsafe fn xml_ns_list_dump_output(buf: &mut XmlOutputBuffer, mut cur: XmlNsPtr) {
-    while !cur.is_null() {
-        xml_ns_dump_output(Some(buf), cur, None);
-        cur = (*cur).next;
+pub(crate) unsafe fn xml_ns_list_dump_output(buf: &mut XmlOutputBuffer, mut cur: Option<XmlNsPtr>) {
+    while let Some(now) = cur {
+        xml_ns_dump_output(Some(buf), now, None);
+        cur = now.next;
     }
 }

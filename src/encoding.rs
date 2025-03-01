@@ -417,7 +417,7 @@ macro_rules! xml_encoding_err {
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromI18N,
             $error,
             XmlErrorLevel::XmlErrFatal,

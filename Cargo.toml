@@ -45,6 +45,7 @@ default = [
     "libxml_unicode",
     "libxml_valid",
     "libxml_writer",
+    "libxml_xptr_locs",
 ]
 c14n = []
 catalog = []

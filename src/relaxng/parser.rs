@@ -42,7 +42,7 @@ pub struct XmlRelaxNGParserCtxt {
     pub(crate) documents: XmlRelaxNGDocumentPtr, // all the documents loaded
     pub(crate) includes: XmlRelaxNGIncludePtr,   // all the includes loaded
     pub(crate) url: Option<String>,
-    pub(crate) document: XmlDocPtr,
+    pub(crate) document: Option<XmlDocPtr>,
 
     pub(crate) def_tab: Vec<XmlRelaxNGDefinePtr>, // pointer to the allocated definitions
 
@@ -195,7 +195,7 @@ impl Default for XmlRelaxNGParserCtxt {
             documents: null_mut(),
             includes: null_mut(),
             url: None,
-            document: null_mut(),
+            document: None,
             def_tab: vec![],
             buffer: null_mut(),
             size: 0,
@@ -269,13 +269,12 @@ pub unsafe fn xml_relaxng_new_mem_parser_ctxt(
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlRelaxNGNewDocParserCtxt")]
 pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlRelaxNGParserCtxtPtr {
-    if doc.is_null() {
+    // if doc.is_null() {
+    //     return null_mut();
+    // }
+    let Some(copy) = xml_copy_doc(doc, 1) else {
         return null_mut();
-    }
-    let copy: XmlDocPtr = xml_copy_doc(doc, 1);
-    if copy.is_null() {
-        return null_mut();
-    }
+    };
 
     let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
     if ret.is_null() {
@@ -284,7 +283,7 @@ pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlRelaxNGParse
         return null_mut();
     }
     std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
-    (*ret).document = copy;
+    (*ret).document = Some(copy);
     (*ret).freedoc = 1;
     GLOBAL_STATE.with_borrow(|state| {
         (*ret).user_data = state.generic_error_context.clone();
@@ -314,8 +313,8 @@ pub unsafe fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
     for def in (*ctxt).def_tab.drain(..) {
         xml_relaxng_free_define(def);
     }
-    if !(*ctxt).document.is_null() && (*ctxt).freedoc != 0 {
-        xml_free_doc((*ctxt).document);
+    if let Some(document) = (*ctxt).document.take().filter(|_| (*ctxt).freedoc != 0) {
+        xml_free_doc(document);
     }
     drop_in_place(ctxt);
     xml_free(ctxt as _);

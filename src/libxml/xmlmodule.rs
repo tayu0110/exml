@@ -68,7 +68,7 @@ unsafe fn xml_module_err_memory(module: XmlModulePtr, extra: &str) {
         None,
         None,
         null_mut(),
-        null_mut(),
+        None,
         XmlErrorDomain::XmlFromModule,
         XmlParserErrors::XmlErrNoMemory,
         XmlErrorLevel::XmlErrFatal,
@@ -87,14 +87,14 @@ unsafe fn xml_module_err_memory(module: XmlModulePtr, extra: &str) {
 /// Returns a handle on success, and zero on error.
 #[doc(alias = "xmlModulePlatformOpen")]
 #[cfg(not(target_os = "windows"))]
-unsafe extern "C" fn xml_module_platform_open(name: *const c_char) -> *mut c_void {
+unsafe fn xml_module_platform_open(name: *const c_char) -> *mut c_void {
     dlopen(name, RTLD_GLOBAL | RTLD_NOW)
 }
 
 // returns a handle on success, and zero on error.
 #[doc(alias = "xmlModulePlatformOpen")]
 #[cfg(target_os = "windows")]
-unsafe extern "C" fn xml_module_platform_open(name: *const c_char) -> *mut c_void {
+unsafe fn xml_module_platform_open(name: *const c_char) -> *mut c_void {
     todo!("replace to libloading");
     LoadLibraryA(name)
 }
@@ -127,7 +127,7 @@ pub unsafe fn xml_module_open(name: &str, _options: i32) -> XmlModulePtr {
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromModule,
             XmlParserErrors::XmlModuleOpen,
             XmlErrorLevel::XmlErrFatal,
@@ -199,7 +199,7 @@ pub unsafe extern "C" fn xml_module_symbol(
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromModule,
             XmlParserErrors::XmlModuleOpen,
             XmlErrorLevel::XmlErrFatal,
@@ -224,7 +224,7 @@ pub unsafe extern "C" fn xml_module_symbol(
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromModule,
             XmlParserErrors::XmlModuleOpen,
             XmlErrorLevel::XmlErrFatal,
@@ -275,7 +275,7 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromModule,
             XmlParserErrors::XmlModuleClose,
             XmlErrorLevel::XmlErrFatal,
@@ -302,7 +302,7 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromModule,
             XmlParserErrors::XmlModuleClose,
             XmlErrorLevel::XmlErrFatal,
@@ -334,7 +334,7 @@ pub unsafe extern "C" fn xml_module_free(module: XmlModulePtr) -> i32 {
             None,
             None,
             null_mut(),
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromModule,
             XmlParserErrors::XmlModuleClose,
             XmlErrorLevel::XmlErrFatal,

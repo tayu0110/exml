@@ -19,59 +19,59 @@
 // daniel@veillard.com
 
 use std::{
+    any::type_name,
     borrow::Cow,
     ffi::CStr,
+    ops::{Deref, DerefMut},
     os::raw::c_void,
-    ptr::{drop_in_place, null_mut},
+    ptr::{null_mut, NonNull},
 };
 
 use crate::{
     libxml::{globals::xml_free, xmlstring::XmlChar},
     tree::{
-        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElementType,
-        XmlNode,
+        InvalidNodePointerCastError, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
+        XmlElementType, XmlGenericNodePtr,
     },
 };
 
-use super::XmlEnumeration;
+use super::{XmlDtdPtr, XmlEnumeration};
 
-/// An Attribute declaration in a DTD.
-pub type XmlAttributePtr = *mut XmlAttribute;
 #[repr(C)]
 #[derive(Clone)]
 pub struct XmlAttribute {
-    pub(crate) _private: *mut c_void,     /* application data */
-    pub(crate) typ: XmlElementType,       /* XML_ATTRIBUTE_DECL, must be second ! */
-    pub(crate) name: *const XmlChar,      /* Attribute name */
-    pub(crate) children: Option<NodePtr>, /* NULL */
-    pub(crate) last: Option<NodePtr>,     /* NULL */
-    pub(crate) parent: *mut XmlDtd,       /* -> DTD */
-    pub(crate) next: Option<NodePtr>,     /* next sibling link  */
-    pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
-    pub(crate) doc: *mut XmlDoc,          /* the containing document */
+    pub _private: *mut c_void,                      /* application data */
+    pub(crate) typ: XmlElementType,                 /* XML_ATTRIBUTE_DECL, must be second ! */
+    pub(crate) name: *const XmlChar,                /* Attribute name */
+    pub(crate) children: Option<XmlGenericNodePtr>, /* NULL */
+    pub(crate) last: Option<XmlGenericNodePtr>,     /* NULL */
+    pub(crate) parent: Option<XmlDtdPtr>,           /* -> DTD */
+    pub(crate) next: Option<XmlGenericNodePtr>,     /* next sibling link  */
+    pub(crate) prev: Option<XmlGenericNodePtr>,     /* previous sibling link  */
+    pub(crate) doc: Option<XmlDocPtr>,              /* the containing document */
 
-    pub(crate) nexth: *mut XmlAttribute, /* next in hash table */
-    pub(crate) atype: XmlAttributeType,  /* The attribute type */
-    pub(crate) def: XmlAttributeDefault, /* the default */
-    pub(crate) default_value: *const XmlChar, /* or the default value */
+    pub(crate) nexth: Option<XmlAttributePtr>, /* next in hash table */
+    pub(crate) atype: XmlAttributeType,        /* The attribute type */
+    pub(crate) def: XmlAttributeDefault,       /* the default */
+    pub(crate) default_value: *const XmlChar,  /* or the default value */
     pub(crate) tree: Option<Box<XmlEnumeration>>, /* or the enumeration tree if any */
-    pub(crate) prefix: Option<String>,   /* the namespace prefix if any */
-    pub(crate) elem: Option<String>,     /* Element holding the attribute */
+    pub(crate) prefix: Option<String>,         /* the namespace prefix if any */
+    pub(crate) elem: Option<String>,           /* Element holding the attribute */
 }
 
 impl Default for XmlAttribute {
     fn default() -> Self {
         Self {
             _private: null_mut(),
-            typ: XmlElementType::default(),
+            typ: XmlElementType::XmlAttributeDecl,
             name: null_mut(),
             children: None,
             last: None,
-            parent: null_mut(),
+            parent: None,
             next: None,
             prev: None,
-            doc: null_mut(),
-            nexth: null_mut(),
+            doc: None,
+            nexth: None,
             atype: XmlAttributeType::XmlAttributeCDATA,
             def: XmlAttributeDefault::XmlAttributeNone,
             default_value: null_mut(),
@@ -83,10 +83,10 @@ impl Default for XmlAttribute {
 }
 
 impl NodeCommon for XmlAttribute {
-    fn document(&self) -> *mut XmlDoc {
+    fn document(&self) -> Option<XmlDocPtr> {
         self.doc
     }
-    fn set_document(&mut self, doc: *mut XmlDoc) {
+    fn set_document(&mut self, doc: Option<XmlDocPtr>) {
         self.doc = doc;
     }
     fn element_type(&self) -> XmlElementType {
@@ -96,53 +96,166 @@ impl NodeCommon for XmlAttribute {
         (!self.name.is_null())
             .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
     }
-    fn children(&self) -> Option<NodePtr> {
+    fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children
     }
-    fn set_children(&mut self, children: Option<NodePtr>) {
+    fn set_children(&mut self, children: Option<XmlGenericNodePtr>) {
         self.children = children;
     }
-    fn last(&self) -> Option<NodePtr> {
+    fn last(&self) -> Option<XmlGenericNodePtr> {
         self.last
     }
-    fn set_last(&mut self, last: Option<NodePtr>) {
+    fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
         self.last = last;
     }
-    fn next(&self) -> Option<NodePtr> {
+    fn next(&self) -> Option<XmlGenericNodePtr> {
         self.next
     }
-    fn set_next(&mut self, next: Option<NodePtr>) {
+    fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
         self.next = next;
     }
-    fn prev(&self) -> Option<NodePtr> {
+    fn prev(&self) -> Option<XmlGenericNodePtr> {
         self.prev
     }
-    fn set_prev(&mut self, prev: Option<NodePtr>) {
+    fn set_prev(&mut self, prev: Option<XmlGenericNodePtr>) {
         self.prev = prev;
     }
-    fn parent(&self) -> Option<NodePtr> {
-        NodePtr::from_ptr(self.parent as *mut XmlNode)
+    fn parent(&self) -> Option<XmlGenericNodePtr> {
+        self.parent.map(|node| node.into())
     }
-    fn set_parent(&mut self, parent: Option<NodePtr>) {
-        self.parent = parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlDtd;
+    fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>) {
+        self.parent = parent.map(|p| XmlDtdPtr::try_from(p).unwrap());
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct XmlAttributePtr(NonNull<XmlAttribute>);
+
+impl XmlAttributePtr {
+    /// Allocate new memory and create new `XmlAttributePtr` from an owned xml node.
+    ///
+    /// This method leaks allocated memory.  
+    /// Users can use `free` method for deallocating memory.
+    pub(crate) fn new(node: XmlAttribute) -> Option<Self> {
+        let boxed = Box::new(node);
+        NonNull::new(Box::leak(boxed)).map(Self)
+    }
+
+    /// Create `XmlAttributePtr` from a raw pointer.  
+    ///
+    /// If `ptr` is a NULL pointer, return `Ok(None)`.  
+    /// If `ptr` is a valid pointer of `XmlAttribute`, return `Ok(Some(Self))`.  
+    /// Otherwise, return `Err`.
+    ///
+    /// # Safety
+    /// - `ptr` must be a pointer of types that is implemented `NodeCommon` at least.
+    pub(crate) unsafe fn from_raw(
+        ptr: *mut XmlAttribute,
+    ) -> Result<Option<Self>, InvalidNodePointerCastError> {
+        if ptr.is_null() {
+            return Ok(None);
+        }
+        match (*ptr).element_type() {
+            XmlElementType::XmlAttributeDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+            _ => Err(InvalidNodePointerCastError {
+                from: (*ptr).element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+
+    // pub(crate) fn as_ptr(self) -> *mut XmlAttribute {
+    //     self.0.as_ptr()
+    // }
+
+    /// Deallocate memory.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn free(self) {
+        let _ = *Box::from_raw(self.0.as_ptr());
+    }
+
+    /// Acquire the ownership of the inner value.  
+    /// As a result, `self` will be invalid. `self` must not be used after performs this method.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn into_inner(self) -> Box<XmlAttribute> {
+        Box::from_raw(self.0.as_ptr())
+    }
+}
+
+impl Clone for XmlAttributePtr {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl Copy for XmlAttributePtr {}
+
+impl Deref for XmlAttributePtr {
+    type Target = XmlAttribute;
+    fn deref(&self) -> &Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlAttribute`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl DerefMut for XmlAttributePtr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `*mut XmlAttribute`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_mut() }
+    }
+}
+
+impl TryFrom<XmlGenericNodePtr> for XmlAttributePtr {
+    type Error = InvalidNodePointerCastError;
+
+    fn try_from(value: XmlGenericNodePtr) -> Result<Self, Self::Error> {
+        match value.element_type() {
+            XmlElementType::XmlAttributeDecl => Ok(Self(value.0.cast())),
+            _ => Err(InvalidNodePointerCastError {
+                from: value.element_type(),
+                to: type_name::<Self>(),
+            }),
+        }
+    }
+}
+
+impl From<XmlAttributePtr> for XmlGenericNodePtr {
+    fn from(value: XmlAttributePtr) -> Self {
+        Self(value.0 as NonNull<dyn NodeCommon>)
+    }
+}
+
+impl From<XmlAttributePtr> for *mut XmlAttribute {
+    fn from(value: XmlAttributePtr) -> Self {
+        value.0.as_ptr()
     }
 }
 
 /// Deallocate the memory used by an attribute definition
 #[doc(alias = "xmlFreeAttribute")]
-pub(crate) unsafe fn xml_free_attribute(attr: XmlAttributePtr) {
-    if attr.is_null() {
-        return;
+pub(crate) unsafe fn xml_free_attribute(mut attr: XmlAttributePtr) {
+    attr.unlink();
+    attr.elem = None;
+    if !attr.name.is_null() {
+        xml_free(attr.name as _);
     }
-    (*attr).unlink();
-    (*attr).elem = None;
-    if !(*attr).name.is_null() {
-        xml_free((*attr).name as _);
+    if !attr.default_value.is_null() {
+        xml_free(attr.default_value as _);
     }
-    if !(*attr).default_value.is_null() {
-        xml_free((*attr).default_value as _);
-    }
-    (*attr).prefix = None;
-    drop_in_place(attr);
-    xml_free(attr as _);
+    attr.prefix = None;
+    attr.free();
 }

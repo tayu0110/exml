@@ -35,9 +35,8 @@ use exml::{
         XmlParserInputPtr,
     },
     tree::{
-        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
-        XmlEnumeration,
+        xml_free_doc, XmlAttributeDefault, XmlAttributeType, XmlElementContentPtr, XmlElementType,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr,
     },
 };
 use libc::{memcpy, strlen, strncmp};
@@ -255,11 +254,6 @@ unsafe fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 
     })
 }
 
-/************************************************************************
- *									*
- *		Crazy document generator				*
- *									*
- ************************************************************************/
 thread_local! {
     static CRAZY_INDX: Cell<usize> = const { Cell::new(0) };
 }
@@ -366,11 +360,6 @@ unsafe fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32
         len
     })
 }
-/************************************************************************
- *									*
- *		Libxml2 specific routines				*
- *									*
- ************************************************************************/
 
 thread_local! {
     static NB_TESTS: Cell<i32> = const { Cell::new(0) };
@@ -448,10 +437,9 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 
     unsafe {
-        if let Some(node) =
-            node.filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
-        {
-            name = node.as_ref().name;
+        if let Some(node) = node.filter(|n| n.element_type() == XmlElementType::XmlElementNode) {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            name = node.name;
         }
 
         // Maintain the compatibility with the legacy error handling
@@ -637,11 +625,6 @@ unsafe fn initialize_libxml2() {
     }
 }
 
-/************************************************************************
- *									*
- *		SAX empty callbacks                                     *
- *									*
- ************************************************************************/
 thread_local! {
     static CALLBACKS: AtomicU64 = const { AtomicU64::new(0) };
 }
@@ -716,18 +699,21 @@ fn resolve_entity_callback(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityCallback")]
-fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> XmlEntityPtr {
+fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> Option<XmlEntityPtr> {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
-    null_mut()
+    None
 }
 
 /// Get a parameter entity by name
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityCallback")]
-fn get_parameter_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> XmlEntityPtr {
+fn get_parameter_entity_callback(
+    _ctx: Option<GenericErrorContext>,
+    _name: &str,
+) -> Option<XmlEntityPtr> {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
-    null_mut()
+    None
 }
 
 /// An entity definition has been parsed
@@ -949,9 +935,7 @@ unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -
     };
     let filename = CStr::from_ptr(filename).to_string_lossy();
     let filename = filename.as_ref();
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
-
-    if !doc.is_null() {
+    if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
         eprintln!("SAX parsing generated a document !");
         xml_free_doc(doc);
         res = 0;
@@ -1045,12 +1029,6 @@ unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32
     res
 }
 
-/************************************************************************
- *									*
- *			Tests descriptions				*
- *									*
- ************************************************************************/
-
 type Functest = unsafe fn(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32;
 
 struct LimitDesc<'a> {
@@ -1061,7 +1039,7 @@ struct LimitDesc<'a> {
 }
 
 static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
-    /* max length of a text node in content */
+    // max length of a text node in content
     LimitDesc {
         name: "huge:textNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
@@ -1080,7 +1058,7 @@ static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
         options: XmlParserOption::XmlParseHuge as i32,
         fail: 0,
     },
-    /* max length of a text node in content */
+    // max length of a text node in content
     LimitDesc {
         name: "huge:attrNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
@@ -1099,7 +1077,7 @@ static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
         options: XmlParserOption::XmlParseHuge as i32,
         fail: 0,
     },
-    /* max length of a comment node */
+    // max length of a comment node
     LimitDesc {
         name: "huge:commentNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
@@ -1118,7 +1096,7 @@ static LIMIT_DESCRIPTIONS: &[LimitDesc] = &[
         options: XmlParserOption::XmlParseHuge as i32,
         fail: 0,
     },
-    /* max length of a PI node */
+    // max length of a PI node
     LimitDesc {
         name: "huge:piNode",
         limit: XML_MAX_TEXT_LENGTH - CHUNK,
@@ -1150,7 +1128,7 @@ static TEST_DESCRIPTIONS: &[TestDesc] = &[
         desc: Some("Parsing of huge files with the sax parser"),
         func: Some(sax_test),
     },
-    /*    { "Parsing of huge files with the tree parser", treeTest}, */
+    // { "Parsing of huge files with the tree parser", treeTest},
     #[cfg(feature = "libxml_reader")]
     TestDesc {
         desc: Some("Parsing of huge files with the reader"),
@@ -1170,7 +1148,7 @@ struct TestException {
 }
 
 static TEST_EXCEPTIONS: &[TestException] = &[
-    /* the SAX parser doesn't hit a limit of XML_MAX_TEXT_LENGTH text nodes */
+    // the SAX parser doesn't hit a limit of XML_MAX_TEXT_LENGTH text nodes
     TestException {
         test: 0,
         limit: 1,

@@ -23,11 +23,10 @@ use std::io::Write;
 use std::{
     collections::HashMap,
     ffi::{c_char, CStr, CString},
-    mem::{size_of, size_of_val, zeroed},
+    mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut, NonNull},
+    ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
-    sync::atomic::Ordering,
 };
 
 use libc::{memset, strcat, strlen, strncat};
@@ -39,23 +38,22 @@ use crate::libxml::xmlautomata::{
 };
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlregexp::{
-    xml_reg_exec_push_string, xml_reg_free_exec_ctxt, xml_reg_free_regexp, xml_reg_new_exec_ctxt,
+    xml_reg_exec_push_string, xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt,
     xml_regexp_is_determinist, XmlRegExecCtxtPtr,
 };
 #[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlstring::xml_strncmp;
 #[cfg(not(feature = "libxml_regexp"))]
-use crate::tree::xml_free_node_list;
+use crate::tree::{xml_free_node_list, XmlNodePtr};
+#[cfg(feature = "libxml_valid")]
+use crate::tree::{XmlElementPtr, XmlGenericNodePtr, XmlNsPtr};
 use crate::{
     error::{XmlParserErrors, __xml_raise_error},
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{
-        globals::{xml_free, xml_malloc, xml_realloc},
-        hash::{
-            xml_hash_add_entry2, xml_hash_copy, xml_hash_free, xml_hash_lookup2,
-            xml_hash_remove_entry2, XmlHashTable,
-        },
+        globals::{xml_free, xml_malloc},
+        hash::XmlHashTable,
         parser::XmlParserMode,
         parser_internals::xml_string_current_char,
         xmlautomata::{
@@ -67,20 +65,16 @@ use crate::{
     list::XmlList,
     parser::{split_qname2, XmlParserCtxtPtr},
     tree::{
-        xml_build_qname, xml_free_attribute, xml_free_node, xml_get_doc_entity, xml_new_doc_node,
-        xml_split_qname2, xml_split_qname3, NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute,
-        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr,
-        XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur, XmlElementContentPtr,
-        XmlElementContentType, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNodePtr, XmlNotation, XmlNsPtr, XmlRef,
+        xml_build_qname, xml_free_attribute, xml_free_element, xml_free_node, xml_get_doc_entity,
+        xml_new_doc_node, xml_split_qname2, xml_split_qname3, NodeCommon, XmlAttrPtr, XmlAttribute,
+        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocProperties,
+        XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur,
+        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
+        XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID, XmlNodePtr, XmlNotation, XmlRef,
     },
 };
 
-use super::{
-    chvalid::xml_is_blank_char,
-    hash::{xml_hash_create, CVoidWrapper},
-    parser_internals::XML_VCTXT_USE_PCTXT,
-};
+use super::{chvalid::xml_is_blank_char, parser_internals::XML_VCTXT_USE_PCTXT};
 
 // Validation state added for non-determinist content model.
 pub type XmlValidStatePtr = *mut XmlValidState;
@@ -92,29 +86,29 @@ pub type XmlValidStatePtr = *mut XmlValidState;
 #[cfg(feature = "libxml_regexp")]
 #[repr(C)]
 pub struct XmlValidState {
-    elem_decl: XmlElementPtr, /* pointer to the content model */
-    node: XmlNodePtr,         /* pointer to the current node */
-    exec: XmlRegExecCtxtPtr,  /* regexp runtime */
+    elem_decl: Option<XmlElementPtr>, /* pointer to the content model */
+    node: XmlNodePtr,                 /* pointer to the current node */
+    exec: XmlRegExecCtxtPtr,          /* regexp runtime */
 }
 #[cfg(not(feature = "libxml_regexp"))]
 #[repr(C)]
 pub struct XmlValidState {
     cont: XmlElementContentPtr, /* pointer to the content model subtree */
     node: XmlNodePtr,           /* pointer to the current node in the list */
-    occurs: c_long,             /* bitfield for multiple occurrences */
-    depth: c_uchar,             /* current depth in the overall tree */
-    state: c_uchar,             /* ROLLBACK_XXX */
+    occurs: i64,                /* bitfield for multiple occurrences */
+    depth: u8,                  /* current depth in the overall tree */
+    state: u8,                  /* ROLLBACK_XXX */
 }
 
 /// Callback called when a validity error is found. This is a message
 /// oriented function similar to an *printf function.
 #[doc(alias = "xmlValidityErrorFunc")]
-pub type XmlValidityErrorFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
+pub type XmlValidityErrorFunc = unsafe fn(ctx: *mut c_void, msg: *const i8);
 
 /// Callback called when a validity warning is found. This is a message
 /// oriented function similar to an *printf function.
 #[doc(alias = "xmlValidityWarningFunc")]
-pub type XmlValidityWarningFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
+pub type XmlValidityWarningFunc = unsafe fn(ctx: *mut c_void, msg: *const i8);
 
 pub type XmlValidCtxtPtr = *mut XmlValidCtxt;
 /// An xmlValidCtxt is used for error reporting when validating.
@@ -126,20 +120,15 @@ pub struct XmlValidCtxt {
     pub warning: Option<GenericError>,                 /* the callback in case of warning */
 
     /* Node analysis stack used when validating within entities */
-    pub(crate) node: XmlNodePtr,          /* Current parsed Node */
-    pub(crate) node_nr: i32,              /* Depth of the parsing stack */
-    pub(crate) node_max: i32,             /* Max depth of the parsing stack */
-    pub(crate) node_tab: *mut XmlNodePtr, /* array of nodes */
+    pub(crate) node: Option<XmlNodePtr>, /* Current parsed Node */
+    pub(crate) node_tab: Vec<XmlNodePtr>, /* array of nodes */
 
-    pub(crate) flags: u32,     /* internal flags */
-    pub(crate) doc: XmlDocPtr, /* the document */
-    pub(crate) valid: i32,     /* temporary validity check result */
+    pub(crate) flags: u32,             /* internal flags */
+    pub(crate) doc: Option<XmlDocPtr>, /* the document */
+    pub(crate) valid: i32,             /* temporary validity check result */
 
-    /* state state used for non-determinist content validation */
-    pub(crate) vstate: *mut XmlValidState, /* current state */
-    pub(crate) vstate_nr: i32,             /* Depth of the validation stack */
-    pub(crate) vstate_max: i32,            /* Max depth of the validation stack */
-    pub(crate) vstate_tab: *mut XmlValidState, /* array of validation states */
+    // state state used for non-determinist content validation
+    pub(crate) vstate_tab: Vec<XmlValidState>, /* array of validation states */
 
     #[cfg(feature = "libxml_regexp")]
     pub(crate) am: XmlAutomataPtr, /* the automata */
@@ -157,42 +146,17 @@ impl Default for XmlValidCtxt {
             user_data: None,
             error: None,
             warning: None,
-            node: null_mut(),
-            node_nr: 0,
-            node_max: 0,
-            node_tab: null_mut(),
+            node: None,
+            node_tab: vec![],
             flags: 0,
-            doc: null_mut(),
+            doc: None,
             valid: 0,
-            vstate: null_mut(),
-            vstate_nr: 0,
-            vstate_max: 0,
-            vstate_tab: null_mut(),
+            vstate_tab: vec![],
             am: null_mut(),
             state: null_mut(),
         }
     }
 }
-
-// ALL notation declarations are stored in a table.
-// There is one table per DTD.
-pub type XmlNotationTable = XmlHashTable<'static, CVoidWrapper>;
-pub type XmlNotationTablePtr = *mut XmlNotationTable;
-
-// ALL element declarations are stored in a table.
-// There is one table per DTD.
-pub type XmlElementTable = XmlHashTable<'static, CVoidWrapper>;
-pub type XmlElementTablePtr = *mut XmlElementTable;
-
-// ALL attribute declarations are stored in a table.
-// There is one table per DTD.
-pub type XmlAttributeTable = XmlHashTable<'static, CVoidWrapper>;
-pub type XmlAttributeTablePtr = *mut XmlAttributeTable;
-
-// ALL Refs attributes are stored in a table.
-// There is one table per document.
-pub type XmlRefTable = XmlHashTable<'static, CVoidWrapper>;
-pub type XmlRefTablePtr = *mut XmlRefTable;
 
 /// Handle a validation error
 #[doc(alias = "xmlErrValid")]
@@ -213,8 +177,7 @@ macro_rules! xml_err_valid {
         if !ctxt.is_null() {
             channel = (*ctxt).error;
             data = (*ctxt).user_data.clone();
-            /* Look up flag to detect if it is part of a parsing
-            context */
+            // Look up flag to detect if it is part of a parsing context
             if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
                 pctxt = (*ctxt)
                     .user_data
@@ -231,7 +194,7 @@ macro_rules! xml_err_valid {
             channel,
             data,
             pctxt as _,
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromValid,
             $error,
             XmlErrorLevel::XmlErrError,
@@ -249,7 +212,7 @@ macro_rules! xml_err_valid {
 
 /// Handle an out of memory error
 #[doc(alias = "xmlVErrMemory")]
-unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>) {
+pub(crate) unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>) {
     let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut data = None;
@@ -275,7 +238,7 @@ unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>) {
             channel,
             data,
             pctxt as _,
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromValid,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
@@ -295,7 +258,7 @@ unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>) {
             channel,
             data,
             pctxt as _,
-            null_mut(),
+            None,
             XmlErrorDomain::XmlFromValid,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
@@ -317,20 +280,17 @@ unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>) {
 #[doc(alias = "xmlAddNotationDecl")]
 pub unsafe fn xml_add_notation_decl<'a>(
     _ctxt: XmlValidCtxtPtr,
-    dtd: XmlDtdPtr,
+    dtd: Option<&'a mut XmlDtd>,
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<&'a XmlNotation> {
-    if dtd.is_null() {
-        return None;
-    }
     if public_id.is_none() && system_id.is_none() {
         return None;
     }
 
     // Create the Notation table if needed.
-    let table = (*dtd)
+    let table = dtd?
         .notations
         .get_or_insert_with(|| Box::new(XmlHashTable::with_capacity(0)));
 
@@ -387,7 +347,7 @@ pub unsafe fn xml_new_element_content(
     name: Option<&str>,
     typ: XmlElementContentType,
 ) -> XmlElementContentPtr {
-    xml_new_doc_element_content(null_mut(), name, typ)
+    xml_new_doc_element_content(None, name, typ)
 }
 
 /// Build a copy of an element content description.
@@ -396,14 +356,14 @@ pub unsafe fn xml_new_element_content(
 /// Returns the new xmlElementContentPtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyElementContent")]
 pub unsafe fn xml_copy_element_content(content: XmlElementContentPtr) -> XmlElementContentPtr {
-    xml_copy_doc_element_content(null_mut(), content)
+    xml_copy_doc_element_content(None, content)
 }
 
 /// Free an element content structure. The whole subtree is removed.
 /// Deprecated, use xmlFreeDocElementContent instead
 #[doc(alias = "xmlFreeElementContent")]
 pub unsafe fn xml_free_element_content(cur: XmlElementContentPtr) {
-    xml_free_doc_element_content(null_mut(), cur);
+    xml_free_doc_element_content(None, cur);
 }
 
 /// Allocate an element content structure for the document.
@@ -411,7 +371,7 @@ pub unsafe fn xml_free_element_content(cur: XmlElementContentPtr) {
 /// Returns null_mut() if not, otherwise the new element content structure
 #[doc(alias = "xmlNewDocElementContent")]
 pub unsafe fn xml_new_doc_element_content(
-    _doc: XmlDocPtr,
+    _doc: Option<XmlDocPtr>,
     name: Option<&str>,
     typ: XmlElementContentType,
 ) -> XmlElementContentPtr {
@@ -470,7 +430,7 @@ pub unsafe fn xml_new_doc_element_content(
 /// Returns the new xmlElementContentPtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyDocElementContent")]
 pub unsafe fn xml_copy_doc_element_content(
-    _doc: XmlDocPtr,
+    _doc: Option<XmlDocPtr>,
     mut cur: XmlElementContentPtr,
 ) -> XmlElementContentPtr {
     let mut prev: XmlElementContentPtr;
@@ -538,7 +498,7 @@ pub unsafe fn xml_copy_doc_element_content(
 
 /// Free an element content structure. The whole subtree is removed.
 #[doc(alias = "xmlFreeDocElementContent")]
-pub unsafe fn xml_free_doc_element_content(_doc: XmlDocPtr, mut cur: XmlElementContentPtr) {
+pub unsafe fn xml_free_doc_element_content(_doc: Option<XmlDocPtr>, mut cur: XmlElementContentPtr) {
     let mut depth: usize = 0;
 
     if cur.is_null() {
@@ -739,23 +699,6 @@ pub unsafe fn xml_sprintf_element_content(
 ) {
 }
 
-/// Deallocate the memory used by an element definition
-#[doc(alias = "xmlFreeElement")]
-unsafe fn xml_free_element(elem: XmlElementPtr) {
-    if elem.is_null() {
-        return;
-    }
-    (*elem).unlink();
-    xml_free_doc_element_content((*elem).doc, (*elem).content);
-    (*elem).name = None;
-    (*elem).prefix = None;
-    #[cfg(feature = "libxml_regexp")]
-    if !(*elem).cont_model.is_null() {
-        xml_reg_free_regexp((*elem).cont_model);
-    }
-    xml_free(elem as _);
-}
-
 /// Handle a validation error, provide contextual information
 ///
 /// # Note
@@ -764,7 +707,7 @@ unsafe fn xml_free_element(elem: XmlElementPtr) {
 #[cfg(any(feature = "libxml_valid", feature = "schema"))]
 unsafe fn xml_err_valid_node(
     ctxt: XmlValidCtxtPtr,
-    node: XmlNodePtr,
+    node: Option<XmlGenericNodePtr>,
     error: XmlParserErrors,
     msg: &str,
     str1: Option<&str>,
@@ -798,7 +741,7 @@ unsafe fn xml_err_valid_node(
         channel,
         data,
         pctxt as _,
-        node as _,
+        node,
         XmlErrorDomain::XmlFromValid,
         error,
         XmlErrorLevel::XmlErrError,
@@ -819,19 +762,12 @@ unsafe fn xml_err_valid_node(
 #[doc(alias = "xmlAddElementDecl")]
 pub unsafe fn xml_add_element_decl(
     ctxt: XmlValidCtxtPtr,
-    dtd: XmlDtdPtr,
+    dtd: Option<XmlDtdPtr>,
     mut name: &str,
     typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
-) -> XmlElementPtr {
-    let mut ret: XmlElementPtr;
-    let mut table: XmlElementTablePtr;
-    let mut old_attributes: XmlAttributePtr = null_mut();
-
-    if dtd.is_null() {
-        return null_mut();
-    }
-
+) -> Option<XmlElementPtr> {
+    let mut dtd = dtd?;
     match typ {
         Some(XmlElementTypeVal::XmlElementTypeEmpty) => {
             if !content.is_null() {
@@ -840,7 +776,7 @@ pub unsafe fn xml_add_element_decl(
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content != NULL for EMPTY\n"
                 );
-                return null_mut();
+                return None;
             }
         }
         Some(XmlElementTypeVal::XmlElementTypeAny) => {
@@ -850,7 +786,7 @@ pub unsafe fn xml_add_element_decl(
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content != NULL for ANY\n"
                 );
-                return null_mut();
+                return None;
             }
         }
         Some(XmlElementTypeVal::XmlElementTypeMixed) => {
@@ -860,7 +796,7 @@ pub unsafe fn xml_add_element_decl(
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content == NULL for MIXED\n"
                 );
-                return null_mut();
+                return None;
             }
         }
         Some(XmlElementTypeVal::XmlElementTypeElement) => {
@@ -870,7 +806,7 @@ pub unsafe fn xml_add_element_decl(
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content == NULL for ELEMENT\n"
                 );
-                return null_mut();
+                return None;
             }
         }
         _ => {
@@ -879,7 +815,7 @@ pub unsafe fn xml_add_element_decl(
                 XmlParserErrors::XmlErrInternalError,
                 "Internal: ELEMENT decl corrupted invalid type\n"
             );
-            return null_mut();
+            return None;
         }
     }
 
@@ -890,59 +826,39 @@ pub unsafe fn xml_add_element_decl(
         name = localname;
     }
 
-    // Create the Element table if needed.
-    table = (*dtd).elements as XmlElementTablePtr;
-    if table.is_null() {
-        table = xml_hash_create(0);
-        (*dtd).elements = table as *mut c_void;
-    }
-    if table.is_null() {
-        xml_verr_memory(ctxt, Some("xmlAddElementDecl: Table creation failed!\n"));
-        return null_mut();
-    }
-
+    let mut old_attributes = None;
     // lookup old attributes inserted on an undefined element in the internal subset.
-    if !(*dtd).doc.is_null() && !(*(*dtd).doc).int_subset.is_null() {
-        let name = CString::new(name).unwrap();
-        let ns = ns.map(|ns| CString::new(ns).unwrap());
-        ret = xml_hash_lookup2(
-            (*(*(*dtd).doc).int_subset).elements as _,
-            name.as_ptr() as *const u8,
-            ns.as_deref()
-                .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
-        ) as _;
-        if !ret.is_null() && matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
-            old_attributes = (*ret).attributes;
-            (*ret).attributes = null_mut();
-            xml_hash_remove_entry2(
-                (*(*(*dtd).doc).int_subset).elements as _,
-                name.as_ptr() as *const u8,
-                ns.as_deref()
-                    .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
-                None,
-            );
-            xml_free_element(ret);
+    if let Some(mut dtd) = dtd.doc.and_then(|doc| doc.int_subset) {
+        let ret = dtd
+            .elements
+            .as_ref()
+            .and_then(|table| table.lookup2(name, ns))
+            .cloned();
+        if let Some(mut ret) =
+            ret.filter(|ret| ret.etype == XmlElementTypeVal::XmlElementTypeUndefined)
+        {
+            old_attributes = ret.attributes.take();
+            dtd.elements
+                .as_mut()
+                .unwrap()
+                .remove_entry2(name, ns, |_, _| {});
+            xml_free_element(Some(ret));
         }
     }
 
-    let cname = CString::new(name).unwrap();
-    let cns = ns.map(|ns| CString::new(ns).unwrap());
-
+    // Create the Element table if needed.
+    let table = dtd
+        .elements
+        .get_or_insert_with(|| XmlHashTable::with_capacity(0));
     // The element may already be present if one of its attribute was registered first
-    ret = xml_hash_lookup2(
-        table,
-        cname.as_ptr() as *const u8,
-        cns.as_deref()
-            .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
-    ) as _;
-    if !ret.is_null() {
-        if !matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
+    let mut ret = if let Some(ret) = table.lookup2(name, ns).cloned() {
+        if !matches!(ret.etype, XmlElementTypeVal::XmlElementTypeUndefined) {
             #[cfg(feature = "libxml_valid")]
             {
                 // The element is already defined in this DTD.
                 xml_err_valid_node(
                     ctxt,
-                    dtd as XmlNodePtr,
+                    Some(dtd.into()),
                     XmlParserErrors::XmlDTDElemRedefined,
                     format!("Redefinition of element {name}\n").as_str(),
                     Some(name),
@@ -950,38 +866,29 @@ pub unsafe fn xml_add_element_decl(
                     None,
                 );
             }
-            return null_mut();
+            return None;
         }
+        ret
     } else {
-        ret = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
-        if ret.is_null() {
+        let Some(mut ret) = XmlElementPtr::new(XmlElement {
+            typ: XmlElementType::XmlElementDecl,
+            name: Some(Box::new(name.to_owned())),
+            prefix: ns.map(|ns| ns.to_owned()),
+            ..Default::default()
+        }) else {
             xml_verr_memory(ctxt as _, Some("malloc failed"));
-            return null_mut();
-        }
-        memset(ret as _, 0, size_of::<XmlElement>());
-        std::ptr::write(&mut *ret, XmlElement::default());
-        (*ret).typ = XmlElementType::XmlElementDecl;
-
-        // fill the structure.
-        (*ret).name = Some(Box::new(name.to_owned()));
-        (*ret).prefix = ns.map(|ns| ns.to_owned());
+            return None;
+        };
 
         // Validity Check:
         // Insertion must not fail
-        if xml_hash_add_entry2(
-            table,
-            cname.as_ptr() as *const u8,
-            cns.as_deref()
-                .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
-            ret as _,
-        ) != 0
-        {
+        if table.add_entry2(name, ns, ret).is_err() {
             #[cfg(feature = "libxml_valid")]
             {
                 // The element is already defined in this DTD.
                 xml_err_valid_node(
                     ctxt,
-                    dtd as XmlNodePtr,
+                    Some(dtd.into()),
                     XmlParserErrors::XmlDTDElemRedefined,
                     format!("Redefinition of element {name}\n").as_str(),
                     Some(name),
@@ -989,101 +896,52 @@ pub unsafe fn xml_add_element_decl(
                     None,
                 );
             }
-            xml_free_element(ret);
-            return null_mut();
+            ret.free();
+            return None;
         }
         // For new element, may have attributes from earlier
         // definition in internal subset
-        (*ret).attributes = old_attributes;
-    }
+        ret.attributes = old_attributes;
+        ret
+    };
 
     // Finish to fill the structure.
-    (*ret).etype = typ.unwrap();
+    ret.etype = typ.unwrap();
     // Avoid a stupid copy when called by the parser
     // and flag it by setting a special parent value
     // so the parser doesn't unallocate it.
     if !ctxt.is_null() && (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-        (*ret).content = content;
+        ret.content = content;
         if !content.is_null() {
             (*content).parent = 1 as XmlElementContentPtr;
         }
     } else {
-        (*ret).content = xml_copy_doc_element_content((*dtd).doc, content);
+        ret.content = xml_copy_doc_element_content(dtd.doc, content);
     }
 
     // Link it to the DTD
-    (*ret).parent = dtd;
-    (*ret).doc = (*dtd).doc;
-    if let Some(mut last) = (*dtd).last {
-        last.next = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*ret).prev = Some(last);
-        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
+    ret.parent = Some(dtd);
+    ret.doc = dtd.doc;
+    if let Some(mut last) = dtd.last() {
+        last.set_next(Some(ret.into()));
+        ret.set_prev(Some(last));
+        dtd.set_last(Some(ret.into()));
     } else {
-        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*dtd).last = (*dtd).children;
+        dtd.set_children(Some(ret.into()));
+        let children = dtd.children();
+        dtd.set_last(children);
     }
-    ret
-}
-
-/// Build a copy of an element.
-///
-/// Returns the new xmlElementPtr or null_mut() in case of error.
-#[doc(alias = "xmlCopyElement")]
-#[cfg(feature = "libxml_tree")]
-extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
-    let elem: XmlElementPtr = payload as XmlElementPtr;
-
-    unsafe {
-        let cur: XmlElementPtr = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
-        if cur.is_null() {
-            xml_verr_memory(null_mut(), Some("malloc failed"));
-            return null_mut();
-        }
-        memset(cur as _, 0, size_of::<XmlElement>());
-        std::ptr::write(&mut *cur, XmlElement::default());
-        (*cur).typ = XmlElementType::XmlElementDecl;
-        (*cur).etype = (*elem).etype;
-        (*cur).name = (*elem).name.clone();
-        (*cur).prefix = (*elem).prefix.clone();
-        (*cur).content = xml_copy_element_content((*elem).content);
-        /* TODO : rebuild the attribute list on the copy */
-        (*cur).attributes = null_mut();
-        cur as _
-    }
-}
-
-/// Build a copy of an element table.
-///
-/// Returns the new xmlElementTablePtr or null_mut() in case of error.
-#[doc(alias = "xmlCopyElementTable")]
-#[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_copy_element_table(table: XmlElementTablePtr) -> XmlElementTablePtr {
-    xml_hash_copy(table, Some(xml_copy_element)) as XmlElementTablePtr
-}
-
-extern "C" fn xml_free_element_table_entry(elem: *mut c_void, _name: *const XmlChar) {
-    unsafe {
-        xml_free_element(elem as XmlElementPtr);
-    }
-}
-
-/// Deallocate the memory used by an element hash table.
-#[doc(alias = "xmlFreeElementTable")]
-pub unsafe fn xml_free_element_table(table: XmlElementTablePtr) {
-    xml_hash_free(table, Some(xml_free_element_table_entry));
+    Some(ret)
 }
 
 /// This will dump the content of the element table as an XML DTD definition
 #[doc(alias = "xmlDumpElementTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_element_table<'a>(buf: &mut (impl Write + 'a), table: XmlElementTablePtr) {
-    if table.is_null() {
-        return;
-    }
-    let Some(table) = XmlHashTableRef::from_raw(table) else {
-        return;
-    };
-    table.scan(|data, _, _, _| xml_dump_element_decl(buf, data.0 as XmlElementPtr));
+pub unsafe fn xml_dump_element_table<'a>(
+    buf: &mut (impl Write + 'a),
+    table: &XmlHashTable<'static, XmlElementPtr>,
+) {
+    table.scan(|data, _, _, _| xml_dump_element_decl(buf, *data));
 }
 
 /// Dump the occurrence operator of an element.
@@ -1210,41 +1068,38 @@ unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: Xml
 #[doc(alias = "xmlDumpElementDecl")]
 #[cfg(feature = "libxml_output")]
 pub unsafe fn xml_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlElementPtr) {
-    if elem.is_null() {
-        return;
-    }
-    let name = (*elem).name.as_deref().unwrap();
-    match (*elem).etype {
+    let name = elem.name.as_deref().unwrap();
+    match elem.etype {
         XmlElementTypeVal::XmlElementTypeEmpty => {
             write!(buf, "<!ELEMENT ");
-            if let Some(prefix) = (*elem).prefix.as_deref() {
+            if let Some(prefix) = elem.prefix.as_deref() {
                 write!(buf, "{prefix}:");
             }
             writeln!(buf, "{} EMPTY>", name);
         }
         XmlElementTypeVal::XmlElementTypeAny => {
             write!(buf, "<!ELEMENT ");
-            if let Some(prefix) = (*elem).prefix.as_deref() {
+            if let Some(prefix) = elem.prefix.as_deref() {
                 write!(buf, "{prefix}:");
             }
             writeln!(buf, "{} ANY>", name);
         }
         XmlElementTypeVal::XmlElementTypeMixed => {
             write!(buf, "<!ELEMENT ");
-            if let Some(prefix) = (*elem).prefix.as_deref() {
+            if let Some(prefix) = elem.prefix.as_deref() {
                 write!(buf, "{prefix}:");
             }
             write!(buf, "{} ", name);
-            xml_dump_element_content(buf, (*elem).content);
+            xml_dump_element_content(buf, elem.content);
             writeln!(buf, ">",);
         }
         XmlElementTypeVal::XmlElementTypeElement => {
             write!(buf, "<!ELEMENT ");
-            if let Some(prefix) = (*elem).prefix.as_deref() {
+            if let Some(prefix) = elem.prefix.as_deref() {
                 write!(buf, "{prefix}:");
             }
             write!(buf, "{} ", name);
-            xml_dump_element_content(buf, (*elem).content);
+            xml_dump_element_content(buf, elem.content);
             writeln!(buf, ">",);
         }
         _ => {
@@ -1258,10 +1113,12 @@ pub unsafe fn xml_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlEl
 }
 
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_is_doc_name_start_char(doc: XmlDocPtr, c: i32) -> i32 {
+unsafe fn xml_is_doc_name_start_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
     use super::parser_internals::xml_is_letter;
 
-    if doc.is_null() || (*doc).properties & XmlDocProperties::XmlDocOld10 as i32 == 0 {
+    if doc.map_or(true, |doc| {
+        doc.properties & XmlDocProperties::XmlDocOld10 as i32 == 0
+    }) {
         // Use the new checks of production [4] [4a] amd [5] of the
         // Update 5 of XML-1.0
         if (c >= b'a' as i32 && c <= b'z' as i32)
@@ -1290,7 +1147,7 @@ unsafe fn xml_is_doc_name_start_char(doc: XmlDocPtr, c: i32) -> i32 {
 }
 
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_is_doc_name_char(doc: XmlDocPtr, c: i32) -> i32 {
+unsafe fn xml_is_doc_name_char(doc: Option<XmlDocPtr>, c: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_digit, xml_is_extender},
         parser_internals::xml_is_letter,
@@ -1298,7 +1155,9 @@ unsafe fn xml_is_doc_name_char(doc: XmlDocPtr, c: i32) -> i32 {
 
     use super::chvalid::xml_is_combining;
 
-    if doc.is_null() || (*doc).properties & XmlDocProperties::XmlDocOld10 as i32 == 0 {
+    if doc.map_or(true, |doc| {
+        doc.properties & XmlDocProperties::XmlDocOld10 as i32 == 0
+    }) {
         // Use the new checks of production [4] [4a] amd [5] of the
         // Update 5 of XML-1.0
         if (c >= b'a' as i32 && c <= b'z' as i32)
@@ -1345,7 +1204,7 @@ unsafe fn xml_is_doc_name_char(doc: XmlDocPtr, c: i32) -> i32 {
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNamesValueInternal")]
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_validate_names_value_internal(doc: XmlDocPtr, value: *const XmlChar) -> i32 {
+unsafe fn xml_validate_names_value_internal(doc: Option<XmlDocPtr>, value: *const XmlChar) -> i32 {
     let mut cur: *const XmlChar;
     let mut val: i32;
     let mut len: i32 = 0;
@@ -1396,7 +1255,7 @@ unsafe fn xml_validate_names_value_internal(doc: XmlDocPtr, value: *const XmlCha
 }
 
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_validate_name_value_internal(doc: XmlDocPtr, value: *const XmlChar) -> i32 {
+unsafe fn xml_validate_name_value_internal(doc: Option<XmlDocPtr>, value: *const XmlChar) -> i32 {
     let mut cur: *const XmlChar;
     let mut val: i32;
     let mut len: i32 = 0;
@@ -1432,7 +1291,10 @@ unsafe fn xml_validate_name_value_internal(doc: XmlDocPtr, value: *const XmlChar
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNmtokensValueInternal")]
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_validate_nmtokens_value_internal(doc: XmlDocPtr, value: *const XmlChar) -> i32 {
+unsafe fn xml_validate_nmtokens_value_internal(
+    doc: Option<XmlDocPtr>,
+    value: *const XmlChar,
+) -> i32 {
     use super::chvalid::xml_is_blank_char;
 
     let mut cur: *const XmlChar;
@@ -1497,7 +1359,10 @@ unsafe fn xml_validate_nmtokens_value_internal(doc: XmlDocPtr, value: *const Xml
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNmtokenValueInternal")]
 #[cfg(feature = "libxml_valid")]
-unsafe fn xml_validate_nmtoken_value_internal(doc: XmlDocPtr, value: *const XmlChar) -> i32 {
+unsafe fn xml_validate_nmtoken_value_internal(
+    doc: Option<XmlDocPtr>,
+    value: *const XmlChar,
+) -> i32 {
     let mut cur: *const XmlChar;
     let mut val: i32;
     let mut len: i32 = 0;
@@ -1533,7 +1398,7 @@ unsafe fn xml_validate_nmtoken_value_internal(doc: XmlDocPtr, value: *const XmlC
 #[doc(alias = "xmlValidateAttributeValueInternal")]
 #[cfg(feature = "libxml_valid")]
 unsafe fn xml_validate_attribute_value_internal(
-    doc: XmlDocPtr,
+    doc: Option<XmlDocPtr>,
     typ: XmlAttributeType,
     value: *const XmlChar,
 ) -> i32 {
@@ -1639,7 +1504,7 @@ macro_rules! xml_err_valid_warning {
             channel,
             data,
             pctxt as _,
-            $node as _,
+            $node,
             XmlErrorDomain::XmlFromValid,
             $error,
             XmlErrorLevel::XmlErrWarning,
@@ -1661,44 +1526,43 @@ macro_rules! xml_err_valid_warning {
 #[doc(alias = "xmlGetDtdElementDesc2")]
 unsafe fn xml_get_dtd_element_desc2(
     ctxt: XmlValidCtxtPtr,
-    dtd: XmlDtdPtr,
+    mut dtd: XmlDtdPtr,
     mut name: *const XmlChar,
     create: i32,
-) -> XmlElementPtr {
-    let mut table: XmlElementTablePtr;
-    let mut cur: XmlElementPtr;
-
+) -> Option<XmlElementPtr> {
     let mut prefix: *mut XmlChar = null_mut();
 
-    if dtd.is_null() {
-        return null_mut();
+    if dtd.elements.is_none() && create == 0 {
+        return None;
     }
-    if (*dtd).elements.is_null() {
-        if create == 0 {
-            return null_mut();
-        }
-        // Create the Element table if needed.
-        table = (*dtd).elements as XmlElementTablePtr;
-        if table.is_null() {
-            table = xml_hash_create(0);
-            (*dtd).elements = table as *mut c_void;
-        }
-        if table.is_null() {
-            xml_verr_memory(ctxt, Some("element table allocation failed"));
-            return null_mut();
-        }
-    }
-    table = (*dtd).elements as XmlElementTablePtr;
-
+    let table = dtd
+        .elements
+        .get_or_insert_with(|| XmlHashTable::with_capacity(0));
     let uqname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix));
     if !uqname.is_null() {
         name = uqname;
     }
-    let name = CString::new(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()).unwrap();
-    cur = xml_hash_lookup2(table, name.as_ptr() as *const u8, prefix) as _;
-    if cur.is_null() && create != 0 {
-        cur = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
-        if cur.is_null() {
+    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+    let mut cur = table
+        .lookup2(
+            &name,
+            (!prefix.is_null())
+                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                .as_deref(),
+        )
+        .cloned();
+    if cur.is_none() && create != 0 {
+        let Some(res) = XmlElementPtr::new(XmlElement {
+            typ: XmlElementType::XmlElementDecl,
+            name: Some(Box::new(name.clone().into_owned())),
+            prefix: (!prefix.is_null()).then(|| {
+                CStr::from_ptr(prefix as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+            }),
+            etype: XmlElementTypeVal::XmlElementTypeUndefined,
+            ..Default::default()
+        }) else {
             xml_verr_memory(ctxt as _, Some("malloc failed"));
             //  goto error;
             if !prefix.is_null() {
@@ -1707,24 +1571,22 @@ unsafe fn xml_get_dtd_element_desc2(
             if !uqname.is_null() {
                 xml_free(uqname as _);
             }
-            return cur;
-        }
-        std::ptr::write(&mut *cur, XmlElement::default());
-        (*cur).typ = XmlElementType::XmlElementDecl;
-
-        // fill the structure.
-        (*cur).name = Some(Box::new(name.to_string_lossy().into_owned()));
-        (*cur).prefix = (!prefix.is_null()).then(|| {
-            CStr::from_ptr(prefix as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        (*cur).etype = XmlElementTypeVal::XmlElementTypeUndefined;
-
-        if xml_hash_add_entry2(table, name.as_ptr() as *const u8, prefix, cur as _) < 0 {
+            return None;
+        };
+        cur = Some(res);
+        if table
+            .add_entry2(
+                &name,
+                (!prefix.is_null())
+                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                    .as_deref(),
+                res,
+            )
+            .is_err()
+        {
             xml_verr_memory(ctxt, Some("adding entry failed"));
             xml_free_element(cur);
-            cur = null_mut();
+            cur = None;
         }
     }
     //  error:
@@ -1744,22 +1606,18 @@ unsafe fn xml_get_dtd_element_desc2(
 #[doc(alias = "xmlScanIDAttributeDecl")]
 #[cfg(feature = "libxml_valid")]
 unsafe fn xml_scan_id_attribute_decl(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr, err: i32) -> i32 {
-    let mut cur: XmlAttributePtr;
     let mut ret: i32 = 0;
 
-    if elem.is_null() {
-        return 0;
-    }
-    cur = (*elem).attributes;
-    while !cur.is_null() {
-        if matches!((*cur).atype, XmlAttributeType::XmlAttributeID) {
+    let mut cur = elem.attributes;
+    while let Some(now) = cur {
+        if matches!(now.atype, XmlAttributeType::XmlAttributeID) {
             ret += 1;
             if ret > 1 && err != 0 {
-                let elem_name = (*elem).name.as_deref().unwrap();
-                let cur_name = (*cur).name().unwrap();
+                let elem_name = elem.name.as_deref().unwrap();
+                let cur_name = now.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem as XmlNodePtr,
+                    Some(elem.into()),
                     XmlParserErrors::XmlDTDMultipleID,
                     format!(
                         "Element {elem_name} has too many ID attributes defined : {cur_name}\n"
@@ -1771,7 +1629,7 @@ unsafe fn xml_scan_id_attribute_decl(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr,
                 );
             }
         }
-        cur = (*cur).nexth;
+        cur = now.nexth;
     }
     ret
 }
@@ -1784,7 +1642,7 @@ unsafe fn xml_scan_id_attribute_decl(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr,
 #[doc(alias = "xmlAddAttributeDecl")]
 pub unsafe fn xml_add_attribute_decl(
     ctxt: XmlValidCtxtPtr,
-    dtd: XmlDtdPtr,
+    dtd: Option<XmlDtdPtr>,
     elem: &str,
     name: &str,
     ns: Option<&str>,
@@ -1792,12 +1650,8 @@ pub unsafe fn xml_add_attribute_decl(
     def: XmlAttributeDefault,
     mut default_value: Option<&str>,
     tree: Option<Box<XmlEnumeration>>,
-) -> XmlAttributePtr {
-    let mut ret: XmlAttributePtr;
-
-    if dtd.is_null() {
-        return null_mut();
-    }
+) -> Option<XmlAttributePtr> {
+    let mut dtd = dtd?;
 
     #[cfg(feature = "libxml_valid")]
     {
@@ -1812,28 +1666,16 @@ pub unsafe fn xml_add_attribute_decl(
             XmlAttributeType::XmlAttributeNmtoken => {}
             XmlAttributeType::XmlAttributeNmtokens => {}
             XmlAttributeType::XmlAttributeEnumeration => {}
-            XmlAttributeType::XmlAttributeNotation => {} // _ => {
-                                                         //     xml_err_valid!(
-                                                         //         ctxt,
-                                                         //         XmlParserErrors::XmlErrInternalError,
-                                                         //         c"Internal: ATTRIBUTE struct corrupted invalid type\n".as_ptr() as _,
-                                                         //         null_mut(),
-                                                         //     );
-                                                         //     xml_free_enumeration(tree);
-                                                         //     return null_mut();
-                                                         // }
+            XmlAttributeType::XmlAttributeNotation => {}
         }
         if let Some(def) = default_value.filter(|&default_value| {
             let default_value = CString::new(default_value).unwrap();
-            xml_validate_attribute_value_internal(
-                (*dtd).doc,
-                typ,
-                default_value.as_ptr() as *const u8,
-            ) == 0
+            xml_validate_attribute_value_internal(dtd.doc, typ, default_value.as_ptr() as *const u8)
+                == 0
         }) {
             xml_err_valid_node(
                 ctxt,
-                dtd as XmlNodePtr,
+                Some(dtd.into()),
                 XmlParserErrors::XmlDTDAttributeDefault,
                 format!("Attribute {elem} of {name}: invalid default value\n").as_str(),
                 Some(elem),
@@ -1849,58 +1691,50 @@ pub unsafe fn xml_add_attribute_decl(
 
     // Check first that an attribute defined in the external subset wasn't
     // already defined in the internal subset
-    if !(*dtd).doc.is_null()
-        && (*(*dtd).doc).ext_subset == dtd
-        && !(*(*dtd).doc).int_subset.is_null()
-    {
-        if let Some(attributes) = (*(*(*dtd).doc).int_subset).attributes {
-            ret = attributes
-                .lookup3(name, ns, Some(elem))
-                .copied()
-                .unwrap_or(null_mut());
-            if !ret.is_null() {
-                return null_mut();
+    if let Some(doc) = dtd.doc.filter(|doc| doc.ext_subset == Some(dtd)) {
+        if let Some(int_subset) = doc.int_subset {
+            if let Some(attributes) = int_subset.attributes {
+                let ret = attributes.lookup3(name, ns, Some(elem)).copied();
+                if ret.is_some() {
+                    return None;
+                }
             }
         }
     }
 
     // Create the Attribute table if needed.
-    let mut table = if let Some(table) = (*dtd).attributes {
+    let mut table = if let Some(table) = dtd.attributes {
         table
     } else {
         let table = XmlHashTable::with_capacity(0);
         let Some(table) = XmlHashTableRef::from_table(table) else {
             xml_verr_memory(ctxt, Some("xmlAddAttributeDecl: Table creation failed!\n"));
-            return null_mut();
+            return None;
         };
-        (*dtd).attributes = Some(table);
+        dtd.attributes = Some(table);
         table
     };
 
-    ret = xml_malloc(size_of::<XmlAttribute>()) as XmlAttributePtr;
-    if ret.is_null() {
+    let Some(mut ret) = XmlAttributePtr::new(XmlAttribute {
+        typ: XmlElementType::XmlAttributeDecl,
+        atype: typ,
+        // doc must be set before possible error causes call
+        // to xmlFreeAttribute (because it's used to check on dict use)
+        doc: dtd.doc,
+        name: xml_strndup(name.as_ptr(), name.len() as i32),
+        prefix: ns.map(|ns| ns.to_owned()),
+        elem: Some(elem.to_owned()),
+        def,
+        tree,
+        ..Default::default()
+    }) else {
         xml_verr_memory(ctxt as _, Some("malloc failed"));
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlAttribute::default());
-    (*ret).typ = XmlElementType::XmlAttributeDecl;
+        return None;
+    };
 
-    // fill the structure.
-    (*ret).atype = typ;
-    // doc must be set before possible error causes call
-    // to xmlFreeAttribute (because it's used to check on dict use)
-    (*ret).doc = (*dtd).doc;
-    {
-        let name = CString::new(name).unwrap();
-        (*ret).name = xml_strdup(name.as_ptr() as *const u8);
-    }
-    (*ret).prefix = ns.map(|ns| ns.to_owned());
-    (*ret).elem = Some(elem.to_owned());
-    (*ret).def = def;
-    (*ret).tree = tree;
     if let Some(default_value) = default_value {
         let default_value = CString::new(default_value).unwrap();
-        (*ret).default_value = xml_strdup(default_value.as_ptr() as *const u8);
+        ret.default_value = xml_strdup(default_value.as_ptr() as *const u8);
     }
 
     // Validity Check:
@@ -1908,8 +1742,8 @@ pub unsafe fn xml_add_attribute_decl(
     if table
         .add_entry3(
             (*ret).name().unwrap().as_ref(),
-            (*ret).prefix.as_deref(),
-            (*ret).elem.as_deref(),
+            ret.prefix.as_deref(),
+            ret.elem.as_deref(),
             ret as _,
         )
         .is_err()
@@ -1919,7 +1753,7 @@ pub unsafe fn xml_add_attribute_decl(
             // The attribute is already defined in this DTD.
             xml_err_valid_warning!(
                 ctxt,
-                dtd as XmlNodePtr,
+                Some(dtd.into()),
                 XmlParserErrors::XmlDTDAttributeRedefined,
                 "Attribute {} of element {}: already defined\n",
                 name,
@@ -1927,15 +1761,14 @@ pub unsafe fn xml_add_attribute_decl(
             );
         }
         xml_free_attribute(ret);
-        return null_mut();
+        return None;
     }
 
     let celem = CString::new(elem).unwrap();
     // Validity Check:
     // Multiple ID per element
-    let elem_def: XmlElementPtr =
-        xml_get_dtd_element_desc2(ctxt, dtd, celem.as_ptr() as *const u8, 1);
-    if !elem_def.is_null() {
+    let elem_def = xml_get_dtd_element_desc2(ctxt, dtd, celem.as_ptr() as *const u8, 1);
+    if let Some(mut elem_def) = elem_def {
         #[cfg(feature = "libxml_valid")]
         {
             if matches!(typ, XmlAttributeType::XmlAttributeID)
@@ -1943,7 +1776,7 @@ pub unsafe fn xml_add_attribute_decl(
             {
                 xml_err_valid_node(
                     ctxt,
-                    dtd as XmlNodePtr,
+                    Some(dtd.into()),
                     XmlParserErrors::XmlDTDMultipleID,
                     format!("Element {elem} has too may ID attributes defined : {name}\n").as_str(),
                     Some(elem),
@@ -1957,74 +1790,41 @@ pub unsafe fn xml_add_attribute_decl(
         }
 
         // Insert namespace default def first they need to be processed first.
-        if xml_str_equal((*ret).name, c"xmlns".as_ptr() as _)
-            || (*ret).prefix.as_deref() == Some("xmlns")
-        {
-            (*ret).nexth = (*elem_def).attributes;
-            (*elem_def).attributes = ret;
+        if (*ret).name().as_deref() == Some("xmlns") || ret.prefix.as_deref() == Some("xmlns") {
+            ret.nexth = elem_def.attributes;
+            elem_def.attributes = Some(ret);
         } else {
-            let mut tmp: XmlAttributePtr = (*elem_def).attributes;
+            let mut tmp = elem_def.attributes;
 
-            while !tmp.is_null()
-                && (xml_str_equal((*tmp).name, c"xmlns".as_ptr() as _)
-                    || (*ret).prefix.as_deref() == Some("xmlns"))
-            {
-                if (*tmp).nexth.is_null() {
+            while let Some(now) = tmp.filter(|tmp| {
+                tmp.name().as_deref() == Some("xmlns") || ret.prefix.as_deref() == Some("xmlns")
+            }) {
+                if now.nexth.is_none() {
                     break;
                 }
-                tmp = (*tmp).nexth;
+                tmp = now.nexth;
             }
-            if !tmp.is_null() {
-                (*ret).nexth = (*tmp).nexth;
-                (*tmp).nexth = ret;
+            if let Some(mut tmp) = tmp {
+                ret.nexth = tmp.nexth;
+                tmp.nexth = Some(ret);
             } else {
-                (*ret).nexth = (*elem_def).attributes;
-                (*elem_def).attributes = ret;
+                ret.nexth = elem_def.attributes;
+                elem_def.attributes = Some(ret);
             }
         }
     }
 
     // Link it to the DTD
-    (*ret).parent = dtd;
-    if let Some(mut last) = (*dtd).last {
-        last.next = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*ret).prev = Some(last);
-        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
+    ret.parent = Some(dtd);
+    if let Some(mut last) = dtd.last() {
+        last.set_next(Some(ret.into()));
+        ret.set_prev(Some(last));
+        dtd.set_last(Some(ret.into()));
     } else {
-        (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
-        (*dtd).last = NodePtr::from_ptr(ret as *mut XmlNode);
+        dtd.set_children(Some(ret.into()));
+        dtd.set_last(Some(ret.into()));
     }
-    ret
-}
-
-/// Build a copy of an attribute.
-///
-/// Returns the new xmlAttributePtr or null_mut() in case of error.
-#[doc(alias = "xmlCopyAttribute")]
-#[cfg(feature = "libxml_tree")]
-extern "C" fn xml_copy_attribute(attr: *mut XmlAttribute) -> *mut XmlAttribute {
-    unsafe {
-        let cur: XmlAttributePtr = xml_malloc(size_of::<XmlAttribute>()) as XmlAttributePtr;
-        if cur.is_null() {
-            xml_verr_memory(null_mut(), Some("malloc failed"));
-            return null_mut();
-        }
-        memset(cur as _, 0, size_of::<XmlAttribute>());
-        std::ptr::write(&mut *cur, XmlAttribute::default());
-        (*cur).typ = XmlElementType::XmlAttributeDecl;
-        (*cur).atype = (*attr).atype;
-        (*cur).def = (*attr).def;
-        (*cur).tree = (*attr).tree.clone();
-        (*cur).elem = (*attr).elem.clone();
-        if !(*attr).name.is_null() {
-            (*cur).name = xml_strdup((*attr).name);
-        }
-        (*cur).prefix = (*attr).prefix.clone();
-        if !(*attr).default_value.is_null() {
-            (*cur).default_value = xml_strdup((*attr).default_value);
-        }
-        cur
-    }
+    Some(ret)
 }
 
 /// Build a copy of an attribute table.
@@ -2033,15 +1833,33 @@ extern "C" fn xml_copy_attribute(attr: *mut XmlAttribute) -> *mut XmlAttribute {
 #[doc(alias = "xmlCopyAttributeTable")]
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_copy_attribute_table(
-    table: XmlHashTableRef<'static, *mut XmlAttribute>,
-) -> Option<XmlHashTableRef<'_, *mut XmlAttribute>> {
-    let new = table.clone_with(|payload, _| xml_copy_attribute(*payload));
+    table: XmlHashTableRef<'static, XmlAttributePtr>,
+) -> Option<XmlHashTableRef<'_, XmlAttributePtr>> {
+    let new = table.clone_with(|attr, _| {
+        let mut cur = XmlAttributePtr::new(XmlAttribute {
+            typ: XmlElementType::XmlAttributeDecl,
+            atype: attr.atype,
+            def: attr.def,
+            tree: attr.tree.clone(),
+            elem: attr.elem.clone(),
+            prefix: attr.prefix.clone(),
+            ..Default::default()
+        })
+        .unwrap();
+        if !attr.name.is_null() {
+            cur.name = xml_strdup(attr.name);
+        }
+        if !attr.default_value.is_null() {
+            cur.default_value = xml_strdup(attr.default_value);
+        }
+        cur
+    });
     XmlHashTableRef::from_table(new)
 }
 
 /// Deallocate the memory used by an entities hash table.
 #[doc(alias = "xmlFreeAttributeTable")]
-pub unsafe fn xml_free_attribute_table(mut table: XmlHashTable<'static, *mut XmlAttribute>) {
+pub unsafe fn xml_free_attribute_table(mut table: XmlHashTable<'static, XmlAttributePtr>) {
     table.clear_with(|payload, _| {
         xml_free_attribute(payload);
     });
@@ -2052,15 +1870,9 @@ pub unsafe fn xml_free_attribute_table(mut table: XmlHashTable<'static, *mut Xml
 #[cfg(feature = "libxml_output")]
 pub unsafe fn xml_dump_attribute_table<'a>(
     buf: &mut (impl Write + 'a),
-    table: XmlAttributeTablePtr,
+    table: XmlHashTableRef<'static, XmlAttributePtr>,
 ) {
-    if table.is_null() {
-        return;
-    }
-    let Some(table) = XmlHashTableRef::from_raw(table) else {
-        return;
-    };
-    table.scan(|data, _, _, _| xml_dump_attribute_decl(buf, data.0 as XmlAttributePtr));
+    table.scan(|data, _, _, _| xml_dump_attribute_decl(buf, *data));
 }
 
 /// This will dump the content of the attribute declaration as an XML DTD definition
@@ -2069,18 +1881,15 @@ pub unsafe fn xml_dump_attribute_table<'a>(
 pub unsafe fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: XmlAttributePtr) {
     use crate::{io::write_quoted, tree::xml_dump_enumeration};
 
-    if attr.is_null() {
-        return;
-    }
     write!(buf, "<!ATTLIST ");
-    let elem = (*attr).elem.as_deref().unwrap();
+    let elem = attr.elem.as_deref().unwrap();
     write!(buf, "{elem}");
     write!(buf, " ");
-    if let Some(prefix) = (*attr).prefix.as_deref() {
+    if let Some(prefix) = attr.prefix.as_deref() {
         write!(buf, "{}:", prefix);
     }
     write!(buf, "{}", (*attr).name().unwrap());
-    match (*attr).atype {
+    match attr.atype {
         XmlAttributeType::XmlAttributeCDATA => write!(buf, " CDATA").ok(),
         XmlAttributeType::XmlAttributeID => write!(buf, " ID").ok(),
         XmlAttributeType::XmlAttributeIDREF => write!(buf, " IDREF").ok(),
@@ -2091,26 +1900,26 @@ pub unsafe fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: Xml
         XmlAttributeType::XmlAttributeNmtokens => write!(buf, " NMTOKENS").ok(),
         XmlAttributeType::XmlAttributeEnumeration => {
             write!(buf, " (");
-            xml_dump_enumeration(buf, (*attr).tree.as_deref().unwrap());
+            xml_dump_enumeration(buf, attr.tree.as_deref().unwrap());
             Some(())
         }
         XmlAttributeType::XmlAttributeNotation => {
             write!(buf, " NOTATION (");
-            xml_dump_enumeration(buf, (*attr).tree.as_deref().unwrap());
+            xml_dump_enumeration(buf, attr.tree.as_deref().unwrap());
             Some(())
         }
     };
-    match (*attr).def {
+    match attr.def {
         XmlAttributeDefault::XmlAttributeNone => None,
         XmlAttributeDefault::XmlAttributeRequired => write!(buf, " #REQUIRED").ok(),
         XmlAttributeDefault::XmlAttributeImplied => write!(buf, " #IMPLIED").ok(),
         XmlAttributeDefault::XmlAttributeFixed => write!(buf, " #FIXED").ok(),
     };
-    if !(*attr).default_value.is_null() {
+    if !attr.default_value.is_null() {
         write!(buf, " ");
         write_quoted(
             buf,
-            CStr::from_ptr((*attr).default_value as *const i8)
+            CStr::from_ptr(attr.default_value as *const i8)
                 .to_string_lossy()
                 .as_ref(),
         );
@@ -2140,47 +1949,42 @@ unsafe fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> i32 {
 ///
 /// Returns null_mut() if not, otherwise the new xmlIDPtr
 #[doc(alias = "xmlAddID")]
-pub unsafe fn xml_add_id<'a>(
+pub unsafe fn xml_add_id(
     ctxt: XmlValidCtxtPtr,
-    doc: XmlDocPtr,
+    mut doc: XmlDocPtr,
     value: &str,
-    attr: XmlAttrPtr,
-) -> Option<&'a XmlID> {
-    if doc.is_null() {
-        return None;
-    }
+    mut attr: XmlAttrPtr,
+) -> Option<()> {
     if value.is_empty() {
         return None;
     }
-    if attr.is_null() {
-        return None;
-    }
 
-    // Create the ID table if needed.
-    let table = (*doc)
-        .ids
-        .get_or_insert_with(|| Box::new(XmlHashTable::with_capacity(0)));
-
-    let mut ret = Box::new(XmlID::default());
-    ret.value = value.to_owned();
-    ret.doc = doc;
+    let mut ret = XmlID {
+        value: value.to_owned(),
+        doc: Some(doc),
+        ..Default::default()
+    };
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
-        ret.name = (*attr).name().map(|n| n.into_owned());
-        ret.attr = null_mut();
+        ret.name = attr.name().map(|n| n.into_owned());
+        ret.attr = None;
     } else {
-        ret.attr = attr;
+        ret.attr = Some(attr);
         ret.name = None;
     }
-    ret.lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
+    ret.lineno = attr.parent().map_or(-1, |p| p.get_line_no() as i32);
 
+    // Create the ID table if needed.
+    doc.ids
+        .get_or_insert(Box::new(XmlHashTable::with_capacity(0)));
+    let table = doc.ids.as_deref_mut().unwrap();
     if table.add_entry(value, ret).is_err() {
         // The id is already defined in this DTD.
         #[cfg(feature = "libxml_valid")]
         if !ctxt.is_null() {
             xml_err_valid_node(
                 ctxt,
-                (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
+                attr.parent(),
                 XmlParserErrors::XmlDTDIDRedefined,
                 format!("ID {value} already defined\n").as_str(),
                 Some(value),
@@ -2190,10 +1994,8 @@ pub unsafe fn xml_add_id<'a>(
         }
         return None;
     }
-    if !attr.is_null() {
-        (*attr).atype = Some(XmlAttributeType::XmlAttributeID);
-    }
-    table.lookup(value).map(|res| &**res)
+    attr.atype = Some(XmlAttributeType::XmlAttributeID);
+    Some(())
 }
 
 /// Search the attribute declaring the given ID
@@ -2201,23 +2003,24 @@ pub unsafe fn xml_add_id<'a>(
 /// Returns null_mut() if not found,
 /// otherwise the xmlAttrPtr defining the ID or XmlDocPtr as `*mut dyn NodeCommon`.
 #[doc(alias = "xmlGetID")]
-pub unsafe fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> Option<NonNull<dyn NodeCommon>> {
-    if doc.is_null() {
-        return None;
-    }
-
+pub unsafe fn xml_get_id(
+    doc: XmlDocPtr,
+    id: *const XmlChar,
+) -> Option<Result<XmlAttrPtr, XmlDocPtr>> {
     if id.is_null() {
         return None;
     }
 
-    let table = (*doc).ids.as_deref()?;
+    let table = doc.ids.as_deref()?;
     let id_ptr = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())?;
-    if id_ptr.attr.is_null() {
-        // We are operating on a stream, return a well known reference
-        // since the attribute node doesn't exist anymore
-        return NonNull::new(doc as *mut dyn NodeCommon);
+    match id_ptr.attr {
+        Some(attr) => Some(Ok(attr)),
+        None => {
+            // We are operating on a stream, return a well known reference
+            // since the attribute node doesn't exist anymore
+            Some(Err(doc))
+        }
     }
-    NonNull::new(id_ptr.attr as *mut dyn NodeCommon)
 }
 
 /// Determine whether an attribute is of type ID. In case we have DTD(s)
@@ -2227,85 +2030,95 @@ pub unsafe fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> Option<NonNull<d
 ///
 /// Returns 0 or 1 depending on the lookup result
 #[doc(alias = "xmlIsID")]
-pub unsafe fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAttrPtr) -> i32 {
-    if attr.is_null() || (*attr).name.is_null() {
+pub unsafe fn xml_is_id(
+    doc: Option<XmlDocPtr>,
+    elem: Option<XmlNodePtr>,
+    attr: Option<XmlAttrPtr>,
+) -> i32 {
+    let Some(attr) = attr.filter(|a| !a.name.is_null()) else {
         return 0;
-    }
-    if !(*attr).ns.is_null()
-        && (*attr).name().as_deref() == Some("id")
-        && (*(*attr).ns).prefix().as_deref() == Some("xml")
+    };
+    if attr.name().as_deref() == Some("id")
+        && attr
+            .ns
+            .map_or(false, |ns| ns.prefix().as_deref() == Some("xml"))
     {
         return 1;
     }
-    if doc.is_null() {
+    let Some(doc) = doc else {
         return 0;
-    }
-    if (*doc).int_subset.is_null()
-        && (*doc).ext_subset.is_null()
-        && !matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode)
+    };
+    if doc.int_subset.is_none()
+        && doc.ext_subset.is_none()
+        && !matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode)
     {
         return 0;
-    } else if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
-        if xml_str_equal(c"id".as_ptr() as _, (*attr).name)
-            || (xml_str_equal(c"name".as_ptr() as _, (*attr).name)
-                && (elem.is_null() || xml_str_equal((*elem).name, c"a".as_ptr() as _)))
+    } else if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
+        if xml_str_equal(c"id".as_ptr() as _, attr.name)
+            || (xml_str_equal(c"name".as_ptr() as _, attr.name)
+                && elem.map_or(true, |elem| xml_str_equal(elem.name, c"a".as_ptr() as _)))
         {
             return 1;
         }
         return 0;
-    } else if elem.is_null() {
-        return 0;
-    } else {
-        let mut attr_decl: XmlAttributePtr = null_mut();
-
+    } else if let Some(elem) = elem {
         let felem: [XmlChar; 50] = [0; 50];
         let fattr: [XmlChar; 50] = [0; 50];
 
         let fullelemname: *mut XmlChar =
-            if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
-                xml_build_qname((*elem).name, (*(*elem).ns).prefix, felem.as_ptr() as _, 50)
+            if let Some(prefix) = elem.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                xml_build_qname(elem.name, prefix, felem.as_ptr() as _, 50)
             } else {
-                (*elem).name as *mut XmlChar
+                elem.name as *mut XmlChar
             };
 
         let fullattrname: *mut XmlChar =
-            if !(*attr).ns.is_null() && (*(*attr).ns).prefix().is_some() {
-                xml_build_qname((*attr).name, (*(*attr).ns).prefix, fattr.as_ptr() as _, 50)
+            if let Some(prefix) = attr.ns.map(|ns| ns.prefix).filter(|pre| !pre.is_null()) {
+                xml_build_qname(attr.name, prefix, fattr.as_ptr() as _, 50)
             } else {
-                (*attr).name as *mut XmlChar
+                attr.name as *mut XmlChar
             };
 
+        let mut attr_decl = None;
         if !fullelemname.is_null() && !fullattrname.is_null() {
-            attr_decl = (*(*doc).int_subset).get_attr_desc(
-                CStr::from_ptr(fullelemname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                CStr::from_ptr(fullattrname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            );
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_attr_desc(
+            attr_decl = doc.int_subset.and_then(|dtd| {
+                dtd.get_attr_desc(
                     CStr::from_ptr(fullelemname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
                     CStr::from_ptr(fullattrname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                );
+                )
+            });
+            if attr_decl.is_none() {
+                if let Some(ext_subset) = doc.ext_subset {
+                    attr_decl = ext_subset.get_attr_desc(
+                        CStr::from_ptr(fullelemname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        CStr::from_ptr(fullattrname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                }
             }
         }
 
-        if fullattrname != fattr.as_ptr() as _ && fullattrname != (*attr).name as _ {
+        if fullattrname != fattr.as_ptr() as _ && fullattrname != attr.name as _ {
             xml_free(fullattrname as _);
         }
-        if fullelemname != felem.as_ptr() as _ && fullelemname != (*elem).name as _ {
+        if fullelemname != felem.as_ptr() as _ && fullelemname != elem.name as _ {
             xml_free(fullelemname as _);
         }
 
-        if !attr_decl.is_null() && matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeID) {
+        if attr_decl.map_or(false, |attr_decl| {
+            matches!(attr_decl.atype, XmlAttributeType::XmlAttributeID)
+        }) {
             return 1;
         }
+    } else {
+        return 0;
     }
     0
 }
@@ -2347,31 +2160,24 @@ unsafe fn xml_valid_normalize_string(str: *mut XmlChar) {
 ///
 /// Returns -1 if the lookup failed and 0 otherwise
 #[doc(alias = "xmlRemoveID")]
-pub unsafe fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
-    if doc.is_null() {
+pub unsafe fn xml_remove_id(mut doc: XmlDocPtr, mut attr: XmlAttrPtr) -> i32 {
+    if doc.ids.is_none() {
         return -1;
     }
-    if attr.is_null() {
-        return -1;
-    }
-
-    let Some(table) = (*doc).ids.as_deref_mut() else {
-        return -1;
-    };
-
-    let Some(id) = (*attr).children.and_then(|c| c.get_string(doc, 1)) else {
+    let Some(id) = attr.children().and_then(|c| c.get_string(Some(doc), 1)) else {
         return -1;
     };
     let id = CString::new(id).unwrap();
     let id = xml_strdup(id.as_ptr() as *const u8);
     xml_valid_normalize_string(id);
 
+    let table = doc.ids.as_deref_mut().unwrap();
     let Some(id_ptr) = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())
     else {
         xml_free(id as _);
         return -1;
     };
-    if id_ptr.attr != attr {
+    if id_ptr.attr != Some(attr) {
         xml_free(id as _);
         return -1;
     }
@@ -2381,7 +2187,7 @@ pub unsafe fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
         |_, _| {},
     );
     xml_free(id as _);
-    (*attr).atype = None;
+    attr.atype = None;
     0
 }
 
@@ -2395,19 +2201,12 @@ pub unsafe fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
 #[doc(alias = "xmlAddRef")]
 pub(crate) unsafe fn xml_add_ref(
     ctxt: XmlValidCtxtPtr,
-    doc: XmlDocPtr,
+    mut doc: XmlDocPtr,
     value: &str,
     attr: XmlAttrPtr,
 ) -> Option<()> {
-    if doc.is_null() {
-        return None;
-    }
-    if attr.is_null() {
-        return None;
-    }
-
     // Create the Ref table if needed.
-    let table = (*doc).refs.get_or_insert_with(HashMap::new);
+    let table = doc.refs.get_or_insert_with(HashMap::new);
     let mut ret = XmlRef {
         value: value.to_owned(),
         ..Default::default()
@@ -2415,13 +2214,13 @@ pub(crate) unsafe fn xml_add_ref(
     // fill the structure.
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
-        ret.name = (*attr).name().map(|n| n.into_owned());
-        ret.attr = null_mut();
+        ret.name = attr.name().map(|n| n.into_owned());
+        ret.attr = None;
     } else {
         ret.name = None;
-        ret.attr = attr;
+        ret.attr = Some(attr);
     }
-    ret.lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
+    ret.lineno = attr.parent().map_or(-1, |p| p.get_line_no() as i32);
 
     // To add a reference :-
     // References are maintained as a list of references,
@@ -2441,45 +2240,48 @@ pub(crate) unsafe fn xml_add_ref(
 ///
 /// Returns 0 or 1 depending on the lookup result
 #[doc(alias = "xmlIsRef")]
-pub(crate) unsafe fn xml_is_ref(mut doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAttrPtr) -> i32 {
-    if attr.is_null() {
+pub(crate) unsafe fn xml_is_ref(
+    doc: Option<XmlDocPtr>,
+    elem: Option<XmlNodePtr>,
+    attr: Option<XmlAttrPtr>,
+) -> i32 {
+    let Some(attr) = attr else {
         return 0;
-    }
-    if doc.is_null() {
-        doc = (*attr).doc;
-        if doc.is_null() {
-            return 0;
-        }
-    }
+    };
+    let Some(doc) = doc.or(attr.doc) else {
+        return 0;
+    };
 
-    if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
+    if doc.int_subset.is_none() && doc.ext_subset.is_none() {
         return 0;
-    } else if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
+    } else if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
         // TODO @@@
         return 0;
     } else {
-        let mut attr_decl: XmlAttributePtr;
-
-        if elem.is_null() {
+        let Some(elem) = elem else {
             return 0;
-        }
-        attr_decl = (*(*doc).int_subset).get_attr_desc(
-            (*elem).name().as_deref().unwrap(),
-            (*attr).name().as_deref().unwrap(),
-        );
-        if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-            attr_decl = (*(*doc).ext_subset).get_attr_desc(
-                (*elem).name().as_deref().unwrap(),
+        };
+        let mut attr_decl = doc.int_subset.and_then(|dtd| {
+            dtd.get_attr_desc(
+                elem.name().as_deref().unwrap(),
                 (*attr).name().as_deref().unwrap(),
-            );
+            )
+        });
+        if attr_decl.is_none() {
+            if let Some(ext_subset) = doc.ext_subset {
+                attr_decl = ext_subset.get_attr_desc(
+                    elem.name().as_deref().unwrap(),
+                    (*attr).name().as_deref().unwrap(),
+                );
+            }
         }
 
-        if !attr_decl.is_null()
-            && matches!(
-                (*attr_decl).atype,
+        if attr_decl.map_or(false, |attr_decl| {
+            matches!(
+                attr_decl.atype,
                 XmlAttributeType::XmlAttributeIDREF | XmlAttributeType::XmlAttributeIDREFS
             )
-        {
+        }) {
             return 1;
         }
     }
@@ -2490,22 +2292,16 @@ pub(crate) unsafe fn xml_is_ref(mut doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlA
 ///
 /// Returns -1 if the lookup failed and 0 otherwise
 #[doc(alias = "xmlRemoveRef")]
-pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
-    if doc.is_null() {
-        return -1;
-    }
-    if attr.is_null() {
+pub(crate) unsafe fn xml_remove_ref(mut doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
+    if doc.refs.is_none() {
         return -1;
     }
 
-    let Some(table) = (*doc).refs.as_mut() else {
+    let Some(id) = attr.children().and_then(|c| c.get_string(Some(doc), 1)) else {
         return -1;
     };
 
-    let Some(id) = (*attr).children.and_then(|c| c.get_string(doc, 1)) else {
-        return -1;
-    };
-
+    let table = doc.refs.as_mut().unwrap();
     let Some(ref_list) = table.get_mut(&id) else {
         return -1;
     };
@@ -2521,7 +2317,7 @@ pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
     // will have enough data to be able to remove the entry.
 
     // Remove the supplied attr from our list
-    ref_list.remove_first_by(|refe| refe.attr == attr);
+    ref_list.remove_first_by(|refe| refe.attr == Some(attr));
 
     // If the list is empty then remove the list entry in the hash
     if ref_list.is_empty() {
@@ -2535,14 +2331,10 @@ pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
 /// Returns `None` if not found, otherwise node set for the ID.
 #[doc(alias = "xmlGetRefs")]
 pub(crate) unsafe fn xml_get_refs<'a>(
-    doc: XmlDocPtr,
+    doc: &'a XmlDoc,
     id: &str,
 ) -> Option<&'a XmlList<Box<XmlRef>>> {
-    if doc.is_null() {
-        return None;
-    }
-
-    (*doc).refs.as_ref()?.get(id)
+    doc.refs.as_ref()?.get(id)
 }
 
 /// Allocate a validation context structure.
@@ -2557,7 +2349,7 @@ pub unsafe fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
         return null_mut();
     }
 
-    memset(ret as _, 0, size_of::<XmlValidCtxt>());
+    std::ptr::write(&mut *ret, XmlValidCtxt::default());
 
     ret
 }
@@ -2566,15 +2358,12 @@ pub unsafe fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
 #[doc(alias = "xmlFreeValidCtxt")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
+    use std::ptr::drop_in_place;
+
     if cur.is_null() {
         return;
     }
-    if !(*cur).vstate_tab.is_null() {
-        xml_free((*cur).vstate_tab as _);
-    }
-    if !(*cur).node_tab.is_null() {
-        xml_free((*cur).node_tab as _);
-    }
+    drop_in_place(cur);
     xml_free(cur as _);
 }
 
@@ -2590,36 +2379,31 @@ pub unsafe fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
 pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     let ret: i32;
 
-    if doc.is_null() {
-        return 0;
-    }
+    // if doc.is_null() {
+    //     return 0;
+    // }
 
-    let root: XmlNodePtr = (*doc).get_root_element();
-    if root.is_null() || (*root).name.is_null() {
+    let Some(root) = doc.get_root_element().filter(|root| !root.name.is_null()) else {
         xml_err_valid!(ctxt, XmlParserErrors::XmlDTDNoRoot, "no root element\n");
         return 0;
-    }
+    };
 
     // When doing post validation against a separate DTD, those may
     // no internal subset has been generated
-    if !(*doc).int_subset.is_null() && !(*(*doc).int_subset).name.is_null() {
+    if let Some(int_subset) = doc.int_subset.filter(|dtd| !dtd.name.is_null()) {
         // Check first the document root against the NQName
-        if !xml_str_equal((*(*doc).int_subset).name, (*root).name) {
-            if !(*root).ns.is_null() && (*(*root).ns).prefix().is_some() {
+        if !xml_str_equal(int_subset.name, root.name) {
+            if let Some(prefix) = root.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
                 let mut fname: [XmlChar; 50] = [0; 50];
 
-                let fullname: *mut XmlChar = xml_build_qname(
-                    (*root).name,
-                    (*(*root).ns).prefix as _,
-                    fname.as_mut_ptr(),
-                    50,
-                );
+                let fullname: *mut XmlChar =
+                    xml_build_qname(root.name, prefix, fname.as_mut_ptr(), 50);
                 if fullname.is_null() {
                     xml_verr_memory(ctxt, None);
                     return 0;
                 }
-                ret = xml_str_equal((*(*doc).int_subset).name, fullname) as i32;
-                if fullname != fname.as_ptr() as _ && fullname != (*root).name as _ {
+                ret = xml_str_equal(int_subset.name, fullname) as i32;
+                if fullname != fname.as_ptr() as _ && fullname != root.name as _ {
                     xml_free(fullname as _);
                 }
                 if ret == 1 {
@@ -2627,18 +2411,18 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
                     return 1;
                 }
             }
-            if xml_str_equal((*(*doc).int_subset).name, c"HTML".as_ptr() as _)
-                && xml_str_equal((*root).name, c"html".as_ptr() as _)
+            if xml_str_equal(int_subset.name, c"HTML".as_ptr() as _)
+                && xml_str_equal(root.name, c"html".as_ptr() as _)
             {
                 // goto name_ok;
                 return 1;
             }
 
-            let root_name = (*root).name().unwrap();
-            let subset_name = (*(*doc).int_subset).name().unwrap();
+            let root_name = root.name().unwrap();
+            let subset_name = int_subset.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                root,
+                Some(root.into()),
                 XmlParserErrors::XmlDTDRootName,
                 format!("root and DTD name do not match '{root_name}' and '{subset_name}'\n")
                     .as_str(),
@@ -2657,7 +2441,7 @@ macro_rules! CHECK_DTD {
     ($doc:expr) => {
         if $doc.is_null() {
             return 0;
-        } else if (*$doc).int_subset.is_null() && (*$doc).ext_subset.is_null() {
+        } else if (*$doc).int_subset.is_none() && (*$doc).ext_subset.is_none() {
             return 0;
         }
     };
@@ -2676,16 +2460,20 @@ macro_rules! CHECK_DTD {
 pub unsafe fn xml_validate_element_decl(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    elem: XmlElementPtr,
+    elem: Option<XmlElementPtr>,
 ) -> i32 {
     let mut ret: i32 = 1;
-    let mut tst: XmlElementPtr;
 
-    CHECK_DTD!(doc);
+    // if doc.is_null() {
+    //     return 0;
+    // }
+    if doc.int_subset.is_none() && doc.ext_subset.is_none() {
+        return 0;
+    };
 
-    if elem.is_null() {
+    let Some(elem) = elem else {
         return 1;
-    }
+    };
 
     // #if 0
     // #ifdef LIBXML_REGEXP_ENABLED
@@ -2695,12 +2483,12 @@ pub unsafe fn xml_validate_element_decl(
     // #endif
 
     // No Duplicate Types
-    if matches!((*elem).etype, XmlElementTypeVal::XmlElementTypeMixed) {
+    if matches!(elem.etype, XmlElementTypeVal::XmlElementTypeMixed) {
         let mut cur: XmlElementContentPtr;
         let mut next: XmlElementContentPtr;
         let mut name: *const XmlChar;
 
-        cur = (*elem).content;
+        cur = elem.content;
         while !cur.is_null() {
             if !matches!((*cur).typ, XmlElementContentType::XmlElementContentOr) {
                 break;
@@ -2719,12 +2507,12 @@ pub unsafe fn xml_validate_element_decl(
                         if xml_str_equal((*next).name, name)
                             && xml_str_equal((*next).prefix, (*(*cur).c1).prefix)
                         {
-                            let elem_name = (*elem).name.as_deref().unwrap();
+                            let elem_name = elem.name.as_deref().unwrap();
                             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                             if (*(*cur).c1).prefix.is_null() {
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem as XmlNodePtr,
+                                    Some(elem.into()),
                                     XmlParserErrors::XmlDTDContentError,
                                     format!("Definition of {elem_name} has duplicate references of {name}\n")
                                         .as_str(),
@@ -2737,7 +2525,7 @@ pub unsafe fn xml_validate_element_decl(
                                     .to_string_lossy();
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem as XmlNodePtr,
+                                    Some(elem.into()),
                                     XmlParserErrors::XmlDTDContentError,
                                     format!("Definition of {elem_name} has duplicate references of {prefix}:{name}\n").as_str(),
                                     Some(elem_name.as_str()),
@@ -2761,12 +2549,12 @@ pub unsafe fn xml_validate_element_decl(
                     if xml_str_equal((*(*next).c1).name, name)
                         && xml_str_equal((*(*next).c1).prefix, (*(*cur).c1).prefix)
                     {
-                        let elem_name = (*elem).name.as_deref().unwrap();
+                        let elem_name = elem.name.as_deref().unwrap();
                         let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                         if (*(*cur).c1).prefix.is_null() {
                             xml_err_valid_node(
                                 ctxt,
-                                elem as XmlNodePtr,
+                                Some(elem.into()),
                                 XmlParserErrors::XmlDTDContentError,
                                 format!(
                                     "Definition of {elem_name} has duplicate references to {name}\n"
@@ -2781,7 +2569,7 @@ pub unsafe fn xml_validate_element_decl(
                                 CStr::from_ptr((*(*cur).c1).prefix as *const i8).to_string_lossy();
                             xml_err_valid_node(
                                 ctxt,
-                                elem as XmlNodePtr,
+                                Some(elem.into()),
                                 XmlParserErrors::XmlDTDContentError,
                                 format!(
                                     "Definition of {elem_name} has duplicate references to {prefix}:{name}\n"
@@ -2801,26 +2589,26 @@ pub unsafe fn xml_validate_element_decl(
         }
     }
 
-    let elem_name = (*elem)
+    let elem_name = elem
         .name
         .as_ref()
         .map(|n| CString::new(n.as_str()).unwrap());
     // VC: Unique Element Type Declaration
-    tst = xml_get_dtd_element_desc(
-        (*doc).int_subset,
+    let tst = xml_get_dtd_element_desc(
+        doc.int_subset,
         elem_name
             .as_ref()
             .map_or(null(), |n| n.as_ptr() as *const u8),
     );
-    if !tst.is_null()
-        && tst != elem
-        && (*tst).prefix == (*elem).prefix
-        && !matches!((*tst).etype, XmlElementTypeVal::XmlElementTypeUndefined)
-    {
+    if tst.map_or(false, |tst| {
+        tst != elem
+            && tst.prefix == elem.prefix
+            && !matches!(tst.etype, XmlElementTypeVal::XmlElementTypeUndefined)
+    }) {
         let elem_name = elem_name.as_deref().unwrap().to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem as XmlNodePtr,
+            Some(elem.into()),
             XmlParserErrors::XmlDTDElemRedefined,
             format!("Redefinition of element {elem_name}\n").as_str(),
             Some(&elem_name),
@@ -2829,21 +2617,21 @@ pub unsafe fn xml_validate_element_decl(
         );
         ret = 0;
     }
-    tst = xml_get_dtd_element_desc(
-        (*doc).ext_subset,
+    let tst = xml_get_dtd_element_desc(
+        doc.ext_subset,
         elem_name
             .as_ref()
             .map_or(null(), |n| n.as_ptr() as *const u8),
     );
-    if !tst.is_null()
-        && tst != elem
-        && (*tst).prefix == (*elem).prefix
-        && !matches!((*tst).etype, XmlElementTypeVal::XmlElementTypeUndefined)
-    {
+    if tst.map_or(false, |tst| {
+        tst != elem
+            && tst.prefix == elem.prefix
+            && !matches!(tst.etype, XmlElementTypeVal::XmlElementTypeUndefined)
+    }) {
         let elem_name = elem_name.as_deref().unwrap().to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem as XmlNodePtr,
+            Some(elem.into()),
             XmlParserErrors::XmlDTDElemRedefined,
             format!("Redefinition of element {elem_name}\n").as_str(),
             Some(&elem_name),
@@ -2877,43 +2665,37 @@ pub unsafe fn xml_valid_normalize_attribute_value(
     name: &str,
     value: *const XmlChar,
 ) -> *mut XmlChar {
-    let mut attr_decl: XmlAttributePtr;
-
-    if doc.is_null() {
-        return null_mut();
-    }
-    if elem.is_null() {
-        return null_mut();
-    }
+    // if elem.is_null() {
+    //     return null_mut();
+    // }
     if value.is_null() {
         return null_mut();
     }
 
-    if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
+    if let Some(prefix) = elem.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
         let mut fname: [XmlChar; 50] = [0; 50];
 
-        let fullname: *mut XmlChar = xml_build_qname(
-            (*elem).name,
-            (*(*elem).ns).prefix as _,
-            fname.as_mut_ptr(),
-            50,
-        );
+        let fullname: *mut XmlChar = xml_build_qname(elem.name, prefix, fname.as_mut_ptr(), 50);
         if fullname.is_null() {
             return null_mut();
         }
-        if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
+        if fullname != fname.as_ptr() as _ && fullname != elem.name as _ {
             xml_free(fullname as _);
         }
     }
-    attr_decl = (*(*doc).int_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
-    if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-        attr_decl = (*(*doc).ext_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
+    let mut attr_decl = doc
+        .int_subset
+        .and_then(|dtd| dtd.get_attr_desc(elem.name().as_deref().unwrap(), name));
+    if attr_decl.is_none() {
+        if let Some(ext_subset) = doc.ext_subset {
+            attr_decl = ext_subset.get_attr_desc(elem.name().as_deref().unwrap(), name);
+        }
     }
 
-    if attr_decl.is_null() {
+    let Some(attr_decl) = attr_decl else {
         return null_mut();
-    }
-    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeCDATA) {
+    };
+    if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeCDATA) {
         return null_mut();
     }
 
@@ -2946,66 +2728,66 @@ pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
     name: &str,
     value: *const XmlChar,
 ) -> *mut XmlChar {
-    let mut attr_decl: XmlAttributePtr = null_mut();
     let mut extsubset: i32 = 0;
 
-    if doc.is_null() {
-        return null_mut();
-    }
-    if elem.is_null() {
-        return null_mut();
-    }
+    // if elem.is_null() {
+    //     return null_mut();
+    // }
     if value.is_null() {
         return null_mut();
     }
 
-    if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
+    let mut attr_decl = None;
+    if let Some(prefix) = elem.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
         let mut fname: [XmlChar; 50] = [0; 50];
 
-        let fullname: *mut XmlChar = xml_build_qname(
-            (*elem).name,
-            (*(*elem).ns).prefix as _,
-            fname.as_mut_ptr(),
-            50,
-        );
+        let fullname: *mut XmlChar = xml_build_qname(elem.name, prefix, fname.as_mut_ptr(), 50);
         if fullname.is_null() {
             return null_mut();
         }
-        attr_decl = (*(*doc).int_subset).get_attr_desc(
-            CStr::from_ptr(fullname as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-            name,
-        );
-        if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-            attr_decl = (*(*doc).ext_subset).get_attr_desc(
+        attr_decl = doc.int_subset.and_then(|dtd| {
+            dtd.get_attr_desc(
                 CStr::from_ptr(fullname as *const i8)
                     .to_string_lossy()
                     .as_ref(),
                 name,
-            );
-            if !attr_decl.is_null() {
-                extsubset = 1;
+            )
+        });
+        if attr_decl.is_none() {
+            if let Some(ext_subset) = doc.ext_subset {
+                attr_decl = ext_subset.get_attr_desc(
+                    CStr::from_ptr(fullname as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    name,
+                );
+                if attr_decl.is_some() {
+                    extsubset = 1;
+                }
             }
         }
-        if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
+        if fullname != fname.as_ptr() as _ && fullname != elem.name as _ {
             xml_free(fullname as _);
         }
     }
-    if attr_decl.is_null() && !(*doc).int_subset.is_null() {
-        attr_decl = (*(*doc).int_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
+    if attr_decl.is_none() {
+        if let Some(int_subset) = doc.int_subset {
+            attr_decl = int_subset.get_attr_desc(elem.name().as_deref().unwrap(), name);
+        }
     }
-    if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-        attr_decl = (*(*doc).ext_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
-        if !attr_decl.is_null() {
-            extsubset = 1;
+    if attr_decl.is_none() {
+        if let Some(ext_subset) = doc.ext_subset {
+            attr_decl = ext_subset.get_attr_desc(elem.name().as_deref().unwrap(), name);
+            if attr_decl.is_some() {
+                extsubset = 1;
+            }
         }
     }
 
-    if attr_decl.is_null() {
+    let Some(attr_decl) = attr_decl else {
         return null_mut();
-    }
-    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeCDATA) {
+    };
+    if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeCDATA) {
         return null_mut();
     }
 
@@ -3014,11 +2796,11 @@ pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
         return null_mut();
     }
     xml_valid_normalize_string(ret);
-    if (*doc).standalone != 0 && extsubset == 1 && !xml_str_equal(value, ret) {
-        let elem_name = (*elem).name().unwrap();
+    if doc.standalone != 0 && extsubset == 1 && !xml_str_equal(value, ret) {
+        let elem_name = elem.name().unwrap();
         xml_err_valid_node(
             ctxt,
-            elem,
+            Some(XmlGenericNodePtr::from(elem)),
             XmlParserErrors::XmlDTDNotStandalone,
             format!("standalone: {name} on {elem_name} value had to be normalized based on external subset declaration\n").as_str(),
             Some(name),
@@ -3028,14 +2810,6 @@ pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
         (*ctxt).valid = 0;
     }
     ret
-}
-
-extern "C" fn xml_validate_attribute_id_callback(attr: XmlAttributePtr, count: *mut i32) {
-    unsafe {
-        if matches!((*attr).atype, XmlAttributeType::XmlAttributeID) {
-            (*count) += 1;
-        }
-    }
 }
 
 /// Handle a validation error, provide contextual information
@@ -3068,7 +2842,7 @@ macro_rules! xml_err_valid_node_nr {
             channel,
             data,
             pctxt as _,
-            $node as _,
+            $node,
             XmlErrorDomain::XmlFromValid,
             $error,
             XmlErrorLevel::XmlErrError,
@@ -3103,22 +2877,24 @@ pub unsafe fn xml_validate_attribute_decl(
 ) -> i32 {
     let mut ret: i32 = 1;
     let val: i32;
-    CHECK_DTD!(doc);
-    if attr.is_null() {
-        return 1;
-    }
+    // if doc.is_null() {
+    //     return 0;
+    // }
+    if doc.int_subset.is_none() && doc.ext_subset.is_none() {
+        return 0;
+    };
 
-    let attr_elem = (*attr).elem.as_deref().map(|e| CString::new(e).unwrap());
+    let attr_elem = attr.elem.as_deref().map(|e| CString::new(e).unwrap());
     // Attribute Default Legal
     // Enumeration
-    if !(*attr).default_value.is_null() {
-        val = xml_validate_attribute_value_internal(doc, (*attr).atype, (*attr).default_value);
+    if !attr.default_value.is_null() {
+        val = xml_validate_attribute_value_internal(Some(doc), attr.atype, attr.default_value);
         if val == 0 {
             let attr_name = (*attr).name().unwrap();
             let attr_elem = attr_elem.as_deref().unwrap().to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                attr as XmlNodePtr,
+                Some(attr.into()),
                 XmlParserErrors::XmlDTDAttributeDefault,
                 format!("Syntax of default value for attribute {attr_name} of {attr_elem} is not valid\n")
                     .as_str(),
@@ -3131,17 +2907,17 @@ pub unsafe fn xml_validate_attribute_decl(
     }
 
     // ID Attribute Default
-    if matches!((*attr).atype, XmlAttributeType::XmlAttributeID)
+    if matches!(attr.atype, XmlAttributeType::XmlAttributeID)
         && !matches!(
-            (*attr).def,
+            attr.def,
             XmlAttributeDefault::XmlAttributeImplied | XmlAttributeDefault::XmlAttributeRequired
         )
     {
-        let attr_name = (*attr).name().unwrap();
+        let attr_name = attr.name().unwrap();
         let attr_elem = attr_elem.as_deref().unwrap().to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            attr as XmlNodePtr,
+            Some(attr.into()),
             XmlParserErrors::XmlDTDIDFixed,
             format!("ID attribute {attr_name} of {attr_elem} is not valid must be #IMPLIED or #REQUIRED\n").as_str(),
             Some(&attr_name),
@@ -3152,30 +2928,30 @@ pub unsafe fn xml_validate_attribute_decl(
     }
 
     // One ID per Element Type
-    if matches!((*attr).atype, XmlAttributeType::XmlAttributeID) {
+    if matches!(attr.atype, XmlAttributeType::XmlAttributeID) {
         let mut nb_id: i32;
 
         // the trick is that we parse DtD as their own internal subset
-        let mut elem: XmlElementPtr = xml_get_dtd_element_desc(
-            (*doc).int_subset,
+        let mut elem = xml_get_dtd_element_desc(
+            doc.int_subset,
             attr_elem
                 .as_ref()
                 .map_or(null(), |e| e.as_ptr() as *const u8),
         );
-        if !elem.is_null() {
+        if let Some(elem) = elem {
             nb_id = xml_scan_id_attribute_decl(null_mut(), elem, 0);
         } else {
             // The attribute may be declared in the internal subset and the
             // element in the external subset.
             nb_id = 0;
-            if !(*doc).int_subset.is_null() {
-                if let Some(table) = (*(*doc).int_subset).attributes {
+            if let Some(int_subset) = doc.int_subset {
+                if let Some(table) = int_subset.attributes {
                     table.scan(|&payload, _, _, name3| {
-                        if !payload.is_null()
+                        if matches!(payload.atype, XmlAttributeType::XmlAttributeID)
                             && name3.map(|n| n.as_ref())
                                 == attr_elem.as_deref().map(|a| a.to_string_lossy()).as_deref()
                         {
-                            xml_validate_attribute_id_callback(payload, &raw mut nb_id);
+                            nb_id += 1;
                         }
                     });
                 }
@@ -3184,40 +2960,40 @@ pub unsafe fn xml_validate_attribute_decl(
         if nb_id > 1 {
             xml_err_valid_node_nr!(
                 ctxt,
-                attr as XmlNodePtr,
+                Some(attr.into()),
                 XmlParserErrors::XmlDTDIDSubset,
                 "Element {} has {} ID attribute defined in the internal subset : {}\n",
                 attr_elem.as_deref().unwrap().to_string_lossy().into_owned(),
                 nb_id,
-                (*attr).name().unwrap()
+                (*attr).name().unwrap().into_owned()
             );
-        } else if !(*doc).ext_subset.is_null() {
+        } else if doc.ext_subset.is_some() {
             let mut ext_id: i32 = 0;
             elem = xml_get_dtd_element_desc(
-                (*doc).ext_subset,
+                doc.ext_subset,
                 attr_elem
                     .as_ref()
                     .map_or(null(), |e| e.as_ptr() as *const u8),
             );
-            if !elem.is_null() {
+            if let Some(elem) = elem {
                 ext_id = xml_scan_id_attribute_decl(null_mut(), elem, 0);
             }
             if ext_id > 1 {
                 xml_err_valid_node_nr!(
                     ctxt,
-                    attr as XmlNodePtr,
+                    Some(attr.into()),
                     XmlParserErrors::XmlDTDIDSubset,
                     "Element {} has {} ID attribute defined in the external subset : {}\n",
                     attr_elem.as_deref().unwrap().to_string_lossy().into_owned(),
                     ext_id,
-                    (*attr).name().unwrap()
+                    (*attr).name().unwrap().into_owned()
                 );
             } else if ext_id + nb_id > 1 {
                 let attr_elem = attr_elem.as_deref().unwrap().to_string_lossy();
                 let attr_name = (*attr).name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    attr as XmlNodePtr,
+                    Some(attr.into()),
                     XmlParserErrors::XmlDTDIDSubset,
                     format!("Element {attr_elem} has ID attributes defined in the internal and external subset : {attr_name}\n").as_str(),
                     Some(&attr_elem),
@@ -3229,21 +3005,21 @@ pub unsafe fn xml_validate_attribute_decl(
     }
 
     // Validity Constraint: Enumeration
-    if !(*attr).default_value.is_null() && (*attr).tree.is_some() {
-        let mut tree = (*attr).tree.as_deref();
+    if !attr.default_value.is_null() && attr.tree.is_some() {
+        let mut tree = attr.tree.as_deref();
         while let Some(now) = tree {
-            if now.name == CStr::from_ptr((*attr).default_value as *const i8).to_string_lossy() {
+            if now.name == CStr::from_ptr(attr.default_value as *const i8).to_string_lossy() {
                 break;
             }
             tree = now.next.as_deref();
         }
         if tree.is_none() {
-            let attr_name = (*attr).name().unwrap();
+            let attr_name = attr.name().unwrap();
             let attr_elem = attr_elem.as_deref().unwrap().to_string_lossy();
-            let attr_def = CStr::from_ptr((*attr).default_value as *const i8).to_string_lossy();
+            let attr_def = CStr::from_ptr(attr.default_value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                attr as XmlNodePtr,
+                Some(attr.into()),
                 XmlParserErrors::XmlDTDAttributeValue,
                 format!(
                     "Default value \"{attr_def}\" for attribute {attr_name} of {attr_elem} is not among the enumerated set\n"
@@ -3283,7 +3059,7 @@ pub unsafe fn xml_validate_attribute_decl(
 #[doc(alias = "xmlValidateAttributeValue")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_attribute_value(typ: XmlAttributeType, value: *const XmlChar) -> i32 {
-    xml_validate_attribute_value_internal(null_mut(), typ, value)
+    xml_validate_attribute_value_internal(None, typ, value)
 }
 
 /// Try to validate a single notation definition
@@ -3297,7 +3073,7 @@ pub unsafe fn xml_validate_attribute_value(typ: XmlAttributeType, value: *const 
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_notation_decl(
     _ctxt: XmlValidCtxtPtr,
-    _doc: XmlDocPtr,
+    _doc: Option<XmlDocPtr>,
     _nota: Option<&XmlNotation>,
 ) -> i32 {
     1
@@ -3312,32 +3088,27 @@ pub unsafe fn xml_validate_notation_decl(
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDtd")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr, dtd: XmlDtdPtr) -> i32 {
-    let mut ret: i32;
-
-    if dtd.is_null() {
-        return 0;
-    }
-    if doc.is_null() {
-        return 0;
-    }
-    let old_ext: XmlDtdPtr = (*doc).ext_subset;
-    let old_int: XmlDtdPtr = (*doc).int_subset;
-    (*doc).ext_subset = dtd;
-    (*doc).int_subset = null_mut();
-    ret = xml_validate_root(ctxt, doc);
+pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr, dtd: XmlDtdPtr) -> i32 {
+    // if doc.is_null() {
+    //     return 0;
+    // }
+    let old_ext = doc.ext_subset;
+    let old_int = doc.int_subset;
+    doc.ext_subset = Some(dtd);
+    doc.int_subset = None;
+    let mut ret = xml_validate_root(ctxt, doc);
     if ret == 0 {
-        (*doc).ext_subset = old_ext;
-        (*doc).int_subset = old_int;
+        doc.ext_subset = old_ext;
+        doc.int_subset = old_int;
         return ret;
     }
-    (*doc).ids.take();
-    (*doc).refs.take();
-    let root: XmlNodePtr = (*doc).get_root_element();
-    ret = xml_validate_element(ctxt, doc, root);
+    doc.ids.take();
+    doc.refs.take();
+    let root = doc.get_root_element();
+    ret = xml_validate_element(ctxt, doc, root.map(|root| root.into()));
     ret &= xml_validate_document_final(ctxt, doc);
-    (*doc).ext_subset = old_ext;
-    (*doc).int_subset = old_int;
+    doc.ext_subset = old_ext;
+    doc.int_subset = old_int;
     ret
 }
 
@@ -3361,7 +3132,7 @@ pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr, dtd: XmlDt
 #[doc(alias = "xmlValidateAttributeValue2")]
 unsafe fn xml_validate_attribute_value2(
     ctxt: XmlValidCtxtPtr,
-    doc: XmlDocPtr,
+    mut doc: XmlDocPtr,
     name: *const XmlChar,
     typ: XmlAttributeType,
     value: &str,
@@ -3376,38 +3147,37 @@ unsafe fn xml_validate_attribute_value2(
         | XmlAttributeType::XmlAttributeNmtoken
         | XmlAttributeType::XmlAttributeCDATA => {}
         XmlAttributeType::XmlAttributeEntity => {
-            let mut ent = xml_get_doc_entity(doc, value);
-            /* yeah it's a bit messy... */
-            if ent.is_null() && (*doc).standalone == 1 {
-                (*doc).standalone = 0;
-                ent = xml_get_doc_entity(doc, value);
+            let mut ent = xml_get_doc_entity(Some(doc), value);
+            // yeah it's a bit messy...
+            if ent.is_none() && doc.standalone == 1 {
+                doc.standalone = 0;
+                ent = xml_get_doc_entity(Some(doc), value);
             }
-            if ent.is_null() {
+            if let Some(ent) = ent {
+                if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
+                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                    xml_err_valid_node(
+                        ctxt,
+                        Some(doc.into()),
+                        XmlParserErrors::XmlDTDEntityType,
+                        format!(
+                            "ENTITY attribute {name} reference an entity \"{value}\" of wrong type\n"
+                        )
+                        .as_str(),
+                        Some(&name),
+                        Some(value),
+                        None,
+                    );
+                    ret = 0;
+                }
+            } else {
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
-                    doc as XmlNodePtr,
+                    Some(doc.into()),
                     XmlParserErrors::XmlDTDUnknownEntity,
                     format!("ENTITY attribute {name} reference an unknown entity \"{value}\"\n")
                         .as_str(),
-                    Some(&name),
-                    Some(value),
-                    None,
-                );
-                ret = 0;
-            } else if !matches!(
-                (*ent).etype,
-                XmlEntityType::XmlExternalGeneralUnparsedEntity
-            ) {
-                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                xml_err_valid_node(
-                    ctxt,
-                    doc as XmlNodePtr,
-                    XmlParserErrors::XmlDTDEntityType,
-                    format!(
-                        "ENTITY attribute {name} reference an entity \"{value}\" of wrong type\n"
-                    )
-                    .as_str(),
                     Some(&name),
                     Some(value),
                     None,
@@ -3418,7 +3188,6 @@ unsafe fn xml_validate_attribute_value2(
         XmlAttributeType::XmlAttributeEntities => {
             let mut cur: *mut XmlChar;
             let mut save: XmlChar;
-            let mut ent: XmlEntityPtr;
             let value = CString::new(value).unwrap();
             let value = value.as_ptr() as *const u8;
 
@@ -3435,12 +3204,26 @@ unsafe fn xml_validate_attribute_value2(
                 save = *cur;
                 *cur = 0;
                 let nam = CStr::from_ptr(nam as *const i8).to_string_lossy();
-                ent = xml_get_doc_entity(doc, &nam);
-                if ent.is_null() {
+                if let Some(ent) = xml_get_doc_entity(Some(doc), &nam) {
+                    if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
+                        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                        xml_err_valid_node(
+                            ctxt,
+                            Some(doc.into()),
+                            XmlParserErrors::XmlDTDEntityType,
+                            format!("ENTITIES attribute {name} reference an entity \"{nam}\" of wrong type\n")
+                                .as_str(),
+                            Some(&name),
+                            Some(&nam),
+                            None,
+                        );
+                        ret = 0;
+                    }
+                } else {
                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
-                        doc as XmlNodePtr,
+                        Some(doc.into()),
                         XmlParserErrors::XmlDTDUnknownEntity,
                         format!(
                             "ENTITIES attribute {name} reference an unknown entity \"{nam}\"\n"
@@ -3451,23 +3234,8 @@ unsafe fn xml_validate_attribute_value2(
                         None,
                     );
                     ret = 0;
-                } else if !matches!(
-                    (*ent).etype,
-                    XmlEntityType::XmlExternalGeneralUnparsedEntity
-                ) {
-                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                    xml_err_valid_node(
-                        ctxt,
-                        doc as XmlNodePtr,
-                        XmlParserErrors::XmlDTDEntityType,
-                        format!("ENTITIES attribute {name} reference an entity \"{nam}\" of wrong type\n")
-                            .as_str(),
-                        Some(&name),
-                        Some(&nam),
-                        None,
-                    );
-                    ret = 0;
                 }
+
                 if save == 0 {
                     break;
                 }
@@ -3479,17 +3247,14 @@ unsafe fn xml_validate_attribute_value2(
             xml_free(dup as _);
         }
         XmlAttributeType::XmlAttributeNotation => {
-            let nota = xml_get_dtd_notation_desc((*doc).int_subset, value).or_else(|| {
-                (!(*doc).ext_subset.is_null())
-                    .then(|| xml_get_dtd_notation_desc((*doc).ext_subset, value))
-                    .flatten()
-            });
+            let nota = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), value)
+                .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), value));
 
             if nota.is_none() {
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
-                    doc as XmlNodePtr,
+                    Some(doc.into()),
                     XmlParserErrors::XmlDTDUnknownNotation,
                     format!(
                         "NOTATION attribute {name} reference an unknown notation \"{value}\"\n"
@@ -3506,139 +3271,123 @@ unsafe fn xml_validate_attribute_value2(
     ret
 }
 
-extern "C" fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCtxtPtr) {
+unsafe fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCtxtPtr) {
     let mut ret: i32;
-    let doc: XmlDocPtr;
-    let mut elem: XmlElementPtr = null_mut();
 
-    if cur.is_null() {
-        return;
-    }
-    unsafe {
-        match (*cur).atype {
-            XmlAttributeType::XmlAttributeCDATA
-            | XmlAttributeType::XmlAttributeID
-            | XmlAttributeType::XmlAttributeIDREF
-            | XmlAttributeType::XmlAttributeIDREFS
-            | XmlAttributeType::XmlAttributeNmtoken
-            | XmlAttributeType::XmlAttributeNmtokens
-            | XmlAttributeType::XmlAttributeEnumeration => {}
-            XmlAttributeType::XmlAttributeEntity
-            | XmlAttributeType::XmlAttributeEntities
-            | XmlAttributeType::XmlAttributeNotation => {
-                if !(*cur).default_value.is_null() {
+    match cur.atype {
+        XmlAttributeType::XmlAttributeCDATA
+        | XmlAttributeType::XmlAttributeID
+        | XmlAttributeType::XmlAttributeIDREF
+        | XmlAttributeType::XmlAttributeIDREFS
+        | XmlAttributeType::XmlAttributeNmtoken
+        | XmlAttributeType::XmlAttributeNmtokens
+        | XmlAttributeType::XmlAttributeEnumeration => {}
+        XmlAttributeType::XmlAttributeEntity
+        | XmlAttributeType::XmlAttributeEntities
+        | XmlAttributeType::XmlAttributeNotation => {
+            if !cur.default_value.is_null() {
+                ret = xml_validate_attribute_value2(
+                    ctxt,
+                    (*ctxt).doc.unwrap(),
+                    cur.name,
+                    cur.atype,
+                    &CStr::from_ptr(cur.default_value as *const i8).to_string_lossy(),
+                );
+                if ret == 0 && (*ctxt).valid == 1 {
+                    (*ctxt).valid = 0;
+                }
+            }
+            if cur.tree.is_some() {
+                let mut tree = cur.tree.as_deref();
+                while let Some(now) = tree {
                     ret = xml_validate_attribute_value2(
                         ctxt,
-                        (*ctxt).doc,
-                        (*cur).name,
-                        (*cur).atype,
-                        &CStr::from_ptr((*cur).default_value as *const i8).to_string_lossy(),
+                        (*ctxt).doc.unwrap(),
+                        cur.name,
+                        cur.atype,
+                        &now.name,
                     );
                     if ret == 0 && (*ctxt).valid == 1 {
                         (*ctxt).valid = 0;
                     }
-                }
-                if (*cur).tree.is_some() {
-                    let mut tree = (*cur).tree.as_deref();
-                    while let Some(now) = tree {
-                        ret = xml_validate_attribute_value2(
-                            ctxt,
-                            (*ctxt).doc,
-                            (*cur).name,
-                            (*cur).atype,
-                            &now.name,
-                        );
-                        if ret == 0 && (*ctxt).valid == 1 {
-                            (*ctxt).valid = 0;
-                        }
-                        tree = now.next.as_deref();
-                    }
+                    tree = now.next.as_deref();
                 }
             }
         }
-        if matches!((*cur).atype, XmlAttributeType::XmlAttributeNotation) {
-            doc = (*cur).doc;
-            let Some(cur_elem) = (*cur).elem.as_deref().map(|e| CString::new(e).unwrap()) else {
-                xml_err_valid!(
-                    ctxt,
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlValidateAttributeCallback({}): internal error\n",
-                    (*cur).name().as_deref().unwrap()
-                );
-                return;
-            };
+    }
+    if matches!(cur.atype, XmlAttributeType::XmlAttributeNotation) {
+        let doc = cur.doc;
+        let Some(cur_elem) = cur.elem.as_deref().map(|e| CString::new(e).unwrap()) else {
+            xml_err_valid!(
+                ctxt,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlValidateAttributeCallback({}): internal error\n",
+                (*cur).name().as_deref().unwrap()
+            );
+            return;
+        };
 
-            if !doc.is_null() {
-                elem = xml_get_dtd_element_desc((*doc).int_subset, cur_elem.as_ptr() as *const u8);
+        let mut elem = None;
+        if let Some(doc) = doc {
+            elem = xml_get_dtd_element_desc(doc.int_subset, cur_elem.as_ptr() as *const u8);
+            if elem.is_none() {
+                elem = xml_get_dtd_element_desc(doc.ext_subset, cur_elem.as_ptr() as *const u8);
             }
-            if elem.is_null() && !doc.is_null() {
-                elem = xml_get_dtd_element_desc((*doc).ext_subset, cur_elem.as_ptr() as *const u8);
-            }
-            if elem.is_null()
-                && !(*cur).parent.is_null()
-                && matches!((*(*cur).parent).element_type(), XmlElementType::XmlDTDNode)
+        }
+        if elem.is_none() {
+            if let Some(dtd) = cur
+                .parent
+                .filter(|dtd| dtd.element_type() == XmlElementType::XmlDTDNode)
             {
-                elem = xml_get_dtd_element_desc(
-                    (*(*cur).parent).as_dtd_node().unwrap().as_ptr(),
-                    cur_elem.as_ptr() as *const u8,
-                );
+                elem = xml_get_dtd_element_desc(Some(dtd), cur_elem.as_ptr() as *const u8);
             }
-            if elem.is_null() {
-                let name = (*cur).name().unwrap();
-                let cur_elem = cur_elem.to_string_lossy();
-                xml_err_valid_node(
-                    ctxt,
-                    null_mut(),
-                    XmlParserErrors::XmlDTDUnknownElem,
-                    format!("attribute {name}: could not find decl for element {cur_elem}\n")
-                        .as_str(),
-                    Some(&name),
-                    Some(&cur_elem),
-                    None,
-                );
-                return;
-            }
-            if matches!((*elem).etype, XmlElementTypeVal::XmlElementTypeEmpty) {
-                let name = (*cur).name().unwrap();
-                let cur_elem = cur_elem.to_string_lossy();
-                xml_err_valid_node(
-                    ctxt,
-                    null_mut(),
-                    XmlParserErrors::XmlDTDEmptyNotation,
-                    format!("NOTATION attribute {name} declared for EMPTY element {cur_elem}\n")
-                        .as_str(),
-                    Some(&name),
-                    Some(&cur_elem),
-                    None,
-                );
-                (*ctxt).valid = 0;
-            }
+        }
+        let Some(elem) = elem else {
+            let name = (*cur).name().unwrap();
+            let cur_elem = cur_elem.to_string_lossy();
+            xml_err_valid_node(
+                ctxt,
+                None,
+                XmlParserErrors::XmlDTDUnknownElem,
+                format!("attribute {name}: could not find decl for element {cur_elem}\n").as_str(),
+                Some(&name),
+                Some(&cur_elem),
+                None,
+            );
+            return;
+        };
+        if matches!(elem.etype, XmlElementTypeVal::XmlElementTypeEmpty) {
+            let name = (*cur).name().unwrap();
+            let cur_elem = cur_elem.to_string_lossy();
+            xml_err_valid_node(
+                ctxt,
+                None,
+                XmlParserErrors::XmlDTDEmptyNotation,
+                format!("NOTATION attribute {name} declared for EMPTY element {cur_elem}\n")
+                    .as_str(),
+                Some(&name),
+                Some(&cur_elem),
+                None,
+            );
+            (*ctxt).valid = 0;
         }
     }
 }
 
-extern "C" fn xml_validate_notation_callback(cur: XmlEntityPtr, ctxt: XmlValidCtxtPtr) {
-    if cur.is_null() {
-        return;
-    }
-    unsafe {
-        if matches!(
-            (*cur).etype,
-            XmlEntityType::XmlExternalGeneralUnparsedEntity
-        ) {
-            let notation: *mut XmlChar = (*cur).content.load(Ordering::Relaxed) as _;
+unsafe fn xml_validate_notation_callback(cur: XmlEntityPtr, ctxt: XmlValidCtxtPtr) {
+    if matches!(cur.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
+        let notation: *mut XmlChar = cur.content;
 
-            if !notation.is_null() {
-                let ret: i32 = xml_validate_notation_use(
-                    ctxt,
-                    (*cur).doc.load(Ordering::Relaxed) as _,
-                    CStr::from_ptr(notation as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-                if ret != 1 {
-                    (*ctxt).valid = 0;
-                }
+        if !notation.is_null() {
+            let ret: i32 = xml_validate_notation_use(
+                ctxt,
+                cur.doc.unwrap(),
+                CStr::from_ptr(notation as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            );
+            if ret != 1 {
+                (*ctxt).valid = 0;
             }
         }
     }
@@ -3656,41 +3405,38 @@ extern "C" fn xml_validate_notation_callback(cur: XmlEntityPtr, ctxt: XmlValidCt
 #[doc(alias = "xmlValidateDtdFinal")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
-    let mut dtd: XmlDtdPtr;
-
-    if doc.is_null() || ctxt.is_null() {
+    // if doc.is_null() {
+    //     return 0;
+    // }
+    if ctxt.is_null() {
         return 0;
     }
-    if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
+    if doc.int_subset.is_none() && doc.ext_subset.is_none() {
         return 0;
     }
-    (*ctxt).doc = doc;
+    (*ctxt).doc = Some(doc);
     (*ctxt).valid = 1;
-    dtd = (*doc).int_subset;
-    if !dtd.is_null() {
-        if let Some(table) = (*dtd).attributes {
+    let dtd = doc.int_subset;
+    if let Some(dtd) = dtd {
+        if let Some(table) = dtd.attributes {
             table.scan(|&payload, _, _, _| {
                 xml_validate_attribute_callback(payload, ctxt);
             });
         }
-    }
-    if !dtd.is_null() {
-        if let Some(entities) = (*dtd).entities {
+        if let Some(entities) = dtd.entities {
             entities.scan(|payload, _, _, _| {
                 xml_validate_notation_callback(*payload, ctxt);
             });
         }
     }
-    dtd = (*doc).ext_subset;
-    if !dtd.is_null() {
-        if let Some(table) = (*dtd).attributes {
+    let dtd = doc.ext_subset;
+    if let Some(dtd) = dtd {
+        if let Some(table) = dtd.attributes {
             table.scan(|payload, _, _, _| {
                 xml_validate_attribute_callback(*payload, ctxt);
             });
         }
-    }
-    if !dtd.is_null() {
-        if let Some(entities) = (*dtd).entities {
+        if let Some(entities) = dtd.entities {
             entities.scan(|entity, _, _, _| {
                 xml_validate_notation_callback(*entity, ctxt);
             });
@@ -3708,24 +3454,23 @@ pub unsafe fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i
 /// Returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDocument")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
+pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr) -> i32 {
     use crate::{libxml::parser::xml_parse_dtd, uri::build_uri};
 
     let mut ret: i32;
 
-    if doc.is_null() {
-        return 0;
-    }
-    if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
+    // if doc.is_null() {
+    //     return 0;
+    // }
+    if doc.int_subset.is_none() && doc.ext_subset.is_none() {
         xml_err_valid!(ctxt, XmlParserErrors::XmlDTDNoDTD, "no DTD found!\n");
         return 0;
     }
-    if !(*doc).int_subset.is_null()
-        && ((*(*doc).int_subset).system_id.is_some() || (*(*doc).int_subset).external_id.is_some())
-        && (*doc).ext_subset.is_null()
-    {
-        let sys_id = if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
-            let Some(sys_id) = (*doc)
+    if let Some(int_subset) = doc.int_subset.filter(|dtd| {
+        (dtd.system_id.is_some() || dtd.external_id.is_some()) && doc.ext_subset.is_none()
+    }) {
+        let sys_id = if let Some(system_id) = int_subset.system_id.as_deref() {
+            let Some(sys_id) = doc
                 .url
                 .as_deref()
                 .and_then(|base| build_uri(system_id, base))
@@ -3742,10 +3487,10 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i3
         } else {
             None
         };
-        let external_id = (*(*doc).int_subset).external_id.as_deref();
-        (*doc).ext_subset = xml_parse_dtd(external_id, sys_id.as_deref());
-        if (*doc).ext_subset.is_null() {
-            if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
+        let external_id = int_subset.external_id.as_deref();
+        doc.ext_subset = xml_parse_dtd(external_id, sys_id.as_deref());
+        if doc.ext_subset.is_none() {
+            if let Some(system_id) = int_subset.system_id.as_deref() {
                 xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
@@ -3764,15 +3509,15 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i3
         }
     }
 
-    (*doc).ids.take();
-    (*doc).refs.take();
+    doc.ids.take();
+    doc.refs.take();
     ret = xml_validate_dtd_final(ctxt, doc);
     if xml_validate_root(ctxt, doc) == 0 {
         return 0;
     }
 
-    let root: XmlNodePtr = (*doc).get_root_element();
-    ret &= xml_validate_element(ctxt, doc, root);
+    let root = doc.get_root_element();
+    ret &= xml_validate_element(ctxt, doc, root.map(|root| root.into()));
     ret &= xml_validate_document_final(ctxt, doc);
     ret
 }
@@ -3782,60 +3527,69 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i3
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateElement")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe fn xml_validate_element(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr, root: XmlNodePtr) -> i32 {
-    let mut elem: XmlNodePtr;
-    let mut attr: XmlAttrPtr;
-    let mut ns: XmlNsPtr;
+pub unsafe fn xml_validate_element(
+    ctxt: XmlValidCtxtPtr,
+    doc: XmlDocPtr,
+    root: Option<XmlGenericNodePtr>,
+) -> i32 {
     let mut ret: i32 = 1;
 
-    if root.is_null() {
+    let Some(root) = root else {
         return 0;
-    }
+    };
 
-    CHECK_DTD!(doc);
+    // if doc.is_null() {
+    //     return 0;
+    // }
+    if doc.int_subset.is_none() && doc.ext_subset.is_none() {
+        return 0;
+    };
 
-    elem = root;
+    let mut elem = root;
     loop {
-        ret &= xml_validate_one_element(ctxt, doc, elem);
+        ret &= xml_validate_one_element(ctxt, doc, Some(elem));
 
-        if matches!((*elem).element_type(), XmlElementType::XmlElementNode) {
-            attr = (*elem).properties;
-            while !attr.is_null() {
-                let value = (*attr)
-                    .children
-                    .and_then(|c| c.get_string(doc, 0))
+        if let Some(node) = XmlNodePtr::try_from(elem)
+            .ok()
+            .filter(|elem| elem.element_type() == XmlElementType::XmlElementNode)
+        {
+            let mut attr = node.properties;
+            while let Some(now) = attr {
+                let value = now
+                    .children()
+                    .and_then(|c| c.get_string(Some(doc), 0))
                     .map(|c| CString::new(c).unwrap());
                 ret &= xml_validate_one_attribute(
                     ctxt,
                     doc,
-                    elem,
-                    attr,
+                    node,
+                    Some(now),
                     value
                         .as_ref()
                         .map_or(null_mut(), |c| c.as_ptr() as *const u8),
                 );
-                attr = (*attr).next;
+                attr = now.next;
             }
 
-            ns = (*elem).ns_def;
-            while !ns.is_null() {
-                if (*elem).ns.is_null() {
-                    ret &= xml_validate_one_namespace(ctxt, doc, elem, None, ns, (*ns).href);
-                } else {
+            let mut ns = node.ns_def;
+            while let Some(now) = ns {
+                if let Some(elem_ns) = node.ns {
                     ret &= xml_validate_one_namespace(
                         ctxt,
                         doc,
-                        elem,
-                        (*(*elem).ns).prefix().as_deref(),
-                        ns,
-                        (*ns).href,
+                        node,
+                        elem_ns.prefix().as_deref(),
+                        now,
+                        now.href,
                     );
+                } else {
+                    ret &= xml_validate_one_namespace(ctxt, doc, node, None, now, now.href);
                 }
-                ns = (*ns).next;
+                ns = now.next;
             }
 
-            if let Some(children) = (*elem).children() {
-                elem = children.as_ptr();
+            if let Some(children) = elem.children() {
+                elem = children;
                 continue;
             }
         }
@@ -3845,12 +3599,12 @@ pub unsafe fn xml_validate_element(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr, root: 
                 // goto done;
                 return ret;
             }
-            if (*elem).next.is_some() {
+            if elem.next().is_some() {
                 break;
             }
-            elem = (*elem).parent().map_or(null_mut(), |p| p.as_ptr());
+            elem = elem.parent().unwrap();
         }
-        elem = (*elem).next.map_or(null_mut(), |n| n.as_ptr());
+        elem = elem.next().unwrap();
     }
 
     // done:
@@ -3866,32 +3620,26 @@ unsafe fn xml_valid_get_elem_decl(
     doc: XmlDocPtr,
     elem: XmlNodePtr,
     extsubset: *mut i32,
-) -> XmlElementPtr {
-    let mut elem_decl: XmlElementPtr = null_mut();
-
-    if ctxt.is_null() || doc.is_null() || elem.is_null() || (*elem).name.is_null() {
-        return null_mut();
+) -> Option<XmlElementPtr> {
+    // if elem.is_null() {
+    //     return None;
+    // }
+    if ctxt.is_null() || elem.name.is_null() {
+        return None;
     }
     if !extsubset.is_null() {
         *extsubset = 0;
     }
 
     // Fetch the declaration for the qualified name
-    let mut prefix = None;
-    if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
-        prefix = (*(*elem).ns).prefix();
-    }
-
+    let prefix = elem.ns.as_deref().and_then(|ns| ns.prefix());
+    let mut elem_decl = None;
     if let Some(prefix) = prefix {
-        elem_decl =
-            xml_get_dtd_qelement_desc((*doc).int_subset, &(*elem).name().unwrap(), Some(&prefix));
-        if elem_decl.is_null() && !(*doc).ext_subset.is_null() {
-            elem_decl = xml_get_dtd_qelement_desc(
-                (*doc).ext_subset,
-                &(*elem).name().unwrap(),
-                Some(&prefix),
-            );
-            if !elem_decl.is_null() && !extsubset.is_null() {
+        elem_decl = xml_get_dtd_qelement_desc(doc.int_subset, &elem.name().unwrap(), Some(&prefix));
+        if elem_decl.is_none() && doc.ext_subset.is_some() {
+            elem_decl =
+                xml_get_dtd_qelement_desc(doc.ext_subset, &elem.name().unwrap(), Some(&prefix));
+            if elem_decl.is_some() && !extsubset.is_null() {
                 *extsubset = 1;
             }
         }
@@ -3900,20 +3648,20 @@ unsafe fn xml_valid_get_elem_decl(
     // Fetch the declaration for the non qualified name
     // This is "non-strict" validation should be done on the
     // full QName but in that case being flexible makes sense.
-    if elem_decl.is_null() {
-        elem_decl = xml_get_dtd_element_desc((*doc).int_subset, (*elem).name);
-        if elem_decl.is_null() && !(*doc).ext_subset.is_null() {
-            elem_decl = xml_get_dtd_element_desc((*doc).ext_subset, (*elem).name);
-            if !elem_decl.is_null() && !extsubset.is_null() {
+    if elem_decl.is_none() {
+        elem_decl = xml_get_dtd_element_desc(doc.int_subset, elem.name);
+        if elem_decl.is_none() && doc.ext_subset.is_some() {
+            elem_decl = xml_get_dtd_element_desc(doc.ext_subset, elem.name);
+            if elem_decl.is_some() && !extsubset.is_null() {
                 *extsubset = 1;
             }
         }
     }
-    if elem_decl.is_null() {
-        let name = (*elem).name().unwrap();
+    if elem_decl.is_none() {
+        let name = elem.name().unwrap();
         xml_err_valid_node(
             ctxt,
-            elem,
+            Some(elem.into()),
             XmlParserErrors::XmlDTDUnknownElem,
             format!("No declaration for element {name}\n").as_str(),
             Some(&name),
@@ -3925,49 +3673,15 @@ unsafe fn xml_valid_get_elem_decl(
 }
 
 unsafe fn node_vpush(ctxt: XmlValidCtxtPtr, value: XmlNodePtr) -> i32 {
-    if (*ctxt).node_max <= 0 {
-        (*ctxt).node_max = 4;
-        (*ctxt).node_tab =
-            xml_malloc((*ctxt).node_max as usize * size_of_val(&*(*ctxt).node_tab.add(0)))
-                as *mut XmlNodePtr;
-        if (*ctxt).node_tab.is_null() {
-            xml_verr_memory(ctxt as _, Some("malloc failed"));
-            (*ctxt).node_max = 0;
-            return 0;
-        }
-    }
-    if (*ctxt).node_nr >= (*ctxt).node_max {
-        let tmp: *mut XmlNodePtr = xml_realloc(
-            (*ctxt).node_tab as _,
-            (*ctxt).node_max as usize * 2 * size_of_val(&*(*ctxt).node_tab.add(0)),
-        ) as *mut XmlNodePtr;
-        if tmp.is_null() {
-            xml_verr_memory(ctxt as _, Some("realloc failed"));
-            return 0;
-        }
-        (*ctxt).node_max *= 2;
-        (*ctxt).node_tab = tmp;
-    }
-    *(*ctxt).node_tab.add((*ctxt).node_nr as usize) = value;
-    (*ctxt).node = value;
-    let res = (*ctxt).node_nr;
-    (*ctxt).node_nr += 1;
-    res
+    (*ctxt).node_tab.push(value);
+    (*ctxt).node = Some(value);
+    (*ctxt).node_tab.len() as i32 - 1
 }
 
-unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> XmlNodePtr {
-    if (*ctxt).node_nr <= 0 {
-        return null_mut();
-    }
-    (*ctxt).node_nr -= 1;
-    if (*ctxt).node_nr > 0 {
-        (*ctxt).node = *(*ctxt).node_tab.add((*ctxt).node_nr as usize - 1);
-    } else {
-        (*ctxt).node = null_mut();
-    }
-    let ret: XmlNodePtr = *(*ctxt).node_tab.add((*ctxt).node_nr as usize);
-    *(*ctxt).node_tab.add((*ctxt).node_nr as usize) = null_mut();
-    ret
+unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> Option<XmlNodePtr> {
+    let res = (*ctxt).node_tab.pop()?;
+    (*ctxt).node = (*ctxt).node_tab.last().cloned();
+    Some(res)
 }
 
 /// Check that an element follows #CDATA
@@ -3976,32 +3690,29 @@ unsafe fn node_vpop(ctxt: XmlValidCtxtPtr) -> XmlNodePtr {
 #[doc(alias = "xmlValidateCdataElement")]
 unsafe fn xml_validate_one_cdata_element(
     ctxt: XmlValidCtxtPtr,
-    doc: XmlDocPtr,
+    _doc: XmlDocPtr,
     elem: XmlNodePtr,
 ) -> i32 {
     let mut ret: i32 = 1;
 
-    if ctxt.is_null()
-        || doc.is_null()
-        || elem.is_null()
-        || !matches!((*elem).element_type(), XmlElementType::XmlElementNode)
-    {
+    if ctxt.is_null() || !matches!(elem.element_type(), XmlElementType::XmlElementNode) {
         return 0;
     }
 
-    let child = (*elem).children();
+    let child = elem.children;
 
     let mut cur = child;
     'done: while let Some(now) = cur {
         match now.element_type() {
             XmlElementType::XmlEntityRefNode => {
+                let now = XmlNodePtr::try_from(now).unwrap();
                 // Push the current node to be able to roll back
                 // and process within the entity
                 if let Some(children) = now
-                    .children()
+                    .children
                     .filter(|children| children.children().is_some())
                 {
-                    node_vpush(ctxt, now.as_ptr());
+                    node_vpush(ctxt, now);
                     cur = children.children();
                     continue;
                 }
@@ -4017,22 +3728,17 @@ unsafe fn xml_validate_one_cdata_element(
             }
         }
         // Switch to next element
-        cur = now.next;
+        cur = now.next();
         while cur.is_none() {
-            cur = NodePtr::from_ptr(node_vpop(ctxt));
+            cur = node_vpop(ctxt).map(|node| node.into());
             let Some(now) = cur else {
                 break;
             };
-            cur = now.next;
+            cur = now.next();
         }
     }
     // done:
-    (*ctxt).node_max = 0;
-    (*ctxt).node_nr = 0;
-    if !(*ctxt).node_tab.is_null() {
-        xml_free((*ctxt).node_tab as _);
-        (*ctxt).node_tab = null_mut();
-    }
+    (*ctxt).node_tab.clear();
     ret
 }
 
@@ -4046,18 +3752,22 @@ macro_rules! DEBUG_VALID_MSG {
 /// This will dump the list of elements to the buffer
 /// Intended just for the debug routine
 #[doc(alias = "xmlSnprintfElements")]
-unsafe fn xml_snprintf_elements(buf: *mut c_char, size: i32, node: XmlNodePtr, glob: i32) {
-    let mut cur: XmlNodePtr;
+unsafe fn xml_snprintf_elements(
+    buf: *mut c_char,
+    size: i32,
+    node: Option<XmlGenericNodePtr>,
+    glob: i32,
+) {
     let mut len: i32;
 
-    if node.is_null() {
+    if node.is_none() {
         return;
     }
     if glob != 0 {
         strcat(buf, c"(".as_ptr() as _);
     }
-    cur = node;
-    while !cur.is_null() {
+    let mut cur = node;
+    while let Some(cur_node) = cur {
         len = strlen(buf) as _;
         if size - len < 50 {
             if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
@@ -4065,39 +3775,39 @@ unsafe fn xml_snprintf_elements(buf: *mut c_char, size: i32, node: XmlNodePtr, g
             }
             return;
         }
-        match (*cur).element_type() {
+        match cur_node.element_type() {
             XmlElementType::XmlElementNode => {
-                if !(*cur).ns.is_null() {
-                    if let Some(prefix) = (*(*cur).ns).prefix() {
-                        if size - len < prefix.len() as i32 + 10 {
-                            if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
-                                strcat(buf, c" ...".as_ptr() as _);
-                            }
-                            return;
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if let Some(prefix) = cur_node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                    if size - len < prefix.len() as i32 + 10 {
+                        if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
+                            strcat(buf, c" ...".as_ptr() as _);
                         }
-                        strncat(buf, prefix.as_ptr() as *const i8, prefix.len());
-                        strcat(buf, c":".as_ptr() as _);
+                        return;
                     }
+                    strncat(buf, prefix.as_ptr() as *const i8, prefix.len());
+                    strcat(buf, c":".as_ptr() as _);
                 }
-                if size - len < xml_strlen((*cur).name) + 10 {
+                if size - len < xml_strlen(cur_node.name) + 10 {
                     if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
                         strcat(buf, c" ...".as_ptr() as _);
                     }
                     return;
                 }
-                strcat(buf, (*cur).name as *mut c_char);
-                if (*cur).next.is_some() {
+                strcat(buf, cur_node.name as *mut c_char);
+                if cur_node.next.is_some() {
                     strcat(buf, c" ".as_ptr() as _);
                 }
             }
             ty @ XmlElementType::XmlTextNode
             | ty @ XmlElementType::XmlCDATASectionNode
             | ty @ XmlElementType::XmlEntityRefNode => 'to_break: {
-                if matches!(ty, XmlElementType::XmlTextNode) && (*cur).is_blank_node() {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if matches!(ty, XmlElementType::XmlTextNode) && cur_node.is_blank_node() {
                     break 'to_break;
                 }
                 strcat(buf, c"CDATA".as_ptr() as _);
-                if (*cur).next.is_some() {
+                if cur_node.next.is_some() {
                     strcat(buf, c" ".as_ptr() as _);
                 }
             }
@@ -4109,7 +3819,7 @@ unsafe fn xml_snprintf_elements(buf: *mut c_char, size: i32, node: XmlNodePtr, g
             | XmlElementType::XmlNotationNode
             | XmlElementType::XmlNamespaceDecl => {
                 strcat(buf, c"???".as_ptr() as _);
-                if (*cur).next.is_some() {
+                if cur_node.next().is_some() {
                     strcat(buf, c" ".as_ptr() as _);
                 }
             }
@@ -4124,7 +3834,7 @@ unsafe fn xml_snprintf_elements(buf: *mut c_char, size: i32, node: XmlNodePtr, g
             | XmlElementType::XmlXIncludeEnd => {}
             _ => unreachable!(),
         }
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+        cur = cur_node.next();
     }
     if glob != 0 {
         strcat(buf, c")".as_ptr() as _);
@@ -4147,7 +3857,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
     let mut ret: i32 = -1;
     let mut determinist: i32 = 1;
 
-    (*(*ctxt).vstate).node = xmlValidateSkipIgnorable((*(*ctxt).vstate).node);
+    (*(*ctxt).vstate).node = xml_validate_skip_ignorable((*(*ctxt).vstate).node);
     if (*(*ctxt).vstate).node.is_null() && (*(*ctxt).vstate).cont.is_null() {
         return 1;
     }
@@ -4204,7 +3914,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                 if vstate_vpush(
                     ctxt,
                     (*(*ctxt).vstate).cont,
-                    (*(*ctxt).vstate).node,
+                    XmlNodePtr::from_raw((*(*ctxt).vstate).node).unwrap(),
                     (*(*ctxt).vstate).depth,
                     (*(*ctxt).vstate).occurs,
                     ROLLBACK_PARENT as _,
@@ -4229,7 +3939,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                             loop {
                                 (*(*ctxt).vstate).node = (*(*(*ctxt).vstate).node).next;
                                 (*(*ctxt).vstate).node =
-                                    xmlValidateSkipIgnorable((*(*ctxt).vstate).node);
+                                    xml_validate_skip_ignorable((*(*ctxt).vstate).node);
                                 if !(*(*ctxt).vstate).node.is_null()
                                     && matches!(
                                         (*(*(*ctxt).vstate).node).typ,
@@ -4303,7 +4013,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                             loop {
                                 (*(*ctxt).vstate).node = (*(*(*ctxt).vstate).node).next;
                                 (*(*ctxt).vstate).node =
-                                    xmlValidateSkipIgnorable((*(*ctxt).vstate).node);
+                                    xml_validate_skip_ignorable((*(*ctxt).vstate).node);
                                 if !(*(*ctxt).vstate).node.is_null()
                                     && matches!(
                                         (*(*(*ctxt).vstate).node).typ,
@@ -4382,7 +4092,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                     if vstate_vpush(
                         ctxt,
                         (*(*(*ctxt).vstate).cont).c2,
-                        (*(*ctxt).vstate).node,
+                        XmlNodePtr::from_raw((*(*ctxt).vstate).node).unwrap(),
                         (*(*ctxt).vstate).depth + 1,
                         (*(*ctxt).vstate).occurs,
                         ROLLBACK_OR as _,
@@ -4459,10 +4169,9 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
         while !(*(*ctxt).vstate).cont.is_null() {
             // First do the analysis depending on the occurrence model at this level.
             if ret == 0 {
-                let cur: XmlNodePtr;
                 match (*(*(*ctxt).vstate).cont).ocur {
                     XmlElementContentOccur::XmlElementContentOnce => {
-                        cur = (*(*ctxt).vstate).node;
+                        let cur = (*(*ctxt).vstate).node;
                         DEBUG_VALID_MSG!(c"Once branch failed, rollback".as_ptr());
                         if vstate_vpop(ctxt) < 0 {
                             DEBUG_VALID_MSG!(c"exhaustion, failed".as_ptr());
@@ -4476,7 +4185,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                     }
                     XmlElementContentOccur::XmlElementContentPlus => {
                         if ((*(*ctxt).vstate).occurs & (1 << (*(*ctxt).vstate).depth)) == 0 {
-                            cur = (*(*ctxt).vstate).node;
+                            let cur = (*(*ctxt).vstate).node;
                             DEBUG_VALID_MSG!(c"Plus branch failed, rollback".as_ptr());
                             if vstate_vpop(ctxt) < 0 {
                                 DEBUG_VALID_MSG!(c"exhaustion, failed".as_ptr());
@@ -4596,9 +4305,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
             }
         }
         if !(*(*ctxt).vstate).node.is_null() {
-            let cur: XmlNodePtr;
-
-            cur = (*(*ctxt).vstate).node;
+            let cur = (*(*ctxt).vstate).node;
             DEBUG_VALID_MSG!(c"Failed, remaining input, rollback".as_ptr());
             if vstate_vpop(ctxt) < 0 {
                 DEBUG_VALID_MSG!(c"exhaustion, failed".as_ptr());
@@ -4611,9 +4318,7 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
             continue 'cont;
         }
         if ret == 0 {
-            let cur: XmlNodePtr;
-
-            cur = (*(*ctxt).vstate).node;
+            let cur = (*(*ctxt).vstate).node;
             DEBUG_VALID_MSG!(c"Failure, rollback".as_ptr());
             if vstate_vpop(ctxt) < 0 {
                 DEBUG_VALID_MSG!(c"exhaustion, failed".as_ptr());
@@ -4634,25 +4339,24 @@ unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
 #[doc(alias = "xmlValidateElementContent")]
 unsafe fn xml_validate_element_content(
     ctxt: XmlValidCtxtPtr,
-    child: XmlNodePtr,
+    child: Option<XmlGenericNodePtr>,
     elem_decl: XmlElementPtr,
     warn: i32,
     parent: XmlNodePtr,
 ) -> i32 {
     let mut ret: i32 = 1;
     #[cfg(not(feature = "libxml_regexp"))]
-    let mut repl: XmlNodePtr = null_mut();
+    let mut repl: Option<XmlGenericNodePtr> = None;
     #[cfg(not(feature = "libxml_regexp"))]
-    let mut last: XmlNodePtr = null_mut();
+    let mut last: Option<XmlGenericNodePtr> = None;
     #[cfg(not(feature = "libxml_regexp"))]
-    let mut tmp: XmlNodePtr;
-    let mut cur: XmlNodePtr;
+    let mut tmp: Option<XmlGenericNodePtr>;
 
-    if elem_decl.is_null() || parent.is_null() || ctxt.is_null() {
+    if ctxt.is_null() {
         return -1;
     }
-    let cont: XmlElementContentPtr = (*elem_decl).content;
-    let name = (*elem_decl)
+    let cont: XmlElementContentPtr = elem_decl.content;
+    let name = elem_decl
         .name
         .as_ref()
         .map(|n| CString::new(n.as_str()).unwrap());
@@ -4660,39 +4364,39 @@ unsafe fn xml_validate_element_content(
     #[cfg(feature = "libxml_regexp")]
     {
         // Build the regexp associated to the content model
-        if (*elem_decl).cont_model.is_null() {
+        if elem_decl.cont_model.is_null() {
             ret = xml_valid_build_content_model(ctxt, elem_decl);
         }
-        if (*elem_decl).cont_model.is_null() {
+        if elem_decl.cont_model.is_null() {
             return -1;
         } else {
-            if xml_regexp_is_determinist((*elem_decl).cont_model) == 0 {
+            if xml_regexp_is_determinist(elem_decl.cont_model) == 0 {
                 return -1;
             }
-            (*ctxt).node_max = 0;
-            (*ctxt).node_nr = 0;
-            (*ctxt).node_tab = null_mut();
+            (*ctxt).node_tab.clear();
             let exec: XmlRegExecCtxtPtr =
-                xml_reg_new_exec_ctxt((*elem_decl).cont_model, None, null_mut());
+                xml_reg_new_exec_ctxt(elem_decl.cont_model, None, null_mut());
             if !exec.is_null() {
-                cur = child;
+                let mut cur = child;
                 'fail: {
-                    while !cur.is_null() {
-                        match (*cur).element_type() {
+                    while let Some(cur_node) = cur {
+                        match cur_node.element_type() {
                             XmlElementType::XmlEntityRefNode => {
+                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                                 // Push the current node to be able to roll back
                                 // and process within the entity
-                                if let Some(children) = (*cur)
-                                    .children()
+                                if let Some(children) = cur_node
+                                    .children
                                     .filter(|children| children.children().is_some())
                                 {
-                                    node_vpush(ctxt, cur);
-                                    cur = children.children().map_or(null_mut(), |c| c.as_ptr());
+                                    node_vpush(ctxt, cur_node);
+                                    cur = children.children();
                                     continue;
                                 }
                             }
                             XmlElementType::XmlTextNode => {
-                                if (*cur).is_blank_node() {
+                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                                if cur_node.is_blank_node() {
                                     //  break;
                                 } else {
                                     ret = 0;
@@ -4705,12 +4409,15 @@ unsafe fn xml_validate_element_content(
                                 break 'fail;
                             }
                             XmlElementType::XmlElementNode => {
-                                if !(*cur).ns.is_null() && (*(*cur).ns).prefix().is_some() {
+                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                                if let Some(prefix) =
+                                    cur_node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
+                                {
                                     let mut fname: [XmlChar; 50] = [0; 50];
 
                                     let fullname: *mut XmlChar = xml_build_qname(
-                                        (*cur).name,
-                                        (*(*cur).ns).prefix as _,
+                                        cur_node.name,
+                                        prefix as _,
                                         fname.as_mut_ptr(),
                                         50,
                                     );
@@ -4721,25 +4428,25 @@ unsafe fn xml_validate_element_content(
                                     // ret =
                                     xml_reg_exec_push_string(exec, fullname, null_mut());
                                     if fullname != fname.as_ptr() as _
-                                        && fullname != (*cur).name as _
+                                        && fullname != cur_node.name as _
                                     {
                                         xml_free(fullname as _);
                                     }
                                 } else {
                                     // ret =
-                                    xml_reg_exec_push_string(exec, (*cur).name, null_mut());
+                                    xml_reg_exec_push_string(exec, cur_node.name, null_mut());
                                 }
                             }
                             _ => {}
                         }
                         // Switch to next element
-                        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-                        while cur.is_null() {
-                            cur = node_vpop(ctxt);
-                            if cur.is_null() {
+                        cur = cur_node.next();
+                        while cur.is_none() {
+                            cur = node_vpop(ctxt).map(|node| node.into());
+                            if cur.is_none() {
                                 break;
                             }
-                            cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+                            cur = cur_node.next();
                         }
                     }
 
@@ -4758,10 +4465,10 @@ unsafe fn xml_validate_element_content(
         {
             // Allocate the stack
             (*ctxt).vstateMax = 8;
-            (*ctxt).vstateTab =
-                xml_malloc((*ctxt).vstateMax as usize * size_of_val(&*(*ctxt).vstateTab.add(0)))
+            (*ctxt).vstate_tab =
+                xml_malloc((*ctxt).vstateMax as usize * size_of_val(&*(*ctxt).vstate_tab.add(0)))
                     as *mut XmlValidState;
-            if (*ctxt).vstateTab.is_null() {
+            if (*ctxt).vstate_tab.is_null() {
                 xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
                 return -1;
             }
@@ -4769,8 +4476,8 @@ unsafe fn xml_validate_element_content(
             (*ctxt).nodeMax = 0;
             (*ctxt).nodeNr = 0;
             (*ctxt).nodeTab = null_mut();
-            (*ctxt).vstate = (*ctxt).vstateTab.add(0);
-            (*ctxt).vstateNr = 1;
+            (*ctxt).vstate = (*ctxt).vstate_tab.add(0);
+            (*ctxt).vstate_nr = 1;
             (*(*ctxt).vstate).cont = cont;
             (*(*ctxt).vstate).node = child;
             (*(*ctxt).vstate).depth = 0;
@@ -4783,7 +4490,7 @@ unsafe fn xml_validate_element_content(
                 xml_snprintf_element_content(expr.as_mut_ptr() as _, 5000, (*elem_decl).content, 1);
                 xml_err_valid_node(
                     ctxt,
-                    elem_decl as XmlNodePtr,
+                    Some(elem_decl.into()),
                     XmlParserErrors::XmlDTDContentNotDeterminist,
                     c"Content model of %s is not deterministic: %s\n".as_ptr() as _,
                     name,
@@ -4818,18 +4525,19 @@ unsafe fn xml_validate_element_content(
                             } else {
                                 // Allocate a new node and minimally fills in
                                 // what's required
-                                tmp = xml_malloc(size_of::<XmlNode>()) as XmlNodePtr;
-                                if tmp.is_null() {
+                                let Some(tmp) = XmlNodePtr::new(XmlNode {
+                                    typ: (*cur).typ,
+                                    name: (*cur).name,
+                                    ns: (*cur).ns,
+                                    next: null_mut(),
+                                    content: null_mut(),
+                                    ..Default::default()
+                                }) else {
                                     xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
                                     xmlFreeNodeList(repl);
                                     ret = -1;
                                     break 'done;
-                                }
-                                (*tmp).typ = (*cur).typ;
-                                (*tmp).name = (*cur).name;
-                                (*tmp).ns = (*cur).ns;
-                                (*tmp).next = null_mut();
-                                (*tmp).content = null_mut();
+                                };
                                 if repl.is_null() {
                                     repl = tmp;
                                     last = tmp;
@@ -4857,8 +4565,8 @@ unsafe fn xml_validate_element_content(
                 }
 
                 // Relaunch the validation
-                (*ctxt).vstate = (*ctxt).vstateTab.add(0);
-                (*ctxt).vstateNr = 1;
+                (*ctxt).vstate = (*ctxt).vstate_tab.add(0);
+                (*ctxt).vstate_nr = 1;
                 (*(*ctxt).vstate).cont = cont;
                 (*(*ctxt).vstate).node = repl;
                 (*(*ctxt).vstate).depth = 0;
@@ -4879,7 +4587,12 @@ unsafe fn xml_validate_element_content(
                 #[cfg(not(feature = "libxml_regexp"))]
                 {
                     if !repl.is_null() {
-                        xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, repl, 1);
+                        xml_snprintf_elements(
+                            list.as_mut_ptr().add(0) as _,
+                            5000,
+                            XmlGenericNodePtr::from_raw(repl),
+                            1,
+                        );
                     } else {
                         xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
                     }
@@ -4895,7 +4608,7 @@ unsafe fn xml_validate_element_content(
                     let list = CStr::from_ptr(list.as_ptr()).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
-                        parent,
+                        Some(parent.into()),
                         XmlParserErrors::XmlDTDContentModel,
                         format!(
                             "Element {name} content does not follow the DTD, expecting {expr}, got {list}\n"
@@ -4910,7 +4623,7 @@ unsafe fn xml_validate_element_content(
                     let list = CStr::from_ptr(list.as_ptr()).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
-                        parent,
+                        Some(parent.into()),
                         XmlParserErrors::XmlDTDContentModel,
                         format!("Element content does not follow the DTD, expecting {expr}, got {list}\n")
                             .as_str(),
@@ -4923,7 +4636,7 @@ unsafe fn xml_validate_element_content(
                 let name = name.to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
-                    parent,
+                    Some(parent.into()),
                     XmlParserErrors::XmlDTDContentModel,
                     format!("Element {name} content does not follow the DTD\n").as_str(),
                     Some(&name),
@@ -4933,7 +4646,7 @@ unsafe fn xml_validate_element_content(
             } else {
                 xml_err_valid_node(
                     ctxt,
-                    parent,
+                    Some(parent.into()),
                     XmlParserErrors::XmlDTDContentModel,
                     "Element content does not follow the DTD\n",
                     None,
@@ -4958,17 +4671,12 @@ unsafe fn xml_validate_element_content(
             repl = tmp;
         }
         (*ctxt).vstateMax = 0;
-        if !(*ctxt).vstateTab.is_null() {
-            xml_free((*ctxt).vstateTab as _);
-            (*ctxt).vstateTab = null_mut();
+        if !(*ctxt).vstate_tab.is_null() {
+            xml_free((*ctxt).vstate_tab as _);
+            (*ctxt).vstate_tab = null_mut();
         }
     }
-    (*ctxt).node_max = 0;
-    (*ctxt).node_nr = 0;
-    if !(*ctxt).node_tab.is_null() {
-        xml_free((*ctxt).node_tab as _);
-        (*ctxt).node_tab = null_mut();
-    }
+    (*ctxt).node_tab.clear();
     ret
 }
 
@@ -4987,26 +4695,26 @@ unsafe fn xml_validate_element_content(
 pub unsafe fn xml_validate_one_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    elem: XmlNodePtr,
+    elem: Option<XmlGenericNodePtr>,
 ) -> i32 {
     let mut cont: XmlElementContentPtr;
-    let mut attr: XmlAttributePtr;
-    let mut child: XmlNodePtr;
     let mut ret: i32 = 1;
     let tmp: i32;
     let mut name: *const XmlChar;
     let mut extsubset: i32 = 0;
 
-    CHECK_DTD!(doc);
-
-    if elem.is_null() {
+    if doc.int_subset.is_none() && doc.ext_subset.is_none() {
         return 0;
-    }
-    match (*elem).element_type() {
+    };
+
+    let Some(elem) = elem else {
+        return 0;
+    };
+    match elem.element_type() {
         XmlElementType::XmlAttributeNode => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem),
                 XmlParserErrors::XmlErrInternalError,
                 "Attribute element not expected\n",
                 None,
@@ -5016,10 +4724,11 @@ pub unsafe fn xml_validate_one_element(
             return 0;
         }
         XmlElementType::XmlTextNode => {
-            if (*elem).children().is_some() {
+            let elem = XmlNodePtr::try_from(elem).unwrap();
+            if elem.children().is_some() {
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    Some(elem.into()),
                     XmlParserErrors::XmlErrInternalError,
                     "Text element has children !\n",
                     None,
@@ -5028,10 +4737,10 @@ pub unsafe fn xml_validate_one_element(
                 );
                 return 0;
             }
-            if !(*elem).ns.is_null() {
+            if elem.ns.is_some() {
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    Some(elem.into()),
                     XmlParserErrors::XmlErrInternalError,
                     "Text element has namespace !\n",
                     None,
@@ -5040,10 +4749,10 @@ pub unsafe fn xml_validate_one_element(
                 );
                 return 0;
             }
-            if (*elem).content.is_null() {
+            if elem.content.is_null() {
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    Some(elem.into()),
                     XmlParserErrors::XmlErrInternalError,
                     "Text element has no content !\n",
                     None,
@@ -5066,7 +4775,7 @@ pub unsafe fn xml_validate_one_element(
         XmlElementType::XmlEntityNode => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem),
                 XmlParserErrors::XmlErrInternalError,
                 "Entity element not expected\n",
                 None,
@@ -5078,7 +4787,7 @@ pub unsafe fn xml_validate_one_element(
         XmlElementType::XmlNotationNode => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem),
                 XmlParserErrors::XmlErrInternalError,
                 "Notation element not expected\n",
                 None,
@@ -5092,7 +4801,7 @@ pub unsafe fn xml_validate_one_element(
         | XmlElementType::XmlDocumentFragNode => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem),
                 XmlParserErrors::XmlErrInternalError,
                 "Document element not expected\n",
                 None,
@@ -5104,7 +4813,7 @@ pub unsafe fn xml_validate_one_element(
         XmlElementType::XmlHTMLDocumentNode => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem),
                 XmlParserErrors::XmlErrInternalError,
                 "HTML Document not expected\n",
                 None,
@@ -5117,7 +4826,7 @@ pub unsafe fn xml_validate_one_element(
         _ => {
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem),
                 XmlParserErrors::XmlErrInternalError,
                 "unknown element type\n",
                 None,
@@ -5128,23 +4837,24 @@ pub unsafe fn xml_validate_one_element(
         }
     }
 
-    // Fetch the declaration
-    let elem_decl: XmlElementPtr =
-        xml_valid_get_elem_decl(ctxt, doc, elem, addr_of_mut!(extsubset));
-    if elem_decl.is_null() {
-        return 0;
-    }
+    // At this point, `elem` is just `XmlElementNode`.
+    let elem = XmlNodePtr::try_from(elem).unwrap();
 
-    // If vstateNr is not zero that means continuous validation is
+    // Fetch the declaration
+    let Some(elem_decl) = xml_valid_get_elem_decl(ctxt, doc, elem, addr_of_mut!(extsubset)) else {
+        return 0;
+    };
+
+    // If vstate_nr is not zero that means continuous validation is
     // activated, do not try to check the content model at that level.
-    if (*ctxt).vstate_nr == 0 {
+    if (*ctxt).vstate_tab.is_empty() {
         // Check that the element content matches the definition
-        match (*elem_decl).etype {
+        match elem_decl.etype {
             XmlElementTypeVal::XmlElementTypeUndefined => {
-                let name = (*elem).name().unwrap();
+                let name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    Some(elem.into()),
                     XmlParserErrors::XmlDTDUnknownElem,
                     format!("No declaration for element {name}\n").as_str(),
                     Some(&name),
@@ -5154,11 +4864,11 @@ pub unsafe fn xml_validate_one_element(
                 return 0;
             }
             XmlElementTypeVal::XmlElementTypeEmpty => {
-                if (*elem).children().is_some() {
-                    let name = (*elem).name().unwrap();
+                if elem.children().is_some() {
+                    let name = elem.name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        elem,
+                        Some(elem.into()),
                         XmlParserErrors::XmlDTDNotEmpty,
                         format!("Element {name} was declared EMPTY this one has content\n")
                             .as_str(),
@@ -5174,15 +4884,15 @@ pub unsafe fn xml_validate_one_element(
             }
             XmlElementTypeVal::XmlElementTypeMixed => {
                 // simple case of declared as #PCDATA
-                if !(*elem_decl).content.is_null()
-                    && (*(*elem_decl).content).typ == XmlElementContentType::XmlElementContentPCDATA
+                if !elem_decl.content.is_null()
+                    && (*elem_decl.content).typ == XmlElementContentType::XmlElementContentPCDATA
                 {
                     ret = xml_validate_one_cdata_element(ctxt, doc, elem);
                     if ret == 0 {
-                        let name = (*elem).name().unwrap();
+                        let name = elem.name().unwrap();
                         xml_err_valid_node(
                             ctxt,
-                            elem,
+                            Some(elem.into()),
                             XmlParserErrors::XmlDTDNotPCDATA,
                             format!(
                                 "Element {name} was declared #PCDATA but contains non text nodes\n"
@@ -5194,25 +4904,28 @@ pub unsafe fn xml_validate_one_element(
                         );
                     }
                 } else {
-                    child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
+                    let mut child = elem.children;
                     // Hum, this start to get messy
-                    while !child.is_null() {
+                    while let Some(cur_node) = child {
                         'child_ok: {
-                            if matches!((*child).element_type(), XmlElementType::XmlElementNode) {
-                                name = (*child).name;
-                                if !(*child).ns.is_null() && (*(*child).ns).prefix().is_some() {
+                            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                                name = cur_node.name;
+                                if let Some(prefix) =
+                                    cur_node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
+                                {
                                     let mut fname: [XmlChar; 50] = [0; 50];
 
                                     let fullname: *mut XmlChar = xml_build_qname(
-                                        (*child).name,
-                                        (*(*child).ns).prefix,
+                                        cur_node.name,
+                                        prefix,
                                         fname.as_mut_ptr() as _,
                                         50,
                                     );
                                     if fullname.is_null() {
                                         return 0;
                                     }
-                                    cont = (*elem_decl).content;
+                                    cont = elem_decl.content;
                                     while !cont.is_null() {
                                         if matches!(
                                             (*cont).typ,
@@ -5250,7 +4963,7 @@ pub unsafe fn xml_validate_one_element(
                                         cont = (*cont).c2;
                                     }
                                     if fullname != fname.as_ptr() as _
-                                        && fullname != (*child).name as _
+                                        && fullname != cur_node.name as _
                                     {
                                         xml_free(fullname as _);
                                     }
@@ -5259,7 +4972,7 @@ pub unsafe fn xml_validate_one_element(
                                     }
                                 }
 
-                                cont = (*elem_decl).content;
+                                cont = elem_decl.content;
                                 while !cont.is_null() {
                                     if matches!(
                                         (*cont).typ,
@@ -5300,10 +5013,10 @@ pub unsafe fn xml_validate_one_element(
                                 }
                                 if cont.is_null() {
                                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                                    let elem_name = (*elem).name().unwrap();
+                                    let elem_name = elem.name().unwrap();
                                     xml_err_valid_node(
                                         ctxt,
-                                        elem,
+                                        Some(elem.into()),
                                         XmlParserErrors::XmlDTDInvalidChild,
                                         format!("Element {name} is not declared in {elem_name} list of possible children\n").as_str(),
                                         Some(&name),
@@ -5315,28 +5028,29 @@ pub unsafe fn xml_validate_one_element(
                             }
                         }
                         // child_ok:
-                        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+                        child = cur_node.next();
                     }
                 }
             }
             XmlElementTypeVal::XmlElementTypeElement => {
-                if (*doc).standalone == 1 && extsubset == 1 {
+                if doc.standalone == 1 && extsubset == 1 {
                     // VC: Standalone Document Declaration
                     //     - element types with element content, if white space
                     //       occurs directly within any instance of those types.
-                    child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
-                    while !child.is_null() {
-                        if matches!((*child).element_type(), XmlElementType::XmlTextNode) {
-                            let mut content: *const XmlChar = (*child).content;
+                    let mut child = elem.children();
+                    while let Some(cur_node) = child {
+                        if matches!(cur_node.element_type(), XmlElementType::XmlTextNode) {
+                            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                            let mut content: *const XmlChar = cur_node.content;
 
                             while xml_is_blank_char(*content as u32) {
                                 content = content.add(1);
                             }
                             if *content == 0 {
-                                let name = (*elem).name().unwrap();
+                                let name = elem.name().unwrap();
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem,
+                                    Some(elem.into()),
                                     XmlParserErrors::XmlDTDStandaloneWhiteSpace,
                                     format!("standalone: {name} declared in the external subset contains white spaces nodes\n").as_str(),
                                     Some(&name),
@@ -5347,10 +5061,10 @@ pub unsafe fn xml_validate_one_element(
                                 break;
                             }
                         }
-                        child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
+                        child = cur_node.next();
                     }
                 }
-                child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
+                let child = elem.children;
                 // cont = (*elem_decl).content;
                 tmp = xml_validate_element_content(ctxt, child, elem_decl, 1, elem);
                 if tmp <= 0 {
@@ -5358,60 +5072,52 @@ pub unsafe fn xml_validate_one_element(
                 }
             }
         }
-    } /* not continuous */
+    }
 
     // [ VC: Required Attribute ]
-    attr = (*elem_decl).attributes;
-    while !attr.is_null() {
+    let mut attr = elem_decl.attributes;
+    while let Some(cur_attr) = attr {
         'found: {
-            if matches!((*attr).def, XmlAttributeDefault::XmlAttributeRequired) {
+            if matches!(cur_attr.def, XmlAttributeDefault::XmlAttributeRequired) {
                 let mut qualified: i32 = -1;
 
-                if (*attr).prefix.is_none() && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) {
-                    let mut ns: XmlNsPtr;
-
-                    ns = (*elem).ns_def;
-                    while !ns.is_null() {
-                        if (*ns).prefix().is_none() {
+                if cur_attr.prefix.is_none() && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
+                {
+                    let mut ns = elem.ns_def;
+                    while let Some(now) = ns {
+                        if now.prefix().is_none() {
                             break 'found;
                         }
-                        ns = (*ns).next;
+                        ns = now.next;
                     }
-                } else if (*attr).prefix.as_deref() == Some("xmlns") {
-                    let mut ns: XmlNsPtr;
-
-                    ns = (*elem).ns_def;
-                    while !ns.is_null() {
-                        if (*attr).name() == (*ns).prefix() {
+                } else if cur_attr.prefix.as_deref() == Some("xmlns") {
+                    let mut ns = elem.ns_def;
+                    while let Some(now) = ns {
+                        if cur_attr.name() == now.prefix() {
                             break 'found;
                         }
-                        ns = (*ns).next;
+                        ns = now.next;
                     }
                 } else {
-                    let mut attrib: XmlAttrPtr;
+                    let mut attrib = elem.properties;
+                    while let Some(attr) = attrib {
+                        if xml_str_equal(attr.name, cur_attr.name) {
+                            if let Some(prefix) = cur_attr.prefix.as_deref() {
+                                let name_space = attr.ns.or(elem.ns);
 
-                    attrib = (*elem).properties;
-                    while !attrib.is_null() {
-                        if xml_str_equal((*attrib).name, (*attr).name) {
-                            if let Some(prefix) = (*attr).prefix.as_deref() {
-                                let mut name_space: XmlNsPtr = (*attrib).ns;
-
-                                if name_space.is_null() {
-                                    name_space = (*elem).ns;
-                                }
                                 // qualified names handling is problematic, having a
                                 // different prefix should be possible but DTDs don't
                                 // allow to define the URI instead of the prefix :-(
-                                if name_space.is_null() {
-                                    if qualified < 0 {
-                                        qualified = 0;
+                                if let Some(name_space) = name_space {
+                                    if (*name_space).prefix().as_deref() != Some(prefix) {
+                                        if qualified < 1 {
+                                            qualified = 1;
+                                        }
+                                    } else {
+                                        break 'found;
                                     }
-                                } else if (*name_space).prefix().as_deref() != Some(prefix) {
-                                    if qualified < 1 {
-                                        qualified = 1;
-                                    }
-                                } else {
-                                    break 'found;
+                                } else if qualified < 0 {
+                                    qualified = 0;
                                 }
                             } else {
                                 // We should allow applications to define namespaces
@@ -5420,16 +5126,16 @@ pub unsafe fn xml_validate_one_element(
                                 break 'found;
                             }
                         }
-                        attrib = (*attrib).next;
+                        attrib = attr.next;
                     }
                 }
                 if qualified == -1 {
-                    if (*attr).prefix.is_none() {
-                        let elem_name = (*elem).name().unwrap();
-                        let attr_name = (*attr).name().unwrap();
+                    if cur_attr.prefix.is_none() {
+                        let elem_name = elem.name().unwrap();
+                        let attr_name = cur_attr.name().unwrap();
                         xml_err_valid_node(
                             ctxt,
-                            elem,
+                            Some(elem.into()),
                             XmlParserErrors::XmlDTDMissingAttribute,
                             format!("Element {elem_name} does not carry attribute {attr_name}\n")
                                 .as_str(),
@@ -5439,12 +5145,12 @@ pub unsafe fn xml_validate_one_element(
                         );
                         ret = 0;
                     } else {
-                        let elem_name = (*elem).name().unwrap();
-                        let prefix = (*attr).prefix.as_deref().unwrap();
-                        let attr_name = (*attr).name().unwrap();
+                        let elem_name = elem.name().unwrap();
+                        let prefix = cur_attr.prefix.as_deref().unwrap();
+                        let attr_name = cur_attr.name().unwrap();
                         xml_err_valid_node(
                             ctxt,
-                            elem,
+                            Some(elem.into()),
                             XmlParserErrors::XmlDTDMissingAttribute,
                             format!("Element {elem_name} does not carry attribute {prefix}:{attr_name}\n").as_str(),
                             Some(&elem_name),
@@ -5456,39 +5162,38 @@ pub unsafe fn xml_validate_one_element(
                 } else if qualified == 0 {
                     xml_err_valid_warning!(
                         ctxt,
-                        elem,
+                        Some(elem.into()),
                         XmlParserErrors::XmlDTDNoPrefix,
                         "Element {} required attribute {}:{} has no prefix\n",
-                        (*elem).name().unwrap(),
-                        (*attr).prefix.as_deref().unwrap(),
-                        (*attr).name().unwrap()
+                        elem.name().unwrap().into_owned(),
+                        cur_attr.prefix.as_deref().unwrap(),
+                        cur_attr.name().unwrap().into_owned()
                     );
                 } else if qualified == 1 {
                     xml_err_valid_warning!(
                         ctxt,
-                        elem,
+                        Some(elem.into()),
                         XmlParserErrors::XmlDTDDifferentPrefix,
                         "Element {} required attribute {}:{} has different prefix\n",
-                        (*elem).name().unwrap(),
-                        (*attr).prefix.as_deref().unwrap(),
-                        (*attr).name().unwrap()
+                        elem.name().unwrap().into_owned(),
+                        cur_attr.prefix.as_deref().unwrap(),
+                        cur_attr.name().unwrap().into_owned()
                     );
                 }
-            } else if matches!((*attr).def, XmlAttributeDefault::XmlAttributeFixed) {
+            } else if matches!(cur_attr.def, XmlAttributeDefault::XmlAttributeFixed) {
                 // Special tests checking #FIXED namespace declarations
                 // have the right value since this is not done as an
                 // attribute checking
-                if (*attr).prefix.is_none() && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) {
-                    let mut ns: XmlNsPtr;
-
-                    ns = (*elem).ns_def;
-                    while !ns.is_null() {
-                        if (*ns).prefix().is_none() {
-                            if !xml_str_equal((*attr).default_value, (*ns).href) {
-                                let elem_name = (*elem).name().unwrap();
+                if cur_attr.prefix.is_none() && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
+                {
+                    let mut ns = elem.ns_def;
+                    while let Some(now) = ns {
+                        if now.prefix().is_none() {
+                            if !xml_str_equal(cur_attr.default_value, now.href) {
+                                let elem_name = elem.name().unwrap();
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem,
+                                    Some(elem.into()),
                                     XmlParserErrors::XmlDTDElemDefaultNamespace,
                                     format!("Element {elem_name} namespace name for default namespace does not match the DTD\n").as_str(),
                                     Some(&elem_name),
@@ -5499,20 +5204,18 @@ pub unsafe fn xml_validate_one_element(
                             }
                             break 'found;
                         }
-                        ns = (*ns).next;
+                        ns = now.next;
                     }
-                } else if (*attr).prefix.as_deref() == Some("xmlns") {
-                    let mut ns: XmlNsPtr;
-
-                    ns = (*elem).ns_def;
-                    while !ns.is_null() {
-                        if (*attr).name() == (*ns).prefix() {
-                            if !xml_str_equal((*attr).default_value, (*ns).href) {
-                                let elem_name = (*elem).name().unwrap();
-                                let prefix = (*ns).prefix().unwrap();
+                } else if cur_attr.prefix.as_deref() == Some("xmlns") {
+                    let mut ns = elem.ns_def;
+                    while let Some(now) = ns {
+                        if cur_attr.name() == now.prefix() {
+                            if !xml_str_equal(cur_attr.default_value, now.href) {
+                                let elem_name = elem.name().unwrap();
+                                let prefix = now.prefix().unwrap();
                                 xml_err_valid_node(
                                     ctxt,
-                                    elem,
+                                    Some(elem.into()),
                                     XmlParserErrors::XmlDTDElemNamespace,
                                     format!(
                                         "Element {elem_name} namespace name for {prefix} does not match the DTD\n"
@@ -5526,13 +5229,13 @@ pub unsafe fn xml_validate_one_element(
                             }
                             break 'found;
                         }
-                        ns = (*ns).next;
+                        ns = now.next;
                     }
                 }
             }
         }
         // found:
-        attr = (*attr).nexth;
+        attr = cur_attr.nexth;
     }
     ret
 }
@@ -5558,104 +5261,124 @@ pub unsafe fn xml_validate_one_attribute(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     elem: XmlNodePtr,
-    attr: XmlAttrPtr,
+    attr: Option<XmlAttrPtr>,
     value: *const XmlChar,
 ) -> i32 {
-    let mut attr_decl: XmlAttributePtr = null_mut();
     let mut ret: i32 = 1;
 
-    CHECK_DTD!(doc);
-    if elem.is_null() || (*elem).name.is_null() {
+    // if doc.is_null() {
+    //     return 0;
+    // }
+    if doc.int_subset.is_none() && doc.ext_subset.is_none() {
+        return 0;
+    };
+    // if elem.is_null() {
+    //     return 0;
+    // }
+    if elem.name.is_null() {
         return 0;
     }
-    if attr.is_null() || (*attr).name.is_null() {
+    let Some(mut attr) = attr.filter(|a| !a.name.is_null()) else {
         return 0;
-    }
+    };
 
-    if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
+    let mut attr_decl = None;
+    if let Some(prefix) = elem.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
         let mut fname: [XmlChar; 50] = [0; 50];
 
-        let fullname: *mut XmlChar = xml_build_qname(
-            (*elem).name,
-            (*(*elem).ns).prefix as _,
-            fname.as_mut_ptr(),
-            50,
-        );
+        let fullname: *mut XmlChar =
+            xml_build_qname(elem.name, prefix as _, fname.as_mut_ptr(), 50);
         if fullname.is_null() {
             return 0;
         }
-        if !(*attr).ns.is_null() {
-            attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                CStr::from_ptr(fullname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                (*attr).name().as_deref().unwrap(),
-                (*(*attr).ns).prefix().as_deref(),
-            );
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
+        if let Some(attr_ns) = attr.ns {
+            attr_decl = doc.int_subset.and_then(|dtd| {
+                dtd.get_qattr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                    (*attr).name().as_deref().unwrap(),
-                    (*(*attr).ns).prefix().as_deref(),
-                );
+                    attr.name().as_deref().unwrap(),
+                    attr_ns.prefix().as_deref(),
+                )
+            });
+            if attr_decl.is_none() && doc.ext_subset.is_some() {
+                attr_decl = doc.ext_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc(
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        attr.name().as_deref().unwrap(),
+                        attr_ns.prefix().as_deref(),
+                    )
+                });
             }
         } else {
-            attr_decl = (*(*doc).int_subset).get_attr_desc(
-                CStr::from_ptr(fullname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                (*attr).name().as_deref().unwrap(),
-            );
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_attr_desc(
+            attr_decl = doc.int_subset.and_then(|dtd| {
+                dtd.get_attr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                    (*attr).name().as_deref().unwrap(),
-                );
+                    attr.name().as_deref().unwrap(),
+                )
+            });
+            if attr_decl.is_none() && doc.ext_subset.is_some() {
+                attr_decl = doc.ext_subset.and_then(|dtd| {
+                    dtd.get_attr_desc(
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        attr.name().as_deref().unwrap(),
+                    )
+                });
             }
         }
-        if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
+        if fullname != fname.as_ptr() as _ && fullname != elem.name as _ {
             xml_free(fullname as _);
         }
     }
-    if attr_decl.is_null() {
-        if !(*attr).ns.is_null() {
-            attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                (*elem).name().unwrap().as_ref(),
-                (*attr).name().as_deref().unwrap(),
-                (*(*attr).ns).prefix().as_deref(),
-            );
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
-                    (*elem).name().unwrap().as_ref(),
-                    (*attr).name().as_deref().unwrap(),
-                    (*(*attr).ns).prefix().as_deref(),
-                );
+    if attr_decl.is_none() {
+        if let Some(attr_ns) = attr.ns {
+            attr_decl = doc.int_subset.and_then(|dtd| {
+                dtd.get_qattr_desc(
+                    elem.name().unwrap().as_ref(),
+                    attr.name().as_deref().unwrap(),
+                    attr_ns.prefix().as_deref(),
+                )
+            });
+            if attr_decl.is_none() && doc.ext_subset.is_some() {
+                attr_decl = doc.ext_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc(
+                        elem.name().unwrap().as_ref(),
+                        attr.name().as_deref().unwrap(),
+                        attr_ns.prefix().as_deref(),
+                    )
+                });
             }
         } else {
-            attr_decl = (*(*doc).int_subset).get_attr_desc(
-                (*elem).name().as_deref().unwrap(),
-                (*attr).name().as_deref().unwrap(),
-            );
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_attr_desc(
-                    (*elem).name().as_deref().unwrap(),
-                    (*attr).name().as_deref().unwrap(),
-                );
+            attr_decl = doc.int_subset.and_then(|dtd| {
+                dtd.get_attr_desc(
+                    elem.name().as_deref().unwrap(),
+                    attr.name().as_deref().unwrap(),
+                )
+            });
+            if attr_decl.is_none() && doc.ext_subset.is_some() {
+                attr_decl = doc.ext_subset.and_then(|dtd| {
+                    dtd.get_attr_desc(
+                        elem.name().as_deref().unwrap(),
+                        attr.name().as_deref().unwrap(),
+                    )
+                });
             }
         }
     }
 
     // Validity Constraint: Attribute Value Type
-    if attr_decl.is_null() {
-        let attr_name = (*attr).name().unwrap();
-        let elem_name = (*elem).name().unwrap();
+    let Some(attr_decl) = attr_decl else {
+        let attr_name = attr.name().unwrap();
+        let elem_name = elem.name().unwrap();
         xml_err_valid_node(
             ctxt,
-            elem,
+            Some(elem.into()),
             XmlParserErrors::XmlDTDUnknownAttribute,
             format!("No declaration for attribute {attr_name} of element {elem_name}\n").as_str(),
             Some(&attr_name),
@@ -5663,16 +5386,16 @@ pub unsafe fn xml_validate_one_attribute(
             None,
         );
         return 0;
-    }
-    (*attr).atype = Some((*attr_decl).atype);
+    };
+    attr.atype = Some(attr_decl.atype);
 
-    let val: i32 = xml_validate_attribute_value_internal(doc, (*attr_decl).atype, value);
+    let val: i32 = xml_validate_attribute_value_internal(Some(doc), attr_decl.atype, value);
     if val == 0 {
-        let attr_name = (*attr).name().unwrap();
-        let elem_name = (*elem).name().unwrap();
+        let attr_name = attr.name().unwrap();
+        let elem_name = elem.name().unwrap();
         xml_err_valid_node(
             ctxt,
-            elem,
+            Some(elem.into()),
             XmlParserErrors::XmlDTDAttributeValue,
             format!("Syntax of value for attribute {attr_name} of {elem_name} is not valid\n")
                 .as_str(),
@@ -5684,15 +5407,15 @@ pub unsafe fn xml_validate_one_attribute(
     }
 
     // Validity constraint: Fixed Attribute Default
-    if matches!((*attr_decl).def, XmlAttributeDefault::XmlAttributeFixed)
-        && !xml_str_equal(value, (*attr_decl).default_value)
+    if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
+        && !xml_str_equal(value, attr_decl.default_value)
     {
-        let attr_name = (*attr).name().unwrap();
-        let elem_name = (*elem).name().unwrap();
-        let def_value = CStr::from_ptr((*attr_decl).default_value as *const i8).to_string_lossy();
+        let attr_name = attr.name().unwrap();
+        let elem_name = elem.name().unwrap();
+        let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem,
+            Some(elem.into()),
             XmlParserErrors::XmlDTDAttributeDefault,
             format!(
                 "Value for attribute {attr_name} of {elem_name} is different from default \"{def_value}\"\n"
@@ -5706,7 +5429,7 @@ pub unsafe fn xml_validate_one_attribute(
     }
 
     // Validity Constraint: ID uniqueness
-    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeID)
+    if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeID)
         && xml_add_id(
             ctxt,
             doc,
@@ -5721,7 +5444,7 @@ pub unsafe fn xml_validate_one_attribute(
     }
 
     if matches!(
-        (*attr_decl).atype,
+        attr_decl.atype,
         XmlAttributeType::XmlAttributeIDREF | XmlAttributeType::XmlAttributeIDREFS
     ) && xml_add_ref(
         ctxt,
@@ -5737,20 +5460,20 @@ pub unsafe fn xml_validate_one_attribute(
     }
 
     // Validity Constraint: Notation Attributes
-    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeNotation) {
-        let mut tree = (*attr_decl).tree.as_deref();
+    if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeNotation) {
+        let mut tree = attr_decl.tree.as_deref();
         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
 
         // First check that the given NOTATION was declared
-        let nota = xml_get_dtd_notation_desc((*doc).int_subset, &value)
-            .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset, &value));
+        let nota = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), &value)
+            .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), &value));
 
         if nota.is_none() {
-            let attr_name = (*attr).name().unwrap();
-            let elem_name = (*elem).name().unwrap();
+            let attr_name = attr.name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDUnknownNotation,
                 format!("Value \"{value}\" for attribute {attr_name} of {elem_name} is not a declared Notation\n").as_str(),
                 Some(&value),
@@ -5768,11 +5491,11 @@ pub unsafe fn xml_validate_one_attribute(
             tree = now.next.as_deref();
         }
         if tree.is_none() {
-            let attr_name = (*attr).name().unwrap();
-            let elem_name = (*elem).name().unwrap();
+            let attr_name = attr.name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDNotationValue,
                 format!("Value \"{value}\" for attribute {attr_name} of {elem_name} is not among the enumerated notations\n").as_str(),
                 Some(&value),
@@ -5784,11 +5507,8 @@ pub unsafe fn xml_validate_one_attribute(
     }
 
     // Validity Constraint: Enumeration
-    if matches!(
-        (*attr_decl).atype,
-        XmlAttributeType::XmlAttributeEnumeration
-    ) {
-        let mut tree = (*attr_decl).tree.as_deref();
+    if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeEnumeration) {
+        let mut tree = attr_decl.tree.as_deref();
         while let Some(now) = tree {
             if now.name == CStr::from_ptr(value as *const i8).to_string_lossy() {
                 break;
@@ -5797,11 +5517,11 @@ pub unsafe fn xml_validate_one_attribute(
         }
         if tree.is_none() {
             let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-            let attr_name = (*attr).name().unwrap();
-            let elem_name = (*elem).name().unwrap();
+            let attr_name = attr.name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDAttributeValue,
                 format!("Value \"{value}\" for attribute {attr_name} of {elem_name} is not among the enumerated set\n")
                     .as_str(),
@@ -5814,15 +5534,15 @@ pub unsafe fn xml_validate_one_attribute(
     }
 
     // Fixed Attribute Default
-    if matches!((*attr_decl).def, XmlAttributeDefault::XmlAttributeFixed)
-        && !xml_str_equal((*attr_decl).default_value, value)
+    if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
+        && !xml_str_equal(attr_decl.default_value, value)
     {
-        let attr_name = (*attr).name().unwrap();
-        let elem_name = (*elem).name().unwrap();
-        let def_value = CStr::from_ptr((*attr_decl).default_value as *const i8).to_string_lossy();
+        let attr_name = attr.name().unwrap();
+        let elem_name = elem.name().unwrap();
+        let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem,
+            Some(elem.into()),
             XmlParserErrors::XmlDTDAttributeValue,
             format!("Value for attribute {attr_name} of {elem_name} must be \"{def_value}\"\n")
                 .as_str(),
@@ -5837,8 +5557,8 @@ pub unsafe fn xml_validate_one_attribute(
     ret &= xml_validate_attribute_value2(
         ctxt,
         doc,
-        (*attr).name,
-        (*attr_decl).atype,
+        attr.name,
+        attr_decl.atype,
         &CStr::from_ptr(value as *const i8).to_string_lossy(),
     );
 
@@ -5871,23 +5591,32 @@ pub unsafe fn xml_validate_one_namespace(
     value: *const XmlChar,
 ) -> i32 {
     // let elemDecl: xmlElementPtr;
-    let mut attr_decl: XmlAttributePtr = null_mut();
+
     let mut ret: i32 = 1;
 
-    CHECK_DTD!(doc);
-    if elem.is_null() || (*elem).name.is_null() {
+    // if doc.is_null() {
+    //     return 0;
+    // }
+    if doc.int_subset.is_none() && doc.ext_subset.is_none() {
+        return 0;
+    };
+    // if elem.is_null() {
+    //     return 0;
+    // }
+    if elem.name.is_null() {
         return 0;
     }
-    if ns.is_null() || (*ns).href.is_null() {
+    if ns.href.is_null() {
         return 0;
     }
 
+    let mut attr_decl = None;
     if let Some(prefix) = prefix {
         let mut fname: [XmlChar; 50] = [0; 50];
         let prefix = CString::new(prefix).unwrap();
 
         let fullname: *mut XmlChar = xml_build_qname(
-            (*elem).name,
+            elem.name,
             prefix.as_ptr() as *const u8,
             fname.as_mut_ptr(),
             50,
@@ -5897,73 +5626,79 @@ pub unsafe fn xml_validate_one_namespace(
             return 0;
         }
         if let Some(prefix) = (*ns).prefix() {
-            attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                CStr::from_ptr(fullname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                &prefix,
-                Some("xmlns"),
-            );
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
+            attr_decl = doc.int_subset.and_then(|dtd| {
+                dtd.get_qattr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
                     &prefix,
                     Some("xmlns"),
-                );
+                )
+            });
+            if attr_decl.is_none() && doc.ext_subset.is_some() {
+                attr_decl = doc.ext_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc(
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        &prefix,
+                        Some("xmlns"),
+                    )
+                });
             }
         } else {
-            attr_decl = (*(*doc).int_subset).get_attr_desc(
-                CStr::from_ptr(fullname as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                "xmlns",
-            );
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_attr_desc(
+            attr_decl = doc.int_subset.and_then(|dtd| {
+                dtd.get_attr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
                     "xmlns",
-                );
+                )
+            });
+            if attr_decl.is_none() && doc.ext_subset.is_some() {
+                attr_decl = doc.ext_subset.and_then(|dtd| {
+                    dtd.get_attr_desc(
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        "xmlns",
+                    )
+                });
             }
         }
-        if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
+        if fullname != fname.as_ptr() as _ && fullname != elem.name as _ {
             xml_free(fullname as _);
         }
     }
-    if attr_decl.is_null() {
+    if attr_decl.is_none() {
         if let Some(prefix) = (*ns).prefix() {
-            attr_decl = (*(*doc).int_subset).get_qattr_desc(
-                (*elem).name().unwrap().as_ref(),
-                &prefix,
-                Some("xmlns"),
-            );
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
-                    (*elem).name().unwrap().as_ref(),
-                    &prefix,
-                    Some("xmlns"),
-                );
+            attr_decl = doc.int_subset.and_then(|dtd| {
+                dtd.get_qattr_desc(elem.name().unwrap().as_ref(), &prefix, Some("xmlns"))
+            });
+            if attr_decl.is_none() && doc.ext_subset.is_some() {
+                attr_decl = doc.ext_subset.and_then(|dtd| {
+                    dtd.get_qattr_desc(elem.name().unwrap().as_ref(), &prefix, Some("xmlns"))
+                });
             }
         } else {
-            attr_decl =
-                (*(*doc).int_subset).get_attr_desc((*elem).name().as_deref().unwrap(), "xmlns");
-            if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl =
-                    (*(*doc).ext_subset).get_attr_desc((*elem).name().as_deref().unwrap(), "xmlns");
+            attr_decl = doc
+                .int_subset
+                .and_then(|dtd| dtd.get_attr_desc(elem.name().as_deref().unwrap(), "xmlns"));
+            if attr_decl.is_none() && doc.ext_subset.is_some() {
+                attr_decl = doc
+                    .ext_subset
+                    .and_then(|dtd| dtd.get_attr_desc(elem.name().as_deref().unwrap(), "xmlns"));
             }
         }
     }
 
     // Validity Constraint: Attribute Value Type
-    if attr_decl.is_null() {
+    let Some(attr_decl) = attr_decl else {
         if let Some(prefix) = (*ns).prefix() {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDUnknownAttribute,
                 format!("No declaration for attribute xmlns:{prefix} of element {elem_name}\n")
                     .as_str(),
@@ -5972,10 +5707,10 @@ pub unsafe fn xml_validate_one_namespace(
                 None,
             );
         } else {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDUnknownAttribute,
                 format!("No declaration for attribute xmlns of element {elem_name}\n").as_str(),
                 Some(&elem_name),
@@ -5984,15 +5719,15 @@ pub unsafe fn xml_validate_one_namespace(
             );
         }
         return 0;
-    }
+    };
 
-    let val: i32 = xml_validate_attribute_value_internal(doc, (*attr_decl).atype, value);
+    let val: i32 = xml_validate_attribute_value_internal(Some(doc), attr_decl.atype, value);
     if val == 0 {
         if let Some(prefix) = (*ns).prefix() {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDInvalidDefault,
                 format!(
                     "Syntax of value for attribute xmlns:{prefix} of {elem_name} is not valid\n"
@@ -6003,10 +5738,10 @@ pub unsafe fn xml_validate_one_namespace(
                 None,
             );
         } else {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDInvalidDefault,
                 format!("Syntax of value for attribute xmlns of {elem_name} is not valid\n")
                     .as_str(),
@@ -6019,16 +5754,15 @@ pub unsafe fn xml_validate_one_namespace(
     }
 
     // Validity constraint: Fixed Attribute Default
-    if matches!((*attr_decl).def, XmlAttributeDefault::XmlAttributeFixed)
-        && !xml_str_equal(value, (*attr_decl).default_value)
+    if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
+        && !xml_str_equal(value, attr_decl.default_value)
     {
         if let Some(prefix) = (*ns).prefix() {
-            let elem_name = (*elem).name().unwrap();
-            let def_value =
-                CStr::from_ptr((*attr_decl).default_value as *const i8).to_string_lossy();
+            let elem_name = elem.name().unwrap();
+            let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDAttributeDefault,
                 format!("Value for attribute xmlns:{prefix} of {elem_name} is different from default \"{def_value}\"\n").as_str(),
                 Some(&prefix),
@@ -6036,12 +5770,11 @@ pub unsafe fn xml_validate_one_namespace(
                 Some(&def_value),
             );
         } else {
-            let elem_name = (*elem).name().unwrap();
-            let def_value =
-                CStr::from_ptr((*attr_decl).default_value as *const i8).to_string_lossy();
+            let elem_name = elem.name().unwrap();
+            let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDAttributeDefault,
                 format!("Value for attribute xmlns of {elem_name} is different from default \"{def_value}\"\n")
                     .as_str(),
@@ -6069,20 +5802,20 @@ pub unsafe fn xml_validate_one_namespace(
     // #endif
 
     // Validity Constraint: Notation Attributes
-    if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeNotation) {
-        let mut tree = (*attr_decl).tree.as_deref();
+    if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeNotation) {
+        let mut tree = attr_decl.tree.as_deref();
         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
 
         // First check that the given NOTATION was declared
-        let nota = xml_get_dtd_notation_desc((*doc).int_subset, &value)
-            .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset, &value));
+        let nota = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), &value)
+            .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), &value));
 
         if nota.is_none() {
             if let Some(prefix) = (*ns).prefix() {
-                let elem_name = (*elem).name().unwrap();
+                let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    Some(elem.into()),
                     XmlParserErrors::XmlDTDUnknownNotation,
                     format!("Value \"{value}\" for attribute xmlns:{prefix} of {elem_name} is not a declared Notation\n").as_str(),
                     Some(&value),
@@ -6090,10 +5823,10 @@ pub unsafe fn xml_validate_one_namespace(
                     Some(&elem_name),
                 );
             } else {
-                let elem_name = (*elem).name().unwrap();
+                let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    Some(elem.into()),
                     XmlParserErrors::XmlDTDUnknownNotation,
                     format!("Value \"{value}\" for attribute xmlns of {elem_name} is not a declared Notation\n").as_str(),
                     Some(&value),
@@ -6112,11 +5845,11 @@ pub unsafe fn xml_validate_one_namespace(
             tree = now.next.as_deref();
         }
         if tree.is_none() {
-            let elem_name = (*elem).name().unwrap();
+            let elem_name = elem.name().unwrap();
             if let Some(prefix) = (*ns).prefix() {
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    Some(elem.into()),
                     XmlParserErrors::XmlDTDNotationValue,
                     format!("Value \"{value}\" for attribute xmlns:{prefix} of {elem_name} is not among the enumerated notations\n").as_str(),
                     Some(&value),
@@ -6126,7 +5859,7 @@ pub unsafe fn xml_validate_one_namespace(
             } else {
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    Some(elem.into()),
                     XmlParserErrors::XmlDTDNotationValue,
                     format!("Value \"{value}\" for attribute xmlns of {elem_name} is not among the enumerated notations\n").as_str(),
                     Some(&value),
@@ -6139,11 +5872,8 @@ pub unsafe fn xml_validate_one_namespace(
     }
 
     // Validity Constraint: Enumeration
-    if matches!(
-        (*attr_decl).atype,
-        XmlAttributeType::XmlAttributeEnumeration
-    ) {
-        let mut tree = (*attr_decl).tree.as_deref();
+    if matches!(attr_decl.atype, XmlAttributeType::XmlAttributeEnumeration) {
+        let mut tree = attr_decl.tree.as_deref();
         while let Some(now) = tree {
             if now.name == CStr::from_ptr(value as *const i8).to_string_lossy() {
                 break;
@@ -6153,10 +5883,10 @@ pub unsafe fn xml_validate_one_namespace(
         if tree.is_none() {
             if let Some(prefix) = (*ns).prefix() {
                 let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                let elem_name = (*elem).name().unwrap();
+                let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    Some(elem.into()),
                     XmlParserErrors::XmlDTDAttributeValue,
                     format!("Value \"{value}\" for attribute xmlns:{prefix} of {elem_name} is not among the enumerated set\n").as_str(),
                     Some(&value),
@@ -6165,10 +5895,10 @@ pub unsafe fn xml_validate_one_namespace(
                 );
             } else {
                 let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                let elem_name = (*elem).name().unwrap();
+                let elem_name = elem.name().unwrap();
                 xml_err_valid_node(
                     ctxt,
-                    elem,
+                    Some(elem.into()),
                     XmlParserErrors::XmlDTDAttributeValue,
                     format!(
                         "Value \"{value}\" for attribute xmlns of {elem_name} is not among the enumerated set\n"
@@ -6184,16 +5914,15 @@ pub unsafe fn xml_validate_one_namespace(
     }
 
     // Fixed Attribute Default
-    if matches!((*attr_decl).def, XmlAttributeDefault::XmlAttributeFixed)
-        && !xml_str_equal((*attr_decl).default_value, value)
+    if matches!(attr_decl.def, XmlAttributeDefault::XmlAttributeFixed)
+        && !xml_str_equal(attr_decl.default_value, value)
     {
         if let Some(prefix) = (*ns).prefix() {
-            let elem_name = (*elem).name().unwrap();
-            let def_value =
-                CStr::from_ptr((*attr_decl).default_value as *const i8).to_string_lossy();
+            let elem_name = elem.name().unwrap();
+            let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDElemNamespace,
                 format!(
                     "Value for attribute xmlns:{prefix} of {elem_name} must be \"{def_value}\"\n"
@@ -6204,12 +5933,11 @@ pub unsafe fn xml_validate_one_namespace(
                 Some(&def_value),
             );
         } else {
-            let elem_name = (*elem).name().unwrap();
-            let def_value =
-                CStr::from_ptr((*attr_decl).default_value as *const i8).to_string_lossy();
+            let elem_name = elem.name().unwrap();
+            let def_value = CStr::from_ptr(attr_decl.default_value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                elem,
+                Some(elem.into()),
                 XmlParserErrors::XmlDTDElemNamespace,
                 format!("Value for attribute xmlns of {elem_name} must be \"{def_value}\"\n")
                     .as_str(),
@@ -6229,7 +5957,7 @@ pub unsafe fn xml_validate_one_namespace(
             ctxt,
             doc,
             prefix.as_ptr() as *const u8,
-            (*attr_decl).atype,
+            attr_decl.atype,
             &value,
         );
     } else {
@@ -6237,7 +5965,7 @@ pub unsafe fn xml_validate_one_namespace(
             ctxt,
             doc,
             c"xmlns".as_ptr() as _,
-            (*attr_decl).atype,
+            attr_decl.atype,
             &value,
         );
     }
@@ -6247,11 +5975,73 @@ pub unsafe fn xml_validate_one_namespace(
 
 #[doc(alias = "xmlValidateRef")]
 unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const XmlChar) {
-    if refe.attr.is_null() && refe.name.is_none() {
+    if refe.attr.is_none() && refe.name.is_none() {
         return;
     }
-    let attr: XmlAttrPtr = refe.attr;
-    if attr.is_null() {
+    if let Some(attr) = refe.attr {
+        if matches!(attr.atype, Some(XmlAttributeType::XmlAttributeIDREF)) {
+            if xml_get_id((*ctxt).doc.unwrap(), name).is_none() {
+                let attr_name = attr.name().unwrap();
+                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                xml_err_valid_node(
+                    ctxt,
+                    attr.parent.map(|p| p.into()),
+                    XmlParserErrors::XmlDTDUnknownID,
+                    format!("IDREF attribute {attr_name} references an unknown ID \"{name}\"\n")
+                        .as_str(),
+                    Some(&attr_name),
+                    Some(&name),
+                    None,
+                );
+                (*ctxt).valid = 0;
+            }
+        } else if matches!(attr.atype, Some(XmlAttributeType::XmlAttributeIDREFS)) {
+            let mut str: *mut XmlChar;
+            let mut cur: *mut XmlChar;
+            let mut save: XmlChar;
+
+            let dup: *mut XmlChar = xml_strdup(name);
+            if dup.is_null() {
+                xml_verr_memory(ctxt, Some("IDREFS split"));
+                (*ctxt).valid = 0;
+                return;
+            }
+            cur = dup;
+            while *cur != 0 {
+                str = cur;
+                while *cur != 0 && !xml_is_blank_char(*cur as u32) {
+                    cur = cur.add(1);
+                }
+                save = *cur;
+                *cur = 0;
+                if xml_get_id((*ctxt).doc.unwrap(), str).is_none() {
+                    let attr_name = attr.name().unwrap();
+                    let str = CStr::from_ptr(str as *const i8).to_string_lossy();
+                    xml_err_valid_node(
+                        ctxt,
+                        attr.parent.map(|p| p.into()),
+                        XmlParserErrors::XmlDTDUnknownID,
+                        format!(
+                            "IDREFS attribute {attr_name} references an unknown ID \"{str}\"\n"
+                        )
+                        .as_str(),
+                        Some(&attr_name),
+                        Some(&str),
+                        None,
+                    );
+                    (*ctxt).valid = 0;
+                }
+                if save == 0 {
+                    break;
+                }
+                *cur = save;
+                while xml_is_blank_char(*cur as u32) {
+                    cur = cur.add(1);
+                }
+            }
+            xml_free(dup as _);
+        }
+    } else {
         let mut str: *mut XmlChar;
         let mut cur: *mut XmlChar;
         let mut save: XmlChar;
@@ -6269,74 +6059,15 @@ unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const Xm
             }
             save = *cur;
             *cur = 0;
-            if xml_get_id((*ctxt).doc, str).is_none() {
+            if xml_get_id((*ctxt).doc.unwrap(), str).is_none() {
                 xml_err_valid_node_nr!(
                     ctxt,
-                    null_mut(),
+                    None::<XmlGenericNodePtr>,
                     XmlParserErrors::XmlDTDUnknownID,
                     "attribute {} line {} references an unknown ID \"{}\"\n",
                     refe.name.as_deref().unwrap(),
                     refe.lineno,
                     CStr::from_ptr(str as *const i8).to_string_lossy()
-                );
-                (*ctxt).valid = 0;
-            }
-            if save == 0 {
-                break;
-            }
-            *cur = save;
-            while xml_is_blank_char(*cur as u32) {
-                cur = cur.add(1);
-            }
-        }
-        xml_free(dup as _);
-    } else if matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeIDREF)) {
-        if xml_get_id((*ctxt).doc, name).is_none() {
-            let attr_name = (*attr).name().unwrap();
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-            xml_err_valid_node(
-                ctxt,
-                (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
-                XmlParserErrors::XmlDTDUnknownID,
-                format!("IDREF attribute {attr_name} references an unknown ID \"{name}\"\n")
-                    .as_str(),
-                Some(&attr_name),
-                Some(&name),
-                None,
-            );
-            (*ctxt).valid = 0;
-        }
-    } else if matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeIDREFS)) {
-        let mut str: *mut XmlChar;
-        let mut cur: *mut XmlChar;
-        let mut save: XmlChar;
-
-        let dup: *mut XmlChar = xml_strdup(name);
-        if dup.is_null() {
-            xml_verr_memory(ctxt, Some("IDREFS split"));
-            (*ctxt).valid = 0;
-            return;
-        }
-        cur = dup;
-        while *cur != 0 {
-            str = cur;
-            while *cur != 0 && !xml_is_blank_char(*cur as u32) {
-                cur = cur.add(1);
-            }
-            save = *cur;
-            *cur = 0;
-            if xml_get_id((*ctxt).doc, str).is_none() {
-                let attr_name = (*attr).name().unwrap();
-                let str = CStr::from_ptr(str as *const i8).to_string_lossy();
-                xml_err_valid_node(
-                    ctxt,
-                    (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
-                    XmlParserErrors::XmlDTDUnknownID,
-                    format!("IDREFS attribute {attr_name} references an unknown ID \"{str}\"\n")
-                        .as_str(),
-                    Some(&attr_name),
-                    Some(&str),
-                    None,
                 );
                 (*ctxt).valid = 0;
             }
@@ -6366,14 +6097,14 @@ pub unsafe fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr)
     if ctxt.is_null() {
         return 0;
     }
-    if doc.is_null() {
-        xml_err_valid!(
-            ctxt,
-            XmlParserErrors::XmlDTDNoDoc,
-            "xmlValidateDocumentFinal: doc == NULL\n"
-        );
-        return 0;
-    }
+    // if doc.is_null() {
+    //     xml_err_valid!(
+    //         ctxt,
+    //         XmlParserErrors::XmlDTDNoDoc,
+    //         "xmlValidateDocumentFinal: doc == NULL\n"
+    //     );
+    //     return 0;
+    // }
 
     // trick to get correct line id report
     let save: u32 = (*ctxt).flags;
@@ -6382,9 +6113,9 @@ pub unsafe fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr)
     // Check all the NOTATION/NOTATIONS attributes
     // Check all the ENTITY/ENTITIES attributes definition for validity
     // Check all the IDREF/IDREFS attributes definition for validity
-    (*ctxt).doc = doc;
+    (*ctxt).doc = Some(doc);
     (*ctxt).valid = 1;
-    if let Some(table) = (*doc).refs.as_ref() {
+    if let Some(table) = doc.refs.as_ref() {
         for (name, ref_list) in table.iter() {
             let name = CString::new(name.as_str()).unwrap();
 
@@ -6410,20 +6141,20 @@ pub unsafe fn xml_validate_notation_use(
     doc: XmlDocPtr,
     notation_name: &str,
 ) -> i32 {
-    if doc.is_null() || (*doc).int_subset.is_null() {
+    // if doc.is_null() {
+    //     return -1;
+    // }
+    if doc.int_subset.is_none() {
         return -1;
     }
 
-    let nota_decl = xml_get_dtd_notation_desc((*doc).int_subset, notation_name).or_else(|| {
-        (!(*doc).ext_subset.is_null())
-            .then(|| xml_get_dtd_notation_desc((*doc).ext_subset, notation_name))
-            .flatten()
-    });
+    let nota_decl = xml_get_dtd_notation_desc(doc.int_subset.as_deref(), notation_name)
+        .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), notation_name));
 
     if nota_decl.is_none() && !ctxt.is_null() {
         xml_err_valid_node(
             ctxt,
-            doc as XmlNodePtr,
+            Some(doc.into()),
             XmlParserErrors::XmlDTDUnknownNotation,
             format!("NOTATION {notation_name} is not declared\n").as_str(),
             Some(notation_name),
@@ -6441,20 +6172,21 @@ pub unsafe fn xml_validate_notation_use(
 /// returns 0 if no, 1 if yes, and -1 if no element description is available
 #[doc(alias = "xmlIsMixedElement")]
 pub unsafe fn xml_is_mixed_element(doc: XmlDocPtr, name: *const XmlChar) -> i32 {
-    let mut elem_decl: XmlElementPtr;
-
-    if doc.is_null() || (*doc).int_subset.is_null() {
+    // if doc.is_null() {
+    //     return -1;
+    // }
+    if doc.int_subset.is_none() {
         return -1;
     }
 
-    elem_decl = xml_get_dtd_element_desc((*doc).int_subset, name);
-    if elem_decl.is_null() && !(*doc).ext_subset.is_null() {
-        elem_decl = xml_get_dtd_element_desc((*doc).ext_subset, name);
+    let mut elem_decl = xml_get_dtd_element_desc(doc.int_subset, name);
+    if elem_decl.is_none() && doc.ext_subset.is_some() {
+        elem_decl = xml_get_dtd_element_desc(doc.ext_subset, name);
     }
-    if elem_decl.is_null() {
+    let Some(elem_decl) = elem_decl else {
         return -1;
-    }
-    match (*elem_decl).etype {
+    };
+    match elem_decl.etype {
         XmlElementTypeVal::XmlElementTypeUndefined => {
             -1
         }
@@ -6475,11 +6207,12 @@ pub unsafe fn xml_is_mixed_element(doc: XmlDocPtr, name: *const XmlChar) -> i32 
 ///
 /// returns the xmlNotationPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdNotationDesc")]
-pub unsafe fn xml_get_dtd_notation_desc<'a>(dtd: XmlDtdPtr, name: &str) -> Option<&'a XmlNotation> {
-    if dtd.is_null() {
-        return None;
-    }
-    (*dtd).notations.as_deref()?.lookup(name)
+pub unsafe fn xml_get_dtd_notation_desc<'a>(
+    dtd: Option<&'a XmlDtd>,
+    name: &str,
+) -> Option<&'a XmlNotation> {
+    dtd.and_then(|dtd| dtd.notations.as_deref())
+        .and_then(|notations| notations.lookup(name))
 }
 
 /// Search the DTD for the description of this element
@@ -6487,49 +6220,41 @@ pub unsafe fn xml_get_dtd_notation_desc<'a>(dtd: XmlDtdPtr, name: &str) -> Optio
 /// returns the xmlElementPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdQElementDesc")]
 pub unsafe fn xml_get_dtd_qelement_desc(
-    dtd: XmlDtdPtr,
+    dtd: Option<XmlDtdPtr>,
     name: &str,
     prefix: Option<&str>,
-) -> XmlElementPtr {
-    if dtd.is_null() {
-        return null_mut();
-    }
-    if (*dtd).elements.is_null() {
-        return null_mut();
-    }
-    let table: XmlElementTablePtr = (*dtd).elements as XmlElementTablePtr;
-
-    let name = CString::new(name).unwrap();
-    let prefix = prefix.map(|p| CString::new(p).unwrap());
-    xml_hash_lookup2(
-        table,
-        name.as_ptr() as *const u8,
-        prefix
-            .as_deref()
-            .map_or(null(), |p| p.as_ptr() as *const u8),
-    ) as _
+) -> Option<XmlElementPtr> {
+    dtd?.elements.as_ref()?.lookup2(name, prefix).cloned()
 }
 
 /// Search the DTD for the description of this element
 ///
 /// returns the xmlElementPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdElementDesc")]
-pub unsafe fn xml_get_dtd_element_desc(dtd: XmlDtdPtr, mut name: *const XmlChar) -> XmlElementPtr {
+pub unsafe fn xml_get_dtd_element_desc(
+    dtd: Option<XmlDtdPtr>,
+    mut name: *const XmlChar,
+) -> Option<XmlElementPtr> {
     let mut prefix: *mut XmlChar = null_mut();
 
-    if dtd.is_null() || name.is_null() {
-        return null_mut();
+    if name.is_null() {
+        return None;
     }
-    if (*dtd).elements.is_null() {
-        return null_mut();
-    }
-    let table: XmlElementTablePtr = (*dtd).elements as XmlElementTablePtr;
+    let dtd = dtd?;
+    let table = dtd.elements.as_ref()?;
 
     let uqname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix));
     if !uqname.is_null() {
         name = uqname;
     }
-    let cur: XmlElementPtr = xml_hash_lookup2(table, name, prefix) as _;
+    let cur = table
+        .lookup2(
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            (!prefix.is_null())
+                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                .as_deref(),
+        )
+        .cloned();
     if !prefix.is_null() {
         xml_free(prefix as _);
     }
@@ -6611,20 +6336,17 @@ fn xml_no_validity_err(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 #[doc(alias = "xmlValidGetValidElements")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_valid_get_valid_elements(
-    prev: *mut XmlNode,
-    next: *mut XmlNode,
+    prev: Option<XmlGenericNodePtr>,
+    next: Option<XmlGenericNodePtr>,
     names: *mut *const XmlChar,
     max: i32,
 ) -> i32 {
-    use crate::tree::NodePtr;
-
-    let mut vctxt: XmlValidCtxt = unsafe { zeroed() };
+    let mut vctxt = XmlValidCtxt::default();
     let mut nb_valid_elements: i32;
     let mut elements: [*const XmlChar; 256] = [null(); 256];
     let mut nb_elements: i32 = 0;
-    let mut element_desc: *mut XmlElement;
 
-    if prev.is_null() && next.is_null() {
+    if prev.is_none() && next.is_none() {
         return -1;
     }
 
@@ -6635,71 +6357,76 @@ pub unsafe fn xml_valid_get_valid_elements(
         return -1;
     }
 
-    memset(addr_of_mut!(vctxt) as _, 0, size_of::<XmlValidCtxt>());
+    std::ptr::write(&mut vctxt, XmlValidCtxt::default());
     vctxt.error = Some(xml_no_validity_err); /* this suppresses err/warn output */
 
     nb_valid_elements = 0;
-    let ref_node: *mut XmlNode = if !prev.is_null() { prev } else { next };
-    let parent: *mut XmlNode = (*ref_node).parent().map_or(null_mut(), |p| p.as_ptr());
+    let ref_node = prev.or(next).unwrap();
+    // Why can I do `unwrap` for parent without checking ????????
+    let mut parent = ref_node.parent().unwrap();
+    let parname = CString::new(parent.name().unwrap().as_ref()).unwrap();
 
     // Retrieves the parent element declaration
-    element_desc = xml_get_dtd_element_desc((*(*parent).doc).int_subset, (*parent).name);
-    if element_desc.is_null() && !(*(*parent).doc).ext_subset.is_null() {
-        element_desc = xml_get_dtd_element_desc((*(*parent).doc).ext_subset, (*parent).name);
+    let mut element_desc = xml_get_dtd_element_desc(
+        parent.document().unwrap().int_subset,
+        parname.as_ptr() as *const u8,
+    );
+    if element_desc.is_none() && parent.document().unwrap().ext_subset.is_some() {
+        element_desc = xml_get_dtd_element_desc(
+            parent.document().unwrap().ext_subset,
+            parname.as_ptr() as *const u8,
+        );
     }
-    if element_desc.is_null() {
+    let Some(element_desc) = element_desc else {
         return -1;
-    }
+    };
 
     // Do a backup of the current tree structure
-    let prev_next: *mut XmlNode = if !prev.is_null() {
-        (*prev).next.map_or(null_mut(), |n| n.as_ptr())
-    } else {
-        null_mut()
-    };
-    let next_prev: *mut XmlNode = if !next.is_null() {
-        (*next).prev.map_or(null_mut(), |p| p.as_ptr())
-    } else {
-        null_mut()
-    };
-    let parent_childs: *mut XmlNode = (*parent).children().map_or(null_mut(), |c| c.as_ptr());
-    let parent_last: *mut XmlNode = (*parent).last().map_or(null_mut(), |l| l.as_ptr());
+    let prev_next = prev.and_then(|prev| prev.next());
+    let next_prev = next.and_then(|next| next.prev());
+
+    let parent_childs = parent.children();
+    let parent_last = parent.last();
 
     // Creates a dummy node and insert it into the tree
-    let test_node: *mut XmlNode =
-        xml_new_doc_node((*ref_node).doc, null_mut(), "<!dummy?>", null_mut());
-    if test_node.is_null() {
+    let Some(mut test_node) = xml_new_doc_node(ref_node.document(), None, "<!dummy?>", null_mut())
+    else {
         return -1;
+    };
+
+    test_node.parent = Some(parent);
+    test_node.prev = prev;
+    test_node.next = next;
+    let name: *const XmlChar = test_node.name;
+
+    if let Some(mut prev) = prev {
+        prev.set_next(Some(test_node.into()));
+    } else {
+        parent.set_children(Some(test_node.into()));
     }
 
-    (*test_node).set_parent(NodePtr::from_ptr(parent));
-    (*test_node).prev = NodePtr::from_ptr(prev);
-    (*test_node).next = NodePtr::from_ptr(next);
-    let name: *const XmlChar = (*test_node).name;
-
-    if !prev.is_null() {
-        (*prev).next = NodePtr::from_ptr(test_node);
+    if let Some(mut next) = next {
+        next.set_prev(Some(test_node.into()));
     } else {
-        (*parent).set_children(NodePtr::from_ptr(test_node));
-    }
-
-    if !next.is_null() {
-        (*next).prev = NodePtr::from_ptr(test_node);
-    } else {
-        (*parent).set_last(NodePtr::from_ptr(test_node));
+        parent.set_last(Some(test_node.into()));
     }
 
     // Insert each potential child node and check if the parent is still valid
     nb_elements = xml_valid_get_potential_children(
-        (*element_desc).content,
+        element_desc.content,
         elements.as_mut_ptr(),
         addr_of_mut!(nb_elements),
         256,
     );
 
     for i in 0..nb_elements {
-        (*test_node).name = elements[i as usize];
-        if xml_validate_one_element(addr_of_mut!(vctxt) as _, (*parent).doc, parent) != 0 {
+        test_node.name = elements[i as usize];
+        if xml_validate_one_element(
+            addr_of_mut!(vctxt) as _,
+            parent.document().unwrap(),
+            Some(parent),
+        ) != 0
+        {
             for j in 0..nb_valid_elements {
                 if xml_str_equal(elements[i as usize], *names.add(j as usize)) {
                     break;
@@ -6714,17 +6441,17 @@ pub unsafe fn xml_valid_get_valid_elements(
     }
 
     // Restore the tree structure
-    if !prev.is_null() {
-        (*prev).next = NodePtr::from_ptr(prev_next);
+    if let Some(mut prev) = prev {
+        prev.set_next(prev_next);
     }
-    if !next.is_null() {
-        (*next).prev = NodePtr::from_ptr(next_prev);
+    if let Some(mut next) = next {
+        next.set_prev(next_prev);
     }
-    (*parent).set_children(NodePtr::from_ptr(parent_childs));
-    (*parent).set_last(NodePtr::from_ptr(parent_last));
+    parent.set_children(parent_childs);
+    parent.set_last(parent_last);
 
     // Free up the dummy node
-    (*test_node).name = name;
+    test_node.name = name;
     xml_free_node(test_node);
 
     nb_valid_elements
@@ -6736,7 +6463,7 @@ pub unsafe fn xml_valid_get_valid_elements(
 #[doc(alias = "xmlValidateNameValue")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_name_value(value: *const XmlChar) -> i32 {
-    xml_validate_name_value_internal(null_mut(), value)
+    xml_validate_name_value_internal(None, value)
 }
 
 /// Validate that the given value match Names production
@@ -6745,7 +6472,7 @@ pub unsafe fn xml_validate_name_value(value: *const XmlChar) -> i32 {
 #[doc(alias = "xmlValidateNamesValue")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_names_value(value: *const XmlChar) -> i32 {
-    xml_validate_names_value_internal(null_mut(), value)
+    xml_validate_names_value_internal(None, value)
 }
 
 /// Validate that the given value match Nmtoken production
@@ -6756,7 +6483,7 @@ pub unsafe fn xml_validate_names_value(value: *const XmlChar) -> i32 {
 #[doc(alias = "xmlValidateNmtokenValue")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_nmtoken_value(value: *const XmlChar) -> i32 {
-    xml_validate_nmtoken_value_internal(null_mut(), value)
+    xml_validate_nmtoken_value_internal(None, value)
 }
 
 /// Validate that the given value match Nmtokens production
@@ -6767,7 +6494,7 @@ pub unsafe fn xml_validate_nmtoken_value(value: *const XmlChar) -> i32 {
 #[doc(alias = "xmlValidateNmtokensValue")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_nmtokens_value(value: *const XmlChar) -> i32 {
-    xml_validate_nmtokens_value_internal(null_mut(), value)
+    xml_validate_nmtokens_value_internal(None, value)
 }
 
 /// Generate the automata sequence needed for that type
@@ -6783,7 +6510,7 @@ unsafe fn xml_valid_build_acontent_model(
         let name = CStr::from_ptr(name as *const i8).to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            null_mut(),
+            None,
             XmlParserErrors::XmlErrInternalError,
             format!("Found NULL content in content model of {name}\n").as_str(),
             Some(&name),
@@ -6797,7 +6524,7 @@ unsafe fn xml_valid_build_acontent_model(
             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
-                null_mut(),
+                None,
                 XmlParserErrors::XmlErrInternalError,
                 format!("Found PCDATA in content model of {name}\n").as_str(),
                 Some(&name),
@@ -6978,19 +6705,19 @@ unsafe fn xml_valid_build_acontent_model(
 /// Returns 1 in case of success, 0 in case of error
 #[doc(alias = "xmlValidBuildContentModel")]
 #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr) -> i32 {
-    if ctxt.is_null() || elem.is_null() {
+pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: XmlElementPtr) -> i32 {
+    if ctxt.is_null() {
         return 0;
     }
-    if !matches!((*elem).element_type(), XmlElementType::XmlElementDecl) {
+    if !matches!(elem.element_type(), XmlElementType::XmlElementDecl) {
         return 0;
     }
-    if !matches!((*elem).etype, XmlElementTypeVal::XmlElementTypeElement) {
+    if !matches!(elem.etype, XmlElementTypeVal::XmlElementTypeElement) {
         return 1;
     }
     // TODO: should we rebuild in this case ?
-    if !(*elem).cont_model.is_null() {
-        if xml_regexp_is_determinist((*elem).cont_model) == 0 {
+    if !elem.cont_model.is_null() {
+        if xml_regexp_is_determinist(elem.cont_model) == 0 {
             (*ctxt).valid = 0;
             return 0;
         }
@@ -6998,15 +6725,15 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, elem: XmlElem
     }
 
     (*ctxt).am = xml_new_automata();
-    let name = (*elem)
+    let name = elem
         .name
         .as_ref()
         .map(|n| CString::new(n.as_str()).unwrap());
     if (*ctxt).am.is_null() {
-        let name = (*elem).name.as_deref().unwrap();
+        let name = elem.name.as_deref().unwrap();
         xml_err_valid_node(
             ctxt,
-            elem as XmlNodePtr,
+            Some(elem.into()),
             XmlParserErrors::XmlErrInternalError,
             format!("Cannot create automata for element {name}\n").as_str(),
             Some(name.as_str()),
@@ -7017,21 +6744,21 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, elem: XmlElem
     }
     (*ctxt).state = xml_automata_get_init_state((*ctxt).am);
     xml_valid_build_acontent_model(
-        (*elem).content,
+        elem.content,
         ctxt,
         name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
     );
     xml_automata_set_final_state((*ctxt).am, (*ctxt).state);
-    (*elem).cont_model = xml_automata_compile((*ctxt).am);
-    if xml_regexp_is_determinist((*elem).cont_model) != 1 {
+    elem.cont_model = xml_automata_compile((*ctxt).am);
+    if xml_regexp_is_determinist(elem.cont_model) != 1 {
         let mut expr: [c_char; 5000] = [0; 5000];
         expr[0] = 0;
-        xml_snprintf_element_content(expr.as_mut_ptr() as _, 5000, (*elem).content, 1);
-        let name = (*elem).name.as_deref().unwrap();
+        xml_snprintf_element_content(expr.as_mut_ptr() as _, 5000, elem.content, 1);
+        let name = elem.name.as_deref().unwrap();
         let expr = CStr::from_ptr(expr.as_ptr()).to_string_lossy();
         xml_err_valid_node(
             ctxt,
-            elem as XmlNodePtr,
+            Some(elem.into()),
             XmlParserErrors::XmlDTDContentNotDeterminist,
             format!("Content model of {name} is not deterministic: {expr}\n").as_str(),
             Some(name.as_str()),
@@ -7138,48 +6865,32 @@ unsafe fn xml_validate_check_mixed(
 }
 
 #[cfg(feature = "libxml_regexp")]
-unsafe fn vstate_vpush(ctxt: XmlValidCtxtPtr, elem_decl: XmlElementPtr, node: XmlNodePtr) -> i32 {
-    if (*ctxt).vstate_max == 0 || (*ctxt).vstate_tab.is_null() {
-        (*ctxt).vstate_max = 10;
-        (*ctxt).vstate_tab =
-            xml_malloc((*ctxt).vstate_max as usize * size_of_val(&*(*ctxt).vstate_tab.add(0)))
-                as *mut XmlValidState;
-        if (*ctxt).vstate_tab.is_null() {
-            xml_verr_memory(ctxt as _, Some("malloc failed"));
-            return -1;
-        }
-    }
-
-    if (*ctxt).vstate_nr >= (*ctxt).vstate_max {
-        let tmp: *mut XmlValidState = xml_realloc(
-            (*ctxt).vstate_tab as _,
-            2 * (*ctxt).vstate_max as usize * size_of_val(&*(*ctxt).vstate_tab.add(0)),
-        ) as *mut XmlValidState;
-        if tmp.is_null() {
-            xml_verr_memory(ctxt as _, Some("realloc failed"));
-            return -1;
-        }
-        (*ctxt).vstate_max *= 2;
-        (*ctxt).vstate_tab = tmp;
-    }
-    (*ctxt).vstate = (*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize);
-    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).elem_decl = elem_decl;
-    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).node = node;
-    if !elem_decl.is_null()
-        && matches!((*elem_decl).etype, XmlElementTypeVal::XmlElementTypeElement)
+unsafe fn vstate_vpush(
+    ctxt: XmlValidCtxtPtr,
+    elem_decl: Option<XmlElementPtr>,
+    node: XmlNodePtr,
+) -> usize {
+    // (*ctxt).vstate = (*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize);
+    (*ctxt).vstate_tab.push(XmlValidState {
+        elem_decl,
+        node,
+        exec: null_mut(),
+    });
+    if let Some(elem_decl) =
+        elem_decl.filter(|decl| matches!(decl.etype, XmlElementTypeVal::XmlElementTypeElement))
     {
-        if (*elem_decl).cont_model.is_null() {
+        if elem_decl.cont_model.is_null() {
             xml_valid_build_content_model(ctxt, elem_decl);
         }
-        if !(*elem_decl).cont_model.is_null() {
-            (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).exec =
-                xml_reg_new_exec_ctxt((*elem_decl).cont_model, None, null_mut());
+        if !elem_decl.cont_model.is_null() {
+            (*ctxt).vstate_tab.last_mut().unwrap().exec =
+                xml_reg_new_exec_ctxt(elem_decl.cont_model, None, null_mut());
         } else {
-            (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).exec = null_mut();
+            (*ctxt).vstate_tab.last_mut().unwrap().exec = null_mut();
             let node_name = (*node).name().unwrap();
             xml_err_valid_node(
                 ctxt,
-                elem_decl as XmlNodePtr,
+                Some(elem_decl.into()),
                 XmlParserErrors::XmlErrInternalError,
                 format!("Failed to build content model regexp for {node_name}\n").as_str(),
                 Some(&node_name),
@@ -7188,10 +6899,7 @@ unsafe fn vstate_vpush(ctxt: XmlValidCtxtPtr, elem_decl: XmlElementPtr, node: Xm
             );
         }
     }
-
-    let res = (*ctxt).vstate_nr;
-    (*ctxt).vstate_nr += 1;
-    res
+    (*ctxt).vstate_tab.len() - 1
 }
 
 #[cfg(not(feature = "libxml_regexp"))]
@@ -7206,54 +6914,54 @@ unsafe fn vstate_vpush(
     occurs: c_long,
     state: c_uchar,
 ) -> i32 {
-    let i: i32 = (*ctxt).vstateNr - 1;
+    let i: i32 = (*ctxt).vstate_nr - 1;
 
-    if (*ctxt).vstateNr > MAX_RECURSE as i32 {
+    if (*ctxt).vstate_nr > MAX_RECURSE as i32 {
         return -1;
     }
-    if (*ctxt).vstateTab.is_null() {
+    if (*ctxt).vstate_tab.is_null() {
         (*ctxt).vstateMax = 8;
-        (*ctxt).vstateTab =
-            xml_malloc((*ctxt).vstateMax as usize * size_of_val(&*(*ctxt).vstateTab.add(0)))
+        (*ctxt).vstate_tab =
+            xml_malloc((*ctxt).vstateMax as usize * size_of_val(&*(*ctxt).vstate_tab.add(0)))
                 as *mut XmlValidState;
-        if (*ctxt).vstateTab.is_null() {
+        if (*ctxt).vstate_tab.is_null() {
             xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
             return -1;
         }
     }
-    if (*ctxt).vstateNr >= (*ctxt).vstateMax {
+    if (*ctxt).vstate_nr >= (*ctxt).vstateMax {
         let tmp: *mut XmlValidState;
 
         tmp = xml_realloc(
-            (*ctxt).vstateTab as _,
-            2 * (*ctxt).vstateMax as usize * size_of_val(&*(*ctxt).vstateTab.add(0)),
+            (*ctxt).vstate_tab as _,
+            2 * (*ctxt).vstateMax as usize * size_of_val(&*(*ctxt).vstate_tab.add(0)),
         ) as *mut XmlValidState;
         if tmp.is_null() {
             xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
             return -1;
         }
         (*ctxt).vstateMax *= 2;
-        (*ctxt).vstateTab = tmp;
-        (*ctxt).vstate = (*ctxt).vstateTab.add(0);
+        (*ctxt).vstate_tab = tmp;
+        (*ctxt).vstate = (*ctxt).vstate_tab.add(0);
     }
     // Don't push on the stack a state already here
     if i >= 0
-        && (*(*ctxt).vstateTab.add(i as usize)).cont == cont
-        && (*(*ctxt).vstateTab.add(i as usize)).node == node
-        && (*(*ctxt).vstateTab.add(i as usize)).depth == depth
-        && (*(*ctxt).vstateTab.add(i as usize)).occurs == occurs
-        && (*(*ctxt).vstateTab.add(i as usize)).state == state
+        && (*(*ctxt).vstate_tab.add(i as usize)).cont == cont
+        && (*(*ctxt).vstate_tab.add(i as usize)).node == node.as_ptr()
+        && (*(*ctxt).vstate_tab.add(i as usize)).depth == depth
+        && (*(*ctxt).vstate_tab.add(i as usize)).occurs == occurs
+        && (*(*ctxt).vstate_tab.add(i as usize)).state == state
     {
-        return (*ctxt).vstateNr;
+        return (*ctxt).vstate_nr;
     }
-    (*(*ctxt).vstateTab.add((*ctxt).vstateNr as usize)).cont = cont;
-    (*(*ctxt).vstateTab.add((*ctxt).vstateNr as usize)).node = node;
-    (*(*ctxt).vstateTab.add((*ctxt).vstateNr as usize)).depth = depth;
-    (*(*ctxt).vstateTab.add((*ctxt).vstateNr as usize)).occurs = occurs;
-    (*(*ctxt).vstateTab.add((*ctxt).vstateNr as usize)).state = state;
+    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).cont = cont;
+    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).node = node;
+    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).depth = depth;
+    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).occurs = occurs;
+    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).state = state;
 
-    let res = (*ctxt).vstateNr;
-    (*ctxt).vstateNr += 1;
+    let res = (*ctxt).vstate_nr;
+    (*ctxt).vstate_nr += 1;
     res
 }
 
@@ -7275,23 +6983,18 @@ pub unsafe fn xml_validate_push_element(
         return 0;
     }
 
-    if (*ctxt).vstate_nr > 0 && !(*ctxt).vstate.is_null() {
-        let state: XmlValidStatePtr = (*ctxt).vstate;
-        let elem_decl: XmlElementPtr;
-
+    if let Some(state) = (*ctxt).vstate_tab.last() {
         // Check the new element against the content model of the new elem.
-        if !(*state).elem_decl.is_null() {
-            elem_decl = (*state).elem_decl;
-
-            match (*elem_decl).etype {
+        if let Some(elem_decl) = state.elem_decl {
+            match elem_decl.etype {
                 XmlElementTypeVal::XmlElementTypeUndefined => {
                     ret = 0;
                 }
                 XmlElementTypeVal::XmlElementTypeEmpty => {
-                    let name = (*(*state).node).name().unwrap();
+                    let name = (*state.node).name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        (*state).node,
+                        Some(state.node.into()),
                         XmlParserErrors::XmlDTDNotEmpty,
                         format!("Element {name} was declared EMPTY this one has content\n")
                             .as_str(),
@@ -7306,14 +7009,14 @@ pub unsafe fn xml_validate_push_element(
                 }
                 XmlElementTypeVal::XmlElementTypeMixed => {
                     // simple case of declared as #PCDATA
-                    if !(*elem_decl).content.is_null()
-                        && (*(*elem_decl).content).typ
+                    if !elem_decl.content.is_null()
+                        && (*elem_decl.content).typ
                             == XmlElementContentType::XmlElementContentPCDATA
                     {
-                        let name = (*(*state).node).name().unwrap();
+                        let name = (*state.node).name().unwrap();
                         xml_err_valid_node(
                             ctxt,
-                            (*state).node,
+                            Some(state.node.into()),
                             XmlParserErrors::XmlDTDNotPCDATA,
                             format!(
                                 "Element {name} was declared #PCDATA but contains non text nodes\n"
@@ -7325,13 +7028,13 @@ pub unsafe fn xml_validate_push_element(
                         );
                         ret = 0;
                     } else {
-                        ret = xml_validate_check_mixed(ctxt, (*elem_decl).content, qname);
+                        ret = xml_validate_check_mixed(ctxt, elem_decl.content, qname);
                         if ret != 1 {
                             let qname = CStr::from_ptr(qname as *const i8).to_string_lossy();
-                            let name = (*(*state).node).name().unwrap();
+                            let name = (*state.node).name().unwrap();
                             xml_err_valid_node(
                                 ctxt,
-                                (*state).node,
+                                Some(state.node.into()),
                                 XmlParserErrors::XmlDTDInvalidChild,
                                 format!("Element {qname} is not declared in {name} list of possible children\n").as_str(),
                                 Some(&qname),
@@ -7346,14 +7049,14 @@ pub unsafe fn xml_validate_push_element(
                     // VC: Standalone Document Declaration
                     //     - element types with element content, if white space
                     //       occurs directly within any instance of those types.
-                    if !(*state).exec.is_null() {
-                        ret = xml_reg_exec_push_string((*state).exec, qname, null_mut());
+                    if !state.exec.is_null() {
+                        ret = xml_reg_exec_push_string(state.exec, qname, null_mut());
                         if ret < 0 {
-                            let name = (*(*state).node).name().unwrap();
+                            let name = (*state.node).name().unwrap();
                             let qname = CStr::from_ptr(qname as *const i8).to_string_lossy();
                             xml_err_valid_node(
                                 ctxt,
-                                (*state).node,
+                                Some(state.node.into()),
                                 XmlParserErrors::XmlDTDContentModel,
                                 format!("Element {name} content does not follow the DTD, Misplaced {qname}\n").as_str(),
                                 Some(&name),
@@ -7369,7 +7072,7 @@ pub unsafe fn xml_validate_push_element(
             }
         }
     }
-    let e_decl: XmlElementPtr = xml_valid_get_elem_decl(ctxt, doc, elem, addr_of_mut!(extsubset));
+    let e_decl = xml_valid_get_elem_decl(ctxt, doc, elem, addr_of_mut!(extsubset));
     vstate_vpush(ctxt, e_decl, elem);
     ret
 }
@@ -7393,23 +7096,18 @@ pub unsafe fn xml_validate_push_cdata(
     if len <= 0 {
         return ret;
     }
-    if (*ctxt).vstate_nr > 0 && !(*ctxt).vstate.is_null() {
-        let state: XmlValidStatePtr = (*ctxt).vstate;
-        let elem_decl: XmlElementPtr;
-
+    if let Some(state) = (*ctxt).vstate_tab.last() {
         // Check the new element against the content model of the new elem.
-        if !(*state).elem_decl.is_null() {
-            elem_decl = (*state).elem_decl;
-
-            match (*elem_decl).etype {
+        if let Some(elem_decl) = state.elem_decl {
+            match elem_decl.etype {
                 XmlElementTypeVal::XmlElementTypeUndefined => {
                     ret = 0;
                 }
                 XmlElementTypeVal::XmlElementTypeEmpty => {
-                    let name = (*(*state).node).name().unwrap();
+                    let name = (*state.node).name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        (*state).node,
+                        Some(state.node.into()),
                         XmlParserErrors::XmlDTDNotEmpty,
                         format!("Element {name} was declared EMPTY this one has content\n")
                             .as_str(),
@@ -7424,10 +7122,10 @@ pub unsafe fn xml_validate_push_cdata(
                 XmlElementTypeVal::XmlElementTypeElement => {
                     for i in 0..len {
                         if !xml_is_blank_char(*data.add(i as usize) as u32) {
-                            let name = (*(*state).node).name().unwrap();
+                            let name = (*state.node).name().unwrap();
                             xml_err_valid_node(
                                 ctxt,
-                                (*state).node,
+                                Some(state.node.into()),
                                 XmlParserErrors::XmlDTDContentModel,
                                 format!("Element {name} content does not follow the DTD, Text not allowed\n").as_str(),
                                 Some(&name),
@@ -7453,40 +7151,32 @@ pub unsafe fn xml_validate_push_cdata(
 
 #[cfg(feature = "libxml_regexp")]
 unsafe fn vstate_vpop(ctxt: XmlValidCtxtPtr) -> i32 {
-    if (*ctxt).vstate_nr < 1 {
+    if (*ctxt).vstate_tab.is_empty() {
         return -1;
     }
-    (*ctxt).vstate_nr -= 1;
-    let elem_decl: XmlElementPtr = (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).elem_decl;
-    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).elem_decl = null_mut();
-    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).node = null_mut();
-    if !elem_decl.is_null()
-        && matches!((*elem_decl).etype, XmlElementTypeVal::XmlElementTypeElement)
-    {
-        xml_reg_free_exec_ctxt((*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).exec);
+    let state = (*ctxt).vstate_tab.pop().unwrap();
+    let elem_decl = state.elem_decl;
+    if elem_decl.map_or(false, |elem_decl| {
+        matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
+    }) {
+        xml_reg_free_exec_ctxt(state.exec);
     }
-    (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).exec = null_mut();
-    if (*ctxt).vstate_nr >= 1 {
-        (*ctxt).vstate = (*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize - 1);
-    } else {
-        (*ctxt).vstate = null_mut();
-    }
-    (*ctxt).vstate_nr
+    (*ctxt).vstate_tab.len() as i32
 }
 
 #[cfg(not(feature = "libxml_regexp"))]
 unsafe fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
-    if (*ctxt).vstateNr <= 1 {
+    if (*ctxt).vstate_nr <= 1 {
         return -1;
     }
-    (*ctxt).vstateNr -= 1;
-    (*ctxt).vstate = (*ctxt).vstateTab.add(0);
-    (*(*ctxt).vstate).cont = (*(*ctxt).vstateTab.add((*ctxt).vstateNr as usize)).cont;
-    (*(*ctxt).vstate).node = (*(*ctxt).vstateTab.add((*ctxt).vstateNr as usize)).node;
-    (*(*ctxt).vstate).depth = (*(*ctxt).vstateTab.add((*ctxt).vstateNr as usize)).depth;
-    (*(*ctxt).vstate).occurs = (*(*ctxt).vstateTab.add((*ctxt).vstateNr as usize)).occurs;
-    (*(*ctxt).vstate).state = (*(*ctxt).vstateTab.add((*ctxt).vstateNr as usize)).state;
-    return (*ctxt).vstateNr;
+    (*ctxt).vstate_nr -= 1;
+    (*ctxt).vstate = (*ctxt).vstate_tab.add(0);
+    (*(*ctxt).vstate).cont = (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).cont;
+    (*(*ctxt).vstate).node = (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).node;
+    (*(*ctxt).vstate).depth = (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).depth;
+    (*(*ctxt).vstate).occurs = (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).occurs;
+    (*(*ctxt).vstate).state = (*(*ctxt).vstate_tab.add((*ctxt).vstate_nr as usize)).state;
+    return (*ctxt).vstate_nr;
 }
 
 /// Pop the element end from the validation stack.
@@ -7496,8 +7186,8 @@ unsafe fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
 #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
 pub unsafe fn xml_validate_pop_element(
     ctxt: XmlValidCtxtPtr,
-    _doc: XmlDocPtr,
-    _elem: XmlNodePtr,
+    _doc: Option<XmlDocPtr>,
+    _elem: Option<XmlNodePtr>,
     _qname: *const XmlChar,
 ) -> i32 {
     let mut ret: i32 = 1;
@@ -7506,23 +7196,18 @@ pub unsafe fn xml_validate_pop_element(
         return 0;
     }
     // printf("PopElem %s\n", qname);
-    if (*ctxt).vstate_nr > 0 && !(*ctxt).vstate.is_null() {
-        let state: XmlValidStatePtr = (*ctxt).vstate;
-        let elem_decl: XmlElementPtr;
-
+    if let Some(state) = (*ctxt).vstate_tab.last() {
         // Check the new element against the content model of the new elem.
-        if !(*state).elem_decl.is_null() {
-            elem_decl = (*state).elem_decl;
-
-            if matches!((*elem_decl).etype, XmlElementTypeVal::XmlElementTypeElement)
-                && !(*state).exec.is_null()
+        if let Some(elem_decl) = state.elem_decl {
+            if matches!(elem_decl.etype, XmlElementTypeVal::XmlElementTypeElement)
+                && !state.exec.is_null()
             {
-                ret = xml_reg_exec_push_string((*state).exec, null_mut(), null_mut());
+                ret = xml_reg_exec_push_string(state.exec, null_mut(), null_mut());
                 if ret <= 0 {
-                    let name = (*(*state).node).name().unwrap();
+                    let name = (*state.node).name().unwrap();
                     xml_err_valid_node(
                         ctxt,
-                        (*state).node,
+                        Some(state.node.into()),
                         XmlParserErrors::XmlDTDContentModel,
                         format!(
                             "Element {name} content does not follow the DTD, Expecting more children\n"
@@ -7549,19 +7234,23 @@ pub unsafe fn xml_validate_pop_element(
 /// Returns the first element to consider for validation of the content model
 #[doc(alias = "xmlValidateSkipIgnorable")]
 #[cfg(not(feature = "libxml_regexp"))]
-unsafe fn xmlValidateSkipIgnorable(mut child: XmlNodePtr) -> XmlNodePtr {
-    while !child.is_null() {
-        match (*child).typ {
+unsafe fn xml_validate_skip_ignorable(
+    mut child: Option<XmlGenericNodePtr>,
+) -> Option<XmlGenericNodePtr> {
+    while let Some(cur_node) = child {
+        match cur_node.element_type() {
             // These things are ignored (skipped) during validation.
             XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd => {
-                child = (*child).next;
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                child = cur_node.next;
             }
             XmlElementType::XmlTextNode => {
-                if xml_is_blank_node(child) != 0 {
-                    child = (*child).next;
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                if cur_node.is_text_node() {
+                    child = cur_node.next;
                 } else {
                     return child;
                 }
@@ -7572,7 +7261,7 @@ unsafe fn xmlValidateSkipIgnorable(mut child: XmlNodePtr) -> XmlNodePtr {
             }
         }
     }
-    return child;
+    child
 }
 
 #[cfg(test)]
@@ -7580,40 +7269,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_copy_doc_element_content() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_cur in 0..GEN_NB_XML_ELEMENT_CONTENT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let cur = gen_xml_element_content_ptr(n_cur, 1);
-
-                    let ret_val = xml_copy_doc_element_content(doc, cur);
-                    desret_xml_element_content_ptr(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_xml_element_content_ptr(n_cur, cur, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCopyDocElementContent",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlCopyDocElementContent()"
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_cur);
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_copy_element_content() {
@@ -7639,235 +7294,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlCopyElementContent()"
                     );
                     eprintln!(" {}", n_cur);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_get_dtd_element_desc() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_dtd in 0..GEN_NB_XML_DTD_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let dtd = gen_xml_dtd_ptr(n_dtd, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_get_dtd_element_desc(dtd, name);
-                    desret_xml_element_ptr(ret_val);
-                    des_xml_dtd_ptr(n_dtd, dtd, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlGetDtdElementDesc",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlGetDtdElementDesc()"
-                        );
-                        eprint!(" {}", n_dtd);
-                        eprintln!(" {}", n_name);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_get_id() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let id = gen_const_xml_char_ptr(n_id, 1);
-
-                    let ret_val = xml_get_id(doc, id);
-                    desret_xml_attr_ptr(ret_val.map_or(null_mut(), |p| p.as_ptr() as XmlAttrPtr));
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_id, id, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlGetID",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlGetID()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_id);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_is_id() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                    for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let elem = gen_xml_node_ptr(n_elem, 1);
-                        let attr = gen_xml_attr_ptr(n_attr, 2);
-
-                        let ret_val = xml_is_id(doc, elem, attr);
-                        desret_int(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_xml_node_ptr(n_elem, elem, 1);
-                        des_xml_attr_ptr(n_attr, attr, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlIsID",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlIsID()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_elem);
-                            eprintln!(" {}", n_attr);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_is_mixed_element() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_is_mixed_element(doc, name);
-                    desret_int(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlIsMixedElement",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlIsMixedElement()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_name);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_is_ref() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                    for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let elem = gen_xml_node_ptr(n_elem, 1);
-                        let attr = gen_xml_attr_ptr(n_attr, 2);
-
-                        let ret_val = xml_is_ref(doc, elem, attr);
-                        desret_int(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_xml_node_ptr(n_elem, elem, 1);
-                        des_xml_attr_ptr(n_attr, attr, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlIsRef",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlIsRef()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_elem);
-                            eprintln!(" {}", n_attr);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_remove_id() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let attr = gen_xml_attr_ptr(n_attr, 1);
-
-                    let ret_val = xml_remove_id(doc, attr);
-                    desret_int(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_xml_attr_ptr(n_attr, attr, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlRemoveID",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlRemoveID()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_attr);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_remove_ref() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let attr = gen_xml_attr_ptr(n_attr, 1);
-
-                    let ret_val = xml_remove_ref(doc, attr);
-                    desret_int(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_xml_attr_ptr(n_attr, attr, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlRemoveRef",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlRemoveRef()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_attr);
-                    }
                 }
             }
         }
@@ -7956,41 +7382,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_valid_build_content_model() {
-        #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_elem in 0..GEN_NB_XML_ELEMENT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                    let elem = gen_xml_element_ptr(n_elem, 1);
-
-                    let ret_val = xml_valid_build_content_model(ctxt, elem);
-                    desret_int(ret_val);
-                    des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_element_ptr(n_elem, elem, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlValidBuildContentModel",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlValidBuildContentModel()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_elem);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_valid_get_potential_children() {
         #[cfg(feature = "libxml_valid")]
         unsafe {
@@ -8041,96 +7432,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_valid_get_valid_elements() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_prev in 0..GEN_NB_XML_NODE_PTR {
-                for n_next in 0..GEN_NB_XML_NODE_PTR {
-                    for n_names in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
-                        for n_max in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let prev = gen_xml_node_ptr(n_prev, 0);
-                            let next = gen_xml_node_ptr(n_next, 1);
-                            let names = gen_const_xml_char_ptr_ptr(n_names, 2);
-                            let max = gen_int(n_max, 3);
-
-                            let ret_val = xml_valid_get_valid_elements(
-                                prev,
-                                next,
-                                names as *mut *const XmlChar,
-                                max,
-                            );
-                            desret_int(ret_val);
-                            des_xml_node_ptr(n_prev, prev, 0);
-                            des_xml_node_ptr(n_next, next, 1);
-                            des_const_xml_char_ptr_ptr(n_names, names as *mut *const XmlChar, 2);
-                            des_int(n_max, max, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlValidGetValidElements",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlValidGetValidElements()"
-                                );
-                                eprint!(" {}", n_prev);
-                                eprint!(" {}", n_next);
-                                eprint!(" {}", n_names);
-                                eprintln!(" {}", n_max);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_attribute_decl() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_attr in 0..GEN_NB_XML_ATTRIBUTE_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let attr = gen_xml_attribute_ptr(n_attr, 2);
-
-                        let ret_val = xml_validate_attribute_decl(ctxt, doc, attr);
-                        desret_int(ret_val);
-                        des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_attribute_ptr(n_attr, attr, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidateAttributeDecl",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlValidateAttributeDecl()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_attr);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_validate_attribute_value() {
         #[cfg(feature = "libxml_valid")]
         unsafe {
@@ -8159,228 +7460,6 @@ mod tests {
                         );
                         eprint!(" {}", n_type);
                         eprintln!(" {}", n_value);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_document() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                    let doc = gen_xml_doc_ptr(n_doc, 1);
-
-                    let ret_val = xml_validate_document(ctxt, doc);
-                    desret_int(ret_val);
-                    des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_doc_ptr(n_doc, doc, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlValidateDocument",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlValidateDocument()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_doc);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_document_final() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                    let doc = gen_xml_doc_ptr(n_doc, 1);
-
-                    let ret_val = xml_validate_document_final(ctxt, doc);
-                    desret_int(ret_val);
-                    des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_doc_ptr(n_doc, doc, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlValidateDocumentFinal",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlValidateDocumentFinal()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_doc);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_dtd() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_dtd in 0..GEN_NB_XML_DTD_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let dtd = gen_xml_dtd_ptr(n_dtd, 2);
-
-                        let ret_val = xml_validate_dtd(ctxt, doc, dtd);
-                        desret_int(ret_val);
-                        des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_dtd_ptr(n_dtd, dtd, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidateDtd",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlValidateDtd()");
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_dtd);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_dtd_final() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                    let doc = gen_xml_doc_ptr(n_doc, 1);
-
-                    let ret_val = xml_validate_dtd_final(ctxt, doc);
-                    desret_int(ret_val);
-                    des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_doc_ptr(n_doc, doc, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlValidateDtdFinal",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlValidateDtdFinal()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_doc);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_element() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_root in 0..GEN_NB_XML_NODE_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let root = gen_xml_node_ptr(n_root, 2);
-
-                        let ret_val = xml_validate_element(ctxt, doc, root);
-                        desret_int(ret_val);
-                        des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_node_ptr(n_root, root, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidateElement",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlValidateElement()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_root);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_element_decl() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_ELEMENT_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let elem = gen_xml_element_ptr(n_elem, 2);
-
-                        let ret_val = xml_validate_element_decl(ctxt, doc, elem);
-                        desret_int(ret_val);
-                        des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_element_ptr(n_elem, elem, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidateElementDecl",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlValidateElementDecl()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_elem);
-                        }
                     }
                 }
             }
@@ -8508,142 +7587,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_validate_one_attribute() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                        for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                            for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                let mem_base = xml_mem_blocks();
-                                let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                                let doc = gen_xml_doc_ptr(n_doc, 1);
-                                let elem = gen_xml_node_ptr(n_elem, 2);
-                                let attr = gen_xml_attr_ptr(n_attr, 3);
-                                let value = gen_const_xml_char_ptr(n_value, 4);
-
-                                let ret_val =
-                                    xml_validate_one_attribute(ctxt, doc, elem, attr, value);
-                                desret_int(ret_val);
-                                des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                                des_xml_doc_ptr(n_doc, doc, 1);
-                                des_xml_node_ptr(n_elem, elem, 2);
-                                des_xml_attr_ptr(n_attr, attr, 3);
-                                des_const_xml_char_ptr(n_value, value, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlValidateOneAttribute",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(
-                                        leaks == 0,
-                                        "{leaks} Leaks are found in xmlValidateOneAttribute()"
-                                    );
-                                    eprint!(" {}", n_ctxt);
-                                    eprint!(" {}", n_doc);
-                                    eprint!(" {}", n_elem);
-                                    eprint!(" {}", n_attr);
-                                    eprintln!(" {}", n_value);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_one_element() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let elem = gen_xml_node_ptr(n_elem, 2);
-
-                        let ret_val = xml_validate_one_element(ctxt, doc, elem);
-                        desret_int(ret_val);
-                        des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_node_ptr(n_elem, elem, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidateOneElement",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlValidateOneElement()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_elem);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_pop_element() {
-        #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                        for n_qname in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                            let doc = gen_xml_doc_ptr(n_doc, 1);
-                            let elem = gen_xml_node_ptr(n_elem, 2);
-                            let qname = gen_const_xml_char_ptr(n_qname, 3);
-
-                            let ret_val = xml_validate_pop_element(ctxt, doc, elem, qname);
-                            desret_int(ret_val);
-                            des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                            des_xml_doc_ptr(n_doc, doc, 1);
-                            des_xml_node_ptr(n_elem, elem, 2);
-                            des_const_xml_char_ptr(n_qname, qname, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlValidatePopElement",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlValidatePopElement()"
-                                );
-                                eprint!(" {}", n_ctxt);
-                                eprint!(" {}", n_doc);
-                                eprint!(" {}", n_elem);
-                                eprintln!(" {}", n_qname);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_validate_push_cdata() {
         #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
         unsafe {
@@ -8680,83 +7623,6 @@ mod tests {
                             eprint!(" {}", n_data);
                             eprintln!(" {}", n_len);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_push_element() {
-        #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                        for n_qname in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                            let doc = gen_xml_doc_ptr(n_doc, 1);
-                            let elem = gen_xml_node_ptr(n_elem, 2);
-                            let qname = gen_const_xml_char_ptr(n_qname, 3);
-
-                            let ret_val = xml_validate_push_element(ctxt, doc, elem, qname);
-                            desret_int(ret_val);
-                            des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                            des_xml_doc_ptr(n_doc, doc, 1);
-                            des_xml_node_ptr(n_elem, elem, 2);
-                            des_const_xml_char_ptr(n_qname, qname, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlValidatePushElement",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlValidatePushElement()"
-                                );
-                                eprint!(" {}", n_ctxt);
-                                eprint!(" {}", n_doc);
-                                eprint!(" {}", n_elem);
-                                eprintln!(" {}", n_qname);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_root() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                    let doc = gen_xml_doc_ptr(n_doc, 1);
-
-                    let ret_val = xml_validate_root(ctxt, doc);
-                    desret_int(ret_val);
-                    des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_doc_ptr(n_doc, doc, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlValidateRoot",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlValidateRoot()");
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_doc);
                     }
                 }
             }

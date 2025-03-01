@@ -1006,6 +1006,162 @@ pub fn build_uri(uri: &str, base: &str) -> Option<String> {
     Some(res.save())
 }
 
+/// Expresses the URI of the reference in terms relative to the base.  
+/// Some examples of this operation include:
+/// ```text
+///    base = "http://site1.com/docs/book1.html"
+///    URI input                        URI returned
+///    docs/pic1.gif                    pic1.gif
+///    docs/img/pic1.gif                img/pic1.gif
+///    img/pic1.gif                     ../img/pic1.gif
+///    http://site1.com/docs/pic1.gif   pic1.gif
+///    http://site2.com/docs/pic1.gif   http://site2.com/docs/pic1.gif
+///
+///    base = "docs/book1.html"
+///    URI input                        URI returned
+///    docs/pic1.gif                    pic1.gif
+///    docs/img/pic1.gif                img/pic1.gif
+///    img/pic1.gif                     ../img/pic1.gif
+///    http://site1.com/docs/pic1.gif   http://site1.com/docs/pic1.gif
+/// ```
+///
+/// # Examples
+/// ```
+/// use std::borrow::Cow;
+///
+/// use exml::uri::build_relative_uri;
+///
+/// let base = Some("http://site1.com/docs/book1.html");
+/// assert_eq!(build_relative_uri("docs/pic1.gif", base), Some("pic1.gif".into()));
+/// assert_eq!(build_relative_uri("docs/img/pic1.gif", base), Some("img/pic1.gif".into()));
+/// assert_eq!(build_relative_uri("img/pic1.gif", base), Some("../img/pic1.gif".into()));
+/// assert_eq!(build_relative_uri("http://site1.com/docs/pic1.gif", base), Some("pic1.gif".into()));
+/// assert_eq!(build_relative_uri("http://site2.com/docs/pic1.gif", base), Some("http://site2.com/docs/pic1.gif".into()));
+///
+/// let base = Some("docs/book1.html");
+/// assert_eq!(build_relative_uri("docs/pic1.gif", base), Some("pic1.gif".into()));
+/// assert_eq!(build_relative_uri("docs/img/pic1.gif", base), Some("img/pic1.gif".into()));
+/// assert_eq!(build_relative_uri("img/pic1.gif", base), Some("../img/pic1.gif".into()));
+/// assert_eq!(build_relative_uri("http://site1.com/docs/pic1.gif", base), Some("http://site1.com/docs/pic1.gif".into()));
+/// ```
+///
+/// # Note
+/// if the URI reference is really weird or complicated, it may be
+/// worthwhile to first convert it into a "nice" one by calling
+/// xmlBuildURI (using 'base') before calling this routine,
+/// since this routine (for reasonable efficiency) assumes URI has
+/// already been through some validation.
+///
+/// Returns a new URI string (to be freed by the caller) or NULL in case error.
+#[doc(alias = "xmlBuildRelativeURI")]
+pub fn build_relative_uri<'a>(uri: &'a str, base: Option<&str>) -> Option<Cow<'a, str>> {
+    if uri.is_empty() {
+        return None;
+    }
+
+    // First parse URI into a standard form
+    let mut refe = XmlURI::new();
+    // If URI not already in "relative" form
+    if !uri.starts_with('.') {
+        refe.parse_uri_reference(uri).ok()?;
+    } else {
+        refe.path = Some(uri.to_owned().into());
+    }
+
+    // Next parse base into the same standard form
+    let Some(base) = base.filter(|base| !base.is_empty()) else {
+        return Some(uri.into());
+    };
+    let mut bas = XmlURI::new();
+    if !base.starts_with('.') {
+        bas.parse_uri_reference(base).ok()?;
+    } else {
+        bas.path = Some(base.to_owned().into());
+    }
+
+    // If the scheme / server on the URI differs from the base, just return the URI
+    if let Some(rscheme) = refe.scheme.as_deref() {
+        if bas.scheme.map_or(true, |scheme| scheme != rscheme)
+            || bas.port != refe.port
+            || bas.server != refe.server
+        {
+            return Some(uri.into());
+        }
+    }
+    if bas.path == refe.path {
+        return Some("".into());
+    }
+    let Some(base_path) = bas.path.as_deref() else {
+        return refe.path;
+    };
+    let refe_path = refe.path.unwrap_or_else(|| "/".into());
+
+    // At this point (at last!) we can compare the two paths
+    //
+    // First we take care of the special case where either of the
+    // two path components may be missing (bug 316224)
+    let mut bptr = base_path;
+    let mut rptr = refe_path.as_ref();
+
+    // Next we compare the two strings and find where they first differ
+    if let Some(rem) = rptr.strip_prefix("./") {
+        rptr = rem;
+    }
+    if let Some(rem) = bptr.strip_prefix("./") {
+        bptr = rem;
+    } else if let Some(rem) = bptr.strip_prefix('/').filter(|_| !rptr.starts_with('/')) {
+        bptr = rem;
+    }
+    let pos = bptr
+        .bytes()
+        .zip(rptr.bytes())
+        .take_while(|(b, r)| r == b)
+        .count();
+
+    if bptr.len() == rptr.len() && pos == bptr.len() {
+        return Some("".into());
+    }
+
+    // In URI, "back up" to the last '/' encountered.  This will be the
+    // beginning of the "unique" suffix of URI
+    let ix = rptr.as_bytes()[..pos]
+        .iter()
+        .rposition(|&b| b == b'/')
+        .map(|pos| pos + 1)
+        .unwrap_or(0);
+    let uptr = &rptr[ix..];
+    // In base, count the number of '/' from the differing point
+    let nbslash = bptr.as_bytes()[ix..].iter().filter(|&&b| b == b'/').count();
+
+    // e.g: URI="foo/" base="foo/bar" -> "./"
+    if nbslash == 0 && uptr.is_empty() {
+        return Some("./".into());
+    }
+
+    if nbslash == 0 {
+        return Some(escape_url_except(uptr, b"/;&=+$,").into_owned().into());
+    }
+
+    // Allocate just enough space for the returned string -
+    // length of the remainder of the URI, plus enough space
+    // for the "../" groups, plus one for the terminator
+    let mut res = String::with_capacity(uptr.len() + 3 * nbslash);
+    // Put in as many "../" as needed
+    for _ in 0..nbslash {
+        res.push_str("../");
+    }
+    // Finish up with the end of the URI
+    if !res.is_empty() && !uptr.is_empty() && uptr.starts_with('/') && res.ends_with('/') {
+        res.push_str(&uptr[1..]);
+    } else {
+        res.push_str(uptr);
+    }
+
+    // escape the freshly-built path
+    // exception characters from xmlSaveUri
+    Some(escape_url_except(&res, b"/;&=+$,").into_owned().into())
+}
+
 /// This routine escapes a string to hex, ignoring reserved characters
 /// (a-z, A-Z, 0-9, "@-_.!~*'()") and the characters in the exception list.
 ///

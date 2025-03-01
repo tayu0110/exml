@@ -71,7 +71,7 @@ pub use output::*;
 ///  Handle an out of memory condition
 #[doc(alias = "xmlIOErrMemory")]
 pub(crate) unsafe fn xml_ioerr_memory(extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromIO, null_mut(), Some(extra));
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromIO, None, Some(extra));
 }
 
 const IOERR: &[&str] = &[
@@ -264,7 +264,7 @@ pub(crate) unsafe fn __xml_ioerr(
         index => IOERR[index as usize].into(),
     };
 
-    __xml_simple_error!(domain, code, null_mut(), &msg);
+    __xml_simple_error!(domain, code, None, &msg);
 }
 
 /// Handle an I/O error
@@ -380,7 +380,7 @@ macro_rules! __xml_loader_err {
                 channel,
                 data,
                 ctxt as _,
-                null_mut(),
+                None,
                 XmlErrorDomain::XmlFromIO,
                 XmlParserErrors::XmlIOLoadError,
                 level,

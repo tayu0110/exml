@@ -79,7 +79,7 @@ pub struct XmlParserCtxt {
     // For SAX interface only, used by DOM build
     pub(crate) user_data: Option<GenericErrorContext>,
     // the document being built
-    pub my_doc: XmlDocPtr,
+    pub my_doc: Option<XmlDocPtr>,
     // is the document well formed
     pub well_formed: i32,
     // shall we replace entities ?
@@ -103,7 +103,7 @@ pub struct XmlParserCtxt {
 
     // Node analysis stack only used for DOM building
     // Current parsed Node
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: Option<XmlNodePtr>,
     // array of nodes
     pub(crate) node_tab: Vec<XmlNodePtr>,
 
@@ -230,11 +230,11 @@ pub struct XmlParserCtxt {
     // number of freed element nodes
     pub(crate) free_elems_nr: i32,
     // List of freed element nodes
-    pub(crate) free_elems: XmlNodePtr,
+    pub(crate) free_elems: Option<XmlNodePtr>,
     // number of freed attributes nodes
     pub(crate) free_attrs_nr: i32,
     // List of freed attributes nodes
-    pub(crate) free_attrs: XmlAttrPtr,
+    pub(crate) free_attrs: Option<XmlAttrPtr>,
 
     // the complete error information for the last error.
     pub last_error: XmlError,
@@ -478,7 +478,7 @@ impl XmlParserCtxt {
         self.space_tab.clear();
 
         self.node_tab.clear();
-        self.node = null_mut();
+        self.node = None;
 
         self.name_tab.clear();
         self.name = None;
@@ -490,10 +490,9 @@ impl XmlParserCtxt {
         self.directory = None;
         self.ext_sub_uri = None;
         self.ext_sub_system = None;
-        if !self.my_doc.is_null() {
-            xml_free_doc(self.my_doc);
+        if let Some(doc) = self.my_doc.take() {
+            xml_free_doc(doc);
         }
-        self.my_doc = null_mut();
 
         self.standalone = -1;
         self.has_external_subset = 0;
@@ -722,11 +721,12 @@ impl XmlParserCtxt {
                     consumed = consumed.saturating_add((*self.input).offset_from_base() as u64);
 
                     // Add to sizeentities when parsing an external entity for the first time.
-                    let ent = (*self.input).entity;
-                    if matches!((*ent).etype, XmlEntityType::XmlExternalParameterEntity)
-                        && (*ent).flags & XML_ENT_PARSED as i32 == 0
+                    // Is this `unwrap` OK ????
+                    let mut ent = (*self.input).entity.unwrap();
+                    if matches!(ent.etype, XmlEntityType::XmlExternalParameterEntity)
+                        && ent.flags & XML_ENT_PARSED as i32 == 0
                     {
-                        (*ent).flags |= XML_ENT_PARSED as i32;
+                        ent.flags |= XML_ENT_PARSED as i32;
 
                         self.sizeentities = self.sizeentities.saturating_add(consumed);
                     }
@@ -929,7 +929,7 @@ impl XmlParserCtxt {
             self.halt();
             return -1;
         }
-        self.node = value;
+        self.node = Some(value);
         self.node_tab.push(value);
         self.node_tab.len() as i32 - 1
     }
@@ -938,9 +938,9 @@ impl XmlParserCtxt {
     ///
     /// Returns the node just removed
     #[doc(alias = "nodePop")]
-    pub(crate) fn node_pop(&mut self) -> XmlNodePtr {
-        let res = self.node_tab.pop().unwrap_or(null_mut());
-        self.node = *self.node_tab.last().unwrap_or(&null_mut());
+    pub(crate) fn node_pop(&mut self) -> Option<XmlNodePtr> {
+        let res = self.node_tab.pop();
+        self.node = self.node_tab.last().cloned();
         res
     }
 
@@ -1142,8 +1142,8 @@ impl XmlParserCtxt {
             );
         }
         let input: XmlParserInputPtr = self.input_pop();
-        if !(*input).entity.is_null() {
-            (*(*input).entity).flags &= !XML_ENT_EXPANDING as i32;
+        if let Some(mut entity) = (*input).entity {
+            entity.flags &= !XML_ENT_EXPANDING as i32;
         }
         xml_free_input_stream(input);
         if *(*self.input).cur == 0 {
@@ -1337,9 +1337,7 @@ impl XmlParserCtxt {
         url: Option<&str>,
         encoding: Option<&str>,
         options: i32,
-    ) -> XmlDocPtr {
-        let ret: XmlDocPtr;
-
+    ) -> Option<XmlDocPtr> {
         self.ctxt_use_options_internal(options, encoding);
         if let Some(encoding) = encoding {
             // TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
@@ -1355,15 +1353,13 @@ impl XmlParserCtxt {
         }
         xml_parse_document(self);
         if self.well_formed != 0 || self.recovery != 0 {
-            ret = self.my_doc;
+            self.my_doc.take()
         } else {
-            ret = null_mut();
-            if !self.my_doc.is_null() {
-                xml_free_doc(self.my_doc);
+            if let Some(my_doc) = self.my_doc.take() {
+                xml_free_doc(my_doc);
             }
+            None
         }
-        self.my_doc = null_mut();
-        ret
     }
 
     /// change the input functions when discovering the character encoding of a given entity.
@@ -1571,7 +1567,7 @@ impl Default for XmlParserCtxt {
         Self {
             sax: None,
             user_data: None,
-            my_doc: null_mut(),
+            my_doc: None,
             well_formed: 0,
             replace_entities: 0,
             version: None,
@@ -1580,7 +1576,7 @@ impl Default for XmlParserCtxt {
             html: 0,
             input: null_mut(),
             input_tab: vec![],
-            node: null_mut(),
+            node: None,
             node_tab: vec![],
             record_info: 0,
             node_seq: XmlParserNodeInfoSeq::default(),
@@ -1635,16 +1631,13 @@ impl Default for XmlParserCtxt {
             options: 0,
             dict_names: 0,
             free_elems_nr: 0,
-            free_elems: null_mut(),
+            free_elems: None,
             free_attrs_nr: 0,
-            free_attrs: null_mut(),
+            free_attrs: None,
             last_error: XmlError::default(),
             parse_mode: XmlParserMode::default(),
             nbentities: 0,
             sizeentities: 0,
-            // node_info: null_mut(),
-            // node_info_nr: 0,
-            // node_info_max: 0,
             node_info_tab: vec![],
             input_id: 0,
             sizeentcopy: 0,
@@ -1737,7 +1730,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     // Allocate the Node stack
     (*ctxt).node_tab.clear();
     (*ctxt).node_tab.shrink_to(10);
-    (*ctxt).node = null_mut();
+    (*ctxt).node = None;
 
     // Allocate the Name stack
     (*ctxt).name_tab.clear();
@@ -1749,7 +1742,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).space_tab.shrink_to(10);
     (*ctxt).space_tab.push(-1);
 
-    (*ctxt).my_doc = null_mut();
+    (*ctxt).my_doc = None;
     (*ctxt).well_formed = 1;
     (*ctxt).ns_well_formed = 1;
     (*ctxt).valid = 1;
@@ -1781,7 +1774,8 @@ unsafe fn xml_init_sax_parser_ctxt(
         } else {
             (*ctxt).vctxt.warning = Some(parser_validity_warning);
         }
-        (*ctxt).vctxt.node_max = 0;
+        // (*ctxt).vctxt.node_max = 0;
+        (*ctxt).vctxt.node_tab.clear();
         (*ctxt).options |= XmlParserOption::XmlParseDTDValid as i32;
     }
     (*ctxt).replace_entities = get_substitute_entities_default_value();
@@ -1876,9 +1870,6 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     (*ctxt).ext_sub_system = None;
     (*ctxt).sax = None;
     (*ctxt).directory = None;
-    if !(*ctxt).vctxt.node_tab.is_null() {
-        xml_free((*ctxt).vctxt.node_tab as _);
-    }
     if !(*ctxt).dict.is_null() {
         xml_dict_free((*ctxt).dict);
     }
@@ -1891,22 +1882,17 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         table.clear_with(|data, _| xml_free(data as _));
     }
     let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
-    if !(*ctxt).free_elems.is_null() {
-        let mut cur = (*ctxt).free_elems;
-        while !cur.is_null() {
-            let next = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-            xml_free(cur as _);
-            cur = next;
-        }
+    let mut cur = (*ctxt).free_elems;
+    while let Some(now) = cur {
+        let next = now.next.map(|node| XmlNodePtr::try_from(node).unwrap());
+        now.free();
+        cur = next;
     }
-    if !(*ctxt).free_attrs.is_null() {
-        let mut cur: XmlAttrPtr;
-        let mut next: XmlAttrPtr;
-
-        cur = (*ctxt).free_attrs;
-        while !cur.is_null() {
-            next = (*cur).next;
-            xml_free(cur as _);
+    if let Some(attrs) = (*ctxt).free_attrs.take() {
+        let mut cur = Some(attrs);
+        while let Some(now) = cur {
+            let next = now.next;
+            now.free();
             cur = next;
         }
     }

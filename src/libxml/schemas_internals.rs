@@ -312,7 +312,7 @@ pub struct XmlSchemaAttribute {
     pub(crate) occurs: i32,               /* Deprecated; not used */
     pub(crate) def_value: *const XmlChar, /* The initial value of the value constraint */
     pub(crate) subtypes: XmlSchemaTypePtr, /* the type definition */
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: Option<XmlNodePtr>,
     pub(crate) target_namespace: *const XmlChar,
     pub(crate) flags: i32,
     pub(crate) ref_prefix: *const XmlChar, /* Deprecated; not used */
@@ -350,7 +350,7 @@ pub struct XmlSchemaWildcard {
     pub(crate) typ: XmlSchemaTypeType, /* The kind of type */
     pub(crate) id: *const XmlChar,     /* Deprecated; not used */
     pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: Option<XmlNodePtr>,
     pub(crate) min_occurs: i32, /* Deprecated; not used */
     pub(crate) max_occurs: i32, /* Deprecated; not used */
     pub(crate) process_contents: i32,
@@ -385,7 +385,7 @@ pub struct XmlSchemaAttributeGroup {
     pub(crate) annot: XmlSchemaAnnotPtr,
 
     pub(crate) attributes: XmlSchemaAttributePtr, /* Deprecated; not used */
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: Option<XmlNodePtr>,
     pub(crate) flags: i32,
     pub(crate) attribute_wildcard: XmlSchemaWildcardPtr,
     pub(crate) ref_prefix: *const XmlChar, /* Deprecated; not used */
@@ -496,7 +496,7 @@ pub struct XmlSchemaType {
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) subtypes: XmlSchemaTypePtr,
     pub(crate) attributes: XmlSchemaAttributePtr, /* Deprecated; not used */
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: Option<XmlNodePtr>,
     pub(crate) min_occurs: i32, /* Deprecated; not used */
     pub(crate) max_occurs: i32, /* Deprecated; not used */
 
@@ -580,7 +580,7 @@ pub struct XmlSchemaElement {
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) subtypes: XmlSchemaTypePtr, /* the type definition */
     pub(crate) attributes: XmlSchemaAttributePtr,
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: Option<XmlNodePtr>,
     pub(crate) min_occurs: i32, /* Deprecated; not used */
     pub(crate) max_occurs: i32, /* Deprecated; not used */
 
@@ -618,7 +618,7 @@ pub struct XmlSchemaFacet {
     pub(crate) value: *const XmlChar,     /* The original value */
     pub(crate) id: *const XmlChar,        /* Obsolete */
     pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) node: XmlNodePtr,
+    pub(crate) node: Option<XmlNodePtr>,
     pub(crate) fixed: i32, /* XML_SCHEMAS_FACET_PRESERVE, etc. */
     pub(crate) whitespace: i32,
     pub(crate) val: XmlSchemaValPtr, /* The compiled value */
@@ -665,7 +665,7 @@ pub(crate) const XML_SCHEMAS_INCLUDING_CONVERT_NS: i32 = 1 << 9;
 
 /// Deallocate a annotation structure
 #[doc(alias = "xmlSchemaFreeAnnot")]
-pub(crate) unsafe extern "C" fn xml_schema_free_annot(mut annot: XmlSchemaAnnotPtr) {
+pub(crate) unsafe fn xml_schema_free_annot(mut annot: XmlSchemaAnnotPtr) {
     if annot.is_null() {
         return;
     }
@@ -685,7 +685,7 @@ pub(crate) unsafe extern "C" fn xml_schema_free_annot(mut annot: XmlSchemaAnnotP
 
 /// Deallocate a annotation structure
 #[doc(alias = "xmlSchemaItemListFree")]
-pub(crate) unsafe extern "C" fn xml_schema_item_list_free(list: XmlSchemaItemListPtr) {
+pub(crate) unsafe fn xml_schema_item_list_free(list: XmlSchemaItemListPtr) {
     if list.is_null() {
         return;
     }
@@ -697,7 +697,7 @@ pub(crate) unsafe extern "C" fn xml_schema_item_list_free(list: XmlSchemaItemLis
 
 /// Deallocate a list of types.
 #[doc(alias = "xmlSchemaFreeTypeLinkList")]
-unsafe extern "C" fn xml_schema_free_type_link_list(mut link: XmlSchemaTypeLinkPtr) {
+unsafe fn xml_schema_free_type_link_list(mut link: XmlSchemaTypeLinkPtr) {
     let mut next: XmlSchemaTypeLinkPtr;
 
     while !link.is_null() {
@@ -709,7 +709,7 @@ unsafe extern "C" fn xml_schema_free_type_link_list(mut link: XmlSchemaTypeLinkP
 
 /// Deallocate a Schema Type structure.
 #[doc(alias = "xmlSchemaFreeType")]
-pub unsafe extern "C" fn xml_schema_free_type(typ: XmlSchemaTypePtr) {
+pub unsafe fn xml_schema_free_type(typ: XmlSchemaTypePtr) {
     if typ.is_null() {
         return;
     }
@@ -753,7 +753,7 @@ pub unsafe extern "C" fn xml_schema_free_type(typ: XmlSchemaTypePtr) {
 
 /// Deallocates a list of wildcard constraint structures.
 #[doc(alias = "xmlSchemaFreeWildcardNsSet")]
-pub(crate) unsafe extern "C" fn xml_schema_free_wildcard_ns_set(mut set: XmlSchemaWildcardNsPtr) {
+pub(crate) unsafe fn xml_schema_free_wildcard_ns_set(mut set: XmlSchemaWildcardNsPtr) {
     let mut next: XmlSchemaWildcardNsPtr;
 
     while !set.is_null() {
@@ -765,7 +765,7 @@ pub(crate) unsafe extern "C" fn xml_schema_free_wildcard_ns_set(mut set: XmlSche
 
 /// Deallocates a wildcard structure.
 #[doc(alias = "xmlSchemaFreeWildcard")]
-pub unsafe extern "C" fn xml_schema_free_wildcard(wildcard: XmlSchemaWildcardPtr) {
+pub unsafe fn xml_schema_free_wildcard(wildcard: XmlSchemaWildcardPtr) {
     if wildcard.is_null() {
         return;
     }

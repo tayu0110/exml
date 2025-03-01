@@ -43,8 +43,8 @@ use crate::{
     io::{write_quoted, XmlOutputBuffer},
     list::XmlList,
     tree::{
-        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc,
-        XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocPtr,
+        XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
     xpath::XmlNodeSet,
@@ -53,7 +53,7 @@ use crate::{
 use super::{
     globals::{xml_free, xml_malloc_atomic, xml_realloc},
     uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
-    xmlstring::{xml_str_equal, xml_strcmp, xml_strlen, XmlChar},
+    xmlstring::{xml_strcmp, xml_strlen, XmlChar},
 };
 
 // Predefined values for C14N modes
@@ -92,7 +92,7 @@ pub enum XmlC14NPosition {
 
 pub type XmlC14NVisibleNsStackPtr = *mut XmlC14NVisibleNsStack;
 #[repr(C)]
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct XmlC14NVisibleNsStack {
     ns_cur_end: usize,         /* number of nodes in the set */
     ns_prev_start: usize,      /* the beginning of the stack for previous visible node */
@@ -133,22 +133,8 @@ impl XmlC14NVisibleNsStack {
 
         let start = if has_empty_ns { 0 } else { self.ns_prev_start };
         for &ns1 in self.ns_tab[start..self.ns_cur_end].iter().rev() {
-            if xml_c14n_str_equal(
-                prefix,
-                if !ns1.is_null() {
-                    (*ns1).prefix
-                } else {
-                    null_mut()
-                },
-            ) {
-                return xml_c14n_str_equal(
-                    href,
-                    if !ns1.is_null() {
-                        (*ns1).href
-                    } else {
-                        null_mut()
-                    },
-                );
+            if xml_c14n_str_equal(prefix, ns1.prefix) {
+                return xml_c14n_str_equal(href, ns1.href);
             }
         }
         has_empty_ns
@@ -182,8 +168,11 @@ impl XmlC14NVisibleNsStack {
 ///
 /// Returns 1 if the node should be included
 #[doc(alias = "xmlC14NIsVisibleCallback")]
-pub type XmlC14NIsVisibleCallback<T> =
-    unsafe fn(user_data: &T, node: Option<&dyn NodeCommon>, parent: Option<&dyn NodeCommon>) -> i32;
+pub type XmlC14NIsVisibleCallback<T> = unsafe fn(
+    user_data: &T,
+    node: Option<XmlGenericNodePtr>,
+    parent: Option<XmlGenericNodePtr>,
+) -> i32;
 
 #[repr(C)]
 pub struct XmlC14NCtx<'a, T> {
@@ -212,8 +201,8 @@ pub struct XmlC14NCtx<'a, T> {
 impl<T> XmlC14NCtx<'_, T> {
     unsafe fn is_visible(
         &self,
-        node: Option<&dyn NodeCommon>,
-        parent: Option<&dyn NodeCommon>,
+        node: Option<XmlGenericNodePtr>,
+        parent: Option<XmlGenericNodePtr>,
     ) -> bool {
         if let Some(callback) = self.is_visible_callback {
             callback(&self.user_data, node, parent) != 0
@@ -237,9 +226,9 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         let mut ns = cur.ns_def;
-        while !ns.is_null() {
-            if xml_strlen((*ns).href as _) > 0 {
-                let uri: XmlURIPtr = xml_parse_uri((*ns).href as _);
+        while let Some(now) = ns {
+            if xml_strlen(now.href as _) > 0 {
+                let uri: XmlURIPtr = xml_parse_uri(now.href as _);
                 if uri.is_null() {
                     xml_c14n_err_internal("parsing namespace uri");
                     return -1;
@@ -252,7 +241,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 }
                 xml_free_uri(uri);
             }
-            ns = (*ns).next as _;
+            ns = now.next;
         }
         0
     }
@@ -310,7 +299,7 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns 0 on success or -1 on fail.
     #[doc(alias = "xmlC14NProcessNamespacesAxis")]
-    unsafe fn process_namespaces_axis(&mut self, cur: &mut XmlNode, visible: bool) -> i32 {
+    unsafe fn process_namespaces_axis(&mut self, mut cur: XmlNodePtr, visible: bool) -> i32 {
         let mut has_empty_ns = false;
 
         if !matches!(cur.element_type(), XmlElementType::XmlElementNode) {
@@ -329,31 +318,32 @@ impl<T> XmlC14NCtx<'_, T> {
         );
 
         // check all namespaces
-        let mut n = cur as *mut XmlNode;
-        while !n.is_null() {
-            let mut ns = (*n).ns_def;
-            while !ns.is_null() {
-                let prefix = (*ns).prefix();
-                let tmp = (*cur).search_ns(cur.doc, prefix.as_deref());
+        let mut n = Some(cur);
+        while let Some(node) = n {
+            let mut ns = node.ns_def;
+            while let Some(now) = ns {
+                let prefix = now.prefix();
+                let cur_doc = cur.doc;
+                let tmp = cur.search_ns(cur_doc, prefix.as_deref());
 
-                if tmp == ns
-                    && !xml_c14n_is_xml_ns(ns)
-                    && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
+                if tmp == Some(now)
+                    && !xml_c14n_is_xml_ns(now)
+                    && self.is_visible(Some(now.into()), Some(cur.into()))
                 {
-                    let already_rendered = (*self.ns_rendered).find(Some(&*ns));
+                    let already_rendered = (*self.ns_rendered).find(Some(&*now));
                     if visible {
-                        (*self.ns_rendered).add(ns, cur);
+                        (*self.ns_rendered).add(now, cur);
                     }
                     if !already_rendered {
-                        list.insert_lower_bound(ns);
+                        list.insert_lower_bound(now);
                     }
-                    if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
+                    if now.prefix().map_or(0, |pre| pre.len()) == 0 {
                         has_empty_ns = true;
                     }
                 }
-                ns = (*ns).next;
+                ns = now.next;
             }
-            n = (*n).parent().map_or(null_mut(), |p| p.as_ptr());
+            n = node.parent().and_then(|p| XmlNodePtr::try_from(p).ok());
         }
 
         // if the first node is not the default namespace node (a node with no
@@ -368,7 +358,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        list.walk(|data| self.print_namespaces(&**data) != 0);
+        list.walk(|data| self.print_namespaces(data) != 0);
 
         // Cleanup
         0
@@ -399,8 +389,8 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns 0 on success or -1 on fail.
     #[doc(alias = "xmlC14NProcessAttrsAxis")]
-    unsafe fn process_attrs_axis(&mut self, cur: &XmlNode, parent_visible: bool) -> i32 {
-        let mut attrs_to_delete: XmlAttrPtr = null_mut();
+    unsafe fn process_attrs_axis(&mut self, cur: XmlNodePtr, parent_visible: bool) -> i32 {
+        let mut attrs_to_delete = None::<XmlAttrPtr>;
 
         if !matches!(cur.element_type(), XmlElementType::XmlElementNode) {
             xml_c14n_err_param("processing attributes axis");
@@ -408,7 +398,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // Create a sorted list to store element attributes
-        let mut list = XmlList::<*mut XmlAttr>::new(
+        let mut list = XmlList::new(
             None,
             Rc::new(
                 |&attr1, &attr2| match xml_c14n_attrs_compare(attr1, attr2) {
@@ -432,33 +422,32 @@ impl<T> XmlC14NCtx<'_, T> {
 
                 // Add all visible attributes from current node.
                 let mut attr = cur.properties;
-                while !attr.is_null() {
+                while let Some(now) = attr {
                     // check that attribute is visible
-                    if self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur)) {
-                        list.insert_lower_bound(attr);
+                    if self.is_visible(Some(now.into()), Some(cur.into())) {
+                        list.insert_lower_bound(now);
                     }
-                    attr = (*attr).next;
+                    attr = now.next;
                 }
 
                 // Handle xml attributes
                 if parent_visible
-                    && (*cur).parent().is_some()
-                    && !self.is_visible(
-                        (*cur).parent().map(|p| &*p.as_ptr() as _),
-                        (*cur).parent().unwrap().parent().map(|p| &*p.as_ptr() as _),
-                    )
+                    && cur.parent().is_some()
+                    && !self.is_visible(cur.parent(), cur.parent().and_then(|cur| cur.parent()))
                 {
                     // If XPath node-set is not specified then the parent is always visible!
-                    let mut tmp = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-                    while !tmp.is_null() {
-                        attr = (*tmp).properties;
-                        while !attr.is_null() {
-                            if xml_c14n_is_xml_attr(attr) && list.search(&attr).is_none() {
-                                list.insert_lower_bound(attr);
+                    let mut tmp = cur
+                        .parent()
+                        .and_then(|node| XmlNodePtr::try_from(node).ok());
+                    while let Some(cur_node) = tmp {
+                        let mut attr = cur_node.properties;
+                        while let Some(now) = attr {
+                            if xml_c14n_is_xml_attr(now) && list.search(&now).is_none() {
+                                list.insert_lower_bound(now);
                             }
-                            attr = (*attr).next;
+                            attr = now.next;
                         }
-                        tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
+                        tmp = cur_node.parent().and_then(|p| XmlNodePtr::try_from(p).ok());
                     }
                 }
             }
@@ -468,12 +457,12 @@ impl<T> XmlC14NCtx<'_, T> {
 
                 // Add all visible attributes from current node.
                 let mut attr = cur.properties;
-                while !attr.is_null() {
+                while let Some(now) = attr {
                     // check that attribute is visible
-                    if self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur)) {
-                        list.insert_lower_bound(attr);
+                    if self.is_visible(Some(now.into()), Some(cur.into())) {
+                        list.insert_lower_bound(now);
                     }
-                    attr = (*attr).next;
+                    attr = now.next;
                 }
             }
             XmlC14NMode::XmlC14N1_1 => {
@@ -505,33 +494,33 @@ impl<T> XmlC14NCtx<'_, T> {
                 // as ordinary attributes.
 
                 // special processing for 1.1 spec
-                let mut xml_base_attr: XmlAttrPtr = null_mut();
-                let mut xml_lang_attr: XmlAttrPtr = null_mut();
-                let mut xml_space_attr: XmlAttrPtr = null_mut();
+                let mut xml_base_attr = None;
+                let mut xml_lang_attr = None;
+                let mut xml_space_attr = None;
 
                 // Add all visible attributes from current node.
                 let mut attr = cur.properties;
-                while !attr.is_null() {
+                while let Some(now) = attr {
                     // special processing for XML attribute kiks in only when we have invisible parents
-                    if !parent_visible || !xml_c14n_is_xml_attr(attr) {
+                    if !parent_visible || !xml_c14n_is_xml_attr(now) {
                         // check that attribute is visible
-                        if self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur)) {
-                            list.insert_lower_bound(attr);
+                        if self.is_visible(Some(now.into()), Some(cur.into())) {
+                            list.insert_lower_bound(now);
                         }
                     } else {
                         let mut matched: i32 = 0;
 
                         // check for simple inheritance attributes
                         if matched == 0
-                            && xml_lang_attr.is_null()
-                            && (*attr).name().as_deref() == Some("lang")
+                            && xml_lang_attr.is_none()
+                            && now.name().as_deref() == Some("lang")
                         {
                             xml_lang_attr = attr;
                             matched = 1;
                         }
                         if matched == 0
-                            && xml_space_attr.is_null()
-                            && (*attr).name().as_deref() == Some("space")
+                            && xml_space_attr.is_none()
+                            && now.name().as_deref() == Some("space")
                         {
                             xml_space_attr = attr;
                             matched = 1;
@@ -539,66 +528,64 @@ impl<T> XmlC14NCtx<'_, T> {
 
                         // check for base attr
                         if matched == 0
-                            && xml_base_attr.is_null()
-                            && (*attr).name().as_deref() == Some("base")
+                            && xml_base_attr.is_none()
+                            && now.name().as_deref() == Some("base")
                         {
                             xml_base_attr = attr;
                             matched = 1;
                         }
 
                         // otherwise, it is a normal attribute, so just check if it is visible
-                        if matched == 0
-                            && self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur))
-                        {
-                            list.insert_lower_bound(attr);
+                        if matched == 0 && self.is_visible(Some(now.into()), Some(cur.into())) {
+                            list.insert_lower_bound(now);
                         }
                     }
 
                     // move to the next one
-                    attr = (*attr).next;
+                    attr = now.next;
                 }
 
                 // special processing for XML attribute kiks in only when we have invisible parents
                 if parent_visible {
                     // simple inheritance attributes - copy
-                    if xml_lang_attr.is_null() {
+                    if xml_lang_attr.is_none() {
                         xml_lang_attr = self.find_hidden_parent_attr(
-                            (*cur).parent().map(|p| &*p.as_ptr()),
+                            cur.parent(),
                             "lang",
                             XML_XML_NAMESPACE.to_str().unwrap(),
                         );
                     }
-                    if !xml_lang_attr.is_null() {
-                        list.insert_lower_bound(xml_lang_attr);
+                    if let Some(attr) = xml_lang_attr {
+                        list.insert_lower_bound(attr);
                     }
-                    if xml_space_attr.is_null() {
+                    if xml_space_attr.is_none() {
                         xml_space_attr = self.find_hidden_parent_attr(
-                            (*cur).parent().map(|p| &*p.as_ptr()),
+                            cur.parent(),
                             "space",
                             XML_XML_NAMESPACE.to_str().unwrap(),
                         );
                     }
-                    if !xml_space_attr.is_null() {
-                        list.insert_lower_bound(xml_space_attr);
+                    if let Some(attr) = xml_space_attr {
+                        list.insert_lower_bound(attr);
                     }
 
                     // base uri attribute - fix up
-                    if xml_base_attr.is_null() {
+                    if xml_base_attr.is_none() {
                         // if we don't have base uri attribute, check if we have a "hidden" one above
                         xml_base_attr = self.find_hidden_parent_attr(
-                            (*cur).parent().map(|p| &*p.as_ptr()),
+                            cur.parent(),
                             "base",
                             XML_XML_NAMESPACE.to_str().unwrap(),
                         );
                     }
-                    if !xml_base_attr.is_null() {
-                        xml_base_attr = self.fixup_base_attr(&*xml_base_attr);
-                        if !xml_base_attr.is_null() {
-                            list.insert_lower_bound(xml_base_attr);
+                    if let Some(attr) = xml_base_attr {
+                        xml_base_attr = self.fixup_base_attr(&attr);
+                        if let Some(mut attr) = xml_base_attr {
+                            list.insert_lower_bound(attr);
 
                             // note that we MUST delete returned attr node ourselves!
-                            (*xml_base_attr).next = attrs_to_delete;
-                            attrs_to_delete = xml_base_attr;
+                            attr.next = attrs_to_delete;
+                            attrs_to_delete = Some(attr);
                         }
                     }
                 }
@@ -629,7 +616,7 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns non-negative value on success or negative value on fail
     #[doc(alias = "xmlC14NProcessElementNode")]
-    unsafe fn process_element_node(&mut self, cur: &mut XmlNode, visible: bool) -> i32 {
+    unsafe fn process_element_node(&mut self, cur: XmlNodePtr, visible: bool) -> i32 {
         let mut parent_is_doc = false;
 
         if !matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
@@ -640,7 +627,7 @@ impl<T> XmlC14NCtx<'_, T> {
         // Check relative relative namespaces:
         // implementations of XML canonicalization MUST report an operation
         // failure on documents containing relative namespace URIs.
-        if self.check_for_relative_namespaces(cur) < 0 {
+        if self.check_for_relative_namespaces(&cur) < 0 {
             xml_c14n_err_internal("checking for relative namespaces");
             return -1;
         }
@@ -658,11 +645,9 @@ impl<T> XmlC14NCtx<'_, T> {
             }
             self.buf.borrow_mut().write_str("<");
 
-            if !cur.ns.is_null() {
-                if let Some(prefix) = (*cur.ns).prefix().filter(|pre| !pre.is_empty()) {
-                    self.buf.borrow_mut().write_str(&prefix);
-                    self.buf.borrow_mut().write_str(":");
-                }
+            if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
+                self.buf.borrow_mut().write_str(&prefix);
+                self.buf.borrow_mut().write_str(":");
             }
 
             self.buf
@@ -694,7 +679,7 @@ impl<T> XmlC14NCtx<'_, T> {
             self.buf.borrow_mut().write_str(">");
         }
         if let Some(children) = (*cur).children() {
-            let ret = self.process_node_list(Some(&*children.as_ptr()));
+            let ret = self.process_node_list(Some(children));
             if ret < 0 {
                 xml_c14n_err_internal("processing childrens list");
                 return -1;
@@ -702,11 +687,9 @@ impl<T> XmlC14NCtx<'_, T> {
         }
         if visible {
             self.buf.borrow_mut().write_str("</");
-            if !cur.ns.is_null() {
-                if let Some(prefix) = (*cur.ns).prefix().filter(|pre| !pre.is_empty()) {
-                    self.buf.borrow_mut().write_str(&prefix);
-                    self.buf.borrow_mut().write_str(":");
-                }
+            if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
+                self.buf.borrow_mut().write_str(&prefix);
+                self.buf.borrow_mut().write_str(":");
             }
 
             self.buf
@@ -729,11 +712,11 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns non-negative value on success or negative value on fail
     #[doc(alias = "xmlC14NProcessNodeList")]
-    unsafe fn process_node_list(&mut self, mut cur: Option<&dyn NodeCommon>) -> i32 {
+    unsafe fn process_node_list(&mut self, mut cur: Option<XmlGenericNodePtr>) -> i32 {
         let mut ret = 0;
         while let Some(now) = cur {
             ret = self.process_node(now);
-            cur = now.next().map(|n| &*n.as_ptr() as _);
+            cur = now.next();
             if ret < 0 {
                 break;
             }
@@ -745,14 +728,14 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns non-negative value on success or negative value on fail
     #[doc(alias = "xmlC14NProcessNode")]
-    unsafe fn process_node(&mut self, cur: &dyn NodeCommon) -> i32 {
+    unsafe fn process_node(&mut self, cur: XmlGenericNodePtr) -> i32 {
         let mut ret: i32 = 0;
 
-        let visible = self.is_visible(Some(cur), (*cur).parent().map(|p| &*p.as_ptr() as _));
+        let visible = self.is_visible(Some(cur), cur.parent());
         match (*cur).element_type() {
             XmlElementType::XmlElementNode => {
-                let mut cur = cur.as_node().unwrap();
-                ret = self.process_element_node(cur.as_mut(), visible);
+                let cur = XmlNodePtr::try_from(cur).unwrap();
+                ret = self.process_element_node(cur, visible);
             }
             XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
                 // Text Nodes
@@ -761,11 +744,11 @@ impl<T> XmlC14NCtx<'_, T> {
                 // angle brackets (>) are replaced by &gt;, and all #xD characters are
                 // replaced by &#xD;.
 
-                let cur = cur.as_node().unwrap();
+                let cur = XmlNodePtr::try_from(cur).unwrap();
                 // cdata sections are processed as text nodes
                 // todo: verify that cdata sections are included in XPath nodes set
-                if visible && !cur.as_ref().content.is_null() {
-                    let buffer: *mut XmlChar = xml_c11n_normalize_text(cur.as_ref().content);
+                if visible && !cur.content.is_null() {
+                    let buffer: *mut XmlChar = xml_c11n_normalize_text(cur.content);
                     if !buffer.is_null() {
                         self.buf
                             .borrow_mut()
@@ -796,12 +779,12 @@ impl<T> XmlC14NCtx<'_, T> {
                     }
 
                     self.buf.borrow_mut().write_str(&(*cur).name().unwrap());
-                    let cur = cur.as_node().unwrap();
-                    if !cur.as_ref().content.is_null() && *cur.as_ref().content != b'\0' {
+                    let cur = XmlNodePtr::try_from(cur).unwrap();
+                    if !cur.content.is_null() && *cur.content != b'\0' {
                         self.buf.borrow_mut().write_str(" ");
 
                         /* todo: do we need to normalize pi? */
-                        let buffer: *mut XmlChar = xml_c11n_normalize_pi(cur.as_ref().content);
+                        let buffer: *mut XmlChar = xml_c11n_normalize_pi(cur.content);
                         if !buffer.is_null() {
                             self.buf
                                 .borrow_mut()
@@ -821,21 +804,19 @@ impl<T> XmlC14NCtx<'_, T> {
                 }
             }
             XmlElementType::XmlCommentNode => {
-                /*
-                 * Comment Nodes
-                 * Nothing if generating canonical XML without  comments. For
-                 * canonical XML with comments, generate the opening comment
-                 * symbol (<!--), the string value of the node, and the
-                 * closing comment symbol (-->). Also, a trailing #xA is rendered
-                 * after the closing comment symbol for comment children of the
-                 * root node with a lesser document order than the document
-                 * element, and a leading #xA is rendered before the opening
-                 * comment symbol of comment children of the root node with a
-                 * greater document order than the document element. (Comment
-                 * children of the root node represent comments outside of the
-                 * top-level document element and outside of the document type
-                 * declaration).
-                 */
+                // Comment Nodes
+                // Nothing if generating canonical XML without  comments. For
+                // canonical XML with comments, generate the opening comment
+                // symbol (<!--), the string value of the node, and the
+                // closing comment symbol (-->). Also, a trailing #xA is rendered
+                // after the closing comment symbol for comment children of the
+                // root node with a lesser document order than the document
+                // element, and a leading #xA is rendered before the opening
+                // comment symbol of comment children of the root node with a
+                // greater document order than the document element. (Comment
+                // children of the root node represent comments outside of the
+                // top-level document element and outside of the document type
+                // declaration).
                 if visible && self.with_comments {
                     if matches!(self.pos, XmlC14NPosition::XmlC14NAfterDocumentElement) {
                         self.buf.borrow_mut().write_str("\x0A<!--");
@@ -843,10 +824,10 @@ impl<T> XmlC14NCtx<'_, T> {
                         self.buf.borrow_mut().write_str("<!--");
                     }
 
-                    let cur = cur.as_node().unwrap();
-                    if !cur.as_ref().content.is_null() {
+                    let cur = XmlNodePtr::try_from(cur).unwrap();
+                    if !cur.content.is_null() {
                         /* todo: do we need to normalize comment? */
-                        let buffer: *mut XmlChar = xml_c11n_normalize_comment(cur.as_ref().content);
+                        let buffer: *mut XmlChar = xml_c11n_normalize_comment(cur.content);
                         if !buffer.is_null() {
                             self.buf
                                 .borrow_mut()
@@ -870,7 +851,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 if let Some(children) = (*cur).children() {
                     self.pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
                     self.parent_is_doc = true;
-                    ret = self.process_node_list(Some(&*children.as_ptr()));
+                    ret = self.process_node_list(Some(children));
                 }
             }
             #[cfg(feature = "html")]
@@ -879,7 +860,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 if let Some(children) = (*cur).children() {
                     self.pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
                     self.parent_is_doc = true;
-                    ret = self.process_node_list(Some(&*children.as_ptr()));
+                    ret = self.process_node_list(Some(children));
                 }
             }
 
@@ -945,8 +926,11 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns 0 on success or -1 on fail.
     #[doc(alias = "xmlExcC14NProcessNamespacesAxis")]
-    unsafe fn exc_c14n_process_namespaces_axis(&mut self, cur: &mut XmlNode, visible: bool) -> i32 {
-        let mut ns: XmlNsPtr;
+    unsafe fn exc_c14n_process_namespaces_axis(
+        &mut self,
+        mut cur: XmlNodePtr,
+        visible: bool,
+    ) -> i32 {
         let mut has_empty_ns = false;
         let mut has_visibly_utilized_empty_ns = false;
         let mut has_empty_ns_in_inclusive_list = false;
@@ -984,15 +968,15 @@ impl<T> XmlC14NCtx<'_, T> {
                     Some(prefix.as_str())
                 };
 
-                ns = cur.search_ns(cur.doc, prefix);
-                if !ns.is_null()
-                    && !xml_c14n_is_xml_ns(ns)
-                    && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
-                {
+                let cur_doc = cur.doc;
+                let ns = cur.search_ns(cur_doc, prefix);
+                if let Some(ns) = ns.filter(|&ns| {
+                    !xml_c14n_is_xml_ns(ns) && self.is_visible(Some(ns.into()), Some(cur.into()))
+                }) {
                     let already_rendered = (*self.ns_rendered).find(Some(&*ns));
                     if visible {
                         // TODO: replace `cur` to `Rc<XmlNode>`
-                        (*self.ns_rendered).add(ns, cur as *const XmlNode as _);
+                        (*self.ns_rendered).add(ns, cur);
                     }
                     if !already_rendered {
                         list.insert_lower_bound(ns);
@@ -1005,22 +989,23 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // add node namespace
-        if !cur.ns.is_null() {
-            ns = cur.ns;
+        let ns = if cur.ns.is_some() {
+            cur.ns
         } else {
-            ns = cur.search_ns(cur.doc, None);
+            let cur_doc = cur.doc;
             has_visibly_utilized_empty_ns = true;
-        }
-        if !ns.is_null() && !xml_c14n_is_xml_ns(ns) {
+            cur.search_ns(cur_doc, None)
+        };
+        if let Some(ns) = ns.filter(|&ns| !xml_c14n_is_xml_ns(ns)) {
             if visible
-                && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
+                && self.is_visible(Some(ns.into()), Some(cur.into()))
                 && self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*ns)) == 0
             {
                 list.insert_lower_bound(ns);
             }
             if visible {
                 // TODO: replace `cur` to `Rc<XmlNode>`
-                (*self.ns_rendered).add(ns, cur as *const XmlNode as _);
+                (*self.ns_rendered).add(ns, cur);
             }
             if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                 has_empty_ns = true;
@@ -1029,31 +1014,29 @@ impl<T> XmlC14NCtx<'_, T> {
 
         // add attributes
         let mut attr = cur.properties;
-        while !attr.is_null() {
+        while let Some(cur_attr) = attr {
             // we need to check that attribute is visible and has non
             // default namespace (XML Namespaces: "default namespaces
             // do not apply directly to attributes")
-            if !(*attr).ns.is_null()
-                && !xml_c14n_is_xml_ns((*attr).ns)
-                && self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur))
-            {
+            if let Some(attr_ns) = cur_attr.ns.filter(|&ns| {
+                !xml_c14n_is_xml_ns(ns) && self.is_visible(Some(cur_attr.into()), Some(cur.into()))
+            }) {
                 let already_rendered =
-                    self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*(*attr).ns));
+                    self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*attr_ns));
                 // TODO: replace `cur` to `Rc<XmlNode>`
-                (*self.ns_rendered).add((*attr).ns, cur as *const XmlNode as _);
+                (*self.ns_rendered).add(attr_ns, cur);
                 if already_rendered == 0 && visible {
-                    list.insert_lower_bound((*attr).ns);
+                    list.insert_lower_bound(attr_ns);
                 }
-                if (*(*attr).ns).prefix().map_or(0, |pre| pre.len()) == 0 {
+                if attr_ns.prefix().map_or(0, |pre| pre.len()) == 0 {
                     has_empty_ns = true;
                 }
-            } else if !(*attr).ns.is_null()
-                && (*(*attr).ns).prefix().map_or(0, |pre| pre.len()) == 0
-                && xml_strlen((*(*attr).ns).href) == 0
-            {
+            } else if cur_attr.ns.map_or(false, |ns| {
+                ns.prefix().map_or(0, |pre| pre.len()) == 0 && xml_strlen(ns.href) == 0
+            }) {
                 has_visibly_utilized_empty_ns = true;
             }
-            attr = (*attr).next;
+            attr = cur_attr.next;
         }
 
         // Process xmlns=""
@@ -1076,7 +1059,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        list.walk(|data| self.print_namespaces(&**data) != 0);
+        list.walk(|data| self.print_namespaces(data) != 0);
 
         // Cleanup
         0
@@ -1105,27 +1088,10 @@ impl<T> XmlC14NCtx<'_, T> {
             (xml_c14n_str_equal(prefix, null_mut()) && xml_c14n_str_equal(href, null_mut())) as _;
 
         for (i, &ns1) in cur.ns_tab[..cur.ns_cur_end].iter().enumerate().rev() {
-            if xml_c14n_str_equal(
-                prefix,
-                if !ns1.is_null() {
-                    (*ns1).prefix
-                } else {
-                    null_mut()
-                },
-            ) {
-                if xml_c14n_str_equal(
-                    href,
-                    if !ns1.is_null() {
-                        (*ns1).href
-                    } else {
-                        null_mut()
-                    },
-                ) {
+            if xml_c14n_str_equal(prefix, ns1.prefix) {
+                if xml_c14n_str_equal(href, ns1.href) {
                     let node = cur.node_tab[i];
-                    return self.is_visible(
-                        (!ns1.is_null()).then(|| &*ns1 as _),
-                        (!node.is_null()).then(|| &*node as _),
-                    ) as i32;
+                    return self.is_visible(Some(ns1.into()), Some(node.into())) as i32;
                 } else {
                     return 0;
                 }
@@ -1140,104 +1106,101 @@ impl<T> XmlC14NCtx<'_, T> {
     #[doc(alias = "xmlC14NFindHiddenParentAttr")]
     unsafe fn find_hidden_parent_attr(
         &self,
-        mut cur: Option<&XmlNode>,
+        mut cur: Option<XmlGenericNodePtr>,
         name: &str,
         ns: &str,
-    ) -> XmlAttrPtr {
-        let mut res: XmlAttrPtr;
-        while let Some(now) =
-            cur.filter(|&now| !self.is_visible(Some(now), now.parent().map(|p| &*p.as_ptr() as _)))
-        {
-            res = now.has_ns_prop(name, Some(ns));
-            if !res.is_null() {
-                return res;
+    ) -> Option<XmlAttrPtr> {
+        while let Some(now) = cur.filter(|&now| !self.is_visible(Some(now), now.parent())) {
+            if let Ok(now) = XmlNodePtr::try_from(now) {
+                if let Some(res) = now.has_ns_prop(name, Some(ns)) {
+                    // Is this `unwrap` OK ????
+                    return Some(res.unwrap());
+                }
             }
 
-            cur = now.parent().map(|p| &*p.as_ptr());
+            cur = now.parent();
         }
 
-        null_mut()
+        None
     }
 
     /// Fixes up the xml:base attribute
     ///
     /// Returns the newly created attribute or NULL
     #[doc(alias = "xmlC14NFixupBaseAttr")]
-    unsafe fn fixup_base_attr(&mut self, xml_base_attr: &XmlAttr) -> XmlAttrPtr {
-        let mut cur: XmlNodePtr;
-        let mut attr: XmlAttrPtr;
-
+    unsafe fn fixup_base_attr(&mut self, xml_base_attr: &XmlAttr) -> Option<XmlAttrPtr> {
         let Some(parent) = xml_base_attr.parent() else {
             xml_c14n_err_param("processing xml:base attribute");
-            return null_mut();
+            return None;
         };
 
         // start from current value
         let Some(mut res) = xml_base_attr
             .children()
-            .and_then(|c| c.get_string(self.doc, 1))
+            .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1))
         else {
             xml_c14n_err_internal("processing xml:base attribute - can't get attr value");
-            return null_mut();
+            return None;
         };
 
         // go up the stack until we find a node that we rendered already
-        cur = parent.parent().map_or(null_mut(), |p| p.as_ptr());
-        while !cur.is_null()
-            && !self.is_visible(
-                (!cur.is_null()).then(|| &*cur as _),
-                (*cur).parent().map(|p| &*p.as_ptr() as _),
-            )
-        {
-            attr = (*cur).has_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
-            if !attr.is_null() {
-                /* get attr value */
-                let Some(mut tmp_str) = (*attr).children.and_then(|c| c.get_string(self.doc, 1))
-                else {
-                    xml_c14n_err_internal("processing xml:base attribute - can't get attr value");
-                    return null_mut();
-                };
+        let mut cur = parent.parent();
+        while let Some(cur_node) = cur.filter(|&cur| !self.is_visible(Some(cur), cur.parent())) {
+            if let Ok(cur) = XmlNodePtr::try_from(cur_node) {
+                if let Some(attr) = cur.has_ns_prop("base", XML_XML_NAMESPACE.to_str().ok()) {
+                    // get attr value
+                    let Some(mut tmp_str) = (match attr {
+                        Ok(attr) => attr
+                            .children()
+                            .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1)),
+                        Err(attr) => attr
+                            .children()
+                            .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1)),
+                    }) else {
+                        xml_c14n_err_internal(
+                            "processing xml:base attribute - can't get attr value",
+                        );
+                        return None;
+                    };
 
-                // we need to add '/' if our current base uri ends with '..' or '.'
-                // to ensure that we are forced to go "up" all the time
-                let tmp_str_len = tmp_str.len();
-                if tmp_str_len > 1 && tmp_str.as_bytes()[tmp_str_len - 2] == b'.' {
-                    tmp_str.push('/');
+                    // we need to add '/' if our current base uri ends with '..' or '.'
+                    // to ensure that we are forced to go "up" all the time
+                    let tmp_str_len = tmp_str.len();
+                    if tmp_str_len > 1 && tmp_str.as_bytes()[tmp_str_len - 2] == b'.' {
+                        tmp_str.push('/');
+                    }
+
+                    // build uri
+                    let Some(tmp_str2) = build_uri(&res, &tmp_str) else {
+                        xml_c14n_err_internal(
+                            "processing xml:base attribute - can't construct uri",
+                        );
+                        return None;
+                    };
+
+                    res = tmp_str2;
                 }
-
-                // build uri
-                let Some(tmp_str2) = build_uri(&res, &tmp_str) else {
-                    xml_c14n_err_internal("processing xml:base attribute - can't construct uri");
-                    return null_mut();
-                };
-
-                res = tmp_str2;
             }
 
             // next
-            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+            cur = cur_node.parent();
         }
 
         // check if result uri is empty or not
         if res.is_empty() {
-            return null_mut();
+            return None;
         }
 
         // create and return the new attribute node
         let res = CString::new(res).unwrap();
-        attr = xml_new_ns_prop(
-            null_mut(),
-            xml_base_attr.ns,
-            "base",
-            res.as_ptr() as *const u8,
-        );
-        if attr.is_null() {
+        let Some(attr) = xml_new_ns_prop(None, xml_base_attr.ns, "base", res.as_ptr() as *const u8)
+        else {
             xml_c14n_err_internal("processing xml:base attribute - can't construct attribute");
-            return null_mut();
-        }
+            return None;
+        };
 
         // done
-        attr
+        Some(attr)
     }
 
     /// Prints out canonical attribute urrent node to the
@@ -1250,24 +1213,25 @@ impl<T> XmlC14NCtx<'_, T> {
     unsafe fn print_attrs(&mut self, attr: XmlAttrPtr) -> bool {
         let buffer: *mut XmlChar;
 
-        if attr.is_null() {
-            xml_c14n_err_param("writing attributes");
-            return false;
-        }
-
         self.buf.borrow_mut().write_str(" ");
-        if !(*attr).ns.is_null() {
-            if let Some(prefix) = (*(*attr).ns).prefix().filter(|pre| !pre.is_empty()) {
-                self.buf.borrow_mut().write_str(&prefix);
-                self.buf.borrow_mut().write_str(":");
-            }
+        if let Some(prefix) = attr
+            .ns
+            .as_deref()
+            .and_then(|ns| ns.prefix())
+            .filter(|p| !p.is_empty())
+        {
+            self.buf.borrow_mut().write_str(&prefix);
+            self.buf.borrow_mut().write_str(":");
         }
 
-        self.buf.borrow_mut().write_str(&(*attr).name().unwrap());
+        self.buf.borrow_mut().write_str(&attr.name().unwrap());
         self.buf.borrow_mut().write_str("=\"");
 
         // todo: should we log an error if value==NULL ?
-        if let Some(value) = (*attr).children().and_then(|c| c.get_string(self.doc, 1)) {
+        if let Some(value) = attr
+            .children()
+            .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1))
+        {
             let value = CString::new(value).unwrap();
             buffer = xml_c11n_normalize_attr(value.as_ptr() as *const u8);
             if !buffer.is_null() {
@@ -1296,25 +1260,30 @@ pub enum XmlC14NNormalizationMode {
 
 unsafe fn xml_c14n_is_node_in_nodeset(
     nodes: &Option<&mut XmlNodeSet>,
-    node: Option<&dyn NodeCommon>,
-    parent: Option<&dyn NodeCommon>,
+    node: Option<XmlGenericNodePtr>,
+    parent: Option<XmlGenericNodePtr>,
 ) -> i32 {
     if let (Some(nodes), Some(node)) = (nodes, node) {
-        if let Some(node) = node.as_namespace_decl_node() {
-            let mut ns = XmlNs { ..*node.as_ref() };
+        if let Ok(node) = XmlNsPtr::try_from(node) {
+            let mut ns = XmlNs { ..*node };
+            ns.node = ns.next.map(|ns| ns.into());
 
             // this is a libxml hack! check xpath.c for details
             if let Some(parent) =
                 parent.filter(|p| p.element_type() == XmlElementType::XmlAttributeNode)
             {
-                ns.next = parent.parent().map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
+                ns.node = parent.parent();
+                // ns.next = parent.parent().map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
             } else if let Some(parent) = parent {
-                ns.next = parent as *const dyn NodeCommon as *mut XmlNs;
+                ns.node = Some(parent);
+                // ns.next = parent.as_ptr() as *mut XmlNs;
             }
 
             // If the input is an XPath node-set, then the node-set must explicitly
             // contain every node to be rendered to the canonical form.
-            return nodes.contains(Some(&ns)) as i32;
+            return nodes.contains(Some(
+                XmlNsPtr::from_raw(&raw mut ns).unwrap().unwrap().into(),
+            )) as i32;
         } else {
             return nodes.contains(Some(node)) as i32;
         }
@@ -1355,7 +1324,7 @@ unsafe fn xml_c14n_err_param(extra: &str) {
         None,
         None,
         null_mut(),
-        null_mut(),
+        None,
         XmlErrorDomain::XmlFromC14N,
         XmlParserErrors::XmlErrInternalError,
         XmlErrorLevel::XmlErrError,
@@ -1379,7 +1348,7 @@ unsafe fn xml_c14n_err_memory(extra: &str) {
         None,
         None,
         null_mut(),
-        null_mut(),
+        None,
         XmlErrorDomain::XmlFromC14N,
         XmlParserErrors::XmlErrNoMemory,
         XmlErrorLevel::XmlErrError,
@@ -1403,7 +1372,7 @@ unsafe fn xml_c14n_err_internal(extra: &str) {
         None,
         None,
         null_mut(),
-        null_mut(),
+        None,
         XmlErrorDomain::XmlFromC14N,
         XmlParserErrors::XmlErrInternalError,
         XmlErrorLevel::XmlErrError,
@@ -1535,7 +1504,7 @@ pub unsafe fn xml_c14n_doc_save(
 #[doc(alias = "xmlC14NErr")]
 unsafe fn xml_c14n_err<T>(
     ctxt: XmlC14NCtxPtr<'_, T>,
-    node: XmlNodePtr,
+    node: Option<XmlGenericNodePtr>,
     error: XmlParserErrors,
     msg: &str,
 ) {
@@ -1547,7 +1516,7 @@ unsafe fn xml_c14n_err<T>(
         None,
         None,
         ctxt as _,
-        node as _,
+        node,
         XmlErrorDomain::XmlFromC14N,
         error,
         XmlErrorLevel::XmlErrError,
@@ -1600,7 +1569,7 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
     if buf.borrow().encoder.is_some() {
         xml_c14n_err::<T>(
             null_mut(),
-            doc as *mut XmlDoc as _,
+            Some(XmlDocPtr::from_raw(doc).unwrap().unwrap().into()),
             XmlParserErrors::XmlC14NRequiresUtf8,
             "xmlC14NNewCtx: output buffer encoder != NULL but C14N requires UTF8 output\n",
         );
@@ -1638,7 +1607,7 @@ unsafe fn xml_c14n_err_relative_namespace(ns_uri: &str) {
         None,
         None,
         null_mut(),
-        null_mut(),
+        None,
         XmlErrorDomain::XmlFromC14N,
         XmlParserErrors::XmlC14NRelativeNamespace,
         XmlErrorLevel::XmlErrError,
@@ -1662,14 +1631,14 @@ unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> i32 {
     if ns1 == ns2 {
         return 0;
     }
-    if ns1.is_null() {
-        return -1;
-    }
-    if ns2.is_null() {
-        return 1;
-    }
+    // if ns1.is_null() {
+    //     return -1;
+    // }
+    // if ns2.is_null() {
+    //     return 1;
+    // }
 
-    xml_strcmp((*ns1).prefix, (*ns2).prefix)
+    xml_strcmp(ns1.prefix, ns2.prefix)
 }
 
 /// Check whether `ns` is a default 'xml:' namespace with `href="http://www.w3.org/XML/1998/namespace"`.  
@@ -1679,9 +1648,8 @@ unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> i32 {
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlNs")]
 unsafe fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
-    !ns.is_null()
-        && xml_str_equal((*ns).prefix as _, c"xml".as_ptr() as _)
-        && xml_str_equal((*ns).href as _, XML_XML_NAMESPACE.as_ptr() as _)
+    ns.prefix().as_deref() == Some("xml")
+        && ns.href().as_deref() == Some(XML_XML_NAMESPACE.to_str().unwrap())
 }
 
 #[doc(alias = "xmlC14NStrEqual")]
@@ -1717,36 +1685,36 @@ unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> i32 {
     if attr1 == attr2 {
         return 0;
     }
-    if attr1.is_null() {
-        return -1;
-    }
-    if attr2.is_null() {
-        return 1;
-    }
+    // if attr1.is_null() {
+    //     return -1;
+    // }
+    // if attr2.is_null() {
+    //     return 1;
+    // }
 
-    if (*attr1).ns == (*attr2).ns {
-        return xml_strcmp((*attr1).name, (*attr2).name);
+    if attr1.ns == attr2.ns {
+        return xml_strcmp(attr1.name, attr2.name);
     }
 
     // Attributes in the default namespace are first
     // because the default namespace is not applied to
     // unqualified attributes
-    if (*attr1).ns.is_null() {
+    let Some(attr1_ns) = attr1.ns else {
         return -1;
-    }
-    if (*attr2).ns.is_null() {
+    };
+    let Some(attr2_ns) = attr2.ns else {
         return 1;
-    }
-    if (*(*attr1).ns).prefix().is_none() {
+    };
+    if attr1_ns.prefix().is_none() {
         return -1;
     }
-    if (*(*attr2).ns).prefix().is_none() {
+    if attr2_ns.prefix().is_none() {
         return 1;
     }
 
-    let mut ret: i32 = xml_strcmp((*(*attr1).ns).href, (*(*attr2).ns).href);
+    let mut ret: i32 = xml_strcmp(attr1_ns.href, attr2_ns.href);
     if ret == 0 {
-        ret = xml_strcmp((*attr1).name, (*attr2).name);
+        ret = xml_strcmp(attr1.name, attr2.name);
     }
     ret
 }
@@ -1756,7 +1724,8 @@ unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> i32 {
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlAttr")]
 unsafe fn xml_c14n_is_xml_attr(attr: XmlAttrPtr) -> bool {
-    !(*attr).ns.is_null() && xml_c14n_is_xml_ns((*attr).ns)
+    let ns = attr.ns;
+    ns.map_or(false, |ns| xml_c14n_is_xml_ns(ns))
 }
 
 // Macro used to grow the current buffer.
@@ -1939,7 +1908,7 @@ unsafe fn xml_c14n_err_invalid_node(node_type: &str, extra: &str) {
         None,
         None,
         null_mut(),
-        null_mut(),
+        None,
         XmlErrorDomain::XmlFromC14N,
         XmlParserErrors::XmlC14NInvalidNode,
         XmlErrorLevel::XmlErrError,
@@ -1964,7 +1933,7 @@ unsafe fn xml_c14n_err_unknown_node(node_type: i32, extra: &str) {
         None,
         None,
         null_mut(),
-        null_mut(),
+        None,
         XmlErrorDomain::XmlFromC14N,
         XmlParserErrors::XmlC14NUnknowNode,
         XmlErrorLevel::XmlErrError,
@@ -2002,7 +1971,7 @@ pub unsafe fn xml_c14n_execute<'a, T>(
     if buf.borrow().encoder.is_some() {
         xml_c14n_err::<T>(
             null_mut(),
-            doc as *mut XmlDoc as XmlNodePtr,
+            Some(XmlDocPtr::from_raw(doc).unwrap().unwrap().into()),
             XmlParserErrors::XmlC14NRequiresUtf8,
             "xmlC14NExecute: output buffer encoder != NULL but C14N requires UTF8 output\n",
         );
@@ -2030,7 +1999,7 @@ pub unsafe fn xml_c14n_execute<'a, T>(
     // XML declaration, nor anything from within the document type
     // declaration.
     if let Some(children) = children {
-        ret = ctx.process_node_list(Some(&*children.as_ptr()));
+        ret = ctx.process_node_list(Some(children));
         if ret < 0 {
             xml_c14n_err_internal("processing docs children list");
             return -1;

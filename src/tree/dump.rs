@@ -38,10 +38,10 @@ use crate::{
         xhtml_node_dump_output, xml_node_dump_output_internal, xml_save_err, xml_save_err_memory,
         XmlSaveCtxt, XmlSaveOption,
     },
-    tree::is_xhtml,
+    tree::{is_xhtml, XmlNodePtr},
 };
 
-use super::{XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr};
+use super::{XmlDoc, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode};
 
 impl XmlDoc {
     /// Dump the current DOM tree into memory using the character encoding specified by the caller.  
@@ -83,7 +83,7 @@ impl XmlDoc {
             let Some(handler) = find_encoding_handler(encoding) else {
                 xml_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding,
-                    self as *mut XmlDoc as XmlNodePtr,
+                    XmlGenericNodePtr::from_raw(self),
                     Some(encoding),
                 );
                 return;
@@ -105,7 +105,7 @@ impl XmlDoc {
         ctxt.encoding = encoding;
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(self);
+        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
         out_buff.borrow_mut().flush();
         if let Some(conv) = out_buff.borrow().conv {
             *doc_txt_len = conv.len() as i32;
@@ -210,7 +210,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(self);
+        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
 
         let buf = ctxt.buf.clone();
         drop(ctxt);
@@ -279,7 +279,7 @@ impl XmlDoc {
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
 
-        ctxt.doc_content_dump_output(self);
+        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
 
         let buf = ctxt.buf.clone();
         drop(ctxt);
@@ -353,7 +353,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(self);
+        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
         let buf = ctxt.buf.clone();
         drop(ctxt);
         let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
@@ -388,7 +388,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(self);
+        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
         let buf = ctxt.buf.clone();
         drop(ctxt);
         let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
@@ -410,7 +410,7 @@ impl XmlNode {
     pub unsafe fn dump_output(
         &mut self,
         buf: Rc<RefCell<XmlOutputBuffer>>,
-        doc: XmlDocPtr,
+        doc: Option<XmlDocPtr>,
         level: i32,
         format: i32,
         mut encoding: Option<&str>,
@@ -436,19 +436,21 @@ impl XmlNode {
         #[cfg(feature = "html")]
         {
             let mut is_html = false;
-            let dtd = if doc.is_null() {
-                null_mut()
-            } else {
-                (*doc).get_int_subset()
-            };
-            if !dtd.is_null() {
-                is_html = is_xhtml((*dtd).system_id.as_deref(), (*dtd).external_id.as_deref());
+            let dtd = doc.and_then(|doc| doc.get_int_subset());
+            if let Some(dtd) = dtd {
+                is_html = is_xhtml(dtd.system_id.as_deref(), dtd.external_id.as_deref());
             }
 
             if is_html {
-                xhtml_node_dump_output(&mut ctxt, self);
+                xhtml_node_dump_output(
+                    &mut ctxt,
+                    XmlNodePtr::from_raw(self).unwrap().unwrap().into(),
+                );
             } else {
-                xml_node_dump_output_internal(&mut ctxt as _, self);
+                xml_node_dump_output_internal(
+                    &mut ctxt as _,
+                    XmlNodePtr::from_raw(self).unwrap().unwrap().into(),
+                );
             }
         }
         #[cfg(not(feature = "html"))]
@@ -460,23 +462,29 @@ impl XmlNode {
 
     /// Dump an XML/HTML node, recursive behaviour, children are printed too.
     #[doc(alias = "xmlElemDump")]
-    pub unsafe fn dump_file<'a>(&mut self, f: &mut (impl Write + 'a), doc: XmlDocPtr) {
+    pub unsafe fn dump_file<'a>(&mut self, f: &mut (impl Write + 'a), doc: Option<XmlDocPtr>) {
         xml_init_parser();
 
         let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
             return;
         };
-        if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
+        if let Some(doc) = doc.filter(|doc| matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode))
+        {
             #[cfg(feature = "html")]
             {
-                html_node_dump_output(&mut outbuf, doc, self, null_mut());
+                html_node_dump_output(
+                    &mut outbuf,
+                    Some(doc),
+                    XmlGenericNodePtr::from_raw(self).unwrap(),
+                    null_mut(),
+                );
             }
             #[cfg(not(feature = "html"))]
             {
-                xmlSaveErr(
+                xml_save_err(
                     XmlParserErrors::XmlErrInternalError,
                     cur,
-                    c"HTML support not compiled in\n".as_ptr() as _,
+                    "HTML support not compiled in\n",
                 );
             }
             outbuf.flush();
@@ -496,7 +504,116 @@ impl XmlNode {
     pub unsafe fn dump_memory(
         &mut self,
         buf: &mut Vec<u8>,
-        doc: XmlDocPtr,
+        doc: Option<XmlDocPtr>,
+        level: i32,
+        format: i32,
+    ) -> usize {
+        xml_init_parser();
+
+        let Some(outbuf) = XmlOutputBuffer::from_writer(&mut *buf, None) else {
+            return usize::MAX;
+        };
+
+        let outbuf = Rc::new(RefCell::new(outbuf));
+        self.dump_output(outbuf.clone(), doc, level, format, None);
+        drop(outbuf);
+        buf.len()
+    }
+}
+
+impl XmlGenericNodePtr {
+    /// Dump an XML node, recursive behaviour, children are printed too.  
+    ///
+    /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
+    /// or `xmlKeepBlanksDefault(0)` was called.
+    #[doc(alias = "xmlNodeDumpOutput")]
+    pub unsafe fn dump_output(
+        self,
+        buf: Rc<RefCell<XmlOutputBuffer>>,
+        doc: Option<XmlDocPtr>,
+        level: i32,
+        format: i32,
+        mut encoding: Option<&str>,
+    ) {
+        xml_init_parser();
+
+        if encoding.is_none() {
+            encoding = Some("UTF-8");
+        }
+
+        let mut ctxt = XmlSaveCtxt {
+            buf,
+            level,
+            format: (format != 0) as i32,
+            encoding: encoding.map(|e| e.to_owned()),
+            handler: None,
+            filename: None,
+            ..Default::default()
+        };
+        ctxt.init();
+        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
+
+        #[cfg(feature = "html")]
+        {
+            let mut is_html = false;
+            let dtd = doc.and_then(|doc| doc.get_int_subset());
+            if let Some(dtd) = dtd {
+                is_html = is_xhtml(dtd.system_id.as_deref(), dtd.external_id.as_deref());
+            }
+
+            if is_html {
+                xhtml_node_dump_output(&mut ctxt, self);
+            } else {
+                xml_node_dump_output_internal(&mut ctxt as _, self);
+            }
+        }
+        #[cfg(not(feature = "html"))]
+        {
+            xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
+        }
+        ctxt.buf.borrow_mut().flush();
+    }
+
+    /// Dump an XML/HTML node, recursive behaviour, children are printed too.
+    #[doc(alias = "xmlElemDump")]
+    pub unsafe fn dump_file<'a>(self, f: &mut (impl Write + 'a), doc: Option<XmlDocPtr>) {
+        xml_init_parser();
+
+        let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
+            return;
+        };
+        if let Some(doc) = doc.filter(|doc| matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode))
+        {
+            #[cfg(feature = "html")]
+            {
+                html_node_dump_output(&mut outbuf, Some(doc), self, null_mut());
+            }
+            #[cfg(not(feature = "html"))]
+            {
+                xml_save_err(
+                    XmlParserErrors::XmlErrInternalError,
+                    cur,
+                    "HTML support not compiled in\n",
+                );
+            }
+            outbuf.flush();
+        } else {
+            self.dump_output(Rc::new(RefCell::new(outbuf)), doc, 0, 1, None);
+        }
+    }
+
+    /// Dump an XML node, recursive behaviour,children are printed too.
+    ///
+    /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
+    /// or `xmlKeepBlanksDefault(0)` was called.
+    ///
+    /// Returns the number of bytes written to the buffer, in case of error 0
+    /// is returned or `buf` stores the error.
+    #[doc(alias = "xmlBufNodeDump")]
+    pub unsafe fn dump_memory(
+        self,
+        buf: &mut Vec<u8>,
+        doc: Option<XmlDocPtr>,
         level: i32,
         format: i32,
     ) -> usize {

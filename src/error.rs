@@ -25,7 +25,7 @@ use std::{
 use crate::{
     globals::{GenericError, GenericErrorContext, GLOBAL_STATE},
     parser::{XmlParserCtxtPtr, XmlParserInputPtr},
-    tree::{NodeCommon, XmlElementType, XmlNode, XmlNodePtr},
+    tree::{XmlElementType, XmlGenericNodePtr, XmlNodePtr},
 };
 
 macro_rules! impl_xml_parser_errors {
@@ -861,7 +861,7 @@ pub enum XmlErrorDomain {
     XmlFromURI,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct XmlError {
     pub(crate) domain: XmlErrorDomain,
     pub(crate) code: XmlParserErrors,
@@ -875,7 +875,7 @@ pub struct XmlError {
     pub(crate) int1: i32,
     pub(crate) int2: i32,
     pub(crate) ctxt: Option<NonNull<c_void>>,
-    pub(crate) node: Option<NonNull<XmlNode>>,
+    pub(crate) node: Option<XmlGenericNodePtr>,
 }
 
 impl XmlError {
@@ -917,7 +917,7 @@ impl XmlError {
         self.level
     }
 
-    pub fn node(&self) -> Option<NonNull<XmlNode>> {
+    pub fn node(&self) -> Option<XmlGenericNodePtr> {
         self.node
     }
 
@@ -1091,14 +1091,17 @@ pub unsafe fn report_error(
     let code = err.code;
     let domain = err.domain;
     let level = err.level;
-    let node: XmlNodePtr = err.node.map_or(null_mut(), |n| n.as_ptr()) as _;
+    let node = err.node;
 
     if code.is_ok() {
         return;
     }
 
-    if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-        name = (*node).name;
+    if let Some(node) = node
+        .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        .map(|node| XmlNodePtr::try_from(node).unwrap())
+    {
+        name = node.name;
     }
 
     // Maintain the compatibility with the legacy error handling
@@ -1433,13 +1436,13 @@ macro_rules! __xml_raise_error {
             },
             libxml::parser::XML_SAX2_MAGIC,
             parser::{XmlParserCtxtPtr, XmlParserInputPtr},
-            tree::{NodeCommon, XmlElementType, XmlNodePtr},
+            tree::{XmlElementType, XmlGenericNodePtr, XmlNodePtr},
         };
         (|mut schannel: Option<StructuredError>,
             mut channel: Option<GenericError>,
             mut data: Option<GenericErrorContext>,
             ctx: *mut c_void,
-            nod: *mut c_void,
+            nod: Option<XmlGenericNodePtr>,
             domain: XmlErrorDomain,
             code: XmlParserErrors,
             level: XmlErrorLevel,
@@ -1453,10 +1456,10 @@ macro_rules! __xml_raise_error {
             msg: &str| {
                 let mut ctxt: XmlParserCtxtPtr = null_mut();
                 let Some((channel, error, s, data)) = GLOBAL_STATE.with_borrow_mut(|state| {
-                    let mut node: XmlNodePtr = nod as XmlNodePtr;
+                    let mut node = nod;
                     let mut input: XmlParserInputPtr;
                     let mut to = &mut state.last_error;
-                    let mut baseptr: XmlNodePtr = null_mut();
+                    let mut baseptr = None;
 
                     if code == XmlParserErrors::XmlErrOK {
                         return None;
@@ -1516,26 +1519,26 @@ macro_rules! __xml_raise_error {
                             }
                         }
                         to = &mut (*ctxt).last_error;
-                    } else if !node.is_null() && file.is_none() {
-                        if !(*node).doc.is_null() && !(*(*node).doc).url.is_none() {
-                            baseptr = node;
+                    } else if let Some(now) = node.filter(|_| file.is_none()) {
+                        if now.document().map_or(false, |doc| !doc.url.is_none()) {
+                            baseptr = Some(now);
                         // file = (const c_char *) (*(*node).doc).URL;
                         }
                         for _ in 0..10 {
-                            if node.is_null() || matches!((*node).element_type(), XmlElementType::XmlElementNode) {
+                            let Some(now) = node.filter(|node| node.element_type() != XmlElementType::XmlElementNode) else {
                                 break;
-                            }
-                            node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                            };
+                            node = now.parent();
                         }
-                        if baseptr.is_null() && !node.is_null() && !(*node).doc.is_null() && !(*(*node).doc).url.is_none() {
+                        if baseptr.is_none() && node.map_or(false, |node| node.document().map_or(false, |doc| !doc.url.is_none())) {
                             baseptr = node;
                         }
 
-                        if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-                            line = (*node).line as _;
+                        if let Some(node) = node.filter(|node| matches!(node.element_type(), XmlElementType::XmlElementNode)).map(|node| XmlNodePtr::try_from(node).unwrap()) {
+                            line = node.line as _;
                         }
                         if line == 0 || line == 65535 {
-                            line = if node.is_null() { -1 } else { (*node).get_line_no() as _ };
+                            line = node.map_or(-1, |node| node.get_line_no() as i32);
                         }
                     }
 
@@ -1547,38 +1550,38 @@ macro_rules! __xml_raise_error {
                     to.level = level;
                     if let Some(file) = file {
                         to.file = Some(file.to_owned().into());
-                    } else if !baseptr.is_null() {
+                    } else if let Some(baseptr) = baseptr {
                         #[cfg(feature = "xinclude")]
                         {
                             // We check if the error is within an XInclude section and,
                             // if so, attempt to print out the href of the XInclude instead
                             // of the usual "base" (doc->URL) for the node (bug 152623).
-                            let mut prev: XmlNodePtr = baseptr;
+                            let mut prev = Some(baseptr);
                             let mut href = None;
                             let mut inclcount = 0;
-                            while !prev.is_null() {
-                                if let Some(p) = (*prev).prev {
-                                    prev = p.as_ptr();
-                                    if matches!((*prev).element_type(), XmlElementType::XmlXIncludeStart) {
+                            while let Some(cur_node) = prev {
+                                if let Some(p) = cur_node.prev() {
+                                    prev = Some(p);
+                                    if matches!(p.element_type(), XmlElementType::XmlXIncludeStart) {
                                         if inclcount > 0 {
                                             inclcount -= 1;
                                         } else {
-                                            href = (*prev).get_prop("href");
+                                            href = p.get_prop("href");
                                             if !href.is_none() {
                                                 break;
                                             }
                                         }
-                                    } else if matches!((*prev).element_type(), XmlElementType::XmlXIncludeEnd) {
+                                    } else if matches!(p.element_type(), XmlElementType::XmlXIncludeEnd) {
                                         inclcount += 1;
                                     }
                                 } else {
-                                    prev = (*prev).parent().map_or(null_mut(), |p| p.as_ptr());
+                                    prev = cur_node.parent();
                                 }
                             }
                             if !href.is_none() {
                                 to.file = href.map(|h| h.into());
                             } else {
-                                to.file = (*(*baseptr).doc).url.as_deref().map(|u| Cow::Owned(u.to_owned()));
+                                to.file = baseptr.document().as_deref().and_then(|doc| doc.url.as_deref().map(|u| Cow::Owned(u.to_owned())));
                             }
                         }
                         #[cfg(not(feature = "xinclude"))] {
@@ -1588,8 +1591,12 @@ macro_rules! __xml_raise_error {
                                     .into()
                             });
                         }
-                        if to.file.is_none() && !node.is_null() && !(*node).doc.is_null() {
-                            to.file = (*(*node).doc).url.as_deref().map(|u| Cow::Owned(u.to_owned()));
+                        if to.file.is_none() {
+                            if let Some(node) = node {
+                                if let Some(doc) = node.document() {
+                                    to.file = doc.url.as_deref().map(|u| Cow::Owned(u.to_owned()));
+                                }
+                            }
                         }
                     }
                     to.line = line as usize;
@@ -1598,7 +1605,7 @@ macro_rules! __xml_raise_error {
                     to.str3 = str3;
                     to.int1 = int1;
                     to.int2 = col;
-                    to.node = NonNull::new(node as _);
+                    to.node = node;
                     to.ctxt = NonNull::new(ctx);
 
                     let error = to.clone();
@@ -1653,7 +1660,7 @@ pub(crate) use __xml_raise_error;
 #[doc(hidden)]
 pub(crate) unsafe fn __xml_simple_oom_error(
     domain: XmlErrorDomain,
-    node: XmlNodePtr,
+    node: Option<XmlGenericNodePtr>,
     msg: Option<&str>,
 ) {
     if let Some(msg) = msg {
@@ -1662,7 +1669,7 @@ pub(crate) unsafe fn __xml_simple_oom_error(
             None,
             None,
             null_mut(),
-            node as _,
+            node,
             domain,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
@@ -1681,7 +1688,7 @@ pub(crate) unsafe fn __xml_simple_oom_error(
             None,
             None,
             null_mut(),
-            node as _,
+            node,
             domain,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,

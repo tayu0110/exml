@@ -42,15 +42,11 @@ static mut VERBOSE: c_int = 0;
 const NB_EXPECTED_ERRORS: usize = 15;
 
 const SKIPPED_TESTS: &[&str] = &[
-    /* http://lists.w3.org/Archives/Public/public-xml-testsuite/2008Jul/0000.html */
+    // http://lists.w3.org/Archives/Public/public-xml-testsuite/2008Jul/0000.html
     "rmt-ns10-035",
 ];
 
-/************************************************************************
- *									*
- *		File name and path utilities				*
- *									*
- ************************************************************************/
+// File name and path utilities
 
 fn check_test_file(filename: &str) -> bool {
     match metadata(filename) {
@@ -130,7 +126,7 @@ fn test_error_handler(_user_data: Option<GenericErrorContext>, error: &XmlError)
             NB_ERROR += 1;
         }
         if TEST_ERRORS_SIZE + res as usize >= 32768 {
-            /* buffer is full */
+            // buffer is full
             TEST_ERRORS_SIZE = 32768;
             TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
         } else {
@@ -154,7 +150,7 @@ unsafe fn initialize_libxml2() {
     );
     xml_init_parser();
     xml_set_external_entity_loader(test_external_entity_loader);
-    CTXT_XPATH.store(xml_xpath_new_context(null_mut()), Ordering::Relaxed);
+    CTXT_XPATH.store(xml_xpath_new_context(None), Ordering::Relaxed);
     // Deactivate the cache if created; otherwise we have to create/free it
     // for every test, since it will confuse the memory leak detection.
     // Note that normally this need not be done, since the cache is not
@@ -182,15 +178,9 @@ unsafe fn xmlconf_test_invalid(
         test_log!(logfile, "test {id} : {filename} out of memory\n",);
         return 0;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
-    if doc.is_null() {
-        test_log!(
-            logfile,
-            "test {id} : {filename} invalid document turned not well-formed too\n",
-        );
-    } else {
+    if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
         // invalidity should be reported both in the context and in the document
-        if (*ctxt).valid != 0 || (*doc).properties & XmlDocProperties::XmlDocDTDValid as i32 != 0 {
+        if (*ctxt).valid != 0 || doc.properties & XmlDocProperties::XmlDocDTDValid as i32 != 0 {
             test_log!(
                 logfile,
                 "test {id} : {filename} failed to detect invalid document\n",
@@ -199,6 +189,11 @@ unsafe fn xmlconf_test_invalid(
             ret = 0;
         }
         xml_free_doc(doc);
+    } else {
+        test_log!(
+            logfile,
+            "test {id} : {filename} invalid document turned not well-formed too\n",
+        );
     }
     xml_free_parser_ctxt(ctxt);
     ret
@@ -217,17 +212,9 @@ unsafe fn xmlconf_test_valid(
         test_log!(logfile, "test {id} : {filename} out of memory\n",);
         return 0;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
-    if doc.is_null() {
-        test_log!(
-            logfile,
-            "test {id} : {filename} failed to parse a valid document\n",
-        );
-        NB_ERRORS += 1;
-        ret = 0;
-    } else {
-        /* validity should be reported both in the context and in the document */
-        if (*ctxt).valid == 0 || (*doc).properties & XmlDocProperties::XmlDocDTDValid as i32 == 0 {
+    if let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, options) {
+        // validity should be reported both in the context and in the document
+        if (*ctxt).valid == 0 || doc.properties & XmlDocProperties::XmlDocDTDValid as i32 == 0 {
             test_log!(
                 logfile,
                 "test {id} : {filename} failed to validate a valid document\n",
@@ -236,6 +223,13 @@ unsafe fn xmlconf_test_valid(
             ret = 0;
         }
         xml_free_doc(doc);
+    } else {
+        test_log!(
+            logfile,
+            "test {id} : {filename} failed to parse a valid document\n",
+        );
+        NB_ERRORS += 1;
+        ret = 0;
     }
     xml_free_parser_ctxt(ctxt);
     ret
@@ -251,12 +245,7 @@ unsafe fn xmlconf_test_not_nswf(
 
     // In case of Namespace errors, libxml2 will still parse the document
     // but log a Namespace error.
-    let doc: XmlDocPtr = xml_read_file(filename, None, options);
-    if doc.is_null() {
-        test_log!(logfile, "test {id} : {filename} failed to parse the XML\n",);
-        NB_ERRORS += 1;
-        ret = 0;
-    } else {
+    if let Some(doc) = xml_read_file(filename, None, options) {
         let last_error = get_last_error();
         if last_error.code() == XmlParserErrors::XmlErrOK
             || last_error.domain() != XmlErrorDomain::XmlFromNamespace
@@ -269,6 +258,10 @@ unsafe fn xmlconf_test_not_nswf(
             ret = 0;
         }
         xml_free_doc(doc);
+    } else {
+        test_log!(logfile, "test {id} : {filename} failed to parse the XML\n",);
+        NB_ERRORS += 1;
+        ret = 0;
     }
     ret
 }
@@ -281,8 +274,7 @@ unsafe fn xmlconf_test_not_wf(
 ) -> i32 {
     let mut ret: i32 = 1;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, options);
-    if !doc.is_null() {
+    if let Some(doc) = xml_read_file(filename, None, options) {
         test_log!(
             logfile,
             "test {id} : {filename} failed to detect not well formedness\n",
@@ -294,11 +286,7 @@ unsafe fn xmlconf_test_not_wf(
     ret
 }
 
-unsafe extern "C" fn xmlconf_test_item(
-    logfile: &mut Option<File>,
-    doc: XmlDocPtr,
-    cur: XmlNodePtr,
-) -> c_int {
+unsafe fn xmlconf_test_item(logfile: &mut Option<File>, doc: XmlDocPtr, cur: XmlNodePtr) -> c_int {
     let mut ret: c_int = -1;
     let mut options: c_int = 0;
     let mut nstest: c_int = 0;
@@ -307,8 +295,8 @@ unsafe extern "C" fn xmlconf_test_item(
     TEST_ERRORS[0] = 0;
     NB_ERROR = 0;
     NB_FATAL = 0;
-    let Some(id) = (*cur).get_prop("ID") else {
-        test_log!(logfile, "test missing ID, line {}\n", (*cur).get_line_no());
+    let Some(id) = cur.get_prop("ID") else {
+        test_log!(logfile, "test missing ID, line {}\n", cur.get_line_no());
         return ret;
     };
     for &skipped in SKIPPED_TESTS {
@@ -320,28 +308,28 @@ unsafe extern "C" fn xmlconf_test_item(
             return ret;
         }
     }
-    let Some(typ) = (*cur).get_prop("TYPE") else {
+    let Some(typ) = cur.get_prop("TYPE") else {
         test_log!(logfile, "test {id} missing TYPE\n",);
         return ret;
     };
-    let Some(uri) = (*cur).get_prop("URI") else {
+    let Some(uri) = cur.get_prop("URI") else {
         test_log!(logfile, "test {id} missing URI\n",);
         return ret;
     };
-    let base = (*cur).get_base(doc);
+    let base = cur.get_base(Some(doc));
     let filename = compose_dir(base.as_deref(), &uri);
     if !check_test_file(filename.as_str()) {
         test_log!(logfile, "test {id} missing file {filename} \n",);
         return ret;
     }
 
-    let version = (*cur).get_prop("VERSION");
-    let entities = (*cur).get_prop("ENTITIES");
+    let version = cur.get_prop("VERSION");
+    let entities = cur.get_prop("ENTITIES");
     if entities.as_deref() != Some("none") {
         options |= XmlParserOption::XmlParseDTDLoad as i32;
         options |= XmlParserOption::XmlParseNoEnt as i32;
     }
-    let rec = (*cur).get_prop("RECOMMENDATION");
+    let rec = cur.get_prop("RECOMMENDATION");
     if rec.as_deref().map_or(true, |rec| {
         rec == "XML1.0"
             || rec == "XML1.0-errata2e"
@@ -367,7 +355,7 @@ unsafe extern "C" fn xmlconf_test_item(
         // goto error;
         return ret;
     }
-    let edition = (*cur).get_prop("EDITION");
+    let edition = cur.get_prop("EDITION");
     if edition.as_deref().filter(|e| !e.contains('5')).is_some() {
         // test limited to all versions before 5th
         options |= XmlParserOption::XmlParseOld10 as i32;
@@ -425,10 +413,10 @@ unsafe extern "C" fn xmlconf_test_item(
     ret
 }
 
-unsafe extern "C" fn xmlconf_test_cases(
+unsafe fn xmlconf_test_cases(
     logfile: &mut Option<File>,
     doc: XmlDocPtr,
-    mut cur: XmlNodePtr,
+    cur: XmlNodePtr,
     mut level: c_int,
 ) -> c_int {
     let mut ret: c_int = 0;
@@ -436,64 +424,62 @@ unsafe extern "C" fn xmlconf_test_cases(
     let mut output: c_int = 0;
 
     if level == 1 {
-        if let Some(profile) = (*cur).get_prop("PROFILE") {
+        if let Some(profile) = cur.get_prop("PROFILE") {
             output = 1;
             level += 1;
             println!("Test cases: {profile}",);
         }
     }
-    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-    while !cur.is_null() {
+    let mut cur = cur.children();
+    while let Some(cur_node) = cur {
         // look only at elements we ignore everything else
-        if (*cur).element_type() == XmlElementType::XmlElementNode {
-            if xml_str_equal((*cur).name, c"TESTCASES".as_ptr() as _) {
-                ret += xmlconf_test_cases(logfile, doc, cur, level);
-            } else if xml_str_equal((*cur).name, c"TEST".as_ptr() as _) {
-                if xmlconf_test_item(logfile, doc, cur) >= 0 {
+        if cur_node.element_type() == XmlElementType::XmlElementNode {
+            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+            if xml_str_equal(cur_node.name, c"TESTCASES".as_ptr() as _) {
+                ret += xmlconf_test_cases(logfile, doc, cur_node, level);
+            } else if xml_str_equal(cur_node.name, c"TEST".as_ptr() as _) {
+                if xmlconf_test_item(logfile, doc, cur_node) >= 0 {
                     ret += 1;
                 }
                 tests += 1;
             } else {
                 eprintln!(
                     "Unhandled element {}",
-                    CStr::from_ptr((*cur).name as _).to_string_lossy(),
+                    CStr::from_ptr(cur_node.name as _).to_string_lossy(),
                 );
             }
         }
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+        cur = cur_node.next();
     }
-    if (output == 1) && (tests > 0) {
+    if output == 1 && tests > 0 {
         println!("Test cases: {} tests", tests);
     }
     ret
 }
 
-unsafe extern "C" fn xmlconf_test_suite(
-    logfile: &mut Option<File>,
-    doc: XmlDocPtr,
-    mut cur: XmlNodePtr,
-) -> c_int {
+unsafe fn xmlconf_test_suite(logfile: &mut Option<File>, doc: XmlDocPtr, cur: XmlNodePtr) -> c_int {
     let mut ret: c_int = 0;
 
-    if let Some(profile) = (*cur).get_prop("PROFILE") {
+    if let Some(profile) = cur.get_prop("PROFILE") {
         println!("Test suite: {profile}",);
     } else {
         println!("Test suite");
     }
-    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-    while !cur.is_null() {
+    let mut cur = cur.children();
+    while let Some(cur_node) = cur {
         // look only at elements we ignore everything else
-        if (*cur).element_type() == XmlElementType::XmlElementNode {
-            if xml_str_equal((*cur).name, c"TESTCASES".as_ptr() as _) {
-                ret += xmlconf_test_cases(logfile, doc, cur, 1);
+        if cur_node.element_type() == XmlElementType::XmlElementNode {
+            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+            if xml_str_equal(cur_node.name, c"TESTCASES".as_ptr() as _) {
+                ret += xmlconf_test_cases(logfile, doc, cur_node, 1);
             } else {
                 eprintln!(
                     "Unhandled element {}",
-                    CStr::from_ptr((*cur).name as _).to_string_lossy(),
+                    CStr::from_ptr(cur_node.name as _).to_string_lossy(),
                 );
             }
         }
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+        cur = cur_node.next();
     }
     ret
 }
@@ -513,30 +499,26 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         xmlconf_info();
         return -1;
     }
-    let doc: XmlDocPtr = xml_read_file(confxml, None, XmlParserOption::XmlParseNoEnt as i32);
-    if doc.is_null() {
+    let Some(doc) = xml_read_file(confxml, None, XmlParserOption::XmlParseNoEnt as i32) else {
         eprintln!("{} is corrupted ", confxml);
         xmlconf_info();
         return -1;
-    }
+    };
 
-    let cur: XmlNodePtr = (*doc).get_root_element();
-    let ret = if cur.is_null() || !xml_str_equal((*cur).name, c"TESTSUITE".as_ptr() as _) {
+    let Some(cur) = doc
+        .get_root_element()
+        .filter(|cur| xml_str_equal(cur.name, c"TESTSUITE".as_ptr() as _))
+    else {
         eprintln!("Unexpected format {}", confxml);
         xmlconf_info();
-        -1
-    } else {
-        xmlconf_test_suite(logfile, doc, cur)
+        xml_free_doc(doc);
+        return -1;
     };
+    let ret = xmlconf_test_suite(logfile, doc, cur);
     xml_free_doc(doc);
     ret
 }
 
-/************************************************************************
- *									*
- *		The driver for the tests				*
- *									*
- ************************************************************************/
 #[test]
 fn main() {
     let mut ret: c_int;

@@ -26,16 +26,16 @@ use std::{
     any::type_name,
     ffi::c_char,
     io::Read,
-    mem::{size_of, size_of_val},
+    mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::Ordering,
 };
 
-use libc::memset;
-
 #[cfg(feature = "schema")]
 use crate::relaxng::{xml_relaxng_new_parser_ctxt, XmlRelaxNGValidCtxtPtr};
+#[cfg(feature = "libxml_reader")]
+use crate::tree::{XmlAttrPtr, XmlDocPtr};
 use crate::{
     error::{
         parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
@@ -61,7 +61,7 @@ use crate::{
         valid::{xml_validate_pop_element, xml_validate_push_cdata, xml_validate_push_element},
         xinclude::{
             xml_xinclude_new_context, xml_xinclude_process_node, xml_xinclude_set_flags,
-            xml_xinclude_set_streaming_mode, XmlXincludeCtxtPtr,
+            xml_xinclude_set_streaming_mode, XmlXIncludeCtxtPtr,
         },
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
@@ -76,8 +76,8 @@ use crate::{
     parser::XmlParserCtxtPtr,
     tree::{
         xml_copy_dtd, xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
-        xml_free_ns_list, xml_new_doc_text, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
-        XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        xml_free_ns_list, xml_new_doc_text, XmlElementType, XmlGenericNodePtr, XmlNodePtr,
+        __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -115,8 +115,8 @@ pub enum XmlTextReaderMode {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlParserProperties {
-    XmlParserLoaddtd = 1,
-    XmlParserDefaultattrs = 2,
+    XmlParserLoadDTD = 1,
+    XmlParserDefaultAttrs = 2,
     XmlParserValidate = 3,
     XmlParserSubstEntities = 4,
 }
@@ -124,10 +124,10 @@ pub enum XmlParserProperties {
 impl TryFrom<i32> for XmlParserProperties {
     type Error = anyhow::Error;
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlParserLoaddtd as i32 {
-            Ok(Self::XmlParserLoaddtd)
-        } else if value == Self::XmlParserDefaultattrs as i32 {
-            Ok(Self::XmlParserDefaultattrs)
+        if value == Self::XmlParserLoadDTD as i32 {
+            Ok(Self::XmlParserLoadDTD)
+        } else if value == Self::XmlParserDefaultAttrs as i32 {
+            Ok(Self::XmlParserDefaultAttrs)
         } else if value == Self::XmlParserValidate as i32 {
             Ok(Self::XmlParserValidate)
         } else if value == Self::XmlParserSubstEntities as i32 {
@@ -151,7 +151,7 @@ pub enum XmlReaderTypes {
     XmlReaderTypeElement = 1,
     XmlReaderTypeAttribute = 2,
     XmlReaderTypeText = 3,
-    XmlReaderTypeCdata = 4,
+    XmlReaderTypeCDATA = 4,
     XmlReaderTypeEntityReference = 5,
     XmlReaderTypeEntity = 6,
     XmlReaderTypeProcessingInstruction = 7,
@@ -210,7 +210,7 @@ pub struct XmlTextReader {
     // the parsing mode
     mode: XmlTextReaderMode,
     // when walking an existing doc
-    doc: XmlDocPtr,
+    doc: Option<XmlDocPtr>,
     // is there any validation
     validate: XmlTextReaderValidate,
     // what structure were deallocated
@@ -237,13 +237,13 @@ pub struct XmlTextReader {
     // current position in the input
     cur: u32,
     // current node
-    node: XmlNodePtr,
+    node: Option<XmlGenericNodePtr>,
     // current attribute node
-    curnode: XmlNodePtr,
+    curnode: Option<XmlGenericNodePtr>,
     // depth of the current node
     depth: i32,
     // fake xmlNs chld
-    faketext: XmlNodePtr,
+    faketext: Option<XmlNodePtr>,
     // preserve the resulting document
     preserve: i32,
     // used to return const xmlChar *
@@ -253,13 +253,9 @@ pub struct XmlTextReader {
 
     // entity stack when traversing entities content
     // Current Entity Ref Node
-    ent: XmlNodePtr,
-    // Depth of the entities stack
-    ent_nr: i32,
-    // Max depth of the entities stack
-    ent_max: i32,
+    ent: Option<XmlNodePtr>,
     // array of entities
-    ent_tab: *mut XmlNodePtr,
+    ent_tab: Vec<XmlNodePtr>,
 
     // error handling
     // callback function
@@ -282,7 +278,7 @@ pub struct XmlTextReader {
     rng_valid_errors: i32,
     // the node if RNG not progressive
     #[cfg(feature = "schema")]
-    rng_full_node: XmlNodePtr,
+    rng_full_node: Option<XmlNodePtr>,
 
     // Handling of Schemas validation
     // The Schemas schemas
@@ -310,19 +306,19 @@ pub struct XmlTextReader {
     xinclude_name: *const XmlChar,
     // the xinclude context
     #[cfg(feature = "xinclude")]
-    xincctxt: XmlXincludeCtxtPtr,
+    xincctxt: XmlXIncludeCtxtPtr,
     // counts for xinclude
     #[cfg(feature = "xinclude")]
     in_xinclude: i32,
-    // number of preserve patterns
-    #[cfg(feature = "libxml_pattern")]
-    pattern_nr: i32,
-    // max preserve patterns
-    #[cfg(feature = "libxml_pattern")]
-    pattern_max: i32,
+    // // number of preserve patterns
+    // #[cfg(feature = "libxml_pattern")]
+    // pattern_nr: i32,
+    // // max preserve patterns
+    // #[cfg(feature = "libxml_pattern")]
+    // pattern_max: i32,
     // array of preserve patterns
     #[cfg(feature = "libxml_pattern")]
-    pattern_tab: *mut XmlPatternPtr,
+    pattern_tab: Vec<XmlPatternPtr>,
     // level of preserves
     preserves: i32,
     // the set of options set
@@ -343,16 +339,16 @@ impl XmlTextReader {
     pub unsafe fn read(&mut self) -> i32 {
         use crate::{
             libxml::xinclude::{XINCLUDE_NS, XINCLUDE_OLD_NS},
-            tree::{NodeCommon, NodePtr},
+            tree::{NodeCommon, XmlEntityPtr},
         };
 
         let mut val: i32;
         let mut olddepth = 0;
         let mut oldstate = XmlTextReaderState::Start;
-        let mut oldnode: XmlNodePtr = null_mut();
+        let mut oldnode = None;
 
-        self.curnode = null_mut();
-        if !self.doc.is_null() {
+        self.curnode = None;
+        if self.doc.is_some() {
             return self.read_tree();
         }
         if self.ctxt.is_null() {
@@ -370,30 +366,26 @@ impl XmlTextReader {
                     self.state = XmlTextReaderState::Error;
                     return -1;
                 }
-                (*self.ctxt).node.is_null()
+                (*self.ctxt).node.is_none()
                     && (self.mode != XmlTextReaderMode::XmlTextreaderModeEof
                         && self.state != XmlTextReaderState::Done)
             } {}
-            if (*self.ctxt).node.is_null() {
-                if !(*self.ctxt).my_doc.is_null() {
-                    self.node = (*(*self.ctxt).my_doc)
-                        .children
-                        .map_or(null_mut(), |c| c.as_ptr());
+            if (*self.ctxt).node.is_none() {
+                if let Some(my_doc) = (*self.ctxt).my_doc {
+                    self.node = my_doc.children;
                 }
-                if self.node.is_null() {
+                if self.node.is_none() {
                     self.mode = XmlTextReaderMode::XmlTextreaderModeError;
                     self.state = XmlTextReaderState::Error;
                     return -1;
                 }
                 self.state = XmlTextReaderState::Element;
             } else {
-                if !(*self.ctxt).my_doc.is_null() {
-                    self.node = (*(*self.ctxt).my_doc)
-                        .children
-                        .map_or(null_mut(), |c| c.as_ptr());
+                if let Some(my_doc) = (*self.ctxt).my_doc {
+                    self.node = my_doc.children;
                 }
-                if self.node.is_null() {
-                    self.node = (*self.ctxt).node_tab[0];
+                if self.node.is_none() {
+                    self.node = Some((*self.ctxt).node_tab[0].into());
                 }
                 self.state = XmlTextReaderState::Element;
             }
@@ -410,7 +402,7 @@ impl XmlTextReader {
         // get_next_node:
         'get_next_node: loop {
             if !node_found {
-                if self.node.is_null() {
+                if self.node.is_none() {
                     if self.mode == XmlTextReaderMode::XmlTextreaderModeEof {
                         return 0;
                     } else {
@@ -422,30 +414,37 @@ impl XmlTextReader {
                     // If we are not backtracking on ancestors or examined nodes,
                     // that the parser didn't finished or that we aren't at the end
                     // of stream, continue processing.
-                    while !self.node.is_null()
-                        && (*self.node).next.is_none()
-                        && (*self.ctxt).node_tab.len() == olddepth
-                        && (oldstate == XmlTextReaderState::Backtrack
-                            || (*self.node).children().is_none()
-                            || (*self.node).element_type() == XmlElementType::XmlEntityRefNode
-                            || (*self.node)
-                                .children()
-                                .filter(|children| {
-                                    children.element_type() == XmlElementType::XmlTextNode
-                                        && children.next.is_none()
+                    while self
+                        .node
+                        .filter(|&cur_node| {
+                            cur_node.next().is_none()
+                                && (*self.ctxt).node_tab.len() == olddepth
+                                && (oldstate == XmlTextReaderState::Backtrack
+                                    || cur_node.children().is_none()
+                                    || cur_node.element_type() == XmlElementType::XmlEntityRefNode
+                                    || cur_node
+                                        .children()
+                                        .filter(|children| {
+                                            children.element_type() == XmlElementType::XmlTextNode
+                                                && children.next().is_none()
+                                        })
+                                        .is_some()
+                                    || matches!(
+                                        cur_node.element_type(),
+                                        XmlElementType::XmlDTDNode
+                                            | XmlElementType::XmlDocumentNode
+                                            | XmlElementType::XmlHTMLDocumentNode
+                                    ))
+                                && (*self.ctxt).node.map_or(true, |node| {
+                                    cur_node == node.into()
+                                        || cur_node.parent() == Some(node.into())
                                 })
-                                .is_some()
-                            || matches!(
-                                (*self.node).element_type(),
-                                XmlElementType::XmlDTDNode
-                                    | XmlElementType::XmlDocumentNode
-                                    | XmlElementType::XmlHTMLDocumentNode
-                            ))
-                        && ((*self.ctxt).node.is_null()
-                            || (*self.ctxt).node == self.node
-                            || (*self.ctxt).node
-                                == (*self.node).parent().map_or(null_mut(), |p| p.as_ptr()))
-                        && !matches!((*self.ctxt).instate, XmlParserInputState::XmlParserEOF)
+                                && !matches!(
+                                    (*self.ctxt).instate,
+                                    XmlParserInputState::XmlParserEOF
+                                )
+                        })
+                        .is_some()
                     {
                         val = self.push_data();
                         if val < 0 {
@@ -453,35 +452,37 @@ impl XmlTextReader {
                             self.state = XmlTextReaderState::Error;
                             return -1;
                         }
-                        if self.node.is_null() {
+                        if self.node.is_none() {
                             // goto node_end;
                             self.state = XmlTextReaderState::Done;
                             return 0;
                         }
                     }
-                    if let Some(children) = (*self.node).children().filter(|_| {
+                    if let Some(children) = self.node.unwrap().children().filter(|_| {
                         oldstate != XmlTextReaderState::Backtrack
                             && !matches!(
-                                (*self.node).element_type(),
+                                self.node.unwrap().element_type(),
                                 XmlElementType::XmlEntityRefNode
                                     | XmlElementType::XmlXIncludeStart
                                     | XmlElementType::XmlDTDNode
                             )
                     }) {
-                        self.node = children.as_ptr();
+                        self.node = Some(children);
                         self.depth += 1;
                         self.state = XmlTextReaderState::Element;
                         break 'goto_node_found;
                     }
-                    if let Some(next) = (*self.node).next {
+                    if let Some(next) = self.node.unwrap().next() {
                         #[cfg(not(feature = "xinclude"))]
                         let f = true;
                         #[cfg(feature = "xinclude")]
                         let f = self.in_xinclude <= 0;
                         if oldstate == XmlTextReaderState::Element
-                            && (*self.node).element_type() == XmlElementType::XmlElementNode
-                            && (*self.node).children().is_none()
-                            && (*self.node).extra & NODE_IS_EMPTY as u16 == 0
+                            && self.node.unwrap().element_type() == XmlElementType::XmlElementNode
+                            && self.node.unwrap().children().is_none()
+                            && XmlNodePtr::try_from(self.node.unwrap()).unwrap().extra
+                                & NODE_IS_EMPTY as u16
+                                == 0
                             && f
                         {
                             self.state = XmlTextReaderState::End;
@@ -489,15 +490,18 @@ impl XmlTextReader {
                         }
                         #[cfg(feature = "libxml_regexp")]
                         if self.validate as u32 != 0
-                            && (*self.node).element_type() == XmlElementType::XmlElementNode
+                            && self.node.unwrap().element_type() == XmlElementType::XmlElementNode
                         {
                             self.validate_pop();
                         }
-                        if self.preserves > 0 && (*self.node).extra & NODE_IS_SPRESERVED as u16 != 0
+                        if self.preserves > 0
+                            && XmlNodePtr::try_from(self.node.unwrap()).unwrap().extra
+                                & NODE_IS_SPRESERVED as u16
+                                != 0
                         {
                             self.preserves -= 1;
                         }
-                        self.node = next.as_ptr();
+                        self.node = Some(next);
                         self.state = XmlTextReaderState::Element;
 
                         // Cleanup of the old node
@@ -507,44 +511,55 @@ impl XmlTextReader {
                         let f = self.in_xinclude == 0;
                         if self.preserves == 0
                             && f
-                            && self.ent_nr == 0
-                            && (*self.node).prev.is_some()
-                            && (*self.node).prev.unwrap().element_type()
+                            && self.ent_tab.is_empty()
+                            && self.node.unwrap().prev().is_some()
+                            && self.node.unwrap().prev().unwrap().element_type()
                                 != XmlElementType::XmlDTDNode
                         {
-                            let tmp: XmlNodePtr = (*self.node).prev.unwrap().as_ptr();
-                            if (*tmp).extra & NODE_IS_PRESERVED as u16 == 0 {
-                                if oldnode == tmp {
-                                    oldnode = null_mut();
+                            let mut tmp = self
+                                .node
+                                .unwrap()
+                                .prev()
+                                .map(|prev| XmlNodePtr::try_from(prev).unwrap())
+                                .unwrap();
+                            if tmp.extra & NODE_IS_PRESERVED as u16 == 0 {
+                                if oldnode == Some(tmp.into()) {
+                                    oldnode = None;
                                 }
-                                (*tmp).unlink();
-                                xml_text_reader_free_node(self, tmp);
+                                tmp.unlink();
+                                xml_text_reader_free_node(self, tmp.into());
                             }
                         }
 
                         break 'goto_node_found;
                     }
                     if oldstate == XmlTextReaderState::Element
-                        && (*self.node).element_type() == XmlElementType::XmlElementNode
-                        && (*self.node).children().is_none()
-                        && (*self.node).extra & NODE_IS_EMPTY as u16 == 0
+                        && self.node.unwrap().element_type() == XmlElementType::XmlElementNode
+                        && self.node.unwrap().children().is_none()
+                        && XmlNodePtr::try_from(self.node.unwrap()).unwrap().extra
+                            & NODE_IS_EMPTY as u16
+                            == 0
                     {
                         self.state = XmlTextReaderState::End;
                         break 'goto_node_found;
                     }
                     #[cfg(feature = "libxml_regexp")]
                     if self.validate != XmlTextReaderValidate::NotValidate
-                        && (*self.node).element_type() == XmlElementType::XmlElementNode
+                        && self.node.unwrap().element_type() == XmlElementType::XmlElementNode
                     {
                         self.validate_pop();
                     }
-                    if self.preserves > 0 && (*self.node).extra & NODE_IS_SPRESERVED as u16 != 0 {
+                    if self.preserves > 0
+                        && XmlNodePtr::try_from(self.node.unwrap()).unwrap().extra
+                            & NODE_IS_SPRESERVED as u16
+                            != 0
+                    {
                         self.preserves -= 1;
                     }
-                    self.node = (*self.node).parent().map_or(null_mut(), |p| p.as_ptr());
-                    if self.node.is_null()
+                    self.node = self.node.unwrap().parent();
+                    if self.node.is_none()
                         || matches!(
-                            (*self.node).element_type(),
+                            self.node.unwrap().element_type(),
                             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
                         )
                     {
@@ -555,7 +570,7 @@ impl XmlTextReader {
                                 return -1;
                             }
                         }
-                        self.node = null_mut();
+                        self.node = None;
                         self.depth = -1;
 
                         // Cleanup of the old node
@@ -563,15 +578,16 @@ impl XmlTextReader {
                         let f = true;
                         #[cfg(feature = "xinclude")]
                         let f = self.in_xinclude == 0;
-                        if !oldnode.is_null()
-                            && self.preserves == 0
-                            && f
-                            && self.ent_nr == 0
-                            && (*oldnode).element_type() != XmlElementType::XmlDTDNode
-                            && (*oldnode).extra & NODE_IS_PRESERVED as u16 == 0
-                        {
-                            (*oldnode).unlink();
-                            xml_text_reader_free_node(self, oldnode);
+                        if self.preserves == 0 && f && self.ent_tab.is_empty() {
+                            if let Some(mut oldnode) = oldnode.filter(|&oldnode| {
+                                oldnode.element_type() != XmlElementType::XmlDTDNode
+                                    && XmlNodePtr::try_from(oldnode).unwrap().extra
+                                        & NODE_IS_PRESERVED as u16
+                                        == 0
+                            }) {
+                                oldnode.unlink();
+                                xml_text_reader_free_node(self, oldnode);
+                            }
                         }
 
                         // goto node_end;
@@ -585,12 +601,16 @@ impl XmlTextReader {
                     let f = self.in_xinclude == 0;
                     if self.preserves == 0
                         && f
-                        && self.ent_nr == 0
-                        && (*self.node).last().is_some()
-                        && (*self.node).last().unwrap().extra & NODE_IS_PRESERVED as u16 == 0
+                        && self.ent_tab.is_empty()
+                        && self.node.unwrap().last().is_some()
+                        && XmlNodePtr::try_from(self.node.unwrap().last().unwrap())
+                            .unwrap()
+                            .extra
+                            & NODE_IS_PRESERVED as u16
+                            == 0
                     {
-                        let tmp: XmlNodePtr = (*self.node).last().unwrap().as_ptr();
-                        (*tmp).unlink();
+                        let mut tmp = self.node.unwrap().last().unwrap();
+                        tmp.unlink();
                         xml_text_reader_free_node(self, tmp);
                     }
                     self.depth -= 1;
@@ -603,12 +623,12 @@ impl XmlTextReader {
             // DUMP_READER
 
             // If we are in the middle of a piece of CDATA make sure it's finished
-            if (!self.node.is_null()
-                && (*self.node).next.is_none()
-                && ((*self.node).element_type() == XmlElementType::XmlTextNode
-                    || (*self.node).element_type() == XmlElementType::XmlCDATASectionNode))
-                && self.expand().is_null()
-            {
+            if self.node.map_or(false, |node| {
+                node.next().is_none()
+                    && (node.element_type() == XmlElementType::XmlTextNode
+                        || node.element_type() == XmlElementType::XmlCDATASectionNode)
+                    && self.expand().is_none()
+            }) {
                 return -1;
             }
 
@@ -618,14 +638,22 @@ impl XmlTextReader {
                 if self.xinclude != 0
                     && self.in_xinclude == 0
                     && self.state != XmlTextReaderState::Backtrack
-                    && !self.node.is_null()
-                    && (*self.node).element_type() == XmlElementType::XmlElementNode
-                    && !(*self.node).ns.is_null()
-                    && (xml_str_equal((*(*self.node).ns).href, XINCLUDE_NS.as_ptr() as _)
-                        || xml_str_equal((*(*self.node).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
+                    && self
+                        .node
+                        .and_then(|node| {
+                            XmlNodePtr::try_from(node).ok().filter(|node| {
+                                node.element_type() == XmlElementType::XmlElementNode
+                            })
+                        })
+                        .map_or(false, |node| {
+                            node.ns.map_or(false, |ns| {
+                                xml_str_equal(ns.href, XINCLUDE_NS.as_ptr() as _)
+                                    || xml_str_equal(ns.href, XINCLUDE_OLD_NS.as_ptr() as _)
+                            })
+                        })
                 {
                     if self.xincctxt.is_null() {
-                        self.xincctxt = xml_xinclude_new_context((*self.ctxt).my_doc);
+                        self.xincctxt = xml_xinclude_new_context((*self.ctxt).my_doc.unwrap());
                         xml_xinclude_set_flags(
                             self.xincctxt,
                             self.parser_flags & !(XmlParserOption::XmlParseNoXIncnode as i32),
@@ -633,58 +661,64 @@ impl XmlTextReader {
                         xml_xinclude_set_streaming_mode(self.xincctxt, 1);
                     }
                     // expand that node and process it
-                    if self.expand().is_null() {
+                    if self.expand().is_none() {
                         return -1;
                     }
-                    xml_xinclude_process_node(self.xincctxt, self.node);
+                    xml_xinclude_process_node(
+                        self.xincctxt,
+                        XmlNodePtr::try_from(self.node.unwrap()).unwrap(),
+                    );
                 }
-                if !self.node.is_null()
-                    && (*self.node).element_type() == XmlElementType::XmlXIncludeStart
-                {
+                if self.node.map_or(false, |node| {
+                    node.element_type() == XmlElementType::XmlXIncludeStart
+                }) {
                     self.in_xinclude += 1;
                     // goto get_next_node;
                     continue 'get_next_node;
                 }
-                if !self.node.is_null()
-                    && (*self.node).element_type() == XmlElementType::XmlXIncludeEnd
-                {
+                if self.node.map_or(false, |node| {
+                    node.element_type() == XmlElementType::XmlXIncludeEnd
+                }) {
                     self.in_xinclude -= 1;
                     // goto get_next_node;
                     continue 'get_next_node;
                 }
             }
             // Handle entities enter and exit when in entity replacement mode
-            if !self.node.is_null()
-                && (*self.node).element_type() == XmlElementType::XmlEntityRefNode
-                && !self.ctxt.is_null()
-                && (*self.ctxt).replace_entities == 1
+            if let Some(node) = self
+                .node
+                .and_then(|node| XmlNodePtr::try_from(node).ok())
+                .filter(|node| node.element_type() == XmlElementType::XmlEntityRefNode)
+                .filter(|_| !self.ctxt.is_null() && (*self.ctxt).replace_entities == 1)
             {
-                if let Some(children) = (*self.node).children().filter(|children| {
+                if let Some(children) = node.children().filter(|children| {
                     children.element_type() == XmlElementType::XmlEntityDecl
                         && children.children().is_some()
                 }) {
-                    if self.entity_push(self.node) < 0 {
+                    if self.entity_push(node) < 0 {
                         // goto get_next_node;
                         continue 'get_next_node;
                     }
-                    self.node = children.children().map_or(null_mut(), |c| c.as_ptr());
+                    self.node = children.children();
                 }
             } else {
                 #[cfg(feature = "libxml_regexp")]
-                if !self.node.is_null()
-                    && (*self.node).element_type() == XmlElementType::XmlEntityRefNode
+                if self.node.is_some()
+                    && self.node.unwrap().element_type() == XmlElementType::XmlEntityRefNode
                     && !self.ctxt.is_null()
                     && self.validate as i32 != 0
                 {
                     self.validate_entity();
                 }
             }
-            if !self.node.is_null()
-                && (*self.node).element_type() == XmlElementType::XmlEntityDecl
-                && !self.ent.is_null()
-                && (*self.ent).children() == NodePtr::from_ptr(self.node)
+            if self
+                .node
+                .and_then(|node| XmlEntityPtr::try_from(node).ok())
+                .zip(self.ent)
+                .filter(|&(node, ent)| ent.children == Some(node.into()))
+                .is_some()
             {
-                self.node = self.entity_pop();
+                self.node = self.entity_pop().map(|ent| ent.into());
                 self.depth += 1;
                 // goto get_next_node;
                 continue 'get_next_node;
@@ -693,32 +727,32 @@ impl XmlTextReader {
             break;
         }
         #[cfg(feature = "libxml_regexp")]
-        if self.validate != XmlTextReaderValidate::NotValidate && !self.node.is_null() {
-            let node: XmlNodePtr = self.node;
-
-            if (*node).element_type() == XmlElementType::XmlElementNode
-                && !matches!(
-                    self.state,
-                    XmlTextReaderState::End | XmlTextReaderState::Backtrack
-                )
-            {
-                self.validate_push();
-            } else if matches!(
-                (*node).element_type(),
-                XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
-            ) {
-                self.validate_cdata((*node).content, xml_strlen((*node).content));
+        if self.validate != XmlTextReaderValidate::NotValidate {
+            if let Some(node) = self.node.and_then(|node| XmlNodePtr::try_from(node).ok()) {
+                if node.element_type() == XmlElementType::XmlElementNode
+                    && !matches!(
+                        self.state,
+                        XmlTextReaderState::End | XmlTextReaderState::Backtrack
+                    )
+                {
+                    self.validate_push();
+                } else if matches!(
+                    node.element_type(),
+                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+                ) {
+                    self.validate_cdata(node.content, xml_strlen(node.content));
+                }
             }
         }
         #[cfg(feature = "libxml_pattern")]
-        if self.pattern_nr > 0
+        if !self.pattern_tab.is_empty()
             && !matches!(
                 self.state,
                 XmlTextReaderState::End | XmlTextReaderState::Backtrack
             )
         {
-            for i in 0..self.pattern_nr {
-                if xml_pattern_match(*self.pattern_tab.add(i as usize), self.node) == 1 {
+            for &pattern in &self.pattern_tab {
+                if xml_pattern_match(pattern, self.node.unwrap()) == 1 {
                     self.preserve();
                     break;
                 }
@@ -745,29 +779,26 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadInnerXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_inner_xml(&mut self) -> *mut XmlChar {
-        use crate::{libxml::xmlstring::xml_strndup, tree::NodeCommon};
+        use crate::libxml::xmlstring::xml_strndup;
 
-        let mut node: XmlNodePtr;
-        let mut cur_node: XmlNodePtr;
-
-        if self.expand().is_null() {
+        if self.expand().is_none() {
             return null_mut();
         }
-        let doc: XmlDocPtr = (*self.node).doc;
+        let doc = self.node.unwrap().document();
         let mut buff = vec![];
-        cur_node = (*self.node).children().map_or(null_mut(), |c| c.as_ptr());
-        while !cur_node.is_null() {
-            /* XXX: Why is the node copied? */
-            node = xml_doc_copy_node(cur_node, doc, 1);
-            /* XXX: Why do we need a second buffer? */
+        let mut cur = self.node.unwrap().children();
+        while let Some(cur_node) = cur {
+            // XXX: Why is the node copied?
+            let node = xml_doc_copy_node(cur_node, doc, 1).unwrap();
+            // XXX: Why do we need a second buffer?
             let mut buff2 = vec![];
-            if (*node).dump_memory(&mut buff2, doc, 0, 0) == 0 {
+            if node.dump_memory(&mut buff2, doc, 0, 0) == 0 {
                 xml_free_node(node);
                 return null_mut();
             }
             buff.extend(buff2);
             xml_free_node(node);
-            cur_node = (*cur_node).next.map_or(null_mut(), |n| n.as_ptr());
+            cur = cur_node.next();
         }
         xml_strndup(buff.as_ptr(), buff.len() as i32)
     }
@@ -779,23 +810,21 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadOuterXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_outer_xml(&mut self) -> *mut XmlChar {
-        use crate::{libxml::xmlstring::xml_strndup, tree::NodeCommon};
+        use crate::{libxml::xmlstring::xml_strndup, tree::XmlDtdPtr};
 
-        let mut node: XmlNodePtr;
-
-        if self.expand().is_null() {
+        if self.expand().is_none() {
             return null_mut();
         }
-        node = self.node;
-        let doc: XmlDocPtr = (*node).doc;
+        let mut node = self.node.unwrap();
+        let doc = node.document();
         // XXX: Why is the node copied?
-        if (*node).element_type() == XmlElementType::XmlDTDNode {
-            node = xml_copy_dtd((*node).as_dtd_node().unwrap().as_ptr()) as XmlNodePtr;
+        if let Ok(dtd) = XmlDtdPtr::try_from(node) {
+            node = xml_copy_dtd(dtd).map(|dtd| dtd.into()).unwrap();
         } else {
-            node = xml_doc_copy_node(node, doc, 1);
+            node = xml_doc_copy_node(node, doc, 1).unwrap();
         }
         let mut buff = vec![];
-        if (*node).dump_memory(&mut buff, doc, 0, 0) == 0 {
+        if node.dump_memory(&mut buff, doc, 0, 0) == 0 {
             xml_free_node(node);
             return null_mut();
         }
@@ -811,39 +840,37 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadTree")]
     #[cfg(feature = "libxml_reader")]
     unsafe fn read_tree(&mut self) -> i32 {
-        use crate::tree::NodeCommon;
-
         if self.state == XmlTextReaderState::End {
             return 0;
         }
 
         // next_node:
         'next_node: loop {
-            if self.node.is_null() {
-                let Some(children) = (*self.doc).children else {
+            if self.node.is_none() {
+                let Some(children) = self.doc.unwrap().children else {
                     self.state = XmlTextReaderState::End;
                     return 0;
                 };
 
-                self.node = children.as_ptr();
+                self.node = Some(children);
                 self.state = XmlTextReaderState::Start;
                 // goto found_node;
             } else {
                 if self.state != XmlTextReaderState::Backtrack
                     && !matches!(
-                        (*self.node).element_type(),
+                        self.node.unwrap().element_type(),
                         XmlElementType::XmlDTDNode
                             | XmlElementType::XmlXIncludeStart
                             | XmlElementType::XmlEntityRefNode
                     )
                 {
-                    if let Some(children) = (*self.node).children() {
-                        self.node = children.as_ptr();
+                    if let Some(children) = self.node.unwrap().children() {
+                        self.node = Some(children);
                         self.depth += 1;
                         self.state = XmlTextReaderState::Start;
                         // goto found_node;
                         if matches!(
-                            (*self.node).element_type(),
+                            self.node.unwrap().element_type(),
                             XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
                         ) {
                             // goto next_node;
@@ -852,11 +879,11 @@ impl XmlTextReader {
                         break;
                     }
 
-                    if (*self.node).element_type() == XmlElementType::XmlAttributeNode {
+                    if self.node.unwrap().element_type() == XmlElementType::XmlAttributeNode {
                         self.state = XmlTextReaderState::Backtrack;
                         // goto found_node;
                         if matches!(
-                            (*self.node).element_type(),
+                            self.node.unwrap().element_type(),
                             XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
                         ) {
                             // goto next_node;
@@ -866,11 +893,11 @@ impl XmlTextReader {
                     }
                 }
 
-                if let Some(next) = (*self.node).next {
-                    self.node = next.as_ptr();
+                if let Some(next) = self.node.unwrap().next() {
+                    self.node = Some(next);
                     self.state = XmlTextReaderState::Start;
                     // goto found_node;
-                } else if let Some(parent) = (*self.node).parent() {
+                } else if let Some(parent) = self.node.unwrap().parent() {
                     if matches!(
                         parent.element_type(),
                         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
@@ -879,7 +906,7 @@ impl XmlTextReader {
                         return 0;
                     }
 
-                    self.node = parent.as_ptr();
+                    self.node = Some(parent);
                     self.depth -= 1;
                     self.state = XmlTextReaderState::Backtrack;
                     // goto found_node;
@@ -890,7 +917,7 @@ impl XmlTextReader {
 
             // found_node:
             if matches!(
-                (*self.node).element_type(),
+                self.node.unwrap().element_type(),
                 XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
             ) {
                 // goto next_node;
@@ -910,28 +937,21 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadString")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read_string(&mut self) -> *mut XmlChar {
-        use crate::tree::NodeCommon;
-
-        if self.node.is_null() {
+        let Some(current_node) = self.node else {
             return null_mut();
-        }
-
-        let node: XmlNodePtr = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
         };
-        match (*node).element_type() {
+
+        let node = self.curnode.unwrap_or(current_node);
+        match node.element_type() {
             XmlElementType::XmlTextNode => {
-                if !(*node).content.is_null() {
-                    return xml_strdup((*node).content);
+                let node = XmlNodePtr::try_from(node).unwrap();
+                if !node.content.is_null() {
+                    return xml_strdup(node.content);
                 }
             }
             XmlElementType::XmlElementNode => {
                 if self.do_expand() != -1 {
-                    return xml_text_reader_collect_siblings(
-                        (*node).children().map_or(null_mut(), |c| c.as_ptr()),
-                    );
+                    return xml_text_reader_collect_siblings(node.children().unwrap());
                 }
             }
             XmlElementType::XmlAttributeNode => {
@@ -950,36 +970,34 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadAttributeValue")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn read_attribute_value(&mut self) -> i32 {
-        use crate::tree::NodeCommon;
+        use crate::tree::XmlNsPtr;
 
-        if self.node.is_null() {
+        if self.node.is_none() {
             return -1;
         }
-        if self.curnode.is_null() {
+        let Some(curnode) = self.curnode else {
             return 0;
-        }
-        if (*self.curnode).element_type() == XmlElementType::XmlAttributeNode {
-            let Some(children) = (*self.curnode).children() else {
+        };
+        if curnode.element_type() == XmlElementType::XmlAttributeNode {
+            let Some(children) = curnode.children() else {
                 return 0;
             };
-            self.curnode = children.as_ptr();
-        } else if (*self.curnode).element_type() == XmlElementType::XmlNamespaceDecl {
-            let ns: XmlNsPtr = self.curnode as XmlNsPtr;
-
-            if self.faketext.is_null() {
-                self.faketext = xml_new_doc_text((*self.node).doc, (*ns).href);
-            } else {
-                if !(*self.faketext).content.is_null() {
-                    xml_free((*self.faketext).content as _);
+            self.curnode = Some(children);
+        } else if let Ok(ns) = XmlNsPtr::try_from(curnode) {
+            if let Some(mut faketext) = self.faketext {
+                if !faketext.content.is_null() {
+                    xml_free(faketext.content as _);
                 }
-                (*self.faketext).content = xml_strdup((*ns).href);
+                faketext.content = xml_strdup(ns.href);
+            } else {
+                self.faketext = xml_new_doc_text(self.node.unwrap().document(), ns.href);
             }
-            self.curnode = self.faketext;
+            self.curnode = self.faketext.map(|node| node.into());
         } else {
-            let Some(next) = (*self.curnode).next else {
+            let Some(next) = curnode.next() else {
                 return 0;
             };
-            self.curnode = next.as_ptr();
+            self.curnode = Some(next);
         }
         1
     }
@@ -994,7 +1012,7 @@ impl XmlTextReader {
     unsafe fn do_expand(&mut self) -> i32 {
         let mut val: i32;
 
-        if self.node.is_null() || self.ctxt.is_null() {
+        if self.node.is_none() || self.ctxt.is_null() {
             return -1;
         }
         while {
@@ -1002,7 +1020,7 @@ impl XmlTextReader {
                 return 1;
             }
 
-            if !xml_text_reader_get_successor(self.node).is_null() {
+            if xml_text_reader_get_successor(self.node.unwrap()).is_some() {
                 return 1;
             }
             if ((*self.ctxt).node_tab.len() as i32) < self.depth {
@@ -1028,18 +1046,16 @@ impl XmlTextReader {
     /// Returns a node pointer valid until the next xmlTextReaderRead() call or NULL in case of error.
     #[doc(alias = "xmlTextReaderExpand")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn expand(&mut self) -> XmlNodePtr {
-        if self.node.is_null() {
-            return null_mut();
-        }
-        if !self.doc.is_null() {
+    pub unsafe fn expand(&mut self) -> Option<XmlGenericNodePtr> {
+        self.node?;
+        if self.doc.is_some() {
             return self.node;
         }
         if self.ctxt.is_null() {
-            return null_mut();
+            return None;
         }
         if self.do_expand() < 0 {
-            return null_mut();
+            return None;
         }
         self.node
     }
@@ -1074,7 +1090,7 @@ impl XmlTextReader {
                     } else if val < 0 {
                         self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                         self.state = oldstate;
-                        if oldstate != XmlTextReaderState::Start || !(*self.ctxt).my_doc.is_null() {
+                        if oldstate != XmlTextReaderState::Start || (*self.ctxt).my_doc.is_some() {
                             return val;
                         }
                     } else if val == 0 {
@@ -1164,32 +1180,10 @@ impl XmlTextReader {
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "xmlTextReaderEntPush")]
     #[cfg(feature = "libxml_reader")]
-    unsafe fn entity_push(&mut self, value: XmlNodePtr) -> i32 {
-        use crate::generic_error;
-
-        use super::globals::xml_realloc;
-
-        if self.ent_nr >= self.ent_max {
-            let new_size: usize = if self.ent_max == 0 {
-                10
-            } else {
-                self.ent_max as usize * 2
-            };
-
-            let tmp: *mut XmlNodePtr =
-                xml_realloc(self.ent_tab as _, new_size * size_of::<XmlNodePtr>())
-                    as *mut XmlNodePtr;
-            if tmp.is_null() {
-                generic_error!("xmlRealloc failed !\n");
-                return -1;
-            }
-            self.ent_tab = tmp;
-            self.ent_max = new_size as _;
-        }
-        *self.ent_tab.add(self.ent_nr as usize) = value;
-        self.ent = value;
-        self.ent_nr += 1;
-        self.ent_nr - 1
+    fn entity_push(&mut self, value: XmlNodePtr) -> i32 {
+        self.ent_tab.push(value);
+        self.ent = Some(value);
+        self.ent_tab.len() as i32 - 1
     }
 
     /// Pops the top element entity from the entities stack
@@ -1197,77 +1191,70 @@ impl XmlTextReader {
     /// Returns the entity just removed
     #[doc(alias = "xmlTextReaderEntPop")]
     #[cfg(feature = "libxml_reader")]
-    unsafe fn entity_pop(&mut self) -> XmlNodePtr {
-        if self.ent_nr <= 0 {
-            return null_mut();
-        }
-        self.ent_nr -= 1;
-        if self.ent_nr > 0 {
-            self.ent = *self.ent_tab.add(self.ent_nr as usize - 1);
-        } else {
-            self.ent = null_mut();
-        }
-        let ret: XmlNodePtr = *self.ent_tab.add(self.ent_nr as usize);
-        *self.ent_tab.add(self.ent_nr as usize) = null_mut();
-        ret
+    fn entity_pop(&mut self) -> Option<XmlNodePtr> {
+        let res = self.ent_tab.pop()?;
+        self.ent = self.ent_tab.last().copied();
+        Some(res)
     }
 
     /// Push the current node for validation
     #[doc(alias = "xmlTextReaderValidatePush")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
     unsafe fn validate_push(&mut self) {
-        let mut node: XmlNodePtr = self.node;
+        use crate::tree::XmlNodePtr;
+
+        let node = self
+            .node
+            .map(|node| XmlNodePtr::try_from(node).unwrap())
+            .unwrap();
 
         #[cfg(feature = "libxml_valid")]
         if self.validate == XmlTextReaderValidate::ValidateDtd
             && !self.ctxt.is_null()
             && (*self.ctxt).validate == 1
         {
-            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
-                (*self.ctxt).valid &= xml_validate_push_element(
-                    addr_of_mut!((*self.ctxt).vctxt),
-                    (*self.ctxt).my_doc,
-                    node,
-                    (*node).name,
-                );
-            } else {
-                /* TODO use the BuildQName interface */
-                let mut qname: *mut XmlChar;
-
-                qname = xml_strdup((*(*node).ns).prefix);
+            if let Some(prefix) = node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                // TODO use the BuildQName interface
+                let mut qname = xml_strdup(prefix);
                 qname = xml_strcat(qname, c":".as_ptr() as _);
-                qname = xml_strcat(qname, (*node).name);
+                qname = xml_strcat(qname, node.name);
                 (*self.ctxt).valid &= xml_validate_push_element(
-                    addr_of_mut!((*self.ctxt).vctxt),
-                    (*self.ctxt).my_doc,
+                    &raw mut (*self.ctxt).vctxt,
+                    (*self.ctxt).my_doc.unwrap(),
                     node,
                     qname,
                 );
                 if !qname.is_null() {
                     xml_free(qname as _);
                 }
+            } else {
+                (*self.ctxt).valid &= xml_validate_push_element(
+                    &raw mut (*self.ctxt).vctxt,
+                    (*self.ctxt).my_doc.unwrap(),
+                    node,
+                    node.name,
+                );
             }
         }
         #[cfg(feature = "schema")]
         if self.validate == XmlTextReaderValidate::ValidateRng && !self.rng_valid_ctxt.is_null() {
             let mut ret: i32;
 
-            if !self.rng_full_node.is_null() {
+            if self.rng_full_node.is_some() {
                 return;
             }
             ret = (*self.rng_valid_ctxt).push_element((*self.ctxt).my_doc, node);
             if ret == 0 {
                 // this element requires a full tree
-                node = self.expand();
-                if node.is_null() {
-                    ret = -1;
-                } else {
+                if let Some(node) = self.expand() {
                     ret = xml_relaxng_validate_full_element(
                         self.rng_valid_ctxt,
                         (*self.ctxt).my_doc,
-                        node,
+                        XmlNodePtr::try_from(node).unwrap(),
                     );
-                    self.rng_full_node = node;
+                    self.rng_full_node = Some(XmlNodePtr::try_from(node).unwrap());
+                } else {
+                    ret = -1;
                 }
             }
             if ret != 1 {
@@ -1280,43 +1267,47 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderValidatePop")]
     #[cfg(feature = "libxml_reader")]
     unsafe fn validate_pop(&mut self) {
-        let node: XmlNodePtr = self.node;
+        use crate::tree::XmlNodePtr;
+
+        let node = self
+            .node
+            .map(|node| XmlNodePtr::try_from(node).unwrap())
+            .unwrap();
 
         #[cfg(feature = "libxml_valid")]
         if self.validate == XmlTextReaderValidate::ValidateDtd
             && !self.ctxt.is_null()
             && (*self.ctxt).validate == 1
         {
-            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
-                (*self.ctxt).valid &= xml_validate_pop_element(
-                    addr_of_mut!((*self.ctxt).vctxt),
-                    (*self.ctxt).my_doc,
-                    node,
-                    (*node).name,
-                );
-            } else {
-                /* TODO use the BuildQName interface */
-                let mut qname: *mut XmlChar;
+            if let Some(prefix) = node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                // TODO use the BuildQName interface
 
-                qname = xml_strdup((*(*node).ns).prefix);
+                let mut qname = xml_strdup(prefix);
                 qname = xml_strcat(qname, c":".as_ptr() as _);
-                qname = xml_strcat(qname, (*node).name);
+                qname = xml_strcat(qname, node.name);
                 (*self.ctxt).valid &= xml_validate_pop_element(
-                    addr_of_mut!((*self.ctxt).vctxt),
+                    &raw mut (*self.ctxt).vctxt,
                     (*self.ctxt).my_doc,
-                    node,
+                    Some(node),
                     qname,
                 );
                 if !qname.is_null() {
                     xml_free(qname as _);
                 }
+            } else {
+                (*self.ctxt).valid &= xml_validate_pop_element(
+                    &raw mut (*self.ctxt).vctxt,
+                    (*self.ctxt).my_doc,
+                    Some(node),
+                    node.name,
+                );
             }
         }
         #[cfg(feature = "schema")]
         if self.validate == XmlTextReaderValidate::ValidateRng && !self.rng_valid_ctxt.is_null() {
-            if !self.rng_full_node.is_null() {
-                if node == self.rng_full_node {
-                    self.rng_full_node = null_mut();
+            if self.rng_full_node.is_some() {
+                if Some(node) == self.rng_full_node {
+                    self.rng_full_node = None;
                 }
                 return;
             }
@@ -1333,27 +1324,28 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderValidateEntity")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
     unsafe fn validate_entity(&mut self) {
-        use crate::tree::{NodeCommon, NodePtr};
+        use crate::tree::{NodeCommon, XmlEntityPtr};
 
-        let oldnode: XmlNodePtr = self.node;
-        let mut node: XmlNodePtr = self.node;
+        let oldnode = self.node.unwrap();
+        let mut node = self.node.unwrap();
 
         'main: while {
             'inner: {
                 'skip_children: {
-                    if (*node).element_type() == XmlElementType::XmlEntityRefNode {
-                        if let Some(children) = (*node).children().filter(|children| {
+                    if node.element_type() == XmlElementType::XmlEntityRefNode {
+                        let entity_ref = XmlNodePtr::try_from(node).unwrap();
+                        if let Some(children) = entity_ref.children().filter(|children| {
                             children.element_type() == XmlElementType::XmlEntityDecl
                                 && children.children().is_some()
                         }) {
-                            if self.entity_push(node) < 0 {
-                                if node == oldnode {
+                            if self.entity_push(entity_ref) < 0 {
+                                if oldnode == entity_ref.into() {
                                     // break;
                                     break 'main;
                                 }
                                 break 'skip_children;
                             }
-                            node = children.children().map_or(null_mut(), |c| c.as_ptr());
+                            node = children.children().unwrap();
                             // continue;
                             break 'inner;
                         } else {
@@ -1365,75 +1357,81 @@ impl XmlTextReader {
                         }
                     } else {
                         #[cfg(feature = "libxml_regexp")]
-                        if (*node).element_type() == XmlElementType::XmlElementNode {
-                            self.node = node;
+                        if node.element_type() == XmlElementType::XmlElementNode {
+                            self.node = Some(node);
                             self.validate_push();
                         } else if matches!(
-                            (*node).element_type(),
+                            node.element_type(),
                             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                         ) {
-                            self.validate_cdata((*node).content, xml_strlen((*node).content));
+                            let node = XmlNodePtr::try_from(node).unwrap();
+                            self.validate_cdata(node.content, xml_strlen(node.content));
                         }
                     }
                     // go to next node
-                    if let Some(children) = (*node).children() {
-                        node = children.as_ptr();
+                    if let Some(children) = node.children() {
+                        node = children;
                         // continue;
                         break 'inner;
-                    } else if (*node).element_type() == XmlElementType::XmlElementNode {
+                    } else if node.element_type() == XmlElementType::XmlElementNode {
                         self.validate_pop();
                     }
                 }
 
                 // skip_children:
-                if let Some(next) = (*node).next() {
-                    node = next.as_ptr();
+                if let Some(next) = node.next() {
+                    node = next;
                     // continue;
                     break 'inner;
                 }
 
                 loop {
-                    node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
-                    if (*node).element_type() == XmlElementType::XmlElementNode {
-                        let mut tmp: XmlNodePtr;
-                        if self.ent_nr == 0 {
-                            while {
-                                tmp = (*node).last().map_or(null_mut(), |l| l.as_ptr());
-                                !tmp.is_null()
-                            } {
-                                if (*tmp).extra & NODE_IS_PRESERVED as u16 == 0 {
-                                    (*tmp).unlink();
-                                    xml_text_reader_free_node(self, tmp);
+                    node = node.parent().unwrap();
+                    if node.element_type() == XmlElementType::XmlElementNode {
+                        let node = XmlNodePtr::try_from(node).unwrap();
+                        if self.ent_tab.is_empty() {
+                            let mut tmp = node.last.map(|l| XmlNodePtr::try_from(l).unwrap());
+                            while let Some(mut now) = tmp {
+                                if now.extra & NODE_IS_PRESERVED as u16 == 0 {
+                                    now.unlink();
+                                    xml_text_reader_free_node(self, now.into());
                                 } else {
                                     break;
                                 }
+                                tmp = node.last.map(|l| XmlNodePtr::try_from(l).unwrap());
                             }
                         }
-                        self.node = node;
+                        self.node = Some(node.into());
                         self.validate_pop();
                     }
-                    if (*node).element_type() == XmlElementType::XmlEntityDecl
-                        && !self.ent.is_null()
-                        && (*self.ent).children() == NodePtr::from_ptr(node)
+                    if XmlEntityPtr::try_from(node)
+                        .ok()
+                        .zip(
+                            self.ent
+                                .and_then(|ent| ent.children)
+                                .and_then(|ent| XmlEntityPtr::try_from(ent).ok()),
+                        )
+                        .filter(|&(node, ent)| ent == node)
+                        .is_some()
                     {
-                        node = self.entity_pop();
+                        node = self.entity_pop().map(|node| node.into()).unwrap();
                     }
                     if node == oldnode {
                         break;
                     }
-                    if let Some(next) = (*node).next {
-                        node = next.as_ptr();
+                    if let Some(next) = node.next() {
+                        node = next;
                         break;
                     }
 
-                    if node.is_null() || node == oldnode {
+                    if node == oldnode {
                         break;
                     }
                 }
             }
-            !node.is_null() && node != oldnode
+            node != oldnode
         } {}
-        self.node = oldnode;
+        self.node = Some(oldnode);
     }
 
     /// Push some CData for validation
@@ -1445,12 +1443,11 @@ impl XmlTextReader {
             && !self.ctxt.is_null()
             && (*self.ctxt).validate == 1
         {
-            (*self.ctxt).valid &=
-                xml_validate_push_cdata(addr_of_mut!((*self.ctxt).vctxt), data, len);
+            (*self.ctxt).valid &= xml_validate_push_cdata(&raw mut (*self.ctxt).vctxt, data, len);
         }
         #[cfg(feature = "schema")]
         if self.validate == XmlTextReaderValidate::ValidateRng && !self.rng_valid_ctxt.is_null() {
-            if !self.rng_full_node.is_null() {
+            if self.rng_full_node.is_some() {
                 return;
             }
             let ret: i32 = xml_relaxng_validate_push_cdata(self.rng_valid_ctxt, data, len);
@@ -1500,31 +1497,27 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderIsEmptyElement")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn is_empty_element(&self) -> Option<bool> {
-        use crate::tree::NodeCommon;
-
-        if self.node.is_null() {
-            return None;
-        }
-        if (*self.node).element_type() != XmlElementType::XmlElementNode {
+        let current_node = self.node?;
+        if current_node.element_type() != XmlElementType::XmlElementNode {
             return Some(false);
         }
-        if !self.curnode.is_null() {
+        if self.curnode.is_some() {
             return Some(false);
         }
-        if (*self.node).children().is_some() {
+        if current_node.children().is_some() {
             return Some(false);
         }
         if self.state == XmlTextReaderState::End {
             return Some(false);
         }
-        if !self.doc.is_null() {
+        if self.doc.is_some() {
             return Some(true);
         }
         #[cfg(feature = "xinclude")]
         if self.in_xinclude > 0 {
             return Some(true);
         }
-        Some((*self.node).extra & NODE_IS_EMPTY as u16 != 0)
+        Some(XmlNodePtr::try_from(current_node).unwrap().extra & NODE_IS_EMPTY as u16 != 0)
     }
 
     /// Determine whether the current node is a namespace declaration
@@ -1536,18 +1529,11 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderIsNamespaceDecl")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn is_namespace_decl(&self) -> Option<bool> {
-        use crate::tree::NodeCommon;
+        let current_node = self.node?;
 
-        if self.node.is_null() {
-            return None;
-        }
-        let node = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
-        };
-
-        Some(XmlElementType::XmlNamespaceDecl == (*node).element_type())
+        Some(
+            XmlElementType::XmlNamespaceDecl == self.curnode.unwrap_or(current_node).element_type(),
+        )
     }
 
     /// Whether the node has attributes.
@@ -1558,17 +1544,17 @@ impl XmlTextReader {
     pub unsafe fn has_attributes(&self) -> bool {
         use crate::tree::NodeCommon;
 
-        if self.node.is_null() {
+        let Some(current_node) = self.node else {
             return false;
-        }
-        let node = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
         };
-
-        if (*node).element_type() == XmlElementType::XmlElementNode
-            && (!(*node).properties.is_null() || !(*node).ns_def.is_null())
+        let node = self.curnode.unwrap_or(current_node);
+        if XmlNodePtr::try_from(node)
+            .ok()
+            .filter(|node| {
+                node.element_type() == XmlElementType::XmlElementNode
+                    && (node.properties.is_some() || node.ns_def.is_some())
+            })
+            .is_some()
         {
             return true;
         }
@@ -1580,19 +1566,12 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderHasValue")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn has_value(&self) -> bool {
-        use crate::tree::NodeCommon;
-
-        if self.node.is_null() {
+        let Some(current_node) = self.node else {
             return false;
-        }
-        let node = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
         };
-
+        let node = self.curnode.unwrap_or(current_node);
         matches!(
-            (*node).element_type(),
+            node.element_type(),
             XmlElementType::XmlAttributeNode
                 | XmlElementType::XmlTextNode
                 | XmlElementType::XmlCDATASectionNode
@@ -1612,65 +1591,58 @@ impl XmlTextReader {
 
         use crate::{parser::split_qname2, tree::NodeCommon};
 
-        let mut ns: XmlNsPtr;
-
-        if self.node.is_null() {
-            return None;
-        }
-        if !self.curnode.is_null() {
+        if self.curnode.is_some() {
             return None;
         }
 
         // TODO: handle the xmlDecl
-        if (*self.node).element_type() != XmlElementType::XmlElementNode {
-            return None;
-        }
+        let mut current_node = XmlNodePtr::try_from(self.node?)
+            .ok()
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)?;
 
         let Some((prefix, localname)) = split_qname2(name) else {
             // Namespace default decl
             if name == "xmlns" {
-                ns = (*self.node).ns_def;
-                while !ns.is_null() {
-                    if (*ns).prefix().is_none() {
+                let mut ns = current_node.ns_def;
+                while let Some(now) = ns {
+                    if now.prefix().is_none() {
                         return Some(
-                            CStr::from_ptr((*ns).href as *const i8)
+                            CStr::from_ptr(now.href as *const i8)
                                 .to_string_lossy()
                                 .into_owned(),
                         );
                     }
-                    ns = (*ns).next;
+                    ns = now.next;
                 }
                 return None;
             }
-            return (*self.node).get_no_ns_prop(name);
+            return current_node.get_no_ns_prop(name);
         };
 
         // Namespace default decl
         let mut ret = None;
         if prefix == "xmlns" {
-            ns = (*self.node).ns_def;
-            while !ns.is_null() {
-                if (*ns).prefix().as_deref() == Some(localname) {
+            let mut ns = current_node.ns_def;
+            while let Some(now) = ns {
+                if now.prefix().as_deref() == Some(localname) {
                     ret = Some(
-                        CStr::from_ptr((*ns).href as *const i8)
+                        CStr::from_ptr(now.href as *const i8)
                             .to_string_lossy()
                             .into_owned(),
                     );
                     break;
                 }
-                ns = (*ns).next;
+                ns = now.next;
             }
-        } else {
-            ns = (*self.node).search_ns((*self.node).doc, Some(prefix));
-            if !ns.is_null() {
-                let href = (*ns).href;
-                ret = (*self.node).get_ns_prop(
-                    localname,
-                    (!href.is_null())
-                        .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
-                        .as_deref(),
-                );
-            }
+        } else if let Some(ns) = current_node.search_ns(self.node.unwrap().document(), Some(prefix))
+        {
+            let href = ns.href;
+            ret = current_node.get_ns_prop(
+                localname,
+                (!href.is_null())
+                    .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+                    .as_deref(),
+            );
         }
         ret
     }
@@ -1690,37 +1662,34 @@ impl XmlTextReader {
 
         use crate::tree::NodeCommon;
 
-        if self.node.is_null() {
-            return None;
-        }
-        if !self.curnode.is_null() {
+        if self.curnode.is_some() {
             return None;
         }
 
         // TODO: handle the xmlDecl
-        if (*self.node).element_type() != XmlElementType::XmlElementNode {
-            return None;
-        }
+        let current_node = XmlNodePtr::try_from(self.node?)
+            .ok()
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)?;
 
         if namespace_uri == Some("http://www.w3.org/2000/xmlns/") {
             let prefix = (local_name != "xmlns").then_some(local_name);
-            let mut ns = (*self.node).ns_def;
-            while !ns.is_null() {
-                if (prefix.is_none() && (*ns).prefix().is_none())
-                    || (*ns).prefix().as_deref() == Some(local_name)
+            let mut ns = current_node.ns_def;
+            while let Some(now) = ns {
+                if (prefix.is_none() && now.prefix().is_none())
+                    || now.prefix().as_deref() == Some(local_name)
                 {
                     return Some(
-                        CStr::from_ptr((*ns).href as *const i8)
+                        CStr::from_ptr(now.href as *const i8)
                             .to_string_lossy()
                             .into_owned(),
                     );
                 }
-                ns = (*ns).next;
+                ns = now.next;
             }
             return None;
         }
 
-        (*self.node).get_ns_prop(local_name, namespace_uri)
+        current_node.get_ns_prop(local_name, namespace_uri)
     }
 
     /// Provides the value of the attribute with the specified index relative
@@ -1734,50 +1703,36 @@ impl XmlTextReader {
 
         use crate::tree::NodeCommon;
 
-        let mut cur: XmlAttrPtr;
-        let mut ns: XmlNsPtr;
-
-        if self.node.is_null() {
-            return None;
-        }
-        if !self.curnode.is_null() {
+        if self.curnode.is_some() {
             return None;
         }
         // TODO: handle the xmlDecl
-        if (*self.node).element_type() != XmlElementType::XmlElementNode {
-            return None;
-        }
+        let current_node = XmlNodePtr::try_from(self.node?)
+            .ok()
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)?;
 
-        ns = (*self.node).ns_def;
+        let mut ns = current_node.ns_def;
         let mut i = 0;
-        while i < no && !ns.is_null() {
-            ns = (*ns).next;
+        while let Some(now) = ns.filter(|_| i < no) {
+            ns = now.next;
             i += 1;
         }
 
-        if !ns.is_null() {
+        if let Some(ns) = ns {
             return Some(
-                CStr::from_ptr((*ns).href as *const i8)
+                CStr::from_ptr(ns.href as *const i8)
                     .to_string_lossy()
                     .into_owned(),
             );
         }
-        cur = (*self.node).properties;
-        if cur.is_null() {
-            return None;
-        }
-
+        let mut cur = current_node.properties?;
         for _ in i..no {
-            cur = (*cur).next;
-            if cur.is_null() {
-                return None;
-            }
+            cur = cur.next?;
         }
         // TODO walk the DTD if present
 
-        (*cur)
-            .children
-            .and_then(|c| c.get_string((*self.node).doc, 1))
+        cur.children()
+            .and_then(|c| c.get_string(self.node.unwrap().document(), 1))
             .or_else(|| Some("".to_owned()))
     }
 
@@ -1793,13 +1748,13 @@ impl XmlTextReader {
         let ctxt = self.ctxt;
 
         match prop {
-            XmlParserProperties::XmlParserLoaddtd => {
+            XmlParserProperties::XmlParserLoadDTD => {
                 if (*ctxt).loadsubset != 0 || (*ctxt).validate != 0 {
                     return 1;
                 }
                 0
             }
-            XmlParserProperties::XmlParserDefaultattrs => {
+            XmlParserProperties::XmlParserDefaultAttrs => {
                 if (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0 {
                     return 1;
                 }
@@ -1846,20 +1801,17 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderGetRemainder")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn get_remainder(&mut self) -> Option<XmlParserInputBuffer> {
-        if self.node.is_null() {
-            return None;
-        }
+        self.node?;
 
-        self.node = null_mut();
-        self.curnode = null_mut();
+        self.node = None;
+        self.curnode = None;
         self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
         if !self.ctxt.is_null() {
             (*self.ctxt).stop();
-            if !(*self.ctxt).my_doc.is_null() {
+            if let Some(my_doc) = (*self.ctxt).my_doc.take() {
                 if self.preserve == 0 {
-                    xml_text_reader_free_doc(self, (*self.ctxt).my_doc);
+                    xml_text_reader_free_doc(self, my_doc);
                 }
-                (*self.ctxt).my_doc = null_mut();
             }
         }
         if self.allocs & XML_TEXTREADER_INPUT != 0 {
@@ -1894,16 +1846,14 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToElement")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_element(&mut self) -> i32 {
-        use crate::tree::NodeCommon;
-
-        if self.node.is_null() {
+        if self.node.is_none() {
             return -1;
         }
-        if (*self.node).element_type() != XmlElementType::XmlElementNode {
+        if self.node.unwrap().element_type() != XmlElementType::XmlElementNode {
             return 0;
         }
-        if !self.curnode.is_null() {
-            self.curnode = null_mut();
+        if self.curnode.is_some() {
+            self.curnode = None;
             return 1;
         }
         0
@@ -1917,73 +1867,78 @@ impl XmlTextReader {
     pub unsafe fn move_to_attribute(&mut self, name: &str) -> i32 {
         use crate::{parser::split_qname2, tree::NodeCommon};
 
-        let mut ns: XmlNsPtr;
-        let mut prop: XmlAttrPtr;
-
-        if self.node.is_null() {
+        if self.node.is_none() {
             return -1;
         }
 
         // TODO: handle the xmlDecl
-        if (*self.node).element_type() != XmlElementType::XmlElementNode {
+        if self.node.unwrap().element_type() != XmlElementType::XmlElementNode {
             return 0;
         }
+        let Some(current_node) = self
+            .node
+            .and_then(|node| XmlNodePtr::try_from(node).ok())
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        else {
+            return 0;
+        };
 
         let Some((prefix, localname)) = split_qname2(name) else {
             // Namespace default decl
             if name == "xmlns" {
-                ns = (*self.node).ns_def;
-                while !ns.is_null() {
-                    if (*ns).prefix().is_none() {
-                        self.curnode = ns as XmlNodePtr;
+                let mut ns = current_node.ns_def;
+                while let Some(now) = ns {
+                    if now.prefix().is_none() {
+                        self.curnode = Some(now.into());
                         return 1;
                     }
-                    ns = (*ns).next;
+                    ns = now.next;
                 }
                 return 0;
             }
 
-            prop = (*self.node).properties;
-            while !prop.is_null() {
+            let mut prop = current_node.properties;
+            while let Some(now) = prop {
                 // One need to have
                 //   - same attribute names
                 //   - and the attribute carrying that namespace
-                if (*prop).name().as_deref() == Some(name)
-                    && ((*prop).ns.is_null() || (*(*prop).ns).prefix().is_none())
+                if now.name().as_deref() == Some(name)
+                    && now.ns.map_or(true, |ns| ns.prefix().is_none())
                 {
-                    self.curnode = prop as XmlNodePtr;
+                    self.curnode = Some(now.into());
                     return 1;
                 }
-                prop = (*prop).next;
+                prop = now.next;
             }
             return 0;
         };
 
         // Namespace default decl
         if prefix == "xmlns" {
-            ns = (*self.node).ns_def;
-            while !ns.is_null() {
-                if (*ns).prefix().as_deref() == Some(localname) {
-                    self.curnode = ns as XmlNodePtr;
+            let mut ns = current_node.ns_def;
+            while let Some(now) = ns {
+                if now.prefix().as_deref() == Some(localname) {
+                    self.curnode = Some(now.into());
                     return 1;
                 }
-                ns = (*ns).next;
+                ns = now.next;
             }
         // goto not_found;
         } else {
-            prop = (*self.node).properties;
-            while !prop.is_null() {
+            let mut prop = current_node.properties;
+            while let Some(now) = prop {
                 // One need to have
                 //   - same attribute names
                 //   - and the attribute carrying that namespace
-                if (*prop).name().as_deref() == Some(localname)
-                    && !(*prop).ns.is_null()
-                    && (*(*prop).ns).prefix().as_deref() == Some(prefix)
+                if now.name().as_deref() == Some(localname)
+                    && now
+                        .ns
+                        .map_or(false, |ns| ns.prefix().as_deref() == Some(prefix))
                 {
-                    self.curnode = prop as XmlNodePtr;
+                    self.curnode = Some(now.into());
                     return 1;
                 }
-                prop = (*prop).next;
+                prop = now.next;
             }
         }
         0
@@ -1998,43 +1953,46 @@ impl XmlTextReader {
     pub unsafe fn move_to_attribute_ns(&mut self, local_name: &str, namespace_uri: &str) -> i32 {
         use crate::tree::NodeCommon;
 
-        let mut ns: XmlNsPtr;
-
-        if self.node.is_null() {
+        if self.node.is_none() {
             return -1;
         }
-        if (*self.node).element_type() != XmlElementType::XmlElementNode {
+        let Some(node) = self
+            .node
+            .and_then(|node| XmlNodePtr::try_from(node).ok())
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        else {
             return 0;
-        }
-        let node: XmlNodePtr = self.node;
+        };
 
         if namespace_uri == "http://www.w3.org/2000/xmlns/" {
             let prefix = (local_name != "xmlns").then_some(local_name);
-            ns = (*self.node).ns_def;
-            while !ns.is_null() {
-                if (prefix.is_none() && (*ns).prefix().is_none())
-                    || (*ns).prefix().as_deref() == Some(local_name)
+            let mut ns = node.ns_def;
+            while let Some(now) = ns {
+                if (prefix.is_none() && now.prefix().is_none())
+                    || now.prefix().as_deref() == Some(local_name)
                 {
-                    self.curnode = ns as XmlNodePtr;
+                    self.curnode = Some(now.into());
                     return 1;
                 }
-                ns = (*ns).next;
+                ns = now.next;
             }
             return 0;
         }
 
-        let mut prop = (*node).properties;
-        while !prop.is_null() {
+        let mut prop = node.properties;
+        while let Some(now) = prop {
             // One need to have
             //   - same attribute names
             //   - and the attribute carrying that namespace
-            if (*prop).name().as_deref() == Some(local_name)
-                && (!(*prop).ns.is_null() && (*(*prop).ns).href().as_deref() == Some(namespace_uri))
+            if now.name().as_deref() == Some(local_name)
+                && now
+                    .ns
+                    .map_or(false, |ns| ns.href().as_deref() == Some(namespace_uri))
             {
-                self.curnode = prop as XmlNodePtr;
+                self.curnode = Some(now.into());
                 return 1;
             }
-            prop = (*prop).next;
+            prop = now.next;
         }
         0
     }
@@ -2048,45 +2006,42 @@ impl XmlTextReader {
     pub unsafe fn move_to_attribute_no(&mut self, no: i32) -> i32 {
         use crate::tree::NodeCommon;
 
-        let mut cur: XmlAttrPtr;
-        let mut ns: XmlNsPtr;
-
-        if self.node.is_null() {
-            return -1;
-        }
         // TODO: handle the xmlDecl
-        if (*self.node).element_type() != XmlElementType::XmlElementNode {
+        let Some(current_node) = self
+            .node
+            .and_then(|node| XmlNodePtr::try_from(node).ok())
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        else {
             return -1;
-        }
+        };
 
-        self.curnode = null_mut();
+        self.curnode = None;
 
-        ns = (*self.node).ns_def;
+        let mut ns = current_node.ns_def;
         let mut i = 0;
-        while i < no && !ns.is_null() {
-            ns = (*ns).next;
+        while let Some(now) = ns.filter(|_| i < no) {
+            ns = now.next;
             i += 1;
         }
 
-        if !ns.is_null() {
-            self.curnode = ns as XmlNodePtr;
+        if let Some(ns) = ns {
+            self.curnode = Some(ns.into());
             return 1;
         }
 
-        cur = (*self.node).properties;
-        if cur.is_null() {
+        let Some(mut cur) = current_node.properties else {
             return 0;
-        }
+        };
 
         for _ in i..no {
-            cur = (*cur).next;
-            if cur.is_null() {
+            let Some(next) = cur.next else {
                 return 0;
-            }
+            };
+            cur = next;
         }
         // TODO walk the DTD if present
 
-        self.curnode = cur as XmlNodePtr;
+        self.curnode = Some(cur.into());
         1
     }
 
@@ -2099,19 +2054,23 @@ impl XmlTextReader {
     pub unsafe fn move_to_first_attribute(&mut self) -> i32 {
         use crate::tree::NodeCommon;
 
-        if self.node.is_null() {
+        if self.node.is_none() {
             return -1;
         }
-        if (*self.node).element_type() != XmlElementType::XmlElementNode {
+        let Some(current_node) = self
+            .node
+            .and_then(|node| XmlNodePtr::try_from(node).ok())
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        else {
             return 0;
-        }
+        };
 
-        if !(*self.node).ns_def.is_null() {
-            self.curnode = (*self.node).ns_def as XmlNodePtr;
+        if let Some(ns_def) = current_node.ns_def {
+            self.curnode = Some(ns_def.into());
             return 1;
         }
-        if !(*self.node).properties.is_null() {
-            self.curnode = (*self.node).properties as XmlNodePtr;
+        if let Some(prop) = current_node.properties {
+            self.curnode = Some(prop.into());
             return 1;
         }
         0
@@ -2124,34 +2083,37 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToNextAttribute")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_next_attribute(&mut self) -> i32 {
-        use crate::tree::NodeCommon;
+        use crate::tree::{NodeCommon, XmlNsPtr};
 
-        if self.node.is_null() {
+        if self.node.is_none() {
             return -1;
         }
-        if (*self.node).element_type() != XmlElementType::XmlElementNode {
+        let Some(current_node) = self
+            .node
+            .and_then(|node| XmlNodePtr::try_from(node).ok())
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        else {
             return 0;
-        }
-        if self.curnode.is_null() {
+        };
+        let Some(curnode) = self.curnode else {
             return self.move_to_first_attribute();
-        }
+        };
 
-        if (*self.curnode).element_type() == XmlElementType::XmlNamespaceDecl {
-            let ns: XmlNsPtr = self.curnode as XmlNsPtr;
-            if !(*ns).next.is_null() {
-                self.curnode = (*ns).next as XmlNodePtr;
+        if let Ok(ns) = XmlNsPtr::try_from(curnode) {
+            if let Some(next) = ns.next {
+                self.curnode = Some(next.into());
                 return 1;
             }
-            if !(*self.node).properties.is_null() {
-                self.curnode = (*self.node).properties as XmlNodePtr;
+            if let Some(prop) = current_node.properties {
+                self.curnode = Some(prop.into());
                 return 1;
             }
             return 0;
-        } else if let Some(next) = (*self.curnode)
-            .next
-            .filter(|_| (*self.curnode).element_type() == XmlElementType::XmlAttributeNode)
+        } else if let Some(next) = XmlAttrPtr::try_from(curnode)
+            .ok()
+            .and_then(|attr| attr.next)
         {
-            self.curnode = next.as_ptr();
+            self.curnode = Some(next.into());
             return 1;
         }
         0
@@ -2204,16 +2166,17 @@ impl XmlTextReader {
     /// Returns the xmlDocPtr or NULL in case of error.
     #[doc(alias = "xmlTextReaderCurrentDoc")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn current_doc(&mut self) -> XmlDocPtr {
-        if !self.doc.is_null() {
+    pub unsafe fn current_doc(&mut self) -> Option<XmlDocPtr> {
+        if self.doc.is_some() {
             return self.doc;
         }
-        if self.ctxt.is_null() || (*self.ctxt).my_doc.is_null() {
-            return null_mut();
+        if self.ctxt.is_null() {
+            return None;
         }
+        let my_doc = (*self.ctxt).my_doc?;
 
         self.preserve = 1;
-        (*self.ctxt).my_doc
+        Some(my_doc)
     }
 
     /// Hacking interface allowing to get the xmlNodePtr corresponding to the
@@ -2223,11 +2186,8 @@ impl XmlTextReader {
     /// Returns the xmlNodePtr or NULL in case of error.
     #[doc(alias = "xmlTextReaderCurrentNode")]
     #[cfg(feature = "libxml_reader")]
-    pub fn current_node(&self) -> XmlNodePtr {
-        if !self.curnode.is_null() {
-            return self.curnode;
-        }
-        self.node
+    pub fn current_node(&self) -> Option<XmlGenericNodePtr> {
+        self.curnode.or(self.node)
     }
 
     /// Skip to the node following the current one in document order while
@@ -2242,20 +2202,23 @@ impl XmlTextReader {
 
         let mut ret: i32;
 
-        if !self.doc.is_null() {
+        if self.doc.is_some() {
             return self.next_tree();
         }
-        let cur: XmlNodePtr = self.node;
-        if cur.is_null() || (*cur).element_type() != XmlElementType::XmlElementNode {
+        let Some(cur) = self
+            .node
+            .and_then(|node| XmlNodePtr::try_from(node).ok())
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        else {
             return self.read();
-        }
+        };
         if matches!(
             self.state,
             XmlTextReaderState::End | XmlTextReaderState::Backtrack
         ) {
             return self.read();
         }
-        if (*cur).extra & NODE_IS_EMPTY as u16 != 0 {
+        if cur.extra & NODE_IS_EMPTY as u16 != 0 {
             return self.read();
         }
         while {
@@ -2263,26 +2226,24 @@ impl XmlTextReader {
             if ret != 1 {
                 return ret;
             }
-            self.node != cur
+            self.node != Some(cur.into())
         } {}
         self.read()
     }
 
     #[cfg(feature = "libxml_reader")]
     unsafe fn next_tree(&mut self) -> i32 {
-        use crate::tree::NodeCommon;
-
         if self.state == XmlTextReaderState::End {
             return 0;
         }
 
-        if self.node.is_null() {
-            let Some(children) = (*self.doc).children else {
+        if self.node.is_none() {
+            let Some(children) = self.doc.unwrap().children else {
                 self.state = XmlTextReaderState::End;
                 return 0;
             };
 
-            self.node = children.as_ptr();
+            self.node = Some(children);
             self.state = XmlTextReaderState::Start;
             return 1;
         }
@@ -2290,9 +2251,9 @@ impl XmlTextReader {
         if self.state != XmlTextReaderState::Backtrack {
             /* Here removed traversal to child, because we want to skip the subtree,
             replace with traversal to sibling to skip subtree */
-            if let Some(next) = (*self.node).next {
+            if let Some(next) = self.node.unwrap().next() {
                 /* Move to sibling if present,skipping sub-tree */
-                self.node = next.as_ptr();
+                self.node = Some(next);
                 self.state = XmlTextReaderState::Start;
                 return 1;
             }
@@ -2304,19 +2265,19 @@ impl XmlTextReader {
             self.read();
         }
 
-        if let Some(next) = (*self.node).next {
-            self.node = next.as_ptr();
+        if let Some(next) = self.node.unwrap().next() {
+            self.node = Some(next);
             self.state = XmlTextReaderState::Start;
             return 1;
         }
 
-        if let Some(parent) = (*self.node).parent() {
+        if let Some(parent) = self.node.unwrap().parent() {
             if parent.element_type() == XmlElementType::XmlDocumentNode {
                 self.state = XmlTextReaderState::End;
                 return 0;
             }
 
-            self.node = parent.as_ptr();
+            self.node = Some(parent);
             self.depth -= 1;
             self.state = XmlTextReaderState::Backtrack;
             /* Repeat process to move to sibling of parent node if present */
@@ -2336,7 +2297,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderNextSibling")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn next_sibling(&mut self) -> i32 {
-        if self.doc.is_null() {
+        if self.doc.is_none() {
             // TODO
             return -1;
         }
@@ -2345,12 +2306,12 @@ impl XmlTextReader {
             return 0;
         }
 
-        if self.node.is_null() {
+        if self.node.is_none() {
             return self.next_tree();
         }
 
-        if let Some(next) = (*self.node).next {
-            self.node = next.as_ptr();
+        if let Some(next) = self.node.unwrap().next() {
+            self.node = Some(next);
             self.state = XmlTextReaderState::Start;
             return 1;
         }
@@ -2364,15 +2325,13 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderDepth")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn depth(&self) -> i32 {
-        use crate::tree::NodeCommon;
-
-        if self.node.is_null() {
+        if self.node.is_none() {
             return 0;
         }
 
-        if !self.curnode.is_null() {
+        if let Some(curnode) = self.curnode {
             if matches!(
-                (*self.curnode).element_type(),
+                curnode.element_type(),
                 XmlElementType::XmlAttributeNode | XmlElementType::XmlNamespaceDecl
             ) {
                 return self.depth + 1;
@@ -2404,17 +2363,11 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderNodeType")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn node_type(&self) -> XmlReaderTypes {
-        use crate::tree::NodeCommon;
-
-        if self.node.is_null() {
+        let Some(current_node) = self.node else {
             return XmlReaderTypes::XmlReaderTypeNone;
-        }
-        let node = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
         };
-        match (*node).element_type() {
+        let node = self.curnode.unwrap_or(current_node);
+        match node.element_type() {
             XmlElementType::XmlElementNode => {
                 if matches!(
                     self.state,
@@ -2428,8 +2381,11 @@ impl XmlTextReader {
                 XmlReaderTypes::XmlReaderTypeAttribute
             }
             XmlElementType::XmlTextNode => {
-                if (*self.node).is_blank_node() {
-                    if (*self.node).get_space_preserve() != 0 {
+                if let Some(current_node) = XmlNodePtr::try_from(current_node)
+                    .ok()
+                    .filter(|node| node.is_blank_node())
+                {
+                    if current_node.get_space_preserve() != 0 {
                         XmlReaderTypes::XmlReaderTypeSignificantWhitespace
                     } else {
                         XmlReaderTypes::XmlReaderTypeWhitespace
@@ -2438,7 +2394,7 @@ impl XmlTextReader {
                     XmlReaderTypes::XmlReaderTypeText
                 }
             }
-            XmlElementType::XmlCDATASectionNode => XmlReaderTypes::XmlReaderTypeCdata,
+            XmlElementType::XmlCDATASectionNode => XmlReaderTypes::XmlReaderTypeCDATA,
             XmlElementType::XmlEntityRefNode => XmlReaderTypes::XmlReaderTypeEntityReference,
             XmlElementType::XmlEntityNode => XmlReaderTypes::XmlReaderTypeEntity,
             XmlElementType::XmlPINode => XmlReaderTypes::XmlReaderTypeProcessingInstruction,
@@ -2468,12 +2424,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderBaseUri")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn base_uri(&self) -> Option<String> {
-        use crate::tree::NodeCommon;
-
-        if self.node.is_null() {
-            return None;
-        }
-        (*self.node).get_base(null_mut())
+        self.node?.get_base(None)
     }
 
     /// The local name of the node.
@@ -2482,37 +2433,24 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderLocalName")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn local_name(&self) -> Option<String> {
-        use std::ffi::CStr;
+        use crate::tree::XmlNsPtr;
 
-        use crate::tree::NodeCommon;
-
-        if self.node.is_null() {
-            return None;
-        }
-        let node = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
-        };
-        if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
-            let ns: XmlNsPtr = node as XmlNsPtr;
-            if let Some(prefix) = (*ns).prefix() {
+        let current_node = self.node?;
+        let node = self.curnode.unwrap_or(current_node);
+        if let Ok(ns) = XmlNsPtr::try_from(node) {
+            if let Some(prefix) = ns.prefix() {
                 return Some(prefix.into_owned());
             } else {
                 return Some("xmlns".to_owned());
             }
         }
         if !matches!(
-            (*node).element_type(),
+            node.element_type(),
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
         ) {
             return self.name();
         }
-        (!(*node).name.is_null()).then(|| {
-            CStr::from_ptr((*node).name as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        })
+        node.name().map(|name| name.into_owned())
     }
 
     /// The qualified name of the node, equal to Prefix :LocalName.
@@ -2521,69 +2459,52 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderName")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn name(&self) -> Option<String> {
-        use std::ffi::CStr;
+        use crate::tree::{NodeCommon, XmlNsPtr};
 
-        use crate::tree::NodeCommon;
+        let current_node = self.node?;
+        let node = self.curnode.unwrap_or(current_node);
+        match node.element_type() {
+            XmlElementType::XmlElementNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) else {
+                    return node.name().map(|name| name.into_owned());
+                };
 
-        if self.node.is_null() {
-            return None;
-        }
-        let node = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
-        };
-        match (*node).element_type() {
-            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-                if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
-                    return (!(*node).name.is_null()).then(|| {
-                        CStr::from_ptr((*node).name as *const i8)
-                            .to_string_lossy()
-                            .into_owned()
-                    });
-                }
-
-                let mut ret = (*(*node).ns).prefix().unwrap().into_owned();
+                let mut ret = prefix.into_owned();
                 ret.push(':');
-                ret.push_str((*node).name().unwrap().as_ref());
+                ret.push_str(node.name().unwrap().as_ref());
+                Some(ret)
+            }
+            XmlElementType::XmlAttributeNode => {
+                let attr = XmlAttrPtr::try_from(node).unwrap();
+                let Some(prefix) = attr.ns.as_deref().and_then(|ns| ns.prefix()) else {
+                    return attr.name().map(|name| name.into_owned());
+                };
+
+                let mut ret = prefix.into_owned();
+                ret.push(':');
+                ret.push_str(node.name().unwrap().as_ref());
                 Some(ret)
             }
             XmlElementType::XmlTextNode => Some("#text".to_owned()),
             XmlElementType::XmlCDATASectionNode => Some("#cdata-section".to_owned()),
             XmlElementType::XmlEntityNode | XmlElementType::XmlEntityRefNode => {
-                (!(*node).name.is_null()).then(|| {
-                    CStr::from_ptr((*node).name as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                })
+                node.name().map(|name| name.into_owned())
             }
-            XmlElementType::XmlPINode => (!(*node).name.is_null()).then(|| {
-                CStr::from_ptr((*node).name as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            }),
+            XmlElementType::XmlPINode => node.name().map(|name| name.into_owned()),
             XmlElementType::XmlCommentNode => Some("#comment".to_owned()),
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 Some("#document".to_owned())
             }
             XmlElementType::XmlDocumentFragNode => Some("#document-fragment".to_owned()),
-            XmlElementType::XmlNotationNode => (!(*node).name.is_null()).then(|| {
-                CStr::from_ptr((*node).name as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            }),
+            XmlElementType::XmlNotationNode => node.name().map(|name| name.into_owned()),
             XmlElementType::XmlDocumentTypeNode | XmlElementType::XmlDTDNode => {
-                (!(*node).name.is_null()).then(|| {
-                    CStr::from_ptr((*node).name as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                })
+                node.name().map(|name| name.into_owned())
             }
             XmlElementType::XmlNamespaceDecl => {
-                let ns: XmlNsPtr = node as XmlNsPtr;
-
+                let ns = XmlNsPtr::try_from(node).unwrap();
                 let mut ret = "xmlns".to_owned();
-                let Some(prefix) = (*ns).prefix() else {
+                let Some(prefix) = ns.prefix() else {
                     return Some(ret);
                 };
                 ret.push(':');
@@ -2606,35 +2527,24 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderNamespaceUri")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn namespace_uri(&self) -> Option<String> {
-        use std::ffi::CStr;
-
-        use crate::tree::NodeCommon;
-
-        if self.node.is_null() {
-            return None;
-        }
-        let node = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
-        };
-        if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
+        let current_node = self.node?;
+        let node = self.curnode.unwrap_or(current_node);
+        if node.element_type() == XmlElementType::XmlNamespaceDecl {
             return Some("http://www.w3.org/2000/xmlns/".to_owned());
         }
-        if !matches!(
-            (*node).element_type(),
-            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
-        ) {
-            return None;
+        match node.element_type() {
+            XmlElementType::XmlElementNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                let ns = node.ns?;
+                ns.href().map(|href| href.into_owned())
+            }
+            XmlElementType::XmlAttributeNode => {
+                let node = XmlAttrPtr::try_from(node).unwrap();
+                let ns = node.ns?;
+                ns.href().map(|href| href.into_owned())
+            }
+            _ => None,
         }
-        if !(*node).ns.is_null() {
-            return Some(
-                CStr::from_ptr((*(*node).ns).href as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-        }
-        None
     }
 
     /// A shorthand reference to the namespace associated with the node.
@@ -2643,33 +2553,27 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderPrefix")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn prefix(&self) -> Option<String> {
-        use crate::tree::NodeCommon;
+        use crate::tree::XmlNsPtr;
 
-        if self.node.is_null() {
-            return None;
-        }
-        let node = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
-        };
-        if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
-            let ns: XmlNsPtr = node as XmlNsPtr;
-            (*ns).prefix()?;
+        let current_node = self.node?;
+        let node = self.curnode.unwrap_or(current_node);
+        if let Ok(ns) = XmlNsPtr::try_from(node) {
+            ns.prefix()?;
             return Some("xmlns".to_owned());
         }
-        if !matches!(
-            (*node).element_type(),
-            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
-        ) {
-            return None;
-        }
-        if !(*node).ns.is_null() {
-            if let Some(prefix) = (*(*node).ns).prefix() {
-                return Some(prefix.into_owned());
+        match node.element_type() {
+            XmlElementType::XmlElementNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                let ns = node.ns?;
+                ns.prefix().map(|prefix| prefix.into_owned())
             }
+            XmlElementType::XmlAttributeNode => {
+                let node = XmlAttrPtr::try_from(node).unwrap();
+                let ns = node.ns?;
+                ns.prefix().map(|prefix| prefix.into_owned())
+            }
+            _ => None,
         }
-        None
     }
 
     /// Determine the standalone status of the document being read.
@@ -2680,17 +2584,13 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderStandalone")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn standalone(&self) -> Option<bool> {
-        let mut doc: XmlDocPtr = null_mut();
-        if !self.doc.is_null() {
-            doc = self.doc;
-        } else if !self.ctxt.is_null() {
-            doc = (*self.ctxt).my_doc;
-        }
-        if doc.is_null() {
-            return None;
-        }
+        let doc = self.doc.or_else(|| {
+            (!self.ctxt.is_null())
+                .then(|| (*self.ctxt).my_doc)
+                .flatten()
+        })?;
 
-        match (*doc).standalone {
+        match doc.standalone {
             1 => Some(true),
             0 => Some(false),
             _ => None,
@@ -2703,10 +2603,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderXmlLang")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn xml_lang(&self) -> Option<String> {
-        if self.node.is_null() {
-            return None;
-        }
-        (*self.node).get_lang()
+        self.node?.get_lang()
     }
 
     /// This tells the XML Reader to preserve the current node.
@@ -2716,35 +2613,30 @@ impl XmlTextReader {
     /// Returns the xmlNodePtr or NULL in case of error.
     #[doc(alias = "xmlTextReaderPreserve")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn preserve(&mut self) -> XmlNodePtr {
-        use crate::tree::NodeCommon;
-
-        let cur = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
-        };
-        if cur.is_null() {
-            return null_mut();
-        }
+    pub unsafe fn preserve(&mut self) -> Option<XmlGenericNodePtr> {
+        let cur = self.curnode.or(self.node)?;
 
         if !matches!(
-            (*cur).element_type(),
+            cur.element_type(),
             XmlElementType::XmlDocumentNode | XmlElementType::XmlDTDNode
         ) {
-            (*cur).extra |= NODE_IS_PRESERVED as u16;
-            (*cur).extra |= NODE_IS_SPRESERVED as u16;
+            // Is this `unwrap` OK ???????
+            // The original libxml2 does not check the type of node....
+            let mut cur = XmlNodePtr::try_from(cur).unwrap();
+            cur.extra |= NODE_IS_PRESERVED as u16;
+            cur.extra |= NODE_IS_SPRESERVED as u16;
         }
         self.preserves += 1;
 
-        let mut parent = (*cur).parent();
-        while let Some(mut now) = parent {
+        let mut parent = cur.parent();
+        while let Some(now) = parent {
             if now.element_type() == XmlElementType::XmlElementNode {
+                let mut now = XmlNodePtr::try_from(now).unwrap();
                 now.extra |= NODE_IS_PRESERVED as u16;
             }
             parent = now.parent();
         }
-        cur
+        Some(cur)
     }
 
     /// This tells the XML Reader to preserve all nodes matched by the pattern.
@@ -2761,43 +2653,14 @@ impl XmlTextReader {
     ) -> i32 {
         use std::ffi::CString;
 
-        use crate::generic_error;
-
-        use super::globals::xml_realloc;
-
         let pattern = CString::new(pattern).unwrap();
         let comp: XmlPatternPtr = xml_patterncompile(pattern.as_ptr() as *const u8, 0, namespaces);
         if comp.is_null() {
             return -1;
         }
 
-        if self.pattern_max <= 0 {
-            self.pattern_max = 4;
-            self.pattern_tab =
-                xml_malloc(self.pattern_max as usize * size_of_val(&*self.pattern_tab.add(0)))
-                    as *mut XmlPatternPtr;
-            if self.pattern_tab.is_null() {
-                generic_error!("xmlMalloc failed !\n");
-                return -1;
-            }
-        }
-        if self.pattern_nr >= self.pattern_max {
-            self.pattern_max *= 2;
-            let tmp: *mut XmlPatternPtr = xml_realloc(
-                self.pattern_tab as _,
-                self.pattern_max as usize * size_of_val(&*self.pattern_tab.add(0)),
-            ) as *mut XmlPatternPtr;
-            if tmp.is_null() {
-                generic_error!("xmlRealloc failed !\n");
-                self.pattern_max /= 2;
-                return -1;
-            }
-            self.pattern_tab = tmp;
-        }
-        *self.pattern_tab.add(self.pattern_nr as usize) = comp;
-        let res = self.pattern_nr;
-        self.pattern_nr += 1;
-        res
+        self.pattern_tab.push(comp);
+        self.pattern_tab.len() as i32 - 1
     }
 
     /// Provides the text value of the node if present
@@ -2808,41 +2671,33 @@ impl XmlTextReader {
     pub unsafe fn text_value(&self) -> Option<String> {
         use std::ffi::CStr;
 
-        use crate::tree::NodeCommon;
+        use crate::tree::{NodeCommon, XmlAttrPtr, XmlNsPtr};
 
-        if self.node.is_null() {
-            return None;
-        }
-        let node = if !self.curnode.is_null() {
-            self.curnode
-        } else {
-            self.node
-        };
-
-        match (*node).element_type() {
+        let current_node = self.node?;
+        let node = self.curnode.unwrap_or(current_node);
+        match node.element_type() {
             XmlElementType::XmlNamespaceDecl => {
-                return Some(
-                    CStr::from_ptr((*(node as XmlNsPtr)).href as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                )
+                let ns = XmlNsPtr::try_from(node).unwrap();
+                return ns.href().map(|href| href.into_owned());
             }
             XmlElementType::XmlAttributeNode => {
-                let attr: XmlAttrPtr = (*node).as_attribute_node().unwrap().as_ptr();
+                let attr = XmlAttrPtr::try_from(node).unwrap();
 
-                return if let Some(parent) = (*attr).parent {
-                    (*attr).children.and_then(|c| c.get_string(parent.doc, 1))
+                return if let Some(parent) = attr.parent() {
+                    attr.children()
+                        .and_then(|c| c.get_string(parent.document(), 1))
                 } else {
-                    (*attr).children.and_then(|c| c.get_string(null_mut(), 1))
+                    attr.children().and_then(|c| c.get_string(None, 1))
                 };
             }
             XmlElementType::XmlTextNode
             | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode => {
-                if !(*node).content.is_null() {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                if !node.content.is_null() {
                     return Some(
-                        CStr::from_ptr((*node).content as *const i8)
+                        CStr::from_ptr(node.content as *const i8)
                             .to_string_lossy()
                             .into_owned(),
                     );
@@ -2858,7 +2713,7 @@ impl Default for XmlTextReader {
     fn default() -> Self {
         Self {
             mode: XmlTextReaderMode::default(),
-            doc: null_mut(),
+            doc: None,
             validate: XmlTextReaderValidate::default(),
             allocs: 0,
             state: XmlTextReaderState::default(),
@@ -2873,17 +2728,15 @@ impl Default for XmlTextReader {
             cdata_block: None,
             base: 0,
             cur: 0,
-            node: null_mut(),
-            curnode: null_mut(),
+            node: None,
+            curnode: None,
             depth: 0,
-            faketext: null_mut(),
+            faketext: None,
             preserve: 0,
             buffer: "".to_owned(),
             dict: null_mut(),
-            ent: null_mut(),
-            ent_nr: 0,
-            ent_max: 0,
-            ent_tab: null_mut(),
+            ent: None,
+            ent_tab: vec![],
             error_func: None,
             error_func_arg: None,
             #[cfg(feature = "schema")]
@@ -2895,7 +2748,7 @@ impl Default for XmlTextReader {
             #[cfg(feature = "schema")]
             rng_valid_errors: 0,
             #[cfg(feature = "schema")]
-            rng_full_node: null_mut(),
+            rng_full_node: None,
             #[cfg(feature = "schema")]
             xsd_schemas: null_mut(),
             #[cfg(feature = "schema")]
@@ -2915,11 +2768,7 @@ impl Default for XmlTextReader {
             #[cfg(feature = "xinclude")]
             in_xinclude: 0,
             #[cfg(feature = "libxml_pattern")]
-            pattern_nr: 0,
-            #[cfg(feature = "libxml_pattern")]
-            pattern_max: 0,
-            #[cfg(feature = "libxml_pattern")]
-            pattern_tab: null_mut(),
+            pattern_tab: vec![],
             preserves: 0,
             parser_flags: 0,
             serror_func: None,
@@ -2960,13 +2809,13 @@ unsafe fn xml_text_reader_start_element(
     if !reader.is_null() {
         if let Some(start_element) = (*reader).start_element {
             start_element(ctx, fullname, atts);
-            if !(*ctxt).node.is_null()
-                && !(*ctxt).input.is_null()
-                && !(*(*ctxt).input).cur.is_null()
-                && *(*(*ctxt).input).cur.add(0) == b'/'
-                && *(*(*ctxt).input).cur.add(1) == b'>'
-            {
-                (*(*ctxt).node).extra = NODE_IS_EMPTY as _;
+            if let Some(mut node) = (*ctxt).node.filter(|_| {
+                !(*ctxt).input.is_null()
+                    && !(*(*ctxt).input).cur.is_null()
+                    && *(*(*ctxt).input).cur.add(0) == b'/'
+                    && *(*(*ctxt).input).cur.add(1) == b'>'
+            }) {
+                node.extra = NODE_IS_EMPTY as _;
             }
         }
     }
@@ -3023,13 +2872,13 @@ unsafe fn xml_text_reader_start_element_ns(
                 nb_defaulted,
                 attributes,
             );
-            if !(*ctxt).node.is_null()
-                && !(*ctxt).input.is_null()
-                && !(*(*ctxt).input).cur.is_null()
-                && *(*(*ctxt).input).cur.add(0) == b'/'
-                && *(*(*ctxt).input).cur.add(1) == b'>'
-            {
-                (*(*ctxt).node).extra = NODE_IS_EMPTY as _;
+            if let Some(mut node) = (*ctxt).node.filter(|_| {
+                !(*ctxt).input.is_null()
+                    && !(*(*ctxt).input).cur.is_null()
+                    && *(*(*ctxt).input).cur.add(0) == b'/'
+                    && *(*(*ctxt).input).cur.add(1) == b'>'
+            }) {
+                node.extra = NODE_IS_EMPTY as _;
             }
         }
     }
@@ -3113,10 +2962,7 @@ pub unsafe fn xml_new_text_reader(
         return null_mut();
     }
     std::ptr::write(ret, XmlTextReader::default());
-    (*ret).doc = null_mut();
-    (*ret).ent_tab = null_mut();
-    (*ret).ent_max = 0;
-    (*ret).ent_nr = 0;
+    (*ret).doc = None;
     (*ret).input = Some(input);
     let mut sax = XmlSAXHandler::default();
     xml_sax_version(&mut sax, 2);
@@ -3150,8 +2996,8 @@ pub unsafe fn xml_new_text_reader(
     sax.cdata_block = Some(xml_text_reader_cdata_block);
 
     (*ret).mode = XmlTextReaderMode::XmlTextreaderModeInitial as _;
-    (*ret).node = null_mut();
-    (*ret).curnode = null_mut();
+    (*ret).node = None;
+    (*ret).curnode = None;
     if (*ret)
         .input
         .as_ref()
@@ -3212,8 +3058,7 @@ pub unsafe fn xml_new_text_reader(
     }
     #[cfg(feature = "libxml_pattern")]
     {
-        (*ret).pattern_max = 0;
-        (*ret).pattern_tab = null_mut();
+        (*ret).pattern_tab.clear();
     }
     ret
 }
@@ -3289,13 +3134,12 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         xml_xinclude_free_context((*reader).xincctxt);
     }
     #[cfg(feature = "libxml_pattern")]
-    if !(*reader).pattern_tab.is_null() {
-        for i in 0..(*reader).pattern_nr {
-            if !(*(*reader).pattern_tab.add(i as usize)).is_null() {
-                xml_free_pattern(*(*reader).pattern_tab.add(i as usize));
+    {
+        for pattern in (*reader).pattern_tab.drain(..) {
+            if !pattern.is_null() {
+                xml_free_pattern(pattern);
             }
         }
-        xml_free((*reader).pattern_tab as _);
     }
     if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeClosed {
         xml_text_reader_close(&mut *reader);
@@ -3307,9 +3151,6 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         if (*reader).allocs & XML_TEXTREADER_CTXT != 0 {
             xml_free_parser_ctxt((*reader).ctxt);
         }
-    }
-    if !(*reader).ent_tab.is_null() {
-        xml_free((*reader).ent_tab as _);
     }
     if !(*reader).dict.is_null() {
         xml_dict_free((*reader).dict);
@@ -3348,8 +3189,8 @@ pub unsafe fn xml_text_reader_setup(
     // since usr applications should never modify the tree
     options |= XmlParserOption::XmlParseCompact as i32;
 
-    (*reader).doc = null_mut();
-    (*reader).ent_nr = 0;
+    (*reader).doc = None;
+    (*reader).ent_tab.clear();
     (*reader).parser_flags = options;
     (*reader).validate = XmlTextReaderValidate::NotValidate;
     if input.is_some() && (*reader).input.is_some() && (*reader).allocs & XML_TEXTREADER_INPUT != 0
@@ -3397,8 +3238,8 @@ pub unsafe fn xml_text_reader_setup(
     (*(*reader).ctxt).sax = Some(sax);
 
     (*reader).mode = XmlTextReaderMode::XmlTextreaderModeInitial as _;
-    (*reader).node = null_mut();
-    (*reader).curnode = null_mut();
+    (*reader).node = None;
+    (*reader).curnode = None;
     if replaced {
         if (*reader)
             .input
@@ -3512,17 +3353,9 @@ pub unsafe fn xml_text_reader_setup(
         (*reader).in_xinclude = 0;
     }
     #[cfg(feature = "libxml_pattern")]
-    {
-        if (*reader).pattern_tab.is_null() {
-            (*reader).pattern_nr = 0;
-            (*reader).pattern_max = 0;
-        }
-        while (*reader).pattern_nr > 0 {
-            (*reader).pattern_nr -= 1;
-            if !(*(*reader).pattern_tab.add((*reader).pattern_nr as usize)).is_null() {
-                xml_free_pattern(*(*reader).pattern_tab.add((*reader).pattern_nr as usize));
-                *(*reader).pattern_tab.add((*reader).pattern_nr as usize) = null_mut();
-            }
+    while let Some(pattern) = (*reader).pattern_tab.pop() {
+        if !pattern.is_null() {
+            xml_free_pattern(pattern);
         }
     }
 
@@ -3542,7 +3375,7 @@ pub unsafe fn xml_text_reader_setup(
         }
     }
 
-    (*reader).doc = null_mut();
+    (*reader).doc = None;
 
     0
 }
@@ -3567,15 +3400,10 @@ macro_rules! DICT_FREE {
 /// Free a property and all its siblings, all the children are freed too.
 #[doc(alias = "xmlTextReaderFreePropList")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_free_prop_list(
-    reader: &mut XmlTextReader,
-    mut cur: XmlAttrPtr,
-) {
-    let mut next: XmlAttrPtr;
-
-    while !cur.is_null() {
-        next = (*cur).next;
-        xml_text_reader_free_prop(reader, cur);
+unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: Option<XmlAttrPtr>) {
+    while let Some(now) = cur {
+        let next = now.next;
+        xml_text_reader_free_prop(reader, now);
         cur = next;
     }
 }
@@ -3583,11 +3411,9 @@ unsafe extern "C" fn xml_text_reader_free_prop_list(
 /// Free a node and all its siblings, this is a recursive behaviour, all the children are freed too.
 #[doc(alias = "xmlTextReaderFreeNodeList")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlNodePtr) {
-    use crate::tree::{NodeCommon, NodePtr};
+unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlGenericNodePtr) {
+    use crate::tree::{NodeCommon, XmlNodePtr, XmlNsPtr};
 
-    let mut next: XmlNodePtr;
-    let mut parent: XmlNodePtr;
     let mut depth: usize = 0;
 
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
@@ -3595,105 +3421,102 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
     } else {
         null_mut()
     };
-    if cur.is_null() {
+    if let Ok(ns) = XmlNsPtr::try_from(cur) {
+        xml_free_ns_list(ns);
         return;
     }
-    if (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
-        xml_free_ns_list(cur as XmlNsPtr);
-        return;
-    }
-    if matches!(
-        (*cur).element_type(),
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
-    ) {
-        xml_free_doc((*cur).as_document_node().unwrap().as_ptr());
+    if let Ok(doc) = XmlDocPtr::try_from(cur) {
+        xml_free_doc(doc);
         return;
     }
     loop {
-        while let Some(children) = (*cur).children().filter(|children| {
-            children.parent() == NodePtr::from_ptr(cur)
+        while let Some(children) = cur.children().filter(|children| {
+            children.parent() == Some(cur)
                 && !matches!(
-                    (*cur).element_type(),
+                    cur.element_type(),
                     XmlElementType::XmlDTDNode | XmlElementType::XmlEntityRefNode
                 )
         }) {
-            cur = children.as_ptr();
+            cur = children;
             depth += 1;
         }
 
-        next = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
-        parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+        let next = cur.next();
+        let parent = cur.parent();
 
-        /* unroll to speed up freeing the document */
-        if (*cur).element_type() != XmlElementType::XmlDTDNode {
+        // unroll to speed up freeing the document
+        if cur.element_type() != XmlElementType::XmlDTDNode {
             if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
                 // if let Some(f) = xmlDeregisterNodeDefaultValue {
                 //     f(cur as _);
                 // }
-                xml_deregister_node_default_value(cur as _);
+                xml_deregister_node_default_value(cur);
             }
 
+            let mut cur = XmlNodePtr::try_from(cur).unwrap();
             if matches!(
-                (*cur).element_type(),
+                cur.element_type(),
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlXIncludeStart
                     | XmlElementType::XmlXIncludeEnd
-            ) && !(*cur).properties.is_null()
+            ) && cur.properties.is_some()
             {
-                xml_text_reader_free_prop_list(&mut *reader, (*cur).properties);
+                xml_text_reader_free_prop_list(&mut *reader, cur.properties);
             }
             if !matches!(
-                (*cur).element_type(),
+                cur.element_type(),
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlXIncludeStart
                     | XmlElementType::XmlXIncludeEnd
                     | XmlElementType::XmlEntityRefNode
             ) {
-                DICT_FREE!(dict, (*cur).content);
+                DICT_FREE!(dict, cur.content);
             }
             if matches!(
-                (*cur).element_type(),
+                cur.element_type(),
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlXIncludeStart
                     | XmlElementType::XmlXIncludeEnd
-            ) && !(*cur).ns_def.is_null()
-            {
-                xml_free_ns_list((*cur).ns_def);
+            ) {
+                if let Some(ns_def) = cur.ns_def {
+                    xml_free_ns_list(ns_def);
+                }
             }
 
-            /*
-             * we don't free element names here they are interned now
-             */
+            // we don't free element names here they are interned now
             if !matches!(
-                (*cur).element_type(),
+                cur.element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCommentNode
             ) {
-                DICT_FREE!(dict, (*cur).name);
+                DICT_FREE!(dict, cur.name);
             }
             if matches!(
-                (*cur).element_type(),
+                cur.element_type(),
                 XmlElementType::XmlElementNode | XmlElementType::XmlTextNode
             ) && !reader.is_null()
                 && !(*reader).ctxt.is_null()
                 && (*(*reader).ctxt).free_elems_nr < MAX_FREE_NODES
             {
-                (*cur).next = NodePtr::from_ptr((*(*reader).ctxt).free_elems);
-                (*(*reader).ctxt).free_elems = cur;
+                cur.next = (*(*reader).ctxt).free_elems.map(|node| node.into());
+                (*(*reader).ctxt).free_elems = Some(cur);
                 (*(*reader).ctxt).free_elems_nr += 1;
             } else {
-                xml_free(cur as _);
+                cur.free();
             }
         }
 
-        if !next.is_null() {
+        if let Some(next) = next {
             cur = next;
         } else {
-            if depth == 0 || parent.is_null() {
+            if depth == 0 || parent.is_none() {
                 break;
             }
+            let Some(parent) = parent else {
+                break;
+            };
             depth -= 1;
             cur = parent;
-            (*cur).set_children(None);
+            cur.set_children(None);
         }
     }
 }
@@ -3701,37 +3524,34 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
 /// Free a node.
 #[doc(alias = "xmlTextReaderFreeProp")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: XmlAttrPtr) {
+unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPtr) {
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
         (*(*reader).ctxt).dict
     } else {
         null_mut()
     };
-    if cur.is_null() {
-        return;
-    }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
         // if let Some(f) = xmlDeregisterNodeDefaultValue {
         //     f(cur as _);
         // }
-        xml_deregister_node_default_value(cur as _);
+        xml_deregister_node_default_value(cur.into());
     }
 
-    if let Some(children) = (*cur).children {
-        xml_text_reader_free_node_list(reader, children.as_ptr());
+    if let Some(children) = cur.children.map(XmlGenericNodePtr::from) {
+        xml_text_reader_free_node_list(reader, children);
     }
 
-    DICT_FREE!(dict, (*cur).name);
+    DICT_FREE!(dict, cur.name);
     if !reader.is_null()
         && !(*reader).ctxt.is_null()
         && (*(*reader).ctxt).free_attrs_nr < MAX_FREE_NODES
     {
-        (*cur).next = (*(*reader).ctxt).free_attrs;
-        (*(*reader).ctxt).free_attrs = cur;
+        cur.next = (*(*reader).ctxt).free_attrs;
+        (*(*reader).ctxt).free_attrs = Some(cur);
         (*(*reader).ctxt).free_attrs_nr += 1;
     } else {
-        xml_free(cur as _);
+        cur.free();
     }
 }
 
@@ -3739,35 +3559,35 @@ unsafe extern "C" fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: Xm
 /// This doesn't unlink the child from the list, use xmlUnlinkNode() first.
 #[doc(alias = "xmlTextReaderFreeNode")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: XmlNodePtr) {
-    use crate::tree::{NodeCommon, NodePtr};
+unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGenericNodePtr) {
+    use crate::tree::{NodeCommon, XmlDtdPtr, XmlNodePtr, XmlNsPtr};
 
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
         (*(*reader).ctxt).dict
     } else {
         null_mut()
     };
-    if (*cur).element_type() == XmlElementType::XmlDTDNode {
-        xml_free_dtd((*cur).as_dtd_node().unwrap().as_ptr());
+    if let Ok(dtd) = XmlDtdPtr::try_from(cur) {
+        xml_free_dtd(dtd);
         return;
     }
-    if (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
-        xml_free_ns(cur as XmlNsPtr);
+    if let Ok(ns) = XmlNsPtr::try_from(cur) {
+        xml_free_ns(ns);
         return;
     }
-    if (*cur).element_type() == XmlElementType::XmlAttributeNode {
-        xml_text_reader_free_prop(reader, (*cur).as_attribute_node().unwrap().as_ptr());
+    if let Ok(attr) = XmlAttrPtr::try_from(cur) {
+        xml_text_reader_free_prop(reader, attr);
         return;
     }
 
-    if let Some(children) = (*cur)
+    if let Some(children) = cur
         .children()
-        .filter(|_| (*cur).element_type() != XmlElementType::XmlEntityRefNode)
+        .filter(|_| cur.element_type() != XmlElementType::XmlEntityRefNode)
     {
-        if children.parent() == NodePtr::from_ptr(cur) {
-            xml_text_reader_free_node_list(reader, children.as_ptr());
+        if children.parent() == Some(cur) {
+            xml_text_reader_free_node_list(reader, children);
         }
-        (*cur).set_children(None);
+        cur.set_children(None);
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
@@ -3777,56 +3597,56 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
         xml_deregister_node_default_value(cur);
     }
 
+    let mut cur = XmlNodePtr::try_from(cur).unwrap();
     if matches!(
-        (*cur).element_type(),
+        cur.element_type(),
         XmlElementType::XmlElementNode
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd
-    ) && !(*cur).properties.is_null()
+    ) && cur.properties.is_some()
     {
-        xml_text_reader_free_prop_list(&mut *reader, (*cur).properties);
+        xml_text_reader_free_prop_list(&mut *reader, cur.properties);
     }
     if !matches!(
-        (*cur).element_type(),
+        cur.element_type(),
         XmlElementType::XmlElementNode
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd
             | XmlElementType::XmlEntityRefNode
     ) {
-        DICT_FREE!(dict, (*cur).content);
+        DICT_FREE!(dict, cur.content);
     }
     if matches!(
-        (*cur).element_type(),
+        cur.element_type(),
         XmlElementType::XmlElementNode
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd
-    ) && !(*cur).ns_def.is_null()
-    {
-        xml_free_ns_list((*cur).ns_def);
+    ) {
+        if let Some(ns_def) = cur.ns_def {
+            xml_free_ns_list(ns_def);
+        }
     }
 
-    /*
-     * we don't free names here they are interned now
-     */
+    // we don't free names here they are interned now
     if !matches!(
-        (*cur).element_type(),
+        cur.element_type(),
         XmlElementType::XmlTextNode | XmlElementType::XmlCommentNode
     ) {
-        DICT_FREE!(dict, (*cur).name);
+        DICT_FREE!(dict, cur.name);
     }
 
     if matches!(
-        (*cur).element_type(),
+        cur.element_type(),
         XmlElementType::XmlElementNode | XmlElementType::XmlTextNode
     ) && !reader.is_null()
         && !(*reader).ctxt.is_null()
         && (*(*reader).ctxt).free_elems_nr < MAX_FREE_NODES
     {
-        (*cur).next = NodePtr::from_ptr((*(*reader).ctxt).free_elems);
-        (*(*reader).ctxt).free_elems = cur;
+        cur.next = (*(*reader).ctxt).free_elems.map(|node| node.into());
+        (*(*reader).ctxt).free_elems = Some(cur);
         (*(*reader).ctxt).free_elems_nr += 1;
     } else {
-        xml_free(cur as _);
+        cur.free();
     }
 }
 
@@ -3835,26 +3655,17 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
 /// Returns the successor node or NULL
 #[doc(alias = "xmlTextReaderGetSuccessor")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_get_successor(mut cur: XmlNodePtr) -> XmlNodePtr {
-    use crate::tree::NodeCommon;
-
-    if cur.is_null() {
-        return null_mut(); /* ERROR */
+unsafe fn xml_text_reader_get_successor(cur: XmlGenericNodePtr) -> Option<XmlGenericNodePtr> {
+    if let Some(next) = cur.next() {
+        return Some(next);
     }
-    if let Some(next) = (*cur).next {
-        return next.as_ptr();
+    let mut cur = cur.parent();
+    while let Some(now) = cur {
+        if let Some(next) = now.next() {
+            return Some(next);
+        }
+        cur = now.parent();
     }
-    'b: while {
-        cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-        if cur.is_null() {
-            break 'b;
-        }
-        if let Some(next) = (*cur).next {
-            return next.as_ptr();
-        }
-
-        !cur.is_null()
-    } {}
     cur
 }
 
@@ -3865,32 +3676,34 @@ unsafe extern "C" fn xml_text_reader_get_successor(mut cur: XmlNodePtr) -> XmlNo
 ///  Returns a string containing the content, or NULL in case of error.
 #[doc(alias = "xmlTextReaderCollectSiblings")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *mut XmlChar {
+unsafe fn xml_text_reader_collect_siblings(node: XmlGenericNodePtr) -> *mut XmlChar {
     use std::ffi::CStr;
 
-    use crate::{libxml::xmlstring::xml_strndup, tree::NodeCommon};
+    use crate::libxml::xmlstring::xml_strndup;
 
-    if node.is_null() || (*node).element_type() == XmlElementType::XmlNamespaceDecl {
+    if node.element_type() == XmlElementType::XmlNamespaceDecl {
         return null_mut();
     }
 
     let mut buffer = vec![];
-    while !node.is_null() {
-        match (*node).element_type() {
+    let mut cur = Some(node);
+    while let Some(cur_node) = cur {
+        match cur_node.element_type() {
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
-                buffer.extend(CStr::from_ptr((*node).content as *const i8).to_bytes());
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                buffer.extend(CStr::from_ptr(cur_node.content as *const i8).to_bytes());
             }
             XmlElementType::XmlElementNode => {
-                let tmp: *mut XmlChar = xml_text_reader_collect_siblings(
-                    (*node).children().map_or(null_mut(), |c| c.as_ptr()),
-                );
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let tmp: *mut XmlChar =
+                    xml_text_reader_collect_siblings(cur_node.children.unwrap());
                 buffer.extend(CStr::from_ptr(tmp as *const i8).to_bytes());
                 xml_free(tmp as _);
             }
             _ => {}
         }
 
-        node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
+        cur = cur_node.next();
     }
     xml_strndup(buffer.as_ptr(), buffer.len() as i32)
 }
@@ -3900,42 +3713,35 @@ unsafe fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *mut XmlChar
 /// Returns 0 i no attributes, -1 in case of error or the attribute count
 #[doc(alias = "xmlTextReaderAttributeCount")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32 {
+pub unsafe fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32 {
     use crate::tree::NodeCommon;
 
-    let mut ret: i32;
-    let mut attr: XmlAttrPtr;
-    let mut ns: XmlNsPtr;
-
-    if reader.node.is_null() {
+    let Some(current_node) = reader.node else {
         return 0;
-    }
-
-    let node = if !reader.curnode.is_null() {
-        reader.curnode
-    } else {
-        reader.node
     };
-
-    if (*node).element_type() != XmlElementType::XmlElementNode {
+    let node = reader.curnode.unwrap_or(current_node);
+    let Some(node) = XmlNodePtr::try_from(node)
+        .ok()
+        .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+    else {
         return 0;
-    }
+    };
     if matches!(
         reader.state,
         XmlTextReaderState::End | XmlTextReaderState::Backtrack
     ) {
         return 0;
     }
-    ret = 0;
-    attr = (*node).properties;
-    while !attr.is_null() {
+    let mut ret = 0;
+    let mut attr = node.properties;
+    while let Some(now) = attr {
         ret += 1;
-        attr = (*attr).next;
+        attr = now.next;
     }
-    ns = (*node).ns_def;
-    while !ns.is_null() {
+    let mut ns = node.ns_def;
+    while let Some(now) = ns {
         ret += 1;
-        ns = (*ns).next;
+        ns = now.next;
     }
     ret
 }
@@ -3945,17 +3751,13 @@ pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextRea
 /// Returns the base URI or NULL if not available, the string will be deallocated with the reader
 #[doc(alias = "xmlTextReaderConstBaseUri")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_base_uri(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_base_uri(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
-    use crate::tree::NodeCommon;
-
-    if reader.node.is_null() {
+    let Some(current_node) = reader.node else {
         return null_mut();
-    }
-    let Some(tmp) = (*reader.node).get_base(null_mut()) else {
+    };
+    let Some(tmp) = current_node.get_base(None) else {
         return null_mut();
     };
     let tmp = CString::new(tmp).unwrap();
@@ -3969,31 +3771,30 @@ pub unsafe extern "C" fn xml_text_reader_const_base_uri(
 #[doc(alias = "xmlTextReaderConstLocalName")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_const_local_name(reader: &mut XmlTextReader) -> *const XmlChar {
-    use crate::tree::NodeCommon;
+    use crate::tree::XmlNsPtr;
 
-    if reader.node.is_null() {
+    let Some(current_node) = reader.node else {
         return null_mut();
-    }
-    let node = if !reader.curnode.is_null() {
-        reader.curnode
-    } else {
-        reader.node
     };
-    if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
-        let ns: XmlNsPtr = node as XmlNsPtr;
-        if (*ns).prefix.is_null() {
+    let node = reader.curnode.unwrap_or(current_node);
+    if let Ok(ns) = XmlNsPtr::try_from(node) {
+        if ns.prefix.is_null() {
             return CONSTSTR!(reader, c"xmlns".as_ptr() as _);
         } else {
-            return (*ns).prefix;
+            return ns.prefix;
         }
     }
-    if !matches!(
-        (*node).element_type(),
-        XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
-    ) {
-        return xml_text_reader_const_name(reader);
+    match node.element_type() {
+        XmlElementType::XmlElementNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            node.name
+        }
+        XmlElementType::XmlAttributeNode => {
+            let attr = XmlAttrPtr::try_from(node).unwrap();
+            attr.name
+        }
+        _ => xml_text_reader_const_name(reader),
     }
-    (*node).name
 }
 
 /// The qualified name of the node, equal to Prefix :LocalName.
@@ -4001,32 +3802,40 @@ pub unsafe fn xml_text_reader_const_local_name(reader: &mut XmlTextReader) -> *c
 /// Returns the local name or NULL if not available, the string is deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstName")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) -> *const XmlChar {
-    use crate::tree::NodeCommon;
+pub unsafe fn xml_text_reader_const_name(reader: &mut XmlTextReader) -> *const XmlChar {
+    use crate::tree::{XmlDtdPtr, XmlNsPtr};
 
-    if reader.node.is_null() {
+    let Some(current_node) = reader.node else {
         return null_mut();
-    }
-    let node = if !reader.curnode.is_null() {
-        reader.curnode
-    } else {
-        reader.node
     };
-    match (*node).element_type() {
-        XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
-                return (*node).name;
-            }
-            CONSTQSTR!(reader, (*(*node).ns).prefix, (*node).name)
+    let node = reader.curnode.unwrap_or(current_node);
+    match node.element_type() {
+        XmlElementType::XmlElementNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            let Some(prefix) = node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) else {
+                return node.name;
+            };
+            CONSTQSTR!(reader, prefix, node.name)
+        }
+        XmlElementType::XmlAttributeNode => {
+            let attr = XmlAttrPtr::try_from(node).unwrap();
+            let Some(prefix) = attr.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) else {
+                return attr.name;
+            };
+            CONSTQSTR!(reader, prefix, attr.name)
         }
         XmlElementType::XmlTextNode => CONSTSTR!(reader, c"#text".as_ptr() as _),
         XmlElementType::XmlCDATASectionNode => {
             CONSTSTR!(reader, c"#cdata-section".as_ptr() as _)
         }
         XmlElementType::XmlEntityNode | XmlElementType::XmlEntityRefNode => {
-            CONSTSTR!(reader, (*node).name)
+            let node = XmlNodePtr::try_from(node).unwrap();
+            CONSTSTR!(reader, node.name)
         }
-        XmlElementType::XmlPINode => CONSTSTR!(reader, (*node).name),
+        XmlElementType::XmlPINode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            CONSTSTR!(reader, node.name)
+        }
         XmlElementType::XmlCommentNode => CONSTSTR!(reader, c"#comment".as_ptr() as _),
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
             CONSTSTR!(reader, c"#document".as_ptr() as _)
@@ -4034,17 +3843,21 @@ pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) 
         XmlElementType::XmlDocumentFragNode => {
             CONSTSTR!(reader, c"#document-fragment".as_ptr() as _)
         }
-        XmlElementType::XmlNotationNode => CONSTSTR!(reader, (*node).name),
+        XmlElementType::XmlNotationNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            CONSTSTR!(reader, node.name)
+        }
         XmlElementType::XmlDocumentTypeNode | XmlElementType::XmlDTDNode => {
-            CONSTSTR!(reader, (*node).name)
+            let dtd = XmlDtdPtr::try_from(node).unwrap();
+            CONSTSTR!(reader, dtd.name)
         }
         XmlElementType::XmlNamespaceDecl => {
-            let ns: XmlNsPtr = node as XmlNsPtr;
+            let ns = XmlNsPtr::try_from(node).unwrap();
 
-            if (*ns).prefix.is_null() {
+            if ns.prefix.is_null() {
                 return CONSTSTR!(reader, c"xmlns".as_ptr() as _);
             }
-            CONSTQSTR!(reader, c"xmlns".as_ptr() as _, (*ns).prefix)
+            CONSTQSTR!(reader, c"xmlns".as_ptr() as _, ns.prefix)
         }
 
         XmlElementType::XmlElementDecl
@@ -4062,32 +3875,33 @@ pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) 
 /// Returns the namespace URI or NULL if not available, the string will be deallocated with the reader
 #[doc(alias = "xmlTextReaderConstNamespaceUri")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_namespace_uri(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
-    use crate::tree::NodeCommon;
-
-    if reader.node.is_null() {
+pub unsafe fn xml_text_reader_const_namespace_uri(reader: &mut XmlTextReader) -> *const XmlChar {
+    let Some(current_node) = reader.node else {
         return null_mut();
-    }
-    let node = if !reader.curnode.is_null() {
-        reader.curnode
-    } else {
-        reader.node
     };
-    if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
+    let node = reader.curnode.unwrap_or(current_node);
+    if node.element_type() == XmlElementType::XmlNamespaceDecl {
         return CONSTSTR!(reader, c"http://www.w3.org/2000/xmlns/".as_ptr() as _);
     }
-    if !matches!(
-        (*node).element_type(),
-        XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
-    ) {
-        return null_mut();
+    match node.element_type() {
+        XmlElementType::XmlElementNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            if let Some(ns) = node.ns {
+                CONSTSTR!(reader, ns.href)
+            } else {
+                null_mut()
+            }
+        }
+        XmlElementType::XmlAttributeNode => {
+            let attr = XmlAttrPtr::try_from(node).unwrap();
+            if let Some(ns) = attr.ns {
+                CONSTSTR!(reader, ns.href)
+            } else {
+                null_mut()
+            }
+        }
+        _ => null_mut(),
     }
-    if !(*node).ns.is_null() {
-        return CONSTSTR!(reader, (*(*node).ns).href);
-    }
-    null_mut()
 }
 
 /// A shorthand reference to the namespace associated with the node.
@@ -4095,36 +3909,38 @@ pub unsafe extern "C" fn xml_text_reader_const_namespace_uri(
 /// Returns the prefix or NULL if not available, the string is deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstPrefix")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_prefix(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
-    use crate::tree::NodeCommon;
+pub unsafe fn xml_text_reader_const_prefix(reader: &mut XmlTextReader) -> *const XmlChar {
+    use crate::tree::XmlNsPtr;
 
-    if reader.node.is_null() {
+    let Some(current_node) = reader.node else {
         return null_mut();
-    }
-    let node = if !reader.curnode.is_null() {
-        reader.curnode
-    } else {
-        reader.node
     };
-    if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
-        let ns: XmlNsPtr = node as XmlNsPtr;
-        if (*ns).prefix().is_none() {
+    let node = reader.curnode.unwrap_or(current_node);
+    if let Ok(ns) = XmlNsPtr::try_from(node) {
+        if ns.prefix().is_none() {
             return null_mut();
         }
         return CONSTSTR!(reader, c"xmlns".as_ptr() as _);
     }
-    if !matches!(
-        (*node).element_type(),
-        XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
-    ) {
-        return null_mut();
+    match node.element_type() {
+        XmlElementType::XmlElementNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            if let Some(prefix) = node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                CONSTSTR!(reader, prefix)
+            } else {
+                null_mut()
+            }
+        }
+        XmlElementType::XmlAttributeNode => {
+            let attr = XmlAttrPtr::try_from(node).unwrap();
+            if let Some(prefix) = attr.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
+                CONSTSTR!(reader, prefix)
+            } else {
+                null_mut()
+            }
+        }
+        _ => null_mut(),
     }
-    if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
-        return CONSTSTR!(reader, (*(*node).ns).prefix);
-    }
-    null_mut()
 }
 
 /// The xml:lang scope within which the node resides.
@@ -4132,15 +3948,13 @@ pub unsafe extern "C" fn xml_text_reader_const_prefix(
 /// Returns the xml:lang value or NULL if none exists.
 #[doc(alias = "xmlTextReaderConstXmlLang")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_xml_lang(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_xml_lang(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
-    if reader.node.is_null() {
+    let Some(current_node) = reader.node else {
         return null_mut();
-    }
-    let Some(tmp) = (*reader.node).get_lang() else {
+    };
+    let Some(tmp) = current_node.get_lang() else {
         return null_mut();
     };
     let tmp = CString::new(tmp).unwrap();
@@ -4155,7 +3969,7 @@ pub unsafe extern "C" fn xml_text_reader_const_xml_lang(
 /// The string will be deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstString")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_string(
+pub unsafe fn xml_text_reader_const_string(
     reader: &mut XmlTextReader,
     str: *const XmlChar,
 ) -> *const XmlChar {
@@ -4169,30 +3983,30 @@ pub unsafe extern "C" fn xml_text_reader_const_string(
 #[doc(alias = "xmlTextReaderConstValue")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const XmlChar {
-    use crate::tree::NodeCommon;
+    use crate::tree::{NodeCommon, XmlNsPtr};
 
-    if reader.node.is_null() {
+    let Some(current_node) = reader.node else {
         return null_mut();
-    }
-    let node = if !reader.curnode.is_null() {
-        reader.curnode
-    } else {
-        reader.node
     };
+    let node = reader.curnode.unwrap_or(current_node);
 
     match (*node).element_type() {
-        XmlElementType::XmlNamespaceDecl => return (*(node as XmlNsPtr)).href,
+        XmlElementType::XmlNamespaceDecl => {
+            let ns = XmlNsPtr::try_from(node).unwrap();
+            return ns.href;
+        }
         XmlElementType::XmlAttributeNode => {
-            let attr: XmlAttrPtr = (*node).as_attribute_node().unwrap().as_ptr();
+            let attr = XmlAttrPtr::try_from(node).unwrap();
 
-            if let Some(children) = (*attr)
-                .children
-                .filter(|c| c.element_type() == XmlElementType::XmlTextNode && c.next.is_none())
+            if let Some(children) = attr
+                .children()
+                .filter(|c| c.element_type() == XmlElementType::XmlTextNode && c.next().is_none())
+                .map(|children| XmlNodePtr::try_from(children).unwrap())
             {
                 return children.content;
             } else {
                 reader.buffer.clear();
-                (*node).get_content_to(&mut reader.buffer);
+                attr.get_content_to(&mut reader.buffer);
                 // temporary workaround for NULL terminated string
                 reader.buffer.push('\0');
                 return reader.buffer.as_ptr();
@@ -4201,7 +4015,10 @@ pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const 
         XmlElementType::XmlTextNode
         | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlPINode
-        | XmlElementType::XmlCommentNode => return (*node).content,
+        | XmlElementType::XmlCommentNode => {
+            let node = XmlNodePtr::try_from(node).unwrap();
+            return node.content;
+        }
         _ => {}
     }
     null_mut()
@@ -4210,56 +4027,47 @@ pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const 
 /// Free up all the structures used by a document, tree included.
 #[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
+unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, mut cur: XmlDocPtr) {
     use crate::tree::NodeCommon;
-
-    let mut ext_subset: XmlDtdPtr;
-
-    if cur.is_null() {
-        return;
-    }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
         // if let Some(f) = xmlDeregisterNodeDefaultValue {
         //     f(cur as _);
         // }
-        xml_deregister_node_default_value(cur as _);
+        xml_deregister_node_default_value(cur.into());
     }
 
     // Do this before freeing the children list to avoid ID lookups
-    (*cur).ids.take();
-    (*cur).refs.take();
-    ext_subset = (*cur).ext_subset;
-    let int_subset: XmlDtdPtr = (*cur).int_subset;
+    cur.ids.take();
+    cur.refs.take();
+    let mut ext_subset = cur.ext_subset.take();
+    let int_subset = cur.int_subset.take();
     if int_subset == ext_subset {
-        ext_subset = null_mut();
+        ext_subset = None;
     }
-    if !ext_subset.is_null() {
-        (*(*cur).ext_subset).unlink();
-        (*cur).ext_subset = null_mut();
+    if let Some(mut ext_subset) = ext_subset {
+        ext_subset.unlink();
         xml_free_dtd(ext_subset);
     }
-    if !int_subset.is_null() {
-        (*(*cur).int_subset).unlink();
-        (*cur).int_subset = null_mut();
+    if let Some(mut int_subset) = int_subset {
+        int_subset.unlink();
         xml_free_dtd(int_subset);
     }
 
-    if let Some(children) = (*cur).children {
-        xml_text_reader_free_node_list(reader, children.as_ptr());
+    if let Some(children) = cur.children {
+        xml_text_reader_free_node_list(reader, children);
     }
 
-    (*cur).version = None;
-    if !(*cur).name.is_null() {
-        xml_free((*cur).name as _);
+    cur.version = None;
+    if !cur.name.is_null() {
+        xml_free(cur.name as _);
     }
-    (*cur).encoding = None;
-    if !(*cur).old_ns.is_null() {
-        xml_free_ns_list((*cur).old_ns);
+    cur.encoding = None;
+    if let Some(old_ns) = cur.old_ns.take() {
+        xml_free_ns_list(old_ns);
     }
-    (*cur).url = None;
-
-    xml_free(cur as _);
+    cur.url = None;
+    cur.free();
 }
 
 /// This method releases any resources allocated by the current instance
@@ -4268,40 +4076,27 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlTextReaderClose")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
-    reader.node = null_mut();
-    reader.curnode = null_mut();
+pub unsafe fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
+    reader.node = None;
+    reader.curnode = None;
     reader.mode = XmlTextReaderMode::XmlTextreaderModeClosed;
-    if !reader.faketext.is_null() {
-        xml_free_node(reader.faketext);
-        reader.faketext = null_mut();
+    if let Some(faketext) = reader.faketext.take() {
+        xml_free_node(faketext);
     }
     if !reader.ctxt.is_null() {
-        #[cfg(feature = "libxml_valid")]
-        if !(*reader.ctxt).vctxt.vstate_tab.is_null() && (*reader.ctxt).vctxt.vstate_max > 0 {
-            #[cfg(feature = "libxml_regexp")]
-            while (*reader.ctxt).vctxt.vstate_nr > 0 {
-                xml_validate_pop_element(
-                    addr_of_mut!((*reader.ctxt).vctxt),
-                    null_mut(),
-                    null_mut(),
-                    null_mut(),
-                );
-            }
-            xml_free((*reader.ctxt).vctxt.vstate_tab as _);
-            (*reader.ctxt).vctxt.vstate_tab = null_mut();
-            (*reader.ctxt).vctxt.vstate_max = 0;
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_valid"))]
+        while !(*reader.ctxt).vctxt.vstate_tab.is_empty() {
+            xml_validate_pop_element(addr_of_mut!((*reader.ctxt).vctxt), None, None, null_mut());
         }
+        (*reader.ctxt).vctxt.vstate_tab.clear();
         (*reader.ctxt).stop();
-        if !(*reader.ctxt).my_doc.is_null() {
+        if let Some(my_doc) = (*reader.ctxt).my_doc.take() {
             if reader.preserve == 0 {
-                xml_text_reader_free_doc(reader, (*reader.ctxt).my_doc);
+                xml_text_reader_free_doc(reader, my_doc);
             }
-            (*reader.ctxt).my_doc = null_mut();
         }
     }
     if reader.input.is_some() && reader.allocs & XML_TEXTREADER_INPUT != 0 {
-        // xml_free_parser_input_buffer((*reader).input);
         let _ = reader.input.take();
         reader.allocs -= XML_TEXTREADER_INPUT;
     }
@@ -4314,26 +4109,25 @@ pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> i3
 /// The string must be deallocated by the caller.
 #[doc(alias = "xmlTextReaderLookupNamespace")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_lookup_namespace(
+pub unsafe fn xml_text_reader_lookup_namespace(
     reader: &mut XmlTextReader,
     prefix: *const XmlChar,
 ) -> *mut XmlChar {
     use std::ffi::CStr;
 
-    if reader.node.is_null() {
+    let Some(current_node) = reader.node else {
         return null_mut();
-    }
+    };
 
-    let ns: XmlNsPtr = (*reader.node).search_ns(
-        (*reader.node).doc,
+    let Some(ns) = current_node.search_ns(
+        current_node.document(),
         (!prefix.is_null())
             .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
             .as_deref(),
-    );
-    if ns.is_null() {
+    ) else {
         return null_mut();
-    }
-    xml_strdup((*ns).href)
+    };
+    xml_strdup(ns.href)
 }
 
 /// Determine the encoding of the document being read.
@@ -4342,22 +4136,18 @@ pub unsafe extern "C" fn xml_text_reader_lookup_namespace(
 /// The string is deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstEncoding")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_encoding(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_encoding(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
-    let mut doc: XmlDocPtr = null_mut();
-    if !reader.doc.is_null() {
-        doc = reader.doc;
-    } else if !reader.ctxt.is_null() {
-        doc = (*reader.ctxt).my_doc;
-    }
-    if doc.is_null() {
+    let Some(doc) = reader.doc.or_else(|| {
+        (!reader.ctxt.is_null())
+            .then(|| (*reader.ctxt).my_doc)
+            .flatten()
+    }) else {
         return null_mut();
-    }
+    };
 
-    if let Some(encoding) = (*doc).encoding.as_deref() {
+    if let Some(encoding) = doc.encoding.as_deref() {
         let encoding = CString::new(encoding).unwrap();
         CONSTSTR!(reader, encoding.as_ptr() as *const u8)
     } else {
@@ -4371,7 +4161,7 @@ pub unsafe extern "C" fn xml_text_reader_const_encoding(
 /// Returns 0 if the call was successful, or -1 in case of error
 #[doc(alias = "xmlTextReaderSetParserProp")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_set_parser_prop(
+pub unsafe fn xml_text_reader_set_parser_prop(
     reader: &mut XmlTextReader,
     prop: i32,
     value: i32,
@@ -4382,7 +4172,7 @@ pub unsafe extern "C" fn xml_text_reader_set_parser_prop(
     let ctxt: XmlParserCtxtPtr = reader.ctxt;
 
     match XmlParserProperties::try_from(prop) {
-        Ok(XmlParserProperties::XmlParserLoaddtd) => {
+        Ok(XmlParserProperties::XmlParserLoadDTD) => {
             if value != 0 {
                 if (*ctxt).loadsubset == 0 {
                     if reader.mode != XmlTextReaderMode::XmlTextreaderModeInitial {
@@ -4395,7 +4185,7 @@ pub unsafe extern "C" fn xml_text_reader_set_parser_prop(
             }
             0
         }
-        Ok(XmlParserProperties::XmlParserDefaultattrs) => {
+        Ok(XmlParserProperties::XmlParserDefaultAttrs) => {
             if value != 0 {
                 (*ctxt).loadsubset |= XML_COMPLETE_ATTRS as i32;
             } else if (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0 {
@@ -4782,7 +4572,7 @@ unsafe fn xml_text_reader_relaxng_validate_internal(
         );
     }
     (*reader).rng_valid_errors = 0;
-    (*reader).rng_full_node = null_mut();
+    (*reader).rng_full_node = None;
     (*reader).validate = XmlTextReaderValidate::ValidateRng;
     0
 }
@@ -4883,7 +4673,7 @@ pub unsafe fn xml_text_reader_relaxng_set_schema(
         );
     }
     (*reader).rng_valid_errors = 0;
-    (*reader).rng_full_node = null_mut();
+    (*reader).rng_full_node = None;
     (*reader).validate = XmlTextReaderValidate::ValidateRng;
     0
 }
@@ -4919,12 +4709,12 @@ unsafe fn xml_text_reader_locator(
         }
         return 0;
     }
-    if !(*reader).node.is_null() {
+    if let Some(current_node) = (*reader).node {
         let res: i64;
         let mut ret: i32 = 0;
 
         if !line.is_null() {
-            res = (*(*reader).node).get_line_no();
+            res = current_node.get_line_no();
             if res > 0 {
                 *line = res as u64;
             } else {
@@ -4932,9 +4722,12 @@ unsafe fn xml_text_reader_locator(
             }
         }
         if !file.is_null() {
-            let doc: XmlDocPtr = (*(*reader).node).doc;
-            if !doc.is_null() && (*doc).url.is_some() {
-                *file = (*doc).url.clone();
+            if let Some(url) = current_node
+                .document()
+                .as_deref()
+                .and_then(|doc| doc.url.as_deref())
+            {
+                *file = Some(url.to_owned());
             } else {
                 ret = -1;
             }
@@ -5199,25 +4992,18 @@ pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSc
 /// The string is deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstXmlVersion")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_xml_version(
-    reader: XmlTextReaderPtr,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_xml_version(reader: &mut XmlTextReader) -> *const XmlChar {
     use std::ffi::CString;
 
-    let mut doc: XmlDocPtr = null_mut();
-    if reader.is_null() {
+    let Some(doc) = reader.doc.or_else(|| {
+        (!reader.ctxt.is_null())
+            .then(|| (*reader.ctxt).my_doc)
+            .flatten()
+    }) else {
         return null_mut();
-    }
-    if !(*reader).doc.is_null() {
-        doc = (*reader).doc;
-    } else if !(*reader).ctxt.is_null() {
-        doc = (*(*reader).ctxt).my_doc;
-    }
-    if doc.is_null() {
-        return null_mut();
-    }
+    };
 
-    if let Some(version) = (*doc).version.as_deref() {
+    if let Some(version) = doc.version.as_deref() {
         let version = CString::new(version).unwrap();
         CONSTSTR!(reader, version.as_ptr() as *const u8)
     } else {
@@ -5230,29 +5016,22 @@ pub unsafe extern "C" fn xml_text_reader_const_xml_version(
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderWalker")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
+pub unsafe fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
     use crate::generic_error;
-
-    if doc.is_null() {
-        return null_mut();
-    }
 
     let ret: XmlTextReaderPtr = xml_malloc(size_of::<XmlTextReader>()) as _;
     if ret.is_null() {
         generic_error!("xmlNewTextReader : malloc failed\n");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlTextReader>());
-    (*ret).ent_nr = 0;
-    // (*ret).input = None;
-    std::ptr::write(&raw mut (*ret).input, None);
+    std::ptr::write(&mut *ret, XmlTextReader::default());
     (*ret).mode = XmlTextReaderMode::XmlTextreaderModeInitial;
-    (*ret).node = null_mut();
-    (*ret).curnode = null_mut();
+    (*ret).node = None;
+    (*ret).curnode = None;
     (*ret).base = 0;
     (*ret).cur = 0;
     (*ret).allocs = XML_TEXTREADER_CTXT;
-    (*ret).doc = doc;
+    (*ret).doc = Some(doc);
     (*ret).state = XmlTextReaderState::Start;
     (*ret).dict = xml_dict_create();
     ret
@@ -5360,9 +5139,6 @@ pub unsafe fn xml_reader_for_io(
 #[doc(alias = "xmlReaderNewWalker")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) -> i32 {
-    if doc.is_null() {
-        return -1;
-    }
     if reader.is_null() {
         return -1;
     }
@@ -5374,15 +5150,15 @@ pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) ->
         (*(*reader).ctxt).reset();
     }
 
-    (*reader).ent_nr = 0;
+    (*reader).ent_tab.clear();
     (*reader).input = None;
     (*reader).mode = XmlTextReaderMode::XmlTextreaderModeInitial;
-    (*reader).node = null_mut();
-    (*reader).curnode = null_mut();
+    (*reader).node = None;
+    (*reader).curnode = None;
     (*reader).base = 0;
     (*reader).cur = 0;
     (*reader).allocs = XML_TEXTREADER_CTXT;
-    (*reader).doc = doc;
+    (*reader).doc = Some(doc);
     (*reader).state = XmlTextReaderState::Start;
     if (*reader).dict.is_null() {
         if !(*reader).ctxt.is_null() && !(*(*reader).ctxt).dict.is_null() {
@@ -5530,8 +5306,8 @@ pub unsafe fn xml_text_reader_locator_line_number(locator: XmlTextReaderLocatorP
     if locator.is_null() {
         return -1;
     }
-    if !(*ctx).node.is_null() {
-        ret = (*(*ctx).node).get_line_no() as _;
+    if let Some(node) = (*ctx).node {
+        ret = node.get_line_no() as _;
     } else {
         // inspired from error.c
         let mut input: XmlParserInputPtr;
@@ -5566,10 +5342,8 @@ pub unsafe fn xml_text_reader_locator_base_uri(locator: XmlTextReaderLocatorPtr)
     if locator.is_null() {
         return null_mut();
     }
-    if !(*ctx).node.is_null() {
-        let tmp = (*(*ctx).node)
-            .get_base(null_mut())
-            .map(|c| CString::new(c).unwrap());
+    if let Some(node) = (*ctx).node {
+        let tmp = node.get_base(None).map(|c| CString::new(c).unwrap());
         ret = xml_strdup(tmp.as_ref().map_or(null_mut(), |t| t.as_ptr() as *const u8));
     } else {
         // inspired from error.c
@@ -5789,98 +5563,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_reader_new_walker() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let reader = gen_xml_text_reader_ptr(n_reader, 0);
-                    let doc = gen_xml_doc_ptr(n_doc, 1);
-
-                    let ret_val = xml_reader_new_walker(reader, doc);
-                    desret_int(ret_val);
-                    des_xml_text_reader_ptr(n_reader, reader, 0);
-                    des_xml_doc_ptr(n_doc, doc, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlReaderNewWalker",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlReaderNewWalker()"
-                        );
-                        eprint!(" {}", n_reader);
-                        eprintln!(" {}", n_doc);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reader_walker() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                let mem_base = xml_mem_blocks();
-                let doc = gen_xml_doc_ptr(n_doc, 0);
-
-                let ret_val = xml_reader_walker(doc);
-                desret_xml_text_reader_ptr(ret_val);
-                des_xml_doc_ptr(n_doc, doc, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlReaderWalker",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlReaderWalker()");
-                    eprintln!(" {}", n_doc);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_reader_const_xml_version() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                let mem_base = xml_mem_blocks();
-                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-
-                let ret_val = xml_text_reader_const_xml_version(reader);
-                desret_const_xml_char_ptr(ret_val);
-                des_xml_text_reader_ptr(n_reader, reader, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlTextReaderConstXmlVersion",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlTextReaderConstXmlVersion()"
-                    );
-                    eprintln!(" {}", n_reader);
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_text_reader_locator_base_uri() {

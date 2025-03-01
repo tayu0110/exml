@@ -7,55 +7,38 @@ use std::{
     sync::Mutex,
 };
 
-use libc::snprintf;
-
 #[cfg(feature = "catalog")]
-use crate::libxml::catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr};
+use crate::libxml::catalog::{XmlCatalogAllow, XmlCatalogPrefer};
 #[cfg(feature = "schema")]
-use crate::relaxng::{XmlRelaxNGParserCtxtPtr, XmlRelaxNGValidCtxtPtr};
+use crate::relaxng::XmlRelaxNGValidCtxtPtr;
 use crate::{
-    buf::XmlBuf,
-    io::XmlOutputBuffer,
     libxml::{
-        debug_xml::XmlShellCtxtPtr,
         globals::xml_free,
         htmlparser::{
-            html_free_parser_ctxt, HtmlDocPtr, HtmlElemDesc, HtmlEntityDesc, HtmlNodePtr,
-            HtmlParserCtxtPtr, HtmlStatus,
+            html_free_parser_ctxt, HtmlElemDesc, HtmlEntityDesc, HtmlParserCtxtPtr, HtmlStatus,
         },
-        parser::{XmlFeature, XmlParserOption, XmlSAXHandlerPtr},
+        parser::{XmlFeature, XmlParserOption},
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
         relaxng::XmlRelaxNGPtr,
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaValType},
-        schematron::XmlSchematronValidCtxtPtr,
         uri::XmlURIPtr,
         valid::{
-            xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt,
-            XmlAttributeTablePtr, XmlElementTablePtr, XmlNotationTablePtr, XmlValidCtxtPtr,
+            xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt, XmlValidCtxtPtr,
         },
-        xinclude::XmlXincludeCtxtPtr,
+        xinclude::XmlXIncludeCtxtPtr,
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
         xmlmodule::XmlModulePtr,
         xmlreader::{XmlTextReaderLocatorPtr, XmlTextReaderPtr},
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr, XmlRegexpPtr},
-        xmlschemas::{
-            XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaSAXPlugPtr, XmlSchemaValidCtxtPtr,
-        },
+        xmlschemas::{XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaValidCtxtPtr},
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
-        xmlstring::{xml_strdup, XmlChar},
+        xmlstring::XmlChar,
     },
     parser::{
         xml_create_memory_parser_ctxt, xml_free_input_stream, xml_free_parser_ctxt,
-        xml_new_parser_ctxt, xml_read_memory, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputPtr,
-        XmlParserNodeInfo, XmlParserNodeInfoSeq, XmlParserNodeInfoSeqPtr,
+        xml_new_parser_ctxt, XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{
-        xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, NodeCommon, XmlAttr,
-        XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDOMWrapCtxtPtr,
-        XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementContentType,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntitiesTablePtr, XmlEntityPtr,
-        XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
-    },
+    tree::{XmlAttr, XmlAttributeType, XmlDoc, XmlDtd, XmlElementContentPtr, XmlNode, XmlNs},
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
         XmlXPathParserContextPtr,
@@ -76,57 +59,30 @@ thread_local! {
     static API_NS: Cell<*mut XmlNs> = const { Cell::new(null_mut()) };
 }
 
-pub(crate) const GEN_NB_HTML_DOC_PTR: i32 = 3;
 pub(crate) const GEN_NB_UNSIGNED_CHAR_PTR: i32 = 1;
 pub(crate) const GEN_NB_INT_PTR: i32 = 2;
 pub(crate) const GEN_NB_CONST_UNSIGNED_CHAR_PTR: i32 = 1;
 pub(crate) const GEN_NB_HTML_PARSER_CTXT_PTR: i32 = 3;
 pub(crate) const GEN_NB_FILEPATH: i32 = 8;
-pub(crate) const GEN_NB_FILEOUTPUT: i32 = 6;
 pub(crate) const GEN_NB_CONST_CHAR_PTR: i32 = 4;
 pub(crate) const GEN_NB_CONST_HTML_ELEM_DESC_PTR: i32 = 1;
 pub(crate) const GEN_NB_CONST_XML_CHAR_PTR: i32 = 5;
 pub(crate) const GEN_NB_INT: i32 = 4;
 pub(crate) const GEN_NB_USERDATA: i32 = 3;
 pub(crate) const GEN_NB_UNSIGNED_INT: i32 = 3;
-#[cfg(feature = "html")]
-pub(crate) const GEN_NB_HTML_NODE_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_OUTPUT_BUFFER_PTR: i32 = 2;
-#[cfg(feature = "html")]
-pub(crate) const GEN_NB_CONST_HTML_NODE_PTR: i32 = 1;
 pub(crate) const GEN_NB_CONST_XML_CHAR_PTR_PTR: i32 = 1;
 pub(crate) const GEN_NB_FILE_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_CHAR_PTR_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_BUFFER_PTR: i32 = 3;
-pub(crate) const GEN_NB_XML_NODE_PTR: i32 = 3;
 pub(crate) const GEN_NB_VOID_PTR: i32 = 2;
-pub(crate) const GEN_NB_XML_ENUMERATION_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_CHAR_PTR: i32 = 2;
-pub(crate) const GEN_NB_XML_DOC_PTR: i32 = 4;
 #[cfg(feature = "xpath")]
 pub(crate) const GEN_NB_XML_NODE_SET_PTR: i32 = 1;
-#[cfg(feature = "catalog")]
-pub(crate) const GEN_NB_XML_CATALOG_PTR: i32 = 1;
 #[cfg(feature = "catalog")]
 pub(crate) const GEN_NB_XML_CATALOG_ALLOW: i32 = 4;
 #[cfg(feature = "catalog")]
 pub(crate) const GEN_NB_XML_CATALOG_PREFER: i32 = 3;
-pub(crate) const GEN_NB_CONST_XML_DOC_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_ENTITY_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_ENTITIES_TABLE_PTR: i32 = 1;
-pub(crate) const GEN_NB_CHAR_PTR_PTR: i32 = 1;
-#[cfg(feature = "http")]
-pub(crate) const GEN_NB_XML_NANO_HTTPCTXT_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_NODE_PTR_PTR: i32 = 1;
-pub(crate) const GEN_NB_CONST_XML_PARSER_NODE_INFO_PTR: i32 = 1;
-pub(crate) const GEN_NB_CONST_XML_PARSER_CTXT_PTR: i32 = 1;
-pub(crate) const GEN_NB_CONST_XML_NODE_PTR: i32 = 1;
-pub(crate) const GEN_NB_CONST_XML_PARSER_NODE_INFO_SEQ_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_PARSER_INPUT_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_PARSER_CTXT_PTR: i32 = 3;
-pub(crate) const GEN_NB_XML_PARSER_NODE_INFO_SEQ_PTR: i32 = 1;
-#[cfg(any(feature = "sax1", feature = "libxml_valid", feature = "libxml_push"))]
-pub(crate) const GEN_NB_XML_SAXHANDLER_PTR: i32 = 2;
 pub(crate) const GEN_NB_PARSEROPTIONS: i32 = 5;
 pub(crate) const GEN_NB_XML_FEATURE: i32 = 4;
 pub(crate) const GEN_NB_XML_CHAR: i32 = 4;
@@ -137,8 +93,6 @@ pub(crate) const GEN_NB_XML_PATTERN_PTR: i32 = 1;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_RELAXNG_PTR: i32 = 1;
 #[cfg(feature = "schema")]
-pub(crate) const GEN_NB_XML_RELAXNG_PARSER_CTXT_PTR: i32 = 1;
-#[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_RELAXNG_VALID_CTXT_PTR: i32 = 1;
 #[cfg(any(
     feature = "libxml_modules",
@@ -146,27 +100,11 @@ pub(crate) const GEN_NB_XML_RELAXNG_VALID_CTXT_PTR: i32 = 1;
     feature = "schema"
 ))]
 pub(crate) const GEN_NB_VOID_PTR_PTR: i32 = 1;
-#[cfg(feature = "schematron")]
-pub(crate) const GEN_NB_XML_SCHEMATRON_VALID_CTXT_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_DOMWRAP_CTXT_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_ATTR_PTR: i32 = 2;
-pub(crate) const GEN_NB_XML_DTD_PTR: i32 = 3;
-pub(crate) const GEN_NB_XML_NS_PTR: i32 = 2;
-pub(crate) const GEN_NB_EATEN_NAME: i32 = 2;
 pub(crate) const GEN_NB_XML_URIPTR: i32 = 1;
 pub(crate) const GEN_NB_CHAR_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_ELEMENT_CONTENT_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_NOTATION_TABLE_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_NOTATION_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_ELEMENT_TABLE_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_ELEMENT_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_ATTRIBUTE_TABLE_PTR: i32 = 1;
-pub(crate) const GEN_NB_XML_ATTRIBUTE_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_VALID_CTXT_PTR: i32 = 2;
 pub(crate) const GEN_NB_XML_ATTRIBUTE_TYPE: i32 = 4;
-pub(crate) const GEN_NB_XML_ATTRIBUTE_DEFAULT: i32 = 4;
-pub(crate) const GEN_NB_XML_ELEMENT_TYPE_VAL: i32 = 4;
-pub(crate) const GEN_NB_XML_ELEMENT_CONTENT_TYPE: i32 = 4;
 #[cfg(feature = "xinclude")]
 pub(crate) const GEN_NB_XML_XINCLUDE_CTXT_PTR: i32 = 1;
 #[cfg(feature = "libxml_automata")]
@@ -191,10 +129,6 @@ pub(crate) const GEN_NB_XML_REG_EXEC_CTXT_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_EXP_CTXT_PTR: i32 = 1;
 #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
 pub(crate) const GEN_NB_XML_EXP_NODE_PTR: i32 = 1;
-#[cfg(feature = "libxml_output")]
-pub(crate) const GEN_NB_XML_SAVE_CTXT_PTR: i32 = 1;
-#[cfg(feature = "schema")]
-pub(crate) const GEN_NB_XML_SCHEMA_SAXPLUG_PTR: i32 = 1;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_SCHEMA_PARSER_CTXT_PTR: i32 = 1;
 #[cfg(feature = "schema")]
@@ -213,8 +147,6 @@ pub(crate) const GEN_NB_XML_SCHEMA_VAL_TYPE: i32 = 4;
 pub(crate) const GEN_NB_UNSIGNED_LONG: i32 = 4;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_UNSIGNED_LONG_PTR: i32 = 2;
-#[cfg(feature = "libxml_writer")]
-pub(crate) const GEN_NB_XML_TEXT_WRITER_PTR: i32 = 2;
 #[cfg(feature = "xpath")]
 pub(crate) const GEN_NB_XML_XPATH_COMP_EXPR_PTR: i32 = 1;
 #[cfg(feature = "xpath")]
@@ -225,31 +157,6 @@ pub(crate) const GEN_NB_XML_XPATH_OBJECT_PTR: i32 = 5;
 pub(crate) const GEN_NB_DOUBLE: i32 = 4;
 #[cfg(feature = "xpath")]
 pub(crate) const GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR: i32 = 1;
-#[cfg(feature = "libxml_debug")]
-pub(crate) const GEN_NB_DEBUG_FILE_PTR: i32 = 2;
-#[cfg(feature = "xpath")]
-pub(crate) const GEN_NB_XML_SHELL_CTXT_PTR: i32 = 1;
-
-#[cfg(feature = "xpath")]
-pub(crate) fn gen_xml_shell_ctxt_ptr(_no: i32, _nr: i32) -> XmlShellCtxtPtr<'static> {
-    null_mut()
-}
-
-#[cfg(feature = "xpath")]
-pub(crate) fn des_xml_shell_ctxt_ptr(_no: i32, _val: XmlShellCtxtPtr, _nr: i32) {}
-
-#[cfg(feature = "libxml_debug")]
-pub(crate) fn gen_debug_file_ptr(_no: i32, _nr: i32) -> Option<File> {
-    return File::options()
-        .append(true)
-        .read(true)
-        .create(true)
-        .open("test.out")
-        .ok();
-}
-
-#[cfg(feature = "libxml_debug")]
-pub(crate) unsafe fn des_debug_file_ptr(_no: i32, _val: File, _nr: i32) {}
 
 #[cfg(feature = "xpath")]
 pub(crate) fn gen_xml_xpath_parser_context_ptr(_no: i32, _nr: i32) -> XmlXPathParserContextPtr {
@@ -309,7 +216,7 @@ pub(crate) unsafe fn gen_xml_xpath_object_ptr(no: i32, _nr: i32) -> XmlXPathObje
         return xml_xpath_new_boolean(true);
     }
     if no == 3 {
-        return xml_xpath_new_node_set(null_mut());
+        return xml_xpath_new_node_set(None);
     }
     null_mut()
 }
@@ -463,14 +370,6 @@ pub(crate) fn gen_xml_schema_parser_ctxt_ptr(_no: i32, _nr: i32) -> XmlSchemaPar
 #[cfg(feature = "schema")]
 pub(crate) fn des_xml_schema_parser_ctxt_ptr(_no: i32, _val: XmlSchemaParserCtxtPtr, _nr: i32) {}
 
-#[cfg(feature = "schema")]
-pub(crate) fn gen_xml_schema_saxplug_ptr(_no: i32, _nr: i32) -> XmlSchemaSAXPlugPtr {
-    null_mut()
-}
-
-#[cfg(feature = "schema")]
-pub(crate) fn des_xml_schema_saxplug_ptr(_no: i32, _val: XmlSchemaSAXPlugPtr, _nr: i32) {}
-
 #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
 pub(crate) fn gen_xml_exp_ctxt_ptr(_no: i32, _nr: i32) -> XmlExpCtxtPtr {
     null_mut()
@@ -544,13 +443,6 @@ pub(crate) unsafe fn des_xml_text_reader_ptr(_no: i32, val: XmlTextReaderPtr, _n
 }
 
 #[cfg(feature = "libxml_reader")]
-pub(crate) unsafe fn desret_xml_text_reader_ptr(val: XmlTextReaderPtr) {
-    use crate::libxml::xmlreader::xml_free_text_reader;
-
-    xml_free_text_reader(val);
-}
-
-#[cfg(feature = "libxml_reader")]
 pub(crate) fn gen_xml_text_reader_locator_ptr(_no: i32, _nr: i32) -> XmlTextReaderLocatorPtr {
     null_mut()
 }
@@ -583,66 +475,12 @@ pub(crate) fn gen_xml_automata_state_ptr(_no: i32, _nr: i32) -> XmlAutomataState
 pub(crate) fn des_xml_automata_state_ptr(_no: i32, _val: XmlAutomataStatePtr, _nr: i32) {}
 
 #[cfg(feature = "xinclude")]
-pub(crate) fn gen_xml_xinclude_ctxt_ptr(_no: i32, _nr: i32) -> XmlXincludeCtxtPtr {
+pub(crate) fn gen_xml_xinclude_ctxt_ptr(_no: i32, _nr: i32) -> XmlXIncludeCtxtPtr {
     null_mut()
 }
 
 #[cfg(feature = "xinclude")]
-pub(crate) fn des_xml_xinclude_ctxt_ptr(_no: i32, _val: XmlXincludeCtxtPtr, _nr: i32) {}
-
-pub(crate) fn gen_xml_element_content_type(no: i32, _nr: i32) -> XmlElementContentType {
-    if no == 1 {
-        return XmlElementContentType::XmlElementContentElement;
-    }
-    if no == 2 {
-        return XmlElementContentType::XmlElementContentOr;
-    }
-    if no == 3 {
-        return XmlElementContentType::XmlElementContentPCDATA;
-    }
-    if no == 4 {
-        return XmlElementContentType::XmlElementContentSeq;
-    }
-    XmlElementContentType::XmlElementContentPCDATA
-}
-
-pub(crate) fn des_xml_element_content_type(_no: i32, _val: XmlElementContentType, _nr: i32) {}
-
-pub(crate) fn gen_xml_element_type_val(no: i32, _nr: i32) -> XmlElementTypeVal {
-    if no == 1 {
-        return XmlElementTypeVal::XmlElementTypeAny;
-    }
-    if no == 2 {
-        return XmlElementTypeVal::XmlElementTypeElement;
-    }
-    if no == 3 {
-        return XmlElementTypeVal::XmlElementTypeEmpty;
-    }
-    if no == 4 {
-        return XmlElementTypeVal::XmlElementTypeMixed;
-    }
-    XmlElementTypeVal::XmlElementTypeUndefined
-}
-
-pub(crate) fn des_xml_element_type_val(_no: i32, _val: XmlElementTypeVal, _nr: i32) {}
-
-pub(crate) fn gen_xml_attribute_default(no: i32, _nr: i32) -> XmlAttributeDefault {
-    if no == 1 {
-        return XmlAttributeDefault::XmlAttributeFixed;
-    }
-    if no == 2 {
-        return XmlAttributeDefault::XmlAttributeImplied;
-    }
-    if no == 3 {
-        return XmlAttributeDefault::XmlAttributeNone;
-    }
-    if no == 4 {
-        return XmlAttributeDefault::XmlAttributeRequired;
-    }
-    XmlAttributeDefault::XmlAttributeNone
-}
-
-pub(crate) fn des_xml_attribute_default(_no: i32, _val: XmlAttributeDefault, _nr: i32) {}
+pub(crate) fn des_xml_xinclude_ctxt_ptr(_no: i32, _val: XmlXIncludeCtxtPtr, _nr: i32) {}
 
 pub(crate) fn gen_xml_attribute_type(no: i32, _nr: i32) -> XmlAttributeType {
     if no == 1 {
@@ -676,36 +514,6 @@ pub(crate) unsafe fn des_xml_valid_ctxt_ptr(_no: i32, val: XmlValidCtxtPtr, _nr:
     }
 }
 
-pub(crate) fn gen_xml_attribute_ptr(_no: i32, _nr: i32) -> XmlAttributePtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_attribute_ptr(_no: i32, _val: XmlAttributePtr, _nr: i32) {}
-
-pub(crate) fn gen_xml_attribute_table_ptr(_no: i32, _nr: i32) -> XmlAttributeTablePtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_attribute_table_ptr(_no: i32, _val: XmlAttributeTablePtr, _nr: i32) {}
-
-pub(crate) fn gen_xml_element_ptr(_no: i32, _nr: i32) -> XmlElementPtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_element_ptr(_no: i32, _val: XmlElementPtr, _nr: i32) {}
-
-pub(crate) fn gen_xml_element_table_ptr(_no: i32, _nr: i32) -> XmlElementTablePtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_element_table_ptr(_no: i32, _val: XmlElementTablePtr, _nr: i32) {}
-
-pub(crate) fn gen_xml_notation_table_ptr(_no: i32, _nr: i32) -> XmlNotationTablePtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_notation_table_ptr(_no: i32, _val: XmlNotationTablePtr, _nr: i32) {}
-
 pub(crate) fn gen_char_ptr(_no: i32, _nr: i32) -> *mut c_char {
     null_mut()
 }
@@ -718,151 +526,6 @@ pub(crate) fn gen_xml_uriptr(_no: i32, _nr: i32) -> XmlURIPtr {
 
 pub(crate) fn des_xml_uriptr(_no: i32, _val: XmlURIPtr, _nr: i32) {}
 
-pub(crate) unsafe fn gen_eaten_name(no: i32, _nr: i32) -> *mut XmlChar {
-    if no == 0 {
-        return xml_strdup(c"eaten".as_ptr() as _);
-    }
-    null_mut()
-}
-pub(crate) fn des_eaten_name(_no: i32, _val: *mut XmlChar, _nr: i32) {}
-
-unsafe fn get_api_ns() -> XmlNsPtr {
-    get_api_root();
-    if !API_ROOT.get().is_null() {
-        API_NS.set((*API_ROOT.get()).ns_def);
-    }
-    API_NS.get()
-}
-
-pub(crate) unsafe fn gen_xml_ns_ptr(no: i32, _nr: i32) -> XmlNsPtr {
-    if no == 0 {
-        return get_api_ns();
-    }
-    null_mut()
-}
-pub(crate) unsafe fn des_xml_ns_ptr(no: i32, _val: XmlNsPtr, _nr: i32) {
-    if no == 0 {
-        free_api_doc();
-    }
-}
-
-unsafe fn get_api_dtd() -> XmlDtdPtr {
-    if API_DTD.get().is_null() || (*API_DTD.get()).typ != XmlElementType::XmlDTDNode {
-        get_api_doc();
-        if !API_DOC.get().is_null()
-            && (*API_DOC.get()).children.is_some()
-            && (*API_DOC.get()).children.unwrap().element_type() == XmlElementType::XmlDTDNode
-        {
-            API_DTD.set(
-                (*(*API_DOC.get()).children().unwrap().as_ptr())
-                    .as_dtd_node()
-                    .unwrap()
-                    .as_ptr(),
-            );
-        }
-    }
-    API_DTD.get()
-}
-
-pub(crate) unsafe fn gen_xml_dtd_ptr(no: i32, _nr: i32) -> XmlDtdPtr {
-    if no == 0 {
-        return xml_new_dtd(null_mut(), Some("dtd"), Some("foo"), Some("bar"));
-    }
-    if no == 1 {
-        return get_api_dtd();
-    }
-    null_mut()
-}
-pub(crate) unsafe fn des_xml_dtd_ptr(no: i32, val: XmlDtdPtr, _nr: i32) {
-    if no == 1 {
-        free_api_doc();
-    } else if !val.is_null() {
-        (*val).unlink();
-        xml_free_node(val as XmlNodePtr);
-    }
-}
-
-unsafe fn get_api_attr() -> XmlAttrPtr {
-    #[cfg(any(
-        feature = "libxml_tree",
-        feature = "xinclude",
-        feature = "schema",
-        feature = "html"
-    ))]
-    static mut NR: i32 = 0;
-    #[cfg(any(
-        feature = "libxml_tree",
-        feature = "xinclude",
-        feature = "schema",
-        feature = "html"
-    ))]
-    let mut name: [XmlChar; 20] = [0; 20];
-
-    if API_ROOT.get().is_null()
-        || (*API_ROOT.get()).element_type() != XmlElementType::XmlElementNode
-    {
-        get_api_root();
-    }
-    if API_ROOT.get().is_null() {
-        return null_mut();
-    }
-    if !(*API_ROOT.get()).properties.is_null() {
-        API_ATTR.set((*API_ROOT.get()).properties);
-        return (*API_ROOT.get()).properties;
-    }
-    API_ATTR.set(null_mut());
-    #[cfg(any(
-        feature = "libxml_tree",
-        feature = "xinclude",
-        feature = "schema",
-        feature = "html"
-    ))]
-    {
-        snprintf(name.as_mut_ptr() as _, 20, c"foo%d".as_ptr() as _, NR);
-        NR += 1;
-        let name = CStr::from_ptr(name.as_ptr() as *const i8).to_string_lossy();
-        API_ATTR.set((*API_ROOT.get()).set_prop(name.as_ref(), Some("bar")));
-    }
-    API_ATTR.get()
-}
-
-pub(crate) unsafe fn gen_xml_attr_ptr(no: i32, _nr: i32) -> XmlAttrPtr {
-    if no == 0 {
-        return get_api_attr();
-    }
-    null_mut()
-}
-pub(crate) unsafe fn des_xml_attr_ptr(no: i32, _val: XmlAttrPtr, _nr: i32) {
-    if no == 0 {
-        free_api_doc();
-    }
-}
-
-pub(crate) fn gen_const_xml_buf_ptr(_no: i32, _nr: i32) -> *const XmlBuf {
-    null()
-}
-
-pub(crate) fn des_const_xml_buf_ptr(_no: i32, _val: *const XmlBuf, _nr: i32) {}
-
-pub(crate) fn gen_xml_domwrap_ctxt_ptr(_no: i32, _nr: i32) -> XmlDOMWrapCtxtPtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_domwrap_ctxt_ptr(_no: i32, _val: XmlDOMWrapCtxtPtr, _nr: i32) {}
-
-#[cfg(feature = "schematron")]
-pub(crate) fn gen_xml_schematron_valid_ctxt_ptr(_no: i32, _nr: i32) -> XmlSchematronValidCtxtPtr {
-    null_mut()
-}
-
-#[cfg(feature = "schematron")]
-pub(crate) fn des_xml_schematron_valid_ctxt_ptr(
-    _no: i32,
-    _val: XmlSchematronValidCtxtPtr,
-    _nr: i32,
-) {
-}
-
 #[cfg(feature = "schema")]
 pub(crate) unsafe fn desret_xml_schema_parser_ctxt_ptr(val: XmlSchemaParserCtxtPtr) {
     use crate::libxml::xmlschemas::xml_schema_free_parser_ctxt;
@@ -872,13 +535,6 @@ pub(crate) unsafe fn desret_xml_schema_parser_ctxt_ptr(val: XmlSchemaParserCtxtP
 
 #[cfg(feature = "schema")]
 pub(crate) fn desret_xml_schema_type_ptr(_val: XmlSchemaTypePtr) {}
-
-#[cfg(feature = "schema")]
-pub(crate) unsafe fn desret_xml_relaxng_parser_ctxt_ptr(val: XmlRelaxNGParserCtxtPtr) {
-    use crate::relaxng::xml_relaxng_free_parser_ctxt;
-
-    xml_relaxng_free_parser_ctxt(val);
-}
 
 #[cfg(any(
     feature = "libxml_modules",
@@ -903,14 +559,6 @@ pub(crate) fn gen_xml_relaxng_valid_ctxt_ptr(_no: i32, _nr: i32) -> XmlRelaxNGVa
 
 #[cfg(feature = "schema")]
 pub(crate) fn des_xml_relaxng_valid_ctxt_ptr(_no: i32, _val: XmlRelaxNGValidCtxtPtr, _nr: i32) {}
-
-#[cfg(feature = "schema")]
-pub(crate) fn gen_xml_relaxng_parser_ctxt_ptr(_no: i32, _nr: i32) -> XmlRelaxNGParserCtxtPtr {
-    null_mut()
-}
-
-#[cfg(feature = "schema")]
-pub(crate) fn des_xml_relaxng_parser_ctxt_ptr(_no: i32, _val: XmlRelaxNGParserCtxtPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
 pub(crate) fn gen_xml_relaxng_ptr(_no: i32, _nr: i32) -> XmlRelaxNGPtr {
@@ -950,37 +598,6 @@ pub(crate) fn gen_xml_char(no: i32, _nr: i32) -> XmlChar {
 
 pub(crate) fn des_xml_char(_no: i32, _val: XmlChar, _nr: i32) {}
 
-pub(crate) unsafe fn desret_xml_node_ptr(val: XmlNodePtr) {
-    if !val.is_null() && val != API_ROOT.get() && val != API_DOC.get() as XmlNodePtr {
-        (*val).unlink();
-        xml_free_node(val);
-    }
-}
-pub(crate) unsafe fn desret_xml_attr_ptr(val: XmlAttrPtr) {
-    if !val.is_null() {
-        (*val).unlink();
-        xml_free_node(val as XmlNodePtr);
-    }
-}
-
-pub(crate) unsafe fn desret_xml_element_ptr(val: XmlElementPtr) {
-    if !val.is_null() {
-        (*val).unlink();
-    }
-}
-
-pub(crate) unsafe fn desret_xml_attribute_ptr(val: XmlAttributePtr) {
-    if !val.is_null() {
-        (*val).unlink();
-    }
-}
-
-pub(crate) fn desret_xml_ns_ptr(_val: XmlNsPtr) {}
-
-pub(crate) unsafe fn desret_xml_dtd_ptr(val: XmlDtdPtr) {
-    desret_xml_node_ptr(val as XmlNodePtr);
-}
-
 pub(crate) fn gen_xml_feature(no: i32, _nr: i32) -> Option<XmlFeature> {
     if no == 1 {
         return Some(XmlFeature::XmlWithAutomata);
@@ -999,30 +616,9 @@ pub(crate) fn gen_xml_feature(no: i32, _nr: i32) -> Option<XmlFeature> {
 
 pub(crate) fn des_xml_feature(_no: i32, _val: Option<XmlFeature>, _nr: i32) {}
 
-#[cfg(any(feature = "sax1", feature = "libxml_valid", feature = "libxml_push"))]
-pub(crate) unsafe fn gen_xml_saxhandler_ptr(_no: i32, _nr: i32) -> XmlSAXHandlerPtr {
-    // #[cfg(feature = "sax1")]
-    // if no == 0 {
-    //     use crate::libxml::globals::xml_default_sax_handler;
-    //     return xml_default_sax_handler() as _;
-    // }
-    null_mut()
-}
-
-#[cfg(any(feature = "sax1", feature = "libxml_valid", feature = "libxml_push"))]
-pub(crate) fn des_xml_saxhandler_ptr(_no: i32, _val: XmlSAXHandlerPtr, _nr: i32) {}
-
 pub(crate) unsafe fn desret_xml_parser_ctxt_ptr(val: XmlParserCtxtPtr) {
     xml_free_parser_ctxt(val);
 }
-
-pub(crate) fn gen_xml_parser_node_info_seq_ptr(_no: i32, _nr: i32) -> XmlParserNodeInfoSeqPtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_parser_node_info_seq_ptr(_no: i32, _val: XmlParserNodeInfoSeqPtr, _nr: i32) {}
-
-pub(crate) fn desret_const_xml_parser_node_info_ptr(_val: *const XmlParserNodeInfo) {}
 
 pub(crate) unsafe fn gen_xml_parser_ctxt_ptr(no: i32, _nr: i32) -> XmlParserCtxtPtr {
     if no == 0 {
@@ -1046,84 +642,7 @@ pub(crate) fn gen_xml_parser_input_ptr(_no: i32, _nr: i32) -> XmlParserInputPtr 
 
 pub(crate) fn des_xml_parser_input_ptr(_no: i32, _val: XmlParserInputPtr, _nr: i32) {}
 
-pub(crate) fn gen_const_xml_parser_node_info_seq_ptr(
-    _no: i32,
-    _nr: i32,
-) -> *const XmlParserNodeInfoSeq {
-    null()
-}
-
-pub(crate) fn des_const_xml_parser_node_info_seq_ptr(
-    _no: i32,
-    _val: *const XmlParserNodeInfoSeq,
-    _nr: i32,
-) {
-}
-
-pub(crate) fn gen_const_xml_parser_ctxt_ptr(_no: i32, _nr: i32) -> *const XmlParserCtxt {
-    null()
-}
-
-pub(crate) fn des_const_xml_parser_ctxt_ptr(_no: i32, _val: *const XmlParserCtxt, _nr: i32) {}
-
-pub(crate) fn gen_const_xml_node_ptr(_no: i32, _nr: i32) -> *const XmlNode {
-    null()
-}
-
-pub(crate) fn des_const_xml_node_ptr(_no: i32, _val: *const XmlNode, _nr: i32) {}
-
-pub(crate) fn gen_const_xml_parser_node_info_ptr(_no: i32, _nr: i32) -> *const XmlParserNodeInfo {
-    null()
-}
-
-pub(crate) fn des_const_xml_parser_node_info_ptr(
-    _no: i32,
-    _val: *const XmlParserNodeInfo,
-    _nr: i32,
-) {
-}
-
-pub(crate) fn gen_xml_node_ptr_ptr(_no: i32, _nr: i32) -> *mut XmlNodePtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_node_ptr_ptr(_no: i32, _val: *mut XmlNodePtr, _nr: i32) {}
-
-pub(crate) fn gen_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut c_char {
-    null_mut()
-}
-
-pub(crate) fn des_char_ptr_ptr(_no: i32, _vall: *mut *mut c_char, _nr: i32) {}
-
-pub(crate) fn desret_xml_char(_val: XmlChar) {}
-
-pub(crate) fn desret_long(_val: i64) {}
-
 pub(crate) fn desret_unsigned_long(_val: u64) {}
-
-pub(crate) fn gen_xml_entities_table_ptr(_no: i32, _nr: i32) -> XmlEntitiesTablePtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_entities_table_ptr(_no: i32, _val: XmlEntitiesTablePtr, _nr: i32) {}
-
-pub(crate) fn gen_xml_entity_ptr(_no: i32, _nr: i32) -> XmlEntityPtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_entity_ptr(_no: i32, _val: XmlEntityPtr, _nr: i32) {}
-
-pub(crate) fn gen_const_xml_doc_ptr(_no: i32, _nr: i32) -> *const XmlDoc {
-    null_mut()
-}
-
-pub(crate) fn des_const_xml_doc_ptr(_no: i32, _val: *const XmlDoc, _nr: i32) {}
-
-pub(crate) unsafe fn desret_xml_doc_ptr(val: XmlDocPtr) {
-    if val != API_DOC.get() {
-        xml_free_doc(val);
-    }
-}
 
 #[cfg(feature = "catalog")]
 pub(crate) fn gen_xml_catalog_prefer(no: i32, _nr: i32) -> XmlCatalogPrefer {
@@ -1167,20 +686,11 @@ pub(crate) fn desret_xml_catalog_allow(_val: XmlCatalogAllow) {}
 
 pub(crate) fn desret_void_ptr(_val: *mut c_void) {}
 
-pub(crate) fn desret_const_char_ptr(_val: *const c_char) {}
-
 pub(crate) unsafe fn desret_xml_char_ptr(val: *mut XmlChar) {
     if !val.is_null() {
         xml_free(val as _);
     }
 }
-
-#[cfg(feature = "catalog")]
-pub(crate) fn gen_xml_catalog_ptr(_no: i32, _nr: i32) -> XmlCatalogPtr {
-    null_mut()
-}
-#[cfg(feature = "catalog")]
-pub(crate) fn des_xml_catalog_ptr(_no: i32, _val: XmlCatalogPtr, _nr: i32) {}
 
 #[cfg(feature = "xpath")]
 pub(crate) fn gen_xml_node_set_ptr(_no: i32, _nr: i32) -> Option<Box<XmlNodeSet>> {
@@ -1191,13 +701,6 @@ pub(crate) fn des_xml_node_set_ptr(_no: i32, _val: Option<Box<XmlNodeSet>>, _nr:
 
 pub(crate) unsafe fn desret_xml_parser_input_ptr(val: XmlParserInputPtr) {
     xml_free_input_stream(val);
-}
-
-pub(crate) unsafe fn desret_xml_entity_ptr(val: XmlEntityPtr) {
-    if !val.is_null() {
-        (*val).unlink();
-        xml_free_node(val as XmlNodePtr);
-    }
 }
 
 pub(crate) unsafe fn gen_xml_char_ptr(no: i32, _nr: i32) -> *mut XmlChar {
@@ -1221,66 +724,6 @@ pub(crate) unsafe fn des_xml_element_content_ptr(_no: i32, val: XmlElementConten
 pub(crate) unsafe fn desret_xml_element_content_ptr(val: XmlElementContentPtr) {
     if !val.is_null() {
         xml_free_element_content(val);
-    }
-}
-
-unsafe fn get_api_root() -> XmlNodePtr {
-    if (API_ROOT.get().is_null())
-        || (*API_ROOT.get()).element_type() != XmlElementType::XmlElementNode
-    {
-        get_api_doc();
-        if !API_DOC.get().is_null()
-            && (*API_DOC.get()).children.is_some()
-            && (*API_DOC.get()).children.unwrap().next.is_some()
-            && (*API_DOC.get())
-                .children
-                .unwrap()
-                .next
-                .unwrap()
-                .element_type()
-                == XmlElementType::XmlElementNode
-        {
-            API_ROOT.set((*API_DOC.get()).children.unwrap().next.unwrap().as_ptr());
-        }
-    }
-    API_ROOT.get()
-}
-
-unsafe fn get_api_doc() -> XmlDocPtr {
-    if API_DOC.get().is_null() {
-        API_DOC.set(xml_read_memory("<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_bytes().to_vec(), Some("root_test"), None, 0));
-        API_ROOT.set(null_mut());
-        API_ATTR.set(null_mut());
-    }
-    API_DOC.get()
-}
-
-unsafe fn free_api_doc() {
-    xml_free_doc(API_DOC.get());
-    API_DOC.set(null_mut());
-    API_DTD.set(null_mut());
-    API_ROOT.set(null_mut());
-    API_ATTR.set(null_mut());
-    API_NS.set(null_mut());
-}
-
-pub(crate) unsafe fn gen_xml_node_ptr(no: i32, _nr: i32) -> XmlNodePtr {
-    if no == 0 {
-        return xml_new_pi("test", None);
-    }
-    if no == 1 {
-        return get_api_root();
-    }
-    null_mut()
-    /*     if no == 2 {
-    // return((xmlNodePtr) get_api_doc()); */
-}
-pub(crate) unsafe fn des_xml_node_ptr(no: i32, val: XmlNodePtr, _nr: i32) {
-    if no == 1 {
-        free_api_doc();
-    } else if !val.is_null() {
-        (*val).unlink();
-        xml_free_node(val);
     }
 }
 
@@ -1311,51 +754,9 @@ pub(crate) fn des_int_ptr(_no: i32, _val: *mut i32, _nr: i32) {}
 pub(crate) fn des_const_unsigned_char_ptr(_no: i32, _val: *const u8, _nr: i32) {}
 
 #[cfg(feature = "html")]
-pub(crate) fn gen_const_html_node_ptr(_no: i32, _nr: i32) -> HtmlNodePtr {
-    null_mut()
-}
-
-#[cfg(feature = "html")]
-pub(crate) fn des_const_html_node_ptr(_no: i32, _val: HtmlNodePtr, _nr: i32) {}
-
-#[cfg(feature = "html")]
 pub(crate) unsafe fn desret_html_parser_ctxt_ptr(val: HtmlParserCtxtPtr) {
     if !val.is_null() {
         html_free_parser_ctxt(val);
-    }
-}
-
-#[cfg(feature = "html")]
-pub(crate) unsafe fn gen_html_doc_ptr(no: i32, _nr: i32) -> HtmlDocPtr {
-    use crate::libxml::{htmlparser::html_read_memory, htmltree::html_new_doc};
-
-    if no == 0 {
-        return html_new_doc(null_mut(), null_mut());
-    }
-    if no == 1 {
-        return html_read_memory("<html/>".as_bytes().to_vec(), Some("test"), None, 0);
-    }
-    null_mut()
-}
-
-#[cfg(feature = "html")]
-pub(crate) unsafe fn desret_html_doc_ptr(val: HtmlDocPtr) {
-    if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
-        xml_free_doc(val);
-    }
-}
-
-#[cfg(feature = "html")]
-pub(crate) unsafe fn gen_html_node_ptr(_no: i32, _nr: i32) -> HtmlNodePtr {
-    null_mut()
-}
-#[cfg(feature = "html")]
-pub(crate) unsafe fn des_html_node_ptr(_no: i32, _val: HtmlNodePtr, _nr: i32) {}
-
-#[cfg(feature = "html")]
-pub(crate) unsafe fn des_html_doc_ptr(_no: i32, val: HtmlDocPtr, _nr: i32) {
-    if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
-        xml_free_doc(val);
     }
 }
 
@@ -1477,44 +878,6 @@ pub(crate) fn gen_void_ptr(_no: i32, _nr: i32) -> *mut c_void {
 }
 pub(crate) fn des_void_ptr(_no: i32, _val: *mut c_void, _nr: i32) {}
 
-#[cfg(feature = "libxml_output")]
-pub(crate) unsafe fn gen_xml_output_buffer_ptr(
-    no: i32,
-    _nr: i32,
-) -> Option<XmlOutputBuffer<'static>> {
-    if no == 0 {
-        return XmlOutputBuffer::from_uri("test.out", None, 0);
-    }
-    None
-}
-
-#[cfg(feature = "libxml_output")]
-pub(crate) fn des_xml_output_buffer_ptr(_no: i32, _val: XmlOutputBuffer, _nr: i32) {}
-
-pub(crate) unsafe fn gen_xml_doc_ptr(no: i32, _nr: i32) -> XmlDocPtr {
-    if no == 0 {
-        return xml_new_doc(Some("1.0"));
-    }
-    if no == 1 {
-        return xml_read_memory("<foo/>".as_bytes().to_vec(), Some("test"), None, 0);
-    }
-    if no == 2 {
-        return xml_read_memory(
-            "<!DOCTYPE foo []> <foo/>".as_bytes().to_vec(),
-            Some("test"),
-            None,
-            0,
-        );
-    }
-    null_mut()
-}
-
-pub(crate) unsafe fn des_xml_doc_ptr(_no: i32, val: XmlDocPtr, _nr: i32) {
-    if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
-        xml_free_doc(val);
-    }
-}
-
 pub(crate) fn gen_const_char_ptr(no: i32, _nr: i32) -> *mut c_char {
     if no == 0 {
         return c"foo".as_ptr() as _;
@@ -1536,28 +899,6 @@ pub(crate) fn des_const_char_ptr(_no: i32, _val: *const c_char, _nr: i32) {}
 */
 const REMOTE1GOOD: &CStr = c"http://localhost/";
 const REMOTE1BAD: &CStr = c"http:http://http";
-const REMOTE2GOOD: &CStr = c"ftp://localhost/foo";
-
-pub(crate) fn gen_fileoutput(no: i32, _nr: i32) -> *const c_char {
-    if no == 0 {
-        return c"missing/dir/missing.xml".as_ptr() as _;
-    }
-    if no == 1 {
-        return c"<foo/>".as_ptr() as _;
-    }
-    if no == 2 {
-        return REMOTE2GOOD.as_ptr();
-    }
-    if no == 3 {
-        return REMOTE1GOOD.as_ptr();
-    }
-    if no == 4 {
-        return REMOTE1BAD.as_ptr();
-    }
-    null()
-}
-
-pub(crate) fn des_fileoutput(_no: i32, _val: *const c_char, _nr: i32) {}
 
 pub(crate) fn gen_filepath(no: i32, _nr: i32) -> *const c_char {
     if no == 0 {
@@ -1612,7 +953,6 @@ pub(crate) fn gen_file_ptr(_no: i32, _nr: i32) -> Option<File> {
         .open("test.out")
         .ok();
 }
-pub(crate) fn des_file_ptr(_no: i32, _val: File, _nr: i32) {}
 
 pub(crate) fn gen_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlChar {
     null_mut()

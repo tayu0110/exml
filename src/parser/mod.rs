@@ -304,15 +304,15 @@ pub unsafe fn xml_read_doc(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> Option<XmlDocPtr> {
     if cur.is_null() {
-        return null_mut();
+        return None;
     }
     xml_init_parser();
 
     let ctxt: XmlParserCtxtPtr = xml_create_doc_parser_ctxt(cur);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     let res = (*ctxt).do_read(url, encoding, options);
     xml_free_parser_ctxt(ctxt);
@@ -323,11 +323,15 @@ pub unsafe fn xml_read_doc(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadFile")]
-pub unsafe fn xml_read_file(filename: &str, encoding: Option<&str>, options: i32) -> XmlDocPtr {
+pub unsafe fn xml_read_file(
+    filename: &str,
+    encoding: Option<&str>,
+    options: i32,
+) -> Option<XmlDocPtr> {
     xml_init_parser();
     let ctxt: XmlParserCtxtPtr = xml_create_url_parser_ctxt(Some(filename), options);
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     let res = (*ctxt).do_read(None, encoding, options);
     xml_free_parser_ctxt(ctxt);
@@ -343,12 +347,12 @@ pub unsafe fn xml_read_memory(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> Option<XmlDocPtr> {
     xml_init_parser();
     let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(buffer);
 
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     let res = (*ctxt).do_read(url, encoding, options);
     xml_free_parser_ctxt(ctxt);
@@ -364,19 +368,19 @@ pub unsafe fn xml_read_io(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> Option<XmlDocPtr> {
     xml_init_parser();
 
     let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
         xml_free_parser_ctxt(ctxt);
-        return null_mut();
+        return None;
     }
     (*ctxt).input_push(stream);
     let res = (*ctxt).do_read(url, encoding, options);
@@ -395,9 +399,9 @@ pub unsafe fn xml_ctxt_read_doc(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> Option<XmlDocPtr> {
     if cur.is_null() {
-        return null_mut();
+        return None;
     }
     xml_ctxt_read_memory(
         ctxt,
@@ -418,9 +422,9 @@ pub unsafe fn xml_ctxt_read_file(
     filename: &str,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> Option<XmlDocPtr> {
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     xml_init_parser();
 
@@ -428,7 +432,7 @@ pub unsafe fn xml_ctxt_read_file(
 
     let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), None, ctxt);
     if stream.is_null() {
-        return null_mut();
+        return None;
     }
     (*ctxt).input_push(stream);
     (*ctxt).do_read(None, encoding, options)
@@ -445,20 +449,18 @@ pub unsafe fn xml_ctxt_read_memory(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> Option<XmlDocPtr> {
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     xml_init_parser();
     (*ctxt).reset();
 
-    let Some(input) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
-        return null_mut();
-    };
+    let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
-        return null_mut();
+        return None;
     }
 
     (*ctxt).input_push(stream);
@@ -476,9 +478,9 @@ pub unsafe fn xml_ctxt_read_io(
     url: Option<&str>,
     encoding: Option<&str>,
     options: i32,
-) -> XmlDocPtr {
+) -> Option<XmlDocPtr> {
     if ctxt.is_null() {
-        return null_mut();
+        return None;
     }
     xml_init_parser();
     (*ctxt).reset();
@@ -487,7 +489,7 @@ pub unsafe fn xml_ctxt_read_io(
     let stream: XmlParserInputPtr =
         xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
     if stream.is_null() {
-        return null_mut();
+        return None;
     }
     (*ctxt).input_push(stream);
     (*ctxt).do_read(url, encoding, options)

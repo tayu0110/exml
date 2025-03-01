@@ -18,7 +18,7 @@ use crate::{
         },
         xmlstring::xml_str_equal,
     },
-    tree::XmlNodePtr,
+    tree::XmlGenericNodePtr,
 };
 
 use super::{relaxng_normalize, xml_rng_verr_memory, XML_RELAXNG_NS};
@@ -38,7 +38,7 @@ type XmlRelaxNGTypeCheck = unsafe fn(
     typ: &str,
     value: *const u8,
     result: *mut *mut c_void,
-    node: XmlNodePtr,
+    node: Option<XmlGenericNodePtr>,
 ) -> i32;
 
 /// Function provided by a type library to check a value facet
@@ -66,10 +66,10 @@ type XmlRelaxNGTypeCompare = unsafe fn(
     data: *mut c_void,
     typ: &str,
     value1: *const u8,
-    ctxt1: XmlNodePtr,
+    ctxt1: Option<XmlGenericNodePtr>,
     comp1: *mut c_void,
     value2: *const u8,
-    ctxt2: XmlNodePtr,
+    ctxt2: Option<XmlGenericNodePtr>,
 ) -> i32;
 
 pub type XmlRelaxNGTypeLibraryPtr = *mut XmlRelaxNGTypeLibrary;
@@ -230,7 +230,7 @@ unsafe fn xml_relaxng_schema_type_check(
     r#type: &str,
     value: *const u8,
     result: *mut *mut c_void,
-    node: XmlNodePtr,
+    node: Option<XmlGenericNodePtr>,
 ) -> i32 {
     if value.is_null() {
         return -1;
@@ -261,10 +261,10 @@ unsafe fn xml_relaxng_schema_type_compare(
     _data: *mut c_void,
     r#type: &str,
     value1: *const u8,
-    ctxt1: XmlNodePtr,
+    ctxt1: Option<XmlGenericNodePtr>,
     comp1: *mut c_void,
     value2: *const u8,
-    ctxt2: XmlNodePtr,
+    ctxt2: Option<XmlGenericNodePtr>,
 ) -> i32 {
     let mut ret: i32;
     let mut res1: XmlSchemaValPtr = null_mut();
@@ -403,7 +403,7 @@ unsafe fn xml_relaxng_default_type_check(
     typ: &str,
     value: *const u8,
     _result: *mut *mut c_void,
-    _node: XmlNodePtr,
+    _node: Option<XmlGenericNodePtr>,
 ) -> i32 {
     if value.is_null() {
         return -1;
@@ -423,10 +423,10 @@ unsafe fn xml_relaxng_default_type_compare(
     _data: *mut c_void,
     typ: &str,
     value1: *const u8,
-    _ctxt1: XmlNodePtr,
+    _ctxt1: Option<XmlGenericNodePtr>,
     _comp1: *mut c_void,
     value2: *const u8,
-    _ctxt2: XmlNodePtr,
+    _ctxt2: Option<XmlGenericNodePtr>,
 ) -> i32 {
     let mut ret: i32 = -1;
 

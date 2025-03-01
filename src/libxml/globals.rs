@@ -42,7 +42,9 @@ use crate::{
         parser::XmlSAXLocator,
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
-    tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
+    tree::{
+        XmlBufferAllocationScheme, XmlGenericNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS,
+    },
 };
 
 use super::{
@@ -74,10 +76,10 @@ pub unsafe extern "C" fn xml_cleanup_globals() {}
 
 /// Signature for the registration callback of a created node
 #[doc(alias = "xmlRegisterNodeFunc")]
-pub type XmlRegisterNodeFunc = unsafe extern "C" fn(node: XmlNodePtr);
+pub type XmlRegisterNodeFunc = unsafe fn(node: XmlGenericNodePtr);
 /// Signature for the deregistration callback of a discarded node
 #[doc(alias = "xmlDeregisterNodeFunc")]
-pub type XmlDeregisterNodeFunc = unsafe extern "C" fn(node: XmlNodePtr);
+pub type XmlDeregisterNodeFunc = unsafe fn(node: XmlGenericNodePtr);
 
 pub type XmlGlobalStatePtr = *mut XmlGlobalState;
 pub struct XmlGlobalState {
@@ -366,7 +368,7 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
 ///
 /// Returns the old value of the registration function
 #[doc(alias = "xmlRegisterNodeDefault")]
-pub unsafe extern "C" fn xml_register_node_default(
+pub unsafe fn xml_register_node_default(
     func: Option<XmlRegisterNodeFunc>,
 ) -> Option<XmlRegisterNodeFunc> {
     let old = _XML_REGISTER_NODE_DEFAULT_VALUE;
@@ -376,7 +378,7 @@ pub unsafe extern "C" fn xml_register_node_default(
     old
 }
 
-pub unsafe extern "C" fn xml_thr_def_register_node_default(
+pub unsafe fn xml_thr_def_register_node_default(
     func: XmlRegisterNodeFunc,
 ) -> Option<XmlRegisterNodeFunc> {
     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
@@ -393,7 +395,7 @@ pub unsafe extern "C" fn xml_thr_def_register_node_default(
 ///
 /// Returns the previous value of the deregistration function
 #[doc(alias = "xmlDeregisterNodeDefault")]
-pub unsafe extern "C" fn xml_deregister_node_default(
+pub unsafe fn xml_deregister_node_default(
     func: XmlDeregisterNodeFunc,
 ) -> Option<XmlDeregisterNodeFunc> {
     let old = _XML_DEREGISTER_NODE_DEFAULT_VALUE;
@@ -403,7 +405,7 @@ pub unsafe extern "C" fn xml_deregister_node_default(
     old
 }
 
-pub unsafe extern "C" fn xml_thr_def_deregister_node_default(
+pub unsafe fn xml_thr_def_deregister_node_default(
     func: XmlDeregisterNodeFunc,
 ) -> Option<XmlDeregisterNodeFunc> {
     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
@@ -528,7 +530,7 @@ pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSAXLocator {
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xml_register_node_default_value() -> XmlRegisterNodeFunc {
+pub unsafe fn __xml_register_node_default_value() -> XmlRegisterNodeFunc {
     if IS_MAIN_THREAD!() != 0 {
         _XML_REGISTER_NODE_DEFAULT_VALUE.unwrap()
     } else {
@@ -538,12 +540,12 @@ pub unsafe extern "C" fn __xml_register_node_default_value() -> XmlRegisterNodeF
     }
 }
 
-pub unsafe extern "C" fn xml_register_node_default_value(node: XmlNodePtr) {
+pub unsafe fn xml_register_node_default_value(node: XmlGenericNodePtr) {
     __xml_register_node_default_value()(node)
 }
 
 #[deprecated]
-pub unsafe extern "C" fn __xml_deregister_node_default_value() -> XmlDeregisterNodeFunc {
+pub unsafe fn __xml_deregister_node_default_value() -> XmlDeregisterNodeFunc {
     if IS_MAIN_THREAD!() != 0 {
         _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()
     } else {
@@ -553,7 +555,7 @@ pub unsafe extern "C" fn __xml_deregister_node_default_value() -> XmlDeregisterN
     }
 }
 
-pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
+pub unsafe fn xml_deregister_node_default_value(node: XmlGenericNodePtr) {
     __xml_deregister_node_default_value()(node)
 }
 

@@ -18,7 +18,7 @@ pub type XmlRelaxNGDefinePtr = *mut XmlRelaxNGDefine;
 #[repr(C)]
 pub struct XmlRelaxNGDefine {
     pub(crate) typ: XmlRelaxNGType,             // the type of definition
-    pub(crate) node: XmlNodePtr,                // the node in the source
+    pub(crate) node: Option<XmlNodePtr>,        // the node in the source
     pub(crate) name: *mut u8,                   // the element local name if present
     pub(crate) ns: *mut u8,                     // the namespace local name if present
     pub(crate) value: *mut u8,                  // value when available
@@ -68,7 +68,7 @@ impl Default for XmlRelaxNGDefine {
     fn default() -> Self {
         Self {
             typ: XmlRelaxNGType::default(),
-            node: null_mut(),
+            node: None,
             name: null_mut(),
             ns: null_mut(),
             value: null_mut(),
@@ -92,7 +92,7 @@ impl Default for XmlRelaxNGDefine {
 #[doc(alias = "xmlRelaxNGNewDefine")]
 pub(crate) unsafe fn xml_relaxng_new_define(
     ctxt: XmlRelaxNGParserCtxtPtr,
-    node: XmlNodePtr,
+    node: Option<XmlNodePtr>,
 ) -> XmlRelaxNGDefinePtr {
     let ret: XmlRelaxNGDefinePtr = xml_malloc(size_of::<XmlRelaxNGDefine>()) as _;
     if ret.is_null() {
