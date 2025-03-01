@@ -3,7 +3,6 @@ use std::{
     ffi::{CStr, CString},
     ops::{Deref, DerefMut},
     ptr::{null_mut, NonNull},
-    sync::atomic::Ordering,
 };
 
 use crate::{
@@ -90,7 +89,7 @@ pub trait NodeCommon {
             if let Ok(ent) =
                 XmlEntityPtr::try_from(XmlGenericNodePtr::from_raw(now.as_ptr()).unwrap())
             {
-                let ret = ent.uri.load(Ordering::Relaxed);
+                let ret = ent.uri;
                 return (!ret.is_null()).then(|| {
                     CStr::from_ptr(ret as *const i8)
                         .to_string_lossy()

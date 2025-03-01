@@ -45,7 +45,6 @@ use std::{
     rc::Rc,
     slice::from_raw_parts,
     str::{from_utf8, from_utf8_mut},
-    sync::atomic::Ordering,
 };
 
 use crate::{
@@ -465,20 +464,19 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
     if get_parser_debug_entities() != 0 {
         generic_error!(
             "new input from entity: {}\n",
-            CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8).to_string_lossy()
+            CStr::from_ptr(entity.name as *const i8).to_string_lossy()
         );
     }
-    if entity.content.load(Ordering::Relaxed).is_null() {
+    if entity.content.is_null() {
         match entity.etype {
             XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                let name = CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
+                let name = CStr::from_ptr(entity.name as *const i8).to_string_lossy();
                 xml_err_internal!(ctxt, "Cannot parse entity {}\n", name);
             }
             XmlEntityType::XmlExternalGeneralParsedEntity
             | XmlEntityType::XmlExternalParameterEntity => {
-                let uri = entity.uri.load(Ordering::Relaxed);
-                let external_id = entity.external_id.load(Ordering::Relaxed);
+                let uri = entity.uri;
+                let external_id = entity.external_id;
                 input = xml_load_external_entity(
                     (!uri.is_null())
                         .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
@@ -494,13 +492,11 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
                 return input;
             }
             XmlEntityType::XmlInternalGeneralEntity => {
-                let name = CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
+                let name = CStr::from_ptr(entity.name as *const i8).to_string_lossy();
                 xml_err_internal!(ctxt, "Internal entity {} without content !\n", name);
             }
             XmlEntityType::XmlInternalParameterEntity => {
-                let name = CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
+                let name = CStr::from_ptr(entity.name as *const i8).to_string_lossy();
                 xml_err_internal!(
                     ctxt,
                     "Internal parameter entity {} without content !\n",
@@ -508,8 +504,7 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
                 );
             }
             XmlEntityType::XmlInternalPredefinedEntity => {
-                let name = CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
+                let name = CStr::from_ptr(entity.name as *const i8).to_string_lossy();
                 xml_err_internal!(ctxt, "Predefined entity {} without content !\n", name);
             }
             _ => {
@@ -522,23 +517,20 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
     if input.is_null() {
         return null_mut();
     }
-    if !entity.uri.load(Ordering::Relaxed).is_null() {
+    if !entity.uri.is_null() {
         (*input).filename = Some(
-            CStr::from_ptr(entity.uri.load(Ordering::Relaxed) as *const i8)
+            CStr::from_ptr(entity.uri as *const i8)
                 .to_string_lossy()
                 .into_owned(),
         );
     }
-    (*input).base = entity.content.load(Ordering::Relaxed) as _;
+    (*input).base = entity.content as _;
     if entity.length == 0 {
-        entity.length = xml_strlen(entity.content.load(Ordering::Relaxed) as _);
+        entity.length = xml_strlen(entity.content as _);
     }
-    (*input).cur = entity.content.load(Ordering::Relaxed);
+    (*input).cur = entity.content;
     (*input).length = entity.length;
-    (*input).end = entity
-        .content
-        .load(Ordering::Relaxed)
-        .add((*input).length as usize);
+    (*input).end = entity.content.add((*input).length as usize);
     (*input).entity = Some(entity);
     input
 }

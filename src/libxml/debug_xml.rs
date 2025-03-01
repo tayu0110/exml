@@ -23,7 +23,6 @@ use std::{
     ffi::{c_char, CStr, CString},
     io::{stdout, Write},
     ptr::{addr_of_mut, null, null_mut},
-    sync::atomic::Ordering,
 };
 
 use libc::strlen;
@@ -339,7 +338,7 @@ impl XmlDebugCtxt<'_> {
             let content = if let Ok(node) = XmlNodePtr::try_from(node) {
                 node.content
             } else if let Ok(ent) = XmlEntityPtr::try_from(node) {
-                ent.content.load(Ordering::Relaxed)
+                ent.content
             } else {
                 todo!("What is this type ????: {:?}", node.element_type());
             };
@@ -700,26 +699,22 @@ impl XmlDebugCtxt<'_> {
                 }
                 _ => unreachable!(),
             }
-            if !ent.external_id.load(Ordering::Relaxed).is_null() {
+            if !ent.external_id.is_null() {
                 self.dump_spaces();
-                let external_id =
-                    CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as *const i8)
-                        .to_string_lossy();
+                let external_id = CStr::from_ptr(ent.external_id as *const i8).to_string_lossy();
                 writeln!(self.output, " ExternalID={external_id}");
             }
-            if !ent.system_id.load(Ordering::Relaxed).is_null() {
+            if !ent.system_id.is_null() {
                 self.dump_spaces();
-                let system_id = CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
+                let system_id = CStr::from_ptr(ent.system_id as *const i8).to_string_lossy();
                 writeln!(self.output, " SystemID={system_id}");
             }
-            if !ent.uri.load(Ordering::Relaxed).is_null() {
+            if !ent.uri.is_null() {
                 self.dump_spaces();
-                let uri =
-                    CStr::from_ptr(ent.uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+                let uri = CStr::from_ptr(ent.uri as *const i8).to_string_lossy();
                 writeln!(self.output, " URI={uri}");
             }
-            let content = ent.content.load(Ordering::Relaxed);
+            let content = ent.content;
             if !content.is_null() {
                 self.dump_spaces();
                 write!(self.output, " content=");
@@ -826,26 +821,22 @@ impl XmlDebugCtxt<'_> {
                 _ => unreachable!(),
             }
             writeln!(self.output, "{}", ent.name().unwrap());
-            if !ent.external_id.load(Ordering::Relaxed).is_null() {
+            if !ent.external_id.is_null() {
                 self.dump_spaces();
-                let external_id =
-                    CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as *const i8)
-                        .to_string_lossy();
+                let external_id = CStr::from_ptr(ent.external_id as *const i8).to_string_lossy();
                 writeln!(self.output, "ExternalID={external_id}");
             }
-            if !ent.system_id.load(Ordering::Relaxed).is_null() {
+            if !ent.system_id.is_null() {
                 self.dump_spaces();
-                let system_id = CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
+                let system_id = CStr::from_ptr(ent.system_id as *const i8).to_string_lossy();
                 writeln!(self.output, "SystemID={system_id}");
             }
-            if !ent.uri.load(Ordering::Relaxed).is_null() {
+            if !ent.uri.is_null() {
                 self.dump_spaces();
-                let uri =
-                    CStr::from_ptr(ent.uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+                let uri = CStr::from_ptr(ent.uri as *const i8).to_string_lossy();
                 writeln!(self.output, "URI={uri}");
             }
-            let content = ent.content.load(Ordering::Relaxed);
+            let content = ent.content;
             if !content.is_null() {
                 self.dump_spaces();
                 write!(self.output, "content=");
@@ -1337,27 +1328,20 @@ impl XmlDebugCtxt<'_> {
                 }
                 _ => unreachable!(),
             }
-            if !cur.external_id.load(Ordering::Relaxed).is_null() {
-                let external_id =
-                    CStr::from_ptr(cur.external_id.load(Ordering::Relaxed) as *const i8)
-                        .to_string_lossy();
+            if !cur.external_id.is_null() {
+                let external_id = CStr::from_ptr(cur.external_id as *const i8).to_string_lossy();
                 write!(self.output, "ID \"{external_id}\"");
             }
-            if !cur.system_id.load(Ordering::Relaxed).is_null() {
-                let system_id = CStr::from_ptr(cur.system_id.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
+            if !cur.system_id.is_null() {
+                let system_id = CStr::from_ptr(cur.system_id as *const i8).to_string_lossy();
                 write!(self.output, "SYSTEM \"{system_id}\"");
             }
-            if !cur.orig.load(Ordering::Relaxed).is_null() {
-                let orig =
-                    CStr::from_ptr(cur.orig.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+            if !cur.orig.is_null() {
+                let orig = CStr::from_ptr(cur.orig as *const i8).to_string_lossy();
                 write!(self.output, "\n orig \"{orig}\"");
             }
-            if cur.typ != XmlElementType::XmlElementNode
-                && !cur.content.load(Ordering::Relaxed).is_null()
-            {
-                let content = CStr::from_ptr(cur.content.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
+            if cur.typ != XmlElementType::XmlElementNode && !cur.content.is_null() {
+                let content = CStr::from_ptr(cur.content as *const i8).to_string_lossy();
                 write!(self.output, "\n content \"{content}\"");
             }
             writeln!(self.output);

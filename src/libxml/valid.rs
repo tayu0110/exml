@@ -27,7 +27,6 @@ use std::{
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
-    sync::atomic::Ordering,
 };
 
 use libc::{memset, strcat, strlen, strncat};
@@ -3377,14 +3376,12 @@ unsafe fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCt
 
 unsafe fn xml_validate_notation_callback(cur: XmlEntityPtr, ctxt: XmlValidCtxtPtr) {
     if matches!(cur.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
-        let notation: *mut XmlChar = cur.content.load(Ordering::Relaxed) as _;
+        let notation: *mut XmlChar = cur.content;
 
         if !notation.is_null() {
             let ret: i32 = xml_validate_notation_use(
                 ctxt,
-                XmlDocPtr::from_raw(cur.doc.load(Ordering::Relaxed) as _)
-                    .unwrap()
-                    .unwrap(),
+                cur.doc.unwrap(),
                 CStr::from_ptr(notation as *const i8)
                     .to_string_lossy()
                     .as_ref(),

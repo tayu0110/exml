@@ -3318,7 +3318,7 @@ unsafe fn register_node(node: XmlGenericNodePtr) {
     } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
         node._private = private;
     } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
-        node._private.store(private, Ordering::Relaxed);
+        node._private = private;
     } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
         node._private = private;
     } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {
@@ -3340,7 +3340,7 @@ unsafe fn deregister_node(node: XmlGenericNodePtr) {
     } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
         node._private
     } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
-        node._private.load(Ordering::Relaxed)
+        node._private
     } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
         node._private
     } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {

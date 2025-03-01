@@ -367,10 +367,7 @@ impl XmlDoc {
                         if let Some(ent) = ent.filter(|ent| {
                             matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
                         }) {
-                            buf.extend(
-                                CStr::from_ptr(ent.content.load(Ordering::Relaxed) as *const i8)
-                                    .to_bytes(),
-                            );
+                            buf.extend(CStr::from_ptr(ent.content as *const i8).to_bytes());
                         } else {
                             // Flush buffer so far
                             if !buf.is_empty() {
@@ -638,10 +635,7 @@ impl XmlDoc {
                         if let Some(ent) = ent.filter(|ent| {
                             matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
                         }) {
-                            buf.extend(
-                                CStr::from_ptr(ent.content.load(Ordering::Relaxed) as *const i8)
-                                    .to_bytes(),
-                            );
+                            buf.extend(CStr::from_ptr(ent.content as *const i8).to_bytes());
                         } else {
                             // Flush buffer so far
                             if !buf.is_empty() {

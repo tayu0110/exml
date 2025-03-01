@@ -27,7 +27,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     ops::{Deref, DerefMut},
     os::raw::c_void,
-    ptr::{addr_of_mut, null_mut, NonNull},
+    ptr::{null_mut, NonNull},
     sync::atomic::{AtomicPtr, Ordering},
 };
 
@@ -45,7 +45,7 @@ use crate::{
         hash::{xml_hash_create, XmlHashTable},
         xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
     },
-    tree::{xml_free_node_list, NodeCommon, XmlDoc, XmlDtd, XmlElementType, XmlNode},
+    tree::{xml_free_node_list, NodeCommon, XmlDtd, XmlElementType, XmlNode},
 };
 
 use super::{InvalidNodePointerCastError, XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr};
@@ -88,14 +88,13 @@ impl TryFrom<i32> for XmlEntityType {
 }
 
 #[repr(C)]
-#[derive(Default)]
 pub struct XmlEntity {
     // application data
-    pub _private: AtomicPtr<c_void>,
+    pub _private: *mut c_void,
     // XML_ENTITY_DECL, must be second !
     pub(crate) typ: XmlElementType,
     // Entity name
-    pub(crate) name: AtomicPtr<XmlChar>,
+    pub(crate) name: *mut u8,
     // First child link
     pub(crate) children: AtomicPtr<XmlNode>,
     // Last child link
@@ -107,25 +106,25 @@ pub struct XmlEntity {
     // previous sibling link
     pub(crate) prev: AtomicPtr<XmlNode>,
     // the containing document
-    pub(crate) doc: AtomicPtr<XmlDoc>,
+    pub(crate) doc: Option<XmlDocPtr>,
 
     // content without ref substitution
-    pub(crate) orig: AtomicPtr<XmlChar>,
+    pub(crate) orig: *mut u8,
     // content or ndata if unparsed
-    pub(crate) content: AtomicPtr<XmlChar>,
+    pub(crate) content: *mut u8,
     // the content length
     pub(crate) length: i32,
     // The entity type
     pub(crate) etype: XmlEntityType,
     // External identifier for PUBLIC
-    pub(crate) external_id: AtomicPtr<XmlChar>,
+    pub(crate) external_id: *mut u8,
     // URI for a SYSTEM or PUBLIC Entity
-    pub(crate) system_id: AtomicPtr<XmlChar>,
+    pub(crate) system_id: *mut u8,
 
     // unused
-    pub(crate) nexte: AtomicPtr<XmlEntity>,
+    pub(crate) nexte: Option<XmlEntityPtr>,
     // the full URI as computed
-    pub(crate) uri: AtomicPtr<XmlChar>,
+    pub(crate) uri: *mut u8,
     // does the entity own the childrens
     pub(crate) owner: i32,
     // various flags
@@ -136,19 +135,16 @@ pub struct XmlEntity {
 
 impl NodeCommon for XmlEntity {
     fn document(&self) -> Option<XmlDocPtr> {
-        unsafe { XmlDocPtr::from_raw(self.doc.load(Ordering::Relaxed)).unwrap() }
+        self.doc
     }
     fn set_document(&mut self, doc: Option<XmlDocPtr>) {
-        self.doc.store(
-            doc.map_or(null_mut(), |doc| doc.as_ptr()),
-            Ordering::Relaxed,
-        );
+        self.doc = doc;
     }
     fn element_type(&self) -> XmlElementType {
         self.typ
     }
     fn name(&self) -> Option<Cow<'_, str>> {
-        let name = self.name.load(Ordering::Relaxed);
+        let name = self.name;
         (!name.is_null()).then(|| unsafe { CStr::from_ptr(name as *const i8).to_string_lossy() })
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
@@ -252,6 +248,33 @@ impl XmlEntityPtr {
     }
 }
 
+impl Default for XmlEntity {
+    fn default() -> Self {
+        Self {
+            _private: null_mut(),
+            typ: XmlElementType::XmlEntityDecl,
+            name: null_mut(),
+            children: Default::default(),
+            last: Default::default(),
+            parent: Default::default(),
+            next: Default::default(),
+            prev: Default::default(),
+            doc: Default::default(),
+            orig: null_mut(),
+            content: null_mut(),
+            length: Default::default(),
+            etype: Default::default(),
+            external_id: null_mut(),
+            system_id: null_mut(),
+            nexte: Default::default(),
+            uri: null_mut(),
+            owner: Default::default(),
+            flags: Default::default(),
+            expanded_size: Default::default(),
+        }
+    }
+}
+
 impl Clone for XmlEntityPtr {
     fn clone(&self) -> Self {
         *self
@@ -332,7 +355,7 @@ unsafe fn xml_create_entity(
     let Some(mut ret) = XmlEntityPtr::new(XmlEntity {
         typ: XmlElementType::XmlEntityDecl,
         etype: typ,
-        name: AtomicPtr::new(xml_strndup(name.as_ptr(), name.len() as i32)),
+        name: xml_strndup(name.as_ptr(), name.len() as i32),
         ..Default::default()
     }) else {
         xml_entities_err_memory("xmlCreateEntity: malloc failed");
@@ -342,23 +365,23 @@ unsafe fn xml_create_entity(
     // fill the structure.
     if let Some(external_id) = external_id {
         let external_id = CString::new(external_id).unwrap();
-        ret.external_id = AtomicPtr::new(xml_strdup(external_id.as_ptr() as *const u8) as _);
+        ret.external_id = xml_strdup(external_id.as_ptr() as *const u8);
     }
     if let Some(system_id) = system_id {
         let system_id = CString::new(system_id).unwrap();
-        ret.system_id = AtomicPtr::new(xml_strdup(system_id.as_ptr() as *const u8) as _);
+        ret.system_id = xml_strdup(system_id.as_ptr() as *const u8);
     }
     if let Some(content) = content {
         ret.length = content.len() as i32;
         let content = CString::new(content).unwrap();
-        ret.content = AtomicPtr::new(xml_strndup(content.as_ptr() as *const u8, ret.length));
+        ret.content = xml_strndup(content.as_ptr() as *const u8, ret.length);
     } else {
         ret.length = 0;
-        ret.content = AtomicPtr::new(null_mut());
+        ret.content = null_mut();
     }
     // to be computed by the layer knowing the defining entity
-    ret.uri = AtomicPtr::new(null_mut());
-    ret.orig = AtomicPtr::new(null_mut());
+    ret.uri = null_mut();
+    ret.orig = null_mut();
     ret.owner = 0;
 
     Some(ret)
@@ -384,7 +407,7 @@ pub unsafe fn xml_new_entity(
         return xml_add_doc_entity(doc, name, typ, external_id, system_id, content);
     }
     let mut ret = xml_create_entity(name, typ, external_id, system_id, content)?;
-    ret.doc = AtomicPtr::new(doc.map_or(null_mut(), |doc| doc.as_ptr()));
+    ret.doc = doc;
     Some(ret)
 }
 
@@ -428,7 +451,7 @@ macro_rules! xml_entities_warn {
 
 /// clean-up an entity record.
 #[doc(alias = "xmlFreeEntity")]
-unsafe fn xml_free_entity(entity: XmlEntityPtr) {
+unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
     if !entity.children.load(Ordering::Relaxed).is_null()
         && entity.owner == 1
         && entity.as_ptr() as *mut XmlNode
@@ -441,29 +464,29 @@ unsafe fn xml_free_entity(entity: XmlEntityPtr) {
         ));
         entity.children.store(null_mut(), Ordering::Relaxed);
     }
-    if !entity.name.load(Ordering::Relaxed).is_null() {
-        xml_free(entity.name.load(Ordering::Relaxed) as _);
-        entity.name.store(null_mut(), Ordering::Relaxed);
+    if !entity.name.is_null() {
+        xml_free(entity.name as _);
+        entity.name = null_mut();
     }
-    if !entity.external_id.load(Ordering::Relaxed).is_null() {
-        xml_free(entity.external_id.load(Ordering::Relaxed) as _);
-        entity.external_id.store(null_mut(), Ordering::Relaxed);
+    if !entity.external_id.is_null() {
+        xml_free(entity.external_id as _);
+        entity.external_id = null_mut();
     }
-    if !entity.system_id.load(Ordering::Relaxed).is_null() {
-        xml_free(entity.system_id.load(Ordering::Relaxed) as _);
-        entity.system_id.store(null_mut(), Ordering::Relaxed);
+    if !entity.system_id.is_null() {
+        xml_free(entity.system_id as _);
+        entity.system_id = null_mut();
     }
-    if !entity.uri.load(Ordering::Relaxed).is_null() {
-        xml_free(entity.uri.load(Ordering::Relaxed) as _);
-        entity.uri.store(null_mut(), Ordering::Relaxed);
+    if !entity.uri.is_null() {
+        xml_free(entity.uri as _);
+        entity.uri = null_mut();
     }
-    if !entity.content.load(Ordering::Relaxed).is_null() {
-        xml_free(entity.content.load(Ordering::Relaxed) as _);
-        entity.content.store(null_mut(), Ordering::Relaxed);
+    if !entity.content.is_null() {
+        xml_free(entity.content as _);
+        entity.content = null_mut();
     }
-    if !entity.orig.load(Ordering::Relaxed).is_null() {
-        xml_free(entity.orig.load(Ordering::Relaxed) as _);
-        entity.orig.store(null_mut(), Ordering::Relaxed);
+    if !entity.orig.is_null() {
+        xml_free(entity.orig as _);
+        entity.orig = null_mut();
     }
     entity.free();
 }
@@ -490,7 +513,7 @@ unsafe fn xml_add_entity(
                 // 4.6 Predefined Entities
                 if typ == XmlEntityType::XmlInternalGeneralEntity {
                     if let Some(content) = content {
-                        let c = *predef.content.load(Ordering::Relaxed).add(0);
+                        let c = *predef.content.add(0);
                         if content.as_bytes() == [c]
                             && (content == ">" || content == "\'" || content == "\"")
                         {
@@ -539,11 +562,8 @@ unsafe fn xml_add_entity(
         _ => {}
     }
     let mut table = table?;
-    let ret = xml_create_entity(name, typ, external_id, system_id, content)?;
-    ret.doc.store(
-        dtd.doc.map_or(null_mut(), |doc| doc.as_ptr()),
-        Ordering::Relaxed,
-    );
+    let mut ret = xml_create_entity(name, typ, external_id, system_id, content)?;
+    ret.doc = dtd.doc;
 
     if table.add_entry(name, ret).is_err() {
         // entity was already defined at another level.
@@ -600,13 +620,6 @@ pub unsafe fn xml_add_dtd_entity(
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    // if doc.is_null() {
-    //     xml_entities_err(
-    //         XmlParserErrors::XmlDTDNoDoc,
-    //         "xmlAddDtdEntity: document is NULL",
-    //     );
-    //     return None;
-    // }
     let Some(mut dtd) = doc.ext_subset else {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDTD,
@@ -630,117 +643,118 @@ pub unsafe fn xml_add_dtd_entity(
 }
 
 // The XML predefined entities.
-
-static mut XML_ENTITY_LT: XmlEntity = XmlEntity {
-    _private: AtomicPtr::new(null_mut()),
-    typ: XmlElementType::XmlEntityDecl,
-    name: AtomicPtr::new(c"lt".as_ptr() as _),
-    children: AtomicPtr::new(null_mut()),
-    last: AtomicPtr::new(null_mut()),
-    parent: AtomicPtr::new(null_mut()),
-    next: AtomicPtr::new(null_mut()),
-    prev: AtomicPtr::new(null_mut()),
-    doc: AtomicPtr::new(null_mut()),
-    orig: AtomicPtr::new(c"<".as_ptr() as _),
-    content: AtomicPtr::new(c"<".as_ptr() as _),
-    length: 1,
-    etype: XmlEntityType::XmlInternalPredefinedEntity,
-    external_id: AtomicPtr::new(null_mut()),
-    system_id: AtomicPtr::new(null_mut()),
-    nexte: AtomicPtr::new(null_mut()),
-    uri: AtomicPtr::new(null_mut()),
-    owner: 0,
-    flags: 0,
-    expanded_size: 0,
-};
-static mut XML_ENTITY_GT: XmlEntity = XmlEntity {
-    _private: AtomicPtr::new(null_mut()),
-    typ: XmlElementType::XmlEntityDecl,
-    name: AtomicPtr::new(c"gt".as_ptr() as _),
-    children: AtomicPtr::new(null_mut()),
-    last: AtomicPtr::new(null_mut()),
-    parent: AtomicPtr::new(null_mut()),
-    next: AtomicPtr::new(null_mut()),
-    prev: AtomicPtr::new(null_mut()),
-    doc: AtomicPtr::new(null_mut()),
-    orig: AtomicPtr::new(c">".as_ptr() as _),
-    content: AtomicPtr::new(c">".as_ptr() as _),
-    length: 1,
-    etype: XmlEntityType::XmlInternalPredefinedEntity,
-    external_id: AtomicPtr::new(null_mut()),
-    system_id: AtomicPtr::new(null_mut()),
-    nexte: AtomicPtr::new(null_mut()),
-    uri: AtomicPtr::new(null_mut()),
-    owner: 0,
-    flags: 0,
-    expanded_size: 0,
-};
-static mut XML_ENTITY_AMP: XmlEntity = XmlEntity {
-    _private: AtomicPtr::new(null_mut()),
-    typ: XmlElementType::XmlEntityDecl,
-    name: AtomicPtr::new(c"amp".as_ptr() as _),
-    children: AtomicPtr::new(null_mut()),
-    last: AtomicPtr::new(null_mut()),
-    parent: AtomicPtr::new(null_mut()),
-    next: AtomicPtr::new(null_mut()),
-    prev: AtomicPtr::new(null_mut()),
-    doc: AtomicPtr::new(null_mut()),
-    orig: AtomicPtr::new(c"&".as_ptr() as _),
-    content: AtomicPtr::new(c"&".as_ptr() as _),
-    length: 1,
-    etype: XmlEntityType::XmlInternalPredefinedEntity,
-    external_id: AtomicPtr::new(null_mut()),
-    system_id: AtomicPtr::new(null_mut()),
-    nexte: AtomicPtr::new(null_mut()),
-    uri: AtomicPtr::new(null_mut()),
-    owner: 0,
-    flags: 0,
-    expanded_size: 0,
-};
-static mut XML_ENTITY_QUOT: XmlEntity = XmlEntity {
-    _private: AtomicPtr::new(null_mut()),
-    typ: XmlElementType::XmlEntityDecl,
-    name: AtomicPtr::new(c"quot".as_ptr() as _),
-    children: AtomicPtr::new(null_mut()),
-    last: AtomicPtr::new(null_mut()),
-    parent: AtomicPtr::new(null_mut()),
-    next: AtomicPtr::new(null_mut()),
-    prev: AtomicPtr::new(null_mut()),
-    doc: AtomicPtr::new(null_mut()),
-    orig: AtomicPtr::new(c"\"".as_ptr() as _),
-    content: AtomicPtr::new(c"\"".as_ptr() as _),
-    length: 1,
-    etype: XmlEntityType::XmlInternalPredefinedEntity,
-    external_id: AtomicPtr::new(null_mut()),
-    system_id: AtomicPtr::new(null_mut()),
-    nexte: AtomicPtr::new(null_mut()),
-    uri: AtomicPtr::new(null_mut()),
-    owner: 0,
-    flags: 0,
-    expanded_size: 0,
-};
-static mut XML_ENTITY_APOS: XmlEntity = XmlEntity {
-    _private: AtomicPtr::new(null_mut()),
-    typ: XmlElementType::XmlEntityDecl,
-    name: AtomicPtr::new(c"apos".as_ptr() as _),
-    children: AtomicPtr::new(null_mut()),
-    last: AtomicPtr::new(null_mut()),
-    parent: AtomicPtr::new(null_mut()),
-    next: AtomicPtr::new(null_mut()),
-    prev: AtomicPtr::new(null_mut()),
-    doc: AtomicPtr::new(null_mut()),
-    orig: AtomicPtr::new(c"'".as_ptr() as _),
-    content: AtomicPtr::new(c"'".as_ptr() as _),
-    length: 1,
-    etype: XmlEntityType::XmlInternalPredefinedEntity,
-    external_id: AtomicPtr::new(null_mut()),
-    system_id: AtomicPtr::new(null_mut()),
-    nexte: AtomicPtr::new(null_mut()),
-    uri: AtomicPtr::new(null_mut()),
-    owner: 0,
-    flags: 0,
-    expanded_size: 0,
-};
+thread_local! {
+    static XML_ENTITY_LT: XmlEntity = const { XmlEntity {
+        _private: null_mut(),
+        typ: XmlElementType::XmlEntityDecl,
+        name: c"lt".as_ptr() as _,
+        children: AtomicPtr::new(null_mut()),
+        last: AtomicPtr::new(null_mut()),
+        parent: AtomicPtr::new(null_mut()),
+        next: AtomicPtr::new(null_mut()),
+        prev: AtomicPtr::new(null_mut()),
+        doc: None,
+        orig: c"<".as_ptr() as _,
+        content: c"<".as_ptr() as _,
+        length: 1,
+        etype: XmlEntityType::XmlInternalPredefinedEntity,
+        external_id: null_mut(),
+        system_id: null_mut(),
+        nexte: None,
+        uri: null_mut(),
+        owner: 0,
+        flags: 0,
+        expanded_size: 0,
+    } };
+    static XML_ENTITY_GT: XmlEntity = const { XmlEntity {
+        _private: null_mut(),
+        typ: XmlElementType::XmlEntityDecl,
+        name: c"gt".as_ptr() as _,
+        children: AtomicPtr::new(null_mut()),
+        last: AtomicPtr::new(null_mut()),
+        parent: AtomicPtr::new(null_mut()),
+        next: AtomicPtr::new(null_mut()),
+        prev: AtomicPtr::new(null_mut()),
+        doc: None,
+        orig: c">".as_ptr() as _,
+        content: c">".as_ptr() as _,
+        length: 1,
+        etype: XmlEntityType::XmlInternalPredefinedEntity,
+        external_id: null_mut(),
+        system_id: null_mut(),
+        nexte: None,
+        uri: null_mut(),
+        owner: 0,
+        flags: 0,
+        expanded_size: 0,
+    } };
+    static XML_ENTITY_AMP: XmlEntity = const { XmlEntity {
+        _private: null_mut(),
+        typ: XmlElementType::XmlEntityDecl,
+        name: c"amp".as_ptr() as _,
+        children: AtomicPtr::new(null_mut()),
+        last: AtomicPtr::new(null_mut()),
+        parent: AtomicPtr::new(null_mut()),
+        next: AtomicPtr::new(null_mut()),
+        prev: AtomicPtr::new(null_mut()),
+        doc: None,
+        orig: c"&".as_ptr() as _,
+        content: c"&".as_ptr() as _,
+        length: 1,
+        etype: XmlEntityType::XmlInternalPredefinedEntity,
+        external_id: null_mut(),
+        system_id: null_mut(),
+        nexte: None,
+        uri: null_mut(),
+        owner: 0,
+        flags: 0,
+        expanded_size: 0,
+    } };
+    static XML_ENTITY_QUOT: XmlEntity = const { XmlEntity {
+        _private: null_mut(),
+        typ: XmlElementType::XmlEntityDecl,
+        name: c"quot".as_ptr() as _,
+        children: AtomicPtr::new(null_mut()),
+        last: AtomicPtr::new(null_mut()),
+        parent: AtomicPtr::new(null_mut()),
+        next: AtomicPtr::new(null_mut()),
+        prev: AtomicPtr::new(null_mut()),
+        doc: None,
+        orig: c"\"".as_ptr() as _,
+        content: c"\"".as_ptr() as _,
+        length: 1,
+        etype: XmlEntityType::XmlInternalPredefinedEntity,
+        external_id: null_mut(),
+        system_id: null_mut(),
+        nexte: None,
+        uri: null_mut(),
+        owner: 0,
+        flags: 0,
+        expanded_size: 0,
+    } };
+    static XML_ENTITY_APOS: XmlEntity = const { XmlEntity {
+        _private: null_mut(),
+        typ: XmlElementType::XmlEntityDecl,
+        name: c"apos".as_ptr() as _,
+        children: AtomicPtr::new(null_mut()),
+        last: AtomicPtr::new(null_mut()),
+        parent: AtomicPtr::new(null_mut()),
+        next: AtomicPtr::new(null_mut()),
+        prev: AtomicPtr::new(null_mut()),
+        doc: None,
+        orig: c"'".as_ptr() as _,
+        content: c"'".as_ptr() as _,
+        length: 1,
+        etype: XmlEntityType::XmlInternalPredefinedEntity,
+        external_id: null_mut(),
+        system_id: null_mut(),
+        nexte: None,
+        uri: null_mut(),
+        owner: 0,
+        flags: 0,
+        expanded_size: 0,
+    } };
+}
 
 /// Check whether this name is an predefined entity.
 ///
@@ -748,11 +762,16 @@ static mut XML_ENTITY_APOS: XmlEntity = XmlEntity {
 #[doc(alias = "xmlGetPredefinedEntity")]
 pub unsafe fn xml_get_predefined_entity(name: &str) -> Option<XmlEntityPtr> {
     match name {
-        "lt" => XmlEntityPtr::from_raw(addr_of_mut!(XML_ENTITY_LT)).unwrap(),
-        "gt" => XmlEntityPtr::from_raw(addr_of_mut!(XML_ENTITY_GT)).unwrap(),
-        "amp" => XmlEntityPtr::from_raw(addr_of_mut!(XML_ENTITY_AMP)).unwrap(),
-        "apos" => XmlEntityPtr::from_raw(addr_of_mut!(XML_ENTITY_APOS)).unwrap(),
-        "quot" => XmlEntityPtr::from_raw(addr_of_mut!(XML_ENTITY_QUOT)).unwrap(),
+        "lt" => XML_ENTITY_LT
+            .with(|ptr| XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()),
+        "gt" => XML_ENTITY_GT
+            .with(|ptr| XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()),
+        "amp" => XML_ENTITY_AMP
+            .with(|ptr| XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()),
+        "apos" => XML_ENTITY_APOS
+            .with(|ptr| XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()),
+        "quot" => XML_ENTITY_QUOT
+            .with(|ptr| XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()),
         _ => None,
     }
 }
@@ -1285,23 +1304,23 @@ unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
         ..Default::default()
     })
     .unwrap();
-    if !ent.name.load(Ordering::Relaxed).is_null() {
-        cur.name = AtomicPtr::new(xml_strdup(ent.name.load(Ordering::Relaxed)) as _);
+    if !ent.name.is_null() {
+        cur.name = xml_strdup(ent.name);
     }
-    if !ent.external_id.load(Ordering::Relaxed).is_null() {
-        cur.external_id = AtomicPtr::new(xml_strdup(ent.external_id.load(Ordering::Relaxed)) as _);
+    if !ent.external_id.is_null() {
+        cur.external_id = xml_strdup(ent.external_id);
     }
-    if !ent.system_id.load(Ordering::Relaxed).is_null() {
-        cur.system_id = AtomicPtr::new(xml_strdup(ent.system_id.load(Ordering::Relaxed)) as _);
+    if !ent.system_id.is_null() {
+        cur.system_id = xml_strdup(ent.system_id);
     }
-    if !ent.content.load(Ordering::Relaxed).is_null() {
-        cur.content = AtomicPtr::new(xml_strdup(ent.content.load(Ordering::Relaxed)) as _);
+    if !ent.content.is_null() {
+        cur.content = xml_strdup(ent.content);
     }
-    if !ent.orig.load(Ordering::Relaxed).is_null() {
-        cur.orig = AtomicPtr::new(xml_strdup(ent.orig.load(Ordering::Relaxed)) as _);
+    if !ent.orig.is_null() {
+        cur.orig = xml_strdup(ent.orig);
     }
-    if !ent.uri.load(Ordering::Relaxed).is_null() {
-        cur.uri = AtomicPtr::new(xml_strdup(ent.uri.load(Ordering::Relaxed)) as _);
+    if !ent.uri.is_null() {
+        cur.uri = xml_strdup(ent.uri);
     }
     Some(cur)
 }
@@ -1411,36 +1430,34 @@ unsafe fn xml_dump_entity_content<'a>(buf: &mut (impl Write + 'a), content: *con
 pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
     use crate::io::write_quoted;
 
-    let name = CStr::from_ptr(ent.name.load(Ordering::Relaxed) as _).to_string_lossy();
+    let name = CStr::from_ptr(ent.name as _).to_string_lossy();
     match ent.etype {
         XmlEntityType::XmlInternalGeneralEntity => {
             write!(buf, "<!ENTITY {name} ");
-            if !ent.orig.load(Ordering::Relaxed).is_null() {
+            if !ent.orig.is_null() {
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.orig.load(Ordering::Relaxed) as _)
-                        .to_string_lossy()
-                        .as_ref(),
+                    CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref(),
                 );
             } else {
-                xml_dump_entity_content(buf, ent.content.load(Ordering::Relaxed) as _);
+                xml_dump_entity_content(buf, ent.content as _);
             }
             writeln!(buf, ">");
         }
         XmlEntityType::XmlExternalGeneralParsedEntity => {
             write!(buf, "<!ENTITY {name}");
-            if !ent.external_id.load(Ordering::Relaxed).is_null() {
+            if !ent.external_id.is_null() {
                 write!(buf, " PUBLIC ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.external_id as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
                 write!(buf, " ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
@@ -1448,7 +1465,7 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
                 write!(buf, " SYSTEM ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
@@ -1457,18 +1474,18 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
         }
         XmlEntityType::XmlExternalGeneralUnparsedEntity => {
             write!(buf, "<!ENTITY {name}");
-            if !ent.external_id.load(Ordering::Relaxed).is_null() {
+            if !ent.external_id.is_null() {
                 write!(buf, " PUBLIC ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.external_id as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
                 write!(buf, " ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
@@ -1476,29 +1493,25 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
                 write!(buf, " SYSTEM ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
             }
-            if !ent.content.load(Ordering::Relaxed).is_null() {
+            if !ent.content.is_null() {
                 /* Should be true ! */
                 write!(buf, " NDATA ");
-                if !ent.orig.load(Ordering::Relaxed).is_null() {
+                if !ent.orig.is_null() {
                     write!(
                         buf,
                         "{}",
-                        CStr::from_ptr(ent.orig.load(Ordering::Acquire) as _)
-                            .to_string_lossy()
-                            .as_ref()
+                        CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref()
                     );
                 } else {
                     write!(
                         buf,
                         "{}",
-                        CStr::from_ptr(ent.content.load(Ordering::Acquire) as _)
-                            .to_string_lossy()
-                            .as_ref()
+                        CStr::from_ptr(ent.content as _).to_string_lossy().as_ref()
                     );
                 }
             }
@@ -1506,32 +1519,30 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
         }
         XmlEntityType::XmlInternalParameterEntity => {
             write!(buf, "<!ENTITY % {name} ");
-            if ent.orig.load(Ordering::Relaxed).is_null() {
-                xml_dump_entity_content(buf, ent.content.load(Ordering::Relaxed) as _);
+            if ent.orig.is_null() {
+                xml_dump_entity_content(buf, ent.content as _);
             } else {
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.orig.load(Ordering::Relaxed) as _)
-                        .to_string_lossy()
-                        .as_ref(),
+                    CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref(),
                 );
             }
             writeln!(buf, ">");
         }
         XmlEntityType::XmlExternalParameterEntity => {
             write!(buf, "<!ENTITY % {name}");
-            if !ent.external_id.load(Ordering::Relaxed).is_null() {
+            if !ent.external_id.is_null() {
                 write!(buf, " PUBLIC ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.external_id as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
                 write!(buf, " ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id as _)
                         .to_string_lossy()
                         .as_ref(),
                 );
@@ -1539,7 +1550,7 @@ pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEnti
                 write!(buf, " SYSTEM ");
                 write_quoted(
                     buf,
-                    CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as _)
+                    CStr::from_ptr(ent.system_id as _)
                         .to_string_lossy()
                         .as_ref(),
                 );

@@ -618,7 +618,7 @@ pub unsafe fn xml_sax2_entity_decl(
                 name
             );
         }
-        if let Some(ent) = ent.filter(|ent| ent.uri.load(Ordering::Relaxed).is_null()) {
+        if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
             if let Some(system_id) = system_id {
                 let base = if !(*ctxt).input.is_null() {
                     (*(*ctxt).input)
@@ -632,10 +632,9 @@ pub unsafe fn xml_sax2_entity_decl(
 
                 if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
                     let uri = CString::new(uri).unwrap();
-                    ent.uri
-                        .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
+                    ent.uri = xml_strdup(uri.as_ptr() as *const u8);
                 } else {
-                    ent.uri.store(null_mut(), Ordering::Relaxed);
+                    ent.uri = null_mut();
                 }
             }
         }
@@ -656,7 +655,7 @@ pub unsafe fn xml_sax2_entity_decl(
                 );
             }
         }
-        if let Some(ent) = ent.filter(|ent| ent.uri.load(Ordering::Relaxed).is_null()) {
+        if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
             if let Some(system_id) = system_id {
                 let base = if !(*ctxt).input.is_null() {
                     (*(*ctxt).input)
@@ -670,10 +669,9 @@ pub unsafe fn xml_sax2_entity_decl(
 
                 if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
                     let uri = CString::new(uri).unwrap();
-                    ent.uri
-                        .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
+                    ent.uri = xml_strdup(uri.as_ptr() as *const u8);
                 } else {
-                    ent.uri.store(null_mut(), Ordering::Relaxed);
+                    ent.uri = null_mut();
                 }
             }
         }
@@ -999,7 +997,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
                 )
             }
         }
-        if let Some(ent) = ent.filter(|ent| ent.uri.load(Ordering::Relaxed).is_null()) {
+        if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
             if let Some(system_id) = system_id {
                 let base = if !(*ctxt).input.is_null() {
                     (*(*ctxt).input)
@@ -1013,10 +1011,9 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
 
                 if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
                     let uri = CString::new(uri).unwrap();
-                    ent.uri
-                        .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
+                    ent.uri = xml_strdup(uri.as_ptr() as *const u8);
                 } else {
-                    ent.uri.store(null_mut(), Ordering::Relaxed);
+                    ent.uri = null_mut();
                 }
             }
         }
@@ -1038,7 +1035,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
             }
         }
 
-        if let Some(ent) = ent.filter(|ent| ent.uri.load(Ordering::Relaxed).is_null()) {
+        if let Some(mut ent) = ent.filter(|ent| ent.uri.is_null()) {
             if let Some(system_id) = system_id {
                 let base = if !(*ctxt).input.is_null() {
                     (*(*ctxt).input)
@@ -1052,10 +1049,9 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
 
                 if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
                     let uri = CString::new(uri).unwrap();
-                    ent.uri
-                        .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
+                    ent.uri = xml_strdup(uri.as_ptr() as *const u8);
                 } else {
-                    ent.uri.store(null_mut(), Ordering::Relaxed);
+                    ent.uri = null_mut();
                 }
             }
         }

@@ -29,7 +29,6 @@ use std::{
     mem::{size_of, take, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, drop_in_place, null, null_mut},
-    sync::atomic::Ordering,
 };
 
 use libc::memset;
@@ -660,9 +659,9 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
         | XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
         _ => unreachable!(),
     }
-    let external_id = ent.external_id.load(Ordering::Relaxed);
-    let system_id = ent.system_id.load(Ordering::Relaxed);
-    let content = ent.content.load(Ordering::Relaxed);
+    let external_id = ent.external_id;
+    let system_id = ent.system_id;
+    let content = ent.content;
     let ret = xml_add_doc_entity(
         doc,
         &ent.name().unwrap(),
@@ -677,12 +676,9 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
             .then(|| CStr::from_ptr(content as *const i8).to_string_lossy())
             .as_deref(),
     );
-    if let Some(ret) = ret {
-        if !ent.uri.load(Ordering::Relaxed).is_null() {
-            ret.uri.store(
-                xml_strdup(ent.uri.load(Ordering::Relaxed)),
-                Ordering::Relaxed,
-            );
+    if let Some(mut ret) = ret {
+        if !ent.uri.is_null() {
+            ret.uri = xml_strdup(ent.uri);
         }
     } else {
         let prev = xml_get_doc_entity(Some(doc), &ent.name().unwrap());
@@ -711,33 +707,18 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
                 return error();
             }
 
-            if !ent.system_id.load(Ordering::Relaxed).is_null()
-                && !prev.system_id.load(Ordering::Relaxed).is_null()
-            {
-                if !xml_str_equal(
-                    ent.system_id.load(Ordering::Relaxed),
-                    prev.system_id.load(Ordering::Relaxed),
-                ) {
+            if !ent.system_id.is_null() && !prev.system_id.is_null() {
+                if !xml_str_equal(ent.system_id, prev.system_id) {
                     // goto error;
                     error()
                 }
-            } else if !ent.external_id.load(Ordering::Relaxed).is_null()
-                && !prev.external_id.load(Ordering::Relaxed).is_null()
-            {
-                if !xml_str_equal(
-                    ent.external_id.load(Ordering::Relaxed),
-                    prev.external_id.load(Ordering::Relaxed),
-                ) {
+            } else if !ent.external_id.is_null() && !prev.external_id.is_null() {
+                if !xml_str_equal(ent.external_id, prev.external_id) {
                     // goto error;
                     return error();
                 }
-            } else if !ent.content.load(Ordering::Relaxed).is_null()
-                && !prev.content.load(Ordering::Relaxed).is_null()
-            {
-                if !xml_str_equal(
-                    ent.content.load(Ordering::Relaxed),
-                    prev.content.load(Ordering::Relaxed),
-                ) {
+            } else if !ent.content.is_null() && !prev.content.is_null() {
+                if !xml_str_equal(ent.content, prev.content) {
                     // goto error;
                     return error();
                 }

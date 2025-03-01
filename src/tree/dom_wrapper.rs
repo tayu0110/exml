@@ -18,7 +18,7 @@
 //
 // daniel@veillard.com
 
-use std::{ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
+use std::{ffi::CStr, os::raw::c_void, ptr::null_mut};
 
 use libc::snprintf;
 
@@ -1331,7 +1331,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                 // Assign new entity-node if available.
                                 let ent = xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
                                 if let Some(ent) = ent {
-                                    cur.content = ent.content.load(Ordering::Relaxed);
+                                    cur.content = ent.content;
                                     cur.set_children(Some(ent.into()));
                                     cur.set_last(Some(ent.into()));
                                 }
@@ -1508,7 +1508,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
                     // Assign new entity-node if available.
                     let ent = xml_get_doc_entity(Some(dest_doc), &cur.name().unwrap());
                     if let Some(ent) = ent {
-                        cur.content = ent.content.load(Ordering::Relaxed);
+                        cur.content = ent.content;
                         cur.set_children(Some(ent.into()));
                         cur.set_last(Some(ent.into()));
                     }
@@ -1637,7 +1637,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
                     // Assign new entity-node if available.
                     let ent = xml_get_doc_entity(Some(dest_doc), &node.name().unwrap());
                     if let Some(ent) = ent {
-                        node.content = ent.content.load(Ordering::Relaxed);
+                        node.content = ent.content;
                         node.set_children(Some(ent.into()));
                         node.set_last(Some(ent.into()));
                     }
@@ -2194,8 +2194,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                 let ent =
                                     xml_get_doc_entity(Some(dest_doc), &cur_node.name().unwrap());
                                 if let Some(ent) = ent {
-                                    XmlNodePtr::try_from(clone).unwrap().content =
-                                        ent.content.load(Ordering::Relaxed);
+                                    XmlNodePtr::try_from(clone).unwrap().content = ent.content;
                                     clone.set_children(Some(ent.into()));
                                     clone.set_last(Some(ent.into()));
                                 }

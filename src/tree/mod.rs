@@ -1893,7 +1893,7 @@ pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<Xm
 
     let ent = xml_get_doc_entity(doc, &cur.name().unwrap());
     if let Some(ent) = ent {
-        cur.content = ent.content.load(Ordering::Acquire);
+        cur.content = ent.content;
         // The parent pointer in entity is a DTD pointer and thus is NOT
         // updated.  Not sure if this is 100% correct.
         //  -George
@@ -2315,17 +2315,17 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
         xml_deregister_node_default_value(cur);
     }
 
-    if let Ok(ent) = XmlEntityPtr::try_from(cur) {
-        let system_id = ent.system_id.load(Ordering::Relaxed);
+    if let Ok(mut ent) = XmlEntityPtr::try_from(cur) {
+        let system_id = ent.system_id;
         if !system_id.is_null() {
             xml_free(system_id as _);
         }
-        ent.system_id.store(null_mut(), Ordering::Relaxed);
-        let external_id = ent.external_id.load(Ordering::Relaxed);
+        ent.system_id = null_mut();
+        let external_id = ent.external_id;
         if !external_id.is_null() {
             xml_free(external_id as _);
         }
-        ent.external_id.store(null_mut(), Ordering::Relaxed);
+        ent.external_id = null_mut();
     }
     if let Some(children) = cur
         .children()
@@ -2367,14 +2367,14 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
 
         cur.free();
     } else if let Ok(cur) = XmlEntityPtr::try_from(cur) {
-        let content = cur.content.load(Ordering::Relaxed);
+        let content = cur.content;
         if !content.is_null() {
             xml_free(content as _);
         }
         // When a node is a text node or a comment, it uses a global static
         // variable for the name of the node.
         // Otherwise the node name might come from the document's dictionary
-        let name = cur.name.load(Ordering::Relaxed);
+        let name = cur.name;
         if !name.is_null() {
             xml_free(name as _);
         }

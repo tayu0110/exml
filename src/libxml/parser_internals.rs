@@ -72,10 +72,10 @@ use crate::{
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon,
-        NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
-        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
-        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr,
-        XmlNodePtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
+        NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlElementContentOccur,
+        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
+        XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr,
+        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
         XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
 };
@@ -1794,9 +1794,7 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> Option<XmlE
             // The replacement text of any entity referred to directly or
             // indirectly in an attribute value (other than "&lt;") must not contain a <.
             if ent.flags & XML_ENT_CHECKED_LT as i32 == 0 {
-                if !ent.content.load(Ordering::Relaxed).is_null()
-                    && !xml_strchr(ent.content.load(Ordering::Relaxed) as _, b'<').is_null()
-                {
+                if !ent.content.is_null() && !xml_strchr(ent.content as _, b'<').is_null() {
                     ent.flags |= XML_ENT_CONTAINS_LT as i32;
                 }
                 ent.flags |= XML_ENT_CHECKED_LT as i32;
@@ -2142,10 +2140,8 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     was_checked = ent.flags & XML_ENT_PARSED as i32;
 
     // special case of predefined entities
-    if ent.name.load(Ordering::Relaxed).is_null()
-        || matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
-    {
-        val = ent.content.load(Ordering::Relaxed) as _;
+    if ent.name.is_null() || matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity) {
+        val = ent.content as _;
         if val.is_null() {
             return;
         }
@@ -2209,15 +2205,15 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             (*ctxt).depth += 1;
             ret = xml_parse_balanced_chunk_memory_internal(
                 ctxt,
-                ent.content.load(Ordering::Relaxed),
+                ent.content,
                 user_data,
                 Some(&mut list),
             );
             (*ctxt).depth -= 1;
         } else if matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
             (*ctxt).depth += 1;
-            let uri = ent.uri.load(Ordering::Relaxed);
-            let external_id = ent.external_id.load(Ordering::Relaxed);
+            let uri = ent.uri;
+            let external_id = ent.external_id;
             let has_sax = (*ctxt).sax.is_some();
             let (sax, error) = xml_parse_external_entity_private(
                 (*ctxt).my_doc.unwrap(),
@@ -2271,10 +2267,8 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 let mut cur = Some(l);
                 while let Some(mut now) = cur {
                     now.set_parent(Some(ent.into()));
-                    if now.document().map_or(null_mut(), |doc| doc.as_ptr())
-                        != ent.doc.load(Ordering::Relaxed) as _
-                    {
-                        now.set_doc(XmlDocPtr::from_raw(ent.doc.load(Ordering::Relaxed)).unwrap());
+                    if now.document() != ent.doc {
+                        now.set_doc(ent.doc);
                     }
                     if now.next().is_none() {
                         ent.last.store(now.as_ptr(), Ordering::Relaxed);
@@ -2302,16 +2296,15 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             ret,
             XmlParserErrors::XmlErrOK | XmlParserErrors::XmlWarUndeclaredEntity
         ) {
-            let name =
-                CStr::from_ptr(ent.name.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+            let name = CStr::from_ptr(ent.name as *const i8).to_string_lossy();
             xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
                 "Entity '{}' failed to parse\n",
                 name
             );
-            if !ent.content.load(Ordering::Relaxed).is_null() {
-                *ent.content.load(Ordering::Relaxed).add(0) = 0;
+            if !ent.content.is_null() {
+                *ent.content.add(0) = 0;
             }
         } else if let Some(list) = list.take() {
             xml_free_node_list(Some(list));
@@ -2345,19 +2338,14 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
             if matches!(ent.etype, XmlEntityType::XmlInternalGeneralEntity) {
                 (*ctxt).depth += 1;
-                ret = xml_parse_balanced_chunk_memory_internal(
-                    ctxt,
-                    ent.content.load(Ordering::Relaxed),
-                    user_data,
-                    None,
-                );
+                ret = xml_parse_balanced_chunk_memory_internal(ctxt, ent.content, user_data, None);
                 (*ctxt).depth -= 1;
             } else if matches!(ent.etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
                 let oldsizeentities: u64 = (*ctxt).sizeentities;
 
                 (*ctxt).depth += 1;
-                let uri = ent.uri.load(Ordering::Relaxed);
-                let external_id = ent.external_id.load(Ordering::Relaxed);
+                let uri = ent.uri;
+                let external_id = ent.external_id;
                 let has_sax = (*ctxt).sax.is_some();
                 let (sax, error) = xml_parse_external_entity_private(
                     (*ctxt).my_doc.unwrap(),

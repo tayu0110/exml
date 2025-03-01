@@ -3475,9 +3475,7 @@ unsafe fn xml_parse_string_entity_ref(
             // indirectly in an attribute value (other than "&lt;") must
             // not contain a <.
             if ent.flags & XML_ENT_CHECKED_LT as i32 == 0 {
-                if !ent.content.load(Ordering::Relaxed).is_null()
-                    && !xml_strchr(ent.content.load(Ordering::Relaxed), b'<').is_null()
-                {
+                if !ent.content.is_null() && !xml_strchr(ent.content, b'<').is_null() {
                     ent.flags |= XML_ENT_CONTAINS_LT as i32;
                 }
                 ent.flags |= XML_ENT_CHECKED_LT as i32;
@@ -3672,7 +3670,7 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, mut entity: XmlEntityP
             XmlEntityType::XmlExternalParameterEntity
                 | XmlEntityType::XmlExternalGeneralParsedEntity
         )
-        || !entity.content.load(Ordering::Relaxed).is_null()
+        || !entity.content.is_null()
     {
         xml_fatal_err(
             ctxt,
@@ -3685,7 +3683,7 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, mut entity: XmlEntityP
     if get_parser_debug_entities() != 0 {
         generic_error!(
             "Reading {} entity content input\n",
-            CStr::from_ptr(entity.name.load(Ordering::Relaxed) as *const i8).to_string_lossy()
+            CStr::from_ptr(entity.name as *const i8).to_string_lossy()
         );
     }
 
@@ -3736,10 +3734,7 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, mut entity: XmlEntityP
         return -1;
     }
     entity.length = buf.len() as i32;
-    entity.content.store(
-        xml_strndup(buf.as_ptr(), buf.len() as i32),
-        Ordering::Relaxed,
-    );
+    entity.content = xml_strndup(buf.as_ptr(), buf.len() as i32);
 
     0
 }
@@ -3848,13 +3843,8 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                     if let Some(ent) = ent.filter(|ent| {
                         matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
                     }) {
-                        if !ent.content.load(Ordering::Relaxed).is_null() {
-                            COPY_BUF!(
-                                0,
-                                buffer,
-                                nbchars,
-                                *ent.content.load(Ordering::Relaxed).add(0)
-                            );
+                        if !ent.content.is_null() {
+                            COPY_BUF!(0, buffer, nbchars, *ent.content.add(0));
                             if nbchars + XML_PARSER_BUFFER_SIZE > buffer_size {
                                 grow_buffer!(
                                     ctxt,
@@ -3873,9 +3863,7 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                             );
                             break 'int_error;
                         }
-                    } else if let Some(mut ent) =
-                        ent.filter(|ent| !ent.content.load(Ordering::Relaxed).is_null())
-                    {
+                    } else if let Some(mut ent) = ent.filter(|ent| !ent.content.is_null()) {
                         if check != 0 && xml_parser_entity_check(ctxt, ent.length as _) != 0 {
                             break 'int_error;
                         }
@@ -3883,7 +3871,7 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                         if ent.flags & XML_ENT_EXPANDING as i32 != 0 {
                             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
                             (*ctxt).halt();
-                            *ent.content.load(Ordering::Relaxed).add(0) = 0;
+                            *ent.content.add(0) = 0;
                             break 'int_error;
                         }
 
@@ -3891,7 +3879,7 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                         (*ctxt).depth += 1;
                         rep = xml_string_decode_entities_int(
                             ctxt,
-                            ent.content.load(Ordering::Relaxed) as _,
+                            ent.content as _,
                             ent.length,
                             what,
                             0,
@@ -3903,7 +3891,7 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                         ent.flags &= !XML_ENT_EXPANDING as i32;
 
                         if rep.is_null() {
-                            *ent.content.load(Ordering::Relaxed).add(0) = 0;
+                            *ent.content.add(0) = 0;
                             break 'int_error;
                         }
 
@@ -3926,8 +3914,8 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                         xml_free(rep as _);
                         rep = null_mut();
                     } else if let Some(ent) = ent {
-                        let i: i32 = xml_strlen(ent.name.load(Ordering::Relaxed));
-                        let mut cur: *const XmlChar = ent.name.load(Ordering::Relaxed);
+                        let i: i32 = xml_strlen(ent.name);
+                        let mut cur: *const XmlChar = ent.name;
 
                         *buffer.add(nbchars as usize) = b'&';
                         nbchars += 1;
@@ -3961,7 +3949,7 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                     }
                     let ent = xml_parse_string_pereference(ctxt, addr_of_mut!(str));
                     if let Some(mut ent) = ent {
-                        if ent.content.load(Ordering::Relaxed).is_null() {
+                        if ent.content.is_null() {
                             // Note: external parsed entities will not be loaded,
                             // it is not required for a non-validating parser to
                             // complete external PEReferences coming from the
@@ -3972,9 +3960,7 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                             {
                                 xml_load_entity_content(ctxt, ent);
                             } else {
-                                let name =
-                                    CStr::from_ptr(ent.name.load(Ordering::Relaxed) as *const i8)
-                                        .to_string_lossy();
+                                let name = CStr::from_ptr(ent.name as *const i8).to_string_lossy();
                                 xml_warning_msg!(
                                     ctxt,
                                     XmlParserErrors::XmlErrEntityProcessing,
@@ -3991,8 +3977,8 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                         if ent.flags & XML_ENT_EXPANDING as i32 != 0 {
                             xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
                             (*ctxt).halt();
-                            if !ent.content.load(Ordering::Relaxed).is_null() {
-                                *ent.content.load(Ordering::Relaxed).add(0) = 0;
+                            if !ent.content.is_null() {
+                                *ent.content.add(0) = 0;
                             }
                             break 'int_error;
                         }
@@ -4001,7 +3987,7 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                         (*ctxt).depth += 1;
                         rep = xml_string_decode_entities_int(
                             ctxt,
-                            ent.content.load(Ordering::Relaxed) as _,
+                            ent.content as _,
                             ent.length,
                             what,
                             0,
@@ -4013,8 +3999,8 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                         ent.flags &= !XML_ENT_EXPANDING as i32;
 
                         if rep.is_null() {
-                            if !ent.content.load(Ordering::Relaxed).is_null() {
-                                *ent.content.load(Ordering::Relaxed).add(0) = 0;
+                            if !ent.content.is_null() {
+                                *ent.content.add(0) = 0;
                             }
                             break 'int_error;
                         }
@@ -4161,9 +4147,7 @@ unsafe fn xml_parse_att_value_complex(
                             if len + 10 > buf_size {
                                 grow_buffer!(ctxt, buf, 10, buf_size, rep, 'mem_error);
                             }
-                            if (*ctxt).replace_entities == 0
-                                && *ent.content.load(Ordering::Relaxed).add(0) == b'&'
-                            {
+                            if (*ctxt).replace_entities == 0 && *ent.content.add(0) == b'&' {
                                 *buf.add(len as usize) = b'&';
                                 len += 1;
                                 *buf.add(len as usize) = b'#';
@@ -4175,8 +4159,7 @@ unsafe fn xml_parse_att_value_complex(
                                 *buf.add(len as usize) = b';';
                                 len += 1;
                             } else {
-                                *buf.add(len as usize) =
-                                    *ent.content.load(Ordering::Relaxed).add(0);
+                                *buf.add(len as usize) = *ent.content.add(0);
                                 len += 1;
                             }
                         } else if let Some(ent) = ent.filter(|_| (*ctxt).replace_entities != 0) {
@@ -4188,7 +4171,7 @@ unsafe fn xml_parse_att_value_complex(
                                 (*ctxt).depth += 1;
                                 rep = xml_string_decode_entities_int(
                                     ctxt,
-                                    ent.content.load(Ordering::Relaxed),
+                                    ent.content,
                                     ent.length,
                                     XML_SUBSTITUTE_REF as _,
                                     0,
@@ -4221,21 +4204,20 @@ unsafe fn xml_parse_att_value_complex(
                                 if len + 10 > buf_size {
                                     grow_buffer!(ctxt, buf, 10, buf_size, rep, 'mem_error);
                                 }
-                                if !ent.content.load(Ordering::Relaxed).is_null() {
-                                    *buf.add(len as usize) =
-                                        *ent.content.load(Ordering::Relaxed).add(0);
+                                if !ent.content.is_null() {
+                                    *buf.add(len as usize) = *ent.content.add(0);
                                     len += 1;
                                 }
                             }
                         } else if let Some(mut ent) = ent {
-                            let i: i32 = xml_strlen(ent.name.load(Ordering::Relaxed));
-                            let mut cur: *const XmlChar = ent.name.load(Ordering::Relaxed);
+                            let i: i32 = xml_strlen(ent.name);
+                            let mut cur: *const XmlChar = ent.name;
 
                             // We also check for recursion and amplification
                             // when entities are not substituted. They're
                             // often expanded later.
                             if !matches!(ent.etype, XmlEntityType::XmlInternalPredefinedEntity)
-                                && !ent.content.load(Ordering::Relaxed).is_null()
+                                && !ent.content.is_null()
                             {
                                 if ent.flags & XML_ENT_CHECKED as i32 == 0 {
                                     let old_copy: u64 = (*ctxt).sizeentcopy;
@@ -4245,7 +4227,7 @@ unsafe fn xml_parse_att_value_complex(
                                     (*ctxt).depth += 1;
                                     rep = xml_string_decode_entities_int(
                                         ctxt,
-                                        ent.content.load(Ordering::Relaxed),
+                                        ent.content,
                                         ent.length,
                                         XML_SUBSTITUTE_REF as _,
                                         0,
@@ -4268,7 +4250,7 @@ unsafe fn xml_parse_att_value_complex(
                                         xml_free(rep as _);
                                         rep = null_mut();
                                     } else {
-                                        *ent.content.load(Ordering::Relaxed).add(0) = 0;
+                                        *ent.content.add(0) = 0;
                                     }
 
                                     if xml_parser_entity_check(ctxt, old_copy) != 0 {
@@ -8161,8 +8143,8 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     cur = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)), &name);
                 }
             }
-            if let Some(cur) = cur.filter(|cur| cur.orig.load(Ordering::Relaxed).is_null()) {
-                cur.orig.store(orig, Ordering::Relaxed);
+            if let Some(mut cur) = cur.filter(|cur| cur.orig.is_null()) {
+                cur.orig = orig;
                 orig = null_mut();
             }
         }
