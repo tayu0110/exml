@@ -1732,23 +1732,21 @@ unsafe fn xml_schema_get_component_qname(
     }
 }
 
-unsafe fn xml_schema_get_component_designation(
-    buf: *mut *mut XmlChar,
-    item: *mut c_void,
-) -> *const XmlChar {
+unsafe fn xml_schema_get_component_designation(item: *mut c_void) -> String {
     unsafe {
         let mut str: *mut XmlChar = null_mut();
 
         let typestr = xml_schema_get_component_type_str(item as _);
-        *buf = xml_strncat(*buf, typestr.as_ptr(), typestr.len() as i32);
-        *buf = xml_strcat(*buf, c" '".as_ptr() as _);
-        *buf = xml_strcat(
-            *buf,
-            xml_schema_get_component_qname(addr_of_mut!(str), item),
+        let mut res = typestr.to_owned();
+        res.push_str(" '");
+        res.push_str(
+            CStr::from_ptr(xml_schema_get_component_qname(addr_of_mut!(str), item) as *const i8)
+                .to_string_lossy()
+                .as_ref(),
         );
-        *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+        res.push('\'');
         FREE_AND_NULL!(str);
-        *buf
+        res
     }
 }
 
@@ -1902,9 +1900,7 @@ unsafe fn xml_schema_format_item_for_report(
                     FREE_AND_NULL!(str);
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
-                    let mut buf = null_mut();
-                    xml_schema_get_component_designation(&raw mut buf, item as _);
-                    res.push_str(CStr::from_ptr(buf as *const i8).to_string_lossy().as_ref());
+                    res.push_str(xml_schema_get_component_designation(item as _).as_str());
                 }
                 XmlSchemaTypeType::XmlSchemaTypeElement => {
                     let elem: XmlSchemaElementPtr = item as XmlSchemaElementPtr;
@@ -14347,31 +14343,24 @@ unsafe fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> i
                 }
             }
             if was_redefined != 0 {
-                let mut str: *mut XmlChar = null_mut();
-
                 let node = if !(*redef).reference.is_null() {
                     WXS_ITEM_NODE!((*redef).reference)
                 } else {
                     WXS_ITEM_NODE!((*redef).item)
                 };
 
-                let desig = CStr::from_ptr(xml_schema_get_component_designation(
-                    addr_of_mut!(str),
-                    prev as _,
-                ) as *const i8)
-                .to_string_lossy();
+                let desig = xml_schema_get_component_designation(prev as _);
 
                 // TODO: error code.
                 xml_schema_custom_err(
-                pctxt as XmlSchemaAbstractCtxtPtr,
-                XmlParserErrors::XmlSchemapSrcRedefine,
-                node.map(|node| node.into()),
-                null_mut(),
-                format!("The referenced {desig} was already redefined. Multiple redefinition of the same component is not supported").as_str(),
-                Some(&desig),
-                None
-            );
-                FREE_AND_NULL!(str);
+                    pctxt as XmlSchemaAbstractCtxtPtr,
+                    XmlParserErrors::XmlSchemapSrcRedefine,
+                    node.map(|node| node.into()),
+                    null_mut(),
+                    format!("The referenced {desig} was already redefined. Multiple redefinition of the same component is not supported").as_str(),
+                    Some(&desig),
+                    None
+                );
                 err = (*pctxt).err;
                 redef = (*redef).next;
                 continue;
@@ -17090,12 +17079,7 @@ unsafe fn xml_schema_check_ctprops_correct(
                         if WXS_ATTRUSE_DECL_NAME!(using) == WXS_ATTRUSE_DECL_NAME!(tmp)
                             && WXS_ATTRUSE_DECL_TNS!(using) == WXS_ATTRUSE_DECL_TNS!(tmp)
                         {
-                            let mut str: *mut XmlChar = null_mut();
-                            let desig = CStr::from_ptr(xml_schema_get_component_designation(
-                                addr_of_mut!(str),
-                                using as _,
-                            ) as *const i8)
-                            .to_string_lossy();
+                            let desig = xml_schema_get_component_designation(using as _);
 
                             xml_schema_custom_err(
                                 pctxt as XmlSchemaAbstractCtxtPtr,
@@ -17106,7 +17090,6 @@ unsafe fn xml_schema_check_ctprops_correct(
                                 Some(&desig),
                                 None,
                             );
-                            FREE_AND_NULL!(str);
                             // Remove the duplicate.
                             if xml_schema_item_list_remove(uses, i) == -1 {
                                 // goto exit_failure;
@@ -17128,23 +17111,18 @@ unsafe fn xml_schema_check_ctprops_correct(
                     ) != 0
                 {
                     if has_id != 0 {
-                        let mut str: *mut XmlChar = null_mut();
-                        let desig = CStr::from_ptr(xml_schema_get_component_designation(
-                            addr_of_mut!(str),
-                            using as _,
-                        ) as *const i8)
-                        .to_string_lossy();
+                        let desig = xml_schema_get_component_designation(using as _);
 
                         xml_schema_custom_err(
-                        pctxt as XmlSchemaAbstractCtxtPtr,
-                        XmlParserErrors::XmlSchemapAgPropsCorrect,
-                        None,
-                        typ as XmlSchemaBasicItemPtr,
-                        format!("There must not exist more than one attribute declaration of type 'xs:ID' (or derived from 'xs:ID'). The {desig} violates this constraint").as_str(),
-                        Some(&desig),
-                        None
-                    );
-                        FREE_AND_NULL!(str);
+                            pctxt as XmlSchemaAbstractCtxtPtr,
+                            XmlParserErrors::XmlSchemapAgPropsCorrect,
+                            None,
+                            typ as XmlSchemaBasicItemPtr,
+                            format!("There must not exist more than one attribute declaration of type 'xs:ID' (or derived from 'xs:ID'). The {desig} violates this constraint").as_str(),
+                            Some(&desig),
+                            None
+                        );
+
                         if xml_schema_item_list_remove(uses, i) == -1 {
                             // goto exit_failure;
                             return -1;
@@ -17645,31 +17623,25 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                             if (*cur).occurs == XML_SCHEMAS_ATTR_USE_OPTIONAL
                                 && (*bcur).occurs == XML_SCHEMAS_ATTR_USE_REQUIRED
                             {
-                                let mut str: *mut XmlChar = null_mut();
                                 let action_str = WXS_ACTION_STR!(action);
-                                let desig = CStr::from_ptr(xml_schema_get_component_designation(
-                                    addr_of_mut!(str),
-                                    base_item as _,
-                                )
-                                    as *const i8)
-                                .to_string_lossy();
+                                let desig = xml_schema_get_component_designation(base_item as _);
 
                                 // (2.1.1) "one of the following must be true:"
                                 // (2.1.1.1) "B's {required} is false."
                                 // (2.1.1.2) "R's {required} is true."
                                 xml_schema_pattr_use_err4(
-                                pctxt,
-                                XmlParserErrors::XmlSchemapDerivationOkRestriction2_1_1,
-                                WXS_ITEM_NODE!(item).map(|node| node.into()),
-                                item,
-                                cur,
-                                format!("The 'optional' attribute use is inconsistent with the corresponding 'required' attribute use of the {} {desig}", action_str.unwrap()).as_str(),
-                                action_str,
-                                Some(&desig),
-                                None,
-                                None
-                            );
-                                FREE_AND_NULL!(str);
+                                    pctxt,
+                                    XmlParserErrors::XmlSchemapDerivationOkRestriction2_1_1,
+                                    WXS_ITEM_NODE!(item).map(|node| node.into()),
+                                    item,
+                                    cur,
+                                    format!("The 'optional' attribute use is inconsistent with the corresponding 'required' attribute use of the {} {desig}", action_str.unwrap()).as_str(),
+                                    action_str,
+                                    Some(&desig),
+                                    None,
+                                    None
+                                );
+
                             // err = (*pctxt).err;
                             } else if xml_schema_check_cosstderived_ok(
                                 pctxt as XmlSchemaAbstractCtxtPtr,
@@ -17678,51 +17650,33 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                                 0,
                             ) != 0
                             {
-                                let mut str_a: *mut XmlChar = null_mut();
-                                let mut str_b: *mut XmlChar = null_mut();
-                                let mut str_c: *mut XmlChar = null_mut();
-
-                                let desig1 = CStr::from_ptr(xml_schema_get_component_designation(
-                                    addr_of_mut!(str_a),
+                                let desig1 = xml_schema_get_component_designation(
                                     WXS_ATTRUSE_TYPEDEF!(cur) as _,
-                                )
-                                    as *const i8)
-                                .to_string_lossy();
-                                let desig2 = CStr::from_ptr(xml_schema_get_component_designation(
-                                    addr_of_mut!(str_b),
+                                );
+                                let desig2 = xml_schema_get_component_designation(
                                     WXS_ATTRUSE_TYPEDEF!(bcur) as _,
-                                )
-                                    as *const i8)
-                                .to_string_lossy();
+                                );
                                 let action_str = WXS_ACTION_STR!(action);
-                                let desig3 = CStr::from_ptr(xml_schema_get_component_designation(
-                                    addr_of_mut!(str_c),
-                                    base_item as _,
-                                )
-                                    as *const i8)
-                                .to_string_lossy();
+                                let desig3 = xml_schema_get_component_designation(base_item as _);
 
                                 // SPEC (2.1.2) "R's {attribute declaration}'s
                                 // {type definition} must be validly derived from
                                 // B's {type definition} given the empty set as
                                 // defined in Type Derivation OK (Simple) ($3.14.6)."
                                 xml_schema_pattr_use_err4(
-                                pctxt,
-                                XmlParserErrors::XmlSchemapDerivationOkRestriction2_1_2,
-                                WXS_ITEM_NODE!(item).map(|node| node.into()),
-                                item,
-                                cur,
-                                format!("The attribute declaration's {desig1} is not validly derived from the corresponding {desig2} of the attribute declaration in the {} {desig3}", action_str.unwrap()).as_str(),
-                                Some(&desig1),
-                                Some(&desig2),
-                                action_str,
-                                Some(&desig3),
-                            );
+                                    pctxt,
+                                    XmlParserErrors::XmlSchemapDerivationOkRestriction2_1_2,
+                                    WXS_ITEM_NODE!(item).map(|node| node.into()),
+                                    item,
+                                    cur,
+                                    format!("The attribute declaration's {desig1} is not validly derived from the corresponding {desig2} of the attribute declaration in the {} {desig3}", action_str.unwrap()).as_str(),
+                                    Some(&desig1),
+                                    Some(&desig2),
+                                    action_str,
+                                    Some(&desig3),
+                                );
                                 // xmlSchemaGetComponentDesignation(addr_of_mut!(str), baseItem),
-                                FREE_AND_NULL!(str_a);
-                                FREE_AND_NULL!(str_b);
-                                FREE_AND_NULL!(str_c);
-                            // err = (*pctxt).err;
+                                // err = (*pctxt).err;
                             } else {
                                 // 2.1.3 [Definition:]  Let the effective value
                                 // constraint of an attribute use be its {value
@@ -17755,29 +17709,22 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                                     if eff_fixed == 0
                                         || !WXS_ARE_DEFAULT_STR_EQUAL!(r_eff_value, b_eff_value)
                                     {
-                                        let mut str: *mut XmlChar = null_mut();
                                         let action_str = WXS_ACTION_STR!(action);
                                         let desig =
-                                            CStr::from_ptr(xml_schema_get_component_designation(
-                                                addr_of_mut!(str),
-                                                base_item as _,
-                                            )
-                                                as *const i8)
-                                            .to_string_lossy();
+                                            xml_schema_get_component_designation(base_item as _);
 
                                         xml_schema_pattr_use_err4(
-                                        pctxt,
-                                        XmlParserErrors::XmlSchemapDerivationOkRestriction2_1_3,
-                                        WXS_ITEM_NODE!(item).map(|node| node.into()),
-                                        item,
-                                        cur,
-                                        format!("The effective value constraint of the attribute use is inconsistent with its correspondent in the {} {desig}", action_str.unwrap()).as_str(),
-                                        action_str,
-                                        Some(&desig),
-                                        None,
-                                        None
-                                    );
-                                        FREE_AND_NULL!(str);
+                                            pctxt,
+                                            XmlParserErrors::XmlSchemapDerivationOkRestriction2_1_3,
+                                            WXS_ITEM_NODE!(item).map(|node| node.into()),
+                                            item,
+                                            cur,
+                                            format!("The effective value constraint of the attribute use is inconsistent with its correspondent in the {} {desig}", action_str.unwrap()).as_str(),
+                                            action_str,
+                                            Some(&desig),
+                                            None,
+                                            None
+                                        );
                                         // err = (*pctxt).err;
                                     }
                                 }
@@ -17799,27 +17746,21 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                             (*WXS_ATTRUSE_DECL!(cur)).target_namespace,
                         ) != 0
                     {
-                        let mut str: *mut XmlChar = null_mut();
                         let action_str = WXS_ACTION_STR!(action);
-                        let desig = CStr::from_ptr(xml_schema_get_component_designation(
-                            addr_of_mut!(str),
-                            base_item as _,
-                        ) as *const i8)
-                        .to_string_lossy();
+                        let desig = xml_schema_get_component_designation(base_item as _);
 
                         xml_schema_pattr_use_err4(
-                        pctxt,
-                        XmlParserErrors::XmlSchemapDerivationOkRestriction2_2,
-                        WXS_ITEM_NODE!(item).map(|node| node.into()),
-                        item,
-                        cur,
-                        format!("Neither a matching attribute use, nor a matching wildcard exists in the {} {desig}", action_str.unwrap()).as_str(),
-                        action_str,
-                        Some(&desig),
-                        None,
-                        None
-                    );
-                        FREE_AND_NULL!(str);
+                            pctxt,
+                            XmlParserErrors::XmlSchemapDerivationOkRestriction2_2,
+                            WXS_ITEM_NODE!(item).map(|node| node.into()),
+                            item,
+                            cur,
+                            format!("Neither a matching attribute use, nor a matching wildcard exists in the {} {desig}", action_str.unwrap()).as_str(),
+                            action_str,
+                            Some(&desig),
+                            None,
+                            None
+                        );
                         /* err = (*pctxt).err; */
                     }
                 }
@@ -17850,35 +17791,23 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                     }
                 }
                 if found == 0 {
-                    let mut str_a: *mut XmlChar = null_mut();
-                    let mut str_b: *mut XmlChar = null_mut();
-                    let desig1 = CStr::from_ptr(xml_schema_get_component_designation(
-                        addr_of_mut!(str_a),
-                        bcur as _,
-                    ) as *const i8)
-                    .to_string_lossy();
-                    let desig2 = CStr::from_ptr(xml_schema_get_component_designation(
-                        addr_of_mut!(str_b),
-                        base_item as _,
-                    ) as *const i8)
-                    .to_string_lossy();
+                    let desig1 = xml_schema_get_component_designation(bcur as _);
+                    let desig2 = xml_schema_get_component_designation(base_item as _);
 
                     xml_schema_custom_err4(
-                    pctxt as XmlSchemaAbstractCtxtPtr,
-                    XmlParserErrors::XmlSchemapDerivationOkRestriction3,
-                    None,
-                    item,
-                    format!(
-                        "A matching attribute use for the 'required' {desig1} of the {} {desig2} is missing", WXS_ACTION_STR!(action).unwrap()
-                    )
-                    .as_str(),
-                    Some(&desig1),
-                    WXS_ACTION_STR!(action),
-                    Some(&desig2),
-                    None,
-                );
-                    FREE_AND_NULL!(str_a);
-                    FREE_AND_NULL!(str_b);
+                        pctxt as XmlSchemaAbstractCtxtPtr,
+                        XmlParserErrors::XmlSchemapDerivationOkRestriction3,
+                        None,
+                        item,
+                        format!(
+                            "A matching attribute use for the 'required' {desig1} of the {} {desig2} is missing", WXS_ACTION_STR!(action).unwrap()
+                        )
+                        .as_str(),
+                        Some(&desig1),
+                        WXS_ACTION_STR!(action),
+                        Some(&desig2),
+                        None,
+                    );
                 }
             }
         }
@@ -18079,34 +18008,21 @@ unsafe fn xml_schema_check_derivation_okrestriction(
                     0,
                 );
                 if err != 0 {
-                    let mut str_a: *mut XmlChar = null_mut();
-                    let mut str_b: *mut XmlChar = null_mut();
-
                     if err == -1 {
                         return -1;
                     }
-                    let str1 = CStr::from_ptr(xml_schema_get_component_designation(
-                        addr_of_mut!(str_a),
-                        (*typ).content_type_def as _,
-                    ) as *const i8)
-                    .to_string_lossy();
-                    let str2 = CStr::from_ptr(xml_schema_get_component_designation(
-                        addr_of_mut!(str_b),
-                        (*base).content_type_def as _,
-                    ) as *const i8)
-                    .to_string_lossy();
+                    let str1 = xml_schema_get_component_designation((*typ).content_type_def as _);
+                    let str2 = xml_schema_get_component_designation((*base).content_type_def as _);
 
                     xml_schema_custom_err(
-                    ctxt as XmlSchemaAbstractCtxtPtr,
-                    XmlParserErrors::XmlSchemapDerivationOkRestriction1,
-                    None,
-                    typ as XmlSchemaBasicItemPtr,
-                    format!("The {{content type}} {str1} is not validly derived from the base type's {{content type}} {str2}").as_str(),
-                    Some(&str1),
-                    Some(&str2)
-                );
-                    FREE_AND_NULL!(str_a);
-                    FREE_AND_NULL!(str_b);
+                        ctxt as XmlSchemaAbstractCtxtPtr,
+                        XmlParserErrors::XmlSchemapDerivationOkRestriction1,
+                        None,
+                        typ as XmlSchemaBasicItemPtr,
+                        format!("The {{content type}} {str1} is not validly derived from the base type's {{content type}} {str2}").as_str(),
+                        Some(&str1),
+                        Some(&str2)
+                    );
                     return (*ctxt).err;
                 }
             } else if (*base).content_type == XmlSchemaContentType::XmlSchemaContentMixed
@@ -20676,12 +20592,7 @@ unsafe fn xml_schema_check_agprops_correct(
                         if WXS_ATTRUSE_DECL_NAME!(using) == WXS_ATTRUSE_DECL_NAME!(tmp)
                             && WXS_ATTRUSE_DECL_TNS!(using) == WXS_ATTRUSE_DECL_TNS!(tmp)
                         {
-                            let mut str: *mut XmlChar = null_mut();
-                            let str1 = CStr::from_ptr(xml_schema_get_component_designation(
-                                addr_of_mut!(str),
-                                using as _,
-                            ) as *const i8)
-                            .to_string_lossy();
+                            let str1 = xml_schema_get_component_designation(using as _);
 
                             xml_schema_custom_err(
                                 pctxt as XmlSchemaAbstractCtxtPtr,
@@ -20692,7 +20603,6 @@ unsafe fn xml_schema_check_agprops_correct(
                                 Some(&str1),
                                 None,
                             );
-                            FREE_AND_NULL!(str);
                             // Remove the duplicate.
                             if xml_schema_item_list_remove(uses, i) == -1 {
                                 return -1;
@@ -20714,23 +20624,17 @@ unsafe fn xml_schema_check_agprops_correct(
                     ) != 0
                 {
                     if has_id != 0 {
-                        let mut str: *mut XmlChar = null_mut();
-                        let str1 = CStr::from_ptr(xml_schema_get_component_designation(
-                            addr_of_mut!(str),
-                            using as _,
-                        ) as *const i8)
-                        .to_string_lossy();
+                        let str1 = xml_schema_get_component_designation(using as _);
 
                         xml_schema_custom_err(
-                        pctxt as XmlSchemaAbstractCtxtPtr,
-                        XmlParserErrors::XmlSchemapAgPropsCorrect,
-                        (*attr_gr).node.map(|node| node.into()  ),
-                        attr_gr as XmlSchemaBasicItemPtr,
-                        format!("There must not exist more than one attribute declaration of type 'xs:ID' (or derived from 'xs:ID'). The {str1} violates this constraint").as_str(),
-                        Some(&str1),
-                        None
-                    );
-                        FREE_AND_NULL!(str);
+                            pctxt as XmlSchemaAbstractCtxtPtr,
+                            XmlParserErrors::XmlSchemapAgPropsCorrect,
+                            (*attr_gr).node.map(|node| node.into()  ),
+                            attr_gr as XmlSchemaBasicItemPtr,
+                            format!("There must not exist more than one attribute declaration of type 'xs:ID' (or derived from 'xs:ID'). The {str1} violates this constraint").as_str(),
+                            Some(&str1),
+                            None
+                        );
                         if xml_schema_item_list_remove(uses, i) == -1 {
                             return -1;
                         }
@@ -25513,11 +25417,8 @@ unsafe fn xml_schema_xpath_evaluate(
     }
 }
 
-unsafe fn xml_schema_get_idc_designation(
-    buf: *mut *mut XmlChar,
-    idc: XmlSchemaIDCPtr,
-) -> *const XmlChar {
-    unsafe { xml_schema_get_component_designation(buf, idc as _) }
+unsafe fn xml_schema_get_idc_designation(idc: XmlSchemaIDCPtr) -> String {
+    unsafe { xml_schema_get_component_designation(idc as _) }
 }
 
 /// The validation context is used to store an IDC key.
@@ -25788,26 +25689,20 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                         simple_type = typ;
                     }
                     if simple_type.is_null() {
-                        let mut str: *mut XmlChar = null_mut();
                         let xpath =
                             CStr::from_ptr((*(*sto).sel).xpath as *const i8).to_string_lossy();
-                        let desig = CStr::from_ptr(xml_schema_get_idc_designation(
-                            addr_of_mut!(str),
-                            (*(*(*sto).matcher).aidc).def,
-                        ) as *const i8)
-                        .to_string_lossy();
+                        let desig = xml_schema_get_idc_designation((*(*(*sto).matcher).aidc).def);
 
                         // Not qualified if the field resolves to a node of non simple type.
                         xml_schema_custom_err(
-                        vctxt as XmlSchemaAbstractCtxtPtr,
-                        XmlParserErrors::XmlSchemavCvcIdc,
-                        None,
-                        (*(*(*sto).matcher).aidc).def as XmlSchemaBasicItemPtr,
-                        format!("The XPath '{xpath}' of a field of {desig} does evaluate to a node of non-simple type").as_str(),
-                        Some(&xpath),
-                        Some(&desig)
-                    );
-                        FREE_AND_NULL!(str);
+                            vctxt as XmlSchemaAbstractCtxtPtr,
+                            XmlParserErrors::XmlSchemavCvcIdc,
+                            None,
+                            (*(*(*sto).matcher).aidc).def as XmlSchemaBasicItemPtr,
+                            format!("The XPath '{xpath}' of a field of {desig} does evaluate to a node of non-simple type").as_str(),
+                            Some(&xpath),
+                            Some(&desig)
+                        );
                         (*sto).nb_history -= 1;
                         break 'deregister_check;
                     }
@@ -25902,15 +25797,10 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                                 if key_seq.is_null() {
                                     break 'create_sequence;
                                 } else if !(*key_seq.add(idx as usize)).is_null() {
-                                    let mut str: *mut XmlChar = null_mut();
                                     let xpath = CStr::from_ptr((*(*sto).sel).xpath as *const i8)
                                         .to_string_lossy();
-                                    let desig = CStr::from_ptr(xml_schema_get_idc_designation(
-                                        addr_of_mut!(str),
-                                        (*(*matcher).aidc).def,
-                                    )
-                                        as *const i8)
-                                    .to_string_lossy();
+                                    let desig =
+                                        xml_schema_get_idc_designation((*(*matcher).aidc).def);
 
                                     // cvc-identity-constraint:
                                     // 3 For each node in the `target node set` all
@@ -25921,15 +25811,14 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                                     //
                                     // The key was already set; report an error.
                                     xml_schema_custom_err(
-                                    vctxt as XmlSchemaAbstractCtxtPtr,
-                                    XmlParserErrors::XmlSchemavCvcIdc,
-                                    None,
-                                    (*(*matcher).aidc).def as XmlSchemaBasicItemPtr,
-                                    format!("The XPath '{xpath}' of a field of {desig} evaluates to a node-set with more than one member").as_str(),
-                                    Some(&xpath),
-                                    Some(&desig)
-                                );
-                                    FREE_AND_NULL!(str);
+                                        vctxt as XmlSchemaAbstractCtxtPtr,
+                                        XmlParserErrors::XmlSchemavCvcIdc,
+                                        None,
+                                        (*(*matcher).aidc).def as XmlSchemaBasicItemPtr,
+                                        format!("The XPath '{xpath}' of a field of {desig} evaluates to a node-set with more than one member").as_str(),
+                                        Some(&xpath),
+                                        Some(&desig)
+                                    );
                                     (*sto).nb_history -= 1;
                                     break 'deregister_check;
                                 } else {
@@ -26092,7 +25981,6 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                                 }
                                 if !e.is_null() {
                                     let mut str: *mut XmlChar = null_mut();
-                                    let mut str_b: *mut XmlChar = null_mut();
                                     let seq = CStr::from_ptr(xml_schema_format_idc_key_sequence(
                                         vctxt,
                                         addr_of_mut!(str),
@@ -26101,12 +25989,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                                     )
                                         as *const i8)
                                     .to_string_lossy();
-                                    let desig = CStr::from_ptr(xml_schema_get_idc_designation(
-                                        addr_of_mut!(str_b),
-                                        idc,
-                                    )
-                                        as *const i8)
-                                    .to_string_lossy();
+                                    let desig = xml_schema_get_idc_designation(idc);
                                     // TODO: Try to report the key-sequence.
                                     xml_schema_custom_err(
                                         vctxt as XmlSchemaAbstractCtxtPtr,
@@ -26118,7 +26001,6 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                                         Some(&desig),
                                     );
                                     FREE_AND_NULL!(str);
-                                    FREE_AND_NULL!(str_b);
                                     break 'selector_leave;
                                 }
                             }
@@ -26211,12 +26093,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                         }
                         // selector_key_error:
                         {
-                            let mut str: *mut XmlChar = null_mut();
-                            let desig = CStr::from_ptr(xml_schema_get_idc_designation(
-                                addr_of_mut!(str),
-                                idc,
-                            ) as *const i8)
-                            .to_string_lossy();
+                            let desig = xml_schema_get_idc_designation(idc);
 
                             // 4.2.1 (KEY) The `target node set` and the
                             // `qualified node set` are equal, that is, every
@@ -26231,7 +26108,6 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                                 Some(&desig),
                                 None,
                             );
-                            FREE_AND_NULL!(str);
                         }
                     }
                     // selector_leave:

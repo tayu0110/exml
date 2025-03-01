@@ -1102,8 +1102,8 @@ pub unsafe extern "C" fn xml_escape_format_string(msg: *mut *mut XmlChar) -> *mu
         let result_len: usize = msg_len + count + 1;
         let result: *mut XmlChar = xml_malloc_atomic(result_len) as *mut XmlChar;
         if result.is_null() {
-            /* Clear *msg to prevent format string vulnerabilities in
-            out-of-memory situations. */
+            // Clear *msg to prevent format string vulnerabilities in
+            // out-of-memory situations.
             xml_free(*msg as _);
             *msg = null_mut();
             return null_mut();
