@@ -1721,9 +1721,19 @@ unsafe fn xml_schema_get_component_name(item: XmlSchemaBasicItemPtr) -> *const X
 
 unsafe fn xml_schema_get_component_qname(item: *mut c_void) -> String {
     unsafe {
+        let namespace_name =
+            xml_schema_get_component_target_ns(item as XmlSchemaBasicItemPtr) as *const i8;
         xml_schema_format_qname(
-            xml_schema_get_component_target_ns(item as XmlSchemaBasicItemPtr),
-            xml_schema_get_component_name(item as XmlSchemaBasicItemPtr),
+            (!namespace_name.is_null())
+                .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
+                .as_deref(),
+            Some(
+                CStr::from_ptr(
+                    xml_schema_get_component_name(item as XmlSchemaBasicItemPtr) as *const i8
+                )
+                .to_string_lossy()
+                .as_ref(),
+            ),
         )
     }
 }
@@ -1871,7 +1881,19 @@ unsafe fn xml_schema_format_item_for_report(
                     res.push_str("attribute decl.");
                     res.push_str(" '");
                     res.push_str(
-                        xml_schema_format_qname((*attr).target_namespace, (*attr).name).as_str(),
+                        xml_schema_format_qname(
+                            Some(
+                                CStr::from_ptr((*attr).target_namespace as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                            Some(
+                                CStr::from_ptr((*attr).name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                        )
+                        .as_str(),
                     );
                     res.push('\'');
                     FREE_AND_NULL!(str);
@@ -1883,8 +1905,19 @@ unsafe fn xml_schema_format_item_for_report(
                     let elem: XmlSchemaElementPtr = item as XmlSchemaElementPtr;
                     res.push_str("element decl.");
                     res.push_str(" '");
+                    let namespace_name = (*elem).target_namespace as *const i8;
                     res.push_str(
-                        xml_schema_format_qname((*elem).target_namespace, (*elem).name).as_str(),
+                        xml_schema_format_qname(
+                            (!namespace_name.is_null())
+                                .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
+                                .as_deref(),
+                            Some(
+                                CStr::from_ptr((*elem).name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                        )
+                        .as_str(),
                     );
                     res.push('\'');
                 }
@@ -1969,7 +2002,10 @@ unsafe fn xml_schema_format_item_for_report(
                 };
                 res.push_str("Element '");
                 if let Some(ns) = elem.ns {
-                    res.push_str(xml_schema_format_qname(ns.href, elem.name).as_str());
+                    res.push_str(
+                        xml_schema_format_qname(ns.href().as_deref(), elem.name().as_deref())
+                            .as_str(),
+                    );
                 } else {
                     res.push_str(
                         CStr::from_ptr(elem.name as *const i8)
@@ -1983,7 +2019,9 @@ unsafe fn xml_schema_format_item_for_report(
         if let Some(attr) = item_node.and_then(|node| XmlAttrPtr::try_from(node).ok()) {
             res.push_str(", attribute '");
             if let Some(ns) = attr.ns {
-                res.push_str(xml_schema_format_qname(ns.href, attr.name).as_str());
+                res.push_str(
+                    xml_schema_format_qname(ns.href().as_deref(), attr.name().as_deref()).as_str(),
+                );
             } else {
                 res.push_str(
                     CStr::from_ptr(attr.name as *const i8)
@@ -2027,10 +2065,10 @@ unsafe fn xml_schema_format_node_for_error(
 
                 *msg = xml_strdup(c"Element '".as_ptr() as _);
                 if let Some(ns) = elem.ns {
-                    let res = xml_schema_format_qname(ns.href, elem.name);
+                    let res = xml_schema_format_qname(ns.href().as_deref(), elem.name().as_deref());
                     *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
                 } else {
-                    let res = xml_schema_format_qname(null_mut(), elem.name);
+                    let res = xml_schema_format_qname(None, elem.name().as_deref());
                     *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
                 }
                 *msg = xml_strcat(*msg, c"', ".as_ptr() as _);
@@ -2042,10 +2080,16 @@ unsafe fn xml_schema_format_node_for_error(
                 (node.name, node.ns)
             };
             if let Some(ns) = ns {
-                let res = xml_schema_format_qname(ns.href, name);
+                let res = xml_schema_format_qname(
+                    ns.href().as_deref(),
+                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+                );
                 *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
             } else {
-                let res = xml_schema_format_qname(null_mut(), name);
+                let res = xml_schema_format_qname(
+                    None,
+                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+                );
                 *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
             }
             FREE_AND_NULL!(str);
@@ -2057,15 +2101,34 @@ unsafe fn xml_schema_format_node_for_error(
                 let ielem: XmlSchemaNodeInfoPtr = *(*vctxt).elem_infos.add((*vctxt).depth as usize);
 
                 *msg = xml_strdup(c"Element '".as_ptr() as _);
-                let res = xml_schema_format_qname((*ielem).ns_name, (*ielem).local_name);
+                let namespace_name = (*ielem).ns_name as *const i8;
+                let res = xml_schema_format_qname(
+                    (!namespace_name.is_null())
+                        .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
+                        .as_deref(),
+                    Some(
+                        CStr::from_ptr((*ielem).local_name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                );
                 *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
                 *msg = xml_strcat(*msg, c"', ".as_ptr() as _);
                 *msg = xml_strcat(*msg, c"attribute '".as_ptr() as _);
             } else {
                 *msg = xml_strdup(c"Element '".as_ptr() as _);
             }
-            let res =
-                xml_schema_format_qname((*(*vctxt).inode).ns_name, (*(*vctxt).inode).local_name);
+            let namespace_name = (*(*vctxt).inode).ns_name as *const i8;
+            let res = xml_schema_format_qname(
+                (!namespace_name.is_null())
+                    .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
+                    .as_deref(),
+                Some(
+                    CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                ),
+            );
             *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
             *msg = xml_strcat(*msg, c"': ".as_ptr() as _);
         } else if (*actxt).typ == XML_SCHEMA_CTXT_PARSER {
@@ -3556,14 +3619,20 @@ unsafe fn xml_schema_simple_type_err(
                 msg.push_str("xs:");
                 xml_strdup((*typ).name)
             } else {
-                let qname = xml_schema_format_qname((*typ).target_namespace, (*typ).name);
+                let namespace_name = (*typ).target_namespace as *const i8;
+                let qname = xml_schema_format_qname(
+                    (!namespace_name.is_null())
+                        .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
+                        .as_deref(),
+                    Some(
+                        CStr::from_ptr((*typ).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                );
                 xml_strndup(qname.as_ptr(), qname.len() as i32)
             };
-            msg.push_str(
-                CStr::from_ptr(xml_escape_format_string(addr_of_mut!(str)) as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            );
+            msg.push_str(CStr::from_ptr(str as *const i8).to_string_lossy().as_ref());
             msg.push('\'');
             FREE_AND_NULL!(str);
         }
@@ -4084,32 +4153,22 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
 ///
 /// Returns the localName if @namespaceName is NULL, a formatted string otherwise.
 #[doc(alias = "xmlSchemaFormatQName")]
-pub(crate) unsafe fn xml_schema_format_qname(
-    namespace_name: *const XmlChar,
-    local_name: *const XmlChar,
+pub(crate) fn xml_schema_format_qname(
+    namespace_name: Option<&str>,
+    local_name: Option<&str>,
 ) -> String {
-    unsafe {
-        let mut res = String::new();
-        if !namespace_name.is_null() {
-            res.push('{');
-            res.push_str(
-                CStr::from_ptr(namespace_name as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            );
-            res.push('}');
-        }
-        if !local_name.is_null() {
-            res.push_str(
-                CStr::from_ptr(local_name as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            );
-        } else {
-            res.push_str("(NULL)");
-        }
-        res
+    let mut res = String::new();
+    if let Some(namespace_name) = namespace_name {
+        res.push('{');
+        res.push_str(namespace_name);
+        res.push('}');
     }
+    if let Some(local_name) = local_name {
+        res.push_str(local_name);
+    } else {
+        res.push_str("(NULL)");
+    }
+    res
 }
 
 /// Convert the XmlSchemaTypeType to a c_char string.
@@ -5919,7 +5978,18 @@ unsafe fn xml_schema_psimple_type_err(
                         msg.push_str("xs:");
                         xml_strdup((*typ).name)
                     } else {
-                        let qname = xml_schema_format_qname((*typ).target_namespace, (*typ).name);
+                        let qname = xml_schema_format_qname(
+                            Some(
+                                CStr::from_ptr((*typ).target_namespace as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                            Some(
+                                CStr::from_ptr((*typ).name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                        );
                         xml_strndup(qname.as_ptr(), qname.len() as i32)
                     };
                     msg.push_str(
@@ -6519,12 +6589,12 @@ unsafe fn xml_schema_new_annot(
     }
 }
 
-unsafe fn xml_schema_format_qname_ns(ns: Option<XmlNsPtr>, local_name: *const XmlChar) -> String {
+unsafe fn xml_schema_format_qname_ns(ns: Option<XmlNsPtr>, local_name: Option<&str>) -> String {
     unsafe {
         if let Some(ns) = ns {
-            xml_schema_format_qname(ns.href, local_name)
+            xml_schema_format_qname(ns.href().as_deref(), local_name)
         } else {
-            xml_schema_format_qname(null_mut(), local_name)
+            xml_schema_format_qname(None, local_name)
         }
     }
 }
@@ -6546,7 +6616,7 @@ unsafe fn xml_schema_pillegal_attr_err(
             attr.parent.map(|p| p.into()),
         );
         let str1 = CStr::from_ptr(str_a as *const i8).to_string_lossy();
-        let str2 = xml_schema_format_qname_ns(attr.ns, attr.name);
+        let str2 = xml_schema_format_qname_ns(attr.ns, attr.name().as_deref());
         xml_schema_err4(
             ctxt as XmlSchemaAbstractCtxtPtr,
             error,
@@ -8691,7 +8761,18 @@ unsafe fn xml_schema_parse_local_attribute(
                         && tmp_name == (*(using as XmlSchemaAttributeUseProhibPtr)).name
                         && tmp_ns == (*(using as XmlSchemaAttributeUseProhibPtr)).target_namespace
                     {
-                        let qname = xml_schema_format_qname(tmp_ns, tmp_name);
+                        let qname = xml_schema_format_qname(
+                            Some(
+                                CStr::from_ptr(tmp_ns as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                            Some(
+                                CStr::from_ptr(tmp_name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                        );
                         xml_schema_custom_warning(
                             pctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapWarnAttrPointlessProh,
@@ -8904,7 +8985,14 @@ unsafe fn xml_schema_parse_attribute_group_ref(
             // as the `actual value` of its own name attribute plus
             // target namespace, then it must have exactly one such group."
             if (*pctxt).redef_counter != 0 {
-                let qname = xml_schema_format_qname(ref_ns, refe);
+                let qname = xml_schema_format_qname(
+                    Some(
+                        CStr::from_ptr(ref_ns as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                    Some(CStr::from_ptr(refe as *const i8).to_string_lossy().as_ref()),
+                );
 
                 xml_schema_custom_err(
                     pctxt as XmlSchemaAbstractCtxtPtr,
@@ -11428,8 +11516,16 @@ unsafe fn xml_schema_parse_model_group(
                         // (6.1.1) "It must have exactly one such group."
                         if (*ctxt).redef_counter != 0 {
                             let qname = xml_schema_format_qname(
-                                (*(*ctxt).redef).ref_target_ns,
-                                (*(*ctxt).redef).ref_name,
+                                Some(
+                                    CStr::from_ptr((*(*ctxt).redef).ref_target_ns as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                ),
+                                Some(
+                                    CStr::from_ptr((*(*ctxt).redef).ref_name as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                ),
                             );
 
                             xml_schema_custom_err(
@@ -11446,8 +11542,16 @@ unsafe fn xml_schema_parse_model_group(
                             || (*WXS_PARTICLE!(part)).max_occurs != 1
                         {
                             let qname = xml_schema_format_qname(
-                                (*(*ctxt).redef).ref_target_ns,
-                                (*(*ctxt).redef).ref_name,
+                                Some(
+                                    CStr::from_ptr((*(*ctxt).redef).ref_target_ns as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                ),
+                                Some(
+                                    CStr::from_ptr((*(*ctxt).redef).ref_name as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                ),
                             );
 
                             // SPEC src-redefine:
@@ -11724,8 +11828,30 @@ unsafe fn xml_schema_parse_restriction(
                 } else if !xml_str_equal((*typ).base, (*typ).name)
                     || !xml_str_equal((*typ).base_ns, (*typ).target_namespace)
                 {
-                    let q1 = xml_schema_format_qname((*typ).base_ns, (*typ).base);
-                    let q2 = xml_schema_format_qname((*typ).target_namespace, (*typ).name);
+                    let q1 = xml_schema_format_qname(
+                        Some(
+                            CStr::from_ptr((*typ).base_ns as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                        Some(
+                            CStr::from_ptr((*typ).base as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                    );
+                    let q2 = xml_schema_format_qname(
+                        Some(
+                            CStr::from_ptr((*typ).target_namespace as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                        Some(
+                            CStr::from_ptr((*typ).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                    );
 
                     // REDEFINE: SPEC src-redefine (5)
                     // "Within the [children], each <simpleType> must have a
@@ -14112,7 +14238,18 @@ unsafe fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> i
                 // Probably XmlParserErrors::XML_SCHEMAP_SRC_RESOLVE, if this is using the
                 // reference kind.
                 let typename = xml_schema_get_component_type_str(item as _);
-                let qname = xml_schema_format_qname((*redef).ref_target_ns, (*redef).ref_name);
+                let qname = xml_schema_format_qname(
+                    Some(
+                        CStr::from_ptr((*redef).ref_target_ns as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                    Some(
+                        CStr::from_ptr((*redef).ref_name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                );
                 xml_schema_custom_err(
                     pctxt as XmlSchemaAbstractCtxtPtr,
                     XmlParserErrors::XmlSchemapSrcRedefine,
@@ -14438,7 +14575,18 @@ unsafe fn xml_schema_pres_comp_attr_err(
     unsafe {
         let des = xml_schema_format_item_for_report(None, owner_item, owner_elem);
         let ref_type_str = ref_type_str.unwrap_or_else(|| xml_schema_item_type_to_str(ref_type));
-        let qname = xml_schema_format_qname(ref_uri, ref_name);
+        let qname = xml_schema_format_qname(
+            Some(
+                CStr::from_ptr(ref_uri as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ),
+            Some(
+                CStr::from_ptr(ref_name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ),
+        );
         xml_schema_perr_ext(
             ctxt,
             owner_elem,
@@ -15164,8 +15312,19 @@ unsafe fn xml_schema_resolve_idckey_references(
                 return (*pctxt).err;
             } else if (*idc).nb_fields != (*((*(*idc).refe).item as XmlSchemaIDCPtr)).nb_fields {
                 let refer: XmlSchemaIDCPtr = (*(*idc).refe).item as XmlSchemaIDCPtr;
-                let qname = xml_schema_format_qname((*refer).target_namespace, (*refer).name);
-                // SPEC c-props-correct(2)
+                let qname = xml_schema_format_qname(
+                    Some(
+                        CStr::from_ptr((*refer).target_namespace as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                    Some(
+                        CStr::from_ptr((*refer).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                );
+                // SPEC c-props-correct(2).
                 // "If the {identity-constraint category} is keyref,
                 // the cardinality of the {fields} must equal that of
                 // the {fields} of the {referenced key}.
@@ -15346,7 +15505,18 @@ unsafe fn xml_schema_check_group_def_circular(
             let circ: XmlSchemaTreeItemPtr =
                 xml_schema_get_circ_model_gr_def_ref(item, (*(*item).children).children);
             if !circ.is_null() {
-                let q1 = xml_schema_format_qname((*item).target_namespace, (*item).name);
+                let q1 = xml_schema_format_qname(
+                    Some(
+                        CStr::from_ptr((*item).target_namespace as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                    Some(
+                        CStr::from_ptr((*item).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                );
                 // TODO: The error report is not adequate: this constraint
                 // is defined for model groups but not definitions, but since
                 // there cannot be any circular model groups without a model group
@@ -15945,8 +16115,18 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                     if (*prohib).name == WXS_ATTRUSE_DECL_NAME!(using)
                         && (*prohib).target_namespace == WXS_ATTRUSE_DECL_TNS!(using)
                     {
-                        let qname =
-                            xml_schema_format_qname((*prohib).target_namespace, (*prohib).name);
+                        let qname = xml_schema_format_qname(
+                            Some(
+                                CStr::from_ptr((*prohib).target_namespace as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                            Some(
+                                CStr::from_ptr((*prohib).name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                        );
 
                         xml_schema_custom_warning(
                             pctxt as XmlSchemaAbstractCtxtPtr,
@@ -16465,7 +16645,18 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
             // `resolved` to by the `actual value` of the base [attribute]
             // must be a complex type definition;
             if !WXS_IS_COMPLEX!(base) {
-                let qname = xml_schema_format_qname((*base).target_namespace, (*base).name);
+                let qname = xml_schema_format_qname(
+                    Some(
+                        CStr::from_ptr((*base).target_namespace as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                    Some(
+                        CStr::from_ptr((*base).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                );
 
                 xml_schema_pcustom_err(
                     ctxt,
@@ -16485,7 +16676,18 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
             // base [attribute] must be one of the following:
             if WXS_IS_SIMPLE!(base) {
                 if !WXS_IS_EXTENSION!(typ) {
-                    let qname = xml_schema_format_qname((*base).target_namespace, (*base).name);
+                    let qname = xml_schema_format_qname(
+                        Some(
+                            CStr::from_ptr((*base).target_namespace as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                        Some(
+                            CStr::from_ptr((*base).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                    );
 
                     // 2.1.3 only if the <extension> alternative is also
                     // chosen, a simple type definition.
@@ -16534,7 +16736,18 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
                         // Attention: at this point the <simpleType> child is in
                         // ->contentTypeDef (put there during parsing).
 
-                        let qname = xml_schema_format_qname((*base).target_namespace, (*base).name);
+                        let qname = xml_schema_format_qname(
+                            Some(
+                                CStr::from_ptr((*base).target_namespace as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                            Some(
+                                CStr::from_ptr((*base).name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                        );
                         // 2.2 If clause 2.1.2 above is satisfied, then there
                         // must be a <simpleType> among the [children] of
                         // <restriction>.
@@ -16555,7 +16768,18 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
             }
             if ret > 0 {
                 if WXS_IS_RESTRICTION!(typ) {
-                    let qname = xml_schema_format_qname((*base).target_namespace, (*base).name);
+                    let qname = xml_schema_format_qname(
+                        Some(
+                            CStr::from_ptr((*base).target_namespace as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                        Some(
+                            CStr::from_ptr((*base).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                    );
                     xml_schema_pcustom_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapSrcCt1,
@@ -16565,7 +16789,18 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
                         Some(&qname)
                     );
                 } else {
-                    let qname = xml_schema_format_qname((*base).target_namespace, (*base).name);
+                    let qname = xml_schema_format_qname(
+                        Some(
+                            CStr::from_ptr((*base).target_namespace as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                        Some(
+                            CStr::from_ptr((*base).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                    );
                     xml_schema_pcustom_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapSrcCt1,
@@ -22531,7 +22766,14 @@ unsafe fn xml_schema_attr_uses_dump<'a>(
                 name = WXS_ATTRUSE_DECL_NAME!(using);
                 tns = WXS_ATTRUSE_DECL_TNS!(using);
             }
-            writeln!(output, "'{}'", xml_schema_format_qname(tns, name));
+            writeln!(
+                output,
+                "'{}'",
+                xml_schema_format_qname(
+                    Some(CStr::from_ptr(tns as *const i8).to_string_lossy().as_ref()),
+                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref())
+                )
+            );
         }
     }
 }
@@ -22581,8 +22823,18 @@ unsafe fn xml_schema_content_model_dump<'a>(
                         output,
                         "ELEM '{}'",
                         xml_schema_format_qname(
-                            (*(term as XmlSchemaElementPtr)).target_namespace,
-                            (*(term as XmlSchemaElementPtr)).name,
+                            Some(
+                                CStr::from_ptr(
+                                    (*(term as XmlSchemaElementPtr)).target_namespace as *const i8
+                                )
+                                .to_string_lossy()
+                                .as_ref()
+                            ),
+                            Some(
+                                CStr::from_ptr((*(term as XmlSchemaElementPtr)).name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref()
+                            ),
                         )
                     );
                 }
@@ -24065,7 +24317,18 @@ unsafe fn xml_schema_process_xsi_type(
             // (cvc-assess-elt) (1.2.1.2.3)
             *local_type = xml_schema_get_type((*vctxt).schema, local, ns_name);
             if (*local_type).is_null() {
-                let qname = xml_schema_format_qname(ns_name, local);
+                let qname = xml_schema_format_qname(
+                    Some(
+                        CStr::from_ptr(ns_name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                    Some(
+                        CStr::from_ptr(local as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                );
 
                 xml_schema_custom_err(
                     vctxt as XmlSchemaAbstractCtxtPtr,
@@ -24130,8 +24393,16 @@ unsafe fn xml_schema_process_xsi_type(
                 ) != 0
                 {
                     let qname = xml_schema_format_qname(
-                        (*(*local_type)).target_namespace,
-                        (*(*local_type)).name,
+                        Some(
+                            CStr::from_ptr((*(*local_type)).target_namespace as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                        Some(
+                            CStr::from_ptr((*(*local_type)).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
                     );
 
                     xml_schema_custom_err(
@@ -25788,12 +26059,28 @@ unsafe fn xml_schema_format_error_node_qname(
                 (attr.name, attr.ns)
             };
             if let Some(ns) = ns {
-                return Some(xml_schema_format_qname(ns.href, name));
+                return Some(xml_schema_format_qname(
+                    ns.href().as_deref(),
+                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+                ));
             } else {
-                return Some(xml_schema_format_qname(null_mut(), name));
+                return Some(xml_schema_format_qname(
+                    None,
+                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+                ));
             }
         } else if !ni.is_null() {
-            return Some(xml_schema_format_qname((*ni).ns_name, (*ni).local_name));
+            let namespace_name = (*ni).ns_name as *const i8;
+            return Some(xml_schema_format_qname(
+                (!namespace_name.is_null())
+                    .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
+                    .as_deref(),
+                Some(
+                    CStr::from_ptr((*ni).local_name as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                ),
+            ));
         }
         None
     }
@@ -26392,9 +26679,16 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 match (*iattr).state {
                     w if XML_SCHEMAS_ATTR_ERR_MISSING == w => {
                         ACTIVATE_ELEM!(vctxt);
+                        let namespace_name = (*(*iattr).decl).target_namespace as *const i8;
                         let qname = xml_schema_format_qname(
-                            (*(*iattr).decl).target_namespace,
-                            (*(*iattr).decl).name,
+                            (!namespace_name.is_null())
+                                .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
+                                .as_deref(),
+                            Some(
+                                CStr::from_ptr((*(*iattr).decl).name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
                         );
                         xml_schema_custom_err(
                             vctxt as XmlSchemaAbstractCtxtPtr,
@@ -27276,13 +27570,22 @@ unsafe fn xml_schema_keyref_err(
     str2: Option<&str>,
 ) {
     unsafe {
+        let namespace_name = *(*(*vctxt).node_qnames)
+            .items
+            .add((*idc_node).node_qname_id as usize + 1) as *const i8;
         let qn = xml_schema_format_qname(
-            *(*(*vctxt).node_qnames)
-                .items
-                .add((*idc_node).node_qname_id as usize + 1) as _,
-            *(*(*vctxt).node_qnames)
-                .items
-                .add((*idc_node).node_qname_id as usize) as _,
+            (!namespace_name.is_null())
+                .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
+                .as_deref(),
+            Some(
+                CStr::from_ptr(
+                    *(*(*vctxt).node_qnames)
+                        .items
+                        .add((*idc_node).node_qname_id as usize) as *const i8,
+                )
+                .to_string_lossy()
+                .as_ref(),
+            ),
         );
         let msg = format!("Element '{qn}': {message}.\n");
         xml_schema_err4_line(

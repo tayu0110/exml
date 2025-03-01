@@ -5897,7 +5897,18 @@ pub unsafe fn xml_schema_check_facet(
                     // No error message for RelaxNG.
                     if ctxt_given != 0 {
                         let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
-                        let qname = xml_schema_format_qname((*base).target_namespace, (*base).name);
+                        let qname = xml_schema_format_qname(
+                            Some(
+                                CStr::from_ptr((*base).target_namespace as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                            Some(
+                                CStr::from_ptr((*base).name as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                        );
 
                         xml_schema_custom_err(
                             pctxt as XmlSchemaAbstractCtxtPtr,
