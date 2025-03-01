@@ -267,12 +267,6 @@ macro_rules! WXS_ITEM_NODE {
     };
 }
 
-macro_rules! WXS_ITEM_TYPE_NAME {
-    ($i:expr) => {
-        xml_schema_get_component_type_str($i as _)
-    };
-}
-
 // Macros for element declarations.
 macro_rules! WXS_ELEM_TYPEDEF {
     ($e:expr) => {
@@ -1571,55 +1565,51 @@ unsafe fn xml_schema_add_item_size(
 
 /// Returns the component name of a schema item.
 #[doc(alias = "xmlSchemaItemTypeToStr")]
-unsafe fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> *const XmlChar {
+fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> &'static str {
     match typ {
-        XmlSchemaTypeType::XmlSchemaTypeBasic => c"simple type definition".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeSimple => c"simple type definition".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeComplex => c"complex type definition".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeElement => c"element declaration".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeAttributeUse => c"attribute use".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeAttribute => c"attribute declaration".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeGroup => c"model group definition".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
-            c"attribute group definition".as_ptr() as _
-        }
-        XmlSchemaTypeType::XmlSchemaTypeNotation => c"notation declaration".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeSequence => c"model group (sequence)".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeChoice => c"model group (choice)".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeAll => c"model group (all)".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaTypeParticle => c"particle".as_ptr() as _,
+        XmlSchemaTypeType::XmlSchemaTypeBasic => "simple type definition",
+        XmlSchemaTypeType::XmlSchemaTypeSimple => "simple type definition",
+        XmlSchemaTypeType::XmlSchemaTypeComplex => "complex type definition",
+        XmlSchemaTypeType::XmlSchemaTypeElement => "element declaration",
+        XmlSchemaTypeType::XmlSchemaTypeAttributeUse => "attribute use",
+        XmlSchemaTypeType::XmlSchemaTypeAttribute => "attribute declaration",
+        XmlSchemaTypeType::XmlSchemaTypeGroup => "model group definition",
+        XmlSchemaTypeType::XmlSchemaTypeAttributegroup => "attribute group definition",
+        XmlSchemaTypeType::XmlSchemaTypeNotation => "notation declaration",
+        XmlSchemaTypeType::XmlSchemaTypeSequence => "model group (sequence)",
+        XmlSchemaTypeType::XmlSchemaTypeChoice => "model group (choice)",
+        XmlSchemaTypeType::XmlSchemaTypeAll => "model group (all)",
+        XmlSchemaTypeType::XmlSchemaTypeParticle => "particle",
         XmlSchemaTypeType::XmlSchemaTypeIDCUnique => {
-            c"unique identity-constraint".as_ptr() as _
-            // return (c"IDC (unique)".as_ptr() as _);
+            "unique identity-constraint"
+            // return ("IDC (unique)");
         }
         XmlSchemaTypeType::XmlSchemaTypeIDCKey => {
-            c"key identity-constraint".as_ptr() as _
-            // return (c"IDC (key)".as_ptr() as _);
+            "key identity-constraint"
+            // return ("IDC (key)");
         }
         XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
-            c"keyref identity-constraint".as_ptr() as _
-            // return (c"IDC (keyref)".as_ptr() as _);
+            "keyref identity-constraint"
+            // return ("IDC (keyref)");
         }
-        XmlSchemaTypeType::XmlSchemaTypeAny => c"wildcard (any)".as_ptr() as _,
-        XmlSchemaTypeType::XmlSchemaExtraQnameref => {
-            c"[helper component] QName reference".as_ptr() as _
-        }
+        XmlSchemaTypeType::XmlSchemaTypeAny => "wildcard (any)",
+        XmlSchemaTypeType::XmlSchemaExtraQnameref => "[helper component] QName reference",
         XmlSchemaTypeType::XmlSchemaExtraAttrUseProhib => {
-            c"[helper component] attribute use prohibition".as_ptr() as _
+            "[helper component] attribute use prohibition"
         }
-        _ => c"Not a schema component".as_ptr() as _,
+        _ => "Not a schema component",
     }
 }
 
 /// Returns the component name of a schema item.
-unsafe fn xml_schema_get_component_type_str(item: XmlSchemaBasicItemPtr) -> *const XmlChar {
+unsafe fn xml_schema_get_component_type_str(item: XmlSchemaBasicItemPtr) -> &'static str {
     unsafe {
         match (*item).typ {
             XmlSchemaTypeType::XmlSchemaTypeBasic => {
                 if WXS_IS_COMPLEX!(item as XmlSchemaTypePtr) {
-                    c"complex type definition".as_ptr() as _
+                    "complex type definition"
                 } else {
-                    c"simple type definition".as_ptr() as _
+                    "simple type definition"
                 }
             }
             _ => xml_schema_item_type_to_str((*item).typ),
@@ -1749,7 +1739,8 @@ unsafe fn xml_schema_get_component_designation(
     unsafe {
         let mut str: *mut XmlChar = null_mut();
 
-        *buf = xml_strcat(*buf, WXS_ITEM_TYPE_NAME!(item));
+        let typestr = xml_schema_get_component_type_str(item as _);
+        *buf = xml_strncat(*buf, typestr.as_ptr(), typestr.len() as i32);
         *buf = xml_strcat(*buf, c" '".as_ptr() as _);
         *buf = xml_strcat(
             *buf,
@@ -1965,10 +1956,12 @@ unsafe fn xml_schema_format_item_for_report(
                 | XmlSchemaTypeType::XmlSchemaTypeChoice
                 | XmlSchemaTypeType::XmlSchemaTypeAll
                 | XmlSchemaTypeType::XmlSchemaTypeParticle => {
-                    *buf = xml_strdup(WXS_ITEM_TYPE_NAME!(item));
+                    let typestr = xml_schema_get_component_type_str(item as _);
+                    *buf = xml_strndup(typestr.as_ptr(), typestr.len() as i32);
                 }
                 XmlSchemaTypeType::XmlSchemaTypeNotation => {
-                    *buf = xml_strdup(WXS_ITEM_TYPE_NAME!(item));
+                    let typestr = xml_schema_get_component_type_str(item as _);
+                    *buf = xml_strndup(typestr.as_ptr(), typestr.len() as i32);
                     *buf = xml_strcat(*buf, c" '".as_ptr() as _);
                     *buf = xml_strcat(
                         *buf,
@@ -5075,13 +5068,14 @@ unsafe fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) {
                         xml_schema_free_qname_ref(item as XmlSchemaQnameRefPtr);
                     }
                     _ => {
-                        let name = WXS_ITEM_TYPE_NAME!(item);
-                        let name = (!name.is_null())
-                            .then(|| CStr::from_ptr(name as *const i8).to_string_lossy());
+                        let name = xml_schema_get_component_type_str(item as _);
                         // TODO: This should never be hit.
                         xml_schema_psimple_internal_err(
                         None,
-                        format!("Internal error: xmlSchemaComponentListFree, unexpected component type '{}'\n", name.expect("Internal Error")).as_str(),
+                        format!(
+                            "Internal error: xmlSchemaComponentListFree, unexpected component type '{}'\n",
+                            name
+                        ).as_str(),
                     );
                     }
                 }
@@ -14242,8 +14236,7 @@ unsafe fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> i
                 // TODO: error code.
                 // Probably XmlParserErrors::XML_SCHEMAP_SRC_RESOLVE, if this is using the
                 // reference kind.
-                let typename =
-                    CStr::from_ptr(WXS_ITEM_TYPE_NAME!(item) as *const i8).to_string_lossy();
+                let typename = xml_schema_get_component_type_str(item as _);
                 let qname = CStr::from_ptr(xml_schema_format_qname(
                     addr_of_mut!(str),
                     (*redef).ref_target_ns,
@@ -14256,7 +14249,7 @@ unsafe fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> i
                 node.map(|node| node.into()),
                 null_mut(),
                 format!("The {typename} '{qname}' to be redefined could not be found in the redefined schema").as_str(),
-                Some(&typename),
+                Some(typename),
                 Some(&qname),
             );
                 FREE_AND_NULL!(str);
@@ -14495,8 +14488,7 @@ unsafe fn xml_schema_add_components(
             err = xml_hash_add_entry(*table, name, item as _);
             if err != 0 {
                 let mut str: *mut XmlChar = null_mut();
-                let typename =
-                    CStr::from_ptr(WXS_ITEM_TYPE_NAME!(item) as *const i8).to_string_lossy();
+                let typename = xml_schema_get_component_type_str(item as _);
                 let qname = CStr::from_ptr(xml_schema_get_component_qname(
                     addr_of_mut!(str),
                     item as _,
@@ -14508,7 +14500,7 @@ unsafe fn xml_schema_add_components(
                     WXS_ITEM_NODE!(item).map(|node| node.into()),
                     item as XmlSchemaBasicItemPtr,
                     format!("A global {typename} '{qname}' does already exist").as_str(),
-                    Some(&typename),
+                    Some(typename),
                     Some(&qname),
                 );
                 FREE_AND_NULL!(str);
@@ -14585,22 +14577,23 @@ unsafe fn xml_schema_pres_comp_attr_err(
     ref_name: *const XmlChar,
     ref_uri: *const XmlChar,
     ref_type: XmlSchemaTypeType,
-    mut ref_type_str: *const c_char,
+    ref_type_str: *const c_char,
 ) {
     unsafe {
         let mut des: *mut XmlChar = null_mut();
         let mut str_a: *mut XmlChar = null_mut();
 
         xml_schema_format_item_for_report(addr_of_mut!(des), null_mut(), owner_item, owner_elem);
-        if ref_type_str.is_null() {
-            ref_type_str = xml_schema_item_type_to_str(ref_type) as _;
-        }
+        let ref_type_str = if ref_type_str.is_null() {
+            Cow::Borrowed(xml_schema_item_type_to_str(ref_type))
+        } else {
+            CStr::from_ptr(ref_type_str).to_string_lossy()
+        };
         let d = CStr::from_ptr(des as *const i8).to_string_lossy();
         let qname = CStr::from_ptr(
             xml_schema_format_qname(addr_of_mut!(str_a), ref_uri, ref_name) as *const i8,
         )
         .to_string_lossy();
-        let ref_type_str = CStr::from_ptr(ref_type_str).to_string_lossy();
         xml_schema_perr_ext(
         ctxt,
         owner_elem,
@@ -17900,10 +17893,9 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
             // (4) "If there is an {attribute wildcard}, all of the following must be true:"
             if base_wild.is_null() {
                 let mut str: *mut XmlChar = null_mut();
-                let str1 = CStr::from_ptr(WXS_ITEM_TYPE_NAME!(item) as *const i8).to_string_lossy();
+                let str1 = xml_schema_get_component_type_str(item as _);
                 let str2 = WXS_ACTION_STR!(action);
-                let str3 =
-                    CStr::from_ptr(WXS_ITEM_TYPE_NAME!(base_item) as *const i8).to_string_lossy();
+                let str3 = xml_schema_get_component_type_str(base_item as _);
                 let qname = CStr::from_ptr(xml_schema_get_component_qname(
                     addr_of_mut!(str),
                     base_item as _,
@@ -17921,9 +17913,9 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                     str2.unwrap()
                 )
                 .as_str(),
-                Some(&str1),
+                Some(str1),
                 str2,
-                Some(&str3),
+                Some(str3),
                 Some(&qname),
             );
                 FREE_AND_NULL!(str);
@@ -17931,8 +17923,7 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
             } else if (*base_wild).any == 0 && xml_schema_check_cosnssubset(wild, base_wild) != 0 {
                 let mut str: *mut XmlChar = null_mut();
                 let str1 = WXS_ACTION_STR!(action);
-                let str2 =
-                    CStr::from_ptr(WXS_ITEM_TYPE_NAME!(base_item) as *const i8).to_string_lossy();
+                let str2 = xml_schema_get_component_type_str(base_item as _);
                 let qname = CStr::from_ptr(xml_schema_get_component_qname(
                     addr_of_mut!(str),
                     base_item as _,
@@ -17950,7 +17941,7 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                 item,
                 format!("The attribute wildcard is not a valid subset of the wildcard in the {} {str2} '{qname}'", str1.unwrap()).as_str(),
                 str1,
-                Some(&str2),
+                Some(str2),
                 Some(&qname),
                 None,
             );
@@ -17968,8 +17959,7 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
             {
                 let mut str: *mut XmlChar = null_mut();
                 let str1 = WXS_ACTION_STR!(action);
-                let str2 =
-                    CStr::from_ptr(WXS_ITEM_TYPE_NAME!(base_item) as *const i8).to_string_lossy();
+                let str2 = xml_schema_get_component_type_str(base_item as _);
                 let qname = CStr::from_ptr(xml_schema_get_component_qname(
                     addr_of_mut!(str),
                     base_item as _,
@@ -17983,7 +17973,7 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                 base_item,
                 format!("The {{process contents}} of the attribute wildcard is weaker than the one in the {} {str2} '{qname}'", str1.unwrap()).as_str(),
                 str1,
-                Some(&str2),
+                Some(str2),
                 Some(&qname),
                 None,
             );
@@ -22285,14 +22275,12 @@ unsafe fn xml_schema_build_acontent_model(
                 ret = 1;
             }
             _ => {
-                let typename =
-                    CStr::from_ptr(WXS_ITEM_TYPE_NAME!((*particle).children) as *const i8)
-                        .to_string_lossy();
+                let typename = xml_schema_get_component_type_str(((*particle).children) as _);
                 xml_schema_internal_err2(
                     pctxt as XmlSchemaAbstractCtxtPtr,
                     "xmlSchemaBuildAContentModel",
                     format!("found unexpected term of type '{typename}' in content model").as_str(),
-                    Some(&typename),
+                    Some(typename),
                     None,
                 );
                 return ret;
