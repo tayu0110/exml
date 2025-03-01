@@ -681,11 +681,7 @@ impl XmlDoc {
                                 // The entity should have been checked already,
                                 // but set the flag anyway to avoid recursion.
                                 ent.flags |= XML_ENT_EXPANDING as i32;
-                                ent.children.store(
-                                    self.get_node_list(node.content as _)
-                                        .map_or(null_mut(), |node| node.as_ptr()),
-                                    Ordering::Relaxed,
-                                );
+                                ent.children = self.get_node_list(node.content as _);
                                 ent.owner = 1;
                                 ent.flags &= !XML_ENT_EXPANDING as i32;
                                 ent.flags |= XML_ENT_PARSED as i32;

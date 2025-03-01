@@ -29,7 +29,6 @@ use std::{
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
     str::from_utf8_unchecked,
-    sync::atomic::Ordering,
 };
 
 use libc::{memcpy, INT_MAX};
@@ -2256,7 +2255,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         }
 
         if let Some(l) = list.filter(|_| matches!(ret, XmlParserErrors::XmlErrOK)) {
-            ent.children.store(l.as_ptr(), Ordering::Relaxed);
+            ent.children = Some(XmlNodePtr::try_from(l).unwrap());
             // Prune it directly in the generated document
             // except for single text nodes.
             if (*ctxt).replace_entities == 0
@@ -2271,7 +2270,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         now.set_doc(ent.doc);
                     }
                     if now.next().is_none() {
-                        ent.last.store(now.as_ptr(), Ordering::Relaxed);
+                        ent.last = Some(XmlNodePtr::try_from(now).unwrap());
                     }
                     cur = now
                         .next()
@@ -2284,13 +2283,13 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     now.set_parent((*ctxt).node.map(|node| node.into()));
                     now.set_document((*ctxt).my_doc);
                     if now.next().is_none() {
-                        ent.last.store(now.as_ptr(), Ordering::Relaxed);
+                        ent.last = Some(XmlNodePtr::try_from(now).unwrap());
                     }
                     list = now
                         .next()
                         .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
                 }
-                list = XmlGenericNodePtr::from_raw(ent.children.load(Ordering::Relaxed));
+                list = ent.children.map(|children| children.into());
             }
         } else if !matches!(
             ret,
@@ -2317,7 +2316,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     // Now that the entity content has been gathered
     // provide it to the application, this can take different forms based
     // on the parsing modes.
-    if ent.children.load(Ordering::Relaxed).is_null() {
+    if ent.children.is_none() {
         // Probably running in SAX mode and the callbacks don't
         // build the entity content. So unless we already went
         // though parsing for first checking go though the entity
@@ -2434,8 +2433,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 // if ((*ctxt).parseMode == XML_PARSE_READER)
                 //     (*ent).owner = 1;
 
-                let mut cur =
-                    XmlNodePtr::from_raw(ent.children.load(Ordering::Relaxed) as _).unwrap();
+                let mut cur = ent.children;
                 while let Some(cur_node) = cur {
                     let mut nw =
                         xml_doc_copy_node(XmlGenericNodePtr::from(cur_node), (*ctxt).my_doc, 1)
@@ -2449,7 +2447,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         }
                         nw = XmlNodePtr::try_from(context_node.add_child(now.into()).unwrap()).ok();
                     }
-                    if cur == XmlNodePtr::from_raw(ent.last.load(Ordering::Relaxed) as _).unwrap() {
+                    if cur == ent.last {
                         // needed to detect some strange empty
                         // node cases in the reader tests
                         if matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader) {
@@ -2474,11 +2472,8 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 // entity child list. The goal is to make sure any
                 // ID or REF referenced will be the one from the
                 // document content and not the entity copy.
-                let mut cur =
-                    XmlNodePtr::from_raw(ent.children.load(Ordering::Relaxed) as _).unwrap();
-                ent.children.store(null_mut(), Ordering::Relaxed);
-                let last = XmlNodePtr::from_raw(ent.last.load(Ordering::Relaxed) as _).unwrap();
-                ent.last.store(null_mut(), Ordering::Relaxed);
+                let mut cur = ent.children.take();
+                let last = ent.last.take();
                 while let Some(mut cur_node) = cur {
                     let next = cur_node
                         .next
@@ -2494,7 +2489,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         if first_child.is_none() {
                             first_child = Some(cur_node);
                         }
-                        (*ent).add_child(nw.into());
+                        ent.add_child(nw.into());
                     }
                     context_node.add_child(cur_node.into());
                     if Some(cur_node) == last {
@@ -2512,22 +2507,20 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 let nbktext: *const XmlChar =
                     xml_dict_lookup((*ctxt).dict, c"nbktext".as_ptr() as _, -1);
                 if matches!(
-                    (*ent.children.load(Ordering::Relaxed)).element_type(),
+                    ent.children.unwrap().element_type(),
                     XmlElementType::XmlTextNode
                 ) {
-                    (*ent.children.load(Ordering::Relaxed)).name = nbktext;
+                    ent.children.unwrap().name = nbktext;
                 }
-                if ent.last.load(Ordering::Relaxed) != ent.children.load(Ordering::Relaxed)
+                if ent.last != ent.children
                     && matches!(
-                        (*ent.last.load(Ordering::Relaxed)).element_type(),
+                        ent.last.unwrap().element_type(),
                         XmlElementType::XmlTextNode
                     )
                 {
-                    (*ent.last.load(Ordering::Relaxed)).name = nbktext;
+                    ent.last.unwrap().name = nbktext;
                 }
-                context_node.add_child_list(
-                    XmlGenericNodePtr::from_raw(ent.children.load(Ordering::Relaxed)).unwrap(),
-                );
+                context_node.add_child_list(ent.children.unwrap().into());
             }
 
             // This is to avoid a nasty side effect, see characters() in SAX.c

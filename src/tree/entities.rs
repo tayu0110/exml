@@ -45,10 +45,10 @@ use crate::{
         hash::{xml_hash_create, XmlHashTable},
         xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
     },
-    tree::{xml_free_node_list, NodeCommon, XmlDtd, XmlElementType, XmlNode},
+    tree::{xml_free_node_list, NodeCommon, XmlElementType, XmlNode},
 };
 
-use super::{InvalidNodePointerCastError, XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr};
+use super::{InvalidNodePointerCastError, XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr, XmlNodePtr};
 
 /// The different valid entity types.
 #[repr(C)]
@@ -96,11 +96,11 @@ pub struct XmlEntity {
     // Entity name
     pub(crate) name: *mut u8,
     // First child link
-    pub(crate) children: AtomicPtr<XmlNode>,
+    pub(crate) children: Option<XmlNodePtr>,
     // Last child link
-    pub(crate) last: AtomicPtr<XmlNode>,
+    pub(crate) last: Option<XmlNodePtr>,
     // -> DTD
-    pub(crate) parent: AtomicPtr<XmlDtd>,
+    pub(crate) parent: Option<XmlDtdPtr>,
     // next sibling link
     pub(crate) next: AtomicPtr<XmlNode>,
     // previous sibling link
@@ -148,20 +148,16 @@ impl NodeCommon for XmlEntity {
         (!name.is_null()).then(|| unsafe { CStr::from_ptr(name as *const i8).to_string_lossy() })
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
-        XmlGenericNodePtr::from_raw(self.children.load(Ordering::Relaxed))
+        self.children.map(|node| node.into())
     }
     fn set_children(&mut self, children: Option<XmlGenericNodePtr>) {
-        self.children.store(
-            children.map_or(null_mut(), |c| c.as_ptr()),
-            Ordering::Relaxed,
-        );
+        self.children = children.map(|c| XmlNodePtr::try_from(c).unwrap());
     }
     fn last(&self) -> Option<XmlGenericNodePtr> {
-        XmlGenericNodePtr::from_raw(self.last.load(Ordering::Relaxed))
+        self.last.map(|node| node.into())
     }
     fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
-        self.last
-            .store(last.map_or(null_mut(), |l| l.as_ptr()), Ordering::Relaxed);
+        self.last = last.map(|l| XmlNodePtr::try_from(l).unwrap());
     }
     fn next(&self) -> Option<XmlGenericNodePtr> {
         XmlGenericNodePtr::from_raw(self.next.load(Ordering::Relaxed))
@@ -178,13 +174,10 @@ impl NodeCommon for XmlEntity {
             .store(prev.map_or(null_mut(), |p| p.as_ptr()), Ordering::Relaxed);
     }
     fn parent(&self) -> Option<XmlGenericNodePtr> {
-        XmlGenericNodePtr::from_raw(self.parent.load(Ordering::Relaxed) as *mut XmlNode)
+        self.parent.map(|node| node.into())
     }
     fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>) {
-        self.parent.store(
-            parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlDtd,
-            Ordering::Relaxed,
-        );
+        self.parent = parent.map(|p| XmlDtdPtr::try_from(p).unwrap());
     }
 }
 
@@ -452,17 +445,14 @@ macro_rules! xml_entities_warn {
 /// clean-up an entity record.
 #[doc(alias = "xmlFreeEntity")]
 unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
-    if !entity.children.load(Ordering::Relaxed).is_null()
-        && entity.owner == 1
-        && entity.as_ptr() as *mut XmlNode
-            == (*entity.children.load(Ordering::Relaxed))
-                .parent()
-                .map_or(null_mut(), |p| p.as_ptr())
-    {
-        xml_free_node_list(XmlGenericNodePtr::from_raw(
-            entity.children.load(Ordering::Relaxed),
-        ));
-        entity.children.store(null_mut(), Ordering::Relaxed);
+    if entity.owner == 1 {
+        if let Some(children) = entity
+            .children
+            .filter(|&children| children.parent() == Some(entity.into()))
+        {
+            xml_free_node_list(Some(children));
+            entity.children = None;
+        }
     }
     if !entity.name.is_null() {
         xml_free(entity.name as _);
@@ -648,9 +638,9 @@ thread_local! {
         _private: null_mut(),
         typ: XmlElementType::XmlEntityDecl,
         name: c"lt".as_ptr() as _,
-        children: AtomicPtr::new(null_mut()),
-        last: AtomicPtr::new(null_mut()),
-        parent: AtomicPtr::new(null_mut()),
+        children: None,
+        last: None,
+        parent: None,
         next: AtomicPtr::new(null_mut()),
         prev: AtomicPtr::new(null_mut()),
         doc: None,
@@ -670,9 +660,9 @@ thread_local! {
         _private: null_mut(),
         typ: XmlElementType::XmlEntityDecl,
         name: c"gt".as_ptr() as _,
-        children: AtomicPtr::new(null_mut()),
-        last: AtomicPtr::new(null_mut()),
-        parent: AtomicPtr::new(null_mut()),
+        children: None,
+        last: None,
+        parent: None,
         next: AtomicPtr::new(null_mut()),
         prev: AtomicPtr::new(null_mut()),
         doc: None,
@@ -692,9 +682,9 @@ thread_local! {
         _private: null_mut(),
         typ: XmlElementType::XmlEntityDecl,
         name: c"amp".as_ptr() as _,
-        children: AtomicPtr::new(null_mut()),
-        last: AtomicPtr::new(null_mut()),
-        parent: AtomicPtr::new(null_mut()),
+        children: None,
+        last: None,
+        parent: None,
         next: AtomicPtr::new(null_mut()),
         prev: AtomicPtr::new(null_mut()),
         doc: None,
@@ -714,9 +704,9 @@ thread_local! {
         _private: null_mut(),
         typ: XmlElementType::XmlEntityDecl,
         name: c"quot".as_ptr() as _,
-        children: AtomicPtr::new(null_mut()),
-        last: AtomicPtr::new(null_mut()),
-        parent: AtomicPtr::new(null_mut()),
+        children: None,
+        last: None,
+        parent: None,
         next: AtomicPtr::new(null_mut()),
         prev: AtomicPtr::new(null_mut()),
         doc: None,
@@ -736,9 +726,9 @@ thread_local! {
         _private: null_mut(),
         typ: XmlElementType::XmlEntityDecl,
         name: c"apos".as_ptr() as _,
-        children: AtomicPtr::new(null_mut()),
-        last: AtomicPtr::new(null_mut()),
-        parent: AtomicPtr::new(null_mut()),
+        children: None,
+        last: None,
+        parent: None,
         next: AtomicPtr::new(null_mut()),
         prev: AtomicPtr::new(null_mut()),
         doc: None,
