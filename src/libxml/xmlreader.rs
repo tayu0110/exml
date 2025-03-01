@@ -3931,6 +3931,8 @@ pub unsafe fn xml_text_reader_const_local_name(reader: &mut XmlTextReader) -> *c
 #[doc(alias = "xmlTextReaderConstName")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_const_name(reader: &mut XmlTextReader) -> *const XmlChar {
+    use std::ffi::CString;
+
     unsafe {
         use crate::tree::{XmlDtdPtr, XmlNsPtr};
 
@@ -3978,7 +3980,8 @@ pub unsafe fn xml_text_reader_const_name(reader: &mut XmlTextReader) -> *const X
             }
             XmlElementType::XmlDocumentTypeNode | XmlElementType::XmlDTDNode => {
                 let dtd = XmlDtdPtr::try_from(node).unwrap();
-                CONSTSTR!(reader, dtd.name)
+                let name = CString::new(dtd.name.as_deref().unwrap()).unwrap();
+                CONSTSTR!(reader, name.as_ptr() as *const u8)
             }
             XmlElementType::XmlNamespaceDecl => {
                 let ns = XmlNsPtr::try_from(node).unwrap();

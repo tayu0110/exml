@@ -2445,13 +2445,9 @@ pub unsafe fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
 #[doc(alias = "xmlValidateRoot")]
 #[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
+    use crate::parser::build_qname;
+
     unsafe {
-        let ret: i32;
-
-        // if doc.is_null() {
-        //     return 0;
-        // }
-
         let Some(root) = doc.get_root_element().filter(|root| !root.name.is_null()) else {
             xml_err_valid!(ctxt, XmlParserErrors::XmlDTDNoRoot, "no root element\n");
             return 0;
@@ -2459,28 +2455,17 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
 
         // When doing post validation against a separate DTD, those may
         // no internal subset has been generated
-        if let Some(int_subset) = doc.int_subset.filter(|dtd| !dtd.name.is_null()) {
+        if let Some(int_subset) = doc.int_subset.filter(|dtd| dtd.name.is_some()) {
             // Check first the document root against the NQName
-            if !xml_str_equal(int_subset.name, root.name) {
-                if let Some(prefix) = root.ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
-                    let mut fname: [XmlChar; 50] = [0; 50];
-
-                    let fullname: *mut XmlChar =
-                        xml_build_qname(root.name, prefix, fname.as_mut_ptr(), 50);
-                    if fullname.is_null() {
-                        xml_verr_memory(ctxt, None);
-                        return 0;
-                    }
-                    ret = xml_str_equal(int_subset.name, fullname) as i32;
-                    if fullname != fname.as_ptr() as _ && fullname != root.name as _ {
-                        xml_free(fullname as _);
-                    }
-                    if ret == 1 {
-                        // goto name_ok;
+            if int_subset.name() != root.name() {
+                if let Some(prefix) = root.ns.as_deref().and_then(|ns| ns.prefix()) {
+                    let root_name = root.name();
+                    let fullname = build_qname(root_name.as_deref().unwrap(), Some(&prefix));
+                    if int_subset.name() == Some(fullname) {
                         return 1;
                     }
                 }
-                if xml_str_equal(int_subset.name, c"HTML".as_ptr() as _)
+                if int_subset.name.as_deref() == Some("HTML")
                     && xml_str_equal(root.name, c"html".as_ptr() as _)
                 {
                     // goto name_ok;

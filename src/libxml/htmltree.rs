@@ -897,15 +897,13 @@ unsafe fn html_dtd_dump_output(
     _encoding: *const c_char,
 ) {
     unsafe {
-        use std::ffi::CStr;
-
         let Some(cur) = doc.int_subset else {
             html_save_err(XmlParserErrors::XmlSaveNoDoctype, Some(doc.into()), None);
             return;
         };
 
         buf.write_str("<!DOCTYPE ");
-        buf.write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
+        buf.write_str(cur.name.as_deref().unwrap());
         if let Some(external_id) = cur.external_id.as_deref() {
             buf.write_str(" PUBLIC ");
             if let Some(mut buf) = buf.buffer {

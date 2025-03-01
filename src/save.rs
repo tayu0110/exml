@@ -1117,7 +1117,7 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
         ctxt.buf.borrow_mut().write_bytes(b"<!DOCTYPE ");
         ctxt.buf
             .borrow_mut()
-            .write_str(CStr::from_ptr(dtd.name as _).to_string_lossy().as_ref());
+            .write_str(dtd.name.as_deref().unwrap());
         if let Some(external_id) = dtd.external_id.as_deref() {
             ctxt.buf.borrow_mut().write_bytes(b" PUBLIC ");
             if let Some(mut buf) = ctxt.buf.borrow().buffer {

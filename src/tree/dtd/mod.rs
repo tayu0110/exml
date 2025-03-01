@@ -26,7 +26,6 @@ mod notation;
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::CStr,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
@@ -36,9 +35,8 @@ use std::{
 use crate::{
     hash::{XmlHashTable, XmlHashTableRef},
     libxml::{
-        globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
+        globals::{xml_deregister_node_default_value, xml_register_node_default_value},
         valid::xml_free_attribute_table,
-        xmlstring::{XmlChar, xml_strndup},
     },
     parser::split_qname2,
 };
@@ -57,7 +55,7 @@ pub use notation::*;
 pub struct XmlDtd {
     pub _private: *mut c_void,                      /* application data */
     pub(crate) typ: XmlElementType,                 /* XML_DTD_NODE, must be second ! */
-    pub(crate) name: *const XmlChar,                /* Name of the DTD */
+    pub(crate) name: Option<String>,                /* Name of the DTD */
     pub(crate) children: Option<XmlGenericNodePtr>, /* the value of the property link */
     pub(crate) last: Option<XmlGenericNodePtr>,     /* last child link */
     pub(crate) parent: Option<XmlDocPtr>,           /* child->parent link */
@@ -143,7 +141,7 @@ impl Default for XmlDtd {
         Self {
             _private: null_mut(),
             typ: XmlElementType::default(),
-            name: null_mut(),
+            name: None,
             children: None,
             last: None,
             parent: None,
@@ -172,8 +170,7 @@ impl NodeCommon for XmlDtd {
         self.typ
     }
     fn name(&self) -> Option<Cow<'_, str>> {
-        (!self.name.is_null())
-            .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
+        self.name.as_deref().map(Cow::Borrowed)
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children
@@ -232,14 +229,7 @@ pub unsafe fn xml_create_int_subset(
             return None;
         };
 
-        if let Some(name) = name {
-            cur.name = xml_strndup(name.as_ptr(), name.len() as i32);
-            if cur.name.is_null() {
-                xml_tree_err_memory("building internal subset");
-                cur.free();
-                return None;
-            }
-        }
+        cur.name = name.map(|name| name.to_owned());
         if let Some(mut doc) = doc {
             doc.int_subset = Some(cur);
             cur.parent = Some(doc);
@@ -316,9 +306,7 @@ pub unsafe fn xml_new_dtd(
             return None;
         };
 
-        if let Some(name) = name {
-            cur.name = xml_strndup(name.as_ptr(), name.len() as i32);
-        }
+        cur.name = name.map(|name| name.to_owned());
         if let Some(mut doc) = doc {
             doc.ext_subset = Some(cur);
         }
@@ -485,9 +473,6 @@ pub unsafe fn xml_free_dtd(mut cur: XmlDtdPtr) {
                 }
                 c = next;
             }
-        }
-        if !cur.name.is_null() {
-            xml_free(cur.name as _);
         }
         cur.system_id = None;
         cur.external_id = None;
