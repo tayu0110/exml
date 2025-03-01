@@ -21,7 +21,6 @@
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::CStr,
     ops::{Deref, DerefMut},
     os::raw::c_void,
     ptr::{NonNull, null_mut},
@@ -42,7 +41,7 @@ use super::{XmlDtdPtr, XmlEnumeration};
 pub struct XmlAttribute {
     pub _private: *mut c_void,                      /* application data */
     pub(crate) typ: XmlElementType,                 /* XML_ATTRIBUTE_DECL, must be second ! */
-    pub(crate) name: *const XmlChar,                /* Attribute name */
+    pub(crate) name: Option<String>,                /* Attribute name */
     pub(crate) children: Option<XmlGenericNodePtr>, /* NULL */
     pub(crate) last: Option<XmlGenericNodePtr>,     /* NULL */
     pub(crate) parent: Option<XmlDtdPtr>,           /* -> DTD */
@@ -64,7 +63,7 @@ impl Default for XmlAttribute {
         Self {
             _private: null_mut(),
             typ: XmlElementType::XmlAttributeDecl,
-            name: null_mut(),
+            name: None,
             children: None,
             last: None,
             parent: None,
@@ -93,8 +92,7 @@ impl NodeCommon for XmlAttribute {
         self.typ
     }
     fn name(&self) -> Option<Cow<'_, str>> {
-        (!self.name.is_null())
-            .then(|| unsafe { CStr::from_ptr(self.name as *const i8).to_string_lossy() })
+        self.name.as_deref().map(Cow::Borrowed)
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children
@@ -255,9 +253,6 @@ pub(crate) unsafe fn xml_free_attribute(mut attr: XmlAttributePtr) {
     unsafe {
         attr.unlink();
         attr.elem = None;
-        if !attr.name.is_null() {
-            xml_free(attr.name as _);
-        }
         if !attr.default_value.is_null() {
             xml_free(attr.default_value as _);
         }

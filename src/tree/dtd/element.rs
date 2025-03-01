@@ -40,14 +40,9 @@ use super::{XmlAttributePtr, XmlDtdPtr};
 
 #[repr(C)]
 pub struct XmlElement {
-    pub _private: *mut c_void,      /* application data */
-    pub(crate) typ: XmlElementType, /* XML_ELEMENT_DECL, must be second ! */
-    // In current implementation, this field may be used as `XmlNode::name`,
-    // so the size of string type must be equal to pointer size.
-    // `Option<Box<T>>` is equal to pointer size by NULL pointer optimization if `T` is `Sized`.
-    // ref: https://doc.rust-lang.org/std/option/index.html#representation
-    #[allow(clippy::box_collection)]
-    pub(crate) name: Option<Box<String>>, /* Element name */
+    pub _private: *mut c_void,                      /* application data */
+    pub(crate) typ: XmlElementType,                 /* XML_ELEMENT_DECL, must be second ! */
+    pub(crate) name: Option<String>,                /* Element name */
     pub(crate) children: Option<XmlGenericNodePtr>, /* NULL */
     pub(crate) last: Option<XmlGenericNodePtr>,     /* NULL */
     pub(crate) parent: Option<XmlDtdPtr>,           /* -> DTD */
@@ -97,7 +92,7 @@ impl NodeCommon for XmlElement {
         self.typ
     }
     fn name(&self) -> Option<Cow<'_, str>> {
-        self.name.as_deref().map(|n| Cow::Borrowed(n.as_str()))
+        self.name.as_deref().map(Cow::Borrowed)
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children

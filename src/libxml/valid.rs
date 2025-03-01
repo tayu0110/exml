@@ -889,7 +889,7 @@ pub unsafe fn xml_add_element_decl(
         } else {
             let Some(mut ret) = XmlElementPtr::new(XmlElement {
                 typ: XmlElementType::XmlElementDecl,
-                name: Some(Box::new(name.to_owned())),
+                name: Some(name.to_owned()),
                 prefix: ns.map(|ns| ns.to_owned()),
                 ..Default::default()
             }) else {
@@ -1587,7 +1587,7 @@ unsafe fn xml_get_dtd_element_desc2(
         if cur.is_none() && create != 0 {
             let Some(res) = XmlElementPtr::new(XmlElement {
                 typ: XmlElementType::XmlElementDecl,
-                name: Some(Box::new(name.clone().into_owned())),
+                name: Some(name.clone().into_owned()),
                 prefix: (!prefix.is_null()).then(|| {
                     CStr::from_ptr(prefix as *const i8)
                         .to_string_lossy()
@@ -1658,7 +1658,7 @@ unsafe fn xml_scan_id_attribute_decl(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr,
                             "Element {elem_name} has too many ID attributes defined : {cur_name}\n"
                         )
                         .as_str(),
-                        Some(elem_name.as_str()),
+                        Some(elem_name),
                         Some(&cur_name),
                         None,
                     );
@@ -1761,7 +1761,7 @@ pub unsafe fn xml_add_attribute_decl(
             // doc must be set before possible error causes call
             // to xmlFreeAttribute (because it's used to check on dict use)
             doc: dtd.doc,
-            name: xml_strndup(name.as_ptr(), name.len() as i32),
+            name: Some(name.to_owned()),
             prefix: ns.map(|ns| ns.to_owned()),
             elem: Some(elem.to_owned()),
             def,
@@ -1882,6 +1882,7 @@ pub unsafe fn xml_copy_attribute_table(
             let mut cur = XmlAttributePtr::new(XmlAttribute {
                 typ: XmlElementType::XmlAttributeDecl,
                 atype: attr.atype,
+                name: attr.name.clone(),
                 def: attr.def,
                 tree: attr.tree.clone(),
                 elem: attr.elem.clone(),
@@ -1889,9 +1890,6 @@ pub unsafe fn xml_copy_attribute_table(
                 ..Default::default()
             })
             .unwrap();
-            if !attr.name.is_null() {
-                cur.name = xml_strdup(attr.name);
-            }
             if !attr.default_value.is_null() {
                 cur.default_value = xml_strdup(attr.default_value);
             }
@@ -2589,7 +2587,7 @@ pub unsafe fn xml_validate_element_decl(
                                     XmlParserErrors::XmlDTDContentError,
                                     format!("Definition of {elem_name} has duplicate references of {name}\n")
                                         .as_str(),
-                                    Some(elem_name.as_str()),
+                                    Some(elem_name),
                                     Some(&name),
                                     None,
                                 );
@@ -2601,7 +2599,7 @@ pub unsafe fn xml_validate_element_decl(
                                     Some(elem.into()),
                                     XmlParserErrors::XmlDTDContentError,
                                     format!("Definition of {elem_name} has duplicate references of {prefix}:{name}\n").as_str(),
-                                    Some(elem_name.as_str()),
+                                    Some(elem_name),
                                     Some(&prefix),
                                     Some(&name),
                                 );
@@ -2633,7 +2631,7 @@ pub unsafe fn xml_validate_element_decl(
                                     "Definition of {elem_name} has duplicate references to {name}\n"
                                 )
                                 .as_str(),
-                                Some(elem_name.as_str()),
+                                Some(elem_name),
                                 Some(&name),
                                 None,
                             );
@@ -2648,7 +2646,7 @@ pub unsafe fn xml_validate_element_decl(
                                     "Definition of {elem_name} has duplicate references to {prefix}:{name}\n"
                                 )
                                 .as_str(),
-                                Some(elem_name.as_str()),
+                                Some(elem_name),
                                 Some(&prefix),
                                 Some(&name),
                             );
@@ -3216,7 +3214,7 @@ pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, mut doc: XmlDocPtr, dtd: X
 unsafe fn xml_validate_attribute_value2(
     ctxt: XmlValidCtxtPtr,
     mut doc: XmlDocPtr,
-    name: *const XmlChar,
+    name: &str,
     typ: XmlAttributeType,
     value: &str,
 ) -> i32 {
@@ -3239,7 +3237,6 @@ unsafe fn xml_validate_attribute_value2(
                 }
                 if let Some(ent) = ent {
                     if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
-                        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                         xml_err_valid_node(
                         ctxt,
                         Some(doc.into()),
@@ -3248,14 +3245,13 @@ unsafe fn xml_validate_attribute_value2(
                             "ENTITY attribute {name} reference an entity \"{value}\" of wrong type\n"
                         )
                         .as_str(),
-                        Some(&name),
+                        Some(name),
                         Some(value),
                         None,
                     );
                         ret = 0;
                     }
                 } else {
-                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
                         Some(doc.into()),
@@ -3264,7 +3260,7 @@ unsafe fn xml_validate_attribute_value2(
                             "ENTITY attribute {name} reference an unknown entity \"{value}\"\n"
                         )
                         .as_str(),
-                        Some(&name),
+                        Some(name),
                         Some(value),
                         None,
                     );
@@ -3292,21 +3288,19 @@ unsafe fn xml_validate_attribute_value2(
                     let nam = CStr::from_ptr(nam as *const i8).to_string_lossy();
                     if let Some(ent) = xml_get_doc_entity(Some(doc), &nam) {
                         if !matches!(ent.etype, XmlEntityType::XmlExternalGeneralUnparsedEntity) {
-                            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                             xml_err_valid_node(
                             ctxt,
                             Some(doc.into()),
                             XmlParserErrors::XmlDTDEntityType,
                             format!("ENTITIES attribute {name} reference an entity \"{nam}\" of wrong type\n")
                                 .as_str(),
-                            Some(&name),
+                            Some(name),
                             Some(&nam),
                             None,
                         );
                             ret = 0;
                         }
                     } else {
-                        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                         xml_err_valid_node(
                             ctxt,
                             Some(doc.into()),
@@ -3315,7 +3309,7 @@ unsafe fn xml_validate_attribute_value2(
                                 "ENTITIES attribute {name} reference an unknown entity \"{nam}\"\n"
                             )
                             .as_str(),
-                            Some(&name),
+                            Some(name),
                             Some(&nam),
                             None,
                         );
@@ -3337,7 +3331,6 @@ unsafe fn xml_validate_attribute_value2(
                     .or_else(|| xml_get_dtd_notation_desc(doc.ext_subset.as_deref(), value));
 
                 if nota.is_none() {
-                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
                         Some(doc.into()),
@@ -3346,7 +3339,7 @@ unsafe fn xml_validate_attribute_value2(
                             "NOTATION attribute {name} reference an unknown notation \"{value}\"\n"
                         )
                         .as_str(),
-                        Some(&name),
+                        Some(name),
                         Some(value),
                         None,
                     );
@@ -3377,7 +3370,7 @@ unsafe fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCt
                     ret = xml_validate_attribute_value2(
                         ctxt,
                         (*ctxt).doc.unwrap(),
-                        cur.name,
+                        cur.name.as_deref().unwrap(),
                         cur.atype,
                         &CStr::from_ptr(cur.default_value as *const i8).to_string_lossy(),
                     );
@@ -3391,7 +3384,7 @@ unsafe fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlValidCt
                         ret = xml_validate_attribute_value2(
                             ctxt,
                             (*ctxt).doc.unwrap(),
-                            cur.name,
+                            cur.name.as_deref().unwrap(),
                             cur.atype,
                             &now.name,
                         );
@@ -5203,9 +5196,7 @@ pub unsafe fn xml_validate_one_element(
                 if matches!(cur_attr.def, XmlAttributeDefault::XmlAttributeRequired) {
                     let mut qualified: i32 = -1;
 
-                    if cur_attr.prefix.is_none()
-                        && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
-                    {
+                    if cur_attr.prefix.is_none() && cur_attr.name.as_deref() == Some("xmlns") {
                         let mut ns = elem.ns_def;
                         while let Some(now) = ns {
                             if now.prefix().is_none() {
@@ -5224,7 +5215,7 @@ pub unsafe fn xml_validate_one_element(
                     } else {
                         let mut attrib = elem.properties;
                         while let Some(attr) = attrib {
-                            if xml_str_equal(attr.name, cur_attr.name) {
+                            if attr.name().as_deref() == cur_attr.name.as_deref() {
                                 if let Some(prefix) = cur_attr.prefix.as_deref() {
                                     let name_space = attr.ns.or(elem.ns);
 
@@ -5309,9 +5300,7 @@ pub unsafe fn xml_validate_one_element(
                     // Special tests checking #FIXED namespace declarations
                     // have the right value since this is not done as an
                     // attribute checking
-                    if cur_attr.prefix.is_none()
-                        && xml_str_equal(cur_attr.name, c"xmlns".as_ptr() as _)
-                    {
+                    if cur_attr.prefix.is_none() && cur_attr.name.as_deref() == Some("xmlns") {
                         let mut ns = elem.ns_def;
                         while let Some(now) = ns {
                             if now.prefix().is_none() {
@@ -5686,7 +5675,7 @@ pub unsafe fn xml_validate_one_attribute(
         ret &= xml_validate_attribute_value2(
             ctxt,
             doc,
-            attr.name,
+            attr.name().as_deref().unwrap(),
             attr_decl.atype,
             &CStr::from_ptr(value as *const i8).to_string_lossy(),
         );
@@ -6087,22 +6076,9 @@ pub unsafe fn xml_validate_one_namespace(
         // Extra check for the attribute value
         let value = CStr::from_ptr(value as *const i8).to_string_lossy();
         if let Some(prefix) = (*ns).prefix() {
-            let prefix = CString::new(prefix.as_ref()).unwrap();
-            ret &= xml_validate_attribute_value2(
-                ctxt,
-                doc,
-                prefix.as_ptr() as *const u8,
-                attr_decl.atype,
-                &value,
-            );
+            ret &= xml_validate_attribute_value2(ctxt, doc, &prefix, attr_decl.atype, &value);
         } else {
-            ret &= xml_validate_attribute_value2(
-                ctxt,
-                doc,
-                c"xmlns".as_ptr() as _,
-                attr_decl.atype,
-                &value,
-            );
+            ret &= xml_validate_attribute_value2(ctxt, doc, "xmlns", attr_decl.atype, &value);
         }
 
         ret
@@ -6893,7 +6869,7 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
                 Some(elem.into()),
                 XmlParserErrors::XmlErrInternalError,
                 format!("Cannot create automata for element {name}\n").as_str(),
-                Some(name.as_str()),
+                Some(name),
                 None,
                 None,
             );
@@ -6918,7 +6894,7 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
                 Some(elem.into()),
                 XmlParserErrors::XmlDTDContentNotDeterminist,
                 format!("Content model of {name} is not deterministic: {expr}\n").as_str(),
-                Some(name.as_str()),
+                Some(name),
                 Some(&expr),
                 None,
             );

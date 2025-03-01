@@ -77,7 +77,7 @@ use super::{
         xml_validate_dtd_final, xml_validate_element_decl, xml_validate_notation_decl,
         xml_validate_one_attribute, xml_validate_one_namespace, xml_validate_root,
     },
-    xmlstring::{xml_strcat, xml_strdup, xml_strlen, xml_strndup},
+    xmlstring::{xml_strdup, xml_strlen, xml_strndup},
 };
 
 /// Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"
@@ -1825,29 +1825,14 @@ unsafe fn xml_check_defaulted_attributes(
                             })
                             .is_none()
                     {
-                        let mut fulln: *mut XmlChar;
-
-                        if let Some(prefix) = cur_attr.prefix.as_deref() {
-                            let prefix = CString::new(prefix).unwrap();
-                            fulln = xml_strdup(prefix.as_ptr() as *const u8);
-                            fulln = xml_strcat(fulln, c":".as_ptr() as _);
-                            fulln = xml_strcat(fulln, cur_attr.name);
-                        } else {
-                            fulln = xml_strdup(cur_attr.name);
-                        }
-                        if fulln.is_null() {
-                            xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
-                            break;
-                        }
+                        let fulln = cur_attr
+                            .prefix
+                            .as_deref()
+                            .map(|prefix| format!("{prefix}:{}", cur_attr.name.as_deref().unwrap()))
+                            .unwrap_or_else(|| cur_attr.name.clone().unwrap());
 
                         // Check that the attribute is not declared in the serialization
-                        if !atts.iter().any(|(att, _)| {
-                            att.as_str()
-                                == CStr::from_ptr(fulln as *const i8)
-                                    .to_string_lossy()
-                                    .as_ref()
-                        }) {
-                            let fulln = CStr::from_ptr(fulln as *const i8).to_string_lossy();
+                        if !atts.iter().any(|(att, _)| att.as_str() == fulln) {
                             xml_err_valid!(
                                 ctxt,
                                 XmlParserErrors::XmlDTDStandaloneDefaulted,
@@ -1856,7 +1841,6 @@ unsafe fn xml_check_defaulted_attributes(
                                 elem.as_deref().unwrap().to_string_lossy().into_owned()
                             );
                         }
-                        xml_free(fulln as _);
                     }
                     attr = cur_attr.nexth;
                 }
