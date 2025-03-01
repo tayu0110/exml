@@ -120,7 +120,7 @@ use crate::{
     tree::{
         xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
-        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
+        NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
         XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
         XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr,
         XmlNodePtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -2322,7 +2322,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             .take()
             .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
         xml_parse_content(ctxt);
-        doc.children = NodePtr::from_ptr(content.map_or(null_mut(), |node| node.as_ptr()));
+        doc.children = content;
     } else {
         xml_parse_content(ctxt);
     }
@@ -2331,8 +2331,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if NodePtr::from_ptr((*ctxt).node.map_or(null_mut(), |node| node.as_ptr())) != new_doc.children
-    {
+    if new_doc.children != (*ctxt).node.map(|node| node.into()) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
     }
 
@@ -2529,8 +2528,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if NodePtr::from_ptr((*ctxt).node.map_or(null_mut(), |node| node.as_ptr())) != new_doc.children
-    {
+    if new_doc.children != (*ctxt).node.map(|node| node.into()) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
     }
 
@@ -6457,9 +6455,10 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                     #[cfg(feature = "libxml_valid")]
                     if (*ctxt).validate != 0 && (*ctxt).well_formed != 0 {
                         if let Some(context_node) = (*ctxt).node {
-                            if let Some(my_doc) = (*ctxt).my_doc.filter(|doc| {
-                                NodePtr::from_ptr(context_node.as_ptr()) == doc.children
-                            }) {
+                            if let Some(my_doc) = (*ctxt)
+                                .my_doc
+                                .filter(|doc| doc.children == Some(context_node.into()))
+                            {
                                 (*ctxt).valid &=
                                     xml_validate_root(addr_of_mut!((*ctxt).vctxt) as _, my_doc);
                             }

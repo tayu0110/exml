@@ -71,7 +71,7 @@ use crate::{
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_get_predefined_entity, xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon,
-        NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlElementContentOccur,
+        XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlElementContentOccur,
         XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
         XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr,
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
@@ -1987,7 +1987,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     } else if (*ctxt).current_byte() != 0 {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrExtraContent, None);
     }
-    if NodePtr::from_ptr((*ctxt).node.map_or(null_mut(), |node| node.as_ptr())) != my_doc.children {
+    if my_doc.children != (*ctxt).node.map(|node| node.into()) {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotWellBalanced, None);
     }
 
@@ -2027,8 +2027,8 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     }
     if let Some(mut my_doc) = (*ctxt).my_doc {
         xml_free_node(my_doc.children().unwrap());
-        my_doc.children = NodePtr::from_ptr(content.map_or(null_mut(), |node| node.as_ptr()));
-        my_doc.last = NodePtr::from_ptr(last.map_or(null_mut(), |node| node.as_ptr()));
+        my_doc.children = content;
+        my_doc.last = last;
     }
 
     // Also record the size of the entity parsed
@@ -3118,7 +3118,7 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
         if let Some(context_node) = (*ctxt).node {
             if let Some(my_doc) = (*ctxt)
                 .my_doc
-                .filter(|doc| NodePtr::from_ptr(context_node.as_ptr()) == doc.children)
+                .filter(|doc| doc.children == Some(context_node.into()))
             {
                 (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt), my_doc);
             }

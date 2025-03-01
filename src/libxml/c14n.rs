@@ -343,9 +343,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 }
                 ns = now.next;
             }
-            n = node
-                .parent()
-                .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).ok().flatten());
+            n = node.parent().and_then(|p| XmlNodePtr::try_from(p).ok());
         }
 
         // if the first node is not the default namespace node (a node with no
@@ -434,28 +432,22 @@ impl<T> XmlC14NCtx<'_, T> {
 
                 // Handle xml attributes
                 if parent_visible
-                    && (*cur).parent().is_some()
-                    && !self.is_visible(
-                        (*cur)
-                            .parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
-                        (*cur)
-                            .parent()
-                            .and_then(|cur| cur.parent())
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
-                    )
+                    && cur.parent().is_some()
+                    && !self.is_visible(cur.parent(), cur.parent().and_then(|cur| cur.parent()))
                 {
                     // If XPath node-set is not specified then the parent is always visible!
-                    let mut tmp = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-                    while !tmp.is_null() {
-                        let mut attr = (*tmp).properties;
+                    let mut tmp = cur
+                        .parent()
+                        .and_then(|node| XmlNodePtr::try_from(node).ok());
+                    while let Some(cur_node) = tmp {
+                        let mut attr = cur_node.properties;
                         while let Some(now) = attr {
                             if xml_c14n_is_xml_attr(now) && list.search(&now).is_none() {
                                 list.insert_lower_bound(now);
                             }
                             attr = now.next;
                         }
-                        tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
+                        tmp = cur_node.parent().and_then(|p| XmlNodePtr::try_from(p).ok());
                     }
                 }
             }

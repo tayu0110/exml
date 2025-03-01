@@ -53,15 +53,15 @@ use super::{
 
 #[repr(C)]
 pub struct XmlDoc {
-    pub _private: *mut c_void,          /* application data */
-    pub(crate) typ: XmlElementType,     /* XML_DOCUMENT_NODE, must be second ! */
-    pub(crate) name: *mut i8,           /* name/filename/URI of the document */
-    pub children: Option<NodePtr>,      /* the document tree */
-    pub(crate) last: Option<NodePtr>,   /* last child link */
-    pub(crate) parent: Option<NodePtr>, /* child->parent link */
-    pub(crate) next: Option<NodePtr>,   /* next sibling link  */
-    pub(crate) prev: Option<NodePtr>,   /* previous sibling link  */
-    pub(crate) doc: Option<XmlDocPtr>,  /* autoreference to itself */
+    pub _private: *mut c_void,                  /* application data */
+    pub(crate) typ: XmlElementType,             /* XML_DOCUMENT_NODE, must be second ! */
+    pub(crate) name: *mut i8,                   /* name/filename/URI of the document */
+    pub children: Option<XmlGenericNodePtr>,    /* the document tree */
+    pub(crate) last: Option<XmlGenericNodePtr>, /* last child link */
+    pub(crate) parent: Option<NodePtr>,         /* child->parent link */
+    pub(crate) next: Option<NodePtr>,           /* next sibling link  */
+    pub(crate) prev: Option<NodePtr>,           /* previous sibling link  */
+    pub(crate) doc: Option<XmlDocPtr>,          /* autoreference to itself */
 
     /* End of common part */
     pub(crate) compression: i32, /* level of zlib compression */
@@ -850,17 +850,15 @@ impl NodeCommon for XmlDoc {
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
     }
     fn set_children(&mut self, children: Option<XmlGenericNodePtr>) {
-        self.children = children.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.children = children;
     }
     fn last(&self) -> Option<XmlGenericNodePtr> {
         self.last
-            .and_then(|last| XmlGenericNodePtr::from_raw(last.as_ptr()))
     }
     fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
-        self.last = last.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.last = last;
     }
     fn next(&self) -> Option<XmlGenericNodePtr> {
         self.next
@@ -1114,14 +1112,7 @@ pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> Option<XmlDocPtr> 
         ret.old_ns = xml_copy_namespace_list(doc.old_ns);
     }
     if let Some(children) = doc.children {
-        ret.children = NodePtr::from_ptr(
-            xml_static_copy_node_list(
-                XmlGenericNodePtr::from_raw(children.as_ptr()),
-                Some(ret),
-                Some(ret.into()),
-            )
-            .map_or(null_mut(), |node| node.as_ptr()),
-        );
+        ret.children = xml_static_copy_node_list(Some(children), Some(ret), Some(ret.into()));
         ret.last = None;
         let mut tmp = ret.children();
         while let Some(now) = tmp {

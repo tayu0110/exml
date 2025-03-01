@@ -45,7 +45,7 @@ use crate::{
 
 use super::{
     xml_free_entities_table, xml_free_node, xml_tree_err_memory, InvalidNodePointerCastError,
-    NodeCommon, NodePtr, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr, XmlNode,
+    NodeCommon, NodePtr, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr,
     __XML_REGISTER_CALLBACKS,
 };
 
@@ -276,8 +276,8 @@ pub unsafe fn xml_create_int_subset(
                 }
             }
         } else {
-            doc.children = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
-            doc.last = NodePtr::from_ptr(cur.as_ptr() as *mut XmlNode);
+            doc.children = Some(cur.into());
+            doc.last = Some(cur.into());
         }
     }
 
