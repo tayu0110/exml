@@ -5896,25 +5896,18 @@ pub unsafe fn xml_schema_check_facet(
                     ret = XmlParserErrors::XmlSchemapInvalidFacetValue as i32;
                     // No error message for RelaxNG.
                     if ctxt_given != 0 {
-                        let mut str: *mut XmlChar = null_mut();
                         let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
-                        let qname = CStr::from_ptr(xml_schema_format_qname(
-                            addr_of_mut!(str),
-                            (*base).target_namespace,
-                            (*base).name,
-                        ) as *const i8)
-                        .to_string_lossy();
+                        let qname = xml_schema_format_qname((*base).target_namespace, (*base).name);
 
                         xml_schema_custom_err(
-                        pctxt as XmlSchemaAbstractCtxtPtr,
-                        ret.try_into().unwrap(),
-                        (*facet).node.map(|node| node.into()),
-                        facet as XmlSchemaBasicItemPtr,
-                        format!("The value '{value}' of the facet does not validate against the base type '{qname}'").as_str(),
-                        Some(&value),
-                        Some(&qname),
-                    );
-                        FREE_AND_NULL!(str);
+                            pctxt as XmlSchemaAbstractCtxtPtr,
+                            ret.try_into().unwrap(),
+                            (*facet).node.map(|node| node.into()),
+                            facet as XmlSchemaBasicItemPtr,
+                            format!("The value '{value}' of the facet does not validate against the base type '{qname}'").as_str(),
+                            Some(&value),
+                            Some(&qname),
+                        );
                     }
                     // goto exit;
                     if ctxt_given == 0 && !pctxt.is_null() {
