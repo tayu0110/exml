@@ -1395,10 +1395,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                 if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
                                     break 'rollback;
                                 }
-                                node = node
-                                    .parent()
-                                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                                    .unwrap();
+                                node = node.parent().unwrap();
                                 if matches!(
                                     node.element_type(),
                                     XmlElementType::XmlDocumentNode
@@ -1448,9 +1445,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                     break 'rollback;
                                 }
 
-                                let mut lst = node
-                                    .children()
-                                    .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                                let mut lst = node.children();
 
                                 if !(*step).value.is_null() {
                                     while let Some(now) = lst {
@@ -1465,9 +1460,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                                 break;
                                             }
                                         }
-                                        lst = now
-                                            .next()
-                                            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                                        lst = now.next();
                                     }
                                     if lst.is_some() {
                                         break 'to_continue;
@@ -1510,10 +1503,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                 ) {
                                     break 'rollback;
                                 }
-                                let Some(parent) = node
-                                    .parent()
-                                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                                else {
+                                let Some(parent) = node.parent() else {
                                     break 'rollback;
                                 };
                                 node = parent;
@@ -1569,9 +1559,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                 ) {
                                     break 'rollback;
                                 }
-                                let mut cur = node
-                                    .parent()
-                                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                                let mut cur = node.parent();
                                 while let Some(cur_node) = cur {
                                     if matches!(
                                         cur_node.element_type(),
@@ -1595,9 +1583,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                             }
                                         }
                                     }
-                                    cur = cur_node
-                                        .parent()
-                                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                                    cur = cur_node.parent();
                                 }
                                 let Some(cur) = cur else {
                                     break 'rollback;

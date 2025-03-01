@@ -434,9 +434,7 @@ unsafe fn next_schematron(mut node: Option<XmlNodePtr>) -> Option<XmlNodePtr> {
         {
             break;
         }
-        node = cur
-            .next
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        node = cur.next.map(|node| XmlNodePtr::try_from(node).unwrap());
     }
     node
 }
@@ -654,9 +652,7 @@ unsafe fn xml_schematron_add_rule(
 unsafe fn xml_schematron_parse_test_report_msg(ctxt: XmlSchematronParserCtxtPtr, con: XmlNodePtr) {
     let mut comp: XmlXPathCompExprPtr;
 
-    let mut child = con
-        .children()
-        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    let mut child = con.children().map(|c| XmlNodePtr::try_from(c).unwrap());
     while let Some(cur_node) = child {
         #[allow(clippy::if_same_then_else)]
         if cur_node.element_type() == XmlElementType::XmlTextNode
@@ -691,7 +687,7 @@ unsafe fn xml_schematron_parse_test_report_msg(ctxt: XmlSchematronParserCtxtPtr,
         }
         child = cur_node
             .next
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+            .map(|node| XmlNodePtr::try_from(node).unwrap());
         continue;
     }
 }
@@ -799,9 +795,7 @@ unsafe fn xml_schematron_parse_rule(
         }
     }
 
-    let mut cur = rule
-        .children()
-        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    let mut cur = rule.children().map(|c| XmlNodePtr::try_from(c).unwrap());
     cur = next_schematron(cur);
     while let Some(cur_node) = cur {
         if is_schematron(cur_node, "let") {
@@ -964,7 +958,7 @@ unsafe fn xml_schematron_parse_rule(
         }
         cur = cur_node
             .next
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+            .map(|node| XmlNodePtr::try_from(node).unwrap());
         cur = next_schematron(cur);
     }
     if nb_checks == 0 {
@@ -1001,9 +995,7 @@ unsafe fn xml_schematron_parse_pattern(ctxt: XmlSchematronParserCtxtPtr, pat: Xm
         }
         return;
     }
-    let mut cur = pat
-        .children()
-        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    let mut cur = pat.children().map(|c| XmlNodePtr::try_from(c).unwrap());
     cur = next_schematron(cur);
     while let Some(cur_node) = cur {
         if is_schematron(cur_node, "rule") {
@@ -1020,7 +1012,7 @@ unsafe fn xml_schematron_parse_pattern(ctxt: XmlSchematronParserCtxtPtr, pat: Xm
         }
         cur = cur_node
             .next
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+            .map(|node| XmlNodePtr::try_from(node).unwrap());
         cur = next_schematron(cur);
     }
     if nb_rules == 0 {
@@ -1125,20 +1117,15 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
             (*ctxt).schema = ret;
 
             // scan the schema elements
-            let cur = root
-                .children()
-                .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+            let cur = root.children().map(|c| XmlNodePtr::try_from(c).unwrap());
             let mut cur = next_schematron(cur).unwrap();
             if is_schematron(cur, "title") {
                 if let Some(title) = cur.get_content() {
                     let title = CString::new(title).unwrap();
                     (*ret).title = xml_dict_lookup((*ret).dict, title.as_ptr() as *const u8, -1);
                 }
-                cur = next_schematron(
-                    cur.next
-                        .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap()),
-                )
-                .unwrap();
+                cur = next_schematron(cur.next.map(|node| XmlNodePtr::try_from(node).unwrap()))
+                    .unwrap();
             }
             let mut next = Some(cur);
             while is_schematron(cur, "ns") {
@@ -1175,10 +1162,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                     );
                     (*ret).nb_ns += 1;
                 }
-                next = next_schematron(
-                    cur.next
-                        .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap()),
-                );
+                next = next_schematron(cur.next.map(|node| XmlNodePtr::try_from(node).unwrap()));
                 if let Some(next) = next {
                     cur = next;
                 } else {
@@ -1201,7 +1185,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 }
                 cur = cur_node
                     .next
-                    .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
                 cur = next_schematron(cur);
             }
             if (*ret).nb_pattern == 0 {
@@ -1491,9 +1475,7 @@ unsafe fn xml_schematron_format_report(
     let mut ret: *mut XmlChar = null_mut();
     let mut comp: XmlXPathCompExprPtr;
 
-    let mut child = test
-        .children()
-        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    let mut child = test.children().map(|c| XmlNodePtr::try_from(c).unwrap());
     while let Some(cur_node) = child {
         if cur_node.element_type() == XmlElementType::XmlTextNode
             || cur_node.element_type() == XmlElementType::XmlCDATASectionNode
@@ -1588,7 +1570,7 @@ unsafe fn xml_schematron_format_report(
         } else {
             child = cur_node
                 .next
-                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                .map(|node| XmlNodePtr::try_from(node).unwrap());
             continue;
         }
 
@@ -1615,7 +1597,7 @@ unsafe fn xml_schematron_format_report(
 
         child = cur_node
             .next
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+            .map(|node| XmlNodePtr::try_from(node).unwrap());
     }
     ret
 }
@@ -1816,15 +1798,12 @@ unsafe fn xml_schematron_unregister_variables(
 }
 
 unsafe fn xml_schematron_next_node(cur: XmlNodePtr) -> Option<XmlNodePtr> {
-    let mut cur = if let Some(children) = cur
-        .children()
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-    {
+    let mut cur = if let Some(children) = cur.children() {
         // Do not descend on entities declarations
         if children.element_type() != XmlElementType::XmlEntityDecl {
             // Skip DTDs
             if children.element_type() != XmlElementType::XmlDTDNode {
-                return XmlNodePtr::from_raw(children.as_ptr()).unwrap();
+                return Some(XmlNodePtr::try_from(children).unwrap());
             }
             children
         } else {
@@ -1834,10 +1813,7 @@ unsafe fn xml_schematron_next_node(cur: XmlNodePtr) -> Option<XmlNodePtr> {
         XmlGenericNodePtr::from(cur)
     };
 
-    while let Some(next) = cur
-        .next()
-        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-    {
+    while let Some(next) = cur.next() {
         cur = next;
         if cur.element_type() != XmlElementType::XmlEntityDecl
             && cur.element_type() != XmlElementType::XmlDTDNode
@@ -1847,16 +1823,11 @@ unsafe fn xml_schematron_next_node(cur: XmlNodePtr) -> Option<XmlNodePtr> {
     }
 
     loop {
-        cur = cur
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
+        cur = cur.parent()?;
         if cur.element_type() == XmlElementType::XmlDocumentNode {
             break None;
         }
-        if let Some(next) = cur
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-        {
+        if let Some(next) = cur.next() {
             break Some(XmlNodePtr::try_from(next).unwrap());
         }
     }

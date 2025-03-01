@@ -344,9 +344,7 @@ unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
                 }
             }
         }
-        cur = cur_node
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        cur = cur_node.parent();
     }
     0
 }
@@ -431,12 +429,7 @@ unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
                     .parent()
                     .filter(|&p| {
                         Some(p) != p.document().map(|doc| doc.into())
-                            && xml_search_ns_by_prefix_strict(
-                                doc,
-                                XmlGenericNodePtr::from_raw(p.as_ptr()).unwrap(),
-                                pref,
-                                None,
-                            ) == 1
+                            && xml_search_ns_by_prefix_strict(doc, p, pref, None) == 1
                     })
                     .is_some()
             {
@@ -658,7 +651,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                                         // Gather ancestor in-scope ns-decls.
                                         if xml_dom_wrap_ns_norm_gather_in_scope_ns(
                                             &raw mut ns_map,
-                                            XmlGenericNodePtr::from_raw(parent.as_ptr()),
+                                            Some(parent),
                                         ) == -1
                                         {
                                             break 'internal_error;
@@ -767,7 +760,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                                     Some(p) != p.document().map(|doc| doc.into())
                                         && xml_dom_wrap_ns_norm_gather_in_scope_ns(
                                             &raw mut ns_map,
-                                            XmlGenericNodePtr::from_raw(p.as_ptr()),
+                                            Some(p),
                                         ) == -1
                                 })
                                 .is_some()
@@ -836,7 +829,7 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                                     Some(p) != p.document().map(|doc| doc.into())
                                         && xml_dom_wrap_ns_norm_gather_in_scope_ns(
                                             &raw mut ns_map,
-                                            XmlGenericNodePtr::from_raw(p.as_ptr()),
+                                            Some(p),
                                         ) == -1
                                 })
                                 .is_some()
@@ -901,24 +894,15 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                                 }
                                 depth -= 1;
                             }
-                            if let Some(next) = cur
-                                .next()
-                                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                            {
+                            if let Some(next) = cur.next() {
                                 cur = next;
                             } else {
                                 if matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
-                                    cur = cur
-                                        .parent()
-                                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                                        .unwrap();
+                                    cur = cur.parent().unwrap();
                                     // goto into_content;
                                     break 'next_sibling;
                                 }
-                                cur = cur
-                                    .parent()
-                                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                                    .unwrap();
+                                cur = cur.parent().unwrap();
                                 // goto next_sibling;
                                 continue 'next_sibling;
                             }
@@ -932,7 +916,6 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                     if let Some(children) = cur
                         .children()
                         .filter(|_| matches!(cur.element_type(), XmlElementType::XmlElementNode))
-                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
                     {
                         // Process content of element-nodes only.
                         cur = children;
@@ -959,24 +942,15 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                             }
                             depth -= 1;
                         }
-                        if let Some(next) = cur
-                            .next()
-                            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                        {
+                        if let Some(next) = cur.next() {
                             cur = next;
                         } else {
                             if matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
-                                cur = cur
-                                    .parent()
-                                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                                    .unwrap();
+                                cur = cur.parent().unwrap();
                                 // goto into_content;
                                 continue 'into_content;
                             }
-                            cur = cur
-                                .parent()
-                                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                                .unwrap();
+                            cur = cur.parent().unwrap();
                             // goto next_sibling;
                             continue 'next_sibling;
                         }
@@ -1067,7 +1041,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             !matches!(now.element_type(), XmlElementType::XmlXIncludeEnd)
                                 && now.document() != node.doc
                         }) {
-                            cur_node = XmlGenericNodePtr::from_raw(now.as_ptr()).unwrap();
+                            cur_node = now;
                             next = now.next();
                         }
 
@@ -1349,7 +1323,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                     if !leave_node {
                         // Walk the tree.
                         if let Some(children) = cur_node.children() {
-                            cur = XmlGenericNodePtr::from_raw(children.as_ptr());
+                            cur = Some(children);
                             continue;
                         }
                     }
@@ -1382,18 +1356,15 @@ unsafe fn xml_dom_wrap_adopt_branch(
                         depth -= 1;
                     }
                     if let Some(next) = cur_node.next() {
-                        cur_node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                        cur_node = next;
                     } else if let Some(children) = cur_node.parent().and_then(|p| {
                         p.children().filter(|_| {
                             matches!(cur_node.element_type(), XmlElementType::XmlAttributeNode)
                         })
                     }) {
-                        cur_node = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
+                        cur_node = children;
                     } else {
-                        cur_node = cur_node
-                            .parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                            .unwrap();
+                        cur_node = cur_node.parent().unwrap();
                         // goto leave_node;
                         continue 'leave_node;
                     }
@@ -1516,10 +1487,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
             }
             _ => {}
         }
-        if let Some(children) = cur_node
-            .children()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
-        {
+        if let Some(children) = cur_node.children() {
             cur = Some(children);
             continue;
         }
@@ -1528,16 +1496,10 @@ unsafe fn xml_dom_wrap_adopt_attr(
             if cur_node == attr.into() {
                 break 'main;
             }
-            if let Some(next) = cur_node
-                .next()
-                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-            {
+            if let Some(next) = cur_node.next() {
                 cur_node = next;
             } else {
-                cur_node = cur_node
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                    .unwrap();
+                cur_node = cur_node.parent().unwrap();
                 // goto next_sibling;
                 continue 'next_sibling;
             }
@@ -1610,7 +1572,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
     // Unlink only if @node was not already added to @destParent.
     if node
         .parent()
-        .filter(|p| dest_parent.map(|d| d.into()) != XmlGenericNodePtr::from_raw(p.as_ptr()))
+        .filter(|&p| Some(p) != dest_parent.map(|d| d.into()))
         .is_some()
     {
         node.unlink();
@@ -1725,18 +1687,15 @@ pub unsafe fn xml_dom_wrap_remove_node(
                             if let Some(children) = cur_node.children().filter(|_| {
                                 matches!(cur_node.element_type(), XmlElementType::XmlElementNode)
                             }) {
-                                node = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
+                                node = children;
                                 continue 'main;
                             }
                             // next_sibling:
                             'next_sibling: loop {
                                 if let Some(next) = node.next() {
-                                    node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                                    node = next;
                                 } else {
-                                    let Some(parent) = node
-                                        .parent()
-                                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                                    else {
+                                    let Some(parent) = node.parent() else {
                                         break 'main;
                                     };
                                     node = parent;
@@ -1781,7 +1740,7 @@ pub unsafe fn xml_dom_wrap_remove_node(
                 }
                 if matches!(node.element_type(), XmlElementType::XmlElementNode) {
                     if let Some(prop) = cur_node.properties {
-                        node = XmlGenericNodePtr::from_raw(prop.as_ptr()).unwrap();
+                        node = XmlGenericNodePtr::from(prop);
                         continue;
                     }
                 }
@@ -1797,18 +1756,15 @@ pub unsafe fn xml_dom_wrap_remove_node(
                             if let Some(children) = attr.children().filter(|_| {
                                 matches!(attr.element_type(), XmlElementType::XmlElementNode)
                             }) {
-                                node = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
+                                node = children;
                                 continue 'main;
                             }
                             // next_sibling:
                             'next_sibling: loop {
                                 if let Some(next) = node.next() {
-                                    node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                                    node = next;
                                 } else {
-                                    let Some(parent) = node
-                                        .parent()
-                                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                                    else {
+                                    let Some(parent) = node.parent() else {
                                         break 'main;
                                     };
                                     node = parent;
@@ -1855,12 +1811,9 @@ pub unsafe fn xml_dom_wrap_remove_node(
             _ => {
                 'next_sibling: loop {
                     if let Some(next) = node.next() {
-                        node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                        node = next;
                     } else {
-                        let Some(parent) = node
-                            .parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                        else {
+                        let Some(parent) = node.parent() else {
                             break 'main;
                         };
                         node = parent;
@@ -1877,18 +1830,15 @@ pub unsafe fn xml_dom_wrap_remove_node(
             .children()
             .filter(|_| matches!(node.element_type(), XmlElementType::XmlElementNode))
         {
-            node = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
+            node = children;
             continue;
         }
         // next_sibling:
         'next_sibling: loop {
             if let Some(next) = node.next() {
-                node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                node = next;
             } else {
-                let Some(parent) = node
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                else {
+                let Some(parent) = node.parent() else {
                     break 'main;
                 };
                 node = parent;
@@ -2320,7 +2270,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         && clone.parent().is_some()
                         && xml_is_id(
                             Some(dest_doc),
-                            XmlNodePtr::from_raw(clone.parent().unwrap().as_ptr()).unwrap(),
+                            Some(XmlNodePtr::try_from(clone.parent().unwrap()).unwrap()),
                             XmlAttrPtr::try_from(clone).ok(),
                         ) != 0
                     {
@@ -2361,7 +2311,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     }) {
                         prev_clone = None;
                         parent_clone = Some(clone);
-                        cur = XmlGenericNodePtr::from_raw(children.as_ptr());
+                        cur = Some(children);
                         continue 'main;
                     }
                 }
@@ -2395,7 +2345,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     }
                     if let Some(next) = cur_node.next() {
                         prev_clone = Some(clone);
-                        cur = XmlGenericNodePtr::from_raw(next.as_ptr());
+                        cur = Some(next);
                     } else if !matches!(cur_node.element_type(), XmlElementType::XmlAttributeNode) {
                         // Set clone.last.
                         if let Some(mut parent) = clone.parent() {
@@ -2424,7 +2374,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                         }) {
                             prev_clone = None;
                             parent_clone = Some(clone);
-                            cur = XmlGenericNodePtr::from_raw(children.as_ptr());
+                            cur = Some(children);
                             continue 'main;
                         }
                         continue 'leave_node;

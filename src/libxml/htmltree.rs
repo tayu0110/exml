@@ -134,12 +134,7 @@ pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
     let mut content: *const XmlChar;
     let mut encoding: *const XmlChar;
 
-    // if doc.is_null() {
-    //     return None;
-    // }
-    let mut cur = doc
-        .children
-        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+    let mut cur = doc.children;
 
     // Search the html
     'goto_found_meta: {
@@ -159,13 +154,9 @@ pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
                         }
                     }
                 }
-                cur = now
-                    .next()
-                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                cur = now.next();
             }
-            cur = cur?
-                .children()
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+            cur = cur?.children();
             // Search the head
             while let Some(now) = cur {
                 if matches!(now.element_type(), XmlElementType::XmlElementNode) {
@@ -179,15 +170,11 @@ pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
                         }
                     }
                 }
-                cur = now
-                    .next()
-                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                cur = now.next();
             }
         }
         // found_head:
-        cur = cur?
-            .children()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        cur = cur?.children();
     }
 
     // Search the meta elements
@@ -260,9 +247,7 @@ pub unsafe fn html_get_meta_encoding(doc: XmlDocPtr) -> Option<String> {
                 }
             }
         }
-        cur = cur_node
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        cur = cur_node.next();
     }
     None
 }
@@ -286,9 +271,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
         String::new()
     };
 
-    let mut cur = doc
-        .children
-        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+    let mut cur = doc.children;
 
     let mut found_head = false;
     let mut found_meta = false;
@@ -313,9 +296,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
             }
         }
 
-        cur = now
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        cur = now.next();
     }
 
     let mut head = None;
@@ -323,9 +304,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
         let Some(tmp) = cur else {
             return -1;
         };
-        cur = tmp
-            .children()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        cur = tmp.children();
 
         // Search the head
         while let Some(now) = cur {
@@ -336,17 +315,13 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
                         break;
                     }
                     if xml_strcasecmp(now.name, c"meta".as_ptr() as _) == 0 {
-                        head = now
-                            .parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                        head = now.parent();
                         // goto found_meta;
                         found_meta = true;
                     }
                 }
             }
-            cur = now
-                .next()
-                .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+            cur = now.next();
         }
         if cur.is_none() {
             return -1;
@@ -358,20 +333,13 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
     if !found_meta {
         head = cur;
         assert!(cur.is_some());
-        let Some(children) = cur
-            .unwrap()
-            .children()
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-        else {
+        let Some(children) = cur.unwrap().children() else {
             // goto create;
             if encoding.is_some() {
                 if let Some(mut head) = head {
                     // Create a new Meta element with the right attributes
                     let meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
-                    if let Some(children) = head
-                        .children()
-                        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-                    {
+                    if let Some(children) = head.children() {
                         children.add_prev_sibling(meta.unwrap().into());
                     } else {
                         head.add_child(meta.unwrap().into());
@@ -443,9 +411,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
                 }
             }
         }
-        cur = cur_node
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        cur = cur_node.next();
     }
     // create:
     if let Some(mut meta) = meta {
@@ -464,10 +430,7 @@ pub unsafe fn html_set_meta_encoding(doc: XmlDocPtr, encoding: Option<&str>) -> 
     } else if let Some(mut head) = head.filter(|_| encoding.is_some()) {
         // Create a new Meta element with the right attributes
         let meta = xml_new_doc_node(Some(doc), None, "meta", null_mut());
-        if let Some(children) = head
-            .children()
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-        {
+        if let Some(children) = head.children() {
             children.add_prev_sibling(meta.unwrap().into());
         } else {
             head.add_child(meta.unwrap().into());
@@ -1030,9 +993,7 @@ pub unsafe fn html_node_dump_format_output(
     };
 
     let root = cur;
-    let mut parent = cur
-        .parent()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+    let mut parent = cur.parent();
     'main: loop {
         match cur.element_type() {
             XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode => {
@@ -1042,13 +1003,9 @@ pub unsafe fn html_node_dump_format_output(
                 }
                 if let Some(children) = cur.children() {
                     // Always validate cur.parent when descending.
-                    if cur
-                        .parent()
-                        .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
-                        == parent
-                    {
+                    if cur.parent() == parent {
                         parent = Some(doc.into());
-                        cur = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
+                        cur = children;
                         continue;
                     }
                 } else {
@@ -1060,12 +1017,7 @@ pub unsafe fn html_node_dump_format_output(
                 let node = XmlNodePtr::try_from(cur).unwrap();
                 // Some users like lxml are known to pass nodes with a corrupted
                 // tree structure. Fall back to a recursive call to handle this case.
-                if node
-                    .parent()
-                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
-                    != parent
-                    && node.children().is_some()
-                {
+                if node.parent() != parent && node.children().is_some() {
                     html_node_dump_format_output(buf, doc, Some(cur), _encoding, format);
                     break 'to_break;
                 }
@@ -1111,7 +1063,7 @@ pub unsafe fn html_node_dump_format_output(
                         buf.write_str("\n");
                     }
                     parent = Some(node.into());
-                    cur = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
+                    cur = children;
                     continue 'main;
                 } else if info.map_or(false, |info| {
                     info.save_end_tag != 0 && info.name != "html" && info.name != "body"
@@ -1215,15 +1167,13 @@ pub unsafe fn html_node_dump_format_output(
                 return;
             }
             if let Some(next) = cur.next() {
-                cur = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                cur = next;
                 break;
             }
 
             cur = parent.unwrap();
             // cur.parent was validated when descending.
-            parent = cur
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+            parent = cur.parent();
 
             if matches!(
                 cur.element_type(),

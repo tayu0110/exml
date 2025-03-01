@@ -1528,7 +1528,7 @@ macro_rules! __xml_raise_error {
                             let Some(now) = node.filter(|node| node.element_type() != XmlElementType::XmlElementNode) else {
                                 break;
                             };
-                            node = now.parent().and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                            node = now.parent();
                         }
                         if baseptr.is_none() && node.map_or(false, |node| node.document().map_or(false, |doc| !doc.url.is_none())) {
                             baseptr = node;
@@ -1560,7 +1560,7 @@ macro_rules! __xml_raise_error {
                             let mut href = None;
                             let mut inclcount = 0;
                             while let Some(cur_node) = prev {
-                                if let Some(p) = cur_node.prev().and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr())) {
+                                if let Some(p) = cur_node.prev() {
                                     prev = Some(p);
                                     if matches!(p.element_type(), XmlElementType::XmlXIncludeStart) {
                                         if inclcount > 0 {
@@ -1575,7 +1575,7 @@ macro_rules! __xml_raise_error {
                                         inclcount += 1;
                                     }
                                 } else {
-                                    prev = cur_node.parent().and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                                    prev = cur_node.parent();
                                 }
                             }
                             if !href.is_none() {

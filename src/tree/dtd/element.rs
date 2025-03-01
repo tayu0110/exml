@@ -167,9 +167,9 @@ impl XmlElementPtr {
         }
     }
 
-    pub(crate) fn as_ptr(self) -> *mut XmlElement {
-        self.0.as_ptr()
-    }
+    // pub(crate) fn as_ptr(self) -> *mut XmlElement {
+    //     self.0.as_ptr()
+    // }
 
     /// Deallocate memory.
     ///

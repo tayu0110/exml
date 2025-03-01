@@ -1929,12 +1929,8 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     let mut new_doc = None;
     let mut my_doc = if let Some(my_doc) = (*oldctxt).my_doc {
         (*ctxt).my_doc = Some(my_doc);
-        content = my_doc
-            .children
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
-        last = my_doc
-            .last
-            .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
+        content = my_doc.children;
+        last = my_doc.last;
         my_doc
     } else {
         let Some(mut new) = xml_new_doc(Some("1.0")) else {
@@ -1965,7 +1961,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     (*ctxt).node_push(
         my_doc
             .children
-            .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap())
+            .map(|c| XmlNodePtr::try_from(c).unwrap())
             .unwrap(),
     );
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -2018,9 +2014,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
                     }
                 }
                 now.set_parent(None);
-                cur = now
-                    .next()
-                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                cur = now.next();
             }
             my_doc.children().unwrap().set_children(None);
         }
@@ -2272,9 +2266,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     if now.next().is_none() {
                         ent.last = Some(XmlNodePtr::try_from(now).unwrap());
                     }
-                    cur = now
-                        .next()
-                        .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                    cur = now.next();
                 }
                 list = None;
             } else {
@@ -2285,9 +2277,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     if now.next().is_none() {
                         ent.last = Some(XmlNodePtr::try_from(now).unwrap());
                     }
-                    list = now
-                        .next()
-                        .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                    list = now.next();
                 }
                 list = ent.children.map(|children| children.into());
             }
@@ -2463,7 +2453,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     }
                     cur = cur_node
                         .next
-                        .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
                 }
             } else if list.is_none() || !(*ctxt).input_tab.is_empty() {
                 let mut first_child = None;
@@ -2475,10 +2465,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 let mut cur = ent.children.take();
                 let last = ent.last.take();
                 while let Some(mut cur_node) = cur {
-                    let next = cur_node
-                        .next
-                        .take()
-                        .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                    let next = cur_node.next.take();
                     cur_node.set_parent(None);
                     let nw = xml_doc_copy_node(cur_node.into(), (*ctxt).my_doc, 1)
                         .map(|nw| XmlNodePtr::try_from(nw).unwrap());
@@ -2495,7 +2482,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     if Some(cur_node) == last {
                         break;
                     }
-                    cur = next;
+                    cur = next.map(|node| XmlNodePtr::try_from(node).unwrap());
                 }
                 if ent.owner == 0 {
                     ent.owner = 1;

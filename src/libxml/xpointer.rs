@@ -633,9 +633,7 @@ unsafe fn xml_xptr_get_arity(cur: XmlGenericNodePtr) -> i32 {
     if cur.element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
-    let mut cur = cur
-        .children()
-        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+    let mut cur = cur.children();
     i = 0;
     while let Some(now) = cur {
         if matches!(
@@ -646,9 +644,7 @@ unsafe fn xml_xptr_get_arity(cur: XmlGenericNodePtr) -> i32 {
         ) {
             i += 1;
         }
-        cur = now
-            .next()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        cur = now.next();
     }
     i
 }
@@ -672,9 +668,7 @@ unsafe fn xml_xptr_get_index(cur: XmlGenericNodePtr) -> i32 {
         ) {
             i += 1;
         }
-        cur = now
-            .prev()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        cur = now.prev();
     }
     i
 }
@@ -737,10 +731,7 @@ unsafe fn xml_xptr_covering_range(
                         | XmlElementType::XmlHTMLDocumentNode => {
                             let indx: i32 = xml_xptr_get_index(node);
 
-                            node = node
-                                .parent()
-                                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                                .unwrap();
+                            node = node.parent().unwrap();
                             return xml_xptr_new_range(node, indx - 1, node, indx + 1);
                         }
                         _ => return null_mut(),
@@ -1043,9 +1034,7 @@ unsafe fn xml_xptr_get_nth_child(cur: XmlGenericNodePtr, no: usize) -> Option<Xm
     if cur.element_type() == XmlElementType::XmlNamespaceDecl {
         return Some(cur);
     }
-    let mut cur = cur
-        .children()
-        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+    let mut cur = cur.children();
     let mut i = 0;
     while i <= no {
         let now = cur?;
@@ -1061,9 +1050,7 @@ unsafe fn xml_xptr_get_nth_child(cur: XmlGenericNodePtr, no: usize) -> Option<Xm
             }
         }
 
-        cur = now
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        cur = now.next();
     }
     cur
 }
@@ -1083,10 +1070,7 @@ pub(crate) unsafe fn xml_xptr_advance_node(
         if cur.element_type() == XmlElementType::XmlNamespaceDecl {
             return None;
         }
-        if let Some(children) = cur
-            .children()
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-        {
+        if let Some(children) = cur.children() {
             cur = children;
             if !level.is_null() {
                 *level += 1;
@@ -1115,10 +1099,7 @@ pub(crate) unsafe fn xml_xptr_advance_node(
         }
         // skip:		/* This label should only be needed if something is wrong! */
         'skip: loop {
-            if let Some(next) = cur
-                .next()
-                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-            {
+            if let Some(next) = cur.next() {
                 cur = next;
                 // goto found;
             } else {
@@ -1126,13 +1107,8 @@ pub(crate) unsafe fn xml_xptr_advance_node(
                     if !level.is_null() {
                         *level -= 1;
                     }
-                    cur = cur
-                        .parent()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
-                    if let Some(next) = cur
-                        .next()
-                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                    {
+                    cur = cur.parent()?;
+                    if let Some(next) = cur.next() {
                         cur = next;
                         // goto found;
                         break;
@@ -1274,10 +1250,7 @@ unsafe fn xml_xptr_get_last_char(node: &mut Option<XmlGenericNodePtr>, indx: &mu
         cur = xml_xptr_get_nth_child(cur.unwrap(), pos);
     }
     while let Some(now) = cur {
-        if let Some(last) = now
-            .last()
-            .and_then(|last| XmlGenericNodePtr::from_raw(last.as_ptr()))
-        {
+        if let Some(last) = now.last() {
             cur = Some(last);
         } else if let Some(now) = XmlNodePtr::try_from(now).ok().filter(|now| {
             now.element_type() != XmlElementType::XmlElementNode && !now.content.is_null()
@@ -1792,16 +1765,12 @@ unsafe fn xml_xptr_nb_loc_children(node: XmlGenericNodePtr) -> i32 {
         XmlElementType::XmlHTMLDocumentNode
         | XmlElementType::XmlDocumentNode
         | XmlElementType::XmlElementNode => {
-            let mut node = node
-                .children()
-                .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
+            let mut node = node.children();
             while let Some(now) = node {
                 if now.element_type() == XmlElementType::XmlElementNode {
                     ret += 1;
                 }
-                node = now
-                    .next()
-                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                node = now.next();
             }
         }
         XmlElementType::XmlAttributeNode => return -1,
@@ -2665,9 +2634,7 @@ unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> Option<Xml
                     cur = xml_xptr_get_nth_child(cur_node, index1 as usize - 1);
                     index1 = 0;
                 } else {
-                    cur = cur_node
-                        .children()
-                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                    cur = cur_node.children();
                 }
                 // Now gather the remaining nodes from cur to end
                 continue; /* while */
@@ -2794,10 +2761,7 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> Option<
                 }
                 if let Some(l) = last {
                     l.add_next_sibling(xml_copy_node(node, 1).unwrap());
-                    if let Some(next) = l
-                        .next()
-                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                    {
+                    if let Some(next) = l.next() {
                         last = Some(next);
                     }
                 } else {
@@ -2819,10 +2783,7 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> Option<
                     last = list;
                 }
                 if let Some(mut l) = last {
-                    while let Some(next) = l
-                        .next()
-                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                    {
+                    while let Some(next) = l.next() {
                         l = next;
                     }
                     last = Some(l);

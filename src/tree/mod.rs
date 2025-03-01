@@ -1070,7 +1070,7 @@ pub(crate) unsafe fn xml_static_copy_node(
     let Some(mut ret) = XmlNodePtr::new(XmlNode {
         typ: node.element_type(),
         doc,
-        parent: NodePtr::from_ptr(parent.map_or(null_mut(), |p| p.as_ptr())),
+        parent,
         ..Default::default()
     }) else {
         xml_tree_err_memory("copying node");
@@ -1150,10 +1150,7 @@ pub(crate) unsafe fn xml_static_copy_node(
             if let Some(ns) = node.search_ns(node_doc, prefix.as_deref()) {
                 let mut root = XmlGenericNodePtr::from(ret);
 
-                while let Some(parent) = root
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                {
+                while let Some(parent) = root.parent() {
                     root = parent;
                 }
                 ret.ns = xml_new_ns(
@@ -1185,11 +1182,7 @@ pub(crate) unsafe fn xml_static_copy_node(
         }
         let children = ret.children();
         ret.set_last(children);
-    } else if let Some(children) = node
-        .children()
-        .filter(|_| extended != 2)
-        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
-    {
+    } else if let Some(children) = node.children().filter(|_| extended != 2) {
         let mut cur = Some(children);
         let mut insert = XmlGenericNodePtr::from(ret);
         while let Some(mut now) = cur {
@@ -1212,7 +1205,6 @@ pub(crate) unsafe fn xml_static_copy_node(
             if let Some(children) = now
                 .children()
                 .filter(|_| !matches!(now.element_type(), XmlElementType::XmlEntityRefNode))
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
             {
                 cur = Some(children);
                 insert = copy;
@@ -1220,24 +1212,15 @@ pub(crate) unsafe fn xml_static_copy_node(
             }
 
             cur = loop {
-                if let Some(next) = now
-                    .next()
-                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                {
+                if let Some(next) = now.next() {
                     break Some(next);
                 }
 
-                now = now
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                    .unwrap();
+                now = now.parent().unwrap();
                 if now == node.into() {
                     break None;
                 }
-                insert = insert
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                    .unwrap();
+                insert = insert.parent().unwrap();
             };
         }
     }
@@ -1265,9 +1248,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
         #[cfg(feature = "libxml_tree")]
         let q = if matches!(cur_node.element_type(), XmlElementType::XmlDTDNode) {
             let Some(mut doc) = doc else {
-                node = cur_node
-                    .next()
-                    .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                node = cur_node.next();
                 continue;
             };
             if let Some(int_subset) = doc.int_subset {
@@ -1306,9 +1287,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
             q.set_prev(Some(pr));
             p = Some(q);
         }
-        node = cur_node
-            .next()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        node = cur_node.next();
     }
     ret
     // error:
@@ -1351,9 +1330,7 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
         ret.pentities = xml_copy_entities_table(pentities);
     }
 
-    let mut cur = dtd
-        .children
-        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+    let mut cur = dtd.children;
     let mut p: Option<XmlGenericNodePtr> = None;
     while let Some(cur_node) = cur {
         let mut q = None;
@@ -1396,46 +1373,25 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
         }
 
         let Some(mut q) = q else {
-            cur = cur_node
-                .next()
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+            cur = cur_node.next();
             continue;
         };
 
         if let Some(mut p) = p {
             p.set_next(Some(q));
         } else {
-            ret.children = NodePtr::from_ptr(q.as_ptr());
+            ret.children = Some(q);
         }
 
         q.set_prev(p);
         q.set_parent(Some(ret.into()));
         q.set_next(None);
-        ret.last = NodePtr::from_ptr(q.as_ptr());
+        ret.last = Some(q);
         p = Some(q);
-        cur = cur_node
-            .next()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        cur = cur_node.next();
     }
 
     Some(ret)
-}
-
-macro_rules! UPDATE_LAST_CHILD_AND_PARENT {
-    ($n:expr) => {
-        if !$n.is_null() {
-            if let Some(mut ulccur) = (*$n).children() {
-                while let Some(next) = ulccur.next {
-                    ulccur.set_parent(NodePtr::from_ptr($n));
-                    ulccur = next;
-                }
-                (*ulccur).set_parent(NodePtr::from_ptr($n));
-                (*$n).set_last(Some(ulccur));
-            } else {
-                (*$n).set_last(None);
-            }
-        }
-    };
 }
 
 /// Creation of a new node element within a document. @ns and @content
@@ -1602,10 +1558,6 @@ pub unsafe fn xml_new_child(
     name: &str,
     content: *const XmlChar,
 ) -> Option<XmlNodePtr> {
-    // if parent.is_null() {
-    //     return None;
-    // }
-
     // Allocate a new node
     let mut cur = if let Some(node) = XmlNodePtr::try_from(parent)
         .ok()
@@ -1636,12 +1588,9 @@ pub unsafe fn xml_new_child(
         parent.set_children(Some(cur.into()));
         parent.set_last(Some(cur.into()));
     } else {
-        let mut prev = parent
-            .last()
-            .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
-            .unwrap();
+        let mut prev = parent.last().unwrap();
         prev.set_next(Some(cur.into()));
-        cur.prev = NodePtr::from_ptr(prev.as_ptr());
+        cur.prev = Some(prev);
         parent.set_last(Some(cur.into()));
     }
 
@@ -1968,10 +1917,6 @@ pub unsafe fn xml_new_text_child(
     name: &str,
     content: *const XmlChar,
 ) -> Option<XmlNodePtr> {
-    // if parent.is_null() {
-    //     return None;
-    // }
-
     // Allocate a new node
     let mut cur = if let Some(parent) = XmlNodePtr::try_from(parent)
         .ok()
@@ -2002,12 +1947,9 @@ pub unsafe fn xml_new_text_child(
         parent.set_children(Some(cur.into()));
         parent.set_last(Some(cur.into()));
     } else {
-        let mut prev = parent
-            .last()
-            .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
-            .unwrap();
+        let mut prev = parent.last().unwrap();
         prev.set_next(Some(cur.into()));
-        cur.prev = NodePtr::from_ptr(prev.as_ptr());
+        cur.prev = Some(prev);
         parent.set_last(Some(cur.into()));
     }
 
@@ -2111,17 +2053,11 @@ pub unsafe fn xml_replace_node(
     cur.set_doc(old.document());
     cur.set_parent(old.parent());
     cur.set_next(old.next());
-    if let Some(mut next) = cur
-        .next()
-        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-    {
+    if let Some(mut next) = cur.next() {
         next.set_prev(Some(cur));
     }
     cur.set_prev(old.prev());
-    if let Some(mut prev) = cur
-        .prev()
-        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
-    {
+    if let Some(mut prev) = cur.prev() {
         prev.set_next(Some(cur));
     }
     if let Some(mut parent) = cur.parent() {
@@ -2329,7 +2265,6 @@ pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
     }
     if let Some(children) = cur
         .children()
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
         .filter(|_| !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode))
     {
         xml_free_node_list(Some(children));
@@ -2422,9 +2357,7 @@ unsafe fn xml_ns_in_scope(
                 tst = now.next;
             }
         }
-        node = cur_node
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        node = cur_node.parent();
     }
     if node != ancestor {
         return -1;
@@ -2614,9 +2547,7 @@ unsafe fn xml_search_ns_by_prefix_strict(
         {
             return 0;
         }
-        cur = cur_node
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        cur = cur_node.parent();
     }
     0
 }
@@ -2721,9 +2652,7 @@ unsafe fn xml_search_ns_by_namespace_strict(
         {
             return 0;
         }
-        cur = cur_node
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        cur = cur_node.parent();
     }
     0
 }

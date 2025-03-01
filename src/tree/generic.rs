@@ -17,9 +17,9 @@ use crate::{
 use super::{
     add_prop_sibling, xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node,
     xml_free_prop, xml_get_doc_entity, xml_new_doc_text_len, xml_text_merge, xml_tree_err_memory,
-    XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtd,
-    XmlDtdPtr, XmlElementPtr, XmlElementType, XmlEntity, XmlEntityPtr, XmlNode, XmlNodePtr, XmlNs,
-    XmlNsPtr, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr,
+    XmlDtd, XmlDtdPtr, XmlElement, XmlElementPtr, XmlElementType, XmlEntity, XmlEntityPtr, XmlNode,
+    XmlNodePtr, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -86,9 +86,7 @@ pub trait NodeCommon {
         }
         let mut bases: Vec<String> = vec![];
         while let Some(now) = cur {
-            if let Ok(ent) =
-                XmlEntityPtr::try_from(XmlGenericNodePtr::from_raw(now.as_ptr()).unwrap())
-            {
+            if let Ok(ent) = XmlEntityPtr::try_from(now) {
                 let ret = ent.uri;
                 return (!ret.is_null()).then(|| {
                     CStr::from_ptr(ret as *const i8)
@@ -177,7 +175,6 @@ pub trait NodeCommon {
             return None;
         }
         self.last()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
     }
 
     /// Append the extra substring to the node content.
@@ -213,10 +210,7 @@ pub trait NodeCommon {
                         return;
                     }
                     if let Some(last) = last.filter(|l| l.next() == Some(new_node.into())) {
-                        xml_text_merge(
-                            XmlNodePtr::from_raw(last.as_ptr()).unwrap(),
-                            Some(new_node),
-                        );
+                        xml_text_merge(Some(XmlNodePtr::try_from(last).unwrap()), Some(new_node));
                     }
                 }
             }
@@ -291,16 +285,11 @@ pub trait NodeCommon {
             if let Some(mut last) = self.last().filter(|l| {
                 matches!(l.element_type(), XmlElementType::XmlTextNode)
                     && l.name() == cur.name()
-                    && self
-                        .last()
-                        .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
-                        != Some(cur.into())
+                    && self.last() != Some(cur.into())
             }) {
                 last.add_content(cur.content);
                 xml_free_node(cur);
-                return self
-                    .last()
-                    .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
+                return self.last();
             }
         }
 
@@ -409,9 +398,7 @@ pub trait NodeCommon {
         };
         while let Some(cur) = next {
             if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
-                unsafe {
-                    return XmlNodePtr::from_raw(cur.as_ptr()).unwrap();
-                }
+                return Some(XmlNodePtr::try_from(cur).unwrap());
             }
             next = cur.next();
         }
@@ -440,9 +427,7 @@ pub trait NodeCommon {
         };
         while let Some(now) = cur {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                unsafe {
-                    return XmlNodePtr::from_raw(now.as_ptr()).unwrap();
-                }
+                return Some(XmlNodePtr::try_from(now).unwrap());
             }
             cur = now.prev();
         }
@@ -507,9 +492,7 @@ pub trait NodeCommon {
         };
         while let Some(now) = cur {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                unsafe {
-                    return XmlNodePtr::from_raw(now.as_ptr()).unwrap();
-                }
+                return Some(XmlNodePtr::try_from(now).unwrap());
             }
             cur = now.next();
         }
@@ -542,9 +525,7 @@ pub trait NodeCommon {
         };
         while let Some(now) = node {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                unsafe {
-                    return XmlNodePtr::from_raw(now.as_ptr()).unwrap();
-                }
+                return Some(XmlNodePtr::try_from(now).unwrap());
             }
             node = now.prev();
         }
@@ -577,15 +558,15 @@ pub trait NodeCommon {
             if let Some(doc) = self.document() {
                 if let Some(int_subset) = doc.int_subset {
                     if let (Some(mut table), Some(name)) = (int_subset.entities, name.as_deref()) {
-                        if table.lookup(name).copied().map(|e| e.as_ptr())
-                            == Some(self as *mut Self as *mut XmlEntity)
+                        if table.lookup(name).copied()
+                            == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity).unwrap()
                         {
                             table.remove_entry(name, |_, _| {});
                         }
                     }
                     if let (Some(mut table), Some(name)) = (int_subset.pentities, name.as_deref()) {
-                        if table.lookup(name).copied().map(|e| e.as_ptr())
-                            == Some(self as *mut Self as *mut XmlEntity)
+                        if table.lookup(name).copied()
+                            == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity).unwrap()
                         {
                             table.remove_entry(name, |_, _| {});
                         }
@@ -593,15 +574,15 @@ pub trait NodeCommon {
                 }
                 if let Some(ext_subset) = doc.ext_subset {
                     if let (Some(mut table), Some(name)) = (ext_subset.entities, name.as_deref()) {
-                        if table.lookup(name).copied().map(|e| e.as_ptr())
-                            == Some(self as *mut Self as *mut XmlEntity)
+                        if table.lookup(name).copied()
+                            == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity).unwrap()
                         {
                             table.remove_entry(name, |_, _| {});
                         }
                     }
                     if let (Some(mut table), Some(name)) = (ext_subset.pentities, name.as_deref()) {
-                        if table.lookup(name).copied().map(|e| e.as_ptr())
-                            == Some(self as *mut Self as *mut XmlEntity)
+                        if table.lookup(name).copied()
+                            == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity).unwrap()
                         {
                             table.remove_entry(name, |_, _| {});
                         }
@@ -612,8 +593,8 @@ pub trait NodeCommon {
         if let Some(mut parent) = self.parent() {
             if matches!(self.element_type(), XmlElementType::XmlAttributeNode) {
                 let mut parent = XmlNodePtr::try_from(parent).unwrap();
-                if parent.properties.map_or(null_mut(), |prop| prop.as_ptr())
-                    == self as *mut Self as *mut XmlAttr
+                if parent.properties
+                    == XmlAttrPtr::from_raw(self as *mut Self as *mut XmlAttr).unwrap()
                 {
                     parent.properties = (*(self as *mut Self as *mut XmlAttr)).next;
                 }
@@ -779,9 +760,7 @@ impl XmlGenericNodePtr {
                     }
                 }
             }
-            node = cur_node
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+            node = cur_node.parent();
         }
         None
     }
@@ -847,9 +826,7 @@ impl XmlGenericNodePtr {
                     cur = now.next
                 }
             }
-            node = now
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+            node = now.parent();
         }
         Some(ret)
     }
@@ -920,9 +897,7 @@ impl XmlGenericNodePtr {
                     return lang;
                 }
             }
-            cur = now
-                .parent()
-                .and_then(|now| XmlGenericNodePtr::from_raw(now.as_ptr()));
+            cur = now.parent();
         }
         None
     }
@@ -956,42 +931,30 @@ impl XmlGenericNodePtr {
                 } else if let Some(children) = node
                     .children()
                     .filter(|_| matches!(node.element_type(), XmlElementType::XmlElementNode))
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
                 {
                     result = children.get_line_no_internal(depth + 1);
-                } else if let Some(next) = node
-                    .next()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                {
+                } else if let Some(next) = node.next() {
                     result = next.get_line_no_internal(depth + 1);
-                } else if let Some(prev) = node
-                    .prev()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                {
+                } else if let Some(prev) = node.prev() {
                     result = prev.get_line_no_internal(depth + 1);
                 }
             }
             if result == -1 || result == 65535 {
                 result = node.line as i64;
             }
-        } else if let Some(prev) = self
-            .prev()
-            .filter(|p| {
-                matches!(
-                    p.element_type(),
-                    XmlElementType::XmlElementNode
-                        | XmlElementType::XmlTextNode
-                        | XmlElementType::XmlCommentNode
-                        | XmlElementType::XmlPINode
-                )
-            })
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-        {
+        } else if let Some(prev) = self.prev().filter(|p| {
+            matches!(
+                p.element_type(),
+                XmlElementType::XmlElementNode
+                    | XmlElementType::XmlTextNode
+                    | XmlElementType::XmlCommentNode
+                    | XmlElementType::XmlPINode
+            )
+        }) {
             result = prev.get_line_no_internal(depth + 1);
         } else if let Some(parent) = self
             .parent()
             .filter(|p| matches!(p.element_type(), XmlElementType::XmlElementNode))
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
         {
             result = parent.get_line_no_internal(depth + 1);
         }
@@ -1057,9 +1020,7 @@ impl XmlGenericNodePtr {
 
                 // Thumbler index computation
                 // TODO: the occurrence test seems bogus for namespaced names
-                let mut tmp = current
-                    .prev()
-                    .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                let mut tmp = current.prev();
                 while let Some(now) = tmp {
                     if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                         let now = XmlNodePtr::try_from(now).unwrap();
@@ -1074,14 +1035,10 @@ impl XmlGenericNodePtr {
                             occur += 1;
                         }
                     }
-                    tmp = now
-                        .prev()
-                        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                    tmp = now.prev();
                 }
                 if occur == 0 {
-                    let mut tmp = current
-                        .next()
-                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    let mut tmp = current.next();
                     while let Some(now) = tmp.filter(|_| occur == 0) {
                         if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                             let now = XmlNodePtr::try_from(now).unwrap();
@@ -1096,9 +1053,7 @@ impl XmlGenericNodePtr {
                                 occur += 1;
                             }
                         }
-                        tmp = now
-                            .next()
-                            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                        tmp = now.next();
                     }
                     if occur != 0 {
                         occur = 1;
@@ -1106,36 +1061,26 @@ impl XmlGenericNodePtr {
                 } else {
                     occur += 1;
                 }
-                current
-                    .parent()
-                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+                current.parent()
             } else if matches!(current.element_type(), XmlElementType::XmlCommentNode) {
                 sep = "/";
                 name = "comment()".into();
 
                 // Thumbler index computation
-                let mut tmp = current
-                    .prev()
-                    .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                let mut tmp = current.prev();
                 while let Some(now) = tmp {
                     if matches!(now.element_type(), XmlElementType::XmlCommentNode) {
                         occur += 1;
                     }
-                    tmp = now
-                        .prev()
-                        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                    tmp = now.prev();
                 }
                 if occur == 0 {
-                    let mut tmp = current
-                        .next()
-                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    let mut tmp = current.next();
                     while let Some(now) = tmp.filter(|_| occur == 0) {
                         if matches!(now.element_type(), XmlElementType::XmlCommentNode) {
                             occur += 1;
                         }
-                        tmp = now
-                            .next()
-                            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                        tmp = now.next();
                     }
                     if occur != 0 {
                         occur = 1;
@@ -1143,9 +1088,7 @@ impl XmlGenericNodePtr {
                 } else {
                     occur += 1;
                 }
-                current
-                    .parent()
-                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+                current.parent()
             } else if matches!(
                 current.element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
@@ -1154,9 +1097,7 @@ impl XmlGenericNodePtr {
                 name = "text()".into();
 
                 // Thumbler index computation
-                let mut tmp = current
-                    .prev()
-                    .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                let mut tmp = current.prev();
                 while let Some(now) = tmp {
                     if matches!(
                         now.element_type(),
@@ -1164,16 +1105,12 @@ impl XmlGenericNodePtr {
                     ) {
                         occur += 1;
                     }
-                    tmp = now
-                        .prev()
-                        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                    tmp = now.prev();
                 }
                 // Evaluate if this is the only text- or CDATA-section-node;
                 // if yes, then we'll get "text()".as_ptr() as _, otherwise "text()[1]".
                 if occur == 0 {
-                    let mut tmp = current
-                        .next()
-                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    let mut tmp = current.next();
                     while let Some(now) = tmp {
                         if matches!(
                             now.element_type(),
@@ -1182,16 +1119,12 @@ impl XmlGenericNodePtr {
                             occur = 1;
                             break;
                         }
-                        tmp = now
-                            .next()
-                            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                        tmp = now.next();
                     }
                 } else {
                     occur += 1;
                 }
-                current
-                    .parent()
-                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+                current.parent()
             } else if matches!(current.element_type(), XmlElementType::XmlPINode) {
                 sep = "/";
                 name = Cow::Owned(format!(
@@ -1200,32 +1133,24 @@ impl XmlGenericNodePtr {
                 ));
 
                 // Thumbler index computation
-                let mut tmp = current
-                    .prev()
-                    .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                let mut tmp = current.prev();
                 while let Some(now) = tmp {
                     if matches!(now.element_type(), XmlElementType::XmlPINode)
                         && current.name() == now.name()
                     {
                         occur += 1;
                     }
-                    tmp = now
-                        .prev()
-                        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+                    tmp = now.prev();
                 }
                 if occur == 0 {
-                    let mut tmp = current
-                        .next()
-                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    let mut tmp = current.next();
                     while let Some(now) = tmp.filter(|_| occur == 0) {
                         if matches!(now.element_type(), XmlElementType::XmlPINode)
                             && current.name() == now.name()
                         {
                             occur += 1;
                         }
-                        tmp = now
-                            .next()
-                            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                        tmp = now.next();
                     }
                     if occur != 0 {
                         occur = 1;
@@ -1233,9 +1158,7 @@ impl XmlGenericNodePtr {
                 } else {
                     occur += 1;
                 }
-                current
-                    .parent()
-                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+                current.parent()
             } else if matches!(current.element_type(), XmlElementType::XmlAttributeNode) {
                 let attr = XmlAttrPtr::try_from(current).unwrap();
                 sep = "/@";
@@ -1249,7 +1172,6 @@ impl XmlGenericNodePtr {
                     name = attr.name().unwrap().into_owned().into();
                 }
                 attr.parent()
-                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
             } else {
                 return None;
             };
@@ -1334,9 +1256,7 @@ impl XmlGenericNodePtr {
                     ret = xml_strncat(ret, buf.as_ptr() as _, 1);
                 }
             }
-            node = cur_node
-                .next()
-                .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+            node = cur_node.next();
         }
         let r = (!ret.is_null()).then(|| {
             CStr::from_ptr(ret as *const i8)
@@ -1407,9 +1327,7 @@ impl XmlGenericNodePtr {
                     ret = xml_strncat(ret, buf.as_ptr(), 1);
                 }
             }
-            node = cur_node
-                .next()
-                .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+            node = cur_node.next();
         }
         let r = (!ret.is_null()).then(|| {
             CStr::from_ptr(ret as *const i8)
@@ -1555,17 +1473,12 @@ impl XmlGenericNodePtr {
             }) {
                 self.last().unwrap().add_content(node.content);
                 // if it's the only child, nothing more to be done.
-                let Some(next) = node
-                    .next()
-                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                else {
+                let Some(next) = node.next() else {
                     xml_free_node(node);
-                    return self
-                        .last()
-                        .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
+                    return self.last();
                 };
                 let prev = node;
-                cur = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                cur = next;
                 xml_free_node(prev);
             }
             let mut prev = self.last().unwrap();
@@ -1621,10 +1534,10 @@ impl XmlGenericNodePtr {
             })
             .and_then(|p| p.last().filter(|l| l.next().is_none()))
         {
-            cur = XmlGenericNodePtr::from_raw(last.as_ptr()).unwrap();
+            cur = last;
         } else {
             while let Some(next) = cur.next() {
-                cur = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                cur = next;
             }
         }
 
@@ -1730,9 +1643,7 @@ impl XmlGenericNodePtr {
         } else if matches!(elem.element_type(), XmlElementType::XmlAttributeNode) {
             return Some(
                 add_prop_sibling(
-                    self.prev()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                        .map(|p| XmlAttrPtr::try_from(p).unwrap()),
+                    self.prev().map(|p| XmlAttrPtr::try_from(p).unwrap()),
                     XmlAttrPtr::try_from(self).unwrap(),
                     XmlAttrPtr::try_from(elem).unwrap(),
                 )
@@ -1797,7 +1708,7 @@ impl XmlGenericNodePtr {
                     matches!(next.element_type(), XmlElementType::XmlTextNode)
                         && self.name() == next.name()
                 })
-                .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
+                .map(|next| XmlNodePtr::try_from(next).unwrap())
             {
                 let mut tmp = xml_strdup(elem.content);
                 tmp = xml_strcat(tmp, next.content);
@@ -1824,21 +1735,10 @@ impl XmlGenericNodePtr {
         elem.set_prev(Some(self));
         elem.set_next(self.next());
         self.set_next(Some(elem));
-        if let Some(mut next) = elem
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-        {
+        if let Some(mut next) = elem.next() {
             next.set_prev(Some(elem));
         }
-        if let Some(mut parent) = elem
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-            .filter(|p| {
-                p.last()
-                    .and_then(|last| XmlGenericNodePtr::from_raw(last.as_ptr()))
-                    == Some(self)
-            })
-        {
+        if let Some(mut parent) = elem.parent().filter(|p| p.last() == Some(self)) {
             parent.set_last(Some(elem));
         }
         Some(elem)
@@ -1864,22 +1764,69 @@ impl Eq for XmlGenericNodePtr {}
 impl Deref for XmlGenericNodePtr {
     type Target = dyn NodeCommon;
     fn deref(&self) -> &Self::Target {
-        // # Safety
-        // I don't implement the pointer casting and addition/subtraction methods
-        // and don't expose the inner `NonNull` for `XmlGenericNodePtr`.
-        // Therefore, as long as the constructor is correctly implemented,
-        // the pointer dereference is valid.
-        unsafe { self.0.as_ref() }
+        unsafe {
+            // Hmmm, there seems to be a bug somewhere that causes some cases
+            // to be referenced as a different type than the actual type...
+            // As a workaround, branch manually.
+            let r#type = self.0.as_ref().element_type();
+            match r#type {
+                XmlElementType::XmlAttributeDecl => &*(self.0.as_ptr() as *mut XmlAttribute),
+                XmlElementType::XmlAttributeNode => &*(self.0.as_ptr() as *mut XmlAttr),
+                XmlElementType::XmlDTDNode | XmlElementType::XmlDocumentTypeNode => {
+                    &*(self.0.as_ptr() as *mut XmlDtd)
+                }
+                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                    &*(self.0.as_ptr() as *mut XmlDoc)
+                }
+                XmlElementType::XmlElementDecl => &*(self.0.as_ptr() as *mut XmlElement),
+                XmlElementType::XmlEntityDecl => &*(self.0.as_ptr() as *mut XmlEntity),
+                XmlElementType::XmlNamespaceDecl => &*(self.0.as_ptr() as *mut XmlNs),
+                _ => &*(self.0.as_ptr() as *mut XmlNode),
+            }
+            // // # Safety
+            // // I don't implement the pointer casting and addition/subtraction methods
+            // // and don't expose the inner `NonNull` for `XmlGenericNodePtr`.
+            // // Therefore, as long as the constructor is correctly implemented,
+            // // the pointer dereference is valid.
+            // self.0.as_ref()
+        }
     }
 }
 
 impl DerefMut for XmlGenericNodePtr {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        // # Safety
-        // I don't implement the pointer casting and addition/subtraction methods
-        // and don't expose the inner `NonNull` for `XmlGenericNodePtr`.
-        // Therefore, as long as the constructor is correctly implemented,
-        // the pointer dereference is valid.
-        unsafe { self.0.as_mut() }
+        unsafe {
+            let r#type = self.0.as_ref().element_type();
+            self.0 = match r#type {
+                XmlElementType::XmlAttributeDecl => {
+                    NonNull::new_unchecked(self.0.as_ptr() as *mut XmlAttribute)
+                }
+                XmlElementType::XmlAttributeNode => {
+                    NonNull::new_unchecked(self.0.as_ptr() as *mut XmlAttr)
+                }
+                XmlElementType::XmlDTDNode | XmlElementType::XmlDocumentTypeNode => {
+                    NonNull::new_unchecked(self.0.as_ptr() as *mut XmlDtd)
+                }
+                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                    NonNull::new_unchecked(self.0.as_ptr() as *mut XmlDoc)
+                }
+                XmlElementType::XmlElementDecl => {
+                    NonNull::new_unchecked(self.0.as_ptr() as *mut XmlElement)
+                }
+                XmlElementType::XmlEntityDecl => {
+                    NonNull::new_unchecked(self.0.as_ptr() as *mut XmlEntity)
+                }
+                XmlElementType::XmlNamespaceDecl => {
+                    NonNull::new_unchecked(self.0.as_ptr() as *mut XmlNs)
+                }
+                _ => NonNull::new_unchecked(self.0.as_ptr() as *mut XmlNode),
+            };
+            // # Safety
+            // I don't implement the pointer casting and addition/subtraction methods
+            // and don't expose the inner `NonNull` for `XmlGenericNodePtr`.
+            // Therefore, as long as the constructor is correctly implemented,
+            // the pointer dereference is valid.
+            self.0.as_mut()
+        }
     }
 }

@@ -501,27 +501,23 @@ pub unsafe fn xml_xpath_cmp_nodes(
     if let Ok(attr) = XmlAttrPtr::try_from(node1) {
         attr1 = 1;
         attr_node1 = Some(attr);
-        node1 = XmlGenericNodePtr::from_raw(attr.parent().unwrap().as_ptr()).unwrap();
+        node1 = attr.parent().unwrap();
     }
     if let Ok(attr) = XmlAttrPtr::try_from(node2) {
         attr2 = 1;
         attr_node2 = Some(attr);
-        node2 = XmlGenericNodePtr::from_raw(attr.parent().unwrap().as_ptr()).unwrap();
+        node2 = attr.parent().unwrap();
     }
     if node1 == node2 {
         if attr1 == attr2 {
             // not required, but we keep attributes in order
             if let Some((attr1, attr2)) = attr_node1.zip(attr_node2) {
-                let mut cur = attr2
-                    .prev
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                let mut cur = attr2.prev.map(XmlGenericNodePtr::from);
                 while let Some(now) = cur {
                     if now == attr1.into() {
                         return 1;
                     }
-                    cur = now
-                        .prev()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                    cur = now.prev();
                 }
                 return -1;
             }
@@ -537,18 +533,10 @@ pub unsafe fn xml_xpath_cmp_nodes(
     {
         return 1;
     }
-    if Some(node1)
-        == node2
-            .prev()
-            .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
-    {
+    if Some(node1) == node2.prev() {
         return 1;
     }
-    if Some(node1)
-        == node2
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-    {
+    if Some(node1) == node2.next() {
         return -1;
     }
 
@@ -577,10 +565,7 @@ pub unsafe fn xml_xpath_cmp_nodes(
     // compute depth to root
     depth2 = 0;
     let mut cur = node2;
-    while let Some(parent) = cur
-        .parent()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-    {
+    while let Some(parent) = cur.parent() {
         if parent == node1 {
             return 1;
         }
@@ -591,10 +576,7 @@ pub unsafe fn xml_xpath_cmp_nodes(
 
     depth1 = 0;
     let mut cur = node1;
-    while let Some(parent) = cur
-        .parent()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-    {
+    while let Some(parent) = cur.parent() {
         if parent == node2 {
             return -1;
         }
@@ -608,28 +590,14 @@ pub unsafe fn xml_xpath_cmp_nodes(
     // get the nearest common ancestor.
     while depth1 > depth2 {
         depth1 -= 1;
-        node1 = node1
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-            .unwrap();
+        node1 = node1.parent().unwrap();
     }
     while depth2 > depth1 {
         depth2 -= 1;
-        node2 = node2
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-            .unwrap();
+        node2 = node2.parent().unwrap();
     }
     while node1.parent() != node2.parent() {
-        let Some((n1, n2)) = node1
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-            .zip(
-                node2
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
-            )
-        else {
+        let Some((n1, n2)) = node1.parent().zip(node2.parent()) else {
             // should not happen but just in case ...
             return -2;
         };
@@ -637,18 +605,10 @@ pub unsafe fn xml_xpath_cmp_nodes(
         node2 = n2;
     }
     // Find who's first.
-    if Some(node1)
-        == node2
-            .prev()
-            .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
-    {
+    if Some(node1) == node2.prev() {
         return 1;
     }
-    if Some(node1)
-        == node2
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-    {
+    if Some(node1) == node2.next() {
         return -1;
     }
     // Speedup using document order if available.
@@ -673,16 +633,12 @@ pub unsafe fn xml_xpath_cmp_nodes(
         }
     }
 
-    let mut cur = node1
-        .next()
-        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+    let mut cur = node1.next();
     while let Some(now) = cur {
         if now == node2 {
             return 1;
         }
-        cur = now
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+        cur = now.next();
     }
     -1 /* assume there is no sibling list corruption */
 }
@@ -1119,9 +1075,7 @@ pub unsafe fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
 
     let mut count: isize = 0;
 
-    let mut cur = doc
-        .children
-        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+    let mut cur = doc.children;
     while let Some(mut now) = cur {
         if let Some(mut node) = XmlNodePtr::try_from(now)
             .ok()
@@ -1130,31 +1084,22 @@ pub unsafe fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
             count += 1;
             node.content = (-count) as _;
             if let Some(children) = node.children {
-                cur = XmlGenericNodePtr::from_raw(children.as_ptr());
+                cur = Some(children);
                 continue;
             }
         }
-        if let Some(next) = now
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-        {
+        if let Some(next) = now.next() {
             cur = Some(next);
             continue;
         }
         cur = loop {
-            let Some(cur) = now
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-            else {
+            let Some(cur) = now.parent() else {
                 break None;
             };
             if cur == doc.into() {
                 break None;
             }
-            if let Some(next) = cur
-                .next()
-                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-            {
+            if let Some(next) = cur.next() {
                 break Some(next);
             }
             now = cur;
@@ -1632,10 +1577,7 @@ unsafe fn xml_xpath_cmp_nodes_ext(
             XmlElementType::XmlAttributeNode => {
                 precedence1 = 1; /* element is owner */
                 misc_node1 = Some(node1);
-                node1 = node1
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                    .unwrap();
+                node1 = node1.parent().unwrap();
                 misc = 1;
             }
             XmlElementType::XmlTextNode
@@ -1644,34 +1586,24 @@ unsafe fn xml_xpath_cmp_nodes_ext(
             | XmlElementType::XmlPINode => {
                 misc_node1 = Some(node1);
                 // Find nearest element node.
-                let n1 = if let Some(mut prev1) = node1
-                    .prev()
-                    .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
-                {
+                let n1 = if let Some(mut prev1) = node1.prev() {
                     loop {
                         node1 = prev1;
                         if matches!(node1.element_type(), XmlElementType::XmlElementNode) {
                             precedence1 = 3; /* element in prev-sibl axis */
                             break Some(node1);
                         }
-                        let Some(prev) = node1
-                            .prev()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                        else {
+                        let Some(prev) = node1.prev() else {
                             precedence1 = 2; /* element is parent */
                             // URGENT TODO: Are there any cases, where the
                             // parent of such a node is not an element node?
-                            break node1
-                                .parent()
-                                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                            break node1.parent();
                         };
                         prev1 = prev;
                     }
                 } else {
                     precedence1 = 2; /* element is parent */
-                    node1
-                        .parent()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                    node1.parent()
                 };
                 if let Some(n1) = n1
                     .and_then(|n1| XmlNodePtr::try_from(n1).ok())
@@ -1698,10 +1630,7 @@ unsafe fn xml_xpath_cmp_nodes_ext(
             XmlElementType::XmlAttributeNode => {
                 precedence2 = 1; /* element is owner */
                 misc_node2 = Some(node2);
-                node2 = node2
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                    .unwrap();
+                node2 = node2.parent().unwrap();
                 misc = 1;
             }
             XmlElementType::XmlTextNode
@@ -1709,32 +1638,22 @@ unsafe fn xml_xpath_cmp_nodes_ext(
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlPINode => {
                 misc_node2 = Some(node2);
-                let n2 = if let Some(mut prev2) = node2
-                    .prev()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                {
+                let n2 = if let Some(mut prev2) = node2.prev() {
                     loop {
                         node2 = prev2;
                         if matches!(node2.element_type(), XmlElementType::XmlElementNode) {
                             precedence2 = 3; /* element in prev-sibl axis */
                             break Some(node2);
                         }
-                        let Some(prev) = node2
-                            .prev()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                        else {
+                        let Some(prev) = node2.prev() else {
                             precedence2 = 2; /* element is parent */
-                            break node2
-                                .parent()
-                                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                            break node2.parent();
                         };
                         prev2 = prev;
                     }
                 } else {
                     precedence2 = 2; /* element is parent */
-                    node2
-                        .parent()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                    node2.parent()
                 };
                 if let Some(n2) = n2
                     .and_then(|n2| XmlNodePtr::try_from(n2).ok())
@@ -1758,10 +1677,7 @@ unsafe fn xml_xpath_cmp_nodes_ext(
                 if precedence1 == precedence2 {
                     // The ugly case; but normally there aren't many
                     // adjacent non-element nodes around.
-                    let mut cur = misc_node2
-                        .unwrap()
-                        .prev()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                    let mut cur = misc_node2.unwrap().prev();
                     while let Some(now) = cur {
                         if cur == misc_node1 {
                             return Some(std::cmp::Ordering::Less);
@@ -1769,9 +1685,7 @@ unsafe fn xml_xpath_cmp_nodes_ext(
                         if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                             return Some(std::cmp::Ordering::Greater);
                         }
-                        cur = now
-                            .prev()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                        cur = now.prev();
                     }
                     return Some(std::cmp::Ordering::Greater);
                 } else {
@@ -1793,29 +1707,21 @@ unsafe fn xml_xpath_cmp_nodes_ext(
             //   Text-6(precedence2 == 3)
             // </foo>
             if precedence2 == 3 && precedence1 > 1 {
-                let mut cur = node1
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                let mut cur = node1.parent();
                 while let Some(now) = cur {
                     if now == node2 {
                         return Some(std::cmp::Ordering::Less);
                     }
-                    cur = now
-                        .parent()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                    cur = now.parent();
                 }
             }
             if precedence1 == 3 && precedence2 > 1 {
-                let mut cur = node2
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                let mut cur = node2.parent();
                 while let Some(now) = cur {
                     if now == node1 {
                         return Some(std::cmp::Ordering::Greater);
                     }
-                    cur = now
-                        .parent()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                    cur = now.parent();
                 }
             }
         }
@@ -1845,28 +1751,17 @@ unsafe fn xml_xpath_cmp_nodes_ext(
 
     // turtle_comparison:
 
-    if Some(node1)
-        == node2
-            .prev()
-            .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
-    {
+    if Some(node1) == node2.prev() {
         return Some(std::cmp::Ordering::Less);
     }
-    if Some(node1)
-        == node2
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-    {
+    if Some(node1) == node2.next() {
         return Some(std::cmp::Ordering::Greater);
     }
 
     // compute depth to root
     let mut depth2 = 0;
     let mut cur = node2;
-    while let Some(parent) = cur
-        .parent()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-    {
+    while let Some(parent) = cur.parent() {
         if parent == node1 {
             return Some(std::cmp::Ordering::Less);
         }
@@ -1876,10 +1771,7 @@ unsafe fn xml_xpath_cmp_nodes_ext(
     let root = cur;
     let mut depth1 = 0;
     let mut cur = node1;
-    while let Some(parent) = cur
-        .parent()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-    {
+    while let Some(parent) = cur.parent() {
         if parent == node2 {
             return Some(std::cmp::Ordering::Greater);
         }
@@ -1893,40 +1785,22 @@ unsafe fn xml_xpath_cmp_nodes_ext(
     // get the nearest common ancestor.
     while depth1 > depth2 {
         depth1 -= 1;
-        node1 = node1
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-            .unwrap();
+        node1 = node1.parent().unwrap();
     }
     while depth2 > depth1 {
         depth2 -= 1;
-        node2 = node2
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-            .unwrap();
+        node2 = node2.parent().unwrap();
     }
     while node1.parent() != node2.parent() {
         // should not happen but just in case ...
-        node1 = node1
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
-        node2 = node2
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
+        node1 = node1.parent()?;
+        node2 = node2.parent()?;
     }
     // Find who's first.
-    if Some(node1)
-        == node2
-            .prev()
-            .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
-    {
+    if Some(node1) == node2.prev() {
         return Some(std::cmp::Ordering::Less);
     }
-    if Some(node1)
-        == node2
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-    {
+    if Some(node1) == node2.next() {
         return Some(std::cmp::Ordering::Greater);
     }
     // Speedup using document order if available.
@@ -1951,16 +1825,12 @@ unsafe fn xml_xpath_cmp_nodes_ext(
         }
     }
 
-    let mut cur = node1
-        .next()
-        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+    let mut cur = node1.next();
     while let Some(now) = cur {
         if now == node2 {
             return Some(std::cmp::Ordering::Less);
         }
-        cur = now
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+        cur = now.next();
     }
     // assume there is no sibling list corruption
     Some(std::cmp::Ordering::Greater)

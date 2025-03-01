@@ -62,8 +62,7 @@ use crate::{
         XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
     },
     tree::{
-        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType,
-        XmlGenericNodePtr, XmlNodePtr,
+        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlNodePtr,
     },
     uri::canonic_path,
 };
@@ -4265,19 +4264,12 @@ pub unsafe fn html_entity_value_lookup(value: u32) -> *const HtmlEntityDesc {
 /// Returns 1 if autoclosed, 0 otherwise
 #[doc(alias = "htmlIsAutoClosed")]
 pub unsafe fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> i32 {
-    // if elem.is_null() {
-    //     return 1;
-    // }
-    let mut child = elem
-        .children()
-        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    let mut child = elem.children().map(|c| XmlNodePtr::try_from(c).unwrap());
     while let Some(now) = child {
         if html_auto_close_tag(doc, elem.name, now) != 0 {
             return 1;
         }
-        child = now
-            .next()
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        child = now.next().map(|n| XmlNodePtr::try_from(n).unwrap());
     }
     0
 }
@@ -5347,16 +5339,12 @@ pub unsafe fn html_auto_close_tag(
     {
         return 1;
     }
-    let mut child = elem
-        .children()
-        .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+    let mut child = elem.children().map(|c| XmlNodePtr::try_from(c).unwrap());
     while let Some(now) = child {
         if html_auto_close_tag(_doc, name, now) != 0 {
             return 1;
         }
-        child = now
-            .next()
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        child = now.next().map(|n| XmlNodePtr::try_from(n).unwrap());
     }
     0
 }
@@ -8336,9 +8324,7 @@ unsafe fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> 
     while let Some(now) =
         last_child.filter(|last_child| last_child.element_type() == XmlElementType::XmlCommentNode)
     {
-        last_child = now
-            .prev()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        last_child = now.prev();
     }
     if let Some(last_child) = last_child {
         if last_child.is_text_node() {

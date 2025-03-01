@@ -1884,9 +1884,7 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
     let mut cur = (*ctxt).free_elems;
     while let Some(now) = cur {
-        let next = now
-            .next
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        let next = now.next.map(|node| XmlNodePtr::try_from(node).unwrap());
         now.free();
         cur = next;
     }

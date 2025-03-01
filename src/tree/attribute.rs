@@ -77,9 +77,7 @@ impl XmlAttr {
                 return doc.old_ns;
             }
         }
-        let mut node = self
-            .parent
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        let mut node = self.parent.map(XmlGenericNodePtr::from);
         while let Some(now) = node {
             if matches!(
                 now.element_type(),
@@ -125,9 +123,7 @@ impl XmlAttr {
                     return Some(cur);
                 }
             }
-            node = now
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+            node = now.parent();
         }
         None
     }
@@ -239,8 +235,7 @@ impl NodeCommon for XmlAttr {
         self.children = children.map(|children| XmlNodePtr::try_from(children).unwrap());
     }
     fn last(&self) -> Option<XmlGenericNodePtr> {
-        self.last
-            .and_then(|last| XmlGenericNodePtr::from_raw(last.as_ptr()))
+        self.last.map(|last| last.into())
     }
     fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
         self.last = last.map(|children| XmlNodePtr::try_from(children).unwrap());
@@ -301,9 +296,9 @@ impl XmlAttrPtr {
         }
     }
 
-    pub(crate) fn as_ptr(self) -> *mut XmlAttr {
-        self.0.as_ptr()
-    }
+    // pub(crate) fn as_ptr(self) -> *mut XmlAttr {
+    //     self.0.as_ptr()
+    // }
 
     /// Deallocate memory.
     ///
@@ -640,10 +635,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
                 let mut root = XmlGenericNodePtr::from(target);
                 let mut pred = None;
 
-                while let Some(parent) = root
-                    .parent()
-                    .and_then(|r| XmlGenericNodePtr::from_raw(r.as_ptr()))
-                {
+                while let Some(parent) = root.parent() {
                     pred = Some(root);
                     root = parent;
                 }
@@ -686,13 +678,7 @@ pub(super) unsafe fn xml_copy_prop_internal(
         cur.doc.map_or(false, |doc| doc.ids.is_some())
             && cur
                 .parent
-                .filter(|p| {
-                    xml_is_id(
-                        cur.doc,
-                        XmlNodePtr::from_raw(p.as_ptr()).unwrap(),
-                        Some(cur),
-                    ) != 0
-                })
+                .filter(|&p| xml_is_id(cur.doc, Some(p), Some(cur)) != 0)
                 .is_some()
     }) {
         let children = cur.children();
@@ -760,10 +746,7 @@ pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
     {
         xml_remove_id(doc, cur);
     }
-    if let Some(children) = cur
-        .children()
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-    {
+    if let Some(children) = cur.children() {
         xml_free_node_list(Some(children));
     }
     if !cur.name.is_null() {

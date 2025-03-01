@@ -397,9 +397,7 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     (*ret).endvalue = null_mut();
     if let Some(node) = node {
         (*ret).node = Some(node);
-        (*ret).seq = node
-            .children()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        (*ret).seq = node.children();
     } else {
         (*ret).node = (*ctxt).doc.map(|doc| doc.into());
         (*ret).seq = root.map(|root| root.into());

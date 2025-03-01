@@ -54,9 +54,8 @@ use crate::{
     tree::{
         xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
         xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
-        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDocPtr,
-        XmlElementType, XmlEntityPtr, XmlEntityType, XmlGenericNodePtr, XmlNode, XmlNodePtr,
-        XML_XML_NAMESPACE,
+        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, XmlDocPtr, XmlElementType,
+        XmlEntityPtr, XmlEntityType, XmlGenericNodePtr, XmlNode, XmlNodePtr, XML_XML_NAMESPACE,
     },
     uri::{build_relative_uri, build_uri, escape_url, XmlURI},
     xpath::{
@@ -260,9 +259,7 @@ unsafe fn xml_xinclude_test_node(ctxt: XmlXIncludeCtxtPtr, node: XmlNodePtr) -> 
             (*ctxt).legacy = 1;
         }
         if node.name().as_deref() == Some(XINCLUDE_NODE) {
-            let mut child = node
-                .children
-                .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+            let mut child = node.children.map(|c| XmlNodePtr::try_from(c).unwrap());
             let mut nb_fallback: i32 = 0;
 
             while let Some(cur_node) = child {
@@ -288,7 +285,7 @@ unsafe fn xml_xinclude_test_node(ctxt: XmlXIncludeCtxtPtr, node: XmlNodePtr) -> 
                 }
                 child = cur_node
                     .next
-                    .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
             }
             if nb_fallback > 1 {
                 xml_xinclude_err!(
@@ -829,8 +826,7 @@ unsafe fn xml_xinclude_copy_node(
     let mut insert_last: Option<XmlNodePtr> = None;
 
     let mut cur = if copy_children != 0 {
-        elem.children
-            .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap())?
+        elem.children.map(|c| XmlNodePtr::try_from(c).unwrap())?
     } else {
         elem
     };
@@ -892,16 +888,13 @@ unsafe fn xml_xinclude_copy_node(
                 result = Some(copy);
             }
             if let Some(mut insert_last) = insert_last {
-                insert_last.next = NodePtr::from_ptr(copy.as_ptr());
-                copy.prev = NodePtr::from_ptr(insert_last.as_ptr());
+                insert_last.next = Some(copy.into());
+                copy.prev = Some(insert_last.into());
             } else if let Some(mut insert_parent) = insert_parent {
-                insert_parent.children = NodePtr::from_ptr(copy.as_ptr());
+                insert_parent.children = Some(copy.into());
             }
             let mut now = copy;
-            while let Some(next) = now
-                .next
-                .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
-            {
+            while let Some(next) = now.next.map(|node| XmlNodePtr::try_from(node).unwrap()) {
                 now = next;
             }
             insert_last = Some(now);
@@ -910,7 +903,7 @@ unsafe fn xml_xinclude_copy_node(
         if recurse != 0 {
             cur = cur
                 .children
-                .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap())
+                .map(|c| XmlNodePtr::try_from(c).unwrap())
                 .unwrap();
             insert_parent = insert_last.take();
             continue;
@@ -922,12 +915,11 @@ unsafe fn xml_xinclude_copy_node(
 
         while cur.next.is_none() {
             if let Some(mut insert_parent) = insert_parent {
-                insert_parent.last =
-                    NodePtr::from_ptr(insert_last.map_or(null_mut(), |node| node.as_ptr()));
+                insert_parent.last = insert_last.map(|node| node.into());
             }
             cur = cur
                 .parent
-                .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).unwrap())
+                .map(|p| XmlNodePtr::try_from(p).unwrap())
                 .unwrap();
             if cur == elem {
                 return result;
@@ -936,12 +928,12 @@ unsafe fn xml_xinclude_copy_node(
             insert_parent = insert_parent
                 .unwrap()
                 .parent
-                .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).unwrap());
+                .map(|p| XmlNodePtr::try_from(p).unwrap());
         }
 
         cur = cur
             .next
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap())
+            .map(|node| XmlNodePtr::try_from(node).unwrap())
             .unwrap();
     }
 
@@ -957,9 +949,7 @@ unsafe fn xml_xinclude_get_nth_child(cur: XmlGenericNodePtr, no: i32) -> Option<
     if cur.element_type() == XmlElementType::XmlNamespaceDecl {
         return None;
     }
-    let mut cur = cur
-        .children()
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
+    let mut cur = cur.children();
     let mut i = 0;
     while i <= no {
         let now = cur?;
@@ -975,9 +965,7 @@ unsafe fn xml_xinclude_get_nth_child(cur: XmlGenericNodePtr, no: i32) -> Option<
             }
         }
 
-        cur = now
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+        cur = now.next();
     }
     cur
 }
@@ -1039,10 +1027,7 @@ unsafe fn xml_xinclude_copy_range(
                 let mut tmp2 = xml_doc_copy_node(list_parent.unwrap(), (*ctxt).doc, 2).unwrap();
                 tmp2.add_child(list.unwrap());
                 list = Some(tmp2);
-                list_parent = list_parent
-                    .unwrap()
-                    .parent()
-                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                list_parent = list_parent.unwrap().parent();
                 level += 1;
             }
             last = list;
@@ -1050,10 +1035,7 @@ unsafe fn xml_xinclude_copy_range(
         }
         // Check whether we need to change our insertion point
         while level < last_level {
-            last = last
-                .unwrap()
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+            last = last.unwrap().parent();
             last_level -= 1;
         }
         if cur_node == end {
@@ -1081,9 +1063,7 @@ unsafe fn xml_xinclude_copy_range(
                 }
                 // prune and return full set
                 if level == last_level {
-                    last.unwrap()
-                        .add_next_sibling(tmp.unwrap().into())
-                        .map_or(null_mut(), |node| node.as_ptr());
+                    last.unwrap().add_next_sibling(tmp.unwrap().into());
                 } else {
                     last.unwrap().add_child(tmp.unwrap().into());
                 }
@@ -1096,9 +1076,7 @@ unsafe fn xml_xinclude_copy_range(
                 let tmp = xml_doc_copy_node(cur_node, (*ctxt).doc, 2);
                 if list.is_none() {
                     list = tmp;
-                    list_parent = cur_node
-                        .parent()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                    list_parent = cur_node.parent();
                     last = tmp;
                 } else if level == last_level {
                     last = last.unwrap().add_next_sibling(tmp.unwrap());
@@ -1115,9 +1093,7 @@ unsafe fn xml_xinclude_copy_range(
                     cur = xml_xinclude_get_nth_child(cur_node, index1 - 1);
                     index1 = 0;
                 } else {
-                    cur = cur_node
-                        .children()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                    cur = cur_node.children();
                 }
                 // increment level to show change
                 level += 1;
@@ -1144,9 +1120,7 @@ unsafe fn xml_xinclude_copy_range(
                 };
                 last = tmp.map(|node| node.into());
                 list = tmp.map(|node| node.into());
-                list_parent = cur_node
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                list_parent = cur_node.parent();
             } else {
                 // Not text node
 
@@ -1155,9 +1129,7 @@ unsafe fn xml_xinclude_copy_range(
                 let tmp = xml_doc_copy_node(cur_node, (*ctxt).doc, 2);
                 list = tmp;
                 last = tmp;
-                list_parent = cur_node
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                list_parent = cur_node.parent();
                 if index1 > 1 {
                     // Do we need to position?
                     cur = xml_xinclude_get_nth_child(cur_node, index1 - 1);
@@ -1261,14 +1233,12 @@ unsafe fn xml_xinclude_copy_xpointer(
                     return None;
                 };
                 if let Some(mut last) = last {
-                    while let Some(next) = last
-                        .next
-                        .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
+                    while let Some(next) = last.next.map(|node| XmlNodePtr::try_from(node).unwrap())
                     {
                         last = next;
                     }
-                    copy.prev = NodePtr::from_ptr(last.as_ptr());
-                    last.next = NodePtr::from_ptr(copy.as_ptr());
+                    copy.prev = Some(last.into());
+                    last.next = Some(copy.into());
                 } else {
                     list = Some(copy);
                 }
@@ -1290,10 +1260,7 @@ unsafe fn xml_xinclude_copy_xpointer(
                     last = list;
                 }
                 if let Some(mut l) = last {
-                    while let Some(next) = l
-                        .next
-                        .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
-                    {
+                    while let Some(next) = l.next.map(|node| XmlNodePtr::try_from(node).unwrap()) {
                         l = next;
                     }
                     last = Some(l);
@@ -1725,7 +1692,7 @@ unsafe fn xml_xinclude_load_doc(
                     }
                     node = cur_node
                         .next
-                        .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
                 }
                 xml_free(cbase as _);
             }
@@ -2079,9 +2046,7 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeRefP
 
     if ret < 0 {
         // Time to try a fallback if available
-        let mut children = cur
-            .children
-            .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+        let mut children = cur.children.map(|c| XmlNodePtr::try_from(c).unwrap());
         while let Some(cur_node) = children {
             if cur_node.element_type() == XmlElementType::XmlElementNode
                 && cur_node.name().as_deref() == Some(XINCLUDE_FALLBACK)
@@ -2095,7 +2060,7 @@ unsafe fn xml_xinclude_load_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeRefP
             }
             children = cur_node
                 .next
-                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                .map(|node| XmlNodePtr::try_from(node).unwrap());
         }
     }
     if ret < 0 {
@@ -2192,9 +2157,7 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
             if cur.element_type() == XmlElementType::XmlElementNode {
                 nb_elem += 1;
             }
-            tmp = cur
-                .next
-                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+            tmp = cur.next.map(|node| XmlNodePtr::try_from(node).unwrap());
         }
         if nb_elem > 1 {
             xml_xinclude_err!(
@@ -2213,7 +2176,7 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
         while let Some(cur_node) = list {
             list = cur_node
                 .next
-                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                .map(|node| XmlNodePtr::try_from(node).unwrap());
 
             cur.add_prev_sibling(XmlGenericNodePtr::from(cur_node));
         }
@@ -2227,13 +2190,9 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
         }
         cur.typ = XmlElementType::XmlXIncludeStart;
         // Remove fallback children
-        let mut child = cur
-            .children()
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
+        let mut child = cur.children();
         while let Some(mut now) = child {
-            let next = now
-                .next()
-                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+            let next = now.next();
             now.unlink();
             xml_free_node(now);
             child = next;
@@ -2256,7 +2215,7 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXIncludeCtxtPtr, refe: XmlXIncludeR
         while let Some(cur_node) = list {
             list = cur_node
                 .next
-                .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+                .map(|node| XmlNodePtr::try_from(node).unwrap());
 
             end.add_prev_sibling(XmlGenericNodePtr::from(cur_node));
         }
@@ -2301,7 +2260,7 @@ unsafe fn xml_xinclude_do_process(ctxt: XmlXIncludeCtxtPtr, tree: XmlNodePtr) ->
                         XmlElementType::XmlDocumentNode | XmlElementType::XmlElementNode
                     )
                 })
-                .and_then(|children| XmlNodePtr::from_raw(children.as_ptr()).unwrap())
+                .map(|children| XmlNodePtr::try_from(children).unwrap())
             {
                 cur = children;
                 break 'inner;
@@ -2310,17 +2269,11 @@ unsafe fn xml_xinclude_do_process(ctxt: XmlXIncludeCtxtPtr, tree: XmlNodePtr) ->
                 if cur == tree {
                     break 'main;
                 }
-                if let Some(next) = cur
-                    .next
-                    .and_then(|next| XmlNodePtr::from_raw(next.as_ptr()).unwrap())
-                {
+                if let Some(next) = cur.next.map(|node| XmlNodePtr::try_from(node).unwrap()) {
                     cur = next;
                     break 'b;
                 }
-                let Some(next) = cur
-                    .parent
-                    .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).unwrap())
-                else {
+                let Some(next) = cur.parent.map(|p| XmlNodePtr::try_from(p).unwrap()) else {
                     break 'main;
                 };
 

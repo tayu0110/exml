@@ -3589,7 +3589,7 @@ pub unsafe fn xml_validate_element(
             }
 
             if let Some(children) = elem.children() {
-                elem = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
+                elem = children;
                 continue;
             }
         }
@@ -3602,15 +3602,9 @@ pub unsafe fn xml_validate_element(
             if elem.next().is_some() {
                 break;
             }
-            elem = elem
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                .unwrap();
+            elem = elem.parent().unwrap();
         }
-        elem = elem
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()))
-            .unwrap();
+        elem = elem.next().unwrap();
     }
 
     // done:
@@ -3705,9 +3699,7 @@ unsafe fn xml_validate_one_cdata_element(
         return 0;
     }
 
-    let child = elem
-        .children
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
+    let child = elem.children;
 
     let mut cur = child;
     'done: while let Some(now) = cur {
@@ -3718,13 +3710,10 @@ unsafe fn xml_validate_one_cdata_element(
                 // and process within the entity
                 if let Some(children) = now
                     .children
-                    .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
                     .filter(|children| children.children().is_some())
                 {
                     node_vpush(ctxt, now);
-                    cur = children
-                        .children()
-                        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
+                    cur = children.children();
                     continue;
                 }
             }
@@ -3739,17 +3728,13 @@ unsafe fn xml_validate_one_cdata_element(
             }
         }
         // Switch to next element
-        cur = now
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+        cur = now.next();
         while cur.is_none() {
             cur = node_vpop(ctxt).map(|node| node.into());
             let Some(now) = cur else {
                 break;
             };
-            cur = now
-                .next()
-                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+            cur = now.next();
         }
     }
     // done:
@@ -3849,9 +3834,7 @@ unsafe fn xml_snprintf_elements(
             | XmlElementType::XmlXIncludeEnd => {}
             _ => unreachable!(),
         }
-        cur = cur_node
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        cur = cur_node.next();
     }
     if glob != 0 {
         strcat(buf, c")".as_ptr() as _);
@@ -4404,15 +4387,10 @@ unsafe fn xml_validate_element_content(
                                 // and process within the entity
                                 if let Some(children) = cur_node
                                     .children
-                                    .and_then(|children| {
-                                        XmlGenericNodePtr::from_raw(children.as_ptr())
-                                    })
                                     .filter(|children| children.children().is_some())
                                 {
                                     node_vpush(ctxt, cur_node);
-                                    cur = children
-                                        .children()
-                                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                                    cur = children.children();
                                     continue;
                                 }
                             }
@@ -4462,17 +4440,13 @@ unsafe fn xml_validate_element_content(
                             _ => {}
                         }
                         // Switch to next element
-                        cur = cur_node
-                            .next()
-                            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                        cur = cur_node.next();
                         while cur.is_none() {
                             cur = node_vpop(ctxt).map(|node| node.into());
                             if cur.is_none() {
                                 break;
                             }
-                            cur = cur_node
-                                .next()
-                                .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                            cur = cur_node.next();
                         }
                     }
 
@@ -4930,9 +4904,7 @@ pub unsafe fn xml_validate_one_element(
                         );
                     }
                 } else {
-                    let mut child = elem
-                        .children
-                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                    let mut child = elem.children;
                     // Hum, this start to get messy
                     while let Some(cur_node) = child {
                         'child_ok: {
@@ -5056,9 +5028,7 @@ pub unsafe fn xml_validate_one_element(
                             }
                         }
                         // child_ok:
-                        child = cur_node
-                            .next()
-                            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                        child = cur_node.next();
                     }
                 }
             }
@@ -5067,9 +5037,7 @@ pub unsafe fn xml_validate_one_element(
                     // VC: Standalone Document Declaration
                     //     - element types with element content, if white space
                     //       occurs directly within any instance of those types.
-                    let mut child = elem
-                        .children()
-                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                    let mut child = elem.children();
                     while let Some(cur_node) = child {
                         if matches!(cur_node.element_type(), XmlElementType::XmlTextNode) {
                             let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
@@ -5093,14 +5061,10 @@ pub unsafe fn xml_validate_one_element(
                                 break;
                             }
                         }
-                        child = cur_node
-                            .next()
-                            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                        child = cur_node.next();
                     }
                 }
-                let child = elem
-                    .children
-                    .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                let child = elem.children;
                 // cont = (*elem_decl).content;
                 tmp = xml_validate_element_content(ctxt, child, elem_decl, 1, elem);
                 if tmp <= 0 {
@@ -6021,8 +5985,7 @@ unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const Xm
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
-                    attr.parent
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
+                    attr.parent.map(|p| p.into()),
                     XmlParserErrors::XmlDTDUnknownID,
                     format!("IDREF attribute {attr_name} references an unknown ID \"{name}\"\n")
                         .as_str(),
@@ -6056,8 +6019,7 @@ unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const Xm
                     let str = CStr::from_ptr(str as *const i8).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
-                        attr.parent
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
+                        attr.parent.map(|p| p.into()),
                         XmlParserErrors::XmlDTDUnknownID,
                         format!(
                             "IDREFS attribute {attr_name} references an unknown ID \"{str}\"\n"
@@ -6379,8 +6341,6 @@ pub unsafe fn xml_valid_get_valid_elements(
     names: *mut *const XmlChar,
     max: i32,
 ) -> i32 {
-    use crate::tree::NodePtr;
-
     let mut vctxt = XmlValidCtxt::default();
     let mut nb_valid_elements: i32;
     let mut elements: [*const XmlChar; 256] = [null(); 256];
@@ -6403,10 +6363,7 @@ pub unsafe fn xml_valid_get_valid_elements(
     nb_valid_elements = 0;
     let ref_node = prev.or(next).unwrap();
     // Why can I do `unwrap` for parent without checking ????????
-    let mut parent = ref_node
-        .parent()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-        .unwrap();
+    let mut parent = ref_node.parent().unwrap();
     let parname = CString::new(parent.name().unwrap().as_ref()).unwrap();
 
     // Retrieves the parent element declaration
@@ -6425,19 +6382,11 @@ pub unsafe fn xml_valid_get_valid_elements(
     };
 
     // Do a backup of the current tree structure
-    let prev_next = prev
-        .and_then(|prev| prev.next())
-        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
-    let next_prev = next
-        .and_then(|next| next.prev())
-        .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()));
+    let prev_next = prev.and_then(|prev| prev.next());
+    let next_prev = next.and_then(|next| next.prev());
 
-    let parent_childs = parent
-        .children()
-        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
-    let parent_last = parent
-        .last()
-        .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()));
+    let parent_childs = parent.children();
+    let parent_last = parent.last();
 
     // Creates a dummy node and insert it into the tree
     let Some(mut test_node) = xml_new_doc_node(ref_node.document(), None, "<!dummy?>", null_mut())
@@ -6445,9 +6394,9 @@ pub unsafe fn xml_valid_get_valid_elements(
         return -1;
     };
 
-    test_node.parent = NodePtr::from_ptr(parent.as_ptr());
-    test_node.prev = NodePtr::from_ptr(prev.map_or(null_mut(), |node| node.as_ptr()));
-    test_node.next = NodePtr::from_ptr(next.map_or(null_mut(), |node| node.as_ptr()));
+    test_node.parent = Some(parent);
+    test_node.prev = prev;
+    test_node.next = next;
     let name: *const XmlChar = test_node.name;
 
     if let Some(mut prev) = prev {
@@ -7296,16 +7245,12 @@ unsafe fn xml_validate_skip_ignorable(
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd => {
                 let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                child = cur_node
-                    .next
-                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                child = cur_node.next;
             }
             XmlElementType::XmlTextNode => {
                 let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
                 if cur_node.is_text_node() {
-                    child = cur_node
-                        .next
-                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    child = cur_node.next;
                 } else {
                     return child;
                 }

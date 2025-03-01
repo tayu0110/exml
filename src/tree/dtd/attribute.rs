@@ -164,9 +164,9 @@ impl XmlAttributePtr {
         }
     }
 
-    pub(crate) fn as_ptr(self) -> *mut XmlAttribute {
-        self.0.as_ptr()
-    }
+    // pub(crate) fn as_ptr(self) -> *mut XmlAttribute {
+    //     self.0.as_ptr()
+    // }
 
     /// Deallocate memory.
     ///

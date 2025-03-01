@@ -30,7 +30,7 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_input_from_file, xml_new_parser_ctxt,
         xml_read_file, XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNode},
+    tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
     xpath::{
         xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
     },
@@ -286,11 +286,7 @@ unsafe fn xmlconf_test_not_wf(
     ret
 }
 
-unsafe fn xmlconf_test_item(
-    logfile: &mut Option<File>,
-    doc: XmlDocPtr,
-    cur: *mut XmlNode,
-) -> c_int {
+unsafe fn xmlconf_test_item(logfile: &mut Option<File>, doc: XmlDocPtr, cur: XmlNodePtr) -> c_int {
     let mut ret: c_int = -1;
     let mut options: c_int = 0;
     let mut nstest: c_int = 0;
@@ -299,8 +295,8 @@ unsafe fn xmlconf_test_item(
     TEST_ERRORS[0] = 0;
     NB_ERROR = 0;
     NB_FATAL = 0;
-    let Some(id) = (*cur).get_prop("ID") else {
-        test_log!(logfile, "test missing ID, line {}\n", (*cur).get_line_no());
+    let Some(id) = cur.get_prop("ID") else {
+        test_log!(logfile, "test missing ID, line {}\n", cur.get_line_no());
         return ret;
     };
     for &skipped in SKIPPED_TESTS {
@@ -312,28 +308,28 @@ unsafe fn xmlconf_test_item(
             return ret;
         }
     }
-    let Some(typ) = (*cur).get_prop("TYPE") else {
+    let Some(typ) = cur.get_prop("TYPE") else {
         test_log!(logfile, "test {id} missing TYPE\n",);
         return ret;
     };
-    let Some(uri) = (*cur).get_prop("URI") else {
+    let Some(uri) = cur.get_prop("URI") else {
         test_log!(logfile, "test {id} missing URI\n",);
         return ret;
     };
-    let base = (*cur).get_base(Some(doc));
+    let base = cur.get_base(Some(doc));
     let filename = compose_dir(base.as_deref(), &uri);
     if !check_test_file(filename.as_str()) {
         test_log!(logfile, "test {id} missing file {filename} \n",);
         return ret;
     }
 
-    let version = (*cur).get_prop("VERSION");
-    let entities = (*cur).get_prop("ENTITIES");
+    let version = cur.get_prop("VERSION");
+    let entities = cur.get_prop("ENTITIES");
     if entities.as_deref() != Some("none") {
         options |= XmlParserOption::XmlParseDTDLoad as i32;
         options |= XmlParserOption::XmlParseNoEnt as i32;
     }
-    let rec = (*cur).get_prop("RECOMMENDATION");
+    let rec = cur.get_prop("RECOMMENDATION");
     if rec.as_deref().map_or(true, |rec| {
         rec == "XML1.0"
             || rec == "XML1.0-errata2e"
@@ -359,7 +355,7 @@ unsafe fn xmlconf_test_item(
         // goto error;
         return ret;
     }
-    let edition = (*cur).get_prop("EDITION");
+    let edition = cur.get_prop("EDITION");
     if edition.as_deref().filter(|e| !e.contains('5')).is_some() {
         // test limited to all versions before 5th
         options |= XmlParserOption::XmlParseOld10 as i32;
@@ -420,7 +416,7 @@ unsafe fn xmlconf_test_item(
 unsafe fn xmlconf_test_cases(
     logfile: &mut Option<File>,
     doc: XmlDocPtr,
-    mut cur: *mut XmlNode,
+    cur: XmlNodePtr,
     mut level: c_int,
 ) -> c_int {
     let mut ret: c_int = 0;
@@ -428,64 +424,62 @@ unsafe fn xmlconf_test_cases(
     let mut output: c_int = 0;
 
     if level == 1 {
-        if let Some(profile) = (*cur).get_prop("PROFILE") {
+        if let Some(profile) = cur.get_prop("PROFILE") {
             output = 1;
             level += 1;
             println!("Test cases: {profile}",);
         }
     }
-    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-    while !cur.is_null() {
+    let mut cur = cur.children();
+    while let Some(cur_node) = cur {
         // look only at elements we ignore everything else
-        if (*cur).element_type() == XmlElementType::XmlElementNode {
-            if xml_str_equal((*cur).name, c"TESTCASES".as_ptr() as _) {
-                ret += xmlconf_test_cases(logfile, doc, cur, level);
-            } else if xml_str_equal((*cur).name, c"TEST".as_ptr() as _) {
-                if xmlconf_test_item(logfile, doc, cur) >= 0 {
+        if cur_node.element_type() == XmlElementType::XmlElementNode {
+            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+            if xml_str_equal(cur_node.name, c"TESTCASES".as_ptr() as _) {
+                ret += xmlconf_test_cases(logfile, doc, cur_node, level);
+            } else if xml_str_equal(cur_node.name, c"TEST".as_ptr() as _) {
+                if xmlconf_test_item(logfile, doc, cur_node) >= 0 {
                     ret += 1;
                 }
                 tests += 1;
             } else {
                 eprintln!(
                     "Unhandled element {}",
-                    CStr::from_ptr((*cur).name as _).to_string_lossy(),
+                    CStr::from_ptr(cur_node.name as _).to_string_lossy(),
                 );
             }
         }
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+        cur = cur_node.next();
     }
-    if (output == 1) && (tests > 0) {
+    if output == 1 && tests > 0 {
         println!("Test cases: {} tests", tests);
     }
     ret
 }
 
-unsafe fn xmlconf_test_suite(
-    logfile: &mut Option<File>,
-    doc: XmlDocPtr,
-    mut cur: *mut XmlNode,
-) -> c_int {
+unsafe fn xmlconf_test_suite(logfile: &mut Option<File>, doc: XmlDocPtr, cur: XmlNodePtr) -> c_int {
     let mut ret: c_int = 0;
 
-    if let Some(profile) = (*cur).get_prop("PROFILE") {
+    if let Some(profile) = cur.get_prop("PROFILE") {
         println!("Test suite: {profile}",);
     } else {
         println!("Test suite");
     }
-    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-    while !cur.is_null() {
+    let mut cur = cur.children();
+    while let Some(cur_node) = cur {
         // look only at elements we ignore everything else
-        if (*cur).element_type() == XmlElementType::XmlElementNode {
-            if xml_str_equal((*cur).name, c"TESTCASES".as_ptr() as _) {
-                ret += xmlconf_test_cases(logfile, doc, cur, 1);
+        if cur_node.element_type() == XmlElementType::XmlElementNode {
+            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+            if xml_str_equal(cur_node.name, c"TESTCASES".as_ptr() as _) {
+                ret += xmlconf_test_cases(logfile, doc, cur_node, 1);
             } else {
                 eprintln!(
                     "Unhandled element {}",
-                    CStr::from_ptr((*cur).name as _).to_string_lossy(),
+                    CStr::from_ptr(cur_node.name as _).to_string_lossy(),
                 );
             }
         }
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+        cur = cur_node.next();
     }
     ret
 }
@@ -511,7 +505,7 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         return -1;
     };
 
-    let Some(cur) = (*doc)
+    let Some(cur) = doc
         .get_root_element()
         .filter(|cur| xml_str_equal(cur.name, c"TESTSUITE".as_ptr() as _))
     else {
@@ -520,7 +514,7 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         xml_free_doc(doc);
         return -1;
     };
-    let ret = xmlconf_test_suite(logfile, doc, cur.into());
+    let ret = xmlconf_test_suite(logfile, doc, cur);
     xml_free_doc(doc);
     ret
 }

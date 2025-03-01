@@ -2061,9 +2061,7 @@ pub unsafe fn xml_parse_in_node_context(
                 | XmlElementType::XmlHTMLDocumentNode
         )
     }) {
-        node = now
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        node = now.parent();
     }
     let Some(mut node) = node else {
         return XmlParserErrors::XmlErrInternalError;
@@ -2140,9 +2138,7 @@ pub unsafe fn xml_parse_in_node_context(
                 }
                 ns = cur_ns.next;
             }
-            cur = now
-                .parent()
-                .and_then(|p| XmlNodePtr::from_raw(p.as_ptr()).ok().flatten());
+            cur = now.parent().and_then(|p| XmlNodePtr::try_from(p).ok());
         }
     }
 
@@ -2190,10 +2186,7 @@ pub unsafe fn xml_parse_in_node_context(
     // Return the newly created nodeset after unlinking it from
     // the pseudo sibling.
 
-    let mut cur = fake
-        .next
-        .take()
-        .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+    let mut cur = fake.next.take().map(XmlGenericNodePtr::from);
     node.set_last(Some(fake.into()));
 
     if let Some(mut cur) = cur {
@@ -2204,9 +2197,7 @@ pub unsafe fn xml_parse_in_node_context(
 
     while let Some(mut now) = cur {
         now.set_parent(None);
-        cur = now
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        cur = now.next();
     }
 
     fake.unlink();
@@ -2317,10 +2308,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     (*ctxt).detect_sax2();
 
     if let Some(mut doc) = doc {
-        let content = doc
-            .children
-            .take()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        let content = doc.children.take();
         xml_parse_content(ctxt);
         doc.children = content;
     } else {
@@ -2354,9 +2342,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             while let Some(mut now) = cur {
                 now.set_doc(doc);
                 now.set_parent(None);
-                cur = now
-                    .next()
-                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                cur = now.next();
             }
             new_doc.children().unwrap().set_children(None);
         }
@@ -2447,7 +2433,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     (*ctxt).node_push(
         new_doc
             .children
-            .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap())
+            .map(|c| XmlNodePtr::try_from(c).unwrap())
             .unwrap(),
     );
     (*ctxt).my_doc = Some(doc);
@@ -2542,17 +2528,11 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     } else {
         if let Some(list) = list {
             // Return the newly created nodeset after unlinking it from they pseudo parent.
-            let mut cur = new_doc
-                .children()
-                .unwrap()
-                .children()
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+            let mut cur = new_doc.children().unwrap().children();
             *list = cur;
             while let Some(mut now) = cur {
                 now.set_parent(None);
-                cur = now
-                    .next()
-                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                cur = now.next();
             }
             new_doc.children().unwrap().set_children(None);
         }

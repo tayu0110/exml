@@ -2539,8 +2539,7 @@ unsafe fn xml_parse_xml_catalog_node(
             // Recurse to propagate prefer to the subtree
             // (xml:base handling is automated)
             xml_parse_xml_catalog_node_list(
-                cur.children
-                    .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap()),
+                cur.children.map(|c| XmlNodePtr::try_from(c).unwrap()),
                 prefer,
                 parent,
                 Some(entry),
@@ -2567,8 +2566,8 @@ unsafe fn xml_parse_xml_catalog_node_list(
             xml_parse_xml_catalog_node(cur_node, prefer, parent.clone(), cgroup.clone());
         }
         cur = cur_node
-            .next
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+            .next()
+            .map(|node| XmlNodePtr::try_from(node).unwrap());
     }
     /* TODO: sort the list according to REWRITE lengths and prefer value */
 }
@@ -2624,9 +2623,7 @@ unsafe fn xml_parse_xml_catalog_file(
                 );
             }
         }
-        let cur = cur
-            .children
-            .and_then(|c| XmlNodePtr::from_raw(c.as_ptr()).unwrap());
+        let cur = cur.children.map(|c| XmlNodePtr::try_from(c).unwrap());
         xml_parse_xml_catalog_node_list(cur, prefer, Some(parent.clone()), None);
         xml_free_doc(doc);
         Some(parent.node)

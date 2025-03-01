@@ -69,8 +69,7 @@ use exml::{
     relaxng::xml_relaxng_init_types,
     tree::{
         xml_free_doc, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode,
-        XmlNodePtr,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
     xpath::XmlXPathObjectPtr,
@@ -4272,17 +4271,13 @@ unsafe fn pattern_test(
 unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObjectPtr {
     use exml::{
         globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
-        libxml::{
-            parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
-            xmlstring::xml_str_equal,
-        },
+        libxml::parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
+        tree::NodeCommon,
         xpath::{
             internals::xml_xpath_register_ns, xml_xpath_eval_expression, xml_xpath_free_context,
             xml_xpath_new_context, XmlXPathContextPtr,
         },
     };
-
-    let mut node: *mut XmlNode;
 
     // load XPath expr as a file
     set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
@@ -4304,18 +4299,18 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
         return null_mut();
     }
 
-    node = doc.children.map_or(null_mut(), |c| c.as_ptr());
-    while !node.is_null() && !xml_str_equal((*node).name, c"XPath".as_ptr() as *const XmlChar) {
-        node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
+    let mut node = doc.children();
+    while let Some(now) = node.filter(|node| node.name().as_deref() != Some("XPath")) {
+        node = now.next();
     }
 
-    if node.is_null() {
+    let Some(node) = node else {
         eprintln!("Error: XPath element expected in the file  \"{filename}\"");
         xml_free_doc(doc);
         return null_mut();
-    }
+    };
 
-    let Some(expr) = (*node).get_content() else {
+    let Some(expr) = node.get_content() else {
         eprintln!("Error: XPath content element is NULL \"{filename}\"");
         xml_free_doc(doc);
         return null_mut();
@@ -4329,7 +4324,8 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
     }
 
     // Register namespaces
-    let mut ns = (*node).ns_def;
+    let node = XmlNodePtr::try_from(node).unwrap();
+    let mut ns = node.ns_def;
     while let Some(now) = ns {
         if xml_xpath_register_ns(ctx, now.prefix, now.href) != 0 {
             eprintln!(

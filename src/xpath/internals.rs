@@ -3979,10 +3979,7 @@ unsafe fn xml_xpath_run_stream_eval(
                             if cur.children().is_none() || depth >= max_depth {
                                 // ret =
                                 xml_stream_pop(patstream);
-                                while let Some(next) = cur
-                                    .next()
-                                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                                {
+                                while let Some(next) = cur.next() {
                                     cur = next;
                                     if !matches!(
                                         cur.element_type(),
@@ -4003,11 +4000,7 @@ unsafe fn xml_xpath_run_stream_eval(
                 if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
                     break 'main;
                 }
-                if let Some(children) = cur
-                    .children()
-                    .filter(|_| depth < max_depth)
-                    .and_then(|cur| XmlGenericNodePtr::from_raw(cur.as_ptr()))
-                {
+                if let Some(children) = cur.children().filter(|_| depth < max_depth) {
                     // Do not descend on entities declarations
                     if !matches!(children.element_type(), XmlElementType::XmlEntityDecl) {
                         cur = children;
@@ -4023,10 +4016,7 @@ unsafe fn xml_xpath_run_stream_eval(
                     break 'main;
                 }
 
-                while let Some(next) = cur
-                    .next()
-                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                {
+                while let Some(next) = cur.next() {
                     cur = next;
                     if !matches!(
                         cur.element_type(),
@@ -4041,10 +4031,7 @@ unsafe fn xml_xpath_run_stream_eval(
             }
 
             'inner: loop {
-                let Some(parent) = cur
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                else {
+                let Some(parent) = cur.parent() else {
                     break 'main;
                 };
                 depth -= 1;
@@ -4068,10 +4055,7 @@ unsafe fn xml_xpath_run_stream_eval(
                     // ret =
                     xml_stream_pop(patstream);
                 };
-                if let Some(next) = cur
-                    .next()
-                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                {
+                if let Some(next) = cur.next() {
                     cur = next;
                     break 'inner;
                 }
@@ -4152,11 +4136,11 @@ unsafe fn xml_xpath_next_child_element(
             // URGENT TODO: entify-refs as well?
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode => {
-                let mut cur = cur.children().and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))?;
+                let mut cur = cur.children()?;
                 if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
                     return Some(cur);
                 }
-                while let Some(next) = cur.next().filter(|next| !matches!(next.element_type(), XmlElementType::XmlElementNode)).and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr())) {
+                while let Some(next) = cur.next().filter(|next| !matches!(next.element_type(), XmlElementType::XmlElementNode)) {
                     cur = next;
                 }
                 return Some(cur);
@@ -4184,9 +4168,7 @@ unsafe fn xml_xpath_next_child_element(
             return None;
         }
     }
-    let next = cur
-        .next()
-        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))?;
+    let next = cur.next()?;
     if matches!(next.element_type(), XmlElementType::XmlElementNode) {
         return Some(next);
     }
@@ -4194,7 +4176,6 @@ unsafe fn xml_xpath_next_child_element(
     while let Some(next) = cur
         .next()
         .filter(|next| !matches!(next.element_type(), XmlElementType::XmlElementNode))
-        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
     {
         cur = next;
     }
@@ -4221,17 +4202,13 @@ unsafe fn xml_xpath_next_preceding_internal(
     let mut cur = cur.or_else(|| {
         let mut cur = (*(*ctxt).context).node?;
         if matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
-            cur = cur
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
+            cur = cur.parent()?;
         } else if let Ok(ns) = XmlNsPtr::try_from(cur) {
             cur = ns
                 .node
                 .filter(|node| node.element_type() != XmlElementType::XmlNamespaceDecl)?;
         }
-        (*ctxt).ancestor = cur
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        (*ctxt).ancestor = cur.parent();
         Some(cur)
     })?;
     if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -4240,37 +4217,21 @@ unsafe fn xml_xpath_next_preceding_internal(
     if let Some(prev) = cur
         .prev()
         .filter(|p| matches!(p.element_type(), XmlElementType::XmlDTDNode))
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
     {
         cur = prev;
     }
     while cur.prev().is_none() {
-        cur = cur
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
-        if Some(cur)
-            == (*(*ctxt).context)
-                .doc
-                .unwrap()
-                .children
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
-        {
+        cur = cur.parent()?;
+        if Some(cur) == (*(*ctxt).context).doc.unwrap().children {
             return None;
         }
         if Some(cur) != (*ctxt).ancestor {
             return Some(cur);
         }
-        (*ctxt).ancestor = cur
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        (*ctxt).ancestor = cur.parent();
     }
-    cur = cur
-        .prev()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
-    while let Some(last) = cur
-        .last()
-        .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
-    {
+    cur = cur.prev()?;
+    while let Some(last) = cur.last() {
         cur = last;
     }
     Some(cur)
@@ -7182,10 +7143,7 @@ unsafe fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
             .map(|root| root.into())
         {
             node = tmp;
-        } else if let Some(tmp) = node
-            .children()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
-        {
+        } else if let Some(tmp) = node.children() {
             node = tmp;
         } else {
             return 0;
@@ -7220,12 +7178,9 @@ unsafe fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
         }
         XmlElementType::XmlAttributeNode => {
             let attr = XmlAttrPtr::try_from(node).unwrap();
-            attr.children
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
+            attr.children.map(XmlGenericNodePtr::from)
         }
-        XmlElementType::XmlElementNode => node
-            .children()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr())),
+        XmlElementType::XmlElementNode => node.children(),
         _ => {
             return 0;
         }
@@ -7250,14 +7205,10 @@ unsafe fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
             }
         }
         // Skip to next node
-        if let Some(children) = now
-            .children()
-            .filter(|children| {
-                !matches!(now.element_type(), XmlElementType::XmlDTDNode)
-                    && !matches!(children.element_type(), XmlElementType::XmlEntityDecl)
-            })
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-        {
+        if let Some(children) = now.children().filter(|children| {
+            !matches!(now.element_type(), XmlElementType::XmlDTDNode)
+                && !matches!(children.element_type(), XmlElementType::XmlEntityDecl)
+        }) {
             tmp = Some(children);
             continue;
         }
@@ -7265,28 +7216,19 @@ unsafe fn xml_xpath_node_val_hash(node: Option<XmlGenericNodePtr>) -> u32 {
             break;
         }
 
-        if let Some(next) = now
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-        {
+        if let Some(next) = now.next() {
             tmp = Some(next);
             continue;
         }
 
         tmp = loop {
-            let Some(tmp) = now
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-            else {
+            let Some(tmp) = now.parent() else {
                 break None;
             };
             if tmp == node {
                 break None;
             }
-            if let Some(next) = tmp
-                .next()
-                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-            {
+            if let Some(next) = tmp.next() {
                 break Some(next);
             }
         };
@@ -8459,17 +8401,13 @@ pub unsafe fn xml_xpath_next_child(
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlNotationNode
             | XmlElementType::XmlDTDNode => {
-                return node
-                    .children()
-                    .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                return node.children();
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlHTMLDocumentNode => {
-                return node
-                    .children()
-                    .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                return node.children();
             }
             XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
@@ -8490,7 +8428,6 @@ pub unsafe fn xml_xpath_next_child(
         return None;
     }
     cur.next()
-        .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()))
 }
 
 /// Traversal function for the "descendant" direction
@@ -8516,15 +8453,9 @@ pub unsafe fn xml_xpath_next_descendant(
         }
 
         if (*(*ctxt).context).node == (*(*ctxt).context).doc.map(|doc| doc.into()) {
-            return (*(*ctxt).context)
-                .doc
-                .unwrap()
-                .children
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+            return (*(*ctxt).context).doc.unwrap().children;
         }
-        return node
-            .children()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        return node.children();
     };
 
     if matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -8533,7 +8464,7 @@ pub unsafe fn xml_xpath_next_descendant(
     if let Some(children) = cur.children() {
         // Do not descend on entities declarations
         if !matches!(children.element_type(), XmlElementType::XmlEntityDecl) {
-            cur = XmlGenericNodePtr::from_raw(children.as_ptr()).unwrap();
+            cur = children;
             // Skip DTDs
             if !matches!(cur.element_type(), XmlElementType::XmlDTDNode) {
                 return Some(cur);
@@ -8545,10 +8476,7 @@ pub unsafe fn xml_xpath_next_descendant(
         return None;
     }
 
-    while let Some(next) = cur
-        .next()
-        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-    {
+    while let Some(next) = cur.next() {
         cur = next;
         if !matches!(
             cur.element_type(),
@@ -8559,16 +8487,11 @@ pub unsafe fn xml_xpath_next_descendant(
     }
 
     loop {
-        cur = cur
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
+        cur = cur.parent()?;
         if Some(cur) == (*(*ctxt).context).node {
             return None;
         }
-        if let Some(next) = cur
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-        {
+        if let Some(next) = cur.next() {
             cur = next;
             return Some(cur);
         }
@@ -8650,13 +8573,11 @@ pub unsafe fn xml_xpath_next_parent(
                 {
                     return None;
                 }
-                return XmlGenericNodePtr::from_raw(parent.as_ptr());
+                return Some(parent);
             }
             XmlElementType::XmlAttributeNode => {
                 let att = XmlAttrPtr::try_from(node).unwrap();
-                return att
-                    .parent
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                return att.parent.map(XmlGenericNodePtr::from);
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
@@ -8726,10 +8647,8 @@ pub unsafe fn xml_xpath_next_following_sibling(
     }
     if let Some(cur) = cur {
         cur.next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()))
     } else {
         node.next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()))
     }
 }
 
@@ -8756,7 +8675,6 @@ pub unsafe fn xml_xpath_next_following(
             )
         })
         .and_then(|cur| cur.children())
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
     {
         return Some(children);
     }
@@ -8765,7 +8683,6 @@ pub unsafe fn xml_xpath_next_following(
         let cur = (*(*ctxt).context).node?;
         if let Ok(attr) = XmlAttrPtr::try_from(cur) {
             attr.parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
         } else if let Ok(ns) = XmlNsPtr::try_from(cur) {
             ns.node
                 .filter(|node| node.element_type() != XmlElementType::XmlNamespaceDecl)
@@ -8773,23 +8690,15 @@ pub unsafe fn xml_xpath_next_following(
             None
         }
     })?;
-    if let Some(next) = (*cur)
-        .next()
-        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-    {
+    if let Some(next) = (*cur).next() {
         return Some(next);
     }
     loop {
-        cur = cur
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
+        cur = cur.parent()?;
         if Some(cur) == (*(*ctxt).context).doc.map(|doc| doc.into()) {
             break None;
         }
-        if let Some(next) = (*cur)
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-        {
+        if let Some(next) = (*cur).next() {
             break Some(next);
         }
     }
@@ -8868,7 +8777,6 @@ pub unsafe fn xml_xpath_next_attribute(
         .filter(|node| node.element_type() == XmlElementType::XmlElementNode)?;
     if let Some(cur) = cur {
         cur.next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()))
     } else {
         if (*(*ctxt).context).node == (*(*ctxt).context).doc.map(|doc| doc.into()) {
             return None;
@@ -8905,10 +8813,7 @@ unsafe fn xml_xpath_is_ancestor(
     if Some(node) == ancestor.document().map(|doc| doc.into()) {
         return 0;
     }
-    while let Some(parent) = node
-        .parent()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-    {
+    while let Some(parent) = node.parent() {
         if parent == ancestor {
             return 1;
         }
@@ -8936,7 +8841,6 @@ pub unsafe fn xml_xpath_next_preceding(
         let cur = (*(*ctxt).context).node?;
         if matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
             cur.parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
         } else if let Ok(ns) = XmlNsPtr::try_from(cur) {
             ns.node
                 .filter(|node| node.element_type() != XmlElementType::XmlNamespaceDecl)
@@ -8950,35 +8854,20 @@ pub unsafe fn xml_xpath_next_preceding(
     if let Some(prev) = cur
         .prev()
         .filter(|p| matches!(p.element_type(), XmlElementType::XmlDTDNode))
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
     {
         cur = prev;
     }
     loop {
-        if let Some(prev) = cur
-            .prev()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-        {
+        if let Some(prev) = cur.prev() {
             cur = prev;
-            while let Some(last) = cur
-                .last()
-                .and_then(|l| XmlGenericNodePtr::from_raw(l.as_ptr()))
-            {
+            while let Some(last) = cur.last() {
                 cur = last;
             }
             break Some(cur);
         }
 
-        cur = cur
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))?;
-        if Some(cur)
-            == (*(*ctxt).context)
-                .doc
-                .unwrap()
-                .children
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
-        {
+        cur = cur.parent()?;
+        if Some(cur) == (*(*ctxt).context).doc.unwrap().children {
             break None;
         }
         if xml_xpath_is_ancestor(Some(cur), (*(*ctxt).context).node) == 0 {
@@ -9035,13 +8924,11 @@ pub unsafe fn xml_xpath_next_ancestor(
                 {
                     return None;
                 }
-                return XmlGenericNodePtr::from_raw(parent.as_ptr());
+                return Some(parent);
             }
             XmlElementType::XmlAttributeNode => {
                 let tmp = XmlAttrPtr::try_from(node).unwrap();
-                return tmp
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                return tmp.parent();
             }
             XmlElementType::XmlDocumentNode
             | XmlElementType::XmlDocumentTypeNode
@@ -9063,13 +8950,7 @@ pub unsafe fn xml_xpath_next_ancestor(
             _ => unreachable!(),
         }
     };
-    if Some(cur)
-        == (*(*ctxt).context)
-            .doc
-            .unwrap()
-            .children
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
-    {
+    if Some(cur) == (*(*ctxt).context).doc.unwrap().children {
         return (*(*ctxt).context).doc.map(|doc| doc.into());
     }
     if Some(cur) == (*(*ctxt).context).doc.map(|doc| doc.into()) {
@@ -9090,7 +8971,7 @@ pub unsafe fn xml_xpath_next_ancestor(
         | XmlElementType::XmlEntityDecl
         | XmlElementType::XmlXIncludeStart
         | XmlElementType::XmlXIncludeEnd => {
-            let parent = (*cur).parent()?;
+            let parent = cur.parent()?;
 
             if XmlNodePtr::try_from(parent)
                 .ok()
@@ -9102,12 +8983,11 @@ pub unsafe fn xml_xpath_next_ancestor(
             {
                 return None;
             }
-            XmlGenericNodePtr::from_raw(parent.as_ptr())
+            Some(parent)
         }
         XmlElementType::XmlAttributeNode => {
             let att = XmlAttrPtr::try_from(cur).unwrap();
-            att.parent
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+            att.parent.map(XmlGenericNodePtr::from)
         }
         XmlElementType::XmlNamespaceDecl => {
             let ns = XmlNsPtr::try_from(cur).unwrap();
@@ -9154,19 +9034,12 @@ pub unsafe fn xml_xpath_next_preceding_sibling(
         return None;
     }
     let Some(mut cur) = cur else {
-        return context_node
-            .prev()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        return context_node.prev();
     };
-    if let Some(prev) = cur
-        .prev()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-        .and_then(|p| XmlDtdPtr::try_from(p).ok())
-    {
+    if let Some(prev) = cur.prev().and_then(|p| XmlDtdPtr::try_from(p).ok()) {
         cur = prev.into();
     }
     cur.prev()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
 }
 
 /// Implement the last() XPath function
@@ -9268,8 +9141,7 @@ unsafe fn xml_xpath_get_elements_by_ids(
             // if (xmlValidateNCName(ID, 1) == 0)
             if let Some(attr) = xml_get_id(doc, id) {
                 let elem = if let Ok(attr) = attr {
-                    attr.parent
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
+                    attr.parent.map(XmlGenericNodePtr::from)
                 // The following branch can not be reachable
                 // because `xml_get_id` can only return `XmlAttrPtr` or `XmlDocPtr`...
                 // What is the purpose of this branch ???

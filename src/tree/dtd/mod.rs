@@ -45,7 +45,7 @@ use crate::{
 
 use super::{
     xml_free_entities_table, xml_free_node, xml_tree_err_memory, InvalidNodePointerCastError,
-    NodeCommon, NodePtr, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr,
+    NodeCommon, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr,
     __XML_REGISTER_CALLBACKS,
 };
 
@@ -56,15 +56,15 @@ pub use notation::*;
 
 #[repr(C)]
 pub struct XmlDtd {
-    pub _private: *mut c_void,            /* application data */
-    pub(crate) typ: XmlElementType,       /* XML_DTD_NODE, must be second ! */
-    pub(crate) name: *const XmlChar,      /* Name of the DTD */
-    pub(crate) children: Option<NodePtr>, /* the value of the property link */
-    pub(crate) last: Option<NodePtr>,     /* last child link */
-    pub(crate) parent: Option<XmlDocPtr>, /* child->parent link */
-    pub(crate) next: Option<NodePtr>,     /* next sibling link  */
-    pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
-    pub(crate) doc: Option<XmlDocPtr>,    /* the containing document */
+    pub _private: *mut c_void,                      /* application data */
+    pub(crate) typ: XmlElementType,                 /* XML_DTD_NODE, must be second ! */
+    pub(crate) name: *const XmlChar,                /* Name of the DTD */
+    pub(crate) children: Option<XmlGenericNodePtr>, /* the value of the property link */
+    pub(crate) last: Option<XmlGenericNodePtr>,     /* last child link */
+    pub(crate) parent: Option<XmlDocPtr>,           /* child->parent link */
+    pub(crate) next: Option<XmlGenericNodePtr>,     /* next sibling link  */
+    pub(crate) prev: Option<XmlGenericNodePtr>,     /* previous sibling link  */
+    pub(crate) doc: Option<XmlDocPtr>,              /* the containing document */
 
     // End of common part
     pub(crate) notations: Option<Box<XmlHashTable<'static, XmlNotation>>>, /* Hash table for notations if any */
@@ -176,31 +176,27 @@ impl NodeCommon for XmlDtd {
     }
     fn children(&self) -> Option<XmlGenericNodePtr> {
         self.children
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_children(&mut self, children: Option<XmlGenericNodePtr>) {
-        self.children = children.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.children = children
     }
     fn last(&self) -> Option<XmlGenericNodePtr> {
         self.last
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_last(&mut self, last: Option<XmlGenericNodePtr>) {
-        self.last = last.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.last = last
     }
     fn next(&self) -> Option<XmlGenericNodePtr> {
         self.next
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
-        self.next = next.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.next = next
     }
     fn prev(&self) -> Option<XmlGenericNodePtr> {
         self.prev
-            .and_then(|node| XmlGenericNodePtr::from_raw(node.as_ptr()))
     }
     fn set_prev(&mut self, prev: Option<XmlGenericNodePtr>) {
-        self.prev = prev.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.prev = prev
     }
     fn parent(&self) -> Option<XmlGenericNodePtr> {
         self.parent.map(|node| node.into())
@@ -369,9 +365,9 @@ impl XmlDtdPtr {
         }
     }
 
-    pub(crate) fn as_ptr(self) -> *mut XmlDtd {
-        self.0.as_ptr()
-    }
+    // pub(crate) fn as_ptr(self) -> *mut XmlDtd {
+    //     self.0.as_ptr()
+    // }
 
     /// Deallocate memory.
     ///
@@ -461,17 +457,12 @@ pub unsafe fn xml_free_dtd(mut cur: XmlDtdPtr) {
         xml_deregister_node_default_value(cur.into());
     }
 
-    if let Some(children) = (*cur)
-        .children()
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-    {
+    if let Some(children) = (*cur).children() {
         // Cleanup all nodes which are not part of the specific lists
         // of notations, elements, attributes and entities.
         let mut c = Some(children);
         while let Some(mut now) = c {
-            let next = now
-                .next()
-                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+            let next = now.next();
             if !matches!(
                 now.element_type(),
                 XmlElementType::XmlNotationNode

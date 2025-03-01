@@ -474,10 +474,7 @@ impl<'a> XmlSaveCtxt<'a> {
                     }
                 }
             }
-            if let Some(children) = cur
-                .children
-                .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-            {
+            if let Some(children) = cur.children {
                 let mut child = Some(children);
 
                 while let Some(now) = child {
@@ -498,9 +495,7 @@ impl<'a> XmlSaveCtxt<'a> {
                     ) {
                         self.buf.borrow_mut().write_bytes(b"\n");
                     }
-                    child = now
-                        .next()
-                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+                    child = now.next();
                 }
             }
         }
@@ -773,9 +768,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
     let mut end: *mut u8;
 
     let root = cur;
-    let mut parent = cur
-        .parent()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+    let mut parent = cur.parent();
     loop {
         match cur.element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
@@ -788,15 +781,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
             }
             XmlElementType::XmlDocumentFragNode => {
                 // Always validate cur.parent when descending.
-                if let Some(children) = cur
-                    .children()
-                    .filter(|_| {
-                        cur.parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                            == parent
-                    })
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                {
+                if let Some(children) = cur.children().filter(|_| cur.parent() == parent) {
                     parent = Some(cur);
                     cur = children;
                     continue;
@@ -828,12 +813,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
 
                 // Some users like lxml are known to pass nodes with a corrupted
                 // tree structure. Fall back to a recursive call to handle this case.
-                if cur
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                    != parent
-                    && cur.children().is_some()
-                {
+                if cur.parent() != parent && cur.children().is_some() {
                     xml_node_dump_output_internal(ctxt, cur);
                 } else {
                     ctxt.buf.borrow_mut().write_bytes(b"<");
@@ -854,10 +834,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
                         attr = now.next;
                     }
 
-                    if let Some(children) = cur
-                        .children()
-                        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-                    {
+                    if let Some(children) = cur.children() {
                         if ctxt.format == 1 {
                             let mut tmp = Some(children);
                             while let Some(now) = tmp {
@@ -871,9 +848,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
                                     unformatted_node = Some(cur);
                                     break;
                                 }
-                                tmp = now
-                                    .next()
-                                    .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                                tmp = now.next();
                             }
                         }
                         if ctxt.format == 2 {
@@ -1055,19 +1030,14 @@ pub(crate) unsafe fn xml_node_dump_output_internal(
             {
                 ctxt.buf.borrow_mut().write_bytes(b"\n");
             }
-            if let Some(next) = cur
-                .next()
-                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-            {
+            if let Some(next) = cur.next() {
                 cur = next;
                 break;
             }
 
             cur = parent.unwrap();
             // cur.parent was validated when descending.
-            parent = cur
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+            parent = cur.parent();
 
             if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
                 let cur = XmlNodePtr::try_from(cur).unwrap();
@@ -1153,14 +1123,10 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
     let level: i32 = ctxt.level;
     ctxt.format = 0;
     ctxt.level = -1;
-    let mut cur = dtd
-        .children
-        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+    let mut cur = dtd.children;
     while let Some(now) = cur {
         xml_node_dump_output_internal(ctxt, now);
-        cur = now
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        cur = now.next();
     }
     ctxt.format = format;
     ctxt.level = level;
@@ -1322,9 +1288,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
     let mut end: *mut u8;
 
     let root = cur;
-    let mut parent = cur
-        .parent()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+    let mut parent = cur.parent();
     loop {
         match cur.element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
@@ -1341,15 +1305,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
             }
             XmlElementType::XmlDocumentFragNode => {
                 // Always validate cur.parent when descending.
-                if let Some(children) = cur
-                    .children()
-                    .filter(|_| {
-                        cur.parent()
-                            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                            == parent
-                    })
-                    .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-                {
+                if let Some(children) = cur.children().filter(|_| cur.parent() == parent) {
                     parent = Some(cur);
                     cur = children;
                     continue;
@@ -1383,12 +1339,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
 
                 // Some users like lxml are known to pass nodes with a corrupted
                 // tree structure. Fall back to a recursive call to handle this case.
-                if cur
-                    .parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                    != parent
-                    && cur.children().is_some()
-                {
+                if cur.parent() != parent && cur.children().is_some() {
                     xhtml_node_dump_output(ctxt, cur);
                     break;
                 }
@@ -1420,16 +1371,11 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                 }
 
                 if parent.map_or(false, |parent| {
-                    parent
-                        .parent()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                        == node.doc.map(|doc| doc.into())
+                    parent.parent() == node.doc.map(|doc| doc.into())
                         && (*parent).name().as_deref() == Some("html")
                 }) && cur.name().as_deref() == Some("head")
                 {
-                    let mut tmp = cur
-                        .children()
-                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                    let mut tmp = cur.children();
                     while let Some(now) = tmp {
                         if now.name().as_deref() == Some("meta") {
                             if let Some(httpequiv) = now.get_prop("http-equiv") {
@@ -1438,19 +1384,14 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                                 }
                             }
                         }
-                        tmp = now
-                            .next()
-                            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                        tmp = now.next();
                     }
                     if tmp.is_none() {
                         addmeta = 1;
                     }
                 }
 
-                if let Some(children) = cur
-                    .children()
-                    .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-                {
+                if let Some(children) = cur.children() {
                     ctxt.buf.borrow_mut().write_bytes(b">");
                     if addmeta == 1 {
                         if ctxt.format == 1 {
@@ -1487,9 +1428,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                                 ctxt.format = 0;
                                 break;
                             }
-                            tmp = now
-                                .next()
-                                .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+                            tmp = now.next();
                         }
                     }
 
@@ -1663,19 +1602,14 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
             if ctxt.format == 1 {
                 ctxt.buf.borrow_mut().write_bytes(b"\n");
             }
-            if let Some(next) = cur
-                .next()
-                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-            {
+            if let Some(next) = cur.next() {
                 cur = next;
                 break;
             }
 
             cur = parent.unwrap();
             // cur.parent was validated when descending.
-            parent = cur
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+            parent = cur.parent();
 
             if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
                 let cur = XmlNodePtr::try_from(cur).unwrap();

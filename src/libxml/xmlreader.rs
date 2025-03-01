@@ -372,9 +372,7 @@ impl XmlTextReader {
             } {}
             if (*self.ctxt).node.is_none() {
                 if let Some(my_doc) = (*self.ctxt).my_doc {
-                    self.node = my_doc
-                        .children
-                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                    self.node = my_doc.children;
                 }
                 if self.node.is_none() {
                     self.mode = XmlTextReaderMode::XmlTextreaderModeError;
@@ -384,9 +382,7 @@ impl XmlTextReader {
                 self.state = XmlTextReaderState::Element;
             } else {
                 if let Some(my_doc) = (*self.ctxt).my_doc {
-                    self.node = my_doc
-                        .children
-                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+                    self.node = my_doc.children;
                 }
                 if self.node.is_none() {
                     self.node = Some((*self.ctxt).node_tab[0].into());
@@ -441,8 +437,7 @@ impl XmlTextReader {
                                     ))
                                 && (*self.ctxt).node.map_or(true, |node| {
                                     cur_node == node.into()
-                                        || node.as_ptr()
-                                            == cur_node.parent().map_or(null_mut(), |p| p.as_ptr())
+                                        || cur_node.parent() == Some(node.into())
                                 })
                                 && !matches!(
                                     (*self.ctxt).instate,
@@ -472,7 +467,7 @@ impl XmlTextReader {
                                     | XmlElementType::XmlDTDNode
                             )
                     }) {
-                        self.node = XmlGenericNodePtr::from_raw(children.as_ptr());
+                        self.node = Some(children);
                         self.depth += 1;
                         self.state = XmlTextReaderState::Element;
                         break 'goto_node_found;
@@ -506,7 +501,7 @@ impl XmlTextReader {
                         {
                             self.preserves -= 1;
                         }
-                        self.node = XmlGenericNodePtr::from_raw(next.as_ptr());
+                        self.node = Some(next);
                         self.state = XmlTextReaderState::Element;
 
                         // Cleanup of the old node
@@ -525,7 +520,7 @@ impl XmlTextReader {
                                 .node
                                 .unwrap()
                                 .prev()
-                                .and_then(|prev| XmlNodePtr::from_raw(prev.as_ptr()).unwrap())
+                                .map(|prev| XmlNodePtr::try_from(prev).unwrap())
                                 .unwrap();
                             if tmp.extra & NODE_IS_PRESERVED as u16 == 0 {
                                 if oldnode == Some(tmp.into()) {
@@ -561,11 +556,7 @@ impl XmlTextReader {
                     {
                         self.preserves -= 1;
                     }
-                    self.node = self
-                        .node
-                        .unwrap()
-                        .parent()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+                    self.node = self.node.unwrap().parent();
                     if self.node.is_none()
                         || matches!(
                             self.node.unwrap().element_type(),
@@ -618,12 +609,7 @@ impl XmlTextReader {
                             & NODE_IS_PRESERVED as u16
                             == 0
                     {
-                        let mut tmp = self
-                            .node
-                            .unwrap()
-                            .last()
-                            .and_then(|last| XmlGenericNodePtr::from_raw(last.as_ptr()))
-                            .unwrap();
+                        let mut tmp = self.node.unwrap().last().unwrap();
                         tmp.unlink();
                         xml_text_reader_free_node(self, tmp);
                     }
@@ -729,11 +715,7 @@ impl XmlTextReader {
                 .node
                 .and_then(|node| XmlEntityPtr::try_from(node).ok())
                 .zip(self.ent)
-                .filter(|&(node, ent)| {
-                    ent.children
-                        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-                        == Some(node.into())
-                })
+                .filter(|&(node, ent)| ent.children == Some(node.into()))
                 .is_some()
             {
                 self.node = self.entity_pop().map(|ent| ent.into());
@@ -797,18 +779,14 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadInnerXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_inner_xml(&mut self) -> *mut XmlChar {
-        use crate::{libxml::xmlstring::xml_strndup, tree::XmlGenericNodePtr};
+        use crate::libxml::xmlstring::xml_strndup;
 
         if self.expand().is_none() {
             return null_mut();
         }
         let doc = self.node.unwrap().document();
         let mut buff = vec![];
-        let mut cur = self
-            .node
-            .unwrap()
-            .children()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+        let mut cur = self.node.unwrap().children();
         while let Some(cur_node) = cur {
             // XXX: Why is the node copied?
             let node = xml_doc_copy_node(cur_node, doc, 1).unwrap();
@@ -820,9 +798,7 @@ impl XmlTextReader {
             }
             buff.extend(buff2);
             xml_free_node(node);
-            cur = cur_node
-                .next()
-                .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+            cur = cur_node.next();
         }
         xml_strndup(buff.as_ptr(), buff.len() as i32)
     }
@@ -876,7 +852,7 @@ impl XmlTextReader {
                     return 0;
                 };
 
-                self.node = XmlGenericNodePtr::from_raw(children.as_ptr());
+                self.node = Some(children);
                 self.state = XmlTextReaderState::Start;
                 // goto found_node;
             } else {
@@ -889,7 +865,7 @@ impl XmlTextReader {
                     )
                 {
                     if let Some(children) = self.node.unwrap().children() {
-                        self.node = XmlGenericNodePtr::from_raw(children.as_ptr());
+                        self.node = Some(children);
                         self.depth += 1;
                         self.state = XmlTextReaderState::Start;
                         // goto found_node;
@@ -918,7 +894,7 @@ impl XmlTextReader {
                 }
 
                 if let Some(next) = self.node.unwrap().next() {
-                    self.node = XmlGenericNodePtr::from_raw(next.as_ptr());
+                    self.node = Some(next);
                     self.state = XmlTextReaderState::Start;
                     // goto found_node;
                 } else if let Some(parent) = self.node.unwrap().parent() {
@@ -930,7 +906,7 @@ impl XmlTextReader {
                         return 0;
                     }
 
-                    self.node = XmlGenericNodePtr::from_raw(parent.as_ptr());
+                    self.node = Some(parent);
                     self.depth -= 1;
                     self.state = XmlTextReaderState::Backtrack;
                     // goto found_node;
@@ -975,11 +951,7 @@ impl XmlTextReader {
             }
             XmlElementType::XmlElementNode => {
                 if self.do_expand() != -1 {
-                    return xml_text_reader_collect_siblings(
-                        node.children()
-                            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
-                            .unwrap(),
-                    );
+                    return xml_text_reader_collect_siblings(node.children().unwrap());
                 }
             }
             XmlElementType::XmlAttributeNode => {
@@ -1010,7 +982,7 @@ impl XmlTextReader {
             let Some(children) = curnode.children() else {
                 return 0;
             };
-            self.curnode = XmlGenericNodePtr::from_raw(children.as_ptr());
+            self.curnode = Some(children);
         } else if let Ok(ns) = XmlNsPtr::try_from(curnode) {
             if let Some(mut faketext) = self.faketext {
                 if !faketext.content.is_null() {
@@ -1025,7 +997,7 @@ impl XmlTextReader {
             let Some(next) = curnode.next() else {
                 return 0;
             };
-            self.curnode = XmlGenericNodePtr::from_raw(next.as_ptr());
+            self.curnode = Some(next);
         }
         1
     }
@@ -1352,7 +1324,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderValidateEntity")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
     unsafe fn validate_entity(&mut self) {
-        use crate::tree::{NodeCommon, XmlEntity, XmlEntityPtr};
+        use crate::tree::{NodeCommon, XmlEntityPtr};
 
         let oldnode = self.node.unwrap();
         let mut node = self.node.unwrap();
@@ -1362,14 +1334,10 @@ impl XmlTextReader {
                 'skip_children: {
                     if node.element_type() == XmlElementType::XmlEntityRefNode {
                         let entity_ref = XmlNodePtr::try_from(node).unwrap();
-                        if let Some(children) = entity_ref
-                            .children()
-                            .filter(|children| {
-                                children.element_type() == XmlElementType::XmlEntityDecl
-                                    && children.children().is_some()
-                            })
-                            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-                        {
+                        if let Some(children) = entity_ref.children().filter(|children| {
+                            children.element_type() == XmlElementType::XmlEntityDecl
+                                && children.children().is_some()
+                        }) {
                             if self.entity_push(entity_ref) < 0 {
                                 if oldnode == entity_ref.into() {
                                     // break;
@@ -1377,10 +1345,7 @@ impl XmlTextReader {
                                 }
                                 break 'skip_children;
                             }
-                            node = children
-                                .children()
-                                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
-                                .unwrap();
+                            node = children.children().unwrap();
                             // continue;
                             break 'inner;
                         } else {
@@ -1404,10 +1369,7 @@ impl XmlTextReader {
                         }
                     }
                     // go to next node
-                    if let Some(children) = node
-                        .children()
-                        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-                    {
+                    if let Some(children) = node.children() {
                         node = children;
                         // continue;
                         break 'inner;
@@ -1417,26 +1379,18 @@ impl XmlTextReader {
                 }
 
                 // skip_children:
-                if let Some(next) = node
-                    .next()
-                    .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                {
+                if let Some(next) = node.next() {
                     node = next;
                     // continue;
                     break 'inner;
                 }
 
                 loop {
-                    node = node
-                        .parent()
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()))
-                        .unwrap();
+                    node = node.parent().unwrap();
                     if node.element_type() == XmlElementType::XmlElementNode {
                         let node = XmlNodePtr::try_from(node).unwrap();
                         if self.ent_tab.is_empty() {
-                            let mut tmp = node
-                                .last
-                                .and_then(|l| XmlNodePtr::from_raw(l.as_ptr()).unwrap());
+                            let mut tmp = node.last.map(|l| XmlNodePtr::try_from(l).unwrap());
                             while let Some(mut now) = tmp {
                                 if now.extra & NODE_IS_PRESERVED as u16 == 0 {
                                     now.unlink();
@@ -1444,9 +1398,7 @@ impl XmlTextReader {
                                 } else {
                                     break;
                                 }
-                                tmp = node
-                                    .last
-                                    .and_then(|l| XmlNodePtr::from_raw(l.as_ptr()).unwrap());
+                                tmp = node.last.map(|l| XmlNodePtr::try_from(l).unwrap());
                             }
                         }
                         self.node = Some(node.into());
@@ -1454,11 +1406,11 @@ impl XmlTextReader {
                     }
                     if XmlEntityPtr::try_from(node)
                         .ok()
-                        .zip(self.ent.and_then(|ent| ent.children).and_then(|ent| {
-                            XmlEntityPtr::from_raw(ent.as_ptr() as *mut XmlEntity)
-                                .ok()
-                                .flatten()
-                        }))
+                        .zip(
+                            self.ent
+                                .and_then(|ent| ent.children)
+                                .and_then(|ent| XmlEntityPtr::try_from(ent).ok()),
+                        )
                         .filter(|&(node, ent)| ent == node)
                         .is_some()
                     {
@@ -1467,10 +1419,7 @@ impl XmlTextReader {
                     if node == oldnode {
                         break;
                     }
-                    if let Some(next) = node
-                        .next()
-                        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-                    {
+                    if let Some(next) = node.next() {
                         node = next;
                         break;
                     }
@@ -2294,7 +2243,7 @@ impl XmlTextReader {
                 return 0;
             };
 
-            self.node = XmlGenericNodePtr::from_raw(children.as_ptr());
+            self.node = Some(children);
             self.state = XmlTextReaderState::Start;
             return 1;
         }
@@ -2304,7 +2253,7 @@ impl XmlTextReader {
             replace with traversal to sibling to skip subtree */
             if let Some(next) = self.node.unwrap().next() {
                 /* Move to sibling if present,skipping sub-tree */
-                self.node = XmlGenericNodePtr::from_raw(next.as_ptr());
+                self.node = Some(next);
                 self.state = XmlTextReaderState::Start;
                 return 1;
             }
@@ -2317,7 +2266,7 @@ impl XmlTextReader {
         }
 
         if let Some(next) = self.node.unwrap().next() {
-            self.node = XmlGenericNodePtr::from_raw(next.as_ptr());
+            self.node = Some(next);
             self.state = XmlTextReaderState::Start;
             return 1;
         }
@@ -2328,7 +2277,7 @@ impl XmlTextReader {
                 return 0;
             }
 
-            self.node = XmlGenericNodePtr::from_raw(parent.as_ptr());
+            self.node = Some(parent);
             self.depth -= 1;
             self.state = XmlTextReaderState::Backtrack;
             /* Repeat process to move to sibling of parent node if present */
@@ -2362,7 +2311,7 @@ impl XmlTextReader {
         }
 
         if let Some(next) = self.node.unwrap().next() {
-            self.node = XmlGenericNodePtr::from_raw(next.as_ptr());
+            self.node = Some(next);
             self.state = XmlTextReaderState::Start;
             return 1;
         }
@@ -2679,17 +2628,13 @@ impl XmlTextReader {
         }
         self.preserves += 1;
 
-        let mut parent = cur
-            .parent()
-            .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()));
+        let mut parent = cur.parent();
         while let Some(now) = parent {
             if now.element_type() == XmlElementType::XmlElementNode {
                 let mut now = XmlNodePtr::try_from(now).unwrap();
                 now.extra |= NODE_IS_PRESERVED as u16;
             }
-            parent = now
-                .parent()
-                .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()));
+            parent = now.parent();
         }
         Some(cur)
     }
@@ -3467,7 +3412,7 @@ unsafe fn xml_text_reader_free_prop_list(reader: &mut XmlTextReader, mut cur: Op
 #[doc(alias = "xmlTextReaderFreeNodeList")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlGenericNodePtr) {
-    use crate::tree::{NodeCommon, NodePtr, XmlNodePtr, XmlNsPtr};
+    use crate::tree::{NodeCommon, XmlNodePtr, XmlNsPtr};
 
     let mut depth: usize = 0;
 
@@ -3485,30 +3430,19 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
         return;
     }
     loop {
-        while let Some(children) = cur
-            .children()
-            .filter(|children| {
-                children
-                    .parent()
-                    .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
-                    == Some(cur)
-                    && !matches!(
-                        cur.element_type(),
-                        XmlElementType::XmlDTDNode | XmlElementType::XmlEntityRefNode
-                    )
-            })
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-        {
+        while let Some(children) = cur.children().filter(|children| {
+            children.parent() == Some(cur)
+                && !matches!(
+                    cur.element_type(),
+                    XmlElementType::XmlDTDNode | XmlElementType::XmlEntityRefNode
+                )
+        }) {
             cur = children;
             depth += 1;
         }
 
-        let next = cur
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
-        let parent = cur
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        let next = cur.next();
+        let parent = cur.parent();
 
         // unroll to speed up freeing the document
         if cur.element_type() != XmlElementType::XmlDTDNode {
@@ -3563,11 +3497,7 @@ unsafe fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlG
                 && !(*reader).ctxt.is_null()
                 && (*(*reader).ctxt).free_elems_nr < MAX_FREE_NODES
             {
-                cur.next = NodePtr::from_ptr(
-                    (*(*reader).ctxt)
-                        .free_elems
-                        .map_or(null_mut(), |node| node.as_ptr()),
-                );
+                cur.next = (*(*reader).ctxt).free_elems.map(|node| node.into());
                 (*(*reader).ctxt).free_elems = Some(cur);
                 (*(*reader).ctxt).free_elems_nr += 1;
             } else {
@@ -3608,10 +3538,7 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPt
         xml_deregister_node_default_value(cur.into());
     }
 
-    if let Some(children) = cur
-        .children
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-    {
+    if let Some(children) = cur.children.map(XmlGenericNodePtr::from) {
         xml_text_reader_free_node_list(reader, children);
     }
 
@@ -3633,7 +3560,7 @@ unsafe fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, mut cur: XmlAttrPt
 #[doc(alias = "xmlTextReaderFreeNode")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGenericNodePtr) {
-    use crate::tree::{NodeCommon, NodePtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr};
+    use crate::tree::{NodeCommon, XmlDtdPtr, XmlNodePtr, XmlNsPtr};
 
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
         (*(*reader).ctxt).dict
@@ -3656,13 +3583,8 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
     if let Some(children) = cur
         .children()
         .filter(|_| cur.element_type() != XmlElementType::XmlEntityRefNode)
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
     {
-        if children
-            .parent()
-            .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
-            == Some(cur)
-        {
+        if children.parent() == Some(cur) {
             xml_text_reader_free_node_list(reader, children);
         }
         cur.set_children(None);
@@ -3720,11 +3642,7 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
         && !(*reader).ctxt.is_null()
         && (*(*reader).ctxt).free_elems_nr < MAX_FREE_NODES
     {
-        cur.next = NodePtr::from_ptr(
-            (*(*reader).ctxt)
-                .free_elems
-                .map_or(null_mut(), |node| node.as_ptr()),
-        );
+        cur.next = (*(*reader).ctxt).free_elems.map(|node| node.into());
         (*(*reader).ctxt).free_elems = Some(cur);
         (*(*reader).ctxt).free_elems_nr += 1;
     } else {
@@ -3738,25 +3656,15 @@ unsafe fn xml_text_reader_free_node(reader: XmlTextReaderPtr, mut cur: XmlGeneri
 #[doc(alias = "xmlTextReaderGetSuccessor")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_get_successor(cur: XmlGenericNodePtr) -> Option<XmlGenericNodePtr> {
-    if let Some(next) = cur
-        .next()
-        .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-    {
+    if let Some(next) = cur.next() {
         return Some(next);
     }
-    let mut cur = cur
-        .parent()
-        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+    let mut cur = cur.parent();
     while let Some(now) = cur {
-        if let Some(next) = now
-            .next()
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
-        {
+        if let Some(next) = now.next() {
             return Some(next);
         }
-        cur = now
-            .parent()
-            .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()));
+        cur = now.parent();
     }
     cur
 }
@@ -3787,21 +3695,15 @@ unsafe fn xml_text_reader_collect_siblings(node: XmlGenericNodePtr) -> *mut XmlC
             }
             XmlElementType::XmlElementNode => {
                 let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                let tmp: *mut XmlChar = xml_text_reader_collect_siblings(
-                    cur_node
-                        .children
-                        .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()))
-                        .unwrap(),
-                );
+                let tmp: *mut XmlChar =
+                    xml_text_reader_collect_siblings(cur_node.children.unwrap());
                 buffer.extend(CStr::from_ptr(tmp as *const i8).to_bytes());
                 xml_free(tmp as _);
             }
             _ => {}
         }
 
-        cur = cur_node
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        cur = cur_node.next();
     }
     xml_strndup(buffer.as_ptr(), buffer.len() as i32)
 }
@@ -4152,10 +4054,7 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, mut cur: XmlDocPt
         xml_free_dtd(int_subset);
     }
 
-    if let Some(children) = cur
-        .children
-        .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-    {
+    if let Some(children) = cur.children {
         xml_text_reader_free_node_list(reader, children);
     }
 

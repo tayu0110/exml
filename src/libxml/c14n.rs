@@ -550,9 +550,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     // simple inheritance attributes - copy
                     if xml_lang_attr.is_none() {
                         xml_lang_attr = self.find_hidden_parent_attr(
-                            (*cur)
-                                .parent()
-                                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
+                            cur.parent(),
                             "lang",
                             XML_XML_NAMESPACE.to_str().unwrap(),
                         );
@@ -562,9 +560,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     }
                     if xml_space_attr.is_none() {
                         xml_space_attr = self.find_hidden_parent_attr(
-                            (*cur)
-                                .parent()
-                                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
+                            cur.parent(),
                             "space",
                             XML_XML_NAMESPACE.to_str().unwrap(),
                         );
@@ -577,9 +573,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     if xml_base_attr.is_none() {
                         // if we don't have base uri attribute, check if we have a "hidden" one above
                         xml_base_attr = self.find_hidden_parent_attr(
-                            (*cur)
-                                .parent()
-                                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
+                            cur.parent(),
                             "base",
                             XML_XML_NAMESPACE.to_str().unwrap(),
                         );
@@ -685,7 +679,7 @@ impl<T> XmlC14NCtx<'_, T> {
             self.buf.borrow_mut().write_str(">");
         }
         if let Some(children) = (*cur).children() {
-            let ret = self.process_node_list(XmlGenericNodePtr::from_raw(children.as_ptr()));
+            let ret = self.process_node_list(Some(children));
             if ret < 0 {
                 xml_c14n_err_internal("processing childrens list");
                 return -1;
@@ -722,9 +716,7 @@ impl<T> XmlC14NCtx<'_, T> {
         let mut ret = 0;
         while let Some(now) = cur {
             ret = self.process_node(now);
-            cur = now
-                .next()
-                .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+            cur = now.next();
             if ret < 0 {
                 break;
             }
@@ -739,11 +731,7 @@ impl<T> XmlC14NCtx<'_, T> {
     unsafe fn process_node(&mut self, cur: XmlGenericNodePtr) -> i32 {
         let mut ret: i32 = 0;
 
-        let visible = self.is_visible(
-            Some(cur),
-            cur.parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
-        );
+        let visible = self.is_visible(Some(cur), cur.parent());
         match (*cur).element_type() {
             XmlElementType::XmlElementNode => {
                 let cur = XmlNodePtr::try_from(cur).unwrap();
@@ -863,7 +851,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 if let Some(children) = (*cur).children() {
                     self.pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
                     self.parent_is_doc = true;
-                    ret = self.process_node_list(XmlGenericNodePtr::from_raw(children.as_ptr()));
+                    ret = self.process_node_list(Some(children));
                 }
             }
             #[cfg(feature = "html")]
@@ -872,7 +860,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 if let Some(children) = (*cur).children() {
                     self.pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
                     self.parent_is_doc = true;
-                    ret = self.process_node_list(XmlGenericNodePtr::from_raw(children.as_ptr()));
+                    ret = self.process_node_list(Some(children));
                 }
             }
 
@@ -1122,13 +1110,7 @@ impl<T> XmlC14NCtx<'_, T> {
         name: &str,
         ns: &str,
     ) -> Option<XmlAttrPtr> {
-        while let Some(now) = cur.filter(|&now| {
-            !self.is_visible(
-                Some(now),
-                now.parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
-            )
-        }) {
+        while let Some(now) = cur.filter(|&now| !self.is_visible(Some(now), now.parent())) {
             if let Ok(now) = XmlNodePtr::try_from(now) {
                 if let Some(res) = now.has_ns_prop(name, Some(ns)) {
                     // Is this `unwrap` OK ????
@@ -1136,9 +1118,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 }
             }
 
-            cur = now
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+            cur = now.parent();
         }
 
         None
@@ -1164,16 +1144,8 @@ impl<T> XmlC14NCtx<'_, T> {
         };
 
         // go up the stack until we find a node that we rendered already
-        let mut cur = parent
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
-        while let Some(cur_node) = cur.filter(|&cur| {
-            !self.is_visible(
-                Some(cur),
-                cur.parent()
-                    .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
-            )
-        }) {
+        let mut cur = parent.parent();
+        while let Some(cur_node) = cur.filter(|&cur| !self.is_visible(Some(cur), cur.parent())) {
             if let Ok(cur) = XmlNodePtr::try_from(cur_node) {
                 if let Some(attr) = cur.has_ns_prop("base", XML_XML_NAMESPACE.to_str().ok()) {
                     // get attr value
@@ -1211,9 +1183,7 @@ impl<T> XmlC14NCtx<'_, T> {
             }
 
             // next
-            cur = cur_node
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+            cur = cur_node.parent();
         }
 
         // check if result uri is empty or not
@@ -1302,7 +1272,7 @@ unsafe fn xml_c14n_is_node_in_nodeset(
             if let Some(parent) =
                 parent.filter(|p| p.element_type() == XmlElementType::XmlAttributeNode)
             {
-                ns.node = XmlGenericNodePtr::from_raw(parent.parent().unwrap().as_ptr());
+                ns.node = parent.parent();
                 // ns.next = parent.parent().map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
             } else if let Some(parent) = parent {
                 ns.node = Some(parent);
@@ -2029,7 +1999,7 @@ pub unsafe fn xml_c14n_execute<'a, T>(
     // XML declaration, nor anything from within the document type
     // declaration.
     if let Some(children) = children {
-        ret = ctx.process_node_list(XmlGenericNodePtr::from_raw(children.as_ptr()));
+        ret = ctx.process_node_list(Some(children));
         if ret < 0 {
             xml_c14n_err_internal("processing docs children list");
             return -1;

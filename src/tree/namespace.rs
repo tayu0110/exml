@@ -139,9 +139,7 @@ impl NodeCommon for XmlNs {
         self.next.map(|ns| ns.into())
     }
     fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
-        unsafe {
-            self.next = next.and_then(|p| XmlNsPtr::from_raw(p.as_ptr() as *mut XmlNs).unwrap());
-        }
+        self.next = next.map(|p| XmlNsPtr::try_from(p).unwrap());
     }
     fn prev(&self) -> Option<XmlGenericNodePtr> {
         None
@@ -190,9 +188,9 @@ impl XmlNsPtr {
         }
     }
 
-    pub(crate) fn as_ptr(self) -> *mut XmlNs {
-        self.0.as_ptr()
-    }
+    // pub(crate) fn as_ptr(self) -> *mut XmlNs {
+    //     self.0.as_ptr()
+    // }
 
     /// Deallocate memory.
     ///

@@ -55,7 +55,6 @@ unsafe fn xml_xpath_debug_dump_node_list<'a>(
     };
     xml_debug_dump_one_node(output, Some(cur), depth);
     while let Some(next) = cur.next() {
-        let next = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
         xml_debug_dump_one_node(output, Some(next), depth);
         cur = next;
     }
@@ -97,13 +96,7 @@ unsafe fn xml_xpath_debug_dump_value_tree<'a>(
 
     write!(output, "{}", shift);
     write!(output, "{}", depth.clamp(0, 25) + 1);
-    xml_xpath_debug_dump_node_list(
-        output,
-        (*cur.node_tab[0])
-            .children()
-            .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr())),
-        depth + 1,
-    );
+    xml_xpath_debug_dump_node_list(output, (*cur.node_tab[0]).children(), depth + 1);
 }
 
 #[cfg(feature = "libxml_xptr_locs")]

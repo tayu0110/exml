@@ -214,9 +214,9 @@ impl XmlEntityPtr {
         }
     }
 
-    pub(crate) fn as_ptr(self) -> *mut XmlEntity {
-        self.0.as_ptr()
-    }
+    // pub(crate) fn as_ptr(self) -> *mut XmlEntity {
+    //     self.0.as_ptr()
+    // }
 
     /// Deallocate memory.
     ///

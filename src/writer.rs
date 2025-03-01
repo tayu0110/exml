@@ -54,7 +54,7 @@ use crate::{
     list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
     save::attr_serialize_text_content,
-    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDoc, XmlDocPtr, XmlNodePtr},
+    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
     uri::canonic_path,
 };
 
@@ -217,7 +217,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the new xmlTextWriterPtr or NULL in case of error
     #[doc(alias = "xmlNewTextWriterDoc")]
-    pub unsafe fn with_doc(doc: *mut *mut XmlDoc, compression: i32) -> Option<Self> {
+    pub unsafe fn with_doc(doc: Option<&mut Option<XmlDocPtr>>, compression: i32) -> Option<Self> {
         let mut sax_handler = XmlSAXHandler::default();
         xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
         sax_handler.start_document = Some(xml_text_writer_start_document_callback);
@@ -261,8 +261,8 @@ impl<'a> XmlTextWriter<'a> {
 
         my_doc.set_compress_mode(compression);
 
-        if !doc.is_null() {
-            *doc = my_doc.as_ptr();
+        if let Some(doc) = doc {
+            *doc = Some(my_doc);
             ret.no_doc_free = 1;
         }
 

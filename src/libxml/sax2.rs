@@ -51,7 +51,7 @@ use crate::{
         xml_get_predefined_entity, xml_new_cdata_block, xml_new_char_ref, xml_new_doc,
         xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
         xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
-        NodeCommon, NodePtr, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
+        NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
@@ -1919,7 +1919,7 @@ pub unsafe fn xml_sax2_start_element(
     };
     if let Some(children) = my_doc.children {
         if parent.is_none() {
-            parent = XmlGenericNodePtr::from_raw(children.as_ptr());
+            parent = Some(children);
         }
     } else {
         my_doc.add_child(ret.into());
@@ -2098,9 +2098,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     }
     // allocate the node
     let mut ret = if let Some(mut ret) = (*ctxt).free_elems {
-        (*ctxt).free_elems = ret
-            .next()
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        (*ctxt).free_elems = ret.next().map(|n| XmlNodePtr::try_from(n).unwrap());
         (*ctxt).free_elems_nr -= 1;
         std::ptr::write(&mut *ret, XmlNode::default());
         ret.doc = Some(my_doc);
@@ -2301,9 +2299,7 @@ pub unsafe fn xml_sax2_start_element_ns(
 unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, s: &str) -> Option<XmlNodePtr> {
     // Allocate
     let ret = if let Some(mut ret) = (*ctxt).free_elems {
-        (*ctxt).free_elems = ret
-            .next
-            .and_then(|n| XmlNodePtr::from_raw(n.as_ptr()).unwrap());
+        (*ctxt).free_elems = ret.next.map(|node| XmlNodePtr::try_from(node).unwrap());
         (*ctxt).free_elems_nr -= 1;
         std::ptr::write(&mut *ret, XmlNode::default());
         ret.typ = XmlElementType::XmlTextNode;
@@ -2709,32 +2705,14 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
         .node
         .unwrap()
         .last()
-        .map_or(null_mut(), |l| l.as_ptr());
+        .map(|l| XmlNodePtr::try_from(l).unwrap());
 
     // Here we needed an accelerator mechanism in case of very large elements.
     // Use an attribute in the structure !!!
-    if last_child.is_null() {
-        let last_child = if matches!(typ, XmlElementType::XmlTextNode) {
-            xml_sax2_text_node(ctxt, ch)
-        } else {
-            xml_new_cdata_block((*ctxt).my_doc, ch)
-        };
-        if let Some(mut last_child) = last_child {
-            (*ctxt).node.unwrap().set_children(Some(last_child.into()));
-            (*ctxt).node.unwrap().set_last(Some(last_child.into()));
-            last_child.parent =
-                NodePtr::from_ptr((*ctxt).node.map_or(null_mut(), |node| node.as_ptr()));
-            last_child.doc = (*ctxt).node.unwrap().doc;
-            (*ctxt).nodelen = ch.len() as i32;
-            (*ctxt).nodemem = ch.len() as i32 + 1;
-        } else {
-            xml_sax2_err_memory(ctxt, "xmlSAX2Characters");
-        }
-    } else {
-        let coalesce_text: i32 = (!last_child.is_null()
-            && (*last_child).element_type() == typ
+    if let Some(mut last_child) = last_child {
+        let coalesce_text: i32 = (last_child.element_type() == typ
             && (!matches!(typ, XmlElementType::XmlTextNode)
-                || ((*last_child).name == XML_STRING_TEXT.as_ptr() as _)))
+                || (last_child.name == XML_STRING_TEXT.as_ptr() as _)))
             as i32;
         if coalesce_text != 0 && (*ctxt).nodemem != 0 {
             // The whole point of maintaining nodelen and nodemem,
@@ -2743,11 +2721,11 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
             // We try to minimize realloc() uses and avoid copying
             // and recomputing length over and over.
             if (*ctxt).nodemem == (*ctxt).nodelen + 1
-                && xml_dict_owns((*ctxt).dict, (*last_child).content) != 0
+                && xml_dict_owns((*ctxt).dict, last_child.content) != 0
             {
-                (*last_child).content = xml_strdup((*last_child).content);
+                last_child.content = xml_strdup(last_child.content);
             }
-            if (*last_child).content.is_null() {
+            if last_child.content.is_null() {
                 xml_sax2_err_memory(ctxt, "xmlSAX2Characters: xmlStrdup returned NULL");
                 return;
             }
@@ -2767,36 +2745,33 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
                     .nodemem
                     .saturating_add(ch.len() as i32)
                     .saturating_mul(2);
-                let newbuf: *mut XmlChar = xml_realloc((*last_child).content as _, size as _) as _;
+                let newbuf: *mut XmlChar = xml_realloc(last_child.content as _, size as _) as _;
                 if newbuf.is_null() {
                     xml_sax2_err_memory(ctxt, "xmlSAX2Characters");
                     return;
                 }
                 (*ctxt).nodemem = size;
-                (*last_child).content = newbuf;
+                last_child.content = newbuf;
             }
             memcpy(
-                (*last_child).content.add((*ctxt).nodelen as usize) as _,
+                last_child.content.add((*ctxt).nodelen as usize) as _,
                 ch.as_ptr() as _,
                 ch.len(),
             );
             (*ctxt).nodelen = nodelen;
-            *(*last_child).content.add((*ctxt).nodelen as usize) = 0;
+            *last_child.content.add((*ctxt).nodelen as usize) = 0;
         } else if coalesce_text != 0 {
-            if xml_text_concat(XmlNodePtr::from_raw(last_child).unwrap().unwrap(), ch) != 0 {
+            if xml_text_concat(last_child, ch) != 0 {
                 xml_sax2_err_memory(ctxt, "xmlSAX2Characters");
             }
             if (*ctxt).node.unwrap().children().is_some() {
-                (*ctxt).nodelen = xml_strlen((*last_child).content);
+                (*ctxt).nodelen = xml_strlen(last_child.content);
                 (*ctxt).nodemem = (*ctxt).nodelen + 1;
             }
         } else {
             // Mixed content, first time
             let last_child = if matches!(typ, XmlElementType::XmlTextNode) {
-                let last_child = XmlNodePtr::from_raw(
-                    xml_sax2_text_node(ctxt, ch).map_or(null_mut(), |node| node.as_ptr()),
-                )
-                .unwrap();
+                let last_child = xml_sax2_text_node(ctxt, ch);
                 if let Some(mut last_child) = last_child {
                     last_child.doc = (*ctxt).my_doc;
                 }
@@ -2811,6 +2786,22 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
                     (*ctxt).nodemem = ch.len() as i32 + 1;
                 }
             }
+        }
+    } else {
+        let last_child = if matches!(typ, XmlElementType::XmlTextNode) {
+            xml_sax2_text_node(ctxt, ch)
+        } else {
+            xml_new_cdata_block((*ctxt).my_doc, ch)
+        };
+        if let Some(mut last_child) = last_child {
+            (*ctxt).node.unwrap().set_children(Some(last_child.into()));
+            (*ctxt).node.unwrap().set_last(Some(last_child.into()));
+            last_child.parent = (*ctxt).node.map(|node| node.into());
+            last_child.doc = (*ctxt).node.unwrap().doc;
+            (*ctxt).nodelen = ch.len() as i32;
+            (*ctxt).nodemem = ch.len() as i32 + 1;
+        } else {
+            xml_sax2_err_memory(ctxt, "xmlSAX2Characters");
         }
     }
 }

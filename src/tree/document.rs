@@ -45,7 +45,7 @@ use crate::{
 use super::{
     xml_free_dtd, xml_free_node_list, xml_free_ns_list, xml_get_doc_entity, xml_new_doc_text,
     xml_new_reference, xml_ns_in_scope, xml_tree_err, xml_tree_err_memory,
-    InvalidNodePointerCastError, NodeCommon, NodePtr, XmlDocProperties, XmlDtdPtr, XmlElementType,
+    InvalidNodePointerCastError, NodeCommon, XmlDocProperties, XmlDtdPtr, XmlElementType,
     XmlEntityType, XmlGenericNodePtr, XmlID, XmlNodePtr, XmlNs, XmlNsPtr, XmlRef,
     XML_ENT_EXPANDING, XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
     __XML_REGISTER_CALLBACKS,
@@ -58,9 +58,9 @@ pub struct XmlDoc {
     pub(crate) name: *mut i8,                   /* name/filename/URI of the document */
     pub children: Option<XmlGenericNodePtr>,    /* the document tree */
     pub(crate) last: Option<XmlGenericNodePtr>, /* last child link */
-    pub(crate) parent: Option<NodePtr>,         /* child->parent link */
-    pub(crate) next: Option<NodePtr>,           /* next sibling link  */
-    pub(crate) prev: Option<NodePtr>,           /* previous sibling link  */
+    pub(crate) parent: Option<XmlDocPtr>,       /* child->parent link */
+    pub(crate) next: Option<XmlDocPtr>,         /* next sibling link  */
+    pub(crate) prev: Option<XmlDocPtr>,         /* previous sibling link  */
     pub(crate) doc: Option<XmlDocPtr>,          /* autoreference to itself */
 
     /* End of common part */
@@ -159,9 +159,7 @@ impl XmlDoc {
                     }
                 }
             }
-            node = cur_node
-                .parent()
-                .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+            node = cur_node.parent();
         }
         None
     }
@@ -189,7 +187,7 @@ impl XmlDoc {
         let mut ret = self.children();
         while let Some(now) = ret {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                return XmlNodePtr::from_raw(now.as_ptr()).unwrap();
+                return Some(XmlNodePtr::try_from(now).unwrap());
             }
             ret = now.next();
         }
@@ -773,22 +771,15 @@ impl XmlDoc {
         (*root).unlink();
         (*root).set_doc(XmlDocPtr::from_raw(self).unwrap());
         (*root).set_parent(XmlGenericNodePtr::from_raw(self));
-        let mut old = self
-            .children()
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()));
+        let mut old = self.children();
         while let Some(now) = old {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                 break;
             }
-            old = now
-                .next()
-                .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()));
+            old = now.next();
         }
         if let Some(old) = old {
-            xml_replace_node(
-                XmlGenericNodePtr::from_raw(old.as_ptr()).unwrap(),
-                Some(XmlGenericNodePtr::from(root)),
-            );
+            xml_replace_node(old, Some(XmlGenericNodePtr::from(root)));
         } else if let Some(children) = self.children() {
             children.add_sibling(XmlGenericNodePtr::from(root));
         } else {
@@ -861,25 +852,22 @@ impl NodeCommon for XmlDoc {
         self.last = last;
     }
     fn next(&self) -> Option<XmlGenericNodePtr> {
-        self.next
-            .and_then(|next| XmlGenericNodePtr::from_raw(next.as_ptr()))
+        self.next.map(|next| next.into())
     }
     fn set_next(&mut self, next: Option<XmlGenericNodePtr>) {
-        self.next = next.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.next = next.map(|node| XmlDocPtr::try_from(node).unwrap())
     }
     fn prev(&self) -> Option<XmlGenericNodePtr> {
-        self.prev
-            .and_then(|prev| XmlGenericNodePtr::from_raw(prev.as_ptr()))
+        self.prev.map(|prev| prev.into())
     }
     fn set_prev(&mut self, prev: Option<XmlGenericNodePtr>) {
-        self.prev = prev.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.prev = prev.map(|node| XmlDocPtr::try_from(node).unwrap())
     }
     fn parent(&self) -> Option<XmlGenericNodePtr> {
-        self.parent
-            .and_then(|parent| XmlGenericNodePtr::from_raw(parent.as_ptr()))
+        self.parent.map(|parent| parent.into())
     }
     fn set_parent(&mut self, parent: Option<XmlGenericNodePtr>) {
-        self.parent = parent.and_then(|node| NodePtr::from_ptr(node.as_ptr()));
+        self.parent = parent.map(|node| XmlDocPtr::try_from(node).unwrap());
     }
 }
 
@@ -952,9 +940,9 @@ impl XmlDocPtr {
         }
     }
 
-    pub(crate) fn as_ptr(self) -> *mut XmlDoc {
-        self.0.as_ptr()
-    }
+    // pub(crate) fn as_ptr(self) -> *mut XmlDoc {
+    //     self.0.as_ptr()
+    // }
 
     /// Deallocate memory.
     ///

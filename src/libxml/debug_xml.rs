@@ -265,7 +265,7 @@ impl XmlDebugCtxt<'_> {
                 }
             } else if node
                 .parent()
-                .filter(|p| p.children().map_or(null_mut(), |p| p.as_ptr()) != node.as_ptr())
+                .filter(|p| p.children() != Some(node))
                 .is_some()
             {
                 xml_debug_err!(
@@ -300,7 +300,7 @@ impl XmlDebugCtxt<'_> {
             .parent()
             .filter(|p| {
                 node.element_type() != XmlElementType::XmlAttributeNode
-                    && p.last().map_or(null_mut(), |last| last.as_ptr()) != node.as_ptr()
+                    && p.last() != Some(node)
                     && p.element_type() == XmlElementType::XmlElementNode
             })
             .is_some()
@@ -454,7 +454,7 @@ impl XmlDebugCtxt<'_> {
         self.dump_dtd_node(Some(dtd));
         if let Some(children) = dtd.children() {
             self.depth += 1;
-            self.dump_node_list(XmlGenericNodePtr::from_raw(children.as_ptr()));
+            self.dump_node_list(Some(children));
             self.depth -= 1;
         } else {
             writeln!(self.output, "    DTD is empty");
@@ -865,7 +865,7 @@ impl XmlDebugCtxt<'_> {
             writeln!(self.output);
             if let Some(children) = attr.children() {
                 self.depth += 1;
-                self.dump_node_list(XmlGenericNodePtr::from_raw(children.as_ptr()));
+                self.dump_node_list(Some(children));
                 self.depth -= 1;
             }
         }
@@ -1114,7 +1114,7 @@ impl XmlDebugCtxt<'_> {
                 && node.element_type() != XmlElementType::XmlEntityRefNode
         }) {
             self.depth += 1;
-            self.dump_node_list(XmlGenericNodePtr::from_raw(children.as_ptr()));
+            self.dump_node_list(Some(children));
             self.depth -= 1;
         }
     }
@@ -1125,8 +1125,8 @@ impl XmlDebugCtxt<'_> {
         if let Some(mut node) = node {
             self.dump_node(Some(node));
             while let Some(next) = node.next() {
-                self.dump_node(XmlGenericNodePtr::from_raw(next.as_ptr()));
-                node = XmlGenericNodePtr::from_raw(next.as_ptr()).unwrap();
+                self.dump_node(Some(next));
+                node = next;
             }
         }
     }
@@ -1287,7 +1287,7 @@ impl XmlDebugCtxt<'_> {
             )
         }) {
             self.depth += 1;
-            self.dump_node_list(XmlGenericNodePtr::from_raw(children.as_ptr()));
+            self.dump_node_list(Some(children));
             self.depth -= 1;
         }
     }
@@ -1472,9 +1472,7 @@ unsafe fn xml_ns_check_scope(node: XmlGenericNodePtr, ns: XmlNsPtr) -> i32 {
                 cur = now.next;
             }
         }
-        node = now
-            .parent()
-            .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr()));
+        node = now.parent();
     }
     // the xml namespace may be declared on the document node
     if let Some(node) = node.and_then(|node| XmlDocPtr::try_from(node).ok()) {
@@ -1778,15 +1776,9 @@ pub unsafe fn xml_ls_count_node(node: Option<XmlGenericNodePtr>) -> usize {
     let mut list = match node.element_type() {
         XmlElementType::XmlElementNode => node.children(),
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-            XmlDocPtr::try_from(node)
-                .unwrap()
-                .children
-                .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
+            XmlDocPtr::try_from(node).unwrap().children()
         }
-        XmlElementType::XmlAttributeNode => XmlAttrPtr::try_from(node)
-            .unwrap()
-            .children
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr())),
+        XmlElementType::XmlAttributeNode => XmlAttrPtr::try_from(node).unwrap().children(),
         XmlElementType::XmlTextNode
         | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlPINode
@@ -2012,21 +2004,19 @@ pub unsafe fn xml_shell_list(
         return 0;
     };
     let mut cur = if let Ok(doc) = XmlDocPtr::try_from(node) {
-        XmlGenericNodePtr::from_raw(doc.children.map_or(null_mut(), |c| c.as_ptr()))
+        doc.children()
     } else if let Ok(ns) = XmlNsPtr::try_from(node) {
         xml_ls_one_node(&mut (*ctxt).output, Some(ns.into()));
         return 0;
     } else if let Some(children) = node.children() {
-        XmlGenericNodePtr::from_raw(children.as_ptr())
+        Some(children)
     } else {
         xml_ls_one_node(&mut (*ctxt).output, Some(node));
         return 0;
     };
     while let Some(now) = cur {
         xml_ls_one_node(&mut (*ctxt).output, Some(now));
-        cur = now
-            .next()
-            .and_then(|n| XmlGenericNodePtr::from_raw(n.as_ptr()));
+        cur = now.next();
     }
     0
 }
@@ -2447,28 +2437,26 @@ pub unsafe fn xml_shell_du(
 
         // Browse the full subtree, deep first
         if let Ok(doc) = XmlDocPtr::try_from(now) {
-            node = doc
-                .children
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+            node = doc.children;
         } else if let Some(children) = now
             .children()
             .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
         {
             // deep first
-            node = XmlGenericNodePtr::from_raw(children.as_ptr());
+            node = Some(children);
             indent += 1;
         } else if let Some(next) = now.next().filter(|_| node != Some(tree)) {
             // then siblings
-            node = XmlGenericNodePtr::from_raw(next.as_ptr());
+            node = Some(next);
         } else if node != Some(tree) {
             // go up to parents->next if needed
             while node != Some(tree) {
                 if let Some(parent) = now.parent() {
-                    node = XmlGenericNodePtr::from_raw(parent.as_ptr());
+                    node = Some(parent);
                     indent -= 1;
                 }
                 if let Some(next) = now.next().filter(|_| node != Some(tree)) {
-                    node = XmlGenericNodePtr::from_raw(next.as_ptr());
+                    node = Some(next);
                     break;
                 }
                 if now.parent().is_none() {
@@ -2634,38 +2622,30 @@ unsafe fn xml_shell_grep(
             {
                 let path = now.parent().unwrap().get_node_path().unwrap();
                 write!((*ctxt).output, "{path} : ");
-                xml_shell_list(
-                    ctxt,
-                    null_mut(),
-                    now.parent
-                        .and_then(|p| XmlGenericNodePtr::from_raw(p.as_ptr())),
-                    None,
-                );
+                xml_shell_list(ctxt, null_mut(), now.parent, None);
             }
         }
 
         // Browse the full subtree, deep first
         if let Ok(doc) = XmlDocPtr::try_from(now) {
-            node = doc
-                .children
-                .and_then(|c| XmlGenericNodePtr::from_raw(c.as_ptr()));
+            node = doc.children;
         } else if let Some(children) = now
             .children()
             .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
         {
             // deep first
-            node = XmlGenericNodePtr::from_raw(children.as_ptr());
+            node = Some(children);
         } else if let Some(next) = now.next() {
             // then siblings
-            node = XmlGenericNodePtr::from_raw(next.as_ptr());
+            node = Some(next);
         } else {
             // go up to parents->next if needed
             while let Some(now) = node {
                 if let Some(parent) = now.parent() {
-                    node = XmlGenericNodePtr::from_raw(parent.as_ptr());
+                    node = Some(parent);
                 }
                 if let Some(next) = now.next() {
-                    node = XmlGenericNodePtr::from_raw(next.as_ptr());
+                    node = Some(next);
                     break;
                 }
                 if now.parent().is_none() {
@@ -2709,10 +2689,7 @@ unsafe fn xml_shell_set_content(
         &mut results,
     );
     if ret == XmlParserErrors::XmlErrOK {
-        if let Some(children) = node
-            .children()
-            .and_then(|children| XmlGenericNodePtr::from_raw(children.as_ptr()))
-        {
+        if let Some(children) = node.children() {
             xml_free_node_list(Some(children));
             node.set_children(None);
             node.set_last(None);
