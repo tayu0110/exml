@@ -260,25 +260,6 @@ const XML_SCHEMA_INSTANCE_NS: &CStr = c"http://www.w3.org/2001/XMLSchema-instanc
 
 const XML_NAMESPACE_NS: &CStr = c"http://www.w3.org/2000/xmlns/";
 
-// Macros to query common properties of components.
-macro_rules! WXS_ITEM_NODE {
-    ($i:expr) => {
-        xml_schema_get_component_node($i as _)
-    };
-}
-
-// Macros for element declarations.
-macro_rules! WXS_ELEM_TYPEDEF {
-    ($e:expr) => {
-        (*$e).subtypes
-    };
-}
-
-macro_rules! WXS_SUBST_HEAD {
-    ($item:expr) => {
-        (*$item).ref_decl
-    };
-}
 // Macros for attribute declarations.
 macro_rules! WXS_ATTR_TYPEDEF {
     ($a:expr) => {
@@ -332,18 +313,6 @@ macro_rules! WXS_PARTICLE_TERM {
         (*WXS_PARTICLE!($p)).children
     };
 }
-
-// macro_rules! WXS_PARTICLE_TERM_AS_ELEM {
-//     ($p:expr) => {
-//         WXS_PARTICLE_TERM!($p) as xmlSchemaElementPtr
-//     };
-// }
-
-// macro_rules! WXS_PARTICLE_MODEL {
-//     ($p:expr) => {
-//         (*WXS_PARTICLE!($p)).children as XmlSchemaModelGroupPtr
-//     };
-// }
 
 // Macros for model groups definitions.
 macro_rules! WXS_MODELGROUPDEF_MODEL {
@@ -447,28 +416,6 @@ macro_rules! WXS_IS_TYPE_NOT_FIXED_1 {
     };
 }
 
-// macro_rules! WXS_TYPE_IS_GLOBAL {
-//     ($t:expr) => {
-//         (*$t).flags & XML_SCHEMAS_TYPE_GLOBAL != 0
-//     };
-// }
-
-// macro_rules! WXS_TYPE_IS_LOCAL {
-//     ($t:expr) => {
-//         (*$t).flags & XML_SCHEMAS_TYPE_GLOBAL == 0
-//     };
-// }
-/*
-* Macros for exclusively for complex types.
-*/
-// macro_rules! WXS_HAS_COMPLEX_CONTENT {
-//     ($item:expr) => {
-//         (*$item).content_type == XmlSchemaContentMixed
-//             || (*$item).content_type == XML_SCHEMA_CONTENT_EMPTY
-//             || (*$item).content_type == XML_SCHEMA_CONTENT_ELEMENTS
-//     };
-// }
-
 macro_rules! WXS_HAS_SIMPLE_CONTENT {
     ($item:expr) => {
         (*$item).content_type == XmlSchemaContentType::XmlSchemaContentSimple
@@ -488,12 +435,6 @@ macro_rules! WXS_EMPTIABLE {
     };
 }
 
-macro_rules! WXS_TYPE_CONTENTTYPE {
-    ($t:expr) => {
-        (*$t).subtypes
-    };
-}
-
 macro_rules! WXS_TYPE_PARTICLE {
     ($t:expr) => {
         (*$t).subtypes as XmlSchemaParticlePtr
@@ -506,11 +447,6 @@ macro_rules! WXS_TYPE_PARTICLE_TERM {
     };
 }
 // Macros for exclusively for simple types.
-macro_rules! WXS_LIST_ITEMTYPE {
-    ($t:expr) => {
-        (*$t).subtypes
-    };
-}
 
 macro_rules! WXS_IS_ATOMIC {
     ($t:expr) => {
@@ -554,12 +490,6 @@ macro_rules! WXS_BUCKET {
         (*WXS_CONSTRUCTOR!($ctx)).bucket
     };
 }
-
-// macro_rules! WXS_SCHEMA {
-//     ($ctx:expr) => {
-//         (*$ctx).schema
-//     };
-// }
 
 macro_rules! WXS_ADD_LOCAL {
     ($ctx:expr, $item:expr) => {
@@ -1793,7 +1723,6 @@ unsafe fn xml_schema_format_item_for_report(
     item_node: Option<XmlGenericNodePtr>,
 ) -> String {
     unsafe {
-        let mut str: *mut XmlChar = null_mut();
         let mut named: i32 = 1;
 
         let mut res = String::new();
@@ -1896,7 +1825,6 @@ unsafe fn xml_schema_format_item_for_report(
                         .as_str(),
                     );
                     res.push('\'');
-                    FREE_AND_NULL!(str);
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
                     res.push_str(xml_schema_get_component_designation(item as _).as_str());
@@ -1982,7 +1910,6 @@ unsafe fn xml_schema_format_item_for_report(
                     res.push_str(" '");
                     res.push_str(xml_schema_get_component_qname(item as _).as_str());
                     res.push('\'');
-                    FREE_AND_NULL!(str);
                     named = 0;
                 }
                 _ => {
@@ -2031,7 +1958,6 @@ unsafe fn xml_schema_format_item_for_report(
             }
             res.push('\'');
         }
-        FREE_AND_NULL!(str);
 
         res
     }
@@ -2210,7 +2136,7 @@ pub(crate) unsafe fn xml_schema_custom_err4(
     unsafe {
         let mut msg =
             if node.is_none() && !item.is_null() && (*actxt).typ == XML_SCHEMA_CTXT_PARSER {
-                node = WXS_ITEM_NODE!(item).map(|node| node.into());
+                node = xml_schema_get_component_node(item as _).map(|node| node.into());
                 let mut res = xml_schema_format_item_for_report(None, item, None);
                 res.push_str(": ");
                 Some(res)
@@ -3881,7 +3807,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                 NORMALIZE!(typ, value, norm_value, typ, is_normalized, normalize);
                 // VAL TODO: Optimize validation of empty values.
                 // VAL TODO: We do not have computed values for lists.
-                let item_type: XmlSchemaTypePtr = WXS_LIST_ITEMTYPE!(typ);
+                let item_type: XmlSchemaTypePtr = (*typ).subtypes;
                 cur = value;
                 loop {
                     while xml_is_blank_char(*cur as u32) {
@@ -6889,7 +6815,7 @@ unsafe fn xml_schema_pcustom_err_ext(
         let des = xml_schema_format_item_for_report(None, item, item_elem);
         let msg = format!("{des}: {message}.\n");
         if item_elem.is_none() && !item.is_null() {
-            item_elem = WXS_ITEM_NODE!(item).map(|node| node.into());
+            item_elem = xml_schema_get_component_node(item as _).map(|node| node.into());
         }
         xml_schema_perr_ext(
             ctxt,
@@ -11009,7 +10935,7 @@ unsafe fn xml_schema_parse_element(
                         None,
                     );
                 } else {
-                    WXS_ELEM_TYPEDEF!(decl) =
+                    (*decl).subtypes =
                         xml_schema_parse_complex_type(ctxt, schema, child.unwrap(), 0);
                 }
                 child = child
@@ -11033,7 +10959,7 @@ unsafe fn xml_schema_parse_element(
                         None,
                     );
                 } else {
-                    WXS_ELEM_TYPEDEF!(decl) =
+                    (*decl).subtypes =
                         xml_schema_parse_simple_type(ctxt, schema, child.unwrap(), 0);
                 }
                 child = child
@@ -14182,9 +14108,9 @@ unsafe fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> i
                 // but this won't assure that we search only *inside* the
                 // redefined schema.
                 let node = if !(*redef).reference.is_null() {
-                    WXS_ITEM_NODE!((*redef).reference)
+                    xml_schema_get_component_node(((*redef).reference) as _)
                 } else {
-                    WXS_ITEM_NODE!(item)
+                    xml_schema_get_component_node(item as _)
                 };
                 // TODO: error code.
                 // Probably XmlParserErrors::XML_SCHEMAP_SRC_RESOLVE, if this is using the
@@ -14290,9 +14216,9 @@ unsafe fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> i
             }
             if was_redefined != 0 {
                 let node = if !(*redef).reference.is_null() {
-                    WXS_ITEM_NODE!((*redef).reference)
+                    xml_schema_get_component_node(((*redef).reference) as _)
                 } else {
-                    WXS_ITEM_NODE!((*redef).item)
+                    xml_schema_get_component_node(((*redef).item) as _)
                 };
 
                 let desig = xml_schema_get_component_designation(prev as _);
@@ -14443,7 +14369,7 @@ unsafe fn xml_schema_add_components(
                 xml_schema_custom_err(
                     pctxt as XmlSchemaAbstractCtxtPtr,
                     XmlParserErrors::XmlSchemapRedefinedType,
-                    WXS_ITEM_NODE!(item).map(|node| node.into()),
+                    xml_schema_get_component_node(item as _).map(|node| node.into()),
                     item as XmlSchemaBasicItemPtr,
                     format!("A global {typename} '{qname}' does already exist").as_str(),
                     Some(typename),
@@ -14654,7 +14580,7 @@ unsafe fn xml_schema_resolve_element_references(
                 xml_schema_resolve_element_references(subst_head, ctxt);
                 // Set the "substitution group affiliation".
                 // NOTE that now we use the "ref_decl" field for this.
-                WXS_SUBST_HEAD!(elem_decl) = subst_head;
+                (*elem_decl).ref_decl = subst_head;
                 // The type definitions is set to:
                 // SPEC "...the {type definition} of the element
                 // declaration `resolved` to by the `actual value`
@@ -14891,8 +14817,8 @@ unsafe fn xml_schema_resolve_type_references(
         // The ball of letters below means, that if we have a particle
         // which has a QName-helper component as its {term}, we want
         // to resolve it...
-        else if !WXS_TYPE_CONTENTTYPE!(type_def).is_null()
-            && (*WXS_TYPE_CONTENTTYPE!(type_def)).typ == XmlSchemaTypeType::XmlSchemaTypeParticle
+        else if !(*type_def).subtypes.is_null()
+            && (*(*type_def).subtypes).typ == XmlSchemaTypeType::XmlSchemaTypeParticle
             && !WXS_TYPE_PARTICLE_TERM!(type_def).is_null()
             && (*WXS_TYPE_PARTICLE_TERM!(type_def)).typ == XmlSchemaTypeType::XmlSchemaExtraQnameref
         {
@@ -14913,7 +14839,8 @@ unsafe fn xml_schema_resolve_type_references(
                     ctxt,
                     XmlParserErrors::XmlSchemapSrcResolve,
                     null_mut(),
-                    WXS_ITEM_NODE!(WXS_TYPE_PARTICLE!(type_def)).map(|node| node.into()),
+                    xml_schema_get_component_node((WXS_TYPE_PARTICLE!(type_def)) as _)
+                        .map(|node| node.into()),
                     "ref",
                     (!(*refe).name.is_null())
                         .then(|| CStr::from_ptr((*refe).name as *const i8).to_string_lossy())
@@ -14927,10 +14854,10 @@ unsafe fn xml_schema_resolve_type_references(
                     None,
                 );
                 // Remove the particle.
-                WXS_TYPE_CONTENTTYPE!(type_def) = null_mut();
+                (*type_def).subtypes = null_mut();
             } else if WXS_MODELGROUPDEF_MODEL!(group_def).is_null() {
                 // Remove the particle.
-                WXS_TYPE_CONTENTTYPE!(type_def) = null_mut();
+                (*type_def).subtypes = null_mut();
             } else {
                 // Assign the MG definition's {model group} to the particle's {term}.
                 WXS_TYPE_PARTICLE_TERM!(type_def) = WXS_MODELGROUPDEF_MODEL!(group_def);
@@ -14946,7 +14873,8 @@ unsafe fn xml_schema_resolve_type_references(
                         xml_schema_custom_err(
                             ctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapCosAllLimited,
-                            WXS_ITEM_NODE!(WXS_TYPE_PARTICLE!(type_def)).map(|node| node.into()),
+                            xml_schema_get_component_node((WXS_TYPE_PARTICLE!(type_def)) as _)
+                                .map(|node| node.into()),
                             null_mut(),
                             "The particle's {max occurs} must be 1, since the reference resolves to an 'all' model group",
                             None,
@@ -15185,7 +15113,7 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
                         ctxt,
                         XmlParserErrors::XmlSchemapSrcResolve,
                         null_mut(),
-                        WXS_ITEM_NODE!(particle).map(|node| node.into()),
+                        xml_schema_get_component_node(particle as _).map(|node| node.into()),
                         "ref",
                         (!(*refe).name.is_null())
                             .then(|| CStr::from_ptr((*refe).name as *const i8).to_string_lossy())
@@ -15228,7 +15156,7 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
                         xml_schema_custom_err(
                             ctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapCosAllLimited,
-                            WXS_ITEM_NODE!(particle).map(|node| node.into()),
+                            xml_schema_get_component_node(particle as _).map(|node| node.into()),
                             null_mut(),
                             "A model group definition is referenced, but it contains an 'all' model group, which cannot be contained by model groups",
                             None,
@@ -15411,7 +15339,7 @@ unsafe fn xml_schema_check_type_def_circular_internal(
                 pctxt,
                 XmlParserErrors::XmlSchemapStPropsCorrect2,
                 ctxt_type as XmlSchemaBasicItemPtr,
-                WXS_ITEM_NODE!(ctxt_type).map(|node| node.into()),
+                xml_schema_get_component_node(ctxt_type as _).map(|node| node.into()),
                 "The definition is circular",
                 None,
             );
@@ -15544,7 +15472,7 @@ unsafe fn xml_schema_check_group_def_circular(
                     ctxt,
                     XmlParserErrors::XmlSchemapMgPropsCorrect2,
                     null_mut(),
-                    WXS_ITEM_NODE!(circ).map(|node| node.into()),
+                    xml_schema_get_component_node(circ as _).map(|node| node.into()),
                     format!("Circular reference to the model group definition '{q1}' defined")
                         .as_str(),
                     Some(&q1),
@@ -15637,7 +15565,8 @@ unsafe fn xml_schema_check_attr_group_circular(
                     ctxt,
                     XmlParserErrors::XmlSchemapSrcAttributeGroup3,
                     null_mut(),
-                    WXS_ITEM_NODE!(circ as XmlSchemaBasicItemPtr).map(|node| node.into()),
+                    xml_schema_get_component_node((circ as XmlSchemaBasicItemPtr) as _)
+                        .map(|node| node.into()),
                     format!("Circular reference to the attribute group '{q1}' defined").as_str(),
                     Some(&q1),
                 );
@@ -16063,7 +15992,7 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                                     pctxt,
                                     (*pctxt).schema,
                                     XmlSchemaTypeType::XmlSchemaTypeAnyAttribute,
-                                    WXS_ITEM_NODE!(item),
+                                    xml_schema_get_component_node(item as _),
                                 );
                                 if tmp_wild.is_null() {
                                     return -1;
@@ -17354,8 +17283,6 @@ unsafe fn xml_schema_pattr_use_err4(
     str4: Option<&str>,
 ) {
     unsafe {
-        let mut str: *mut XmlChar = null_mut();
-
         let mut msg = xml_schema_format_item_for_report(None, owner_item, None);
         writeln!(
             msg,
@@ -17363,7 +17290,7 @@ unsafe fn xml_schema_pattr_use_err4(
             xml_schema_format_item_for_report(None, attruse as XmlSchemaBasicItemPtr, None,)
         )
         .ok();
-        FREE_AND_NULL!(str);
+
         xml_schema_err4(
             ctxt as XmlSchemaAbstractCtxtPtr,
             error as _,
@@ -17670,7 +17597,7 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                                 xml_schema_pattr_use_err4(
                                     pctxt,
                                     XmlParserErrors::XmlSchemapDerivationOkRestriction2_1_1,
-                                    WXS_ITEM_NODE!(item).map(|node| node.into()),
+                                    xml_schema_get_component_node(item as _).map(|node| node.into()),
                                     item,
                                     cur,
                                     format!("The 'optional' attribute use is inconsistent with the corresponding 'required' attribute use of the {} {desig}", action_str.unwrap()).as_str(),
@@ -17704,7 +17631,7 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                                 xml_schema_pattr_use_err4(
                                     pctxt,
                                     XmlParserErrors::XmlSchemapDerivationOkRestriction2_1_2,
-                                    WXS_ITEM_NODE!(item).map(|node| node.into()),
+                                    xml_schema_get_component_node(item as _).map(|node| node.into()),
                                     item,
                                     cur,
                                     format!("The attribute declaration's {desig1} is not validly derived from the corresponding {desig2} of the attribute declaration in the {} {desig3}", action_str.unwrap()).as_str(),
@@ -17754,7 +17681,7 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                                         xml_schema_pattr_use_err4(
                                             pctxt,
                                             XmlParserErrors::XmlSchemapDerivationOkRestriction2_1_3,
-                                            WXS_ITEM_NODE!(item).map(|node| node.into()),
+                                            xml_schema_get_component_node(item as _).map(|node| node.into()),
                                             item,
                                             cur,
                                             format!("The effective value constraint of the attribute use is inconsistent with its correspondent in the {} {desig}", action_str.unwrap()).as_str(),
@@ -17790,7 +17717,7 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
                         xml_schema_pattr_use_err4(
                             pctxt,
                             XmlParserErrors::XmlSchemapDerivationOkRestriction2_2,
-                            WXS_ITEM_NODE!(item).map(|node| node.into()),
+                            xml_schema_get_component_node(item as _).map(|node| node.into()),
                             item,
                             cur,
                             format!("Neither a matching attribute use, nor a matching wildcard exists in the {} {desig}", action_str.unwrap()).as_str(),
@@ -18436,7 +18363,7 @@ unsafe fn xml_schema_fixup_complex_type(
                                 xml_schema_custom_err(
                                     pctxt as XmlSchemaAbstractCtxtPtr,
                                     XmlParserErrors::XmlSchemapCosAllLimited,
-                                    WXS_ITEM_NODE!(typ).map(|node| node.into()),
+                                    xml_schema_get_component_node(typ as _).map(|node| node.into()),
                                     null_mut(),
                                     "The type has an 'all' model group in its {content type} and thus cannot be derived from a non-empty type, since this would produce a 'sequence' model group containing the 'all' model group; 'all' model groups are not allowed to appear inside other model groups",
                                     None,
@@ -18452,7 +18379,7 @@ unsafe fn xml_schema_fixup_complex_type(
                                 xml_schema_custom_err(
                                     pctxt as XmlSchemaAbstractCtxtPtr,
                                     XmlParserErrors::XmlSchemapCosAllLimited,
-                                    WXS_ITEM_NODE!(typ).map(|node| node.into()),
+                                    xml_schema_get_component_node(typ as _).map(|node| node.into()),
                                     null_mut(),
                                     "A type cannot be derived by extension from a type which has an 'all' model group in its {content type}, since this would produce a 'sequence' model group containing the 'all' model group; 'all' model groups are not allowed to appear inside other model groups",
                                     None,
@@ -18477,7 +18404,7 @@ unsafe fn xml_schema_fixup_complex_type(
                                 if (*particle).children.is_null() {
                                     break 'exit_failure;
                                 }
-                                WXS_TYPE_CONTENTTYPE!(typ) = particle as XmlSchemaTypePtr;
+                                (*typ).subtypes = particle as XmlSchemaTypePtr;
                                 // SPEC "the particle of the {content type} of
                                 // the ... base ..."
                                 // Create a duplicate of the base type's particle
@@ -20279,7 +20206,7 @@ unsafe fn xml_schema_check_attr_props_correct(
         // Declaration Schema Component ($3.2.1), modulo the impact of
         // Missing Sub-components ($5.3)."
 
-        if WXS_ATTR_TYPEDEF!(attr).is_null() {
+        if (*attr).subtypes.is_null() {
             return 0;
         }
 
@@ -20288,7 +20215,7 @@ unsafe fn xml_schema_check_attr_props_correct(
             // "If the {type definition} is or is derived from ID then there
             // must not be a {value constraint}."
             if xml_schema_is_derived_from_built_in_type(
-                WXS_ATTR_TYPEDEF!(attr),
+                (*attr).subtypes,
                 XmlSchemaValType::XmlSchemasID as i32,
             ) != 0
             {
@@ -20312,7 +20239,7 @@ unsafe fn xml_schema_check_attr_props_correct(
             let ret: i32 = xml_schema_vcheck_cvc_simple_type(
                 pctxt as XmlSchemaAbstractCtxtPtr,
                 (*attr).node.map(|node| node.into()),
-                WXS_ATTR_TYPEDEF!(attr),
+                (*attr).subtypes,
                 (*attr).def_value,
                 addr_of_mut!((*attr).def_val),
                 1,
@@ -20636,20 +20563,20 @@ unsafe fn xml_schema_check_subst_group_circular(
     ancestor: XmlSchemaElementPtr,
 ) -> XmlSchemaElementPtr {
     unsafe {
-        if WXS_SUBST_HEAD!(ancestor).is_null() {
+        if (*ancestor).ref_decl.is_null() {
             return null_mut();
         }
-        if WXS_SUBST_HEAD!(ancestor) == elem_decl {
+        if (*ancestor).ref_decl == elem_decl {
             return ancestor;
         }
 
-        if (*WXS_SUBST_HEAD!(ancestor)).flags & XML_SCHEMAS_ELEM_CIRCULAR != 0 {
+        if (*(*ancestor).ref_decl).flags & XML_SCHEMAS_ELEM_CIRCULAR != 0 {
             return null_mut();
         }
-        (*WXS_SUBST_HEAD!(ancestor)).flags |= XML_SCHEMAS_ELEM_CIRCULAR;
+        (*(*ancestor).ref_decl).flags |= XML_SCHEMAS_ELEM_CIRCULAR;
         let ret: XmlSchemaElementPtr =
-            xml_schema_check_subst_group_circular(elem_decl, WXS_SUBST_HEAD!(ancestor));
-        (*WXS_SUBST_HEAD!(ancestor)).flags ^= XML_SCHEMAS_ELEM_CIRCULAR;
+            xml_schema_check_subst_group_circular(elem_decl, (*ancestor).ref_decl);
+        (*(*ancestor).ref_decl).flags ^= XML_SCHEMAS_ELEM_CIRCULAR;
 
         ret
     }
@@ -20843,13 +20770,13 @@ unsafe fn xml_schema_check_elem_props_correct(
 ) -> i32 {
     unsafe {
         let mut ret: i32 = 0;
-        let type_def: XmlSchemaTypePtr = WXS_ELEM_TYPEDEF!(elem_decl);
+        let type_def: XmlSchemaTypePtr = (*elem_decl).subtypes;
         // SPEC (1) "The values of the properties of an element declaration
         // must be as described in the property tableau in The Element
         // Declaration Schema Component ($3.3.1), modulo the impact of Missing
         // Sub-components ($5.3)."
-        if !WXS_SUBST_HEAD!(elem_decl).is_null() {
-            let head: XmlSchemaElementPtr = WXS_SUBST_HEAD!(elem_decl);
+        if !(*elem_decl).ref_decl.is_null() {
+            let head: XmlSchemaElementPtr = (*elem_decl).ref_decl;
             let circ: XmlSchemaElementPtr;
 
             xml_schema_check_element_decl_component(head, pctxt);
@@ -20871,7 +20798,7 @@ unsafe fn xml_schema_check_elem_props_correct(
             // by repeatedly following the {substitution group affiliation} property."
             if head == elem_decl {
                 circ = head;
-            } else if !WXS_SUBST_HEAD!(head).is_null() {
+            } else if !(*head).ref_decl.is_null() {
                 circ = xml_schema_check_subst_group_circular(head, head);
             } else {
                 circ = null_mut();
@@ -20905,7 +20832,7 @@ unsafe fn xml_schema_check_elem_props_correct(
             // NOTE: {substitution group exclusions} means the values of the
             // attribute "final".
 
-            if type_def != WXS_ELEM_TYPEDEF!(WXS_SUBST_HEAD!(elem_decl)) {
+            if type_def != (*((*elem_decl).ref_decl)).subtypes {
                 let mut set: i32 = 0;
 
                 if (*head).flags & XML_SCHEMAS_ELEM_FINAL_EXTENSION != 0 {
@@ -20918,13 +20845,13 @@ unsafe fn xml_schema_check_elem_props_correct(
                 if xml_schema_check_cos_derived_ok(
                     pctxt as XmlSchemaAbstractCtxtPtr,
                     type_def,
-                    WXS_ELEM_TYPEDEF!(head),
+                    (*head).subtypes,
                     set,
                 ) != 0
                 {
                     let q1 = xml_schema_get_component_qname(type_def as _);
                     let q2 = xml_schema_get_component_qname(head as _);
-                    let q3 = xml_schema_get_component_qname(WXS_ELEM_TYPEDEF!(head) as _);
+                    let q3 = xml_schema_get_component_qname((*head).subtypes as _);
 
                     ret = XmlParserErrors::XmlSchemapEPropsCorrect4 as i32;
                     xml_schema_pcustom_err_ext(
@@ -21136,9 +21063,7 @@ unsafe fn xml_schema_check_elem_subst_group(
 ) {
     unsafe {
         // SPEC (1) "Its {abstract} is false."
-        if WXS_SUBST_HEAD!(elem_decl).is_null()
-            || (*elem_decl).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0
-        {
+        if (*elem_decl).ref_decl.is_null() || (*elem_decl).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0 {
             return;
         }
         {
@@ -21150,7 +21075,7 @@ unsafe fn xml_schema_check_elem_subst_group(
             // SPEC (2) "It is validly substitutable for HEAD subject to HEAD's
             // {disallowed substitutions} as the blocking constraint, as defined in
             // Substitution Group OK (Transitive) ($3.3.6)."
-            head = WXS_SUBST_HEAD!(elem_decl);
+            head = (*elem_decl).ref_decl;
             while !head.is_null() {
                 'to_continue: {
                     set = 0;
@@ -21236,7 +21161,7 @@ unsafe fn xml_schema_check_elem_subst_group(
                         (*head).flags |= XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD;
                     }
                 }
-                head = WXS_SUBST_HEAD!(head);
+                head = (*head).ref_decl;
             }
         }
     }
@@ -21288,7 +21213,7 @@ unsafe fn xml_schema_build_content_model_for_subst_group(
             let name = CStr::from_ptr((*elem_decl).name as *const i8).to_string_lossy();
             xml_schema_perr(
                 pctxt,
-                WXS_ITEM_NODE!(particle).map(|node| node.into()),
+                xml_schema_get_component_node(particle as _).map(|node| node.into()),
                 XmlParserErrors::XmlSchemapInternal,
                 "Internal error: xmlSchemaBuildContentModelForSubstGroup, declaration is marked having a subst. group but none available.\n",
                 Some(&name),
@@ -25055,7 +24980,7 @@ unsafe fn xml_schema_validate_elem_decl(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
             );
             return (*vctxt).err;
         }
-        actual_type = WXS_ELEM_TYPEDEF!(elem_decl);
+        actual_type = (*elem_decl).subtypes;
         // cvc-elt (3.3.4) : 2
         if (*elem_decl).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0 {
             VERROR!(
@@ -26304,7 +26229,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         // an attribute declaration whose {type definition} is
                         // or is derived from ID. Then all of the following
                         // must be true:"
-                        (*iattr).type_def = WXS_ATTR_TYPEDEF!((*iattr).decl);
+                        (*iattr).type_def = (*((*iattr).decl)).subtypes;
                         if xml_schema_is_derived_from_built_in_type(
                             (*iattr).type_def,
                             XmlSchemaValType::XmlSchemasID as i32,
