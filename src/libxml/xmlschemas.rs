@@ -2037,15 +2037,18 @@ unsafe fn xml_schema_format_item_for_report(
     }
 }
 
+/// # Note
+/// In the original libxml2, this function returns a string with escaped characters
+/// that could be recognized as format specifiers ('%').
+///
+/// However, this operation is unnecessary in Rust
+/// because string formatting is not performed at runtime,
+/// and in fact, no such operation is performed.
 unsafe fn xml_schema_format_node_for_error(
-    msg: *mut *mut XmlChar,
     actxt: XmlSchemaAbstractCtxtPtr,
     node: Option<XmlGenericNodePtr>,
-) -> *mut XmlChar {
+) -> Option<String> {
     unsafe {
-        let mut str: *mut XmlChar = null_mut();
-
-        *msg = null_mut();
         if node.is_some_and(|node| {
             !matches!(
                 node.element_type(),
@@ -2055,94 +2058,98 @@ unsafe fn xml_schema_format_node_for_error(
             // Don't try to format other nodes than element and
             // attribute nodes.
             // Play safe and return an empty string.
-            *msg = xml_strdup(c"".as_ptr() as _);
-            return *msg;
+            return Some("".to_owned());
         }
+
+        let mut res = String::new();
         if let Some(node) = node {
             // Work on tree nodes.
             let (name, ns) = if let Ok(node) = XmlAttrPtr::try_from(node) {
                 let elem = node.parent.unwrap();
 
-                *msg = xml_strdup(c"Element '".as_ptr() as _);
+                res.push_str("Element '");
                 if let Some(ns) = elem.ns {
-                    let res = xml_schema_format_qname(ns.href().as_deref(), elem.name().as_deref());
-                    *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
+                    res.push_str(
+                        xml_schema_format_qname(ns.href().as_deref(), elem.name().as_deref())
+                            .as_str(),
+                    );
                 } else {
-                    let res = xml_schema_format_qname(None, elem.name().as_deref());
-                    *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
+                    res.push_str(xml_schema_format_qname(None, elem.name().as_deref()).as_str());
                 }
-                *msg = xml_strcat(*msg, c"', ".as_ptr() as _);
-                *msg = xml_strcat(*msg, c"attribute '".as_ptr() as _);
+                res.push_str("', ");
+                res.push_str("attribute '");
                 (node.name, node.ns)
             } else {
-                *msg = xml_strdup(c"Element '".as_ptr() as _);
+                res.push_str("Element '");
                 let node = XmlNodePtr::try_from(node).unwrap();
                 (node.name, node.ns)
             };
             if let Some(ns) = ns {
-                let res = xml_schema_format_qname(
-                    ns.href().as_deref(),
-                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+                res.push_str(
+                    xml_schema_format_qname(
+                        ns.href().as_deref(),
+                        Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+                    )
+                    .as_str(),
                 );
-                *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
             } else {
-                let res = xml_schema_format_qname(
-                    None,
-                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+                res.push_str(
+                    xml_schema_format_qname(
+                        None,
+                        Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+                    )
+                    .as_str(),
                 );
-                *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
             }
-            FREE_AND_NULL!(str);
-            *msg = xml_strcat(*msg, c"': ".as_ptr() as _);
+            res.push_str("': ");
         } else if (*actxt).typ == XML_SCHEMA_CTXT_VALIDATOR {
             let vctxt: XmlSchemaValidCtxtPtr = actxt as XmlSchemaValidCtxtPtr;
             // Work on node infos.
             if (*(*vctxt).inode).node_type == XmlElementType::XmlAttributeNode as i32 {
                 let ielem: XmlSchemaNodeInfoPtr = *(*vctxt).elem_infos.add((*vctxt).depth as usize);
 
-                *msg = xml_strdup(c"Element '".as_ptr() as _);
+                res.push_str("Element '");
                 let namespace_name = (*ielem).ns_name as *const i8;
-                let res = xml_schema_format_qname(
+                res.push_str(
+                    xml_schema_format_qname(
+                        (!namespace_name.is_null())
+                            .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
+                            .as_deref(),
+                        Some(
+                            CStr::from_ptr((*ielem).local_name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ),
+                    )
+                    .as_str(),
+                );
+                res.push_str("', ");
+                res.push_str("attribute '");
+            } else {
+                res.push_str("Element '");
+            }
+            let namespace_name = (*(*vctxt).inode).ns_name as *const i8;
+            res.push_str(
+                xml_schema_format_qname(
                     (!namespace_name.is_null())
                         .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
                         .as_deref(),
                     Some(
-                        CStr::from_ptr((*ielem).local_name as *const i8)
+                        CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
                             .to_string_lossy()
                             .as_ref(),
                     ),
-                );
-                *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
-                *msg = xml_strcat(*msg, c"', ".as_ptr() as _);
-                *msg = xml_strcat(*msg, c"attribute '".as_ptr() as _);
-            } else {
-                *msg = xml_strdup(c"Element '".as_ptr() as _);
-            }
-            let namespace_name = (*(*vctxt).inode).ns_name as *const i8;
-            let res = xml_schema_format_qname(
-                (!namespace_name.is_null())
-                    .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
-                    .as_deref(),
-                Some(
-                    CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                ),
+                )
+                .as_str(),
             );
-            *msg = xml_strncat(*msg, res.as_ptr(), res.len() as i32);
-            *msg = xml_strcat(*msg, c"': ".as_ptr() as _);
+            res.push_str("': ");
         } else if (*actxt).typ == XML_SCHEMA_CTXT_PARSER {
             // Hmm, no node while parsing?
             // Return an empty string, in case NULL will break something.
-            *msg = xml_strdup(c"".as_ptr() as _);
         } else {
             // TODO
-            return null_mut();
+            return None;
         }
-
-        // xmlSchemaFormatItemForReport() also returns an escaped format string,
-        // so do this before calling it below (in the future).
-        xml_escape_format_string(msg);
 
         // VAL TODO: The output of the given schema component is currently disabled.
         // #if 0
@@ -2153,7 +2160,7 @@ unsafe fn xml_schema_format_node_for_error(
         //     *msg = xmlStrcat(*msg, c"]".as_ptr() as _);
         // }
         // #endif
-        *msg
+        Some(res)
     }
 }
 
@@ -2201,25 +2208,16 @@ pub(crate) unsafe fn xml_schema_custom_err4(
     str4: Option<&str>,
 ) {
     unsafe {
-        let mut msg: *mut XmlChar = null_mut();
-
-        if node.is_none() && !item.is_null() && (*actxt).typ == XML_SCHEMA_CTXT_PARSER {
-            node = WXS_ITEM_NODE!(item).map(|node| node.into());
-            let res = xml_schema_format_item_for_report(None, item, None);
-            msg = xml_strndup(res.as_ptr(), res.len() as i32);
-            msg = xml_strcat(msg, c": ".as_ptr() as _);
-        } else {
-            xml_schema_format_node_for_error(addr_of_mut!(msg), actxt, node);
-        }
-        let mut msg = if msg.is_null() {
-            "".to_owned()
-        } else {
-            let res = CStr::from_ptr(msg as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            xml_free(msg as _);
-            res
-        };
+        let mut msg =
+            if node.is_none() && !item.is_null() && (*actxt).typ == XML_SCHEMA_CTXT_PARSER {
+                node = WXS_ITEM_NODE!(item).map(|node| node.into());
+                let mut res = xml_schema_format_item_for_report(None, item, None);
+                res.push_str(": ");
+                Some(res)
+            } else {
+                xml_schema_format_node_for_error(actxt, node)
+            }
+            .unwrap_or_else(|| "".to_owned());
         msg.push_str(message);
         msg.push_str(".\n");
         xml_schema_err4(actxt, error, node, msg.as_str(), str1, str2, str3, str4);
@@ -2930,24 +2928,15 @@ unsafe fn xml_schema_facet_err(
         use std::fmt::Write as _;
 
         let mut str: *mut XmlChar = null_mut();
-        let mut msg: *mut XmlChar = null_mut();
         let node_type: i32 = xml_schema_eval_error_node_type(actxt, node);
 
-        xml_schema_format_node_for_error(addr_of_mut!(msg), actxt, node);
+        let mut msg =
+            xml_schema_format_node_for_error(actxt, node).unwrap_or_else(|| "".to_owned());
         let facet_type = if matches!(error, XmlParserErrors::XmlSchemavCvcEnumerationValid) {
             XmlSchemaTypeType::XmlSchemaFacetEnumeration
         // If enumerations are validated, one must not expect the facet to be given.
         } else {
             (*facet).typ
-        };
-        let mut msg = if msg.is_null() {
-            String::new()
-        } else {
-            let ret = CStr::from_ptr(msg as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            xml_free(msg as _);
-            ret
         };
         write!(
             msg,
@@ -3577,18 +3566,8 @@ unsafe fn xml_schema_simple_type_err(
     display_value: i32,
 ) {
     unsafe {
-        let mut msg: *mut XmlChar = null_mut();
-
-        xml_schema_format_node_for_error(addr_of_mut!(msg), actxt, node);
-        let mut msg = if msg.is_null() {
-            String::new()
-        } else {
-            let ret = CStr::from_ptr(msg as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            xml_free(msg as _);
-            ret
-        };
+        let mut msg =
+            xml_schema_format_node_for_error(actxt, node).unwrap_or_else(|| "".to_owned());
 
         if display_value != 0
             || xml_schema_eval_error_node_type(actxt, node)
@@ -4624,18 +4603,8 @@ unsafe fn xml_schema_custom_warning(
     unsafe {
         use std::fmt::Write as _;
 
-        let mut msg: *mut XmlChar = null_mut();
-
-        xml_schema_format_node_for_error(addr_of_mut!(msg), actxt, node);
-        let mut msg = if msg.is_null() {
-            String::new()
-        } else {
-            let ret = CStr::from_ptr(msg as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            xml_free(msg as _);
-            ret
-        };
+        let mut msg =
+            xml_schema_format_node_for_error(actxt, node).unwrap_or_else(|| "".to_owned());
         writeln!(msg, "{message}.").ok();
 
         // URGENT TODO: Set the error code to something sane.
@@ -5918,22 +5887,9 @@ unsafe fn xml_schema_psimple_type_err(
     unsafe {
         use std::fmt::Write as _;
 
-        let mut msg: *mut XmlChar = null_mut();
-
-        xml_schema_format_node_for_error(
-            addr_of_mut!(msg),
-            ctxt as XmlSchemaAbstractCtxtPtr,
-            Some(node),
-        );
-        let mut msg = if msg.is_null() {
-            String::new()
-        } else {
-            let ret = CStr::from_ptr(msg as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            xml_free(msg as _);
-            ret
-        };
+        let mut msg =
+            xml_schema_format_node_for_error(ctxt as XmlSchemaAbstractCtxtPtr, Some(node))
+                .unwrap_or_else(|| "".to_owned());
         if let Some(message) = message {
             writeln!(msg, "{message}.").ok();
             xml_schema_perr_ext(
@@ -6608,14 +6564,11 @@ unsafe fn xml_schema_pillegal_attr_err(
     attr: XmlAttrPtr,
 ) {
     unsafe {
-        let mut str_a: *mut XmlChar = null_mut();
-
-        xml_schema_format_node_for_error(
-            addr_of_mut!(str_a),
+        let str1 = xml_schema_format_node_for_error(
             ctxt as XmlSchemaAbstractCtxtPtr,
             attr.parent.map(|p| p.into()),
-        );
-        let str1 = CStr::from_ptr(str_a as *const i8).to_string_lossy();
+        )
+        .unwrap();
         let str2 = xml_schema_format_qname_ns(attr.ns, attr.name().as_deref());
         xml_schema_err4(
             ctxt as XmlSchemaAbstractCtxtPtr,
@@ -6627,7 +6580,6 @@ unsafe fn xml_schema_pillegal_attr_err(
             None,
             None,
         );
-        FREE_AND_NULL!(str_a);
     }
 }
 
@@ -24520,20 +24472,11 @@ unsafe fn xml_schema_complex_type_err(
 ) {
     unsafe {
         let mut str: *mut XmlChar;
-        let mut msg: *mut XmlChar = null_mut();
         let mut local_name: *mut XmlChar;
         let mut ns_name: *mut XmlChar;
 
-        xml_schema_format_node_for_error(addr_of_mut!(msg), actxt, node);
-        let mut msg = if msg.is_null() {
-            String::new()
-        } else {
-            let ret = CStr::from_ptr(msg as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            xml_free(msg as _);
-            ret
-        };
+        let mut msg =
+            xml_schema_format_node_for_error(actxt, node).unwrap_or_else(|| "".to_owned());
         write!(msg, "{message}.").ok();
         // Note that is does not make sense to report that we have a wildcard here,
         // since the wildcard might be unfolded into multiple transitions.
@@ -24600,11 +24543,7 @@ unsafe fn xml_schema_complex_type_err(
                 }
             }
             str = xml_strcat(str, c" ).\n".as_ptr() as _);
-            msg.push_str(
-                CStr::from_ptr(xml_escape_format_string(addr_of_mut!(str)) as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            );
+            msg.push_str(CStr::from_ptr(str as *const i8).to_string_lossy().as_ref());
             FREE_AND_NULL!(str);
         } else {
             msg.push('\n');
@@ -26159,24 +26098,12 @@ unsafe fn xml_schema_illegal_attr_err(
     node: Option<XmlGenericNodePtr>,
 ) {
     unsafe {
-        let mut msg: *mut XmlChar = null_mut();
-        let mut str: *mut XmlChar = null_mut();
-
-        xml_schema_format_node_for_error(addr_of_mut!(msg), actxt, node);
-        let mut msg = if msg.is_null() {
-            String::new()
-        } else {
-            let ret = CStr::from_ptr(msg as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            xml_free(msg as _);
-            ret
-        };
+        let mut msg =
+            xml_schema_format_node_for_error(actxt, node).unwrap_or_else(|| "".to_owned());
         let qname = xml_schema_format_error_node_qname(ni as XmlSchemaNodeInfoPtr, node).unwrap();
 
         msg.push_str(format!("The attribute '{qname}' is not allowed.\n").as_str());
         xml_schema_err(actxt, error, node, msg.as_str(), Some(&qname), None);
-        FREE_AND_NULL!(str);
     }
 }
 
