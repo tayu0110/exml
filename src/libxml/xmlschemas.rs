@@ -1784,7 +1784,7 @@ fn xml_schema_wildcard_pcto_string(pc: i32) -> &'static str {
 #[doc(alias = "xmlSchemaFormatItemForReport")]
 unsafe fn xml_schema_format_item_for_report(
     buf: *mut *mut XmlChar,
-    item_des: *const XmlChar,
+    item_des: Option<&str>,
     item: XmlSchemaBasicItemPtr,
     item_node: Option<XmlGenericNodePtr>,
 ) -> *mut XmlChar {
@@ -1797,8 +1797,8 @@ unsafe fn xml_schema_format_item_for_report(
             *buf = null_mut();
         }
 
-        if !item_des.is_null() {
-            *buf = xml_strdup(item_des);
+        if let Some(item_des) = item_des {
+            *buf = xml_strndup(item_des.as_ptr(), item_des.len() as i32);
         } else if !item.is_null() {
             match (*item).typ {
                 XmlSchemaTypeType::XmlSchemaTypeBasic => {
@@ -2183,7 +2183,7 @@ pub(crate) unsafe fn xml_schema_custom_err4(
 
         if node.is_none() && !item.is_null() && (*actxt).typ == XML_SCHEMA_CTXT_PARSER {
             node = WXS_ITEM_NODE!(item).map(|node| node.into());
-            xml_schema_format_item_for_report(addr_of_mut!(msg), null_mut(), item, None);
+            xml_schema_format_item_for_report(addr_of_mut!(msg), None, item, None);
             msg = xml_strcat(msg, c": ".as_ptr() as _);
         } else {
             xml_schema_format_node_for_error(addr_of_mut!(msg), actxt, node);
@@ -6727,7 +6727,7 @@ unsafe fn xml_schema_pcontent_err(
 
         xml_schema_format_item_for_report(
             addr_of_mut!(des),
-            null_mut(),
+            None,
             owner_item,
             Some(owner_elem.into()),
         );
@@ -6934,7 +6934,7 @@ unsafe fn xml_schema_pcustom_err_ext(
     unsafe {
         let mut des: *mut XmlChar = null_mut();
 
-        xml_schema_format_item_for_report(addr_of_mut!(des), null_mut(), item, item_elem);
+        xml_schema_format_item_for_report(addr_of_mut!(des), None, item, item_elem);
         let d = CStr::from_ptr(des as *const i8).to_string_lossy();
         let msg = format!("{d}: {message}.\n");
         if item_elem.is_none() && !item.is_null() {
@@ -7103,7 +7103,7 @@ unsafe fn xml_schema_pmissing_attr_err(
     unsafe {
         let mut des: *mut XmlChar = null_mut();
 
-        xml_schema_format_item_for_report(addr_of_mut!(des), null_mut(), owner_item, owner_elem);
+        xml_schema_format_item_for_report(addr_of_mut!(des), None, owner_item, owner_elem);
         let d = CStr::from_ptr(des as *const i8).to_string_lossy();
         if let Some(message) = message {
             xml_schema_perr(
@@ -7828,14 +7828,14 @@ unsafe fn xml_schema_pcustom_attr_err(
         if owner_des.is_null() {
             xml_schema_format_item_for_report(
                 addr_of_mut!(des),
-                null_mut(),
+                None,
                 owner_item,
                 attr.unwrap().parent.map(|p| p.into()),
             );
         } else if (*owner_des).is_null() {
             xml_schema_format_item_for_report(
                 owner_des,
-                null_mut(),
+                None,
                 owner_item,
                 attr.unwrap().parent.map(|p| p.into()),
             );
@@ -8045,7 +8045,7 @@ unsafe fn xml_schema_pmutual_excl_attr_err(
 
         xml_schema_format_item_for_report(
             addr_of_mut!(des),
-            null_mut(),
+            None,
             owner_item as XmlSchemaBasicItemPtr,
             attr.parent.map(|p| p.into()),
         );
@@ -14577,18 +14577,14 @@ unsafe fn xml_schema_pres_comp_attr_err(
     ref_name: *const XmlChar,
     ref_uri: *const XmlChar,
     ref_type: XmlSchemaTypeType,
-    ref_type_str: *const c_char,
+    ref_type_str: Option<&str>,
 ) {
     unsafe {
         let mut des: *mut XmlChar = null_mut();
         let mut str_a: *mut XmlChar = null_mut();
 
-        xml_schema_format_item_for_report(addr_of_mut!(des), null_mut(), owner_item, owner_elem);
-        let ref_type_str = if ref_type_str.is_null() {
-            Cow::Borrowed(xml_schema_item_type_to_str(ref_type))
-        } else {
-            CStr::from_ptr(ref_type_str).to_string_lossy()
-        };
+        xml_schema_format_item_for_report(addr_of_mut!(des), None, owner_item, owner_elem);
+        let ref_type_str = ref_type_str.unwrap_or_else(|| xml_schema_item_type_to_str(ref_type));
         let d = CStr::from_ptr(des as *const i8).to_string_lossy();
         let qname = CStr::from_ptr(
             xml_schema_format_qname(addr_of_mut!(str_a), ref_uri, ref_name) as *const i8,
@@ -14608,7 +14604,7 @@ unsafe fn xml_schema_pres_comp_attr_err(
         Some(&d),
         Some(name),
         Some(&qname),
-        Some(&ref_type_str),
+        Some(ref_type_str),
         None,
     );
         FREE_AND_NULL!(des);
@@ -14675,7 +14671,7 @@ unsafe fn xml_schema_resolve_element_references(
                     (*elem_decl).named_type,
                     (*elem_decl).named_type_ns,
                     XmlSchemaTypeType::XmlSchemaTypeBasic,
-                    c"type definition".as_ptr() as _,
+                    Some("type definition"),
                 );
             } else {
                 (*elem_decl).subtypes = typ;
@@ -14698,7 +14694,7 @@ unsafe fn xml_schema_resolve_element_references(
                     (*elem_decl).subst_group,
                     (*elem_decl).subst_group_ns,
                     XmlSchemaTypeType::XmlSchemaTypeElement,
-                    null_mut(),
+                    None,
                 );
             } else {
                 xml_schema_resolve_element_references(subst_head, ctxt);
@@ -14774,7 +14770,7 @@ unsafe fn xml_schema_resolve_union_member_types(
                     name,
                     ns_name,
                     XmlSchemaTypeType::XmlSchemaTypeSimple,
-                    null_mut(),
+                    None,
                 );
                 // Remove the member type link.
                 if last_link.is_null() {
@@ -14888,7 +14884,7 @@ unsafe fn xml_schema_resolve_type_references(
                     (*type_def).base,
                     (*type_def).base_ns,
                     XmlSchemaTypeType::XmlSchemaTypeSimple,
-                    null_mut(),
+                    None,
                 );
                 return;
             }
@@ -14914,7 +14910,7 @@ unsafe fn xml_schema_resolve_type_references(
                             (*type_def).base,
                             (*type_def).base_ns,
                             XmlSchemaTypeType::XmlSchemaTypeSimple,
-                            null_mut(),
+                            None,
                         );
                     }
                 }
@@ -14951,7 +14947,7 @@ unsafe fn xml_schema_resolve_type_references(
                     (*refe).name,
                     (*refe).target_namespace,
                     (*refe).item_type,
-                    null_mut(),
+                    None,
                 );
                 // Remove the particle.
                 WXS_TYPE_CONTENTTYPE!(type_def) = null_mut();
@@ -15017,7 +15013,7 @@ unsafe fn xml_schema_resolve_attr_type_references(
                     (*item).type_name,
                     (*item).type_ns,
                     XmlSchemaTypeType::XmlSchemaTypeSimple,
-                    null_mut(),
+                    None,
                 );
                 return (*ctxt).err;
             } else {
@@ -15090,7 +15086,7 @@ unsafe fn xml_schema_resolve_attr_use_references(
                     (*refe).name,
                     (*refe).target_namespace,
                     XmlSchemaTypeType::XmlSchemaTypeAttribute,
-                    null_mut(),
+                    None,
                 );
                 return (*ctxt).err;
             }
@@ -15150,7 +15146,7 @@ unsafe fn xml_schema_resolve_attr_group_references(
                 (*refe).name,
                 (*refe).target_namespace,
                 (*refe).item_type,
-                null_mut(),
+                None,
             );
             return (*ctxt).err;
         }
@@ -15201,7 +15197,7 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
                         (*refe).name,
                         (*refe).target_namespace,
                         (*refe).item_type,
-                        null_mut(),
+                        None,
                     );
                     // TODO: remove the particle.
                     break 'next_particle;
@@ -15303,7 +15299,7 @@ unsafe fn xml_schema_resolve_idckey_references(
                     (*(*idc).refe).name,
                     (*(*idc).refe).target_namespace,
                     XmlSchemaTypeType::XmlSchemaTypeIDCKey,
-                    null_mut(),
+                    None,
                 );
                 return (*pctxt).err;
             } else if (*(*(*idc).refe).item).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
@@ -15371,7 +15367,7 @@ unsafe fn xml_schema_resolve_attr_use_prohib_references(
                 (*prohib).name,
                 (*prohib).target_namespace,
                 XmlSchemaTypeType::XmlSchemaTypeAttribute,
-                null_mut(),
+                None,
             );
             return XmlParserErrors::XmlSchemapSrcResolve as i32;
         }
@@ -17331,7 +17327,7 @@ unsafe fn xml_schema_pattr_use_err4(
         let mut str: *mut XmlChar = null_mut();
         let mut msg: *mut XmlChar = null_mut();
 
-        xml_schema_format_item_for_report(addr_of_mut!(msg), null_mut(), owner_item, None);
+        xml_schema_format_item_for_report(addr_of_mut!(msg), None, owner_item, None);
         let mut msg = if msg.is_null() {
             String::new()
         } else {
@@ -17346,7 +17342,7 @@ unsafe fn xml_schema_pattr_use_err4(
             ", {}: {message}.",
             CStr::from_ptr(xml_schema_format_item_for_report(
                 addr_of_mut!(str),
-                null_mut(),
+                None,
                 attruse as XmlSchemaBasicItemPtr,
                 None,
             ) as *const i8)
@@ -18837,7 +18833,7 @@ unsafe fn xml_schema_pillegal_facet_atomic_err(
 
         xml_schema_format_item_for_report(
             addr_of_mut!(des),
-            null_mut(),
+            None,
             typ as XmlSchemaBasicItemPtr,
             (*typ).node.map(|node| node.into()),
         );
@@ -18845,7 +18841,7 @@ unsafe fn xml_schema_pillegal_facet_atomic_err(
         let facet_type = xml_schema_facet_type_to_string((*facet).typ);
         let item = CStr::from_ptr(xml_schema_format_item_for_report(
             addr_of_mut!(str_t),
-            null_mut(),
+            None,
             base_type as XmlSchemaBasicItemPtr,
             None,
         ) as *const i8)
@@ -18885,7 +18881,7 @@ unsafe fn xml_schema_pillegal_facet_list_union_err(
 
         xml_schema_format_item_for_report(
             addr_of_mut!(des),
-            null_mut(),
+            None,
             typ as XmlSchemaBasicItemPtr,
             (*typ).node.map(|node| node.into()),
         );
