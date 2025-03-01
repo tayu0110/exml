@@ -14567,26 +14567,15 @@ unsafe fn xml_schema_pres_comp_attr_err(
     owner_item: XmlSchemaBasicItemPtr,
     owner_elem: Option<XmlGenericNodePtr>,
     name: &str,
-    ref_name: *const XmlChar,
-    ref_uri: *const XmlChar,
+    ref_name: Option<&str>,
+    ref_uri: Option<&str>,
     ref_type: XmlSchemaTypeType,
     ref_type_str: Option<&str>,
 ) {
     unsafe {
         let des = xml_schema_format_item_for_report(None, owner_item, owner_elem);
         let ref_type_str = ref_type_str.unwrap_or_else(|| xml_schema_item_type_to_str(ref_type));
-        let qname = xml_schema_format_qname(
-            Some(
-                CStr::from_ptr(ref_uri as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            ),
-            Some(
-                CStr::from_ptr(ref_name as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            ),
-        );
+        let qname = xml_schema_format_qname(ref_uri, ref_name);
         xml_schema_perr_ext(
             ctxt,
             owner_elem,
@@ -14663,8 +14652,17 @@ unsafe fn xml_schema_resolve_element_references(
                     elem_decl as XmlSchemaBasicItemPtr,
                     (*elem_decl).node.map(|node| node.into()),
                     "type",
-                    (*elem_decl).named_type,
-                    (*elem_decl).named_type_ns,
+                    (!(*elem_decl).named_type.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*elem_decl).named_type as *const i8).to_string_lossy()
+                        })
+                        .as_deref(),
+                    (!(*elem_decl).named_type_ns.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*elem_decl).named_type_ns as *const i8)
+                                .to_string_lossy()
+                        })
+                        .as_deref(),
                     XmlSchemaTypeType::XmlSchemaTypeBasic,
                     Some("type definition"),
                 );
@@ -14686,8 +14684,17 @@ unsafe fn xml_schema_resolve_element_references(
                     elem_decl as XmlSchemaBasicItemPtr,
                     None,
                     "substitutionGroup",
-                    (*elem_decl).subst_group,
-                    (*elem_decl).subst_group_ns,
+                    (!(*elem_decl).subst_group.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*elem_decl).subst_group as *const i8).to_string_lossy()
+                        })
+                        .as_deref(),
+                    (!(*elem_decl).subst_group_ns.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*elem_decl).subst_group_ns as *const i8)
+                                .to_string_lossy()
+                        })
+                        .as_deref(),
                     XmlSchemaTypeType::XmlSchemaTypeElement,
                     None,
                 );
@@ -14762,8 +14769,12 @@ unsafe fn xml_schema_resolve_union_member_types(
                     typ as XmlSchemaBasicItemPtr,
                     (*typ).node.map(|node| node.into()),
                     "memberTypes",
-                    name,
-                    ns_name,
+                    (!name.is_null())
+                        .then(|| CStr::from_ptr(name as *const i8).to_string_lossy())
+                        .as_deref(),
+                    (!ns_name.is_null())
+                        .then(|| CStr::from_ptr(ns_name as *const i8).to_string_lossy())
+                        .as_deref(),
                     XmlSchemaTypeType::XmlSchemaTypeSimple,
                     None,
                 );
@@ -14876,8 +14887,12 @@ unsafe fn xml_schema_resolve_type_references(
                     type_def as XmlSchemaBasicItemPtr,
                     (*type_def).node.map(|node| node.into()),
                     "base",
-                    (*type_def).base,
-                    (*type_def).base_ns,
+                    (!(*type_def).base.is_null())
+                        .then(|| CStr::from_ptr((*type_def).base as *const i8).to_string_lossy())
+                        .as_deref(),
+                    (!(*type_def).base_ns.is_null())
+                        .then(|| CStr::from_ptr((*type_def).base_ns as *const i8).to_string_lossy())
+                        .as_deref(),
                     XmlSchemaTypeType::XmlSchemaTypeSimple,
                     None,
                 );
@@ -14902,8 +14917,17 @@ unsafe fn xml_schema_resolve_type_references(
                             type_def as XmlSchemaBasicItemPtr,
                             (*type_def).node.map(|node| node.into()),
                             "itemType",
-                            (*type_def).base,
-                            (*type_def).base_ns,
+                            (!(*type_def).base.is_null())
+                                .then(|| {
+                                    CStr::from_ptr((*type_def).base as *const i8).to_string_lossy()
+                                })
+                                .as_deref(),
+                            (!(*type_def).base_ns.is_null())
+                                .then(|| {
+                                    CStr::from_ptr((*type_def).base_ns as *const i8)
+                                        .to_string_lossy()
+                                })
+                                .as_deref(),
                             XmlSchemaTypeType::XmlSchemaTypeSimple,
                             None,
                         );
@@ -14939,8 +14963,14 @@ unsafe fn xml_schema_resolve_type_references(
                     null_mut(),
                     WXS_ITEM_NODE!(WXS_TYPE_PARTICLE!(type_def)).map(|node| node.into()),
                     "ref",
-                    (*refe).name,
-                    (*refe).target_namespace,
+                    (!(*refe).name.is_null())
+                        .then(|| CStr::from_ptr((*refe).name as *const i8).to_string_lossy())
+                        .as_deref(),
+                    (!(*refe).target_namespace.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*refe).target_namespace as *const i8).to_string_lossy()
+                        })
+                        .as_deref(),
                     (*refe).item_type,
                     None,
                 );
@@ -15005,8 +15035,12 @@ unsafe fn xml_schema_resolve_attr_type_references(
                     item as XmlSchemaBasicItemPtr,
                     (*item).node.map(|node| node.into()),
                     "type",
-                    (*item).type_name,
-                    (*item).type_ns,
+                    (!(*item).type_name.is_null())
+                        .then(|| CStr::from_ptr((*item).type_name as *const i8).to_string_lossy())
+                        .as_deref(),
+                    (!(*item).type_ns.is_null())
+                        .then(|| CStr::from_ptr((*item).type_ns as *const i8).to_string_lossy())
+                        .as_deref(),
                     XmlSchemaTypeType::XmlSchemaTypeSimple,
                     None,
                 );
@@ -15078,8 +15112,14 @@ unsafe fn xml_schema_resolve_attr_use_references(
                     ause as XmlSchemaBasicItemPtr,
                     Some(XmlGenericNodePtr::from((*ause).node)),
                     "ref",
-                    (*refe).name,
-                    (*refe).target_namespace,
+                    (!(*refe).name.is_null())
+                        .then(|| CStr::from_ptr((*refe).name as *const i8).to_string_lossy())
+                        .as_deref(),
+                    (!(*refe).target_namespace.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*refe).target_namespace as *const i8).to_string_lossy()
+                        })
+                        .as_deref(),
                     XmlSchemaTypeType::XmlSchemaTypeAttribute,
                     None,
                 );
@@ -15138,8 +15178,14 @@ unsafe fn xml_schema_resolve_attr_group_references(
                 null_mut(),
                 (*refe).node.map(|node| node.into()),
                 "ref",
-                (*refe).name,
-                (*refe).target_namespace,
+                (!(*refe).name.is_null())
+                    .then(|| CStr::from_ptr((*refe).name as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!(*refe).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*refe).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
                 (*refe).item_type,
                 None,
             );
@@ -15189,8 +15235,15 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
                         null_mut(),
                         WXS_ITEM_NODE!(particle).map(|node| node.into()),
                         "ref",
-                        (*refe).name,
-                        (*refe).target_namespace,
+                        (!(*refe).name.is_null())
+                            .then(|| CStr::from_ptr((*refe).name as *const i8).to_string_lossy())
+                            .as_deref(),
+                        (!(*refe).target_namespace.is_null())
+                            .then(|| {
+                                CStr::from_ptr((*refe).target_namespace as *const i8)
+                                    .to_string_lossy()
+                            })
+                            .as_deref(),
                         (*refe).item_type,
                         None,
                     );
@@ -15291,8 +15344,15 @@ unsafe fn xml_schema_resolve_idckey_references(
                     idc as XmlSchemaBasicItemPtr,
                     Some(XmlGenericNodePtr::from((*idc).node)),
                     "refer",
-                    (*(*idc).refe).name,
-                    (*(*idc).refe).target_namespace,
+                    (!(*(*idc).refe).name.is_null())
+                        .then(|| CStr::from_ptr((*(*idc).refe).name as *const i8).to_string_lossy())
+                        .as_deref(),
+                    (!(*(*idc).refe).target_namespace.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*(*idc).refe).target_namespace as *const i8)
+                                .to_string_lossy()
+                        })
+                        .as_deref(),
                     XmlSchemaTypeType::XmlSchemaTypeIDCKey,
                     None,
                 );
@@ -15362,8 +15422,14 @@ unsafe fn xml_schema_resolve_attr_use_prohib_references(
                 null_mut(),
                 (*prohib).node.map(|node| node.into()),
                 "ref",
-                (*prohib).name,
-                (*prohib).target_namespace,
+                (!(*prohib).name.is_null())
+                    .then(|| CStr::from_ptr((*prohib).name as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!(*prohib).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*prohib).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
                 XmlSchemaTypeType::XmlSchemaTypeAttribute,
                 None,
             );
