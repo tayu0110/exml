@@ -52,7 +52,7 @@ const NB_STRINGS_NS: usize = 100;
 const NB_STRINGS_MAX: usize = 10000;
 const NB_STRINGS_MIN: usize = 10;
 
-unsafe fn fill_strings(strings1: &mut [*mut XmlChar], strings2: &mut [*mut XmlChar]) {
+unsafe fn fill_strings(strings1: &mut [*mut XmlChar], strings2: &mut [*mut XmlChar]) { unsafe {
     /*
      * That's a bit nasty but the output is fine and it doesn't take hours
      * there is a small but sufficient number of duplicates, and we have
@@ -150,9 +150,9 @@ unsafe fn fill_strings(strings1: &mut [*mut XmlChar], strings2: &mut [*mut XmlCh
             k = 0;
         }
     }
-}
+}}
 
-unsafe fn clean_strings(strings1: &mut [*mut XmlChar], strings2: &mut [*mut XmlChar]) {
+unsafe fn clean_strings(strings1: &mut [*mut XmlChar], strings2: &mut [*mut XmlChar]) { unsafe {
     for string in strings1.iter_mut().take(NB_STRINGS_MAX) {
         /* really should not happen */
         if !string.is_null() {
@@ -165,7 +165,7 @@ unsafe fn clean_strings(strings1: &mut [*mut XmlChar], strings2: &mut [*mut XmlC
             xml_free(*string as _);
         }
     }
-}
+}}
 
 /*
  * This tests the sub-dictionary support
@@ -176,7 +176,7 @@ unsafe fn run_test2(
     strings2: &mut [*mut XmlChar],
     test1: &mut [*const XmlChar],
     test2: &mut [*const XmlChar],
-) -> c_int {
+) -> c_int { unsafe {
     let mut prefix: [XmlChar; 40] = [0; 40];
     let mut cur: *mut XmlChar;
     let mut pref: *mut XmlChar;
@@ -337,7 +337,7 @@ unsafe fn run_test2(
 
     xml_dict_free(dict);
     0
-}
+}}
 
 /*
  * Test a single dictionary
@@ -347,7 +347,7 @@ unsafe fn run_test1(
     strings2: &mut [*mut XmlChar],
     test1: &mut [*const XmlChar],
     test2: &mut [*const XmlChar],
-) -> c_int {
+) -> c_int { unsafe {
     let mut prefix: [XmlChar; 40] = [0; 40];
     let mut cur: *mut XmlChar;
     let mut pref: *mut XmlChar;
@@ -455,7 +455,7 @@ unsafe fn run_test1(
 
     xml_dict_free(dict);
     0
-}
+}}
 
 #[test]
 fn main() {

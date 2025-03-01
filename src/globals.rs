@@ -34,7 +34,7 @@ use libc::{free, malloc, realloc};
 
 use crate::{
     encoding::{XmlCharEncoding, XmlCharEncodingHandler},
-    error::{generic_error_default, XmlError},
+    error::{XmlError, generic_error_default},
     io::{XmlOutputBuffer, XmlParserInputBuffer},
     libxml::{
         globals::{XmlDeregisterNodeFunc, XmlRegisterNodeFunc},
@@ -46,7 +46,7 @@ use crate::{
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
         xmlstring::xml_strdup,
     },
-    tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
+    tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme},
 };
 
 pub type GenericError = for<'a> fn(Option<GenericErrorContext>, &str);

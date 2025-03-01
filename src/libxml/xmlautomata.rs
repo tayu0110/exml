@@ -32,14 +32,13 @@ use std::{
 
 use crate::libxml::{
     xmlregexp::{
-        xml_fa_computes_determinism, xml_fa_eliminate_epsilon_transitions,
+        REGEXP_ALL_COUNTER, REGEXP_ALL_LAX_COUNTER, XmlRegAtomPtr, XmlRegAtomType, XmlRegCounter,
+        XmlRegMarkedType, XmlRegParserCtxtPtr, XmlRegQuantType, XmlRegStatePtr, XmlRegStateType,
+        XmlRegTrans, XmlRegexp, xml_fa_computes_determinism, xml_fa_eliminate_epsilon_transitions,
         xml_fa_generate_counted_epsilon_transition, xml_fa_generate_counted_transition,
         xml_fa_generate_epsilon_transition, xml_fa_generate_transitions, xml_reg_atom_push,
         xml_reg_epx_from_parse, xml_reg_free_atom, xml_reg_free_parser_ctxt, xml_reg_get_counter,
         xml_reg_new_atom, xml_reg_new_parser_ctxt, xml_reg_state_add_trans, xml_reg_state_push,
-        XmlRegAtomPtr, XmlRegAtomType, XmlRegCounter, XmlRegMarkedType, XmlRegParserCtxtPtr,
-        XmlRegQuantType, XmlRegStatePtr, XmlRegStateType, XmlRegTrans, XmlRegexp,
-        REGEXP_ALL_COUNTER, REGEXP_ALL_LAX_COUNTER,
     },
     xmlstring::XmlChar,
 };
@@ -109,33 +108,37 @@ pub struct XmlAutomataState {
 /// Returns the new object or NULL in case of failure
 #[doc(alias = "xmlNewAutomata")]
 pub unsafe fn xml_new_automata() -> XmlAutomataPtr {
-    let ctxt: XmlAutomataPtr = xml_reg_new_parser_ctxt(null());
-    if ctxt.is_null() {
-        return null_mut();
+    unsafe {
+        let ctxt: XmlAutomataPtr = xml_reg_new_parser_ctxt(null());
+        if ctxt.is_null() {
+            return null_mut();
+        }
+
+        // initialize the parser
+        (*ctxt).state = xml_reg_state_push(ctxt);
+        if (*ctxt).state.is_null() {
+            xml_free_automata(ctxt);
+            return null_mut();
+        }
+        (*ctxt).start = (*ctxt).state;
+        (*ctxt).end = null_mut();
+
+        (*(*ctxt).start).typ = XmlRegStateType::XmlRegexpStartState;
+        (*ctxt).flags = 0;
+
+        ctxt
     }
-
-    // initialize the parser
-    (*ctxt).state = xml_reg_state_push(ctxt);
-    if (*ctxt).state.is_null() {
-        xml_free_automata(ctxt);
-        return null_mut();
-    }
-    (*ctxt).start = (*ctxt).state;
-    (*ctxt).end = null_mut();
-
-    (*(*ctxt).start).typ = XmlRegStateType::XmlRegexpStartState;
-    (*ctxt).flags = 0;
-
-    ctxt
 }
 
 /// Free an automata
 #[doc(alias = "xmlFreeAutomata")]
 pub unsafe fn xml_free_automata(am: XmlAutomataPtr) {
-    if am.is_null() {
-        return;
+    unsafe {
+        if am.is_null() {
+            return;
+        }
+        xml_reg_free_parser_ctxt(am);
     }
-    xml_reg_free_parser_ctxt(am);
 }
 
 /// Initial state lookup
@@ -143,10 +146,12 @@ pub unsafe fn xml_free_automata(am: XmlAutomataPtr) {
 /// Returns the initial state of the automata
 #[doc(alias = "xmlAutomataGetInitState")]
 pub unsafe fn xml_automata_get_init_state(am: XmlAutomataPtr) -> XmlAutomataStatePtr {
-    if am.is_null() {
-        return null_mut();
+    unsafe {
+        if am.is_null() {
+            return null_mut();
+        }
+        (*am).start
     }
-    (*am).start
 }
 
 /// Makes that state a final state
@@ -154,11 +159,13 @@ pub unsafe fn xml_automata_get_init_state(am: XmlAutomataPtr) -> XmlAutomataStat
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlAutomataSetFinalState")]
 pub unsafe fn xml_automata_set_final_state(am: XmlAutomataPtr, state: XmlAutomataStatePtr) -> i32 {
-    if am.is_null() || state.is_null() {
-        return -1;
+    unsafe {
+        if am.is_null() || state.is_null() {
+            return -1;
+        }
+        (*state).typ = XmlRegStateType::XmlRegexpFinalState;
+        0
     }
-    (*state).typ = XmlRegStateType::XmlRegexpFinalState;
-    0
 }
 
 /// Create a new disconnected state in the automata
@@ -166,10 +173,12 @@ pub unsafe fn xml_automata_set_final_state(am: XmlAutomataPtr, state: XmlAutomat
 /// Returns the new state or NULL in case of error
 #[doc(alias = "xmlAutomataNewState")]
 pub unsafe fn xml_automata_new_state(am: XmlAutomataPtr) -> XmlAutomataStatePtr {
-    if am.is_null() {
-        return null_mut();
+    unsafe {
+        if am.is_null() {
+            return null_mut();
+        }
+        xml_reg_state_push(am)
     }
-    xml_reg_state_push(am)
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -185,24 +194,26 @@ pub unsafe fn xml_automata_new_transition(
     token: &str,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() {
-        return null_mut();
-    }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-    if atom.is_null() {
-        return null_mut();
-    }
-    (*atom).data = data;
-    (*atom).valuep = Some(token.to_owned());
+    unsafe {
+        if am.is_null() || from.is_null() {
+            return null_mut();
+        }
+        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
+        if atom.is_null() {
+            return null_mut();
+        }
+        (*atom).data = data;
+        (*atom).valuep = Some(token.to_owned());
 
-    if xml_fa_generate_transitions(am, from, to, atom) < 0 {
-        xml_reg_free_atom(atom);
-        return null_mut();
+        if xml_fa_generate_transitions(am, from, to, atom) < 0 {
+            xml_reg_free_atom(atom);
+            return null_mut();
+        }
+        if to.is_null() {
+            return (*am).state;
+        }
+        to
     }
-    if to.is_null() {
-        return (*am).state;
-    }
-    to
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -219,28 +230,30 @@ pub unsafe fn xml_automata_new_transition2(
     token2: Option<&str>,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() {
-        return null_mut();
-    }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-    if atom.is_null() {
-        return null_mut();
-    }
-    (*atom).data = data;
-    if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-        (*atom).valuep = Some(format!("{token}|{token2}"));
-    } else {
-        (*atom).valuep = Some(token.to_owned());
-    }
+    unsafe {
+        if am.is_null() || from.is_null() {
+            return null_mut();
+        }
+        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
+        if atom.is_null() {
+            return null_mut();
+        }
+        (*atom).data = data;
+        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+            (*atom).valuep = Some(format!("{token}|{token2}"));
+        } else {
+            (*atom).valuep = Some(token.to_owned());
+        }
 
-    if xml_fa_generate_transitions(am, from, to, atom) < 0 {
-        xml_reg_free_atom(atom);
-        return null_mut();
+        if xml_fa_generate_transitions(am, from, to, atom) < 0 {
+            xml_reg_free_atom(atom);
+            return null_mut();
+        }
+        if to.is_null() {
+            return (*am).state;
+        }
+        to
     }
-    if to.is_null() {
-        return (*am).state;
-    }
-    to
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -259,32 +272,34 @@ pub unsafe fn xml_automata_new_neg_trans(
     token2: Option<&str>,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() {
-        return null_mut();
-    }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-    if atom.is_null() {
-        return null_mut();
-    }
-    (*atom).data = data;
-    (*atom).neg = 1;
-    if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-        (*atom).valuep = Some(format!("{token}|{token2}"));
-    } else {
-        (*atom).valuep = Some(token.to_owned());
-    }
-    let err_msg = format!("not {}", (*atom).valuep.as_deref().unwrap());
-    (*atom).valuep2 = Some(err_msg);
+    unsafe {
+        if am.is_null() || from.is_null() {
+            return null_mut();
+        }
+        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
+        if atom.is_null() {
+            return null_mut();
+        }
+        (*atom).data = data;
+        (*atom).neg = 1;
+        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+            (*atom).valuep = Some(format!("{token}|{token2}"));
+        } else {
+            (*atom).valuep = Some(token.to_owned());
+        }
+        let err_msg = format!("not {}", (*atom).valuep.as_deref().unwrap());
+        (*atom).valuep2 = Some(err_msg);
 
-    if xml_fa_generate_transitions(am, from, to, atom) < 0 {
-        xml_reg_free_atom(atom);
-        return null_mut();
+        if xml_fa_generate_transitions(am, from, to, atom) < 0 {
+            xml_reg_free_atom(atom);
+            return null_mut();
+        }
+        (*am).negs += 1;
+        if to.is_null() {
+            return (*am).state;
+        }
+        to
     }
-    (*am).negs += 1;
-    if to.is_null() {
-        return (*am).state;
-    }
-    to
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -303,64 +318,66 @@ pub unsafe fn xml_automata_new_count_trans(
     max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() {
-        return null_mut();
-    }
-    if min < 0 {
-        return null_mut();
-    }
-    if max < min || max < 1 {
-        return null_mut();
-    }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-    if atom.is_null() {
-        return null_mut();
-    }
-    (*atom).valuep = Some(token.to_owned());
-    (*atom).data = data;
-    if min == 0 {
-        (*atom).min = 1;
-    } else {
-        (*atom).min = min;
-    }
-    (*atom).max = max;
+    unsafe {
+        if am.is_null() || from.is_null() {
+            return null_mut();
+        }
+        if min < 0 {
+            return null_mut();
+        }
+        if max < min || max < 1 {
+            return null_mut();
+        }
+        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
+        if atom.is_null() {
+            return null_mut();
+        }
+        (*atom).valuep = Some(token.to_owned());
+        (*atom).data = data;
+        if min == 0 {
+            (*atom).min = 1;
+        } else {
+            (*atom).min = min;
+        }
+        (*atom).max = max;
 
-    // associate a counter to the transition.
-    let counter = xml_reg_get_counter(am);
-    (*am).counters[counter].min = min;
-    (*am).counters[counter].max = max;
+        // associate a counter to the transition.
+        let counter = xml_reg_get_counter(am);
+        (*am).counters[counter].min = min;
+        (*am).counters[counter].max = max;
 
-    // xmlFAGenerateTransitions(am, from, to, atom);
-    if to.is_null() {
-        to = xml_reg_state_push(am);
+        // xmlFAGenerateTransitions(am, from, to, atom);
         if to.is_null() {
+            to = xml_reg_state_push(am);
+            if to.is_null() {
+                // goto error;
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+        }
+        xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
+        if xml_reg_atom_push(am, atom) < 0 {
             // goto error;
             xml_reg_free_atom(atom);
             return null_mut();
         }
-    }
-    xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
-    if xml_reg_atom_push(am, atom) < 0 {
-        // goto error;
-        xml_reg_free_atom(atom);
-        return null_mut();
-    }
-    (*am).state = to;
+        (*am).state = to;
 
-    if to.is_null() {
-        to = (*am).state;
-    }
-    if to.is_null() {
-        return null_mut();
-    }
-    if min == 0 {
-        xml_fa_generate_epsilon_transition(am, from, to);
-    }
-    to
+        if to.is_null() {
+            to = (*am).state;
+        }
+        if to.is_null() {
+            return null_mut();
+        }
+        if min == 0 {
+            xml_fa_generate_epsilon_transition(am, from, to);
+        }
+        to
 
-    // error:
-    //     xmlRegFreeAtom(atom);
-    //     return null_mut();
+        // error:
+        //     xmlRegFreeAtom(atom);
+        //     return null_mut();
+    }
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -381,68 +398,70 @@ pub unsafe fn xml_automata_new_count_trans2(
     max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() {
-        return null_mut();
-    }
-    if min < 0 {
-        return null_mut();
-    }
-    if max < min || max < 1 {
-        return null_mut();
-    }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-    if atom.is_null() {
-        return null_mut();
-    }
-    if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-        (*atom).valuep = Some(format!("{token}|{token2}"));
-    } else {
-        (*atom).valuep = Some(token.to_owned());
-    }
-    (*atom).data = data;
-    if min == 0 {
-        (*atom).min = 1;
-    } else {
-        (*atom).min = min;
-    }
-    (*atom).max = max;
+    unsafe {
+        if am.is_null() || from.is_null() {
+            return null_mut();
+        }
+        if min < 0 {
+            return null_mut();
+        }
+        if max < min || max < 1 {
+            return null_mut();
+        }
+        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
+        if atom.is_null() {
+            return null_mut();
+        }
+        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+            (*atom).valuep = Some(format!("{token}|{token2}"));
+        } else {
+            (*atom).valuep = Some(token.to_owned());
+        }
+        (*atom).data = data;
+        if min == 0 {
+            (*atom).min = 1;
+        } else {
+            (*atom).min = min;
+        }
+        (*atom).max = max;
 
-    // associate a counter to the transition.
-    let counter = xml_reg_get_counter(am);
-    (*am).counters[counter].min = min;
-    (*am).counters[counter].max = max;
+        // associate a counter to the transition.
+        let counter = xml_reg_get_counter(am);
+        (*am).counters[counter].min = min;
+        (*am).counters[counter].max = max;
 
-    // xmlFAGenerateTransitions(am, from, to, atom);
-    if to.is_null() {
-        to = xml_reg_state_push(am);
+        // xmlFAGenerateTransitions(am, from, to, atom);
         if to.is_null() {
+            to = xml_reg_state_push(am);
+            if to.is_null() {
+                // goto error;
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+        }
+        xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
+        if xml_reg_atom_push(am, atom) < 0 {
             // goto error;
             xml_reg_free_atom(atom);
             return null_mut();
         }
-    }
-    xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
-    if xml_reg_atom_push(am, atom) < 0 {
-        // goto error;
-        xml_reg_free_atom(atom);
-        return null_mut();
-    }
-    (*am).state = to;
+        (*am).state = to;
 
-    if to.is_null() {
-        to = (*am).state;
-    }
-    if to.is_null() {
-        return null_mut();
-    }
-    if min == 0 {
-        xml_fa_generate_epsilon_transition(am, from, to);
-    }
-    to
+        if to.is_null() {
+            to = (*am).state;
+        }
+        if to.is_null() {
+            return null_mut();
+        }
+        if min == 0 {
+            xml_fa_generate_epsilon_transition(am, from, to);
+        }
+        to
 
-    // error:
-    //     xmlRegFreeAtom(atom);
-    //     return null_mut();
+        // error:
+        //     xmlRegFreeAtom(atom);
+        //     return null_mut();
+    }
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -461,50 +480,52 @@ pub unsafe fn xml_automata_new_once_trans(
     max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() {
-        return null_mut();
-    }
-    if min < 1 {
-        return null_mut();
-    }
-    if max < min {
-        return null_mut();
-    }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-    if atom.is_null() {
-        return null_mut();
-    }
-    (*atom).valuep = Some(token.to_owned());
-    (*atom).data = data;
-    (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
-    (*atom).min = min;
-    (*atom).max = max;
-    // associate a counter to the transition.
-    let counter = xml_reg_get_counter(am);
-    (*am).counters[counter].min = 1;
-    (*am).counters[counter].max = 1;
+    unsafe {
+        if am.is_null() || from.is_null() {
+            return null_mut();
+        }
+        if min < 1 {
+            return null_mut();
+        }
+        if max < min {
+            return null_mut();
+        }
+        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
+        if atom.is_null() {
+            return null_mut();
+        }
+        (*atom).valuep = Some(token.to_owned());
+        (*atom).data = data;
+        (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
+        (*atom).min = min;
+        (*atom).max = max;
+        // associate a counter to the transition.
+        let counter = xml_reg_get_counter(am);
+        (*am).counters[counter].min = 1;
+        (*am).counters[counter].max = 1;
 
-    // xmlFAGenerateTransitions(am, from, to, atom);
-    if to.is_null() {
-        to = xml_reg_state_push(am);
+        // xmlFAGenerateTransitions(am, from, to, atom);
         if to.is_null() {
+            to = xml_reg_state_push(am);
+            if to.is_null() {
+                // goto error;
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+        }
+        xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
+        if xml_reg_atom_push(am, atom) < 0 {
             // goto error;
             xml_reg_free_atom(atom);
             return null_mut();
         }
-    }
-    xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
-    if xml_reg_atom_push(am, atom) < 0 {
-        // goto error;
-        xml_reg_free_atom(atom);
-        return null_mut();
-    }
-    (*am).state = to;
-    to
+        (*am).state = to;
+        to
 
-    // error:
-    //     xmlRegFreeAtom(atom);
-    //     return null_mut();
+        // error:
+        //     xmlRegFreeAtom(atom);
+        //     return null_mut();
+    }
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -525,54 +546,56 @@ pub unsafe fn xml_automata_new_once_trans2(
     max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() {
-        return null_mut();
-    }
-    if min < 1 {
-        return null_mut();
-    }
-    if max < min {
-        return null_mut();
-    }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
-    if atom.is_null() {
-        return null_mut();
-    }
-    if let Some(token2) = token2.filter(|t| !t.is_empty()) {
-        (*atom).valuep = Some(format!("{token}|{token2}"));
-    } else {
-        (*atom).valuep = Some(token.to_owned());
-    }
-    (*atom).data = data;
-    (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
-    (*atom).min = min;
-    (*atom).max = max;
-    // associate a counter to the transition.
-    let counter = xml_reg_get_counter(am);
-    (*am).counters[counter].min = 1;
-    (*am).counters[counter].max = 1;
+    unsafe {
+        if am.is_null() || from.is_null() {
+            return null_mut();
+        }
+        if min < 1 {
+            return null_mut();
+        }
+        if max < min {
+            return null_mut();
+        }
+        let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
+        if atom.is_null() {
+            return null_mut();
+        }
+        if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+            (*atom).valuep = Some(format!("{token}|{token2}"));
+        } else {
+            (*atom).valuep = Some(token.to_owned());
+        }
+        (*atom).data = data;
+        (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
+        (*atom).min = min;
+        (*atom).max = max;
+        // associate a counter to the transition.
+        let counter = xml_reg_get_counter(am);
+        (*am).counters[counter].min = 1;
+        (*am).counters[counter].max = 1;
 
-    // xmlFAGenerateTransitions(am, from, to, atom);
-    if to.is_null() {
-        to = xml_reg_state_push(am);
+        // xmlFAGenerateTransitions(am, from, to, atom);
         if to.is_null() {
+            to = xml_reg_state_push(am);
+            if to.is_null() {
+                // goto error;
+                xml_reg_free_atom(atom);
+                return null_mut();
+            }
+        }
+        xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
+        if xml_reg_atom_push(am, atom) < 0 {
             // goto error;
             xml_reg_free_atom(atom);
             return null_mut();
         }
-    }
-    xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
-    if xml_reg_atom_push(am, atom) < 0 {
-        // goto error;
-        xml_reg_free_atom(atom);
-        return null_mut();
-    }
-    (*am).state = to;
-    to
+        (*am).state = to;
+        to
 
-    // error:
-    //     xmlRegFreeAtom(atom);
-    //     return null_mut();
+        // error:
+        //     xmlRegFreeAtom(atom);
+        //     return null_mut();
+    }
 }
 
 #[doc(alias = "xmlFAGenerateAllTransition")]
@@ -582,19 +605,21 @@ unsafe fn xml_fa_generate_all_transition(
     mut to: XmlRegStatePtr,
     lax: i32,
 ) -> i32 {
-    if to.is_null() {
-        to = xml_reg_state_push(ctxt);
+    unsafe {
         if to.is_null() {
-            return -1;
+            to = xml_reg_state_push(ctxt);
+            if to.is_null() {
+                return -1;
+            }
+            (*ctxt).state = to;
         }
-        (*ctxt).state = to;
+        if lax != 0 {
+            xml_reg_state_add_trans(ctxt, from, null_mut(), to, -1, REGEXP_ALL_LAX_COUNTER as _);
+        } else {
+            xml_reg_state_add_trans(ctxt, from, null_mut(), to, -1, REGEXP_ALL_COUNTER as _);
+        }
+        0
     }
-    if lax != 0 {
-        xml_reg_state_add_trans(ctxt, from, null_mut(), to, -1, REGEXP_ALL_LAX_COUNTER as _);
-    } else {
-        xml_reg_state_add_trans(ctxt, from, null_mut(), to, -1, REGEXP_ALL_COUNTER as _);
-    }
-    0
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -610,14 +635,16 @@ pub unsafe fn xml_automata_new_all_trans(
     to: XmlAutomataStatePtr,
     lax: i32,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() {
-        return null_mut();
+    unsafe {
+        if am.is_null() || from.is_null() {
+            return null_mut();
+        }
+        xml_fa_generate_all_transition(am, from, to, lax);
+        if to.is_null() {
+            return (*am).state;
+        }
+        to
     }
-    xml_fa_generate_all_transition(am, from, to, lax);
-    if to.is_null() {
-        return (*am).state;
-    }
-    to
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -630,14 +657,16 @@ pub unsafe fn xml_automata_new_epsilon(
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() {
-        return null_mut();
+    unsafe {
+        if am.is_null() || from.is_null() {
+            return null_mut();
+        }
+        xml_fa_generate_epsilon_transition(am, from, to);
+        if to.is_null() {
+            return (*am).state;
+        }
+        to
     }
-    xml_fa_generate_epsilon_transition(am, from, to);
-    if to.is_null() {
-        return (*am).state;
-    }
-    to
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -652,14 +681,16 @@ pub unsafe fn xml_automata_new_counted_trans(
     to: XmlAutomataStatePtr,
     counter: i32,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() || counter < 0 {
-        return null_mut();
+    unsafe {
+        if am.is_null() || from.is_null() || counter < 0 {
+            return null_mut();
+        }
+        xml_fa_generate_counted_epsilon_transition(am, from, to, counter);
+        if to.is_null() {
+            return (*am).state;
+        }
+        to
     }
-    xml_fa_generate_counted_epsilon_transition(am, from, to, counter);
-    if to.is_null() {
-        return (*am).state;
-    }
-    to
 }
 
 /// If @to is NULL, this creates first a new target state in the automata
@@ -674,14 +705,16 @@ pub unsafe fn xml_automata_new_counter_trans(
     to: XmlAutomataStatePtr,
     counter: i32,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() || counter < 0 {
-        return null_mut();
+    unsafe {
+        if am.is_null() || from.is_null() || counter < 0 {
+            return null_mut();
+        }
+        xml_fa_generate_counted_transition(am, from, to, counter);
+        if to.is_null() {
+            return (*am).state;
+        }
+        to
     }
-    xml_fa_generate_counted_transition(am, from, to, counter);
-    if to.is_null() {
-        return (*am).state;
-    }
-    to
 }
 
 /// Create a new counter
@@ -689,14 +722,16 @@ pub unsafe fn xml_automata_new_counter_trans(
 /// Returns the counter number or -1 in case of error
 #[doc(alias = "xmlAutomataNewCounter")]
 pub unsafe fn xml_automata_new_counter(am: XmlAutomataPtr, min: i32, max: i32) -> i32 {
-    if am.is_null() {
-        return -1;
-    }
+    unsafe {
+        if am.is_null() {
+            return -1;
+        }
 
-    let ret = xml_reg_get_counter(am);
-    (*am).counters[ret].min = min;
-    (*am).counters[ret].max = max;
-    ret as i32
+        let ret = xml_reg_get_counter(am);
+        (*am).counters[ret].min = min;
+        (*am).counters[ret].max = max;
+        ret as i32
+    }
 }
 
 /// Compile the automata into a Reg Exp ready for being executed.
@@ -705,12 +740,14 @@ pub unsafe fn xml_automata_new_counter(am: XmlAutomataPtr, min: i32, max: i32) -
 /// Returns the compiled regexp or NULL in case of error
 #[doc(alias = "xmlAutomataCompile")]
 pub unsafe fn xml_automata_compile(am: XmlAutomataPtr) -> *mut XmlRegexp {
-    if am.is_null() || (*am).error != 0 {
-        return null_mut();
+    unsafe {
+        if am.is_null() || (*am).error != 0 {
+            return null_mut();
+        }
+        xml_fa_eliminate_epsilon_transitions(am);
+        /* xmlFAComputesDeterminism(am); */
+        xml_reg_epx_from_parse(am)
     }
-    xml_fa_eliminate_epsilon_transitions(am);
-    /* xmlFAComputesDeterminism(am); */
-    xml_reg_epx_from_parse(am)
 }
 
 /// Checks if an automata is determinist.
@@ -718,21 +755,25 @@ pub unsafe fn xml_automata_compile(am: XmlAutomataPtr) -> *mut XmlRegexp {
 /// Returns 1 if true, 0 if not, and -1 in case of error
 #[doc(alias = "xmlAutomataIsDeterminist")]
 pub unsafe fn xml_automata_is_determinist(am: XmlAutomataPtr) -> i32 {
-    if am.is_null() {
-        return -1;
-    }
+    unsafe {
+        if am.is_null() {
+            return -1;
+        }
 
-    let ret: i32 = xml_fa_computes_determinism(am);
-    ret
+        let ret: i32 = xml_fa_computes_determinism(am);
+        ret
+    }
 }
 
 /// Set some flags on the automata
 #[doc(alias = "xmlAutomataSetFlags")]
 pub(crate) unsafe fn xml_automata_set_flags(am: XmlAutomataPtr, flags: i32) {
-    if am.is_null() {
-        return;
+    unsafe {
+        if am.is_null() {
+            return;
+        }
+        (*am).flags |= flags;
     }
-    (*am).flags |= flags;
 }
 
 #[cfg(test)]

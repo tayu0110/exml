@@ -47,7 +47,7 @@ use std::{
 use libc::{memcpy, strlen};
 
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
+    error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     libxml::{
         chvalid::xml_is_blank_char,
         globals::{
@@ -55,7 +55,7 @@ use crate::{
             xml_register_node_default_value,
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-        xmlstring::{xml_str_equal, xml_strdup, xml_strncat, xml_strndup, XmlChar},
+        xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strncat, xml_strndup},
     },
 };
 
@@ -406,137 +406,29 @@ macro_rules! CUR_SCHAR {
     feature = "libxml_writer",
 ))]
 pub unsafe fn xml_validate_ncname(value: *const XmlChar, space: i32) -> i32 {
-    use crate::libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser_internals::xml_is_letter,
-    };
+    unsafe {
+        use crate::libxml::{
+            chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+            parser_internals::xml_is_letter,
+        };
 
-    let mut cur: *const XmlChar = value;
-    let mut c: i32;
-    let mut l: i32 = 0;
+        let mut cur: *const XmlChar = value;
+        let mut c: i32;
+        let mut l: i32 = 0;
 
-    if value.is_null() {
-        return -1;
-    }
-
-    // First quick algorithm for ASCII range
-    if space != 0 {
-        while xml_is_blank_char(*cur as u32) {
-            cur = cur.add(1);
+        if value.is_null() {
+            return -1;
         }
-    }
-    if (*cur >= b'a' && *cur <= b'z') || (*cur >= b'A' && *cur <= b'Z') || *cur == b'_' {
-        cur = cur.add(1);
 
-        while (*cur >= b'a' && *cur <= b'z')
-            || (*cur >= b'A' && *cur <= b'Z')
-            || (*cur >= b'0' && *cur <= b'9')
-            || *cur == b'_'
-            || *cur == b'-'
-            || *cur == b'.'
-        {
-            cur = cur.add(1);
-        }
+        // First quick algorithm for ASCII range
         if space != 0 {
             while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
         }
-        if *cur == 0 {
-            return 0;
-        }
-    }
-    // else {
-    //     goto try_complex;
-    // }
-
-    // try_complex:
-    // Second check for chars outside the ASCII range
-    cur = value;
-    c = CUR_SCHAR!(cur, l);
-    if space != 0 {
-        while xml_is_blank_char(c as u32) {
-            cur = cur.add(l as usize);
-            c = CUR_SCHAR!(cur, l);
-        }
-    }
-    if !xml_is_letter(c as u32) && c != b'_' as i32 {
-        return 1;
-    }
-    cur = cur.add(l as usize);
-    c = CUR_SCHAR!(cur, l);
-    while xml_is_letter(c as u32)
-        || xml_is_digit(c as u32)
-        || c == b'.' as i32
-        || c == b'-' as i32
-        || c == b'_' as i32
-        || xml_is_combining(c as u32)
-        || xml_is_extender(c as u32)
-    {
-        cur = cur.add(l as usize);
-        c = CUR_SCHAR!(cur, l);
-    }
-    if space != 0 {
-        while xml_is_blank_char(c as u32) {
-            cur = cur.add(l as usize);
-            c = CUR_SCHAR!(cur, l);
-        }
-    }
-    if c != 0 {
-        return 1;
-    }
-
-    0
-}
-
-/// Check that a value conforms to the lexical space of QName
-///
-/// Returns 0 if this validates, a positive error code number otherwise
-/// and -1 in case of internal or API error.
-#[doc(alias = "xmlValidateQName")]
-#[cfg(any(feature = "libxml_tree", feature = "schema"))]
-pub unsafe fn xml_validate_qname(value: *const XmlChar, space: i32) -> i32 {
-    use crate::libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser_internals::xml_is_letter,
-    };
-
-    let mut cur: *const XmlChar = value;
-    let mut c: i32;
-    let mut l: i32 = 0;
-
-    if value.is_null() {
-        return -1;
-    }
-    // First quick algorithm for ASCII range
-    if space != 0 {
-        while xml_is_blank_char(*cur as u32) {
-            cur = cur.add(1);
-        }
-    }
-
-    'try_complex: {
         if (*cur >= b'a' && *cur <= b'z') || (*cur >= b'A' && *cur <= b'Z') || *cur == b'_' {
             cur = cur.add(1);
-        } else {
-            break 'try_complex;
-        }
-        while (*cur >= b'a' && *cur <= b'z')
-            || (*cur >= b'A' && *cur <= b'Z')
-            || (*cur >= b'0' && *cur <= b'9')
-            || *cur == b'_'
-            || *cur == b'-'
-            || *cur == b'.'
-        {
-            cur = cur.add(1);
-        }
-        if *cur == b':' {
-            cur = cur.add(1);
-            if (*cur >= b'a' && *cur <= b'z') || (*cur >= b'A' && *cur <= b'Z') || *cur == b'_' {
-                cur = cur.add(1);
-            } else {
-                break 'try_complex;
-            }
+
             while (*cur >= b'a' && *cur <= b'z')
                 || (*cur >= b'A' && *cur <= b'Z')
                 || (*cur >= b'0' && *cur <= b'9')
@@ -546,46 +438,29 @@ pub unsafe fn xml_validate_qname(value: *const XmlChar, space: i32) -> i32 {
             {
                 cur = cur.add(1);
             }
-        }
-        if space != 0 {
-            while xml_is_blank_char(*cur as u32) {
-                cur = cur.add(1);
+            if space != 0 {
+                while xml_is_blank_char(*cur as u32) {
+                    cur = cur.add(1);
+                }
+            }
+            if *cur == 0 {
+                return 0;
             }
         }
-        if *cur == 0 {
-            return 0;
-        }
-    }
+        // else {
+        //     goto try_complex;
+        // }
 
-    // try_complex:
-    // Second check for chars outside the ASCII range
-    cur = value;
-    c = CUR_SCHAR!(cur, l);
-    if space != 0 {
-        while xml_is_blank_char(c as u32) {
-            cur = cur.add(l as usize);
-            c = CUR_SCHAR!(cur, l);
+        // try_complex:
+        // Second check for chars outside the ASCII range
+        cur = value;
+        c = CUR_SCHAR!(cur, l);
+        if space != 0 {
+            while xml_is_blank_char(c as u32) {
+                cur = cur.add(l as usize);
+                c = CUR_SCHAR!(cur, l);
+            }
         }
-    }
-    if !xml_is_letter(c as u32) && c != b'_' as i32 {
-        return 1;
-    }
-    cur = cur.add(l as usize);
-    c = CUR_SCHAR!(cur, l);
-    while xml_is_letter(c as u32)
-        || xml_is_digit(c as u32)
-        || c == b'.' as i32
-        || c == b'-' as i32
-        || c == b'_' as i32
-        || xml_is_combining(c as u32)
-        || xml_is_extender(c as u32)
-    {
-        cur = cur.add(l as usize);
-        c = CUR_SCHAR!(cur, l);
-    }
-    if c == b':' as i32 {
-        cur = cur.add(l as usize);
-        c = CUR_SCHAR!(cur, l);
         if !xml_is_letter(c as u32) && c != b'_' as i32 {
             return 1;
         }
@@ -602,17 +477,147 @@ pub unsafe fn xml_validate_qname(value: *const XmlChar, space: i32) -> i32 {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
+        if space != 0 {
+            while xml_is_blank_char(c as u32) {
+                cur = cur.add(l as usize);
+                c = CUR_SCHAR!(cur, l);
+            }
+        }
+        if c != 0 {
+            return 1;
+        }
+
+        0
     }
-    if space != 0 {
-        while xml_is_blank_char(c as u32) {
+}
+
+/// Check that a value conforms to the lexical space of QName
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlValidateQName")]
+#[cfg(any(feature = "libxml_tree", feature = "schema"))]
+pub unsafe fn xml_validate_qname(value: *const XmlChar, space: i32) -> i32 {
+    unsafe {
+        use crate::libxml::{
+            chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+            parser_internals::xml_is_letter,
+        };
+
+        let mut cur: *const XmlChar = value;
+        let mut c: i32;
+        let mut l: i32 = 0;
+
+        if value.is_null() {
+            return -1;
+        }
+        // First quick algorithm for ASCII range
+        if space != 0 {
+            while xml_is_blank_char(*cur as u32) {
+                cur = cur.add(1);
+            }
+        }
+
+        'try_complex: {
+            if (*cur >= b'a' && *cur <= b'z') || (*cur >= b'A' && *cur <= b'Z') || *cur == b'_' {
+                cur = cur.add(1);
+            } else {
+                break 'try_complex;
+            }
+            while (*cur >= b'a' && *cur <= b'z')
+                || (*cur >= b'A' && *cur <= b'Z')
+                || (*cur >= b'0' && *cur <= b'9')
+                || *cur == b'_'
+                || *cur == b'-'
+                || *cur == b'.'
+            {
+                cur = cur.add(1);
+            }
+            if *cur == b':' {
+                cur = cur.add(1);
+                if (*cur >= b'a' && *cur <= b'z') || (*cur >= b'A' && *cur <= b'Z') || *cur == b'_'
+                {
+                    cur = cur.add(1);
+                } else {
+                    break 'try_complex;
+                }
+                while (*cur >= b'a' && *cur <= b'z')
+                    || (*cur >= b'A' && *cur <= b'Z')
+                    || (*cur >= b'0' && *cur <= b'9')
+                    || *cur == b'_'
+                    || *cur == b'-'
+                    || *cur == b'.'
+                {
+                    cur = cur.add(1);
+                }
+            }
+            if space != 0 {
+                while xml_is_blank_char(*cur as u32) {
+                    cur = cur.add(1);
+                }
+            }
+            if *cur == 0 {
+                return 0;
+            }
+        }
+
+        // try_complex:
+        // Second check for chars outside the ASCII range
+        cur = value;
+        c = CUR_SCHAR!(cur, l);
+        if space != 0 {
+            while xml_is_blank_char(c as u32) {
+                cur = cur.add(l as usize);
+                c = CUR_SCHAR!(cur, l);
+            }
+        }
+        if !xml_is_letter(c as u32) && c != b'_' as i32 {
+            return 1;
+        }
+        cur = cur.add(l as usize);
+        c = CUR_SCHAR!(cur, l);
+        while xml_is_letter(c as u32)
+            || xml_is_digit(c as u32)
+            || c == b'.' as i32
+            || c == b'-' as i32
+            || c == b'_' as i32
+            || xml_is_combining(c as u32)
+            || xml_is_extender(c as u32)
+        {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
+        if c == b':' as i32 {
+            cur = cur.add(l as usize);
+            c = CUR_SCHAR!(cur, l);
+            if !xml_is_letter(c as u32) && c != b'_' as i32 {
+                return 1;
+            }
+            cur = cur.add(l as usize);
+            c = CUR_SCHAR!(cur, l);
+            while xml_is_letter(c as u32)
+                || xml_is_digit(c as u32)
+                || c == b'.' as i32
+                || c == b'-' as i32
+                || c == b'_' as i32
+                || xml_is_combining(c as u32)
+                || xml_is_extender(c as u32)
+            {
+                cur = cur.add(l as usize);
+                c = CUR_SCHAR!(cur, l);
+            }
+        }
+        if space != 0 {
+            while xml_is_blank_char(c as u32) {
+                cur = cur.add(l as usize);
+                c = CUR_SCHAR!(cur, l);
+            }
+        }
+        if c != 0 {
+            return 1;
+        }
+        0
     }
-    if c != 0 {
-        return 1;
-    }
-    0
 }
 
 /// Check that a value conforms to the lexical space of Name
@@ -622,89 +627,91 @@ pub unsafe fn xml_validate_qname(value: *const XmlChar, space: i32) -> i32 {
 #[doc(alias = "xmlValidateName")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub unsafe fn xml_validate_name(value: *const XmlChar, space: i32) -> i32 {
-    use crate::libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser_internals::xml_is_letter,
-    };
+    unsafe {
+        use crate::libxml::{
+            chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+            parser_internals::xml_is_letter,
+        };
 
-    let mut cur: *const XmlChar = value;
-    let mut c: i32;
-    let mut l: i32 = 0;
+        let mut cur: *const XmlChar = value;
+        let mut c: i32;
+        let mut l: i32 = 0;
 
-    if value.is_null() {
-        return -1;
-    }
-    // First quick algorithm for ASCII range
-    if space != 0 {
-        while xml_is_blank_char(*cur as u32) {
-            cur = cur.add(1);
+        if value.is_null() {
+            return -1;
         }
-    }
-    if (*cur >= b'a' && *cur <= b'z')
-        || (*cur >= b'A' && *cur <= b'Z')
-        || *cur == b'_'
-        || *cur == b':'
-    {
-        cur = cur.add(1);
-        while (*cur >= b'a' && *cur <= b'z')
-            || (*cur >= b'A' && *cur <= b'Z')
-            || (*cur >= b'0' && *cur <= b'9')
-            || *cur == b'_'
-            || *cur == b'-'
-            || *cur == b'.'
-            || *cur == b':'
-        {
-            cur = cur.add(1);
-        }
+        // First quick algorithm for ASCII range
         if space != 0 {
             while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
         }
-        if *cur == 0 {
-            return 0;
+        if (*cur >= b'a' && *cur <= b'z')
+            || (*cur >= b'A' && *cur <= b'Z')
+            || *cur == b'_'
+            || *cur == b':'
+        {
+            cur = cur.add(1);
+            while (*cur >= b'a' && *cur <= b'z')
+                || (*cur >= b'A' && *cur <= b'Z')
+                || (*cur >= b'0' && *cur <= b'9')
+                || *cur == b'_'
+                || *cur == b'-'
+                || *cur == b'.'
+                || *cur == b':'
+            {
+                cur = cur.add(1);
+            }
+            if space != 0 {
+                while xml_is_blank_char(*cur as u32) {
+                    cur = cur.add(1);
+                }
+            }
+            if *cur == 0 {
+                return 0;
+            }
+        } else {
+            // goto try_complex;
         }
-    } else {
-        // goto try_complex;
-    }
 
-    // try_complex:
-    // Second check for chars outside the ASCII range
-    cur = value;
-    c = CUR_SCHAR!(cur, l);
-    if space != 0 {
-        while xml_is_blank_char(c as u32) {
-            cur = cur.add(l as usize);
-            c = CUR_SCHAR!(cur, l);
+        // try_complex:
+        // Second check for chars outside the ASCII range
+        cur = value;
+        c = CUR_SCHAR!(cur, l);
+        if space != 0 {
+            while xml_is_blank_char(c as u32) {
+                cur = cur.add(l as usize);
+                c = CUR_SCHAR!(cur, l);
+            }
         }
-    }
-    if !xml_is_letter(c as u32) && c != b'_' as i32 && c != b':' as i32 {
-        return 1;
-    }
-    cur = cur.add(l as usize);
-    c = CUR_SCHAR!(cur, l);
-    while xml_is_letter(c as u32)
-        || xml_is_digit(c as u32)
-        || c == b'.' as i32
-        || c == b':' as i32
-        || c == b'-' as i32
-        || c == b'_' as i32
-        || xml_is_combining(c as u32)
-        || xml_is_extender(c as u32)
-    {
+        if !xml_is_letter(c as u32) && c != b'_' as i32 && c != b':' as i32 {
+            return 1;
+        }
         cur = cur.add(l as usize);
         c = CUR_SCHAR!(cur, l);
-    }
-    if space != 0 {
-        while xml_is_blank_char(c as u32) {
+        while xml_is_letter(c as u32)
+            || xml_is_digit(c as u32)
+            || c == b'.' as i32
+            || c == b':' as i32
+            || c == b'-' as i32
+            || c == b'_' as i32
+            || xml_is_combining(c as u32)
+            || xml_is_extender(c as u32)
+        {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
+        if space != 0 {
+            while xml_is_blank_char(c as u32) {
+                cur = cur.add(l as usize);
+                c = CUR_SCHAR!(cur, l);
+            }
+        }
+        if c != 0 {
+            return 1;
+        }
+        0
     }
-    if c != 0 {
-        return 1;
-    }
-    0
 }
 
 /// Check that a value conforms to the lexical space of NMToken
@@ -714,34 +721,26 @@ pub unsafe fn xml_validate_name(value: *const XmlChar, space: i32) -> i32 {
 #[doc(alias = "xmlValidateNMToken")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub unsafe fn xml_validate_nmtoken(value: *const XmlChar, space: i32) -> i32 {
-    use crate::libxml::{
-        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser_internals::xml_is_letter,
-    };
+    unsafe {
+        use crate::libxml::{
+            chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+            parser_internals::xml_is_letter,
+        };
 
-    let mut cur: *const XmlChar = value;
-    let mut c: i32;
-    let mut l: i32 = 0;
+        let mut cur: *const XmlChar = value;
+        let mut c: i32;
+        let mut l: i32 = 0;
 
-    if value.is_null() {
-        return -1;
-    }
-    // First quick algorithm for ASCII range
-    if space != 0 {
-        while xml_is_blank_char(*cur as u32) {
-            cur = cur.add(1);
+        if value.is_null() {
+            return -1;
         }
-    }
-    if (*cur >= b'a' && *cur <= b'z')
-        || (*cur >= b'A' && *cur <= b'Z')
-        || (*cur >= b'0' && *cur <= b'9')
-        || *cur == b'_'
-        || *cur == b'-'
-        || *cur == b'.'
-        || *cur == b':'
-    {
-        cur = cur.add(1);
-        while (*cur >= b'a' && *cur <= b'z')
+        // First quick algorithm for ASCII range
+        if space != 0 {
+            while xml_is_blank_char(*cur as u32) {
+                cur = cur.add(1);
+            }
+        }
+        if (*cur >= b'a' && *cur <= b'z')
             || (*cur >= b'A' && *cur <= b'Z')
             || (*cur >= b'0' && *cur <= b'9')
             || *cur == b'_'
@@ -750,70 +749,82 @@ pub unsafe fn xml_validate_nmtoken(value: *const XmlChar, space: i32) -> i32 {
             || *cur == b':'
         {
             cur = cur.add(1);
-        }
-        if space != 0 {
-            while xml_is_blank_char(*cur as u32) {
+            while (*cur >= b'a' && *cur <= b'z')
+                || (*cur >= b'A' && *cur <= b'Z')
+                || (*cur >= b'0' && *cur <= b'9')
+                || *cur == b'_'
+                || *cur == b'-'
+                || *cur == b'.'
+                || *cur == b':'
+            {
                 cur = cur.add(1);
             }
+            if space != 0 {
+                while xml_is_blank_char(*cur as u32) {
+                    cur = cur.add(1);
+                }
+            }
+            if *cur == 0 {
+                return 0;
+            }
+        } else {
+            // goto try_complex;
         }
-        if *cur == 0 {
-            return 0;
-        }
-    } else {
-        // goto try_complex;
-    }
 
-    // try_complex:
-    // Second check for chars outside the ASCII range
-    cur = value;
-    c = CUR_SCHAR!(cur, l);
-    if space != 0 {
-        while xml_is_blank_char(c as u32) {
-            cur = cur.add(l as usize);
-            c = CUR_SCHAR!(cur, l);
+        // try_complex:
+        // Second check for chars outside the ASCII range
+        cur = value;
+        c = CUR_SCHAR!(cur, l);
+        if space != 0 {
+            while xml_is_blank_char(c as u32) {
+                cur = cur.add(l as usize);
+                c = CUR_SCHAR!(cur, l);
+            }
         }
-    }
-    if !(xml_is_letter(c as u32)
-        || xml_is_digit(c as u32)
-        || c == b'.' as i32
-        || c == b':' as i32
-        || c == b'-' as i32
-        || c == b'_' as i32
-        || xml_is_combining(c as u32)
-        || xml_is_extender(c as u32))
-    {
-        return 1;
-    }
-    cur = cur.add(l as usize);
-    c = CUR_SCHAR!(cur, l);
-    while xml_is_letter(c as u32)
-        || xml_is_digit(c as u32)
-        || c == b'.' as i32
-        || c == b':' as i32
-        || c == b'-' as i32
-        || c == b'_' as i32
-        || xml_is_combining(c as u32)
-        || xml_is_extender(c as u32)
-    {
+        if !(xml_is_letter(c as u32)
+            || xml_is_digit(c as u32)
+            || c == b'.' as i32
+            || c == b':' as i32
+            || c == b'-' as i32
+            || c == b'_' as i32
+            || xml_is_combining(c as u32)
+            || xml_is_extender(c as u32))
+        {
+            return 1;
+        }
         cur = cur.add(l as usize);
         c = CUR_SCHAR!(cur, l);
-    }
-    if space != 0 {
-        while xml_is_blank_char(c as u32) {
+        while xml_is_letter(c as u32)
+            || xml_is_digit(c as u32)
+            || c == b'.' as i32
+            || c == b':' as i32
+            || c == b'-' as i32
+            || c == b'_' as i32
+            || xml_is_combining(c as u32)
+            || xml_is_extender(c as u32)
+        {
             cur = cur.add(l as usize);
             c = CUR_SCHAR!(cur, l);
         }
+        if space != 0 {
+            while xml_is_blank_char(c as u32) {
+                cur = cur.add(l as usize);
+                c = CUR_SCHAR!(cur, l);
+            }
+        }
+        if c != 0 {
+            return 1;
+        }
+        0
     }
-    if c != 0 {
-        return 1;
-    }
-    0
 }
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlTreeErrMemory")]
 unsafe fn xml_tree_err_memory(extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, None, Some(extra));
+    unsafe {
+        __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, None, Some(extra));
+    }
 }
 
 /// Builds the QName @prefix:@ncname in @memory if there is enough space
@@ -829,32 +840,34 @@ pub unsafe fn xml_build_qname(
     memory: *mut XmlChar,
     len: i32,
 ) -> *mut XmlChar {
-    let ret: *mut XmlChar;
+    unsafe {
+        let ret: *mut XmlChar;
 
-    if ncname.is_null() {
-        return null_mut();
-    }
-    if prefix.is_null() {
-        return ncname as _;
-    }
-
-    let lenn: i32 = strlen(ncname as _) as _;
-    let lenp: i32 = strlen(prefix as _) as _;
-
-    if memory.is_null() || len < lenn + lenp + 2 {
-        ret = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
-        if ret.is_null() {
-            xml_tree_err_memory("building QName");
+        if ncname.is_null() {
             return null_mut();
         }
-    } else {
-        ret = memory;
+        if prefix.is_null() {
+            return ncname as _;
+        }
+
+        let lenn: i32 = strlen(ncname as _) as _;
+        let lenp: i32 = strlen(prefix as _) as _;
+
+        if memory.is_null() || len < lenn + lenp + 2 {
+            ret = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
+            if ret.is_null() {
+                xml_tree_err_memory("building QName");
+                return null_mut();
+            }
+        } else {
+            ret = memory;
+        }
+        memcpy(ret.add(0) as _, prefix as _, lenp as usize);
+        *ret.add(lenp as usize) = b':';
+        memcpy(ret.add(lenp as usize + 1) as _, ncname as _, lenn as usize);
+        *ret.add(lenn as usize + lenp as usize + 1) = 0;
+        ret as _
     }
-    memcpy(ret.add(0) as _, prefix as _, lenp as usize);
-    *ret.add(lenp as usize) = b':';
-    memcpy(ret.add(lenp as usize + 1) as _, ncname as _, lenn as usize);
-    *ret.add(lenn as usize + lenp as usize + 1) = 0;
-    ret as _
 }
 
 /// Parse an XML qualified name string
@@ -872,47 +885,49 @@ pub unsafe fn xml_build_qname(
 /// and the prefix must be freed by the caller.
 #[doc(alias = "xmlSplitQName2")]
 pub unsafe fn xml_split_qname2(name: *const XmlChar, prefix: *mut *mut XmlChar) -> *mut XmlChar {
-    let mut len: i32 = 0;
+    unsafe {
+        let mut len: i32 = 0;
 
-    if prefix.is_null() {
-        return null_mut();
-    }
-    *prefix = null_mut();
-    if name.is_null() {
-        return null_mut();
-    }
-
-    // nasty but valid
-    if *name.add(0) == b':' {
-        return null_mut();
-    }
-
-    // we are not trying to validate but just to cut, and yes it will
-    // work even if this is as set of UTF-8 encoded chars
-    while *name.add(len as usize) != 0 && *name.add(len as usize) != b':' {
-        len += 1;
-    }
-
-    if *name.add(len as usize) == 0 {
-        return null_mut();
-    }
-
-    *prefix = xml_strndup(name, len) as _;
-    if (*prefix).is_null() {
-        xml_tree_err_memory("QName split");
-        return null_mut();
-    }
-    let ret: *mut XmlChar = xml_strdup(name.add(len as usize + 1) as _) as _;
-    if ret.is_null() {
-        xml_tree_err_memory("QName split");
-        if !(*prefix).is_null() {
-            xml_free(*prefix as _);
-            *prefix = null_mut();
+        if prefix.is_null() {
+            return null_mut();
         }
-        return null_mut();
-    }
+        *prefix = null_mut();
+        if name.is_null() {
+            return null_mut();
+        }
 
-    ret
+        // nasty but valid
+        if *name.add(0) == b':' {
+            return null_mut();
+        }
+
+        // we are not trying to validate but just to cut, and yes it will
+        // work even if this is as set of UTF-8 encoded chars
+        while *name.add(len as usize) != 0 && *name.add(len as usize) != b':' {
+            len += 1;
+        }
+
+        if *name.add(len as usize) == 0 {
+            return null_mut();
+        }
+
+        *prefix = xml_strndup(name, len) as _;
+        if (*prefix).is_null() {
+            xml_tree_err_memory("QName split");
+            return null_mut();
+        }
+        let ret: *mut XmlChar = xml_strdup(name.add(len as usize + 1) as _) as _;
+        if ret.is_null() {
+            xml_tree_err_memory("QName split");
+            if !(*prefix).is_null() {
+                xml_free(*prefix as _);
+                *prefix = null_mut();
+            }
+            return null_mut();
+        }
+
+        ret
+    }
 }
 
 /// Rarse an XML qualified name string,i
@@ -922,33 +937,35 @@ pub unsafe fn xml_split_qname2(name: *const XmlChar, prefix: *mut *mut XmlChar) 
 /// to the start of the name without the prefix
 #[doc(alias = "xmlSplitQName3")]
 pub unsafe fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -> *const XmlChar {
-    let mut l: i32 = 0;
+    unsafe {
+        let mut l: i32 = 0;
 
-    if name.is_null() {
-        return null_mut();
+        if name.is_null() {
+            return null_mut();
+        }
+        if len.is_null() {
+            return null_mut();
+        }
+
+        // nasty but valid
+        if *name.add(0) == b':' {
+            return null_mut();
+        }
+
+        // we are not trying to validate but just to cut, and yes it will
+        // work even if this is as set of UTF-8 encoded chars
+        while *name.add(l as usize) != 0 && *name.add(l as usize) != b':' {
+            l += 1;
+        }
+
+        if *name.add(l as usize) == 0 {
+            return null_mut();
+        }
+
+        *len = l;
+
+        name.add(l as usize + 1)
     }
-    if len.is_null() {
-        return null_mut();
-    }
-
-    // nasty but valid
-    if *name.add(0) == b':' {
-        return null_mut();
-    }
-
-    // we are not trying to validate but just to cut, and yes it will
-    // work even if this is as set of UTF-8 encoded chars
-    while *name.add(l as usize) != 0 && *name.add(l as usize) != b':' {
-        l += 1;
-    }
-
-    if *name.add(l as usize) == 0 {
-        return null_mut();
-    }
-
-    *len = l;
-
-    name.add(l as usize + 1)
 }
 
 /// This function tries to locate a namespace definition in a tree
@@ -963,35 +980,37 @@ unsafe fn xml_new_reconciled_ns(
     mut tree: XmlNodePtr,
     ns: XmlNsPtr,
 ) -> Option<XmlNsPtr> {
-    let mut counter: i32 = 1;
+    unsafe {
+        let mut counter: i32 = 1;
 
-    // let tree = tree?;
-    if !matches!(tree.element_type(), XmlElementType::XmlElementNode) {
-        return None;
-    }
-    if !matches!(ns.typ, XmlElementType::XmlNamespaceDecl) {
-        return None;
-    }
-    // Search an existing namespace definition inherited.
-    if let Some(def) = tree.search_ns_by_href(doc, ns.href().as_deref().unwrap()) {
-        return Some(def);
-    }
-
-    // Find a close prefix which is not already in use.
-    // Let's strip namespace prefixes longer than 20 chars !
-    let prefix = ns.prefix().unwrap_or(Cow::Borrowed("default"));
-    let mut def = tree.search_ns(doc, Some(&prefix));
-    while def.is_some() {
-        if counter > 1000 {
+        // let tree = tree?;
+        if !matches!(tree.element_type(), XmlElementType::XmlElementNode) {
             return None;
         }
-        let prefix = format!("{prefix}{counter}");
-        counter += 1;
-        def = tree.search_ns(doc, Some(&prefix));
-    }
+        if !matches!(ns.typ, XmlElementType::XmlNamespaceDecl) {
+            return None;
+        }
+        // Search an existing namespace definition inherited.
+        if let Some(def) = tree.search_ns_by_href(doc, ns.href().as_deref().unwrap()) {
+            return Some(def);
+        }
 
-    // OK, now we are ready to create a new one.
-    xml_new_ns(Some(tree), ns.href, Some(&prefix))
+        // Find a close prefix which is not already in use.
+        // Let's strip namespace prefixes longer than 20 chars !
+        let prefix = ns.prefix().unwrap_or(Cow::Borrowed("default"));
+        let mut def = tree.search_ns(doc, Some(&prefix));
+        while def.is_some() {
+            if counter > 1000 {
+                return None;
+            }
+            let prefix = format!("{prefix}{counter}");
+            counter += 1;
+            def = tree.search_ns(doc, Some(&prefix));
+        }
+
+        // OK, now we are ready to create a new one.
+        xml_new_ns(Some(tree), ns.href, Some(&prefix))
+    }
 }
 
 // NOTE about the CopyNode operations !
@@ -1016,224 +1035,226 @@ pub(crate) unsafe fn xml_static_copy_node(
     parent: Option<XmlGenericNodePtr>,
     extended: i32,
 ) -> Option<XmlGenericNodePtr> {
-    // if node.is_null() {
-    //     return null_mut();
-    // }
-    match node.element_type() {
-        XmlElementType::XmlTextNode
-        | XmlElementType::XmlCDATASectionNode
-        | XmlElementType::XmlElementNode
-        | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlPINode
-        | XmlElementType::XmlCommentNode
-        | XmlElementType::XmlXIncludeStart
-        | XmlElementType::XmlXIncludeEnd => {}
-        XmlElementType::XmlAttributeNode => {
-            let attr = XmlAttrPtr::try_from(node).unwrap();
-            return xml_copy_prop_internal(
-                doc,
-                parent.and_then(|p| XmlNodePtr::try_from(p).ok()),
-                attr,
-            )
-            .map(|attr| attr.into());
-        }
-        XmlElementType::XmlNamespaceDecl => {
-            let ns = XmlNsPtr::try_from(node).unwrap();
-            return xml_copy_namespace_list(Some(ns)).map(|ns| ns.into());
+    unsafe {
+        // if node.is_null() {
+        //     return null_mut();
+        // }
+        match node.element_type() {
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlElementNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {}
+            XmlElementType::XmlAttributeNode => {
+                let attr = XmlAttrPtr::try_from(node).unwrap();
+                return xml_copy_prop_internal(
+                    doc,
+                    parent.and_then(|p| XmlNodePtr::try_from(p).ok()),
+                    attr,
+                )
+                .map(|attr| attr.into());
+            }
+            XmlElementType::XmlNamespaceDecl => {
+                let ns = XmlNsPtr::try_from(node).unwrap();
+                return xml_copy_namespace_list(Some(ns)).map(|ns| ns.into());
+            }
+
+            #[cfg(feature = "libxml_tree")]
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                let doc = XmlDocPtr::try_from(node).unwrap();
+                return xml_copy_doc(doc, extended).map(|doc| doc.into());
+            }
+            #[cfg(not(feature = "libxml_tree"))]
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                return None;
+            }
+            XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl => {
+                return None;
+            }
+            _ => unreachable!(),
         }
 
-        #[cfg(feature = "libxml_tree")]
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-            let doc = XmlDocPtr::try_from(node).unwrap();
-            return xml_copy_doc(doc, extended).map(|doc| doc.into());
-        }
-        #[cfg(not(feature = "libxml_tree"))]
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+        let mut node = XmlNodePtr::try_from(node).unwrap();
+
+        // Allocate a new node and fill the fields.
+        let Some(mut ret) = XmlNodePtr::new(XmlNode {
+            typ: node.element_type(),
+            doc,
+            parent,
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("copying node");
             return None;
+        };
+        if node.name == XML_STRING_TEXT.as_ptr() as _ {
+            ret.name = XML_STRING_TEXT.as_ptr() as _;
+        } else if node.name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
+            ret.name = XML_STRING_TEXT_NOENC.as_ptr() as _;
+        } else if node.name == XML_STRING_COMMENT.as_ptr() as _ {
+            ret.name = XML_STRING_COMMENT.as_ptr() as _;
+        } else if !node.name.is_null() {
+            ret.name = xml_strdup(node.name);
         }
-        XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDTDNode
-        | XmlElementType::XmlElementDecl
-        | XmlElementType::XmlAttributeDecl
-        | XmlElementType::XmlEntityDecl => {
-            return None;
-        }
-        _ => unreachable!(),
-    }
-
-    let mut node = XmlNodePtr::try_from(node).unwrap();
-
-    // Allocate a new node and fill the fields.
-    let Some(mut ret) = XmlNodePtr::new(XmlNode {
-        typ: node.element_type(),
-        doc,
-        parent,
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("copying node");
-        return None;
-    };
-    if node.name == XML_STRING_TEXT.as_ptr() as _ {
-        ret.name = XML_STRING_TEXT.as_ptr() as _;
-    } else if node.name == XML_STRING_TEXT_NOENC.as_ptr() as _ {
-        ret.name = XML_STRING_TEXT_NOENC.as_ptr() as _;
-    } else if node.name == XML_STRING_COMMENT.as_ptr() as _ {
-        ret.name = XML_STRING_COMMENT.as_ptr() as _;
-    } else if !node.name.is_null() {
-        ret.name = xml_strdup(node.name);
-    }
-    if !matches!(node.element_type(), XmlElementType::XmlElementNode)
-        && !node.content.is_null()
-        && !matches!(node.element_type(), XmlElementType::XmlEntityRefNode)
-        && !matches!(node.element_type(), XmlElementType::XmlXIncludeEnd)
-        && !matches!(node.element_type(), XmlElementType::XmlXIncludeStart)
-    {
-        ret.content = xml_strdup(node.content);
-    } else if matches!(node.element_type(), XmlElementType::XmlElementNode) {
-        ret.line = node.line;
-    }
-    if let Some(mut parent) = parent {
-        // this is a tricky part for the node register thing:
-        // in case ret does get coalesced in xmlAddChild
-        // the deregister-node callback is called; so we register ret now already
-        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-        // && xmlRegisterNodeDefaultValue.is_some()
+        if !matches!(node.element_type(), XmlElementType::XmlElementNode)
+            && !node.content.is_null()
+            && !matches!(node.element_type(), XmlElementType::XmlEntityRefNode)
+            && !matches!(node.element_type(), XmlElementType::XmlXIncludeEnd)
+            && !matches!(node.element_type(), XmlElementType::XmlXIncludeStart)
         {
-            xml_register_node_default_value(ret.into());
+            ret.content = xml_strdup(node.content);
+        } else if matches!(node.element_type(), XmlElementType::XmlElementNode) {
+            ret.line = node.line;
+        }
+        if let Some(mut parent) = parent {
+            // this is a tricky part for the node register thing:
+            // in case ret does get coalesced in xmlAddChild
+            // the deregister-node callback is called; so we register ret now already
+            if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+            // && xmlRegisterNodeDefaultValue.is_some()
+            {
+                xml_register_node_default_value(ret.into());
+            }
+
+            // Note that since (*ret).parent is already set, xmlAddChild will
+            // return early and not actually insert the node. It will only
+            // coalesce text nodes and unnecessarily call xmlSetTreeDoc.
+            // Assuming that the subtree to be copied always has its text
+            // nodes coalesced, the somewhat confusing call to xmlAddChild
+            // could be removed.
+            let tmp = parent.add_child(ret.into());
+            /* node could have coalesced */
+            if tmp != Some(ret.into()) {
+                return tmp;
+            }
         }
 
-        // Note that since (*ret).parent is already set, xmlAddChild will
-        // return early and not actually insert the node. It will only
-        // coalesce text nodes and unnecessarily call xmlSetTreeDoc.
-        // Assuming that the subtree to be copied always has its text
-        // nodes coalesced, the somewhat confusing call to xmlAddChild
-        // could be removed.
-        let tmp = parent.add_child(ret.into());
-        /* node could have coalesced */
-        if tmp != Some(ret.into()) {
-            return tmp;
-        }
-    }
+        if extended == 0 {
+            //  goto out;
+            // if parent != null_mut() we already registered the node above
+            if parent.is_none() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+            // && xmlRegisterNodeDefaultValue.is_some()
+            {
+                xml_register_node_default_value(ret.into());
+            }
 
-    if extended == 0 {
-        //  goto out;
-        // if parent != null_mut() we already registered the node above
+            return Some(ret.into());
+        }
+        if matches!(
+            node.element_type(),
+            XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
+        ) && node.ns_def.is_some()
+        {
+            ret.ns_def = xml_copy_namespace_list(node.ns_def);
+        }
+
+        if let Some(node_ns) = node.ns {
+            let prefix = node_ns.prefix();
+            if let Some(ns) = ret.search_ns(doc, prefix.as_deref()) {
+                // reference the existing namespace definition in our own tree.
+                ret.ns = Some(ns);
+            } else {
+                // Humm, we are copying an element whose namespace is defined
+                // out of the new tree scope. Search it in the original tree
+                // and add it at the top of the new tree
+                let node_doc = node.doc;
+                if let Some(ns) = node.search_ns(node_doc, prefix.as_deref()) {
+                    let mut root = XmlGenericNodePtr::from(ret);
+
+                    while let Some(parent) = root.parent() {
+                        root = parent;
+                    }
+                    ret.ns = xml_new_ns(
+                        Some(XmlNodePtr::try_from(root).unwrap()),
+                        ns.href,
+                        ns.prefix().as_deref(),
+                    );
+                } else {
+                    ret.ns = xml_new_reconciled_ns(doc, ret, node_ns);
+                }
+            }
+        }
+        if (matches!(node.element_type(), XmlElementType::XmlElementNode)
+            || matches!(node.element_type(), XmlElementType::XmlXIncludeStart))
+            && node.properties.is_some()
+        {
+            ret.properties = xml_copy_prop_list(Some(ret), node.properties);
+        }
+        if matches!(node.element_type(), XmlElementType::XmlEntityRefNode) {
+            if doc.is_none_or(|doc| node.doc != Some(doc)) {
+                // The copied node will go into a separate document, so
+                // to avoid dangling references to the ENTITY_DECL node
+                // we cannot keep the reference. Try to find it in the
+                // target document.
+                let children = xml_get_doc_entity(doc, &ret.name().unwrap());
+                ret.set_children(children.map(|children| children.into()));
+            } else {
+                ret.set_children(node.children());
+            }
+            let children = ret.children();
+            ret.set_last(children);
+        } else if let Some(children) = node.children().filter(|_| extended != 2) {
+            let mut cur = Some(children);
+            let mut insert = XmlGenericNodePtr::from(ret);
+            while let Some(mut now) = cur {
+                let Some(mut copy) = xml_static_copy_node(now, doc, Some(insert), 2) else {
+                    xml_free_node(ret);
+                    return None;
+                };
+
+                // Check for coalesced text nodes
+                if insert.last() != Some(copy) {
+                    if let Some(mut last) = insert.last() {
+                        copy.set_prev(Some(last));
+                        last.set_next(Some(copy));
+                    } else {
+                        insert.set_children(Some(copy));
+                    }
+                    insert.set_last(Some(copy));
+                }
+
+                if let Some(children) = now
+                    .children()
+                    .filter(|_| !matches!(now.element_type(), XmlElementType::XmlEntityRefNode))
+                {
+                    cur = Some(children);
+                    insert = copy;
+                    continue;
+                }
+
+                cur = loop {
+                    if let Some(next) = now.next() {
+                        break Some(next);
+                    }
+
+                    now = now.parent().unwrap();
+                    if now == node.into() {
+                        break None;
+                    }
+                    insert = insert.parent().unwrap();
+                };
+            }
+        }
+
+        //  out:
+        /* if parent != null_mut() we already registered the node above */
         if parent.is_none() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
             xml_register_node_default_value(ret.into());
         }
 
-        return Some(ret.into());
+        Some(ret.into())
     }
-    if matches!(
-        node.element_type(),
-        XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
-    ) && node.ns_def.is_some()
-    {
-        ret.ns_def = xml_copy_namespace_list(node.ns_def);
-    }
-
-    if let Some(node_ns) = node.ns {
-        let prefix = node_ns.prefix();
-        if let Some(ns) = ret.search_ns(doc, prefix.as_deref()) {
-            // reference the existing namespace definition in our own tree.
-            ret.ns = Some(ns);
-        } else {
-            // Humm, we are copying an element whose namespace is defined
-            // out of the new tree scope. Search it in the original tree
-            // and add it at the top of the new tree
-            let node_doc = node.doc;
-            if let Some(ns) = node.search_ns(node_doc, prefix.as_deref()) {
-                let mut root = XmlGenericNodePtr::from(ret);
-
-                while let Some(parent) = root.parent() {
-                    root = parent;
-                }
-                ret.ns = xml_new_ns(
-                    Some(XmlNodePtr::try_from(root).unwrap()),
-                    ns.href,
-                    ns.prefix().as_deref(),
-                );
-            } else {
-                ret.ns = xml_new_reconciled_ns(doc, ret, node_ns);
-            }
-        }
-    }
-    if (matches!(node.element_type(), XmlElementType::XmlElementNode)
-        || matches!(node.element_type(), XmlElementType::XmlXIncludeStart))
-        && node.properties.is_some()
-    {
-        ret.properties = xml_copy_prop_list(Some(ret), node.properties);
-    }
-    if matches!(node.element_type(), XmlElementType::XmlEntityRefNode) {
-        if doc.map_or(true, |doc| node.doc != Some(doc)) {
-            // The copied node will go into a separate document, so
-            // to avoid dangling references to the ENTITY_DECL node
-            // we cannot keep the reference. Try to find it in the
-            // target document.
-            let children = xml_get_doc_entity(doc, &ret.name().unwrap());
-            ret.set_children(children.map(|children| children.into()));
-        } else {
-            ret.set_children(node.children());
-        }
-        let children = ret.children();
-        ret.set_last(children);
-    } else if let Some(children) = node.children().filter(|_| extended != 2) {
-        let mut cur = Some(children);
-        let mut insert = XmlGenericNodePtr::from(ret);
-        while let Some(mut now) = cur {
-            let Some(mut copy) = xml_static_copy_node(now, doc, Some(insert), 2) else {
-                xml_free_node(ret);
-                return None;
-            };
-
-            // Check for coalesced text nodes
-            if insert.last() != Some(copy) {
-                if let Some(mut last) = insert.last() {
-                    copy.set_prev(Some(last));
-                    last.set_next(Some(copy));
-                } else {
-                    insert.set_children(Some(copy));
-                }
-                insert.set_last(Some(copy));
-            }
-
-            if let Some(children) = now
-                .children()
-                .filter(|_| !matches!(now.element_type(), XmlElementType::XmlEntityRefNode))
-            {
-                cur = Some(children);
-                insert = copy;
-                continue;
-            }
-
-            cur = loop {
-                if let Some(next) = now.next() {
-                    break Some(next);
-                }
-
-                now = now.parent().unwrap();
-                if now == node.into() {
-                    break None;
-                }
-                insert = insert.parent().unwrap();
-            };
-        }
-    }
-
-    //  out:
-    /* if parent != null_mut() we already registered the node above */
-    if parent.is_none() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    // && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(ret.into());
-    }
-
-    Some(ret.into())
 }
 
 pub(crate) unsafe fn xml_static_copy_node_list(
@@ -1241,58 +1262,60 @@ pub(crate) unsafe fn xml_static_copy_node_list(
     doc: Option<XmlDocPtr>,
     parent: Option<XmlGenericNodePtr>,
 ) -> Option<XmlGenericNodePtr> {
-    let mut ret = None;
-    let mut p = None;
+    unsafe {
+        let mut ret = None;
+        let mut p = None;
 
-    while let Some(cur_node) = node {
-        #[cfg(feature = "libxml_tree")]
-        let q = if matches!(cur_node.element_type(), XmlElementType::XmlDTDNode) {
-            let Some(mut doc) = doc else {
-                node = cur_node.next();
-                continue;
-            };
-            if let Some(int_subset) = doc.int_subset {
-                let q = int_subset;
-                parent.unwrap().add_child(q.into());
-                Some(q.into())
-            } else {
-                let Some(mut new) = xml_copy_dtd(XmlDtdPtr::try_from(cur_node).unwrap()) else {
-                    // goto error;
-                    xml_free_node_list(ret);
-                    return None;
+        while let Some(cur_node) = node {
+            #[cfg(feature = "libxml_tree")]
+            let q = if matches!(cur_node.element_type(), XmlElementType::XmlDTDNode) {
+                let Some(mut doc) = doc else {
+                    node = cur_node.next();
+                    continue;
                 };
-                new.doc = Some(doc);
-                new.set_parent(parent);
-                doc.int_subset = Some(new);
-                parent.unwrap().add_child(new.into());
-                Some(new.into())
+                if let Some(int_subset) = doc.int_subset {
+                    let q = int_subset;
+                    parent.unwrap().add_child(q.into());
+                    Some(q.into())
+                } else {
+                    let Some(mut new) = xml_copy_dtd(XmlDtdPtr::try_from(cur_node).unwrap()) else {
+                        // goto error;
+                        xml_free_node_list(ret);
+                        return None;
+                    };
+                    new.doc = Some(doc);
+                    new.set_parent(parent);
+                    doc.int_subset = Some(new);
+                    parent.unwrap().add_child(new.into());
+                    Some(new.into())
+                }
+            } else {
+                xml_static_copy_node(cur_node, doc, parent, 1)
+            };
+            #[cfg(not(feature = "libxml_tree"))]
+            let q = xml_static_copy_node(node, doc, parent, 1);
+            let Some(mut q) = q else {
+                // goto error;
+                xml_free_node_list(ret);
+                return None;
+            };
+            if ret.is_none() {
+                q.set_prev(None);
+                ret = Some(q);
+                p = Some(q);
+            } else if let Some(mut pr) = p.filter(|&p| p != q) {
+                // the test is required if xmlStaticCopyNode coalesced 2 text nodes
+                pr.set_next(Some(q));
+                q.set_prev(Some(pr));
+                p = Some(q);
             }
-        } else {
-            xml_static_copy_node(cur_node, doc, parent, 1)
-        };
-        #[cfg(not(feature = "libxml_tree"))]
-        let q = xml_static_copy_node(node, doc, parent, 1);
-        let Some(mut q) = q else {
-            // goto error;
-            xml_free_node_list(ret);
-            return None;
-        };
-        if ret.is_none() {
-            q.set_prev(None);
-            ret = Some(q);
-            p = Some(q);
-        } else if let Some(mut pr) = p.filter(|&p| p != q) {
-            // the test is required if xmlStaticCopyNode coalesced 2 text nodes
-            pr.set_next(Some(q));
-            q.set_prev(Some(pr));
-            p = Some(q);
+            node = cur_node.next();
         }
-        node = cur_node.next();
+        ret
+        // error:
+        //     xmlFreeNodeList(ret);
+        //     return null_mut();
     }
-    ret
-    // error:
-    //     xmlFreeNodeList(ret);
-    //     return null_mut();
 }
 
 /// Do a copy of the dtd.
@@ -1301,97 +1324,100 @@ pub(crate) unsafe fn xml_static_copy_node_list(
 #[doc(alias = "xmlCopyDtd")]
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
-    use crate::libxml::valid::{
-        xml_copy_attribute_table, xml_copy_notation_table, xml_get_dtd_qelement_desc,
-    };
+    unsafe {
+        use crate::libxml::valid::{
+            xml_copy_attribute_table, xml_copy_notation_table, xml_get_dtd_qelement_desc,
+        };
 
-    let mut ret = xml_new_dtd(
-        None,
-        dtd.name().as_deref(),
-        dtd.external_id.as_deref(),
-        dtd.system_id.as_deref(),
-    )?;
-    if let Some(entities) = dtd.entities {
-        ret.entities = xml_copy_entities_table(entities);
-    }
-    if let Some(table) = dtd.notations.as_deref() {
-        let new = xml_copy_notation_table(table);
-        ret.notations = Some(Box::new(new));
-    }
-    if let Some(table) = dtd.elements.as_ref() {
-        ret.elements = Some(
-            table.clone_with(|data, _| xml_copy_element(*data).expect("Failed to copy element")),
-        );
-    }
-    if let Some(table) = dtd.attributes {
-        ret.attributes = xml_copy_attribute_table(table);
-    }
-    if let Some(pentities) = dtd.pentities {
-        ret.pentities = xml_copy_entities_table(pentities);
-    }
+        let mut ret = xml_new_dtd(
+            None,
+            dtd.name().as_deref(),
+            dtd.external_id.as_deref(),
+            dtd.system_id.as_deref(),
+        )?;
+        if let Some(entities) = dtd.entities {
+            ret.entities = xml_copy_entities_table(entities);
+        }
+        if let Some(table) = dtd.notations.as_deref() {
+            let new = xml_copy_notation_table(table);
+            ret.notations = Some(Box::new(new));
+        }
+        if let Some(table) = dtd.elements.as_ref() {
+            ret.elements =
+                Some(table.clone_with(|data, _| {
+                    xml_copy_element(*data).expect("Failed to copy element")
+                }));
+        }
+        if let Some(table) = dtd.attributes {
+            ret.attributes = xml_copy_attribute_table(table);
+        }
+        if let Some(pentities) = dtd.pentities {
+            ret.pentities = xml_copy_entities_table(pentities);
+        }
 
-    let mut cur = dtd.children;
-    let mut p: Option<XmlGenericNodePtr> = None;
-    while let Some(cur_node) = cur {
-        let mut q = None;
+        let mut cur = dtd.children;
+        let mut p: Option<XmlGenericNodePtr> = None;
+        while let Some(cur_node) = cur {
+            let mut q = None;
 
-        if let Ok(tmp) = XmlEntityPtr::try_from(cur_node) {
-            match tmp.etype {
-                XmlEntityType::XmlInternalGeneralEntity
-                | XmlEntityType::XmlExternalGeneralParsedEntity
-                | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                    q = ret
-                        .get_entity(tmp.name().as_deref().unwrap())
-                        .map(XmlGenericNodePtr::from);
+            if let Ok(tmp) = XmlEntityPtr::try_from(cur_node) {
+                match tmp.etype {
+                    XmlEntityType::XmlInternalGeneralEntity
+                    | XmlEntityType::XmlExternalGeneralParsedEntity
+                    | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+                        q = ret
+                            .get_entity(tmp.name().as_deref().unwrap())
+                            .map(XmlGenericNodePtr::from);
+                    }
+                    XmlEntityType::XmlInternalParameterEntity
+                    | XmlEntityType::XmlExternalParameterEntity => {
+                        q = ret
+                            .get_parameter_entity(tmp.name().as_deref().unwrap())
+                            .map(XmlGenericNodePtr::from);
+                    }
+                    XmlEntityType::XmlInternalPredefinedEntity => {}
+                    _ => unreachable!(),
                 }
-                XmlEntityType::XmlInternalParameterEntity
-                | XmlEntityType::XmlExternalParameterEntity => {
-                    q = ret
-                        .get_parameter_entity(tmp.name().as_deref().unwrap())
-                        .map(XmlGenericNodePtr::from);
-                }
-                XmlEntityType::XmlInternalPredefinedEntity => {}
-                _ => unreachable!(),
-            }
-        } else if let Ok(tmp) = XmlElementPtr::try_from(cur_node) {
-            q = xml_get_dtd_qelement_desc(
-                Some(ret),
-                tmp.name().as_deref().unwrap(),
-                tmp.prefix.as_deref(),
-            )
-            .map(XmlGenericNodePtr::from);
-        } else if let Ok(tmp) = XmlAttributePtr::try_from(cur_node) {
-            q = ret
-                .get_qattr_desc(
-                    tmp.elem.as_deref().unwrap(),
+            } else if let Ok(tmp) = XmlElementPtr::try_from(cur_node) {
+                q = xml_get_dtd_qelement_desc(
+                    Some(ret),
                     tmp.name().as_deref().unwrap(),
                     tmp.prefix.as_deref(),
                 )
                 .map(XmlGenericNodePtr::from);
-        } else if matches!(cur_node.element_type(), XmlElementType::XmlCommentNode) {
-            q = xml_copy_node(cur_node, 0);
-        }
+            } else if let Ok(tmp) = XmlAttributePtr::try_from(cur_node) {
+                q = ret
+                    .get_qattr_desc(
+                        tmp.elem.as_deref().unwrap(),
+                        tmp.name().as_deref().unwrap(),
+                        tmp.prefix.as_deref(),
+                    )
+                    .map(XmlGenericNodePtr::from);
+            } else if matches!(cur_node.element_type(), XmlElementType::XmlCommentNode) {
+                q = xml_copy_node(cur_node, 0);
+            }
 
-        let Some(mut q) = q else {
+            let Some(mut q) = q else {
+                cur = cur_node.next();
+                continue;
+            };
+
+            if let Some(mut p) = p {
+                p.set_next(Some(q));
+            } else {
+                ret.children = Some(q);
+            }
+
+            q.set_prev(p);
+            q.set_parent(Some(ret.into()));
+            q.set_next(None);
+            ret.last = Some(q);
+            p = Some(q);
             cur = cur_node.next();
-            continue;
-        };
-
-        if let Some(mut p) = p {
-            p.set_next(Some(q));
-        } else {
-            ret.children = Some(q);
         }
 
-        q.set_prev(p);
-        q.set_parent(Some(ret.into()));
-        q.set_next(None);
-        ret.last = Some(q);
-        p = Some(q);
-        cur = cur_node.next();
+        Some(ret)
     }
-
-    Some(ret)
 }
 
 /// Creation of a new node element within a document. @ns and @content
@@ -1409,28 +1435,30 @@ pub unsafe fn xml_new_doc_node(
     name: &str,
     content: *const XmlChar,
 ) -> Option<XmlNodePtr> {
-    let name = CString::new(name).unwrap();
-    let cur = xml_new_node(ns, name.as_ptr() as *const u8);
-    if let Some(mut cur) = cur {
-        cur.doc = doc;
-        if !content.is_null() {
-            cur.set_children(
-                doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
-            );
-            if let Some(mut ulccur) = cur.children() {
-                while let Some(next) = ulccur.next() {
-                    ulccur.set_parent(Some(cur.into()));
-                    ulccur = next;
+    unsafe {
+        let name = CString::new(name).unwrap();
+        let cur = xml_new_node(ns, name.as_ptr() as *const u8);
+        if let Some(mut cur) = cur {
+            cur.doc = doc;
+            if !content.is_null() {
+                cur.set_children(
+                    doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
+                );
+                if let Some(mut ulccur) = cur.children() {
+                    while let Some(next) = ulccur.next() {
+                        ulccur.set_parent(Some(cur.into()));
+                        ulccur = next;
+                    }
+                    (*ulccur).set_parent(Some(cur.into()));
+                    cur.set_last(Some(ulccur));
+                } else {
+                    cur.set_last(None);
                 }
-                (*ulccur).set_parent(Some(cur.into()));
-                cur.set_last(Some(ulccur));
-            } else {
-                cur.set_last(None);
             }
         }
-    }
 
-    cur
+        cur
+    }
 }
 
 /// Creation of a new node element within a document. @ns and @content
@@ -1448,31 +1476,33 @@ pub unsafe fn xml_new_doc_node_eat_name(
     name: *mut XmlChar,
     content: *const XmlChar,
 ) -> Option<XmlNodePtr> {
-    let cur = xml_new_node_eat_name(ns, name);
-    if let Some(mut cur) = cur {
-        cur.doc = doc;
-        if !content.is_null() {
-            cur.set_children(
-                doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
-            );
-            if let Some(mut ulccur) = cur.children() {
-                while let Some(next) = ulccur.next() {
-                    ulccur.set_parent(Some(cur.into()));
-                    ulccur = next;
+    unsafe {
+        let cur = xml_new_node_eat_name(ns, name);
+        if let Some(mut cur) = cur {
+            cur.doc = doc;
+            if !content.is_null() {
+                cur.set_children(
+                    doc.and_then(|doc| doc.get_node_list(content).map(|node| node.into())),
+                );
+                if let Some(mut ulccur) = cur.children() {
+                    while let Some(next) = ulccur.next() {
+                        ulccur.set_parent(Some(cur.into()));
+                        ulccur = next;
+                    }
+                    (*ulccur).set_parent(Some(cur.into()));
+                    cur.set_last(Some(ulccur));
+                } else {
+                    cur.set_last(None);
                 }
-                (*ulccur).set_parent(Some(cur.into()));
-                cur.set_last(Some(ulccur));
-            } else {
-                cur.set_last(None);
+            }
+        } else {
+            // if name don't come from the doc dictionary free it here
+            if !name.is_null() {
+                xml_free(name as _);
             }
         }
-    } else {
-        // if name don't come from the doc dictionary free it here
-        if !name.is_null() {
-            xml_free(name as _);
-        }
+        cur
     }
-    cur
 }
 
 /// Creation of a new node element. @ns is optional (null_mut()).
@@ -1482,27 +1512,29 @@ pub unsafe fn xml_new_doc_node_eat_name(
 /// Returns a pointer to the new node object. Uses xml_strdup() to make copy of @name.
 #[doc(alias = "xmlNewNode")]
 pub unsafe fn xml_new_node(ns: Option<XmlNsPtr>, name: *const XmlChar) -> Option<XmlNodePtr> {
-    if name.is_null() {
-        return None;
-    }
+    unsafe {
+        if name.is_null() {
+            return None;
+        }
 
-    // Allocate a new node and fill the fields.
-    let Some(cur) = XmlNodePtr::new(XmlNode {
-        typ: XmlElementType::XmlElementNode,
-        name: xml_strdup(name),
-        ns,
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building node");
-        return None;
-    };
+        // Allocate a new node and fill the fields.
+        let Some(cur) = XmlNodePtr::new(XmlNode {
+            typ: XmlElementType::XmlElementNode,
+            name: xml_strdup(name),
+            ns,
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building node");
+            return None;
+        };
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Creation of a new node element. @ns is optional (null_mut()).
@@ -1517,28 +1549,30 @@ pub unsafe fn xml_new_node_eat_name(
     ns: Option<XmlNsPtr>,
     name: *mut XmlChar,
 ) -> Option<XmlNodePtr> {
-    if name.is_null() {
-        return None;
-    }
+    unsafe {
+        if name.is_null() {
+            return None;
+        }
 
-    // Allocate a new node and fill the fields.
-    let Some(cur) = XmlNodePtr::new(XmlNode {
-        typ: XmlElementType::XmlElementNode,
-        name,
-        ns,
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building node");
-        // we can't check here that name comes from the doc dictionary
-        return None;
-    };
+        // Allocate a new node and fill the fields.
+        let Some(cur) = XmlNodePtr::new(XmlNode {
+            typ: XmlElementType::XmlElementNode,
+            name,
+            ns,
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building node");
+            // we can't check here that name comes from the doc dictionary
+            return None;
+        };
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Creation of a new child element, added at the end of @parent children list.
@@ -1558,43 +1592,45 @@ pub unsafe fn xml_new_child(
     name: &str,
     content: *const XmlChar,
 ) -> Option<XmlNodePtr> {
-    // Allocate a new node
-    let mut cur = if let Some(node) = XmlNodePtr::try_from(parent)
-        .ok()
-        .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
-    {
-        if ns.is_none() {
-            xml_new_doc_node(node.doc, node.ns, name, content)
+    unsafe {
+        // Allocate a new node
+        let mut cur = if let Some(node) = XmlNodePtr::try_from(parent)
+            .ok()
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+        {
+            if ns.is_none() {
+                xml_new_doc_node(node.doc, node.ns, name, content)
+            } else {
+                xml_new_doc_node(node.doc, ns, name, content)
+            }
+        } else if let Ok(parent) = XmlDocPtr::try_from(parent) {
+            if ns.is_none() {
+                xml_new_doc_node(Some(parent), None, name, content)
+            } else {
+                xml_new_doc_node(Some(parent), ns, name, content)
+            }
+        } else if matches!(parent.element_type(), XmlElementType::XmlDocumentFragNode) {
+            xml_new_doc_node(parent.document(), ns, name, content)
         } else {
-            xml_new_doc_node(node.doc, ns, name, content)
-        }
-    } else if let Ok(parent) = XmlDocPtr::try_from(parent) {
-        if ns.is_none() {
-            xml_new_doc_node(Some(parent), None, name, content)
-        } else {
-            xml_new_doc_node(Some(parent), ns, name, content)
-        }
-    } else if matches!(parent.element_type(), XmlElementType::XmlDocumentFragNode) {
-        xml_new_doc_node(parent.document(), ns, name, content)
-    } else {
-        None
-    }?;
+            None
+        }?;
 
-    // add the new element at the end of the children list.
-    cur.typ = XmlElementType::XmlElementNode;
-    cur.set_parent(Some(parent));
-    cur.doc = parent.document();
-    if parent.children().is_none() {
-        parent.set_children(Some(cur.into()));
-        parent.set_last(Some(cur.into()));
-    } else {
-        let mut prev = parent.last().unwrap();
-        prev.set_next(Some(cur.into()));
-        cur.prev = Some(prev);
-        parent.set_last(Some(cur.into()));
+        // add the new element at the end of the children list.
+        cur.typ = XmlElementType::XmlElementNode;
+        cur.set_parent(Some(parent));
+        cur.doc = parent.document();
+        if parent.children().is_none() {
+            parent.set_children(Some(cur.into()));
+            parent.set_last(Some(cur.into()));
+        } else {
+            let mut prev = parent.last().unwrap();
+            prev.set_next(Some(cur.into()));
+            cur.prev = Some(prev);
+            parent.set_last(Some(cur.into()));
+        }
+
+        Some(cur)
     }
-
-    Some(cur)
 }
 
 /// Creation of a new text node within a document.
@@ -1604,11 +1640,13 @@ pub unsafe fn xml_new_doc_text(
     doc: Option<XmlDocPtr>,
     content: *const XmlChar,
 ) -> Option<XmlNodePtr> {
-    let cur = xml_new_text(content);
-    if let Some(mut cur) = cur {
-        cur.doc = doc;
+    unsafe {
+        let cur = xml_new_text(content);
+        if let Some(mut cur) = cur {
+            cur.doc = doc;
+        }
+        cur
     }
-    cur
 }
 
 /// Creation of a new text node.
@@ -1618,25 +1656,27 @@ pub unsafe fn xml_new_doc_text(
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewText")]
 pub unsafe fn xml_new_text(content: *const XmlChar) -> Option<XmlNodePtr> {
-    // Allocate a new node and fill the fields.
-    let Some(mut cur) = XmlNodePtr::new(XmlNode {
-        typ: XmlElementType::XmlTextNode,
-        name: XML_STRING_TEXT.as_ptr() as _,
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building text");
-        return None;
-    };
-    if !content.is_null() {
-        cur.content = xml_strdup(content);
-    }
+    unsafe {
+        // Allocate a new node and fill the fields.
+        let Some(mut cur) = XmlNodePtr::new(XmlNode {
+            typ: XmlElementType::XmlTextNode,
+            name: XML_STRING_TEXT.as_ptr() as _,
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building text");
+            return None;
+        };
+        if !content.is_null() {
+            cur.content = xml_strdup(content);
+        }
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Creation of a processing instruction element.
@@ -1647,27 +1687,29 @@ pub unsafe fn xml_new_doc_pi(
     name: &str,
     content: Option<&str>,
 ) -> Option<XmlNodePtr> {
-    // Allocate a new node and fill the fields.
-    let Some(mut cur) = XmlNodePtr::new(XmlNode {
-        typ: XmlElementType::XmlPINode,
-        name: xml_strndup(name.as_ptr(), name.len() as i32),
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building PI");
-        return None;
-    };
-    if let Some(content) = content {
-        let content = CString::new(content).unwrap();
-        cur.content = xml_strdup(content.as_ptr() as *const u8);
-    }
-    cur.doc = doc;
+    unsafe {
+        // Allocate a new node and fill the fields.
+        let Some(mut cur) = XmlNodePtr::new(XmlNode {
+            typ: XmlElementType::XmlPINode,
+            name: xml_strndup(name.as_ptr(), name.len() as i32),
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building PI");
+            return None;
+        };
+        if let Some(content) = content {
+            let content = CString::new(content).unwrap();
+            cur.content = xml_strdup(content.as_ptr() as *const u8);
+        }
+        cur.doc = doc;
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Creation of a processing instruction element.
@@ -1677,7 +1719,7 @@ pub unsafe fn xml_new_doc_pi(
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewPI")]
 pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> Option<XmlNodePtr> {
-    xml_new_doc_pi(None, name, content)
+    unsafe { xml_new_doc_pi(None, name, content) }
 }
 
 /// Creation of a new text node with an extra content length parameter. The
@@ -1689,11 +1731,13 @@ pub unsafe fn xml_new_doc_text_len(
     content: *const XmlChar,
     len: i32,
 ) -> Option<XmlNodePtr> {
-    let cur = xml_new_text_len(content, len);
-    if let Some(mut cur) = cur {
-        cur.doc = doc;
+    unsafe {
+        let cur = xml_new_text_len(content, len);
+        if let Some(mut cur) = cur {
+            cur.doc = doc;
+        }
+        cur
     }
-    cur
 }
 
 /// Use of this function is DISCOURAGED in favor of xmlNewDocTextLen.
@@ -1702,36 +1746,40 @@ pub unsafe fn xml_new_doc_text_len(
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewTextLen")]
 pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> Option<XmlNodePtr> {
-    // Allocate a new node and fill the fields.
-    let Some(mut cur) = XmlNodePtr::new(XmlNode {
-        typ: XmlElementType::XmlTextNode,
-        name: XML_STRING_TEXT.as_ptr() as _,
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building text");
-        return None;
-    };
-    if !content.is_null() {
-        cur.content = xml_strndup(content, len);
-    }
+    unsafe {
+        // Allocate a new node and fill the fields.
+        let Some(mut cur) = XmlNodePtr::new(XmlNode {
+            typ: XmlElementType::XmlTextNode,
+            name: XML_STRING_TEXT.as_ptr() as _,
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building text");
+            return None;
+        };
+        if !content.is_null() {
+            cur.content = xml_strndup(content, len);
+        }
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Creation of a new node containing a comment within a document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocComment")]
 pub unsafe fn xml_new_doc_comment(doc: Option<XmlDocPtr>, content: &str) -> Option<XmlNodePtr> {
-    let cur = xml_new_comment(content);
-    if let Some(mut cur) = cur {
-        cur.doc = doc;
+    unsafe {
+        let cur = xml_new_comment(content);
+        if let Some(mut cur) = cur {
+            cur.doc = doc;
+        }
+        cur
     }
-    cur
 }
 
 /// Use of this function is DISCOURAGED in favor of xmlNewDocComment.
@@ -1740,122 +1788,130 @@ pub unsafe fn xml_new_doc_comment(doc: Option<XmlDocPtr>, content: &str) -> Opti
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewComment")]
 pub unsafe fn xml_new_comment(content: &str) -> Option<XmlNodePtr> {
-    // Allocate a new node and fill the fields.
-    let Some(cur) = XmlNodePtr::new(XmlNode {
-        typ: XmlElementType::XmlCommentNode,
-        name: XML_STRING_COMMENT.as_ptr() as _,
-        content: xml_strndup(content.as_ptr(), content.len() as i32),
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building comment");
-        return None;
-    };
+    unsafe {
+        // Allocate a new node and fill the fields.
+        let Some(cur) = XmlNodePtr::new(XmlNode {
+            typ: XmlElementType::XmlCommentNode,
+            name: XML_STRING_COMMENT.as_ptr() as _,
+            content: xml_strndup(content.as_ptr(), content.len() as i32),
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building comment");
+            return None;
+        };
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Creation of a new node containing a CDATA block.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCDataBlock")]
 pub unsafe fn xml_new_cdata_block(doc: Option<XmlDocPtr>, content: &str) -> Option<XmlNodePtr> {
-    // Allocate a new node and fill the fields.
-    let Some(cur) = XmlNodePtr::new(XmlNode {
-        typ: XmlElementType::XmlCDATASectionNode,
-        doc,
-        content: xml_strndup(content.as_ptr(), content.len() as i32),
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building CDATA");
-        return None;
-    };
+    unsafe {
+        // Allocate a new node and fill the fields.
+        let Some(cur) = XmlNodePtr::new(XmlNode {
+            typ: XmlElementType::XmlCDATASectionNode,
+            doc,
+            content: xml_strndup(content.as_ptr(), content.len() as i32),
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building CDATA");
+            return None;
+        };
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Creation of a new character reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCharRef")]
 pub unsafe fn xml_new_char_ref(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlNodePtr> {
-    // Allocate a new node and fill the fields.
-    let Some(mut cur) = XmlNodePtr::new(XmlNode {
-        typ: XmlElementType::XmlEntityRefNode,
-        doc,
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building character reference");
-        return None;
-    };
-    if let Some(name) = name.strip_prefix('&') {
-        let len = name.len();
-        if let Some(name) = name.strip_suffix(';') {
-            cur.name = xml_strndup(name.as_ptr(), len as i32 - 1);
+    unsafe {
+        // Allocate a new node and fill the fields.
+        let Some(mut cur) = XmlNodePtr::new(XmlNode {
+            typ: XmlElementType::XmlEntityRefNode,
+            doc,
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building character reference");
+            return None;
+        };
+        if let Some(name) = name.strip_prefix('&') {
+            let len = name.len();
+            if let Some(name) = name.strip_suffix(';') {
+                cur.name = xml_strndup(name.as_ptr(), len as i32 - 1);
+            } else {
+                cur.name = xml_strndup(name.as_ptr(), len as i32);
+            }
         } else {
-            cur.name = xml_strndup(name.as_ptr(), len as i32);
+            let name = CString::new(name).unwrap();
+            cur.name = xml_strdup(name.as_ptr() as *const u8);
         }
-    } else {
-        let name = CString::new(name).unwrap();
-        cur.name = xml_strdup(name.as_ptr() as *const u8);
-    }
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Creation of a new reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewReference")]
 pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlNodePtr> {
-    // Allocate a new node and fill the fields.
-    let Some(mut cur) = XmlNodePtr::new(XmlNode {
-        typ: XmlElementType::XmlEntityRefNode,
-        doc,
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building reference");
-        return None;
-    };
-    if let Some(name) = name.strip_prefix('&') {
-        let len = name.len();
-        if let Some(name) = name.strip_suffix(';') {
-            cur.name = xml_strndup(name.as_ptr(), len as i32 - 1);
+    unsafe {
+        // Allocate a new node and fill the fields.
+        let Some(mut cur) = XmlNodePtr::new(XmlNode {
+            typ: XmlElementType::XmlEntityRefNode,
+            doc,
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building reference");
+            return None;
+        };
+        if let Some(name) = name.strip_prefix('&') {
+            let len = name.len();
+            if let Some(name) = name.strip_suffix(';') {
+                cur.name = xml_strndup(name.as_ptr(), len as i32 - 1);
+            } else {
+                cur.name = xml_strndup(name.as_ptr(), len as i32);
+            }
         } else {
-            cur.name = xml_strndup(name.as_ptr(), len as i32);
+            let name = CString::new(name).unwrap();
+            cur.name = xml_strdup(name.as_ptr() as *const u8);
         }
-    } else {
-        let name = CString::new(name).unwrap();
-        cur.name = xml_strdup(name.as_ptr() as *const u8);
-    }
 
-    let ent = xml_get_doc_entity(doc, &cur.name().unwrap());
-    if let Some(ent) = ent {
-        cur.content = ent.content;
-        // The parent pointer in entity is a DTD pointer and thus is NOT
-        // updated.  Not sure if this is 100% correct.
-        //  -George
-        cur.set_children(Some(ent.into()));
-        cur.set_last(Some(ent.into()));
-    }
+        let ent = xml_get_doc_entity(doc, &cur.name().unwrap());
+        if let Some(ent) = ent {
+            cur.content = ent.content;
+            // The parent pointer in entity is a DTD pointer and thus is NOT
+            // updated.  Not sure if this is 100% correct.
+            //  -George
+            cur.set_children(Some(ent.into()));
+            cur.set_last(Some(ent.into()));
+        }
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Do a copy of the node.
@@ -1863,7 +1919,7 @@ pub unsafe fn xml_new_reference(doc: Option<XmlDocPtr>, name: &str) -> Option<Xm
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNode")]
 pub unsafe fn xml_copy_node(node: XmlGenericNodePtr, extended: i32) -> Option<XmlGenericNodePtr> {
-    xml_static_copy_node(node, None, None, extended)
+    unsafe { xml_static_copy_node(node, None, None, extended) }
 }
 
 /// Do a copy of the node to a given document.
@@ -1875,7 +1931,7 @@ pub unsafe fn xml_doc_copy_node(
     doc: Option<XmlDocPtr>,
     extended: i32,
 ) -> Option<XmlGenericNodePtr> {
-    xml_static_copy_node(node, doc, None, extended)
+    unsafe { xml_static_copy_node(node, doc, None, extended) }
 }
 
 /// Do a recursive copy of the node list.
@@ -1886,7 +1942,7 @@ pub unsafe fn xml_doc_copy_node_list(
     doc: Option<XmlDocPtr>,
     node: Option<XmlGenericNodePtr>,
 ) -> Option<XmlGenericNodePtr> {
-    xml_static_copy_node_list(node, doc, None)
+    unsafe { xml_static_copy_node_list(node, doc, None) }
 }
 
 /// Do a recursive copy of the node list.
@@ -1895,7 +1951,7 @@ pub unsafe fn xml_doc_copy_node_list(
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNodeList")]
 pub unsafe fn xml_copy_node_list(node: Option<XmlGenericNodePtr>) -> Option<XmlGenericNodePtr> {
-    xml_static_copy_node_list(node, None, None)
+    unsafe { xml_static_copy_node_list(node, None, None) }
 }
 
 /// Creation of a new child element, added at the end of @parent children list.
@@ -1917,43 +1973,45 @@ pub unsafe fn xml_new_text_child(
     name: &str,
     content: *const XmlChar,
 ) -> Option<XmlNodePtr> {
-    // Allocate a new node
-    let mut cur = if let Some(parent) = XmlNodePtr::try_from(parent)
-        .ok()
-        .filter(|parent| matches!(parent.element_type(), XmlElementType::XmlElementNode))
-    {
-        if ns.is_none() {
-            xml_new_doc_raw_node(parent.doc, parent.ns, name, content)
+    unsafe {
+        // Allocate a new node
+        let mut cur = if let Some(parent) = XmlNodePtr::try_from(parent)
+            .ok()
+            .filter(|parent| matches!(parent.element_type(), XmlElementType::XmlElementNode))
+        {
+            if ns.is_none() {
+                xml_new_doc_raw_node(parent.doc, parent.ns, name, content)
+            } else {
+                xml_new_doc_raw_node(parent.doc, ns, name, content)
+            }
+        } else if let Ok(parent) = XmlDocPtr::try_from(parent) {
+            if ns.is_none() {
+                xml_new_doc_raw_node(Some(parent), None, name, content)
+            } else {
+                xml_new_doc_raw_node(Some(parent), ns, name, content)
+            }
+        } else if matches!(parent.element_type(), XmlElementType::XmlDocumentFragNode) {
+            xml_new_doc_raw_node(parent.document(), ns, name, content)
         } else {
-            xml_new_doc_raw_node(parent.doc, ns, name, content)
-        }
-    } else if let Ok(parent) = XmlDocPtr::try_from(parent) {
-        if ns.is_none() {
-            xml_new_doc_raw_node(Some(parent), None, name, content)
-        } else {
-            xml_new_doc_raw_node(Some(parent), ns, name, content)
-        }
-    } else if matches!(parent.element_type(), XmlElementType::XmlDocumentFragNode) {
-        xml_new_doc_raw_node(parent.document(), ns, name, content)
-    } else {
-        None
-    }?;
+            None
+        }?;
 
-    // add the new element at the end of the children list.
-    cur.typ = XmlElementType::XmlElementNode;
-    cur.set_parent(Some(parent));
-    cur.doc = parent.document();
-    if parent.children().is_none() {
-        parent.set_children(Some(cur.into()));
-        parent.set_last(Some(cur.into()));
-    } else {
-        let mut prev = parent.last().unwrap();
-        prev.set_next(Some(cur.into()));
-        cur.prev = Some(prev);
-        parent.set_last(Some(cur.into()));
+        // add the new element at the end of the children list.
+        cur.typ = XmlElementType::XmlElementNode;
+        cur.set_parent(Some(parent));
+        cur.doc = parent.document();
+        if parent.children().is_none() {
+            parent.set_children(Some(cur.into()));
+            parent.set_last(Some(cur.into()));
+        } else {
+            let mut prev = parent.last().unwrap();
+            prev.set_next(Some(cur.into()));
+            cur.prev = Some(prev);
+            parent.set_last(Some(cur.into()));
+        }
+
+        Some(cur)
     }
-
-    Some(cur)
 }
 
 /// Creation of a new node element within a document. @ns and @content
@@ -1968,24 +2026,26 @@ pub unsafe fn xml_new_doc_raw_node(
     name: &str,
     content: *const XmlChar,
 ) -> Option<XmlNodePtr> {
-    let cur = xml_new_doc_node(doc, ns, name, null_mut());
-    if let Some(mut cur) = cur {
-        cur.doc = doc;
-        if !content.is_null() {
-            cur.set_children(xml_new_doc_text(doc, content).map(|node| node.into()));
-            if let Some(mut ulccur) = cur.children() {
-                while let Some(next) = ulccur.next() {
-                    ulccur.set_parent(Some(cur.into()));
-                    ulccur = next;
+    unsafe {
+        let cur = xml_new_doc_node(doc, ns, name, null_mut());
+        if let Some(mut cur) = cur {
+            cur.doc = doc;
+            if !content.is_null() {
+                cur.set_children(xml_new_doc_text(doc, content).map(|node| node.into()));
+                if let Some(mut ulccur) = cur.children() {
+                    while let Some(next) = ulccur.next() {
+                        ulccur.set_parent(Some(cur.into()));
+                        ulccur = next;
+                    }
+                    (*ulccur).set_parent(Some(cur.into()));
+                    cur.set_last(Some(ulccur));
+                } else {
+                    cur.set_last(None);
                 }
-                (*ulccur).set_parent(Some(cur.into()));
-                cur.set_last(Some(ulccur));
-            } else {
-                cur.set_last(None);
             }
         }
+        cur
     }
-    cur
 }
 
 /// Creation of a new Fragment node.
@@ -1993,22 +2053,24 @@ pub unsafe fn xml_new_doc_raw_node(
 #[doc(alias = "xmlNewDocFragment")]
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_new_doc_fragment(doc: Option<XmlDocPtr>) -> Option<XmlNodePtr> {
-    // Allocate a new DocumentFragment node and fill the fields.
-    let Some(cur) = XmlNodePtr::new(XmlNode {
-        typ: XmlElementType::XmlDocumentFragNode,
-        doc,
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building fragment");
-        return None;
-    };
+    unsafe {
+        // Allocate a new DocumentFragment node and fill the fields.
+        let Some(cur) = XmlNodePtr::new(XmlNode {
+            typ: XmlElementType::XmlDocumentFragNode,
+            doc,
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building fragment");
+            return None;
+        };
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Unlink the old node from its current context, prune the new one
@@ -2024,61 +2086,64 @@ pub unsafe fn xml_replace_node(
     mut old: XmlGenericNodePtr,
     cur: Option<XmlGenericNodePtr>,
 ) -> Option<XmlGenericNodePtr> {
-    if Some(old) == cur {
-        return None;
-    }
-    if matches!(old.element_type(), XmlElementType::XmlNamespaceDecl) || old.parent().is_none() {
-        return None;
-    }
-    let Some(mut cur) =
-        cur.filter(|cur| !matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl))
-    else {
-        old.unlink();
-        return Some(old);
-    };
-    if cur == old {
-        return Some(old);
-    }
-    if matches!(old.element_type(), XmlElementType::XmlAttributeNode)
-        && !matches!(cur.element_type(), XmlElementType::XmlAttributeNode)
-    {
-        return Some(old);
-    }
-    if matches!(cur.element_type(), XmlElementType::XmlAttributeNode)
-        && !matches!(old.element_type(), XmlElementType::XmlAttributeNode)
-    {
-        return Some(old);
-    }
-    cur.unlink();
-    cur.set_doc(old.document());
-    cur.set_parent(old.parent());
-    cur.set_next(old.next());
-    if let Some(mut next) = cur.next() {
-        next.set_prev(Some(cur));
-    }
-    cur.set_prev(old.prev());
-    if let Some(mut prev) = cur.prev() {
-        prev.set_next(Some(cur));
-    }
-    if let Some(mut parent) = cur.parent() {
-        if matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
-            let mut parent = XmlNodePtr::try_from(parent).unwrap();
-            if parent.properties.map(|prop| prop.into()) == Some(old) {
-                parent.properties = Some(XmlAttrPtr::try_from(cur).unwrap());
-            }
-        } else {
-            if parent.children() == Some(old) {
-                parent.set_children(Some(cur));
-            }
-            if parent.last() == Some(old) {
-                parent.set_last(Some(cur));
+    unsafe {
+        if Some(old) == cur {
+            return None;
+        }
+        if matches!(old.element_type(), XmlElementType::XmlNamespaceDecl) || old.parent().is_none()
+        {
+            return None;
+        }
+        let Some(mut cur) =
+            cur.filter(|cur| !matches!(cur.element_type(), XmlElementType::XmlNamespaceDecl))
+        else {
+            old.unlink();
+            return Some(old);
+        };
+        if cur == old {
+            return Some(old);
+        }
+        if matches!(old.element_type(), XmlElementType::XmlAttributeNode)
+            && !matches!(cur.element_type(), XmlElementType::XmlAttributeNode)
+        {
+            return Some(old);
+        }
+        if matches!(cur.element_type(), XmlElementType::XmlAttributeNode)
+            && !matches!(old.element_type(), XmlElementType::XmlAttributeNode)
+        {
+            return Some(old);
+        }
+        cur.unlink();
+        cur.set_doc(old.document());
+        cur.set_parent(old.parent());
+        cur.set_next(old.next());
+        if let Some(mut next) = cur.next() {
+            next.set_prev(Some(cur));
+        }
+        cur.set_prev(old.prev());
+        if let Some(mut prev) = cur.prev() {
+            prev.set_next(Some(cur));
+        }
+        if let Some(mut parent) = cur.parent() {
+            if matches!(cur.element_type(), XmlElementType::XmlAttributeNode) {
+                let mut parent = XmlNodePtr::try_from(parent).unwrap();
+                if parent.properties.map(|prop| prop.into()) == Some(old) {
+                    parent.properties = Some(XmlAttrPtr::try_from(cur).unwrap());
+                }
+            } else {
+                if parent.children() == Some(old) {
+                    parent.set_children(Some(cur));
+                }
+                if parent.last() == Some(old) {
+                    parent.set_last(Some(cur));
+                }
             }
         }
+        old.set_next(None);
+        old.set_prev(None);
+        old.set_parent(None);
+        Some(old)
     }
-    old.set_next(None);
-    old.set_prev(None);
-    old.set_parent(None);
-    Some(old)
 }
 
 /// Merge two text nodes into one
@@ -2088,22 +2153,24 @@ pub unsafe fn xml_text_merge(
     first: Option<XmlNodePtr>,
     second: Option<XmlNodePtr>,
 ) -> Option<XmlNodePtr> {
-    match (first, second) {
-        (Some(mut first), Some(mut second))
-            if first.element_type() == XmlElementType::XmlTextNode
-                && second.element_type() == XmlElementType::XmlTextNode =>
-        {
-            if first.name != second.name {
-                return Some(first);
+    unsafe {
+        match (first, second) {
+            (Some(mut first), Some(mut second))
+                if first.element_type() == XmlElementType::XmlTextNode
+                    && second.element_type() == XmlElementType::XmlTextNode =>
+            {
+                if first.name != second.name {
+                    return Some(first);
+                }
+                first.add_content(second.content);
+                second.unlink();
+                xml_free_node(second);
+                Some(first)
             }
-            first.add_content(second.content);
-            second.unlink();
-            xml_free_node(second);
-            Some(first)
+            (Some(first), Some(_)) => Some(first),
+            (Some(text), None) | (None, Some(text)) => Some(text),
+            (None, None) => None,
         }
-        (Some(first), Some(_)) => Some(first),
-        (Some(text), None) | (None, Some(text)) => Some(text),
-        (None, None) => None,
     }
 }
 
@@ -2112,116 +2179,120 @@ pub unsafe fn xml_text_merge(
 /// Returns -1 in case of error, 0 otherwise
 #[doc(alias = "xmlTextConcat")]
 pub unsafe fn xml_text_concat(mut node: XmlNodePtr, content: &str) -> i32 {
-    // if node.is_null() {
-    //     return -1;
-    // }
+    unsafe {
+        // if node.is_null() {
+        //     return -1;
+        // }
 
-    if !matches!(node.element_type(), XmlElementType::XmlTextNode)
-        && !matches!(node.element_type(), XmlElementType::XmlCDATASectionNode)
-        && !matches!(node.element_type(), XmlElementType::XmlCommentNode)
-        && !matches!(node.element_type(), XmlElementType::XmlPINode)
-    {
-        return -1;
+        if !matches!(node.element_type(), XmlElementType::XmlTextNode)
+            && !matches!(node.element_type(), XmlElementType::XmlCDATASectionNode)
+            && !matches!(node.element_type(), XmlElementType::XmlCommentNode)
+            && !matches!(node.element_type(), XmlElementType::XmlPINode)
+        {
+            return -1;
+        }
+        // need to check if content is currently in the dictionary
+        node.content = xml_strncat(node.content, content.as_ptr(), content.len() as i32);
+        node.properties = None;
+        if node.content.is_null() {
+            return -1;
+        }
+        0
     }
-    // need to check if content is currently in the dictionary
-    node.content = xml_strncat(node.content, content.as_ptr(), content.len() as i32);
-    node.properties = None;
-    if node.content.is_null() {
-        return -1;
-    }
-    0
 }
 
 /// Free a node and all its siblings, this is a recursive behaviour, all
 /// the children are freed too.
 #[doc(alias = "xmlFreeNodeList")]
 pub unsafe fn xml_free_node_list(cur: Option<impl Into<XmlGenericNodePtr>>) {
-    let mut depth: usize = 0;
+    unsafe {
+        let mut depth: usize = 0;
 
-    let Some(mut cur) = cur.map(|cur| cur.into()) else {
-        return;
-    };
-    if let Ok(ns) = XmlNsPtr::try_from(cur) {
-        xml_free_ns_list(ns);
-        return;
-    }
-    loop {
-        // This conditional statement cannot be replaced by `let Some`.
-        // Calling `children()` when `cur` type is `XmlEntityRefNode` will not work correctly.
-        // Cause unknown for now...
-        while !matches!(
-            cur.element_type(),
-            XmlElementType::XmlDocumentNode
-                | XmlElementType::XmlHTMLDocumentNode
-                | XmlElementType::XmlDTDNode
-                | XmlElementType::XmlEntityRefNode
-        ) && cur.children().is_some()
-        {
-            cur = cur.children().unwrap();
-            depth += 1;
+        let Some(mut cur) = cur.map(|cur| cur.into()) else {
+            return;
+        };
+        if let Ok(ns) = XmlNsPtr::try_from(cur) {
+            xml_free_ns_list(ns);
+            return;
         }
-
-        let next = cur.next();
-        let parent = cur.parent();
-        if let Ok(doc) = XmlDocPtr::try_from(cur) {
-            xml_free_doc(doc);
-        } else if !matches!(cur.element_type(), XmlElementType::XmlDTDNode) {
-            let cur = XmlNodePtr::try_from(cur).unwrap();
-            if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-            // && xmlDeregisterNodeDefaultValue.is_some()
+        loop {
+            // This conditional statement cannot be replaced by `let Some`.
+            // Calling `children()` when `cur` type is `XmlEntityRefNode` will not work correctly.
+            // Cause unknown for now...
+            while !matches!(
+                cur.element_type(),
+                XmlElementType::XmlDocumentNode
+                    | XmlElementType::XmlHTMLDocumentNode
+                    | XmlElementType::XmlDTDNode
+                    | XmlElementType::XmlEntityRefNode
+            ) && cur.children().is_some()
             {
-                xml_deregister_node_default_value(cur.into());
+                cur = cur.children().unwrap();
+                depth += 1;
             }
 
-            if (matches!(cur.element_type(), XmlElementType::XmlElementNode)
-                || matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
-                || matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd))
-                && cur.properties.is_some()
-            {
-                xml_free_prop_list(cur.properties);
-            }
-            if !matches!(cur.element_type(), XmlElementType::XmlElementNode)
-                && !matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
-                && !matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
-                && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
-                && !cur.content.is_null()
-            {
-                xml_free(cur.content as _);
-            }
-            if matches!(cur.element_type(), XmlElementType::XmlElementNode)
-                || matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
-                || matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
-            {
-                if let Some(ns_def) = cur.ns_def {
-                    xml_free_ns_list(ns_def);
+            let next = cur.next();
+            let parent = cur.parent();
+            if let Ok(doc) = XmlDocPtr::try_from(cur) {
+                xml_free_doc(doc);
+            } else if !matches!(cur.element_type(), XmlElementType::XmlDTDNode) {
+                let cur = XmlNodePtr::try_from(cur).unwrap();
+                if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+                // && xmlDeregisterNodeDefaultValue.is_some()
+                {
+                    xml_deregister_node_default_value(cur.into());
                 }
+
+                if (matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                    || matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
+                    || matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd))
+                    && cur.properties.is_some()
+                {
+                    xml_free_prop_list(cur.properties);
+                }
+                if !matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                    && !matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
+                    && !matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
+                    && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
+                    && !cur.content.is_null()
+                {
+                    xml_free(cur.content as _);
+                }
+                if matches!(cur.element_type(), XmlElementType::XmlElementNode)
+                    || matches!(cur.element_type(), XmlElementType::XmlXIncludeStart)
+                    || matches!(cur.element_type(), XmlElementType::XmlXIncludeEnd)
+                {
+                    if let Some(ns_def) = cur.ns_def {
+                        xml_free_ns_list(ns_def);
+                    }
+                }
+
+                // When a node is a text node or a comment, it uses a global static
+                // variable for the name of the node.
+                // Otherwise the node name might come from the document's
+                // dictionary
+                if !cur.name.is_null()
+                    && !matches!(cur.element_type(), XmlElementType::XmlTextNode)
+                    && !matches!(cur.element_type(), XmlElementType::XmlCommentNode)
+                {
+                    xml_free(cur.name as _);
+                }
+                cur.free();
             }
 
-            // When a node is a text node or a comment, it uses a global static
-            // variable for the name of the node.
-            // Otherwise the node name might come from the document's
-            // dictionary
-            if !cur.name.is_null()
-                && !matches!(cur.element_type(), XmlElementType::XmlTextNode)
-                && !matches!(cur.element_type(), XmlElementType::XmlCommentNode)
-            {
-                xml_free(cur.name as _);
+            if let Some(next) = next {
+                cur = next;
+            } else {
+                if depth == 0 {
+                    break;
+                }
+                let Some(parent) = parent else {
+                    break;
+                };
+                depth -= 1;
+                cur = parent;
+                cur.set_children(None);
             }
-            cur.free();
-        }
-
-        if let Some(next) = next {
-            cur = next;
-        } else {
-            if depth == 0 {
-                break;
-            }
-            let Some(parent) = parent else {
-                break;
-            };
-            depth -= 1;
-            cur = parent;
-            cur.set_children(None);
         }
     }
 }
@@ -2230,92 +2301,94 @@ pub unsafe fn xml_free_node_list(cur: Option<impl Into<XmlGenericNodePtr>>) {
 /// This doesn't unlink the child from the list, use xmlUnlinkNode() first.
 #[doc(alias = "xmlFreeNode")]
 pub unsafe fn xml_free_node(cur: impl Into<XmlGenericNodePtr>) {
-    let cur = cur.into();
-    // use xmlFreeDtd for DTD nodes
-    if let Ok(dtd) = XmlDtdPtr::try_from(cur) {
-        xml_free_dtd(dtd);
-        return;
-    }
-    if let Ok(ns) = XmlNsPtr::try_from(cur) {
-        xml_free_ns(ns);
-        return;
-    }
-    if let Ok(attr) = XmlAttrPtr::try_from(cur) {
-        xml_free_prop(attr);
-        return;
-    }
-
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    // && xmlDeregisterNodeDefaultValue.is_some()
-    {
-        xml_deregister_node_default_value(cur);
-    }
-
-    if let Ok(mut ent) = XmlEntityPtr::try_from(cur) {
-        let system_id = ent.system_id;
-        if !system_id.is_null() {
-            xml_free(system_id as _);
+    unsafe {
+        let cur = cur.into();
+        // use xmlFreeDtd for DTD nodes
+        if let Ok(dtd) = XmlDtdPtr::try_from(cur) {
+            xml_free_dtd(dtd);
+            return;
         }
-        ent.system_id = null_mut();
-        let external_id = ent.external_id;
-        if !external_id.is_null() {
-            xml_free(external_id as _);
+        if let Ok(ns) = XmlNsPtr::try_from(cur) {
+            xml_free_ns(ns);
+            return;
         }
-        ent.external_id = null_mut();
-    }
-    if let Some(children) = cur
-        .children()
-        .filter(|_| !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode))
-    {
-        xml_free_node_list(Some(children));
-    }
+        if let Ok(attr) = XmlAttrPtr::try_from(cur) {
+            xml_free_prop(attr);
+            return;
+        }
 
-    if let Ok(mut cur) = XmlNodePtr::try_from(cur) {
-        if matches!(
-            cur.element_type(),
-            XmlElementType::XmlElementNode
-                | XmlElementType::XmlXIncludeStart
-                | XmlElementType::XmlXIncludeEnd
-        ) {
-            if cur.properties.is_some() {
-                xml_free_prop_list(cur.properties);
-            }
-            if let Some(ns_def) = cur.ns_def.take() {
-                xml_free_ns_list(ns_def);
-            }
-        } else if !cur.content.is_null()
-            && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
-            && !cur.content.is_null()
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        // && xmlDeregisterNodeDefaultValue.is_some()
         {
-            xml_free(cur.content as _);
+            xml_deregister_node_default_value(cur);
         }
 
-        // When a node is a text node or a comment, it uses a global static
-        // variable for the name of the node.
-        // Otherwise the node name might come from the document's dictionary
-        if !cur.name.is_null()
-            && !matches!(cur.element_type(), XmlElementType::XmlTextNode)
-            && !matches!(cur.element_type(), XmlElementType::XmlCommentNode)
+        if let Ok(mut ent) = XmlEntityPtr::try_from(cur) {
+            let system_id = ent.system_id;
+            if !system_id.is_null() {
+                xml_free(system_id as _);
+            }
+            ent.system_id = null_mut();
+            let external_id = ent.external_id;
+            if !external_id.is_null() {
+                xml_free(external_id as _);
+            }
+            ent.external_id = null_mut();
+        }
+        if let Some(children) = cur
+            .children()
+            .filter(|_| !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode))
         {
-            xml_free(cur.name as _);
+            xml_free_node_list(Some(children));
         }
 
-        cur.free();
-    } else if let Ok(cur) = XmlEntityPtr::try_from(cur) {
-        let content = cur.content;
-        if !content.is_null() {
-            xml_free(content as _);
+        if let Ok(mut cur) = XmlNodePtr::try_from(cur) {
+            if matches!(
+                cur.element_type(),
+                XmlElementType::XmlElementNode
+                    | XmlElementType::XmlXIncludeStart
+                    | XmlElementType::XmlXIncludeEnd
+            ) {
+                if cur.properties.is_some() {
+                    xml_free_prop_list(cur.properties);
+                }
+                if let Some(ns_def) = cur.ns_def.take() {
+                    xml_free_ns_list(ns_def);
+                }
+            } else if !cur.content.is_null()
+                && !matches!(cur.element_type(), XmlElementType::XmlEntityRefNode)
+                && !cur.content.is_null()
+            {
+                xml_free(cur.content as _);
+            }
+
+            // When a node is a text node or a comment, it uses a global static
+            // variable for the name of the node.
+            // Otherwise the node name might come from the document's dictionary
+            if !cur.name.is_null()
+                && !matches!(cur.element_type(), XmlElementType::XmlTextNode)
+                && !matches!(cur.element_type(), XmlElementType::XmlCommentNode)
+            {
+                xml_free(cur.name as _);
+            }
+
+            cur.free();
+        } else if let Ok(cur) = XmlEntityPtr::try_from(cur) {
+            let content = cur.content;
+            if !content.is_null() {
+                xml_free(content as _);
+            }
+            // When a node is a text node or a comment, it uses a global static
+            // variable for the name of the node.
+            // Otherwise the node name might come from the document's dictionary
+            let name = cur.name;
+            if !name.is_null() {
+                xml_free(name as _);
+            }
+        } else {
+            // Does this pattern occur ???
+            todo!()
         }
-        // When a node is a text node or a comment, it uses a global static
-        // variable for the name of the node.
-        // Otherwise the node name might come from the document's dictionary
-        let name = cur.name;
-        if !name.is_null() {
-            xml_free(name as _);
-        }
-    } else {
-        // Does this pattern occur ???
-        todo!()
     }
 }
 
@@ -2329,40 +2402,41 @@ unsafe fn xml_ns_in_scope(
     ancestor: Option<XmlGenericNodePtr>,
     prefix: *const XmlChar,
 ) -> i32 {
-    while let Some(cur_node) = node.filter(|&node| Some(node) != ancestor) {
-        if matches!(
-            cur_node.element_type(),
-            XmlElementType::XmlEntityRefNode
-                | XmlElementType::XmlEntityNode
-                | XmlElementType::XmlEntityDecl
-        ) {
+    unsafe {
+        while let Some(cur_node) = node.filter(|&node| Some(node) != ancestor) {
+            if matches!(
+                cur_node.element_type(),
+                XmlElementType::XmlEntityRefNode
+                    | XmlElementType::XmlEntityNode
+                    | XmlElementType::XmlEntityDecl
+            ) {
+                return -1;
+            }
+            if let Some(cur_node) = XmlNodePtr::try_from(cur_node).ok().filter(|cur_node| {
+                matches!(cur_node.element_type(), XmlElementType::XmlElementNode)
+            }) {
+                let mut tst = cur_node.ns_def;
+                while let Some(now) = tst {
+                    if now.prefix().is_none() && prefix.is_null() {
+                        return 0;
+                    }
+                    if now.prefix().is_some()
+                        && now.prefix()
+                            == (!prefix.is_null())
+                                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                    {
+                        return 0;
+                    }
+                    tst = now.next;
+                }
+            }
+            node = cur_node.parent();
+        }
+        if node != ancestor {
             return -1;
         }
-        if let Some(cur_node) = XmlNodePtr::try_from(cur_node)
-            .ok()
-            .filter(|cur_node| matches!(cur_node.element_type(), XmlElementType::XmlElementNode))
-        {
-            let mut tst = cur_node.ns_def;
-            while let Some(now) = tst {
-                if now.prefix().is_none() && prefix.is_null() {
-                    return 0;
-                }
-                if now.prefix().is_some()
-                    && now.prefix()
-                        == (!prefix.is_null())
-                            .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                {
-                    return 0;
-                }
-                tst = now.next;
-            }
-        }
-        node = cur_node.parent();
+        1
     }
-    if node != ancestor {
-        return -1;
-    }
-    1
 }
 
 /// Do a copy of the namespace.
@@ -2370,10 +2444,12 @@ unsafe fn xml_ns_in_scope(
 /// Returns: a new #xmlNsPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNamespace")]
 pub unsafe fn xml_copy_namespace(cur: Option<XmlNsPtr>) -> Option<XmlNsPtr> {
-    let cur = cur?;
-    match cur.element_type() {
-        XML_LOCAL_NAMESPACE => xml_new_ns(None, cur.href, cur.prefix().as_deref()),
-        _ => None,
+    unsafe {
+        let cur = cur?;
+        match cur.element_type() {
+            XML_LOCAL_NAMESPACE => xml_new_ns(None, cur.href, cur.prefix().as_deref()),
+            _ => None,
+        }
     }
 }
 
@@ -2382,26 +2458,28 @@ pub unsafe fn xml_copy_namespace(cur: Option<XmlNsPtr>) -> Option<XmlNsPtr> {
 /// Returns: a new #xmlNsPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNamespaceList")]
 pub unsafe fn xml_copy_namespace_list(mut cur: Option<XmlNsPtr>) -> Option<XmlNsPtr> {
-    let mut ret = None::<XmlNsPtr>;
-    let mut p = None::<XmlNsPtr>;
+    unsafe {
+        let mut ret = None::<XmlNsPtr>;
+        let mut p = None::<XmlNsPtr>;
 
-    while let Some(now) = cur {
-        let Some(q) = xml_copy_namespace(Some(now)) else {
-            if let Some(ret) = ret {
-                xml_free_ns_list(ret);
+        while let Some(now) = cur {
+            let Some(q) = xml_copy_namespace(Some(now)) else {
+                if let Some(ret) = ret {
+                    xml_free_ns_list(ret);
+                }
+                return None;
+            };
+            if let Some(mut l) = p {
+                l.next = Some(q);
+                p = Some(q);
+            } else {
+                ret = Some(q);
+                p = ret;
             }
-            return None;
-        };
-        if let Some(mut l) = p {
-            l.next = Some(q);
-            p = Some(q);
-        } else {
-            ret = Some(q);
-            p = ret;
+            cur = now.next;
         }
-        cur = now.next;
+        ret
     }
-    ret
 }
 
 static XML_CHECK_DTD: AtomicBool = AtomicBool::new(true);
@@ -2413,18 +2491,20 @@ unsafe fn xml_tree_err(
     node: Option<XmlGenericNodePtr>,
     extra: Option<&str>,
 ) {
-    let msg: Cow<'static, str> = match code {
-        XmlParserErrors::XmlTreeInvalidHex => "invalid hexadecimal character value\n".into(),
-        XmlParserErrors::XmlTreeInvalidDec => "invalid decimal character value\n".into(),
-        XmlParserErrors::XmlTreeUnterminatedEntity => format!(
-            "unterminated entity reference {}\n",
-            extra.expect("Internal Error")
-        )
-        .into(),
-        XmlParserErrors::XmlTreeNotUTF8 => "string is not in UTF-8\n".into(),
-        _ => "unexpected error number\n".into(),
-    };
-    __xml_simple_error!(XmlErrorDomain::XmlFromTree, code, node, &msg);
+    unsafe {
+        let msg: Cow<'static, str> = match code {
+            XmlParserErrors::XmlTreeInvalidHex => "invalid hexadecimal character value\n".into(),
+            XmlParserErrors::XmlTreeInvalidDec => "invalid decimal character value\n".into(),
+            XmlParserErrors::XmlTreeUnterminatedEntity => format!(
+                "unterminated entity reference {}\n",
+                extra.expect("Internal Error")
+            )
+            .into(),
+            XmlParserErrors::XmlTreeNotUTF8 => "string is not in UTF-8\n".into(),
+            _ => "unexpected error number\n".into(),
+        };
+        __xml_simple_error!(XmlErrorDomain::XmlFromTree, code, node, &msg);
+    }
 }
 
 const XHTML_STRICT_PUBLIC_ID: &str = "-//W3C//DTD XHTML 1.0 Strict//EN";
@@ -2437,9 +2517,9 @@ const XHTML_TRANS_SYSTEM_ID: &str = "http://www.w3.org/TR/xhtml1/DTD/xhtml1-tran
 /// Try to find if the document correspond to an XHTML DTD.
 #[doc(alias = "xmlIsXHTML")]
 pub fn is_xhtml(system_id: Option<&str>, public_id: Option<&str>) -> bool {
-    public_id.map_or(false, |s| {
+    public_id.is_some_and(|s| {
         s == XHTML_STRICT_PUBLIC_ID || s == XHTML_FRAME_PUBLIC_ID || s == XHTML_TRANS_PUBLIC_ID
-    }) || system_id.map_or(false, |s| {
+    }) || system_id.is_some_and(|s| {
         s == XHTML_STRICT_SYSTEM_ID || s == XHTML_FRAME_SYSTEM_ID || s == XHTML_TRANS_SYSTEM_ID
     })
 }
@@ -2486,14 +2566,16 @@ unsafe fn xml_tree_nslist_lookup_by_prefix(
     ns_list: Option<XmlNsPtr>,
     prefix: *const XmlChar,
 ) -> Option<XmlNsPtr> {
-    let mut ns = ns_list;
-    while let Some(now) = ns {
-        if prefix == now.prefix || xml_str_equal(prefix, now.prefix) {
-            return ns;
+    unsafe {
+        let mut ns = ns_list;
+        while let Some(now) = ns {
+            if prefix == now.prefix || xml_str_equal(prefix, now.prefix) {
+                return ns;
+            }
+            ns = now.next;
         }
-        ns = now.next;
+        None
     }
-    None
 }
 
 /// Dynamically searches for a ns-declaration which matches
@@ -2507,49 +2589,52 @@ unsafe fn xml_search_ns_by_prefix_strict(
     prefix: *const XmlChar,
     mut ret_ns: Option<&mut Option<XmlNsPtr>>,
 ) -> i32 {
-    if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
-        return -1;
-    }
+    unsafe {
+        if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return -1;
+        }
 
-    if let Some(ret_ns) = ret_ns.as_deref_mut() {
-        *ret_ns = None;
-    }
-    if IS_STR_XML!(prefix) {
-        if let Some(ret_ns) = ret_ns {
-            *ret_ns = doc.ensure_xmldecl();
-            if ret_ns.is_none() {
-                return -1;
-            }
+        if let Some(ret_ns) = ret_ns.as_deref_mut() {
+            *ret_ns = None;
         }
-        return 1;
-    }
-    let mut cur = Some(node);
-    while let Some(cur_node) = cur.filter(|&cur| cur.document().map(|doc| doc.into()) != Some(cur))
-    {
-        if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
-            let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-            let mut ns = cur_node.ns_def;
-            while let Some(now) = ns {
-                if prefix == now.prefix || xml_str_equal(prefix, now.prefix) {
-                    // Disabled namespaces, e.g. xmlns:abc="".
-                    if now.href.is_null() {
-                        return 0;
-                    }
-                    if let Some(ret_ns) = ret_ns {
-                        *ret_ns = ns;
-                    }
-                    return 1;
+        if IS_STR_XML!(prefix) {
+            if let Some(ret_ns) = ret_ns {
+                *ret_ns = doc.ensure_xmldecl();
+                if ret_ns.is_none() {
+                    return -1;
                 }
-                ns = now.next;
             }
-        } else if (matches!(cur_node.element_type(), XmlElementType::XmlEntityNode)
-            || matches!(cur_node.element_type(), XmlElementType::XmlEntityDecl))
-        {
-            return 0;
+            return 1;
         }
-        cur = cur_node.parent();
+        let mut cur = Some(node);
+        while let Some(cur_node) =
+            cur.filter(|&cur| cur.document().map(|doc| doc.into()) != Some(cur))
+        {
+            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+                let mut ns = cur_node.ns_def;
+                while let Some(now) = ns {
+                    if prefix == now.prefix || xml_str_equal(prefix, now.prefix) {
+                        // Disabled namespaces, e.g. xmlns:abc="".
+                        if now.href.is_null() {
+                            return 0;
+                        }
+                        if let Some(ret_ns) = ret_ns {
+                            *ret_ns = ns;
+                        }
+                        return 1;
+                    }
+                    ns = now.next;
+                }
+            } else if (matches!(cur_node.element_type(), XmlElementType::XmlEntityNode)
+                || matches!(cur_node.element_type(), XmlElementType::XmlEntityDecl))
+            {
+                return 0;
+            }
+            cur = cur_node.parent();
+        }
+        0
     }
-    0
 }
 
 /// Dynamically searches for a ns-declaration which matches
@@ -2564,97 +2649,100 @@ unsafe fn xml_search_ns_by_namespace_strict(
     ret_ns: &mut Option<XmlNsPtr>,
     prefixed: i32,
 ) -> i32 {
-    if ns_name.is_null() {
-        return -1;
-    }
-    // if node.is_null() {
-    //     return -1;
-    // }
-    if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
-        return -1;
-    }
-
-    *ret_ns = None;
-    if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) {
-        *ret_ns = doc.ensure_xmldecl();
-        if ret_ns.is_none() {
+    unsafe {
+        if ns_name.is_null() {
             return -1;
         }
-        return 1;
-    }
-    let mut cur = Some(node);
-    let mut prev: Option<XmlNodePtr> = None;
-    let mut out = None;
-    while let Some(cur_node) = cur.filter(|&cur| Some(cur) != cur.document().map(|doc| doc.into()))
-    {
-        if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
-            let cur = XmlNodePtr::try_from(cur_node).unwrap();
-            if cur.ns_def.is_some() {
-                let mut ns = cur.ns_def;
-                while let Some(now) = ns {
-                    if prefixed != 0 && now.prefix().is_none() {
-                        ns = now.next;
-                        continue;
-                    }
-                    if let Some(prev) = prev {
-                        // Check the last level of ns-decls for a
-                        // shadowing prefix.
-                        let mut prevns = prev.ns_def;
-                        while let Some(pns) = prevns {
-                            if pns.prefix() == now.prefix()
-                                || (pns.prefix().is_some()
-                                    && now.prefix().is_some()
-                                    && pns.prefix() == now.prefix())
-                            {
-                                // Shadowed.
-                                break;
-                            }
-                            prevns = pns.next;
-                        }
-                        if prevns.is_some() {
+        // if node.is_null() {
+        //     return -1;
+        // }
+        if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return -1;
+        }
+
+        *ret_ns = None;
+        if xml_str_equal(ns_name, XML_XML_NAMESPACE.as_ptr() as _) {
+            *ret_ns = doc.ensure_xmldecl();
+            if ret_ns.is_none() {
+                return -1;
+            }
+            return 1;
+        }
+        let mut cur = Some(node);
+        let mut prev: Option<XmlNodePtr> = None;
+        let mut out = None;
+        while let Some(cur_node) =
+            cur.filter(|&cur| Some(cur) != cur.document().map(|doc| doc.into()))
+        {
+            if matches!(cur_node.element_type(), XmlElementType::XmlElementNode) {
+                let cur = XmlNodePtr::try_from(cur_node).unwrap();
+                if cur.ns_def.is_some() {
+                    let mut ns = cur.ns_def;
+                    while let Some(now) = ns {
+                        if prefixed != 0 && now.prefix().is_none() {
                             ns = now.next;
                             continue;
                         }
-                    }
-                    // Ns-name comparison.
-                    if ns_name == now.href || xml_str_equal(ns_name, now.href) {
-                        // At this point the prefix can only be shadowed,
-                        // if we are the the (at least) 3rd level of ns-decls.
-                        if out.is_some() {
-                            let ret: i32 = xml_ns_in_scope(
-                                Some(doc),
-                                Some(node),
-                                prev.map(|prev| prev.into()),
-                                now.prefix,
-                            );
-                            if ret < 0 {
-                                return -1;
+                        if let Some(prev) = prev {
+                            // Check the last level of ns-decls for a
+                            // shadowing prefix.
+                            let mut prevns = prev.ns_def;
+                            while let Some(pns) = prevns {
+                                if pns.prefix() == now.prefix()
+                                    || (pns.prefix().is_some()
+                                        && now.prefix().is_some()
+                                        && pns.prefix() == now.prefix())
+                                {
+                                    // Shadowed.
+                                    break;
+                                }
+                                prevns = pns.next;
                             }
-                            // TODO: Should we try to find a matching ns-name
-                            // only once? This here keeps on searching.
-                            // I think we should try further since, there might
-                            // be an other matching ns-decl with an unshadowed
-                            // prefix.
-                            if ret == 0 {
+                            if prevns.is_some() {
                                 ns = now.next;
                                 continue;
                             }
                         }
-                        *ret_ns = ns;
-                        return 1;
+                        // Ns-name comparison.
+                        if ns_name == now.href || xml_str_equal(ns_name, now.href) {
+                            // At this point the prefix can only be shadowed,
+                            // if we are the the (at least) 3rd level of ns-decls.
+                            if out.is_some() {
+                                let ret: i32 = xml_ns_in_scope(
+                                    Some(doc),
+                                    Some(node),
+                                    prev.map(|prev| prev.into()),
+                                    now.prefix,
+                                );
+                                if ret < 0 {
+                                    return -1;
+                                }
+                                // TODO: Should we try to find a matching ns-name
+                                // only once? This here keeps on searching.
+                                // I think we should try further since, there might
+                                // be an other matching ns-decl with an unshadowed
+                                // prefix.
+                                if ret == 0 {
+                                    ns = now.next;
+                                    continue;
+                                }
+                            }
+                            *ret_ns = ns;
+                            return 1;
+                        }
                     }
+                    out = prev;
+                    prev = Some(cur);
                 }
-                out = prev;
-                prev = Some(cur);
+            } else if (matches!(cur_node.element_type(), XmlElementType::XmlEntityNode)
+                || matches!(cur_node.element_type(), XmlElementType::XmlEntityDecl))
+            {
+                return 0;
             }
-        } else if (matches!(cur_node.element_type(), XmlElementType::XmlEntityNode)
-            || matches!(cur_node.element_type(), XmlElementType::XmlEntityDecl))
-        {
-            return 0;
+            cur = cur_node.parent();
         }
-        cur = cur_node.parent();
+        0
     }
-    0
 }
 
 #[cfg(test)]

@@ -27,18 +27,18 @@ use std::{
 };
 
 use libc::{
-    addrinfo, bind, close, connect, fd_set, freeaddrinfo, getaddrinfo, getenv, getsockname,
-    hostent, in6_addr, listen, memcpy, memmove, memset, recv, select, send, snprintf, sockaddr_in,
-    sockaddr_in6, sockaddr_storage, socket, socklen_t, sscanf, strchr, strcmp, strlen, strncmp,
-    timeval, AF_INET, AF_INET6, FD_SET, FD_ZERO, IPPROTO_TCP, SOCK_STREAM,
+    AF_INET, AF_INET6, FD_SET, FD_ZERO, IPPROTO_TCP, SOCK_STREAM, addrinfo, bind, close, connect,
+    fd_set, freeaddrinfo, getaddrinfo, getenv, getsockname, hostent, in6_addr, listen, memcpy,
+    memmove, memset, recv, select, send, snprintf, sockaddr_in, sockaddr_in6, sockaddr_storage,
+    socket, socklen_t, sscanf, strchr, strcmp, strlen, strncmp, timeval,
 };
 
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
+    error::{__xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     io::__xml_ioerr,
     libxml::{
         globals::{xml_free, xml_malloc, xml_mem_strdup},
-        uri::{xml_free_uri, xml_parse_uri_raw, xml_uri_unescape_string, XmlURIPtr},
+        uri::{XmlURIPtr, xml_free_uri, xml_parse_uri_raw, xml_uri_unescape_string},
         xmlstring::xml_strndup,
     },
 };

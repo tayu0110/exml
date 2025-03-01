@@ -21,13 +21,13 @@
 // http://www.fortran-2000.com/ArnaudRecipes/sharedlib.html
 
 use std::{
-    ffi::{c_char, CStr, CString},
+    ffi::{CStr, CString, c_char},
     mem::size_of,
     os::raw::c_void,
     ptr::{null, null_mut},
 };
 
-use libc::{dlclose, dlerror, dlopen, dlsym, memset, RTLD_GLOBAL, RTLD_NOW};
+use libc::{RTLD_GLOBAL, RTLD_NOW, dlclose, dlerror, dlopen, dlsym, memset};
 
 use crate::error::__xml_raise_error;
 
@@ -57,38 +57,40 @@ pub enum XmlModuleOption {
 /// Handle an out of memory condition
 #[doc(alias = "xmlModuleErrMemory")]
 unsafe fn xml_module_err_memory(module: XmlModulePtr, extra: &str) {
-    let mut name: *const c_char = null();
+    unsafe {
+        let mut name: *const c_char = null();
 
-    if !module.is_null() {
-        name = (*module).name as _;
+        if !module.is_null() {
+            name = (*module).name as _;
+        }
+
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            None,
+            XmlErrorDomain::XmlFromModule,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            Some(extra.to_owned().into()),
+            (!name.is_null()).then(|| CStr::from_ptr(name).to_string_lossy().into_owned().into()),
+            None,
+            0,
+            0,
+            "Memory allocation failed : {}\n",
+            extra
+        );
     }
-
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        null_mut(),
-        None,
-        XmlErrorDomain::XmlFromModule,
-        XmlParserErrors::XmlErrNoMemory,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        Some(extra.to_owned().into()),
-        (!name.is_null()).then(|| CStr::from_ptr(name).to_string_lossy().into_owned().into()),
-        None,
-        0,
-        0,
-        "Memory allocation failed : {}\n",
-        extra
-    );
 }
 
 /// Returns a handle on success, and zero on error.
 #[doc(alias = "xmlModulePlatformOpen")]
 #[cfg(not(target_os = "windows"))]
 unsafe fn xml_module_platform_open(name: *const c_char) -> *mut c_void {
-    dlopen(name, RTLD_GLOBAL | RTLD_NOW)
+    unsafe { dlopen(name, RTLD_GLOBAL | RTLD_NOW) }
 }
 
 // returns a handle on success, and zero on error.
@@ -109,43 +111,45 @@ unsafe fn xml_module_platform_open(name: *const c_char) -> *mut c_void {
 /// Returns a handle for the module or NULL in case of error
 #[doc(alias = "xmlModuleOpen")]
 pub unsafe fn xml_module_open(name: &str, _options: i32) -> XmlModulePtr {
-    let module: XmlModulePtr = xml_malloc(size_of::<XmlModule>()) as XmlModulePtr;
-    if module.is_null() {
-        xml_module_err_memory(null_mut(), "creating module");
-        return null_mut();
+    unsafe {
+        let module: XmlModulePtr = xml_malloc(size_of::<XmlModule>()) as XmlModulePtr;
+        if module.is_null() {
+            xml_module_err_memory(null_mut(), "creating module");
+            return null_mut();
+        }
+
+        memset(module as _, 0, size_of::<XmlModule>());
+
+        let cname = CString::new(name).unwrap();
+        (*module).handle = xml_module_platform_open(cname.as_ptr());
+
+        if (*module).handle.is_null() {
+            xml_free(module as _);
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                null_mut(),
+                None,
+                XmlErrorDomain::XmlFromModule,
+                XmlParserErrors::XmlModuleOpen,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                None,
+                Some(name.to_owned().into()),
+                None,
+                0,
+                0,
+                "failed to open {}\n",
+                name
+            );
+            return null_mut();
+        }
+
+        (*module).name = xml_strdup(cname.as_ptr() as _);
+        module
     }
-
-    memset(module as _, 0, size_of::<XmlModule>());
-
-    let cname = CString::new(name).unwrap();
-    (*module).handle = xml_module_platform_open(cname.as_ptr());
-
-    if (*module).handle.is_null() {
-        xml_free(module as _);
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromModule,
-            XmlParserErrors::XmlModuleOpen,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            Some(name.to_owned().into()),
-            None,
-            0,
-            0,
-            "failed to open {}\n",
-            name
-        );
-        return null_mut();
-    }
-
-    (*module).name = xml_strdup(cname.as_ptr() as _);
-    module
 }
 
 // http://www.opengroup.org/onlinepubs/009695399/functions/dlsym.html
@@ -157,11 +161,13 @@ unsafe extern "C" fn xml_module_platform_symbol(
     name: *const c_char,
     symbol: *mut *mut c_void,
 ) -> i32 {
-    *symbol = dlsym(handle, name);
-    if !dlerror().is_null() {
-        return -1;
+    unsafe {
+        *symbol = dlsym(handle, name);
+        if !dlerror().is_null() {
+            return -1;
+        }
+        0
     }
-    0
 }
 
 // http://msdn.microsoft.com/library/default.asp?url=/library/en-us/dllproc/base/getprocaddress.asp
@@ -191,64 +197,66 @@ pub unsafe extern "C" fn xml_module_symbol(
     name: *const c_char,
     symbol: *mut *mut c_void,
 ) -> i32 {
-    let mut rc: i32 = -1;
+    unsafe {
+        let mut rc: i32 = -1;
 
-    if module.is_null() || symbol.is_null() || name.is_null() {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromModule,
-            XmlParserErrors::XmlModuleOpen,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            "null parameter\n",
-        );
-        return rc;
+        if module.is_null() || symbol.is_null() || name.is_null() {
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                null_mut(),
+                None,
+                XmlErrorDomain::XmlFromModule,
+                XmlParserErrors::XmlModuleOpen,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                None,
+                None,
+                None,
+                0,
+                0,
+                "null parameter\n",
+            );
+            return rc;
+        }
+
+        rc = xml_module_platform_symbol((*module).handle, name, symbol);
+
+        let name = CStr::from_ptr(name).to_string_lossy().into_owned();
+        if rc == -1 {
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                null_mut(),
+                None,
+                XmlErrorDomain::XmlFromModule,
+                XmlParserErrors::XmlModuleOpen,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                None,
+                Some(name.clone().into()),
+                None,
+                0,
+                0,
+                "failed to find symbol: {}\n",
+                name
+            );
+            return rc;
+        }
+
+        rc
     }
-
-    rc = xml_module_platform_symbol((*module).handle, name, symbol);
-
-    let name = CStr::from_ptr(name).to_string_lossy().into_owned();
-    if rc == -1 {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromModule,
-            XmlParserErrors::XmlModuleOpen,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            Some(name.clone().into()),
-            None,
-            0,
-            0,
-            "failed to find symbol: {}\n",
-            name
-        );
-        return rc;
-    }
-
-    rc
 }
 
 /// Returns 0 on success, and non-zero on error.
 #[doc(alias = "xmlModulePlatformClose")]
 #[cfg(not(target_os = "windows"))]
 unsafe extern "C" fn xml_module_platform_close(handle: *mut c_void) -> i32 {
-    dlclose(handle)
+    unsafe { dlclose(handle) }
 }
 
 /// Returns 0 on success, and non-zero on error.
@@ -269,57 +277,59 @@ unsafe extern "C" fn xml_module_platform_close(handle: *mut c_void) -> i32 {
 /// if the module could not be closed/unloaded.
 #[doc(alias = "xmlModuleClose")]
 pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
-    if module.is_null() {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromModule,
-            XmlParserErrors::XmlModuleClose,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            "null module pointer\n",
-        );
-        return -1;
+    unsafe {
+        if module.is_null() {
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                null_mut(),
+                None,
+                XmlErrorDomain::XmlFromModule,
+                XmlParserErrors::XmlModuleClose,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                None,
+                None,
+                None,
+                0,
+                0,
+                "null module pointer\n",
+            );
+            return -1;
+        }
+
+        let rc: i32 = xml_module_platform_close((*module).handle);
+
+        let name = CStr::from_ptr((*module).name as *const i8)
+            .to_string_lossy()
+            .into_owned();
+        if rc != 0 {
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                null_mut(),
+                None,
+                XmlErrorDomain::XmlFromModule,
+                XmlParserErrors::XmlModuleClose,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                None,
+                Some(name.clone().into()),
+                None,
+                0,
+                0,
+                "failed to close: {}\n",
+                name
+            );
+            return -2;
+        }
+
+        xml_module_free(module)
     }
-
-    let rc: i32 = xml_module_platform_close((*module).handle);
-
-    let name = CStr::from_ptr((*module).name as *const i8)
-        .to_string_lossy()
-        .into_owned();
-    if rc != 0 {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromModule,
-            XmlParserErrors::XmlModuleClose,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            Some(name.clone().into()),
-            None,
-            0,
-            0,
-            "failed to close: {}\n",
-            name
-        );
-        return -2;
-    }
-
-    xml_module_free(module)
 }
 
 /// The free operations free the data associated to the module
@@ -328,32 +338,34 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
 /// Returns 0 in case of success, -1 in case of argument error
 #[doc(alias = "xmlModuleFree")]
 pub unsafe extern "C" fn xml_module_free(module: XmlModulePtr) -> i32 {
-    if module.is_null() {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            None,
-            XmlErrorDomain::XmlFromModule,
-            XmlParserErrors::XmlModuleClose,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            "null module pointer\n",
-        );
-        return -1;
+    unsafe {
+        if module.is_null() {
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                null_mut(),
+                None,
+                XmlErrorDomain::XmlFromModule,
+                XmlParserErrors::XmlModuleClose,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                None,
+                None,
+                None,
+                0,
+                0,
+                "null module pointer\n",
+            );
+            return -1;
+        }
+
+        xml_free((*module).name as _);
+        xml_free(module as _);
+
+        0
     }
-
-    xml_free((*module).name as _);
-    xml_free(module as _);
-
-    0
 }
 
 #[cfg(test)]

@@ -32,13 +32,13 @@ use crate::{
     libxml::{
         htmltree::html_node_dump_output,
         parser::xml_init_parser,
-        xmlstring::{xml_strndup, XmlChar},
+        xmlstring::{XmlChar, xml_strndup},
     },
     save::{
-        xhtml_node_dump_output, xml_node_dump_output_internal, xml_save_err, xml_save_err_memory,
-        XmlSaveCtxt, XmlSaveOption,
+        XmlSaveCtxt, XmlSaveOption, xhtml_node_dump_output, xml_node_dump_output_internal,
+        xml_save_err, xml_save_err_memory,
     },
-    tree::{is_xhtml, XmlNodePtr},
+    tree::{XmlNodePtr, is_xhtml},
 };
 
 use super::{XmlDoc, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode};
@@ -58,79 +58,82 @@ impl XmlDoc {
         txt_encoding: Option<&str>,
         format: i32,
     ) {
-        let mut ctxt = XmlSaveCtxt::default();
-        let mut dummy: i32 = 0;
+        unsafe {
+            let mut ctxt = XmlSaveCtxt::default();
+            let mut dummy: i32 = 0;
 
-        if doc_txt_len.is_null() {
-            doc_txt_len = &raw mut dummy; /*  Continue, caller just won't get length */
-        }
+            if doc_txt_len.is_null() {
+                doc_txt_len = &raw mut dummy; /*  Continue, caller just won't get length */
+            }
 
-        if doc_txt_ptr.is_null() {
+            if doc_txt_ptr.is_null() {
+                *doc_txt_len = 0;
+                return;
+            }
+
+            *doc_txt_ptr = null_mut();
             *doc_txt_len = 0;
-            return;
-        }
 
-        *doc_txt_ptr = null_mut();
-        *doc_txt_len = 0;
+            // Validate the encoding value, if provided.
+            // This logic is copied from xmlSaveFileEnc.
+            let encoding = txt_encoding.map_or_else(
+                || self.encoding.as_ref().map(|e| e.to_owned()),
+                |e| Some(e.to_owned()),
+            );
+            let conv_hdlr = if let Some(encoding) = encoding.as_deref() {
+                let Some(handler) = find_encoding_handler(encoding) else {
+                    xml_save_err(
+                        XmlParserErrors::XmlSaveUnknownEncoding,
+                        XmlGenericNodePtr::from_raw(self),
+                        Some(encoding),
+                    );
+                    return;
+                };
+                Some(handler)
+            } else {
+                None
+            };
 
-        // Validate the encoding value, if provided.
-        // This logic is copied from xmlSaveFileEnc.
-        let encoding = txt_encoding.map_or_else(
-            || self.encoding.as_ref().map(|e| e.to_owned()),
-            |e| Some(e.to_owned()),
-        );
-        let conv_hdlr = if let Some(encoding) = encoding.as_deref() {
-            let Some(handler) = find_encoding_handler(encoding) else {
-                xml_save_err(
-                    XmlParserErrors::XmlSaveUnknownEncoding,
-                    XmlGenericNodePtr::from_raw(self),
-                    Some(encoding),
-                );
+            let Some(out_buff) =
+                XmlOutputBuffer::new(conv_hdlr).map(|buf| Rc::new(RefCell::new(buf)))
+            else {
+                xml_save_err_memory("creating buffer");
                 return;
             };
-            Some(handler)
-        } else {
-            None
-        };
 
-        let Some(out_buff) = XmlOutputBuffer::new(conv_hdlr).map(|buf| Rc::new(RefCell::new(buf)))
-        else {
-            xml_save_err_memory("creating buffer");
-            return;
-        };
+            ctxt.buf = out_buff.clone();
+            ctxt.level = 0;
+            ctxt.format = (format != 0) as i32;
+            ctxt.encoding = encoding;
+            ctxt.init();
+            ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
+            ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
+            out_buff.borrow_mut().flush();
+            if let Some(conv) = out_buff.borrow().conv {
+                *doc_txt_len = conv.len() as i32;
+                *doc_txt_ptr = xml_strndup(
+                    if conv.is_ok() {
+                        conv.as_ref().as_ptr()
+                    } else {
+                        null()
+                    },
+                    *doc_txt_len,
+                );
+            } else {
+                *doc_txt_len = out_buff.borrow().buffer.map_or(0, |buf| buf.len() as i32);
+                *doc_txt_ptr = xml_strndup(
+                    out_buff
+                        .borrow()
+                        .buffer
+                        .map_or(null(), |buf| buf.as_ref().as_ptr()),
+                    *doc_txt_len,
+                );
+            }
 
-        ctxt.buf = out_buff.clone();
-        ctxt.level = 0;
-        ctxt.format = (format != 0) as i32;
-        ctxt.encoding = encoding;
-        ctxt.init();
-        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
-        out_buff.borrow_mut().flush();
-        if let Some(conv) = out_buff.borrow().conv {
-            *doc_txt_len = conv.len() as i32;
-            *doc_txt_ptr = xml_strndup(
-                if conv.is_ok() {
-                    conv.as_ref().as_ptr()
-                } else {
-                    null()
-                },
-                *doc_txt_len,
-            );
-        } else {
-            *doc_txt_len = out_buff.borrow().buffer.map_or(0, |buf| buf.len() as i32);
-            *doc_txt_ptr = xml_strndup(
-                out_buff
-                    .borrow()
-                    .buffer
-                    .map_or(null(), |buf| buf.as_ref().as_ptr()),
-                *doc_txt_len,
-            );
-        }
-
-        if (*doc_txt_ptr).is_null() && *doc_txt_len > 0 {
-            *doc_txt_len = 0;
-            xml_save_err_memory("creating output");
+            if (*doc_txt_ptr).is_null() && *doc_txt_len > 0 {
+                *doc_txt_len = 0;
+                xml_save_err_memory("creating output");
+            }
         }
     }
 
@@ -146,7 +149,9 @@ impl XmlDoc {
         size: *mut i32,
         format: i32,
     ) {
-        self.dump_format_memory_enc(mem, size, None, format);
+        unsafe {
+            self.dump_format_memory_enc(mem, size, None, format);
+        }
     }
 
     /// Dump an XML document in memory and return the `*mut XmlChar` and it's size in bytes.   
@@ -156,7 +161,9 @@ impl XmlDoc {
     /// included in the returned size.
     #[doc(alias = "xmlDocDumpMemory")]
     pub unsafe fn dump_memory(&mut self, mem: *mut *mut XmlChar, size: *mut i32) {
-        self.dump_format_memory_enc(mem, size, None, 0);
+        unsafe {
+            self.dump_format_memory_enc(mem, size, None, 0);
+        }
     }
 
     /// Dump the current DOM tree into memory using the character encoding specified by the caller.  
@@ -169,7 +176,9 @@ impl XmlDoc {
         doc_txt_len: *mut i32,
         txt_encoding: Option<&str>,
     ) {
-        self.dump_format_memory_enc(doc_txt_ptr, doc_txt_len, txt_encoding, 0);
+        unsafe {
+            self.dump_format_memory_enc(doc_txt_ptr, doc_txt_len, txt_encoding, 0);
+        }
     }
 
     /// Dump an XML document to an open FILE.
@@ -180,47 +189,49 @@ impl XmlDoc {
     /// or `xmlKeepBlanksDefault(0)` was called
     #[doc(alias = "xmlDocFormatDump")]
     pub unsafe fn dump_format_file(&mut self, f: &mut impl Write, format: i32) -> i32 {
-        let mut encoding = self.encoding.clone();
+        unsafe {
+            let mut encoding = self.encoding.clone();
 
-        let handler = if let Some(enc) = self.encoding.as_deref() {
-            if let Some(handler) = find_encoding_handler(enc) {
-                Some(handler)
+            let handler = if let Some(enc) = self.encoding.as_deref() {
+                if let Some(handler) = find_encoding_handler(enc) {
+                    Some(handler)
+                } else {
+                    self.encoding = None;
+                    encoding = None;
+                    None
+                }
             } else {
-                self.encoding = None;
-                encoding = None;
                 None
+            };
+            let Some(buf) =
+                XmlOutputBuffer::from_writer(f, handler).map(|buf| Rc::new(RefCell::new(buf)))
+            else {
+                return -1;
+            };
+
+            let mut ctxt = XmlSaveCtxt {
+                buf,
+                level: 0,
+                format: (format != 0) as i32,
+                encoding,
+                handler: None,
+                filename: None,
+                ..Default::default()
+            };
+            ctxt.init();
+            ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
+            ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
+
+            let buf = ctxt.buf.clone();
+            drop(ctxt);
+            let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
+
+            if buf.error.is_ok() {
+                buf.flush();
+                buf.written
+            } else {
+                -1
             }
-        } else {
-            None
-        };
-        let Some(buf) =
-            XmlOutputBuffer::from_writer(f, handler).map(|buf| Rc::new(RefCell::new(buf)))
-        else {
-            return -1;
-        };
-
-        let mut ctxt = XmlSaveCtxt {
-            buf,
-            level: 0,
-            format: (format != 0) as i32,
-            encoding,
-            handler: None,
-            filename: None,
-            ..Default::default()
-        };
-        ctxt.init();
-        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
-
-        let buf = ctxt.buf.clone();
-        drop(ctxt);
-        let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
-
-        if buf.error.is_ok() {
-            buf.flush();
-            buf.written
-        } else {
-            -1
         }
     }
 
@@ -229,7 +240,7 @@ impl XmlDoc {
     /// returns: the number of bytes written or -1 in case of failure.
     #[doc(alias = "xmlDocDump")]
     pub unsafe fn dump_file<'a>(&mut self, f: &mut (impl Write + 'a)) -> i32 {
-        self.dump_format_file(f, 0)
+        unsafe { self.dump_format_file(f, 0) }
     }
 
     /// Dump an XML document to a file or an URL.
@@ -245,50 +256,52 @@ impl XmlDoc {
         encoding: Option<&str>,
         format: i32,
     ) -> i32 {
-        let encoding = encoding.map_or_else(
-            || self.encoding.as_ref().map(|e| e.to_owned()),
-            |e| Some(e.to_owned()),
-        );
-        let handler = if let Some(enc) = encoding.as_deref() {
-            let Some(handler) = find_encoding_handler(enc) else {
+        unsafe {
+            let encoding = encoding.map_or_else(
+                || self.encoding.as_ref().map(|e| e.to_owned()),
+                |e| Some(e.to_owned()),
+            );
+            let handler = if let Some(enc) = encoding.as_deref() {
+                let Some(handler) = find_encoding_handler(enc) else {
+                    return -1;
+                };
+                Some(handler)
+            } else {
+                None
+            };
+
+            // save the content to a temp buffer.
+            let Some(buf) = XmlOutputBuffer::from_uri(
+                filename,
+                handler.map(|e| Rc::new(RefCell::new(e))),
+                self.compression,
+            )
+            .map(|buf| Rc::new(RefCell::new(buf))) else {
                 return -1;
             };
-            Some(handler)
-        } else {
-            None
-        };
+            let mut ctxt = XmlSaveCtxt {
+                buf,
+                level: 0,
+                format: (format != 0) as i32,
+                encoding,
+                handler: None,
+                filename: None,
+                ..Default::default()
+            };
+            ctxt.init();
+            ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
 
-        // save the content to a temp buffer.
-        let Some(buf) = XmlOutputBuffer::from_uri(
-            filename,
-            handler.map(|e| Rc::new(RefCell::new(e))),
-            self.compression,
-        )
-        .map(|buf| Rc::new(RefCell::new(buf))) else {
-            return -1;
-        };
-        let mut ctxt = XmlSaveCtxt {
-            buf,
-            level: 0,
-            format: (format != 0) as i32,
-            encoding,
-            handler: None,
-            filename: None,
-            ..Default::default()
-        };
-        ctxt.init();
-        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
+            ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
 
-        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
-
-        let buf = ctxt.buf.clone();
-        drop(ctxt);
-        let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
-        if buf.error.is_ok() {
-            buf.flush();
-            buf.written
-        } else {
-            -1
+            let buf = ctxt.buf.clone();
+            drop(ctxt);
+            let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
+            if buf.error.is_ok() {
+                buf.flush();
+                buf.written
+            } else {
+                -1
+            }
         }
     }
 
@@ -303,7 +316,7 @@ impl XmlDoc {
     /// returns: the number of bytes written or -1 in case of failure.
     #[doc(alias = "xmlSaveFormatFile")]
     pub unsafe fn save_format_file(&mut self, filename: &str, format: i32) -> i32 {
-        self.save_format_file_enc(filename, None, format)
+        unsafe { self.save_format_file_enc(filename, None, format) }
     }
 
     /// Dump an XML document, converting it to the given encoding.
@@ -311,7 +324,7 @@ impl XmlDoc {
     /// returns: the number of bytes written or -1 in case of failure.
     #[doc(alias = "xmlSaveFileEnc")]
     pub unsafe fn save_file_enc(&mut self, filename: &str, encoding: Option<&str>) -> i32 {
-        self.save_format_file_enc(filename, encoding, 0)
+        unsafe { self.save_format_file_enc(filename, encoding, 0) }
     }
 
     /// Dump an XML document to a file. Will use compression if compiled in and enabled.  
@@ -320,7 +333,7 @@ impl XmlDoc {
     /// returns: the number of bytes written or -1 in case of failure.
     #[doc(alias = "xmlSaveFile")]
     pub unsafe fn save_file(&mut self, filename: &str) -> i32 {
-        self.save_format_file_enc(filename, None, 0)
+        unsafe { self.save_format_file_enc(filename, None, 0) }
     }
 
     /// Dump an XML document to an I/O buffer.
@@ -336,32 +349,34 @@ impl XmlDoc {
         encoding: Option<&str>,
         format: i32,
     ) -> i32 {
-        if !matches!(
-            self.typ,
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
-        ) {
-            return -1;
-        }
-        let mut ctxt = XmlSaveCtxt {
-            buf: Rc::new(RefCell::new(buf)),
-            level: 0,
-            format: (format != 0) as i32,
-            encoding: encoding.map(|e| e.to_owned()),
-            handler: None,
-            filename: None,
-            ..Default::default()
-        };
-        ctxt.init();
-        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
-        let buf = ctxt.buf.clone();
-        drop(ctxt);
-        let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
-        if buf.error.is_ok() {
-            buf.flush();
-            buf.written
-        } else {
-            -1
+        unsafe {
+            if !matches!(
+                self.typ,
+                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
+            ) {
+                return -1;
+            }
+            let mut ctxt = XmlSaveCtxt {
+                buf: Rc::new(RefCell::new(buf)),
+                level: 0,
+                format: (format != 0) as i32,
+                encoding: encoding.map(|e| e.to_owned()),
+                handler: None,
+                filename: None,
+                ..Default::default()
+            };
+            ctxt.init();
+            ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
+            ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
+            let buf = ctxt.buf.clone();
+            drop(ctxt);
+            let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
+            if buf.error.is_ok() {
+                buf.flush();
+                buf.written
+            } else {
+                -1
+            }
         }
     }
 
@@ -377,26 +392,28 @@ impl XmlDoc {
         buf: Rc<RefCell<XmlOutputBuffer>>,
         encoding: Option<&str>,
     ) -> i32 {
-        let mut ctxt = XmlSaveCtxt {
-            buf,
-            level: 0,
-            format: 0,
-            encoding: encoding.map(|e| e.to_owned()),
-            handler: None,
-            filename: None,
-            ..Default::default()
-        };
-        ctxt.init();
-        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
-        let buf = ctxt.buf.clone();
-        drop(ctxt);
-        let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
-        if buf.error.is_ok() {
-            buf.flush();
-            buf.written
-        } else {
-            -1
+        unsafe {
+            let mut ctxt = XmlSaveCtxt {
+                buf,
+                level: 0,
+                format: 0,
+                encoding: encoding.map(|e| e.to_owned()),
+                handler: None,
+                filename: None,
+                ..Default::default()
+            };
+            ctxt.init();
+            ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
+            ctxt.doc_content_dump_output(XmlDocPtr::from_raw(self).unwrap().unwrap());
+            let buf = ctxt.buf.clone();
+            drop(ctxt);
+            let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
+            if buf.error.is_ok() {
+                buf.flush();
+                buf.written
+            } else {
+                -1
+            }
         }
     }
 }
@@ -415,81 +432,86 @@ impl XmlNode {
         format: i32,
         mut encoding: Option<&str>,
     ) {
-        xml_init_parser();
+        unsafe {
+            xml_init_parser();
 
-        if encoding.is_none() {
-            encoding = Some("UTF-8");
-        }
-
-        let mut ctxt = XmlSaveCtxt {
-            buf,
-            level,
-            format: (format != 0) as i32,
-            encoding: encoding.map(|e| e.to_owned()),
-            handler: None,
-            filename: None,
-            ..Default::default()
-        };
-        ctxt.init();
-        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-
-        #[cfg(feature = "html")]
-        {
-            let mut is_html = false;
-            let dtd = doc.and_then(|doc| doc.get_int_subset());
-            if let Some(dtd) = dtd {
-                is_html = is_xhtml(dtd.system_id.as_deref(), dtd.external_id.as_deref());
+            if encoding.is_none() {
+                encoding = Some("UTF-8");
             }
 
-            if is_html {
-                xhtml_node_dump_output(
-                    &mut ctxt,
-                    XmlNodePtr::from_raw(self).unwrap().unwrap().into(),
-                );
-            } else {
-                xml_node_dump_output_internal(
-                    &mut ctxt as _,
-                    XmlNodePtr::from_raw(self).unwrap().unwrap().into(),
-                );
+            let mut ctxt = XmlSaveCtxt {
+                buf,
+                level,
+                format: (format != 0) as i32,
+                encoding: encoding.map(|e| e.to_owned()),
+                handler: None,
+                filename: None,
+                ..Default::default()
+            };
+            ctxt.init();
+            ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
+
+            #[cfg(feature = "html")]
+            {
+                let mut is_html = false;
+                let dtd = doc.and_then(|doc| doc.get_int_subset());
+                if let Some(dtd) = dtd {
+                    is_html = is_xhtml(dtd.system_id.as_deref(), dtd.external_id.as_deref());
+                }
+
+                if is_html {
+                    xhtml_node_dump_output(
+                        &mut ctxt,
+                        XmlNodePtr::from_raw(self).unwrap().unwrap().into(),
+                    );
+                } else {
+                    xml_node_dump_output_internal(
+                        &mut ctxt as _,
+                        XmlNodePtr::from_raw(self).unwrap().unwrap().into(),
+                    );
+                }
             }
+            #[cfg(not(feature = "html"))]
+            {
+                xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
+            }
+            ctxt.buf.borrow_mut().flush();
         }
-        #[cfg(not(feature = "html"))]
-        {
-            xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
-        }
-        ctxt.buf.borrow_mut().flush();
     }
 
     /// Dump an XML/HTML node, recursive behaviour, children are printed too.
     #[doc(alias = "xmlElemDump")]
     pub unsafe fn dump_file<'a>(&mut self, f: &mut (impl Write + 'a), doc: Option<XmlDocPtr>) {
-        xml_init_parser();
+        unsafe {
+            xml_init_parser();
 
-        let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
-            return;
-        };
-        if let Some(doc) = doc.filter(|doc| matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode))
-        {
-            #[cfg(feature = "html")]
+            let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
+                return;
+            };
+            if let Some(doc) =
+                doc.filter(|doc| matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode))
             {
-                html_node_dump_output(
-                    &mut outbuf,
-                    Some(doc),
-                    XmlGenericNodePtr::from_raw(self).unwrap(),
-                    null_mut(),
-                );
+                #[cfg(feature = "html")]
+                {
+                    html_node_dump_output(
+                        &mut outbuf,
+                        Some(doc),
+                        XmlGenericNodePtr::from_raw(self).unwrap(),
+                        null_mut(),
+                    );
+                }
+                #[cfg(not(feature = "html"))]
+                {
+                    xml_save_err(
+                        XmlParserErrors::XmlErrInternalError,
+                        cur,
+                        "HTML support not compiled in\n",
+                    );
+                }
+                outbuf.flush();
+            } else {
+                self.dump_output(Rc::new(RefCell::new(outbuf)), doc, 0, 1, None);
             }
-            #[cfg(not(feature = "html"))]
-            {
-                xml_save_err(
-                    XmlParserErrors::XmlErrInternalError,
-                    cur,
-                    "HTML support not compiled in\n",
-                );
-            }
-            outbuf.flush();
-        } else {
-            self.dump_output(Rc::new(RefCell::new(outbuf)), doc, 0, 1, None);
         }
     }
 
@@ -508,16 +530,18 @@ impl XmlNode {
         level: i32,
         format: i32,
     ) -> usize {
-        xml_init_parser();
+        unsafe {
+            xml_init_parser();
 
-        let Some(outbuf) = XmlOutputBuffer::from_writer(&mut *buf, None) else {
-            return usize::MAX;
-        };
+            let Some(outbuf) = XmlOutputBuffer::from_writer(&mut *buf, None) else {
+                return usize::MAX;
+            };
 
-        let outbuf = Rc::new(RefCell::new(outbuf));
-        self.dump_output(outbuf.clone(), doc, level, format, None);
-        drop(outbuf);
-        buf.len()
+            let outbuf = Rc::new(RefCell::new(outbuf));
+            self.dump_output(outbuf.clone(), doc, level, format, None);
+            drop(outbuf);
+            buf.len()
+        }
     }
 }
 
@@ -535,70 +559,75 @@ impl XmlGenericNodePtr {
         format: i32,
         mut encoding: Option<&str>,
     ) {
-        xml_init_parser();
+        unsafe {
+            xml_init_parser();
 
-        if encoding.is_none() {
-            encoding = Some("UTF-8");
-        }
-
-        let mut ctxt = XmlSaveCtxt {
-            buf,
-            level,
-            format: (format != 0) as i32,
-            encoding: encoding.map(|e| e.to_owned()),
-            handler: None,
-            filename: None,
-            ..Default::default()
-        };
-        ctxt.init();
-        ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-
-        #[cfg(feature = "html")]
-        {
-            let mut is_html = false;
-            let dtd = doc.and_then(|doc| doc.get_int_subset());
-            if let Some(dtd) = dtd {
-                is_html = is_xhtml(dtd.system_id.as_deref(), dtd.external_id.as_deref());
+            if encoding.is_none() {
+                encoding = Some("UTF-8");
             }
 
-            if is_html {
-                xhtml_node_dump_output(&mut ctxt, self);
-            } else {
-                xml_node_dump_output_internal(&mut ctxt as _, self);
+            let mut ctxt = XmlSaveCtxt {
+                buf,
+                level,
+                format: (format != 0) as i32,
+                encoding: encoding.map(|e| e.to_owned()),
+                handler: None,
+                filename: None,
+                ..Default::default()
+            };
+            ctxt.init();
+            ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
+
+            #[cfg(feature = "html")]
+            {
+                let mut is_html = false;
+                let dtd = doc.and_then(|doc| doc.get_int_subset());
+                if let Some(dtd) = dtd {
+                    is_html = is_xhtml(dtd.system_id.as_deref(), dtd.external_id.as_deref());
+                }
+
+                if is_html {
+                    xhtml_node_dump_output(&mut ctxt, self);
+                } else {
+                    xml_node_dump_output_internal(&mut ctxt as _, self);
+                }
             }
+            #[cfg(not(feature = "html"))]
+            {
+                xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
+            }
+            ctxt.buf.borrow_mut().flush();
         }
-        #[cfg(not(feature = "html"))]
-        {
-            xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
-        }
-        ctxt.buf.borrow_mut().flush();
     }
 
     /// Dump an XML/HTML node, recursive behaviour, children are printed too.
     #[doc(alias = "xmlElemDump")]
     pub unsafe fn dump_file<'a>(self, f: &mut (impl Write + 'a), doc: Option<XmlDocPtr>) {
-        xml_init_parser();
+        unsafe {
+            xml_init_parser();
 
-        let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
-            return;
-        };
-        if let Some(doc) = doc.filter(|doc| matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode))
-        {
-            #[cfg(feature = "html")]
+            let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
+                return;
+            };
+            if let Some(doc) =
+                doc.filter(|doc| matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode))
             {
-                html_node_dump_output(&mut outbuf, Some(doc), self, null_mut());
+                #[cfg(feature = "html")]
+                {
+                    html_node_dump_output(&mut outbuf, Some(doc), self, null_mut());
+                }
+                #[cfg(not(feature = "html"))]
+                {
+                    xml_save_err(
+                        XmlParserErrors::XmlErrInternalError,
+                        cur,
+                        "HTML support not compiled in\n",
+                    );
+                }
+                outbuf.flush();
+            } else {
+                self.dump_output(Rc::new(RefCell::new(outbuf)), doc, 0, 1, None);
             }
-            #[cfg(not(feature = "html"))]
-            {
-                xml_save_err(
-                    XmlParserErrors::XmlErrInternalError,
-                    cur,
-                    "HTML support not compiled in\n",
-                );
-            }
-            outbuf.flush();
-        } else {
-            self.dump_output(Rc::new(RefCell::new(outbuf)), doc, 0, 1, None);
         }
     }
 
@@ -617,15 +646,17 @@ impl XmlGenericNodePtr {
         level: i32,
         format: i32,
     ) -> usize {
-        xml_init_parser();
+        unsafe {
+            xml_init_parser();
 
-        let Some(outbuf) = XmlOutputBuffer::from_writer(&mut *buf, None) else {
-            return usize::MAX;
-        };
+            let Some(outbuf) = XmlOutputBuffer::from_writer(&mut *buf, None) else {
+                return usize::MAX;
+            };
 
-        let outbuf = Rc::new(RefCell::new(outbuf));
-        self.dump_output(outbuf.clone(), doc, level, format, None);
-        drop(outbuf);
-        buf.len()
+            let outbuf = Rc::new(RefCell::new(outbuf));
+            self.dump_output(outbuf.clone(), doc, level, format, None);
+            drop(outbuf);
+            buf.len()
+        }
     }
 }

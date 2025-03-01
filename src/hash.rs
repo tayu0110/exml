@@ -32,7 +32,7 @@ use std::{
     ptr::NonNull,
 };
 
-use anyhow::{anyhow, bail, ensure, Context};
+use anyhow::{Context, anyhow, bail, ensure};
 
 use crate::libxml::parser::xml_init_parser;
 
@@ -187,7 +187,7 @@ struct XmlHashEntry<'a, T> {
     payload: Option<T>,
 }
 
-impl<'a, T> Default for XmlHashEntry<'a, T> {
+impl<T> Default for XmlHashEntry<'_, T> {
     fn default() -> Self {
         Self {
             next: None,
@@ -214,13 +214,13 @@ impl<'a, T> XmlHashEntryRef<'a, T> {
     }
 }
 
-impl<'a, T> Clone for XmlHashEntryRef<'a, T> {
+impl<T> Clone for XmlHashEntryRef<'_, T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, T> Copy for XmlHashEntryRef<'a, T> {}
+impl<T> Copy for XmlHashEntryRef<'_, T> {}
 
 impl<'a, T> Deref for XmlHashEntryRef<'a, T> {
     type Target = XmlHashEntry<'a, T>;
@@ -230,7 +230,7 @@ impl<'a, T> Deref for XmlHashEntryRef<'a, T> {
     }
 }
 
-impl<'a, T> DerefMut for XmlHashEntryRef<'a, T> {
+impl<T> DerefMut for XmlHashEntryRef<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.0.as_mut() }
     }
@@ -1271,13 +1271,13 @@ impl<'a, T> XmlHashTable<'a, T> {
     }
 }
 
-impl<'a, T> Default for XmlHashTable<'a, T> {
+impl<T> Default for XmlHashTable<'_, T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, T> Drop for XmlHashTable<'a, T> {
+impl<T> Drop for XmlHashTable<'_, T> {
     fn drop(&mut self) {
         self.clear();
     }
@@ -1323,13 +1323,13 @@ impl<'a, T> XmlHashTableRef<'a, T> {
     }
 }
 
-impl<'a, T> Clone for XmlHashTableRef<'a, T> {
+impl<T> Clone for XmlHashTableRef<'_, T> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<'a, T> Copy for XmlHashTableRef<'a, T> {}
+impl<T> Copy for XmlHashTableRef<'_, T> {}
 
 impl<'a, T> Deref for XmlHashTableRef<'a, T> {
     type Target = XmlHashTable<'a, T>;
@@ -1339,7 +1339,7 @@ impl<'a, T> Deref for XmlHashTableRef<'a, T> {
     }
 }
 
-impl<'a, T> DerefMut for XmlHashTableRef<'a, T> {
+impl<T> DerefMut for XmlHashTableRef<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.0.as_mut() }
     }
@@ -1409,7 +1409,7 @@ impl<'a, T> Iterator for Drain<'a, T> {
 pub mod libxml_api {
     use std::{
         borrow::Cow,
-        ffi::{c_void, CStr, CString},
+        ffi::{CStr, CString, c_void},
         ptr::{null, null_mut},
     };
 
@@ -1496,7 +1496,7 @@ pub mod libxml_api {
         name: *const XmlChar,
         userdata: *mut c_void,
     ) -> i32 {
-        xml_hash_add_entry3(table, name, null(), null(), userdata)
+        unsafe { xml_hash_add_entry3(table, name, null(), null(), userdata) }
     }
 
     /// # Safety
@@ -1507,7 +1507,7 @@ pub mod libxml_api {
         name2: *const XmlChar,
         userdata: *mut c_void,
     ) -> i32 {
-        xml_hash_add_entry3(table, name, name2, null(), userdata)
+        unsafe { xml_hash_add_entry3(table, name, name2, null(), userdata) }
     }
 
     /// # Safety
@@ -1519,25 +1519,27 @@ pub mod libxml_api {
         name3: *const XmlChar,
         userdata: *mut c_void,
     ) -> i32 {
-        if name.is_null() {
-            return -1;
-        }
-        let Some(mut table) = XmlHashTableRef::from_raw(table) else {
-            return -1;
-        };
+        unsafe {
+            if name.is_null() {
+                return -1;
+            }
+            let Some(mut table) = XmlHashTableRef::from_raw(table) else {
+                return -1;
+            };
 
-        match table.do_add_entry(
-            Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref(),
-            (!name2.is_null())
-                .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
-                .as_deref(),
-            (!name3.is_null())
-                .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
-                .as_deref(),
-            CVoidWrapper(userdata),
-        ) {
-            Ok(_) => 0,
-            Err(_) => -1,
+            match table.do_add_entry(
+                Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref(),
+                (!name2.is_null())
+                    .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!name3.is_null())
+                    .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
+                    .as_deref(),
+                CVoidWrapper(userdata),
+            ) {
+                Ok(_) => 0,
+                Err(_) => -1,
+            }
         }
     }
 
@@ -1549,7 +1551,7 @@ pub mod libxml_api {
         userdata: *mut c_void,
         f: Option<XmlHashDeallocator>,
     ) -> i32 {
-        xml_hash_update_entry3(table, name, null(), null(), userdata, f)
+        unsafe { xml_hash_update_entry3(table, name, null(), null(), userdata, f) }
     }
 
     /// # Safety
@@ -1561,7 +1563,7 @@ pub mod libxml_api {
         userdata: *mut c_void,
         f: Option<XmlHashDeallocator>,
     ) -> i32 {
-        xml_hash_update_entry3(table, name, name2, null(), userdata, f)
+        unsafe { xml_hash_update_entry3(table, name, name2, null(), userdata, f) }
     }
 
     /// # Safety
@@ -1574,34 +1576,36 @@ pub mod libxml_api {
         userdata: *mut c_void,
         f: Option<XmlHashDeallocator>,
     ) -> i32 {
-        if name.is_null() {
-            return -1;
-        }
-        let Some(mut table) = XmlHashTableRef::from_raw(table) else {
-            return -1;
-        };
+        unsafe {
+            if name.is_null() {
+                return -1;
+            }
+            let Some(mut table) = XmlHashTableRef::from_raw(table) else {
+                return -1;
+            };
 
-        match table.do_update_entry(
-            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-            (!name2.is_null())
-                .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
-                .as_deref(),
-            (!name3.is_null())
-                .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
-                .as_deref(),
-            CVoidWrapper(userdata),
-            move |payload: CVoidWrapper, name: Option<Cow<'_, str>>| {
-                if let Some(deallocator) = f {
-                    let name = name.map(|n| CString::new(n.as_ref()).unwrap());
-                    deallocator(
-                        payload.0,
-                        name.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
-                    );
-                }
-            },
-        ) {
-            Ok(_) => 0,
-            Err(_) => -1,
+            match table.do_update_entry(
+                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                (!name2.is_null())
+                    .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!name3.is_null())
+                    .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
+                    .as_deref(),
+                CVoidWrapper(userdata),
+                move |payload: CVoidWrapper, name: Option<Cow<'_, str>>| {
+                    if let Some(deallocator) = f {
+                        let name = name.map(|n| CString::new(n.as_ref()).unwrap());
+                        deallocator(
+                            payload.0,
+                            name.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                        );
+                    }
+                },
+            ) {
+                Ok(_) => 0,
+                Err(_) => -1,
+            }
         }
     }
 
@@ -1612,7 +1616,7 @@ pub mod libxml_api {
         name: *const XmlChar,
         f: Option<XmlHashDeallocator>,
     ) -> i32 {
-        xml_hash_remove_entry3(table, name, null(), null(), f)
+        unsafe { xml_hash_remove_entry3(table, name, null(), null(), f) }
     }
 
     /// # Safety
@@ -1623,7 +1627,7 @@ pub mod libxml_api {
         name2: *const XmlChar,
         f: Option<XmlHashDeallocator>,
     ) -> i32 {
-        xml_hash_remove_entry3(table, name, name2, null(), f)
+        unsafe { xml_hash_remove_entry3(table, name, name2, null(), f) }
     }
 
     /// # Safety
@@ -1635,33 +1639,35 @@ pub mod libxml_api {
         name3: *const XmlChar,
         f: Option<XmlHashDeallocator>,
     ) -> i32 {
-        if name.is_null() {
-            return -1;
-        }
-        let Some(mut table) = XmlHashTableRef::from_raw(table) else {
-            return -1;
-        };
+        unsafe {
+            if name.is_null() {
+                return -1;
+            }
+            let Some(mut table) = XmlHashTableRef::from_raw(table) else {
+                return -1;
+            };
 
-        match table.do_remove_entry(
-            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-            (!name2.is_null())
-                .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
-                .as_deref(),
-            (!name3.is_null())
-                .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
-                .as_deref(),
-            move |payload: CVoidWrapper, name: Option<Cow<'_, str>>| {
-                if let Some(deallocator) = f {
-                    let name = name.map(|n| CString::new(n.as_ref()).unwrap());
-                    deallocator(
-                        payload.0,
-                        name.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
-                    );
-                }
-            },
-        ) {
-            Ok(_) => 0,
-            Err(_) => -1,
+            match table.do_remove_entry(
+                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                (!name2.is_null())
+                    .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!name3.is_null())
+                    .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
+                    .as_deref(),
+                move |payload: CVoidWrapper, name: Option<Cow<'_, str>>| {
+                    if let Some(deallocator) = f {
+                        let name = name.map(|n| CString::new(n.as_ref()).unwrap());
+                        deallocator(
+                            payload.0,
+                            name.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                        );
+                    }
+                },
+            ) {
+                Ok(_) => 0,
+                Err(_) => -1,
+            }
         }
     }
 
@@ -1671,7 +1677,7 @@ pub mod libxml_api {
         table: XmlHashTablePtr,
         name: *const XmlChar,
     ) -> *mut c_void {
-        xml_hash_lookup3(table, name, null(), null())
+        unsafe { xml_hash_lookup3(table, name, null(), null()) }
     }
 
     /// # Safety
@@ -1681,7 +1687,7 @@ pub mod libxml_api {
         name: *const XmlChar,
         name2: *const XmlChar,
     ) -> *mut c_void {
-        xml_hash_lookup3(table, name, name2, null())
+        unsafe { xml_hash_lookup3(table, name, name2, null()) }
     }
 
     /// # Safety
@@ -1692,25 +1698,27 @@ pub mod libxml_api {
         name2: *const XmlChar,
         name3: *const XmlChar,
     ) -> *mut c_void {
-        if name.is_null() {
-            return null_mut();
-        }
-        let Some(table) = XmlHashTableRef::from_raw(table) else {
-            return null_mut();
-        };
+        unsafe {
+            if name.is_null() {
+                return null_mut();
+            }
+            let Some(table) = XmlHashTableRef::from_raw(table) else {
+                return null_mut();
+            };
 
-        table
-            .do_lookup(
-                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                (!name2.is_null())
-                    .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
-                    .as_deref(),
-                (!name3.is_null())
-                    .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
-                    .as_deref(),
-            )
-            .map(|ptr| ptr.0)
-            .unwrap_or(null_mut())
+            table
+                .do_lookup(
+                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                    (!name2.is_null())
+                        .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
+                        .as_deref(),
+                    (!name3.is_null())
+                        .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
+                        .as_deref(),
+                )
+                .map(|ptr| ptr.0)
+                .unwrap_or(null_mut())
+        }
     }
 
     /// # Safety
@@ -1720,7 +1728,7 @@ pub mod libxml_api {
         prefix: *const XmlChar,
         name: *const XmlChar,
     ) -> *mut c_void {
-        xml_hash_qlookup3(table, prefix, name, null(), null(), null(), null())
+        unsafe { xml_hash_qlookup3(table, prefix, name, null(), null(), null(), null()) }
     }
 
     /// # Safety
@@ -1732,7 +1740,7 @@ pub mod libxml_api {
         prefix2: *const XmlChar,
         name2: *const XmlChar,
     ) -> *mut c_void {
-        xml_hash_qlookup3(table, prefix, name, prefix2, name2, null(), null())
+        unsafe { xml_hash_qlookup3(table, prefix, name, prefix2, name2, null(), null()) }
     }
 
     /// # Safety
@@ -1746,34 +1754,36 @@ pub mod libxml_api {
         prefix3: *const XmlChar,
         name3: *const XmlChar,
     ) -> *mut c_void {
-        if name.is_null() {
-            return null_mut();
-        }
-        let Some(table) = XmlHashTableRef::from_raw(table) else {
-            return null_mut();
-        };
+        unsafe {
+            if name.is_null() {
+                return null_mut();
+            }
+            let Some(table) = XmlHashTableRef::from_raw(table) else {
+                return null_mut();
+            };
 
-        table
-            .do_qlookup(
-                (!prefix.is_null())
-                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                    .as_deref(),
-                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                (!prefix2.is_null())
-                    .then(|| CStr::from_ptr(prefix2 as *const i8).to_string_lossy())
-                    .as_deref(),
-                (!name2.is_null())
-                    .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
-                    .as_deref(),
-                (!prefix3.is_null())
-                    .then(|| CStr::from_ptr(prefix3 as *const i8).to_string_lossy())
-                    .as_deref(),
-                (!name3.is_null())
-                    .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
-                    .as_deref(),
-            )
-            .map(|ptr| ptr.0)
-            .unwrap_or(null_mut())
+            table
+                .do_qlookup(
+                    (!prefix.is_null())
+                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                        .as_deref(),
+                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                    (!prefix2.is_null())
+                        .then(|| CStr::from_ptr(prefix2 as *const i8).to_string_lossy())
+                        .as_deref(),
+                    (!name2.is_null())
+                        .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
+                        .as_deref(),
+                    (!prefix3.is_null())
+                        .then(|| CStr::from_ptr(prefix3 as *const i8).to_string_lossy())
+                        .as_deref(),
+                    (!name3.is_null())
+                        .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
+                        .as_deref(),
+                )
+                .map(|ptr| ptr.0)
+                .unwrap_or(null_mut())
+        }
     }
 
     pub extern "C" fn xml_hash_copy(
@@ -1844,34 +1854,36 @@ pub mod libxml_api {
         f: Option<XmlHashScanner>,
         data: *mut c_void,
     ) {
-        let Some(table) = XmlHashTableRef::from_raw(table) else {
-            return;
-        };
+        unsafe {
+            let Some(table) = XmlHashTableRef::from_raw(table) else {
+                return;
+            };
 
-        let Some(scanner) = f else {
-            return;
-        };
+            let Some(scanner) = f else {
+                return;
+            };
 
-        let (name, name2, name3) = (
-            (!name.is_null()).then(|| CStr::from_ptr(name as *const i8).to_string_lossy()),
-            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy()),
-            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy()),
-        );
+            let (name, name2, name3) = (
+                (!name.is_null()).then(|| CStr::from_ptr(name as *const i8).to_string_lossy()),
+                (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy()),
+                (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy()),
+            );
 
-        table.scan(move |payload, n, n2, n3| {
-            if (name.is_none() || n.map(|n| n.as_ref()) == name.as_deref())
-                && (name2.is_none() || n2.map(|n| n.as_ref()) == name2.as_deref())
-                && (name3.is_none() || n3.map(|n| n.as_ref()) == name3.as_deref())
-                && !payload.0.is_null()
-            {
-                let n = n.map(|n| CString::new(n.as_ref()).unwrap());
-                scanner(
-                    payload.0,
-                    data,
-                    n.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
-                );
-            }
-        });
+            table.scan(move |payload, n, n2, n3| {
+                if (name.is_none() || n.map(|n| n.as_ref()) == name.as_deref())
+                    && (name2.is_none() || n2.map(|n| n.as_ref()) == name2.as_deref())
+                    && (name3.is_none() || n3.map(|n| n.as_ref()) == name3.as_deref())
+                    && !payload.0.is_null()
+                {
+                    let n = n.map(|n| CString::new(n.as_ref()).unwrap());
+                    scanner(
+                        payload.0,
+                        data,
+                        n.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                    );
+                }
+            });
+        }
     }
 
     /// # Safety
@@ -1916,38 +1928,40 @@ pub mod libxml_api {
         f: Option<XmlHashScannerFull>,
         data: *mut c_void,
     ) {
-        let Some(table) = XmlHashTableRef::from_raw(table) else {
-            return;
-        };
+        unsafe {
+            let Some(table) = XmlHashTableRef::from_raw(table) else {
+                return;
+            };
 
-        let Some(scanner) = f else {
-            return;
-        };
+            let Some(scanner) = f else {
+                return;
+            };
 
-        let (name, name2, name3) = (
-            (!name.is_null()).then(|| CStr::from_ptr(name as *const i8).to_string_lossy()),
-            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy()),
-            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy()),
-        );
+            let (name, name2, name3) = (
+                (!name.is_null()).then(|| CStr::from_ptr(name as *const i8).to_string_lossy()),
+                (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy()),
+                (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy()),
+            );
 
-        table.scan(move |payload, n, n2, n3| {
-            if (name.is_none() || n.map(|n| n.as_ref()) == name.as_deref())
-                && (name2.is_none() || n2.map(|n| n.as_ref()) == name2.as_deref())
-                && (name3.is_none() || n3.map(|n| n.as_ref()) == name3.as_deref())
-                && !payload.0.is_null()
-            {
-                let n = n.map(|n| CString::new(n.as_ref()).unwrap());
-                let n2 = n2.map(|n| CString::new(n.as_ref()).unwrap());
-                let n3 = n3.map(|n| CString::new(n.as_ref()).unwrap());
-                scanner(
-                    payload.0,
-                    data,
-                    n.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
-                    n2.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
-                    n3.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
-                );
-            }
-        });
+            table.scan(move |payload, n, n2, n3| {
+                if (name.is_none() || n.map(|n| n.as_ref()) == name.as_deref())
+                    && (name2.is_none() || n2.map(|n| n.as_ref()) == name2.as_deref())
+                    && (name3.is_none() || n3.map(|n| n.as_ref()) == name3.as_deref())
+                    && !payload.0.is_null()
+                {
+                    let n = n.map(|n| CString::new(n.as_ref()).unwrap());
+                    let n2 = n2.map(|n| CString::new(n.as_ref()).unwrap());
+                    let n3 = n3.map(|n| CString::new(n.as_ref()).unwrap());
+                    scanner(
+                        payload.0,
+                        data,
+                        n.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                        n2.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                        n3.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                    );
+                }
+            });
+        }
     }
 
     #[cfg(test)]
@@ -1955,10 +1969,11 @@ pub mod libxml_api {
         use std::num::NonZeroU8;
 
         use rand::{
-            distributions::{Alphanumeric, DistString},
+            Rng,
+            distr::{Alphanumeric, SampleString},
             prelude::Distribution,
-            seq::SliceRandom,
-            thread_rng, Rng,
+            seq::IndexedRandom,
+            thread_rng,
         };
 
         use super::*;
@@ -1997,49 +2012,51 @@ pub mod libxml_api {
             entries: &mut Vec<(CString, Option<CString>, Option<CString>, u64)>,
             rng: &mut impl Rng,
         ) {
-            match rng.gen_range(1..=3) {
-                1 => {
-                    let n1 = gen_ncname(rng);
-                    let data = rng.gen::<u64>();
-                    xml_hash_add_entry(table, n1.as_ptr() as _, data as _);
-                    assert_eq!(xml_hash_lookup(table, n1.as_ptr() as _) as u64, data);
-                    entries.push((n1, None, None, data));
-                }
-                2 => {
-                    let n1 = gen_ncname(rng);
-                    let n2 = gen_ncname(rng);
-                    let data = rng.gen::<u64>();
-                    xml_hash_add_entry2(table, n1.as_ptr() as _, n2.as_ptr() as _, data as _);
-                    assert_eq!(
-                        xml_hash_lookup2(table, n1.as_ptr() as _, n2.as_ptr() as _) as u64,
-                        data
-                    );
-                    entries.push((n1, Some(n2), None, data));
-                }
-                3 => {
-                    let n1 = gen_ncname(rng);
-                    let n2 = gen_ncname(rng);
-                    let n3 = gen_ncname(rng);
-                    let data = rng.gen::<u64>();
-                    xml_hash_add_entry3(
-                        table,
-                        n1.as_ptr() as _,
-                        n2.as_ptr() as _,
-                        n3.as_ptr() as _,
-                        data as _,
-                    );
-                    assert_eq!(
-                        xml_hash_lookup3(
+            unsafe {
+                match rng.gen_range(1..=3) {
+                    1 => {
+                        let n1 = gen_ncname(rng);
+                        let data = rng.random::<u64>();
+                        xml_hash_add_entry(table, n1.as_ptr() as _, data as _);
+                        assert_eq!(xml_hash_lookup(table, n1.as_ptr() as _) as u64, data);
+                        entries.push((n1, None, None, data));
+                    }
+                    2 => {
+                        let n1 = gen_ncname(rng);
+                        let n2 = gen_ncname(rng);
+                        let data = rng.random::<u64>();
+                        xml_hash_add_entry2(table, n1.as_ptr() as _, n2.as_ptr() as _, data as _);
+                        assert_eq!(
+                            xml_hash_lookup2(table, n1.as_ptr() as _, n2.as_ptr() as _) as u64,
+                            data
+                        );
+                        entries.push((n1, Some(n2), None, data));
+                    }
+                    3 => {
+                        let n1 = gen_ncname(rng);
+                        let n2 = gen_ncname(rng);
+                        let n3 = gen_ncname(rng);
+                        let data = rng.random::<u64>();
+                        xml_hash_add_entry3(
                             table,
                             n1.as_ptr() as _,
                             n2.as_ptr() as _,
-                            n3.as_ptr() as _
-                        ) as u64,
-                        data
-                    );
-                    entries.push((n1, Some(n2), Some(n3), data));
+                            n3.as_ptr() as _,
+                            data as _,
+                        );
+                        assert_eq!(
+                            xml_hash_lookup3(
+                                table,
+                                n1.as_ptr() as _,
+                                n2.as_ptr() as _,
+                                n3.as_ptr() as _
+                            ) as u64,
+                            data
+                        );
+                        entries.push((n1, Some(n2), Some(n3), data));
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
 
@@ -2057,81 +2074,83 @@ pub mod libxml_api {
             entries: &mut Vec<(CString, Option<CString>, Option<CString>, u64)>,
             rng: &mut impl Rng,
         ) {
-            match rng.gen_range(1..=3) {
-                1 => {
-                    let n1 = gen_qname(rng);
-                    let data = rng.gen::<u64>();
-                    xml_hash_add_entry(table, n1.as_ptr() as _, data as _);
-                    assert_eq!(xml_hash_lookup(table, n1.as_ptr() as _) as u64, data);
-                    let (p1, l1) = split_qname(&n1).unwrap();
-                    assert_eq!(
-                        xml_hash_qlookup(table, p1.as_ptr() as _, l1.as_ptr() as _,) as u64,
-                        data
-                    );
-                    entries.push((n1, None, None, data));
-                }
-                2 => {
-                    let n1 = gen_qname(rng);
-                    let n2 = gen_qname(rng);
-                    let data = rng.gen::<u64>();
-                    xml_hash_add_entry2(table, n1.as_ptr() as _, n2.as_ptr() as _, data as _);
-                    assert_eq!(
-                        xml_hash_lookup2(table, n1.as_ptr() as _, n2.as_ptr() as _) as u64,
-                        data
-                    );
-                    let (p1, l1) = split_qname(&n1).unwrap();
-                    let (p2, l2) = split_qname(&n2).unwrap();
-                    assert_eq!(
-                        xml_hash_qlookup2(
-                            table,
-                            p1.as_ptr() as _,
-                            l1.as_ptr() as _,
-                            p2.as_ptr() as _,
-                            l2.as_ptr() as _,
-                        ) as u64,
-                        data
-                    );
-                    entries.push((n1, Some(n2), None, data));
-                }
-                3 => {
-                    let n1 = gen_qname(rng);
-                    let n2 = gen_qname(rng);
-                    let n3 = gen_qname(rng);
-                    let data = rng.gen::<u64>();
-                    xml_hash_add_entry3(
-                        table,
-                        n1.as_ptr() as _,
-                        n2.as_ptr() as _,
-                        n3.as_ptr() as _,
-                        data as _,
-                    );
-                    assert_eq!(
-                        xml_hash_lookup3(
+            unsafe {
+                match rng.gen_range(1..=3) {
+                    1 => {
+                        let n1 = gen_qname(rng);
+                        let data = rng.random::<u64>();
+                        xml_hash_add_entry(table, n1.as_ptr() as _, data as _);
+                        assert_eq!(xml_hash_lookup(table, n1.as_ptr() as _) as u64, data);
+                        let (p1, l1) = split_qname(&n1).unwrap();
+                        assert_eq!(
+                            xml_hash_qlookup(table, p1.as_ptr() as _, l1.as_ptr() as _,) as u64,
+                            data
+                        );
+                        entries.push((n1, None, None, data));
+                    }
+                    2 => {
+                        let n1 = gen_qname(rng);
+                        let n2 = gen_qname(rng);
+                        let data = rng.random::<u64>();
+                        xml_hash_add_entry2(table, n1.as_ptr() as _, n2.as_ptr() as _, data as _);
+                        assert_eq!(
+                            xml_hash_lookup2(table, n1.as_ptr() as _, n2.as_ptr() as _) as u64,
+                            data
+                        );
+                        let (p1, l1) = split_qname(&n1).unwrap();
+                        let (p2, l2) = split_qname(&n2).unwrap();
+                        assert_eq!(
+                            xml_hash_qlookup2(
+                                table,
+                                p1.as_ptr() as _,
+                                l1.as_ptr() as _,
+                                p2.as_ptr() as _,
+                                l2.as_ptr() as _,
+                            ) as u64,
+                            data
+                        );
+                        entries.push((n1, Some(n2), None, data));
+                    }
+                    3 => {
+                        let n1 = gen_qname(rng);
+                        let n2 = gen_qname(rng);
+                        let n3 = gen_qname(rng);
+                        let data = rng.random::<u64>();
+                        xml_hash_add_entry3(
                             table,
                             n1.as_ptr() as _,
                             n2.as_ptr() as _,
-                            n3.as_ptr() as _
-                        ) as u64,
-                        data
-                    );
-                    let (p1, l1) = split_qname(&n1).unwrap();
-                    let (p2, l2) = split_qname(&n2).unwrap();
-                    let (p3, l3) = split_qname(&n3).unwrap();
-                    assert_eq!(
-                        xml_hash_qlookup3(
-                            table,
-                            p1.as_ptr() as _,
-                            l1.as_ptr() as _,
-                            p2.as_ptr() as _,
-                            l2.as_ptr() as _,
-                            p3.as_ptr() as _,
-                            l3.as_ptr() as _,
-                        ) as u64,
-                        data
-                    );
-                    entries.push((n1, Some(n2), Some(n3), data));
+                            n3.as_ptr() as _,
+                            data as _,
+                        );
+                        assert_eq!(
+                            xml_hash_lookup3(
+                                table,
+                                n1.as_ptr() as _,
+                                n2.as_ptr() as _,
+                                n3.as_ptr() as _
+                            ) as u64,
+                            data
+                        );
+                        let (p1, l1) = split_qname(&n1).unwrap();
+                        let (p2, l2) = split_qname(&n2).unwrap();
+                        let (p3, l3) = split_qname(&n3).unwrap();
+                        assert_eq!(
+                            xml_hash_qlookup3(
+                                table,
+                                p1.as_ptr() as _,
+                                l1.as_ptr() as _,
+                                p2.as_ptr() as _,
+                                l2.as_ptr() as _,
+                                p3.as_ptr() as _,
+                                l3.as_ptr() as _,
+                            ) as u64,
+                            data
+                        );
+                        entries.push((n1, Some(n2), Some(n3), data));
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
         }
 
@@ -2180,12 +2199,10 @@ pub mod libxml_api {
                                         None
                                     ) == 0
                                 );
-                                assert!(xml_hash_lookup2(
-                                    table,
-                                    n1.as_ptr() as _,
-                                    n2.as_ptr() as _
-                                )
-                                .is_null());
+                                assert!(
+                                    xml_hash_lookup2(table, n1.as_ptr() as _, n2.as_ptr() as _)
+                                        .is_null()
+                                );
                             }
                             (n1, Some(n2), Some(n3), data) => {
                                 assert_eq!(
@@ -2206,13 +2223,15 @@ pub mod libxml_api {
                                         None
                                     ) == 0
                                 );
-                                assert!(xml_hash_lookup3(
-                                    table,
-                                    n1.as_ptr() as _,
-                                    n2.as_ptr() as _,
-                                    n3.as_ptr() as _
-                                )
-                                .is_null());
+                                assert!(
+                                    xml_hash_lookup3(
+                                        table,
+                                        n1.as_ptr() as _,
+                                        n2.as_ptr() as _,
+                                        n3.as_ptr() as _
+                                    )
+                                    .is_null()
+                                );
                             }
                             _ => [ncname_insertion_test, qname_insertion_test]
                                 .choose(&mut rng)
@@ -2320,7 +2339,7 @@ pub mod libxml_api {
                         },
                         4 => {
                             let index = rng.gen_range(0..entries.len());
-                            let data: u64 = rng.gen();
+                            let data: u64 = rng.random();
                             match &entries[index] {
                                 (n1, None, None, old) => {
                                     assert_eq!(
@@ -2465,10 +2484,11 @@ mod tests {
     use std::num::NonZeroU8;
 
     use rand::{
-        distributions::{Alphanumeric, DistString},
+        Rng,
+        distr::{Alphanumeric, SampleString},
         prelude::Distribution,
-        seq::SliceRandom,
-        thread_rng, Rng,
+        seq::IndexedRandom,
+        thread_rng,
     };
 
     use super::*;
@@ -2509,7 +2529,7 @@ mod tests {
         match rng.gen_range(1..=3) {
             1 => {
                 let n1 = gen_ncname(rng);
-                let data = rng.gen::<u64>();
+                let data = rng.random::<u64>();
                 table.add_entry(&n1, data);
                 assert_eq!(table.lookup(&n1), Some(&data));
                 entries.push((n1, None, None, data));
@@ -2517,7 +2537,7 @@ mod tests {
             2 => {
                 let n1 = gen_ncname(rng);
                 let n2 = gen_ncname(rng);
-                let data = rng.gen::<u64>();
+                let data = rng.random::<u64>();
                 table.add_entry2(&n1, Some(&n2), data);
                 assert_eq!(table.lookup2(&n1, Some(&n2)), Some(&data));
                 entries.push((n1, Some(n2), None, data));
@@ -2526,7 +2546,7 @@ mod tests {
                 let n1 = gen_ncname(rng);
                 let n2 = gen_ncname(rng);
                 let n3 = gen_ncname(rng);
-                let data = rng.gen::<u64>();
+                let data = rng.random::<u64>();
                 table.add_entry3(&n1, Some(&n2), Some(&n3), data);
                 assert_eq!(table.lookup3(&n1, Some(&n2), Some(&n3)), Some(&data));
                 entries.push((n1, Some(n2), Some(n3), data));
@@ -2549,7 +2569,7 @@ mod tests {
         match rng.gen_range(1..=3) {
             1 => {
                 let n1 = gen_qname(rng);
-                let data = rng.gen::<u64>();
+                let data = rng.random::<u64>();
                 table.add_entry(&n1, data);
                 assert_eq!(table.lookup(&n1), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
@@ -2559,7 +2579,7 @@ mod tests {
             2 => {
                 let n1 = gen_qname(rng);
                 let n2 = gen_qname(rng);
-                let data = rng.gen::<u64>();
+                let data = rng.random::<u64>();
                 table.add_entry2(&n1, Some(&n2), data);
                 assert_eq!(table.lookup2(&n1, Some(&n2)), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
@@ -2574,7 +2594,7 @@ mod tests {
                 let n1 = gen_qname(rng);
                 let n2 = gen_qname(rng);
                 let n3 = gen_qname(rng);
-                let data = rng.gen::<u64>();
+                let data = rng.random::<u64>();
                 table.add_entry3(&n1, Some(&n2), Some(&n3), data);
                 assert_eq!(table.lookup3(&n1, Some(&n2), Some(&n3)), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
@@ -2630,9 +2650,11 @@ mod tests {
                     }
                     (n1, Some(n2), Some(n3), data) => {
                         assert_eq!(table.lookup3(&n1, Some(&n2), Some(&n3)), Some(&data));
-                        assert!(table
-                            .remove_entry3(&n1, Some(&n2), Some(&n3), |_, _| {})
-                            .is_ok());
+                        assert!(
+                            table
+                                .remove_entry3(&n1, Some(&n2), Some(&n3), |_, _| {})
+                                .is_ok()
+                        );
                         assert!(table.lookup3(&n1, Some(&n2), Some(&n3)).is_none());
                         assert_eq!(table.len(), entries.len());
                     }
@@ -2693,7 +2715,7 @@ mod tests {
                 },
                 4 => {
                     let index = rng.gen_range(0..entries.len());
-                    let data = rng.gen();
+                    let data = rng.random();
                     match &entries[index] {
                         (n1, None, None, old) => {
                             assert_eq!(table.lookup(n1), Some(old));
@@ -2707,9 +2729,11 @@ mod tests {
                         }
                         (n1, Some(n2), Some(n3), old) => {
                             assert_eq!(table.lookup3(n1, Some(n2), Some(n3)), Some(old));
-                            assert!(table
-                                .update_entry3(n1, Some(n2), Some(n3), data, |_, _| {})
-                                .is_ok());
+                            assert!(
+                                table
+                                    .update_entry3(n1, Some(n2), Some(n3), data, |_, _| {})
+                                    .is_ok()
+                            );
                             assert_eq!(table.lookup3(n1, Some(n2), Some(n3)), Some(&data));
                         }
                         _ => {}

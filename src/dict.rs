@@ -32,16 +32,16 @@
 use std::{
     ffi::CStr,
     ops::{Deref, DerefMut},
-    ptr::{null, NonNull},
+    ptr::{NonNull, null},
     slice::from_raw_parts,
     sync::atomic::{AtomicI32, Ordering},
 };
 
-use anyhow::{ensure, Context};
+use anyhow::{Context, ensure};
 
 use crate::libxml::{
     parser::xml_init_parser,
-    xmlstring::{xml_str_qequal, xml_strncmp, XmlChar},
+    xmlstring::{XmlChar, xml_str_qequal, xml_strncmp},
 };
 
 pub use libxml_api::*;
@@ -993,7 +993,7 @@ impl XmlDict {
             pool = now.next;
         }
 
-        self.subdict.map_or(false, |subdict| subdict.owns(str))
+        self.subdict.is_some_and(|subdict| subdict.owns(str))
     }
 
     /// Return how many strings the dictionary owns.  
@@ -1184,21 +1184,23 @@ pub(crate) mod libxml_api {
         name: *const XmlChar,
         len: i32,
     ) -> *const XmlChar {
-        let Some(mut dict) = XmlDictRef::from_raw(dict) else {
-            return null();
-        };
+        unsafe {
+            let Some(mut dict) = XmlDictRef::from_raw(dict) else {
+                return null();
+            };
 
-        if name.is_null() {
-            return null();
+            if name.is_null() {
+                return null();
+            }
+
+            let name = if len < 0 {
+                CStr::from_ptr(name as _).to_bytes()
+            } else {
+                from_raw_parts(name, len as usize)
+            };
+
+            dict.lookup(name).map_or(null(), |name| name.as_ptr())
         }
-
-        let name = if len < 0 {
-            CStr::from_ptr(name as _).to_bytes()
-        } else {
-            from_raw_parts(name, len as usize)
-        };
-
-        dict.lookup(name).map_or(null(), |name| name.as_ptr())
     }
 
     /// # Safety
@@ -1210,21 +1212,23 @@ pub(crate) mod libxml_api {
         name: *const XmlChar,
         len: i32,
     ) -> *const XmlChar {
-        let Some(dict) = XmlDictRef::from_raw(dict) else {
-            return null();
-        };
+        unsafe {
+            let Some(dict) = XmlDictRef::from_raw(dict) else {
+                return null();
+            };
 
-        if name.is_null() {
-            return null();
+            if name.is_null() {
+                return null();
+            }
+
+            let name = if len < 0 {
+                CStr::from_ptr(name as _).to_bytes()
+            } else {
+                from_raw_parts(name, len as usize)
+            };
+
+            dict.exists(name).map_or(null(), |name| name.as_ptr())
         }
-
-        let name = if len < 0 {
-            CStr::from_ptr(name as _).to_bytes()
-        } else {
-            from_raw_parts(name, len as usize)
-        };
-
-        dict.exists(name).map_or(null(), |name| name.as_ptr())
     }
 
     /// # Safety
@@ -1236,25 +1240,27 @@ pub(crate) mod libxml_api {
         prefix: *const XmlChar,
         name: *const XmlChar,
     ) -> *const XmlChar {
-        let Some(mut dict) = XmlDictRef::from_raw(dict) else {
-            return null();
-        };
+        unsafe {
+            let Some(mut dict) = XmlDictRef::from_raw(dict) else {
+                return null();
+            };
 
-        if name.is_null() {
-            return null();
+            if name.is_null() {
+                return null();
+            }
+
+            if prefix.is_null() {
+                return dict
+                    .lookup(CStr::from_ptr(name as _).to_bytes())
+                    .map_or(null(), |name| name.as_ptr());
+            }
+
+            dict.qlookup(
+                Some(CStr::from_ptr(prefix as _).to_bytes()),
+                CStr::from_ptr(name as _).to_bytes(),
+            )
+            .map_or(null(), |qname| qname.as_ptr())
         }
-
-        if prefix.is_null() {
-            return dict
-                .lookup(CStr::from_ptr(name as _).to_bytes())
-                .map_or(null(), |name| name.as_ptr());
-        }
-
-        dict.qlookup(
-            Some(CStr::from_ptr(prefix as _).to_bytes()),
-            CStr::from_ptr(name as _).to_bytes(),
-        )
-        .map_or(null(), |qname| qname.as_ptr())
     }
 
     /// # Safety
@@ -1308,24 +1314,26 @@ pub(crate) mod libxml_api {
 
     #[cfg(test)]
     mod tests {
-        use rand::{thread_rng, Rng};
+        use rand::{Rng, thread_rng};
 
         use super::*;
 
         unsafe fn do_lookup_test(dict: *mut XmlDict, s: *const XmlChar) -> *const XmlChar {
-            assert!(xml_dict_exists(dict, s, -1).is_null());
-            assert!(xml_dict_owns(dict, s) == 0);
-            let stored = xml_dict_lookup(dict, s, -1);
+            unsafe {
+                assert!(xml_dict_exists(dict, s, -1).is_null());
+                assert!(xml_dict_owns(dict, s) == 0);
+                let stored = xml_dict_lookup(dict, s, -1);
 
-            assert!(!xml_dict_exists(dict, s, -1).is_null());
-            assert!(xml_dict_owns(dict, s) == 0);
+                assert!(!xml_dict_exists(dict, s, -1).is_null());
+                assert!(xml_dict_owns(dict, s) == 0);
 
-            assert!(!xml_dict_exists(dict, stored, -1).is_null());
-            assert!(xml_dict_owns(dict, stored) != 0);
+                assert!(!xml_dict_exists(dict, stored, -1).is_null());
+                assert!(xml_dict_owns(dict, stored) != 0);
 
-            let stored2 = xml_dict_lookup(dict, stored, -1);
-            assert_eq!(stored, stored2);
-            stored
+                let stored2 = xml_dict_lookup(dict, stored, -1);
+                assert_eq!(stored, stored2);
+                stored
+            }
         }
 
         #[test]
@@ -1363,7 +1371,7 @@ pub(crate) mod libxml_api {
 
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, Rng};
+    use rand::{Rng, thread_rng};
 
     use super::*;
 

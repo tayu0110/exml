@@ -26,9 +26,9 @@ use crate::tree::XmlNodePtr;
 
 use super::{
     globals::xml_free,
-    xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr},
+    xmlregexp::{XmlRegexpPtr, xml_reg_free_regexp},
     xmlschemas::XmlSchemaItemListPtr,
-    xmlschemastypes::{xml_schema_free_facet, XmlSchemaValPtr},
+    xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_facet},
     xmlstring::XmlChar,
 };
 
@@ -479,8 +479,8 @@ pub(crate) const XML_SCHEMAS_TYPE_FIXUP_1: i32 = 1 << 29;
 
 /// The type was redefined.
 pub(crate) const XML_SCHEMAS_TYPE_REDEFINED: i32 = 1 << 30;
-/// The type redefines an other type.
-/* #define XML_SCHEMAS_TYPE_REDEFINING    1 << 31 */
+// The type redefines an other type.
+// #define XML_SCHEMAS_TYPE_REDEFINING    1 << 31
 
 pub type XmlSchemaTypePtr = *mut XmlSchemaType;
 /// Schemas type definition.
@@ -666,117 +666,129 @@ pub(crate) const XML_SCHEMAS_INCLUDING_CONVERT_NS: i32 = 1 << 9;
 /// Deallocate a annotation structure
 #[doc(alias = "xmlSchemaFreeAnnot")]
 pub(crate) unsafe fn xml_schema_free_annot(mut annot: XmlSchemaAnnotPtr) {
-    if annot.is_null() {
-        return;
-    }
-    if (*annot).next.is_null() {
-        xml_free(annot as _);
-    } else {
-        let mut prev: XmlSchemaAnnotPtr;
+    unsafe {
+        if annot.is_null() {
+            return;
+        }
+        if (*annot).next.is_null() {
+            xml_free(annot as _);
+        } else {
+            let mut prev: XmlSchemaAnnotPtr;
 
-        while {
-            prev = annot;
-            annot = (*annot).next;
-            xml_free(prev as _);
-            !annot.is_null()
-        } {}
+            while {
+                prev = annot;
+                annot = (*annot).next;
+                xml_free(prev as _);
+                !annot.is_null()
+            } {}
+        }
     }
 }
 
 /// Deallocate a annotation structure
 #[doc(alias = "xmlSchemaItemListFree")]
 pub(crate) unsafe fn xml_schema_item_list_free(list: XmlSchemaItemListPtr) {
-    if list.is_null() {
-        return;
+    unsafe {
+        if list.is_null() {
+            return;
+        }
+        if !(*list).items.is_null() {
+            xml_free((*list).items as _);
+        }
+        xml_free(list as _);
     }
-    if !(*list).items.is_null() {
-        xml_free((*list).items as _);
-    }
-    xml_free(list as _);
 }
 
 /// Deallocate a list of types.
 #[doc(alias = "xmlSchemaFreeTypeLinkList")]
 unsafe fn xml_schema_free_type_link_list(mut link: XmlSchemaTypeLinkPtr) {
-    let mut next: XmlSchemaTypeLinkPtr;
+    unsafe {
+        let mut next: XmlSchemaTypeLinkPtr;
 
-    while !link.is_null() {
-        next = (*link).next;
-        xml_free(link as _);
-        link = next;
+        while !link.is_null() {
+            next = (*link).next;
+            xml_free(link as _);
+            link = next;
+        }
     }
 }
 
 /// Deallocate a Schema Type structure.
 #[doc(alias = "xmlSchemaFreeType")]
 pub unsafe fn xml_schema_free_type(typ: XmlSchemaTypePtr) {
-    if typ.is_null() {
-        return;
-    }
-    if !(*typ).annot.is_null() {
-        xml_schema_free_annot((*typ).annot);
-    }
-    if !(*typ).facets.is_null() {
-        let mut facet: XmlSchemaFacetPtr;
-        let mut next: XmlSchemaFacetPtr;
-
-        facet = (*typ).facets;
-        while !facet.is_null() {
-            next = (*facet).next;
-            xml_schema_free_facet(facet);
-            facet = next;
+    unsafe {
+        if typ.is_null() {
+            return;
         }
-    }
-    if !(*typ).attr_uses.is_null() {
-        xml_schema_item_list_free((*typ).attr_uses as XmlSchemaItemListPtr);
-    }
-    if !(*typ).member_types.is_null() {
-        xml_schema_free_type_link_list((*typ).member_types);
-    }
-    if !(*typ).facet_set.is_null() {
-        let mut next: XmlSchemaFacetLinkPtr;
-        let mut link: XmlSchemaFacetLinkPtr;
+        if !(*typ).annot.is_null() {
+            xml_schema_free_annot((*typ).annot);
+        }
+        if !(*typ).facets.is_null() {
+            let mut facet: XmlSchemaFacetPtr;
+            let mut next: XmlSchemaFacetPtr;
 
-        link = (*typ).facet_set;
-        while {
-            next = (*link).next;
-            xml_free(link as _);
-            link = next;
-            !link.is_null()
-        } {}
+            facet = (*typ).facets;
+            while !facet.is_null() {
+                next = (*facet).next;
+                xml_schema_free_facet(facet);
+                facet = next;
+            }
+        }
+        if !(*typ).attr_uses.is_null() {
+            xml_schema_item_list_free((*typ).attr_uses as XmlSchemaItemListPtr);
+        }
+        if !(*typ).member_types.is_null() {
+            xml_schema_free_type_link_list((*typ).member_types);
+        }
+        if !(*typ).facet_set.is_null() {
+            let mut next: XmlSchemaFacetLinkPtr;
+            let mut link: XmlSchemaFacetLinkPtr;
+
+            link = (*typ).facet_set;
+            while {
+                next = (*link).next;
+                xml_free(link as _);
+                link = next;
+                !link.is_null()
+            } {}
+        }
+        if !(*typ).cont_model.is_null() {
+            xml_reg_free_regexp((*typ).cont_model);
+        }
+        xml_free(typ as _);
     }
-    if !(*typ).cont_model.is_null() {
-        xml_reg_free_regexp((*typ).cont_model);
-    }
-    xml_free(typ as _);
 }
 
 /// Deallocates a list of wildcard constraint structures.
 #[doc(alias = "xmlSchemaFreeWildcardNsSet")]
 pub(crate) unsafe fn xml_schema_free_wildcard_ns_set(mut set: XmlSchemaWildcardNsPtr) {
-    let mut next: XmlSchemaWildcardNsPtr;
+    unsafe {
+        let mut next: XmlSchemaWildcardNsPtr;
 
-    while !set.is_null() {
-        next = (*set).next;
-        xml_free(set as _);
-        set = next;
+        while !set.is_null() {
+            next = (*set).next;
+            xml_free(set as _);
+            set = next;
+        }
     }
 }
 
 /// Deallocates a wildcard structure.
 #[doc(alias = "xmlSchemaFreeWildcard")]
 pub unsafe fn xml_schema_free_wildcard(wildcard: XmlSchemaWildcardPtr) {
-    if wildcard.is_null() {
-        return;
+    unsafe {
+        if wildcard.is_null() {
+            return;
+        }
+        if !(*wildcard).annot.is_null() {
+            xml_schema_free_annot((*wildcard).annot);
+        }
+        if !(*wildcard).ns_set.is_null() {
+            xml_schema_free_wildcard_ns_set((*wildcard).ns_set);
+        }
+        if !(*wildcard).neg_ns_set.is_null() {
+            xml_free((*wildcard).neg_ns_set as _);
+        }
+        xml_free(wildcard as _);
     }
-    if !(*wildcard).annot.is_null() {
-        xml_schema_free_annot((*wildcard).annot);
-    }
-    if !(*wildcard).ns_set.is_null() {
-        xml_schema_free_wildcard_ns_set((*wildcard).ns_set);
-    }
-    if !(*wildcard).neg_ns_set.is_null() {
-        xml_free((*wildcard).neg_ns_set as _);
-    }
-    xml_free(wildcard as _);
 }

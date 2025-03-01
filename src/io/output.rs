@@ -20,13 +20,13 @@ use std::{
     cell::RefCell,
     ffi::c_void,
     fs::File,
-    io::{self, stdout, Write},
+    io::{self, Write, stdout},
     path::Path,
     rc::Rc,
     str::from_utf8,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Mutex,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
@@ -34,7 +34,7 @@ use url::Url;
 
 use crate::{
     buf::XmlBufRef,
-    encoding::{floor_char_boundary, xml_encoding_err, EncodingError, XmlCharEncodingHandler},
+    encoding::{EncodingError, XmlCharEncodingHandler, floor_char_boundary, xml_encoding_err},
     error::XmlParserErrors,
     globals::GLOBAL_STATE,
     nanohttp::xml_nanohttp_method,
@@ -43,7 +43,7 @@ use crate::{
 };
 
 use super::{
-    xml_escape_content, xml_ioerr, DefaultFileIOCallbacks, DefaultHTTPIOCallbacks, MINLEN,
+    DefaultFileIOCallbacks, DefaultHTTPIOCallbacks, MINLEN, xml_escape_content, xml_ioerr,
 };
 
 /// Callback used in the I/O Output API to detect if the current handler
@@ -208,11 +208,7 @@ impl<'a> XmlOutputBuffer<'a> {
                 }
             }
         };
-        if writtentot != 0 {
-            Ok(writtentot)
-        } else {
-            ret
-        }
+        if writtentot != 0 { Ok(writtentot) } else { ret }
     }
 
     /// Create a buffered parser output
@@ -319,7 +315,7 @@ impl<'a> XmlOutputBuffer<'a> {
                 }
                 if self
                     .buffer
-                    .map_or(true, |mut buffer| buffer.push_bytes(buf).is_err())
+                    .is_none_or(|mut buffer| buffer.push_bytes(buf).is_err())
                 {
                     return Err(io::Error::other("Failed to push a string to the buffer."));
                 }
@@ -348,7 +344,7 @@ impl<'a> XmlOutputBuffer<'a> {
             } else {
                 if self
                     .buffer
-                    .map_or(true, |mut buffer| buffer.push_bytes(buf).is_err())
+                    .is_none_or(|mut buffer| buffer.push_bytes(buf).is_err())
                 {
                     return Err(io::Error::other("Failed to push a string to the buffer."));
                 }

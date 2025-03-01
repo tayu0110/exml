@@ -1,21 +1,21 @@
 use std::ptr::{drop_in_place, null_mut};
 
 use crate::{
-    globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
+    globals::{GLOBAL_STATE, GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{
         globals::{xml_free, xml_malloc},
         relaxng::{
-            xml_relaxng_free_document, xml_relaxng_free_document_list,
-            xml_relaxng_free_include_list, XmlRelaxNGDocumentPtr, XmlRelaxNGGrammarPtr,
-            XmlRelaxNGIncludePtr, XmlRelaxNGParserFlag, XmlRelaxNGPtr, XmlRelaxNGValidErr,
+            XmlRelaxNGDocumentPtr, XmlRelaxNGGrammarPtr, XmlRelaxNGIncludePtr,
+            XmlRelaxNGParserFlag, XmlRelaxNGPtr, XmlRelaxNGValidErr, xml_relaxng_free_document,
+            xml_relaxng_free_document_list, xml_relaxng_free_include_list,
         },
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
     },
-    tree::{xml_copy_doc, xml_free_doc, XmlDocPtr},
+    tree::{XmlDocPtr, xml_copy_doc, xml_free_doc},
 };
 
-use super::{xml_relaxng_free_define, xml_rng_perr_memory, XmlRelaxNGDefinePtr};
+use super::{XmlRelaxNGDefinePtr, xml_relaxng_free_define, xml_rng_perr_memory};
 
 pub type XmlRelaxNGParserCtxtPtr = *mut XmlRelaxNGParserCtxt;
 // TODO: all fieleds are used in only relaxng module.
@@ -218,18 +218,20 @@ impl Default for XmlRelaxNGParserCtxt {
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlRelaxNGNewParserCtxt")]
 pub unsafe fn xml_relaxng_new_parser_ctxt(url: &str) -> XmlRelaxNGParserCtxtPtr {
-    let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
-    if ret.is_null() {
-        xml_rng_perr_memory(null_mut(), Some("building parser\n"));
-        return null_mut();
+    unsafe {
+        let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
+        if ret.is_null() {
+            xml_rng_perr_memory(null_mut(), Some("building parser\n"));
+            return null_mut();
+        }
+        std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
+        (*ret).url = Some(url.to_owned());
+        GLOBAL_STATE.with_borrow(|state| {
+            (*ret).error = Some(state.generic_error);
+            (*ret).user_data = state.generic_error_context.clone();
+        });
+        ret
     }
-    std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
-    (*ret).url = Some(url.to_owned());
-    GLOBAL_STATE.with_borrow(|state| {
-        (*ret).error = Some(state.generic_error);
-        (*ret).user_data = state.generic_error_context.clone();
-    });
-    ret
 }
 
 /// Create an XML RelaxNGs parse context for that memory buffer expected
@@ -241,23 +243,25 @@ pub unsafe fn xml_relaxng_new_mem_parser_ctxt(
     buffer: *const i8,
     size: i32,
 ) -> XmlRelaxNGParserCtxtPtr {
-    if buffer.is_null() || size <= 0 {
-        return null_mut();
-    }
+    unsafe {
+        if buffer.is_null() || size <= 0 {
+            return null_mut();
+        }
 
-    let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
-    if ret.is_null() {
-        xml_rng_perr_memory(null_mut(), Some("building parser\n"));
-        return null_mut();
+        let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
+        if ret.is_null() {
+            xml_rng_perr_memory(null_mut(), Some("building parser\n"));
+            return null_mut();
+        }
+        std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
+        (*ret).buffer = buffer;
+        (*ret).size = size;
+        GLOBAL_STATE.with_borrow(|state| {
+            (*ret).error = Some(state.generic_error);
+            (*ret).user_data = state.generic_error_context.clone();
+        });
+        ret
     }
-    std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
-    (*ret).buffer = buffer;
-    (*ret).size = size;
-    GLOBAL_STATE.with_borrow(|state| {
-        (*ret).error = Some(state.generic_error);
-        (*ret).user_data = state.generic_error_context.clone();
-    });
-    ret
 }
 
 /// Create an XML RelaxNGs parser context for that document.
@@ -269,53 +273,57 @@ pub unsafe fn xml_relaxng_new_mem_parser_ctxt(
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlRelaxNGNewDocParserCtxt")]
 pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlRelaxNGParserCtxtPtr {
-    // if doc.is_null() {
-    //     return null_mut();
-    // }
-    let Some(copy) = xml_copy_doc(doc, 1) else {
-        return null_mut();
-    };
+    unsafe {
+        // if doc.is_null() {
+        //     return null_mut();
+        // }
+        let Some(copy) = xml_copy_doc(doc, 1) else {
+            return null_mut();
+        };
 
-    let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
-    if ret.is_null() {
-        xml_rng_perr_memory(null_mut(), Some("building parser\n"));
-        xml_free_doc(copy);
-        return null_mut();
+        let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
+        if ret.is_null() {
+            xml_rng_perr_memory(null_mut(), Some("building parser\n"));
+            xml_free_doc(copy);
+            return null_mut();
+        }
+        std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
+        (*ret).document = Some(copy);
+        (*ret).freedoc = 1;
+        GLOBAL_STATE.with_borrow(|state| {
+            (*ret).user_data = state.generic_error_context.clone();
+        });
+        ret
     }
-    std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
-    (*ret).document = Some(copy);
-    (*ret).freedoc = 1;
-    GLOBAL_STATE.with_borrow(|state| {
-        (*ret).user_data = state.generic_error_context.clone();
-    });
-    ret
 }
 
 /// Free the resources associated to the schema parser context
 #[doc(alias = "xmlRelaxNGFreeParserCtxt")]
 pub unsafe fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
-    if ctxt.is_null() {
-        return;
+    unsafe {
+        if ctxt.is_null() {
+            return;
+        }
+        (*ctxt).url.take();
+        if !(*ctxt).doc.is_null() {
+            xml_relaxng_free_document((*ctxt).doc);
+        }
+        if let Some(mut table) = (*ctxt).interleaves.take().map(|t| t.into_inner()) {
+            table.clear();
+        }
+        if !(*ctxt).documents.is_null() {
+            xml_relaxng_free_document_list((*ctxt).documents);
+        }
+        if !(*ctxt).includes.is_null() {
+            xml_relaxng_free_include_list((*ctxt).includes);
+        }
+        for def in (*ctxt).def_tab.drain(..) {
+            xml_relaxng_free_define(def);
+        }
+        if let Some(document) = (*ctxt).document.take().filter(|_| (*ctxt).freedoc != 0) {
+            xml_free_doc(document);
+        }
+        drop_in_place(ctxt);
+        xml_free(ctxt as _);
     }
-    (*ctxt).url.take();
-    if !(*ctxt).doc.is_null() {
-        xml_relaxng_free_document((*ctxt).doc);
-    }
-    if let Some(mut table) = (*ctxt).interleaves.take().map(|t| t.into_inner()) {
-        table.clear();
-    }
-    if !(*ctxt).documents.is_null() {
-        xml_relaxng_free_document_list((*ctxt).documents);
-    }
-    if !(*ctxt).includes.is_null() {
-        xml_relaxng_free_include_list((*ctxt).includes);
-    }
-    for def in (*ctxt).def_tab.drain(..) {
-        xml_relaxng_free_define(def);
-    }
-    if let Some(document) = (*ctxt).document.take().filter(|_| (*ctxt).freedoc != 0) {
-        xml_free_doc(document);
-    }
-    drop_in_place(ctxt);
-    xml_free(ctxt as _);
 }

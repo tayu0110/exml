@@ -2,43 +2,44 @@
 //! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
 
 use std::{
+    cell::{Cell, RefCell},
     env::args,
-    ffi::{c_char, c_int, c_ulong, c_void, CStr},
+    ffi::{CStr, c_char, c_int, c_ulong, c_void},
     fs::metadata,
     io::{self, Read},
     mem::zeroed,
     process::exit,
     ptr::{addr_of_mut, null_mut},
-    sync::atomic::{AtomicPtr, Ordering},
+    sync::atomic::{AtomicI32, AtomicPtr, Ordering},
 };
 
 use exml::{
     error::{
-        parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel,
-        XmlParserErrors,
+        XmlError, XmlErrorDomain, XmlErrorLevel, XmlParserErrors,
+        parser_print_file_context_internal,
     },
     globals::{
-        reset_last_error, set_get_warnings_default_value, set_pedantic_parser_default_value,
-        set_structured_error, GenericErrorContext,
+        GenericErrorContext, reset_last_error, set_get_warnings_default_value,
+        set_pedantic_parser_default_value, set_structured_error,
     },
-    io::{register_input_callbacks, xml_no_net_external_entity_loader, XmlInputCallback},
+    io::{XmlInputCallback, register_input_callbacks, xml_no_net_external_entity_loader},
     libxml::{
         parser::{
-            xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader, XmlParserOption,
+            XmlParserOption, xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,
         },
-        xmlstring::{xml_strlen, XmlChar},
+        xmlstring::{XmlChar, xml_strlen},
     },
     parser::{
-        xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_parser_ctxt, XmlParserCtxtPtr,
-        XmlParserInputPtr,
+        XmlParserCtxtPtr, XmlParserInputPtr, xml_ctxt_read_file, xml_free_parser_ctxt,
+        xml_new_parser_ctxt,
     },
-    tree::{xml_free_doc, xml_get_doc_entity, XmlElementType, XmlNodePtr},
+    tree::{XmlElementType, XmlNodePtr, xml_free_doc, xml_get_doc_entity},
 };
-use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};
+use libc::{GLOB_DOOFFS, free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy};
 
 const OPT_SAX: i32 = 1 << 0;
 const OPT_NO_SUBST: i32 = 1 << 1;
@@ -78,9 +79,11 @@ const HUGE_DOC_TABLE: &[XmlHugeDocParts] = &[
     }
 ];
 
-static mut HUGE_DOC_PARTS: &XmlHugeDocParts<'static> = &HUGE_DOC_TABLE[0];
+thread_local! {
+    static HUGE_DOC_PARTS: Cell<&'static XmlHugeDocParts<'static>> = const { Cell::new(&HUGE_DOC_TABLE[0]) };
+}
 static mut CURSEG: usize = 0;
-static mut CURRENT: AtomicPtr<c_char> = AtomicPtr::new(null_mut());
+static CURRENT: AtomicPtr<c_char> = AtomicPtr::new(null_mut());
 static mut RLEN: usize = 0;
 
 /// Check for a huge query
@@ -103,17 +106,19 @@ fn huge_match(uri: &str) -> c_int {
 /// Returns an Input context or NULL in case or error
 #[doc(alias = "hugeOpen")]
 unsafe fn huge_open(uri: &str) -> *mut c_void {
-    for doc in HUGE_DOC_TABLE {
-        if uri == doc.url {
-            HUGE_DOC_PARTS = doc;
-            CURRENT.store(doc.start.as_ptr() as _, Ordering::Relaxed);
-            CURSEG = 0;
-            RLEN = doc.start.to_bytes().len();
-            return CURRENT.load(Ordering::Relaxed) as _;
+    unsafe {
+        for doc in HUGE_DOC_TABLE {
+            if uri == doc.url {
+                HUGE_DOC_PARTS.set(doc);
+                CURRENT.store(doc.start.as_ptr() as _, Ordering::Relaxed);
+                CURSEG = 0;
+                RLEN = doc.start.to_bytes().len();
+                return CURRENT.load(Ordering::Relaxed) as _;
+            }
         }
-    }
 
-    null_mut()
+        null_mut()
+    }
 }
 
 /// Close the huge query handler
@@ -134,39 +139,41 @@ const MAX_NODES: usize = 1000;
 /// Returns the number of bytes read or -1 in case of error
 #[doc(alias = "hugeRead")]
 unsafe extern "C" fn huge_read(context: *mut c_void, buffer: *mut c_char, mut len: c_int) -> c_int {
-    if context.is_null() || buffer.is_null() || len < 0 {
-        return -1;
-    }
+    unsafe {
+        if context.is_null() || buffer.is_null() || len < 0 {
+            return -1;
+        }
 
-    let mut current = CURRENT.load(Ordering::Acquire);
-    if len as usize >= RLEN {
-        if CURSEG > MAX_NODES {
+        let mut current = CURRENT.load(Ordering::Acquire);
+        if len as usize >= RLEN {
+            if CURSEG > MAX_NODES {
+                RLEN = 0;
+                return 0;
+            }
+            len = RLEN as i32;
             RLEN = 0;
-            return 0;
-        }
-        len = RLEN as i32;
-        RLEN = 0;
-        memcpy(buffer as _, current as _, len as _);
-        CURSEG += 1;
-        if CURSEG == MAX_NODES {
-            current = HUGE_DOC_PARTS.finish.as_ptr() as _;
+            memcpy(buffer as _, current as _, len as _);
+            CURSEG += 1;
+            if CURSEG == MAX_NODES {
+                current = HUGE_DOC_PARTS.get().finish.as_ptr() as _;
+            } else {
+                current = HUGE_DOC_PARTS.get().segment.as_ptr() as _;
+            }
+            RLEN = strlen(current as _);
         } else {
-            current = HUGE_DOC_PARTS.segment.as_ptr() as _;
+            memcpy(buffer as _, current as _, len as _);
+            RLEN -= len as usize;
+            current = current.add(len as _);
         }
-        RLEN = strlen(current as _);
-    } else {
-        memcpy(buffer as _, current as _, len as _);
-        RLEN -= len as usize;
-        current = current.add(len as _);
+        CURRENT.store(current, Ordering::Release);
+        len
     }
-    CURRENT.store(current, Ordering::Release);
-    len
 }
 
-static mut NB_TESTS: c_int = 0;
-static mut NB_ERRORS: c_int = 0;
-static mut NB_LEAKS: c_int = 0;
-static mut EXTRA_MEMORY_FROM_RESOLVER: c_int = 0;
+static NB_TESTS: AtomicI32 = AtomicI32::new(0);
+static NB_ERRORS: AtomicI32 = AtomicI32::new(0);
+static NB_LEAKS: AtomicI32 = AtomicI32::new(0);
+static EXTRA_MEMORY_FROM_RESOLVER: AtomicI32 = AtomicI32::new(0);
 
 unsafe fn fatal_error() -> c_int {
     eprintln!("Exitting tests on fatal error");
@@ -181,40 +188,46 @@ unsafe fn test_external_entity_loader(
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
-    let ret: XmlParserInputPtr;
+    unsafe {
+        let ret: XmlParserInputPtr;
 
-    if check_test_file(url.unwrap()) != 0 {
-        ret = xml_no_net_external_entity_loader(url, id, ctxt);
-    } else {
-        let memused: c_int = xml_mem_used();
-        ret = xml_no_net_external_entity_loader(url, id, ctxt);
-        EXTRA_MEMORY_FROM_RESOLVER += xml_mem_used() - memused;
+        if check_test_file(url.unwrap()) != 0 {
+            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+        } else {
+            let memused: c_int = xml_mem_used();
+            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+            EXTRA_MEMORY_FROM_RESOLVER.fetch_add(xml_mem_used() - memused, Ordering::Relaxed);
+        }
+
+        ret
     }
-
-    ret
 }
 
 // Trapping the error messages at the generic level to grab the equivalent of
 // stderr messages on CLI tools.
-static mut TEST_ERRORS: [u8; 32769] = [0; 32769];
-static mut TEST_ERRORS_SIZE: usize = 0;
+thread_local! {
+    static TEST_ERRORS: RefCell<[u8; 32769]> = const { RefCell::new([0; 32769]) };
+    static TEST_ERRORS_SIZE: Cell<usize> = const { Cell::new(0) };
+
+}
 
 fn channel(_ctx: Option<GenericErrorContext>, msg: &str) {
-    unsafe {
-        if TEST_ERRORS_SIZE >= 32768 {
+    TEST_ERRORS.with_borrow_mut(|errors| {
+        if TEST_ERRORS_SIZE.get() >= 32768 {
             return;
         }
-        if TEST_ERRORS_SIZE + msg.len() >= TEST_ERRORS.len() {
-            TEST_ERRORS[TEST_ERRORS_SIZE..]
-                .copy_from_slice(&msg.as_bytes()[..TEST_ERRORS.len() - TEST_ERRORS_SIZE]);
-            TEST_ERRORS_SIZE = TEST_ERRORS.len();
+        if TEST_ERRORS_SIZE.get() + msg.len() >= errors.len() {
+            let len = errors.len();
+            errors[TEST_ERRORS_SIZE.get()..]
+                .copy_from_slice(&msg.as_bytes()[..len - TEST_ERRORS_SIZE.get()]);
+            TEST_ERRORS_SIZE.set(errors.len());
         } else {
-            TEST_ERRORS[TEST_ERRORS_SIZE..TEST_ERRORS_SIZE + msg.len()]
+            errors[TEST_ERRORS_SIZE.get()..TEST_ERRORS_SIZE.get() + msg.len()]
                 .copy_from_slice(msg.as_bytes());
-            TEST_ERRORS_SIZE += msg.len();
+            TEST_ERRORS_SIZE.set(TEST_ERRORS_SIZE.get() + msg.len());
         }
-        TEST_ERRORS[TEST_ERRORS_SIZE] = 0;
-    }
+        errors[TEST_ERRORS_SIZE.get()] = 0;
+    })
 }
 
 fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlError) {
@@ -348,84 +361,91 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 }
 
 unsafe fn initialize_libxml2() {
-    set_get_warnings_default_value(0);
-    set_pedantic_parser_default_value(0);
+    unsafe {
+        set_get_warnings_default_value(0);
+        set_pedantic_parser_default_value(0);
 
-    xml_mem_setup(
-        Some(xml_mem_free),
-        Some(xml_mem_malloc),
-        Some(xml_mem_realloc),
-        Some(xml_memory_strdup),
-    );
-    xml_init_parser();
-    xml_set_external_entity_loader(test_external_entity_loader);
-    set_structured_error(Some(test_structured_error_handler), None);
-    // register the new I/O handlers
-    struct HugeTestIO(*mut c_void);
-    impl Read for HugeTestIO {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-            let res = unsafe { huge_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
-            if res < 0 {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(res as usize)
-            }
-        }
-    }
-    unsafe impl Send for HugeTestIO {}
-    impl Drop for HugeTestIO {
-        fn drop(&mut self) {
-            if !self.0.is_null() {
-                unsafe {
-                    huge_close(self.0);
+        xml_mem_setup(
+            Some(xml_mem_free),
+            Some(xml_mem_malloc),
+            Some(xml_mem_realloc),
+            Some(xml_memory_strdup),
+        );
+        xml_init_parser();
+        xml_set_external_entity_loader(test_external_entity_loader);
+        set_structured_error(Some(test_structured_error_handler), None);
+        // register the new I/O handlers
+        struct HugeTestIO(*mut c_void);
+        impl Read for HugeTestIO {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                let res =
+                    unsafe { huge_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
+                if res < 0 {
+                    Err(io::Error::last_os_error())
+                } else {
+                    Ok(res as usize)
                 }
             }
         }
-    }
-    impl XmlInputCallback for HugeTestIO {
-        fn is_match(&self, filename: &str) -> bool {
-            huge_match(filename) != 0
-        }
-        fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
-            let ptr = unsafe { huge_open(filename) };
-            if ptr.is_null() {
-                Err(io::Error::other("Failed to execute huge_open"))
-            } else {
-                Ok(Box::new(Self(ptr)))
+        unsafe impl Send for HugeTestIO {}
+        impl Drop for HugeTestIO {
+            fn drop(&mut self) {
+                if !self.0.is_null() {
+                    unsafe {
+                        huge_close(self.0);
+                    }
+                }
             }
         }
-    }
-    if register_input_callbacks(HugeTestIO(null_mut())).is_err() {
-        eprintln!("failed to register Huge handler");
-        exit(1);
+        impl XmlInputCallback for HugeTestIO {
+            fn is_match(&self, filename: &str) -> bool {
+                huge_match(filename) != 0
+            }
+            fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
+                let ptr = unsafe { huge_open(filename) };
+                if ptr.is_null() {
+                    Err(io::Error::other("Failed to execute huge_open"))
+                } else {
+                    Ok(Box::new(Self(ptr)))
+                }
+            }
+        }
+        if register_input_callbacks(HugeTestIO(null_mut())).is_err() {
+            eprintln!("failed to register Huge handler");
+            exit(1);
+        }
     }
 }
 
 unsafe fn init_sax(ctxt: XmlParserCtxtPtr) {
-    if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-        sax.start_element_ns = None;
-        sax.end_element_ns = None;
-        sax.characters = None;
-        sax.cdata_block = None;
-        sax.ignorable_whitespace = None;
-        sax.processing_instruction = None;
-        sax.comment = None;
+    unsafe {
+        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            sax.start_element_ns = None;
+            sax.end_element_ns = None;
+            sax.characters = None;
+            sax.cdata_block = None;
+            sax.ignorable_whitespace = None;
+            sax.processing_instruction = None;
+            sax.comment = None;
+        }
     }
 }
 
 unsafe fn base_filename(filename: *const c_char) -> *const c_char {
-    let mut cur: *const c_char;
-    if filename.is_null() {
-        return null_mut();
+    unsafe {
+        let mut cur: *const c_char;
+        if filename.is_null() {
+            return null_mut();
+        }
+        cur = filename.add(strlen(filename));
+        while cur > filename && *cur != b'/' as _ {
+            cur = cur.sub(1);
+        }
+        if *cur == b'/' as _ {
+            return cur.add(1);
+        }
+        cur
     }
-    cur = filename.add(strlen(filename));
-    while cur > filename && *cur != b'/' as _ {
-        cur = cur.sub(1);
-    }
-    if *cur == b'/' as _ {
-        return cur.add(1);
-    }
-    cur
 }
 
 unsafe fn result_filename(
@@ -433,38 +453,40 @@ unsafe fn result_filename(
     mut out: *const c_char,
     mut suffix: *const c_char,
 ) -> *mut c_char {
-    let mut res: [c_char; 500] = [0; 500];
-    let suffixbuff: [c_char; 500] = [0; 500];
+    unsafe {
+        let mut res: [c_char; 500] = [0; 500];
+        let suffixbuff: [c_char; 500] = [0; 500];
 
-    /*************
-       if ((filename[0] == 't') && (filename[1] == 'e') &&
-           (filename[2] == 's') && (filename[3] == 't') &&
-       (filename[4] == '/'))
-       filename = &filename[5];
-    *************/
+        /*************
+           if ((filename[0] == 't') && (filename[1] == 'e') &&
+               (filename[2] == 's') && (filename[3] == 't') &&
+           (filename[4] == '/'))
+           filename = &filename[5];
+        *************/
 
-    let base: *const c_char = base_filename(filename);
-    if suffix.is_null() {
-        suffix = c".tmp".as_ptr();
+        let base: *const c_char = base_filename(filename);
+        if suffix.is_null() {
+            suffix = c".tmp".as_ptr();
+        }
+        if out.is_null() {
+            out = c"".as_ptr();
+        }
+
+        strncpy(suffixbuff.as_ptr() as _, suffix, 499);
+
+        if snprintf(
+            res.as_mut_ptr() as _,
+            499,
+            c"%s%s%s".as_ptr(),
+            out,
+            base,
+            suffixbuff.as_ptr(),
+        ) >= 499
+        {
+            res[499] = 0;
+        }
+        strdup(res.as_ptr())
     }
-    if out.is_null() {
-        out = c"".as_ptr();
-    }
-
-    strncpy(suffixbuff.as_ptr() as _, suffix, 499);
-
-    if snprintf(
-        res.as_mut_ptr() as _,
-        499,
-        c"%s%s%s".as_ptr(),
-        out,
-        base,
-        suffixbuff.as_ptr(),
-    ) >= 499
-    {
-        res[499] = 0;
-    }
-    strdup(res.as_ptr())
 }
 
 fn check_test_file(filename: &str) -> c_int {
@@ -484,33 +506,35 @@ unsafe fn recursive_detect_test(
     _err: *const c_char,
     options: c_int,
 ) -> c_int {
-    let res: c_int = 0;
-    // xmlParserOption::XML_PARSE_DTDVALID is the only way to load external entities
-    // without xmlParserOption::XML_PARSE_NOENT. The validation result doesn't matter anyway.
-    let mut parser_options: c_int = XmlParserOption::XmlParseDTDValid as i32;
+    unsafe {
+        let res: c_int = 0;
+        // xmlParserOption::XML_PARSE_DTDVALID is the only way to load external entities
+        // without xmlParserOption::XML_PARSE_NOENT. The validation result doesn't matter anyway.
+        let mut parser_options: c_int = XmlParserOption::XmlParseDTDValid as i32;
 
-    NB_TESTS += 1;
+        NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-    let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-    if options & OPT_SAX != 0 {
-        init_sax(ctxt);
-    }
-    if options & OPT_NO_SUBST == 0 {
-        parser_options |= XmlParserOption::XmlParseNoEnt as i32;
-    }
-    // base of the test, parse with the old API
-    let doc = xml_ctxt_read_file(ctxt, filename, None, parser_options);
-    if doc.is_some() || (*ctxt).last_error.code() != XmlParserErrors::XmlErrEntityLoop {
-        eprintln!("Failed to detect recursion in {filename}");
-        xml_free_parser_ctxt(ctxt);
-        if let Some(doc) = doc {
-            xml_free_doc(doc);
+        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+        if options & OPT_SAX != 0 {
+            init_sax(ctxt);
         }
-        return 1;
-    }
-    xml_free_parser_ctxt(ctxt);
+        if options & OPT_NO_SUBST == 0 {
+            parser_options |= XmlParserOption::XmlParseNoEnt as i32;
+        }
+        // base of the test, parse with the old API
+        let doc = xml_ctxt_read_file(ctxt, filename, None, parser_options);
+        if doc.is_some() || (*ctxt).last_error.code() != XmlParserErrors::XmlErrEntityLoop {
+            eprintln!("Failed to detect recursion in {filename}");
+            xml_free_parser_ctxt(ctxt);
+            if let Some(doc) = doc {
+                xml_free_doc(doc);
+            }
+            return 1;
+        }
+        xml_free_parser_ctxt(ctxt);
 
-    res
+        res
+    }
 }
 
 /// Parse a file loading DTD and replacing entities check it works for
@@ -524,28 +548,30 @@ unsafe fn not_recursive_detect_test(
     _err: *const c_char,
     options: c_int,
 ) -> c_int {
-    let res: c_int = 0;
-    let mut parser_options: c_int = XmlParserOption::XmlParseDTDLoad as i32;
+    unsafe {
+        let res: c_int = 0;
+        let mut parser_options: c_int = XmlParserOption::XmlParseDTDLoad as i32;
 
-    NB_TESTS += 1;
+        NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-    let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-    if options & OPT_SAX != 0 {
-        init_sax(ctxt);
-    }
-    if options & OPT_NO_SUBST == 0 {
-        parser_options |= XmlParserOption::XmlParseNoEnt as i32;
-    }
-    // base of the test, parse with the old API
-    let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, parser_options) else {
-        eprintln!("Failed to parse correct file {filename}");
+        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+        if options & OPT_SAX != 0 {
+            init_sax(ctxt);
+        }
+        if options & OPT_NO_SUBST == 0 {
+            parser_options |= XmlParserOption::XmlParseNoEnt as i32;
+        }
+        // base of the test, parse with the old API
+        let Some(doc) = xml_ctxt_read_file(ctxt, filename, None, parser_options) else {
+            eprintln!("Failed to parse correct file {filename}");
+            xml_free_parser_ctxt(ctxt);
+            return 1;
+        };
+        xml_free_doc(doc);
         xml_free_parser_ctxt(ctxt);
-        return 1;
-    };
-    xml_free_doc(doc);
-    xml_free_parser_ctxt(ctxt);
 
-    res
+        res
+    }
 }
 
 /// Parse a memory generated file good cases
@@ -558,96 +584,98 @@ unsafe fn not_recursive_huge_test(
     _err: *const c_char,
     options: c_int,
 ) -> c_int {
-    let mut res: c_int = 0;
-    let mut parser_options: c_int = XmlParserOption::XmlParseDTDValid as i32;
+    unsafe {
+        let mut res: c_int = 0;
+        let mut parser_options: c_int = XmlParserOption::XmlParseDTDValid as i32;
 
-    NB_TESTS += 1;
+        NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-    let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-    if options & OPT_SAX != 0 {
-        init_sax(ctxt);
+        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+        if options & OPT_SAX != 0 {
+            init_sax(ctxt);
+        }
+        if options & OPT_NO_SUBST == 0 {
+            parser_options |= XmlParserOption::XmlParseNoEnt as i32;
+        }
+        if let Some(doc) = xml_ctxt_read_file(ctxt, "test/recurse/huge.xml", None, parser_options) {
+            let fixed_cost: c_ulong = 20;
+            let allowed_expansion: c_ulong = 1000000;
+            let f_size: c_ulong = xml_strlen(c"some internal data".as_ptr() as _) as u64;
+
+            let ent = xml_get_doc_entity(Some(doc), "e").unwrap();
+            let e_size: c_ulong =
+                f_size * 2 + xml_strlen(c"&f;".as_ptr() as _) as u64 * 2 + fixed_cost * 2;
+            if ent.expanded_size != e_size {
+                eprintln!(
+                    "Wrong size for entity e: {} (expected {})",
+                    ent.expanded_size, e_size
+                );
+                res = 1;
+            }
+
+            let ent = xml_get_doc_entity(Some(doc), "b").unwrap();
+            if ent.expanded_size != e_size {
+                eprintln!(
+                    "Wrong size for entity b: {} (expected {})",
+                    ent.expanded_size, e_size
+                );
+                res = 1;
+            }
+
+            let ent = xml_get_doc_entity(Some(doc), "d").unwrap();
+            let d_size: c_ulong =
+                e_size * 2 + xml_strlen(c"&e;".as_ptr() as _) as u64 * 2 + fixed_cost * 2;
+            if ent.expanded_size != d_size {
+                eprintln!(
+                    "Wrong size for entity d: {} (expected {})",
+                    ent.expanded_size, d_size
+                );
+                res = 1;
+            }
+
+            let ent = xml_get_doc_entity(Some(doc), "c").unwrap();
+            if ent.expanded_size != d_size {
+                eprintln!(
+                    "Wrong size for entity c: {} (expected {})",
+                    ent.expanded_size, d_size
+                );
+                res = 1;
+            }
+
+            if (*ctxt).sizeentcopy < allowed_expansion {
+                eprintln!("Total entity size too small: {}", (*ctxt).sizeentcopy);
+                res = 1;
+            }
+
+            let total_size: c_ulong =
+                (f_size + e_size + d_size + 3 * fixed_cost) * (MAX_NODES as u64 - 1) * 3;
+            if (*ctxt).sizeentcopy != total_size {
+                eprintln!(
+                    "Wrong total entity size: {} (expected {})",
+                    (*ctxt).sizeentcopy,
+                    total_size
+                );
+                res = 1;
+            }
+
+            if (*ctxt).sizeentities != 30 {
+                eprintln!(
+                    "Wrong parsed entity size: {} (expected {})",
+                    (*ctxt).sizeentities,
+                    30
+                );
+                res = 1;
+            }
+            xml_free_doc(doc);
+        } else {
+            eprintln!("Failed to parse huge.xml");
+            res = 1;
+        }
+
+        xml_free_parser_ctxt(ctxt);
+
+        res
     }
-    if options & OPT_NO_SUBST == 0 {
-        parser_options |= XmlParserOption::XmlParseNoEnt as i32;
-    }
-    if let Some(doc) = xml_ctxt_read_file(ctxt, "test/recurse/huge.xml", None, parser_options) {
-        let fixed_cost: c_ulong = 20;
-        let allowed_expansion: c_ulong = 1000000;
-        let f_size: c_ulong = xml_strlen(c"some internal data".as_ptr() as _) as u64;
-
-        let ent = xml_get_doc_entity(Some(doc), "e").unwrap();
-        let e_size: c_ulong =
-            f_size * 2 + xml_strlen(c"&f;".as_ptr() as _) as u64 * 2 + fixed_cost * 2;
-        if ent.expanded_size != e_size {
-            eprintln!(
-                "Wrong size for entity e: {} (expected {})",
-                ent.expanded_size, e_size
-            );
-            res = 1;
-        }
-
-        let ent = xml_get_doc_entity(Some(doc), "b").unwrap();
-        if ent.expanded_size != e_size {
-            eprintln!(
-                "Wrong size for entity b: {} (expected {})",
-                ent.expanded_size, e_size
-            );
-            res = 1;
-        }
-
-        let ent = xml_get_doc_entity(Some(doc), "d").unwrap();
-        let d_size: c_ulong =
-            e_size * 2 + xml_strlen(c"&e;".as_ptr() as _) as u64 * 2 + fixed_cost * 2;
-        if ent.expanded_size != d_size {
-            eprintln!(
-                "Wrong size for entity d: {} (expected {})",
-                ent.expanded_size, d_size
-            );
-            res = 1;
-        }
-
-        let ent = xml_get_doc_entity(Some(doc), "c").unwrap();
-        if ent.expanded_size != d_size {
-            eprintln!(
-                "Wrong size for entity c: {} (expected {})",
-                ent.expanded_size, d_size
-            );
-            res = 1;
-        }
-
-        if (*ctxt).sizeentcopy < allowed_expansion {
-            eprintln!("Total entity size too small: {}", (*ctxt).sizeentcopy);
-            res = 1;
-        }
-
-        let total_size: c_ulong =
-            (f_size + e_size + d_size + 3 * fixed_cost) * (MAX_NODES as u64 - 1) * 3;
-        if (*ctxt).sizeentcopy != total_size {
-            eprintln!(
-                "Wrong total entity size: {} (expected {})",
-                (*ctxt).sizeentcopy,
-                total_size
-            );
-            res = 1;
-        }
-
-        if (*ctxt).sizeentities != 30 {
-            eprintln!(
-                "Wrong parsed entity size: {} (expected {})",
-                (*ctxt).sizeentities,
-                30
-            );
-            res = 1;
-        }
-        xml_free_doc(doc);
-    } else {
-        eprintln!("Failed to parse huge.xml");
-        res = 1;
-    }
-
-    xml_free_parser_ctxt(ctxt);
-
-    res
 }
 
 /// Parse a memory generated file good cases
@@ -660,71 +688,75 @@ unsafe fn huge_dtd_test(
     _err: *const c_char,
     options: c_int,
 ) -> c_int {
-    let mut res: c_int = 0;
-    let mut parser_options: c_int = XmlParserOption::XmlParseDTDValid as i32;
+    unsafe {
+        let mut res: c_int = 0;
+        let mut parser_options: c_int = XmlParserOption::XmlParseDTDValid as i32;
 
-    NB_TESTS += 1;
+        NB_TESTS.fetch_add(1, Ordering::Relaxed);
 
-    let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-    if options & OPT_SAX != 0 {
-        init_sax(ctxt);
-    }
-    if options & OPT_NO_SUBST == 0 {
-        parser_options |= XmlParserOption::XmlParseNoEnt as i32;
-    }
-    if let Some(doc) = xml_ctxt_read_file(ctxt, "test/recurse/huge_dtd.xml", None, parser_options) {
-        let fixed_cost: usize = 20;
-        let allowed_expansion: usize = 1000000;
-        let a_size: usize = xml_strlen(c"<!-- comment -->".as_ptr() as _) as usize;
-        let mut total_size: usize;
-
-        if (*ctxt).sizeentcopy < allowed_expansion as u64 {
-            eprintln!("Total entity size too small: {}", (*ctxt).sizeentcopy);
-            res = 1;
+        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+        if options & OPT_SAX != 0 {
+            init_sax(ctxt);
         }
+        if options & OPT_NO_SUBST == 0 {
+            parser_options |= XmlParserOption::XmlParseNoEnt as i32;
+        }
+        if let Some(doc) =
+            xml_ctxt_read_file(ctxt, "test/recurse/huge_dtd.xml", None, parser_options)
+        {
+            let fixed_cost: usize = 20;
+            let allowed_expansion: usize = 1000000;
+            let a_size: usize = xml_strlen(c"<!-- comment -->".as_ptr() as _) as usize;
+            let mut total_size: usize;
 
-        let b_size: usize = (a_size + c"&a;".to_bytes().len() + fixed_cost) * 2;
-        let c_size: usize = (b_size + c"&b;".to_bytes().len() + fixed_cost) * 2;
-        // Internal parameter entites are substitued eagerly and
-        // need different accounting.
-        let e_size: usize = a_size * 2;
-        let f_size: usize = e_size * 2;
-        total_size = e_size + f_size + fixed_cost * 4 + (a_size + e_size + f_size + fixed_cost * 3) * (MAX_NODES - 1) * 2 + // internal
+            if (*ctxt).sizeentcopy < allowed_expansion as u64 {
+                eprintln!("Total entity size too small: {}", (*ctxt).sizeentcopy);
+                res = 1;
+            }
+
+            let b_size: usize = (a_size + c"&a;".to_bytes().len() + fixed_cost) * 2;
+            let c_size: usize = (b_size + c"&b;".to_bytes().len() + fixed_cost) * 2;
+            // Internal parameter entites are substitued eagerly and
+            // need different accounting.
+            let e_size: usize = a_size * 2;
+            let f_size: usize = e_size * 2;
+            total_size = e_size + f_size + fixed_cost * 4 + (a_size + e_size + f_size + fixed_cost * 3) * (MAX_NODES - 1) * 2 + // internal
                          (a_size + b_size + c_size + fixed_cost * 3) * (MAX_NODES - 1) * 2 // external
                          + c"success".to_bytes().len() + fixed_cost; // final reference in main doc
-        if (*ctxt).sizeentcopy != total_size as u64 {
-            eprintln!(
-                "Wrong total entity size: {} (expected {})",
-                (*ctxt).sizeentcopy,
-                total_size
-            );
+            if (*ctxt).sizeentcopy != total_size as u64 {
+                eprintln!(
+                    "Wrong total entity size: {} (expected {})",
+                    (*ctxt).sizeentcopy,
+                    total_size
+                );
+                res = 1;
+            }
+
+            total_size = HUGE_DOC_PARTS.get().start.to_bytes().len()
+                + HUGE_DOC_PARTS.get().segment.to_bytes().len() * (MAX_NODES - 1)
+                + HUGE_DOC_PARTS.get().finish.to_bytes().len()
+                + 28;
+            if (*ctxt).sizeentities != total_size as u64 {
+                eprintln!(
+                    "Wrong parsed entity size: {} (expected {})",
+                    (*ctxt).sizeentities,
+                    total_size
+                );
+                res = 1;
+            }
+            xml_free_doc(doc);
+        } else {
+            eprintln!("Failed to parse huge_dtd.xml");
             res = 1;
         }
 
-        total_size = HUGE_DOC_PARTS.start.to_bytes().len()
-            + HUGE_DOC_PARTS.segment.to_bytes().len() * (MAX_NODES - 1)
-            + HUGE_DOC_PARTS.finish.to_bytes().len()
-            + 28;
-        if (*ctxt).sizeentities != total_size as u64 {
-            eprintln!(
-                "Wrong parsed entity size: {} (expected {})",
-                (*ctxt).sizeentities,
-                total_size
-            );
-            res = 1;
-        }
-        xml_free_doc(doc);
-    } else {
-        eprintln!("Failed to parse huge_dtd.xml");
-        res = 1;
+        xml_free_parser_ctxt(ctxt);
+
+        res
     }
-
-    xml_free_parser_ctxt(ctxt);
-
-    res
 }
 
-static mut TEST_DESCRIPTIONS: [TestDesc; 11] = [
+static TEST_DESCRIPTIONS: [TestDesc; 11] = [
     TestDesc {
         desc: "Parsing recursive test cases",
         func: recursive_detect_test,
@@ -827,145 +859,154 @@ static mut TEST_DESCRIPTIONS: [TestDesc; 11] = [
 ];
 
 unsafe fn launch_tests(tst: &TestDesc) -> c_int {
-    let mut res: c_int;
-    let mut err: c_int = 0;
-    let mut result: *mut c_char;
-    let mut error: *mut c_char;
-    let mut mem: c_int;
+    unsafe {
+        let mut res: c_int;
+        let mut err: c_int = 0;
+        let mut result: *mut c_char;
+        let mut error: *mut c_char;
+        let mut mem: c_int;
 
-    if let Some(input) = tst.input {
-        let mut globbuf: glob_t = unsafe { zeroed() };
+        if let Some(input) = tst.input {
+            let mut globbuf: glob_t = zeroed();
 
-        globbuf.gl_offs = 0;
-        glob(input.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-        for i in 0..globbuf.gl_pathc {
-            let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-            if check_test_file(&filename) == 0 {
-                continue;
-            }
-            if let Some(suffix) = tst.suffix {
-                result = result_filename(
-                    *globbuf.gl_pathv.add(i),
-                    tst.out.map_or(null_mut(), |s| s.as_ptr()),
-                    suffix.as_ptr(),
-                );
-                if result.is_null() {
-                    eprintln!("Out of memory !");
-                    fatal_error();
+            globbuf.gl_offs = 0;
+            glob(input.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
+            for i in 0..globbuf.gl_pathc {
+                let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+                if check_test_file(&filename) == 0 {
+                    continue;
                 }
-            } else {
-                result = null_mut();
-            }
-            if let Some(err) = tst.err {
-                error = result_filename(
-                    *globbuf.gl_pathv.add(i),
-                    tst.out.map_or(null_mut(), |s| s.as_ptr()),
-                    err.as_ptr(),
-                );
-                if error.is_null() {
-                    eprintln!("Out of memory !");
-                    fatal_error();
-                }
-            } else {
-                error = null_mut();
-            }
-            if !result.is_null()
-                && check_test_file(CStr::from_ptr(result).to_string_lossy().as_ref()) == 0
-            {
-                eprintln!(
-                    "Missing result file {}",
-                    CStr::from_ptr(result).to_string_lossy()
-                );
-            } else if !error.is_null()
-                && check_test_file(CStr::from_ptr(error).to_string_lossy().as_ref()) == 0
-            {
-                eprintln!(
-                    "Missing error file {}",
-                    CStr::from_ptr(error).to_string_lossy()
-                );
-            } else {
-                mem = xml_mem_used();
-                EXTRA_MEMORY_FROM_RESOLVER = 0;
-                TEST_ERRORS_SIZE = 0;
-                TEST_ERRORS[0] = 0;
-                res = (tst.func)(
-                    &filename,
-                    result,
-                    error,
-                    tst.options | XmlParserOption::XmlParseCompact as i32,
-                );
-                reset_last_error();
-                if res != 0 {
-                    eprintln!(
-                        "File {} generated an error",
-                        CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy()
+                if let Some(suffix) = tst.suffix {
+                    result = result_filename(
+                        *globbuf.gl_pathv.add(i),
+                        tst.out.map_or(null_mut(), |s| s.as_ptr()),
+                        suffix.as_ptr(),
                     );
-                    NB_ERRORS += 1;
-                    err += 1;
-                } else if xml_mem_used() != mem
-                    && xml_mem_used() != mem
-                    && EXTRA_MEMORY_FROM_RESOLVER == 0
+                    if result.is_null() {
+                        eprintln!("Out of memory !");
+                        fatal_error();
+                    }
+                } else {
+                    result = null_mut();
+                }
+                if let Some(err) = tst.err {
+                    error = result_filename(
+                        *globbuf.gl_pathv.add(i),
+                        tst.out.map_or(null_mut(), |s| s.as_ptr()),
+                        err.as_ptr(),
+                    );
+                    if error.is_null() {
+                        eprintln!("Out of memory !");
+                        fatal_error();
+                    }
+                } else {
+                    error = null_mut();
+                }
+                if !result.is_null()
+                    && check_test_file(CStr::from_ptr(result).to_string_lossy().as_ref()) == 0
                 {
                     eprintln!(
-                        "File {} leaked {} bytes",
-                        CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy(),
-                        xml_mem_used() - mem
+                        "Missing result file {}",
+                        CStr::from_ptr(result).to_string_lossy()
                     );
-                    NB_LEAKS += 1;
-                    err += 1;
+                } else if !error.is_null()
+                    && check_test_file(CStr::from_ptr(error).to_string_lossy().as_ref()) == 0
+                {
+                    eprintln!(
+                        "Missing error file {}",
+                        CStr::from_ptr(error).to_string_lossy()
+                    );
+                } else {
+                    mem = xml_mem_used();
+                    EXTRA_MEMORY_FROM_RESOLVER.store(0, Ordering::Relaxed);
+                    TEST_ERRORS_SIZE.set(0);
+                    TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
+                    res = (tst.func)(
+                        &filename,
+                        result,
+                        error,
+                        tst.options | XmlParserOption::XmlParseCompact as i32,
+                    );
+                    reset_last_error();
+                    if res != 0 {
+                        eprintln!(
+                            "File {} generated an error",
+                            CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy()
+                        );
+                        NB_ERRORS.fetch_add(1, Ordering::Relaxed);
+                        err += 1;
+                    } else if xml_mem_used() != mem
+                        && xml_mem_used() != mem
+                        && EXTRA_MEMORY_FROM_RESOLVER.load(Ordering::Relaxed) == 0
+                    {
+                        eprintln!(
+                            "File {} leaked {} bytes",
+                            CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy(),
+                            xml_mem_used() - mem
+                        );
+                        NB_LEAKS.fetch_add(1, Ordering::Relaxed);
+                        err += 1;
+                    }
+                    TEST_ERRORS_SIZE.set(0);
                 }
-                TEST_ERRORS_SIZE = 0;
+                if !result.is_null() {
+                    free(result as _);
+                }
+                if !error.is_null() {
+                    free(error as _);
+                }
             }
-            if !result.is_null() {
-                free(result as _);
-            }
-            if !error.is_null() {
-                free(error as _);
+            globfree(addr_of_mut!(globbuf));
+        } else {
+            TEST_ERRORS_SIZE.set(0);
+            TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
+            EXTRA_MEMORY_FROM_RESOLVER.store(0, Ordering::Relaxed);
+            res = (tst.func)("", null_mut(), null_mut(), tst.options);
+            if res != 0 {
+                NB_ERRORS.fetch_add(1, Ordering::Relaxed);
+                err += 1;
             }
         }
-        globfree(addr_of_mut!(globbuf));
-    } else {
-        TEST_ERRORS_SIZE = 0;
-        TEST_ERRORS[0] = 0;
-        EXTRA_MEMORY_FROM_RESOLVER = 0;
-        res = (tst.func)("", null_mut(), null_mut(), tst.options);
-        if res != 0 {
-            NB_ERRORS += 1;
-            err += 1;
-        }
+        err
     }
-    err
 }
 
 static mut VERBOSE: c_int = 0;
 static mut TESTS_QUIET: c_int = 0;
 
 unsafe fn runtest(i: usize) -> c_int {
-    let mut ret: c_int = 0;
+    unsafe {
+        let mut ret: c_int = 0;
 
-    let old_errors: c_int = NB_ERRORS;
-    let old_tests: c_int = NB_TESTS;
-    let old_leaks: c_int = NB_LEAKS;
-    if TESTS_QUIET == 0 {
-        println!("## {}", TEST_DESCRIPTIONS[i].desc);
-    }
-    let res: c_int = launch_tests(&TEST_DESCRIPTIONS[i]);
-    if res != 0 {
-        ret += 1;
-    }
-    if VERBOSE != 0 {
-        if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {
-            println!("Ran {} tests, no errors", NB_TESTS - old_tests);
-        } else {
-            println!(
-                "Ran {} tests, {} errors, {} leaks",
-                NB_TESTS - old_tests,
-                NB_ERRORS - old_errors,
-                NB_LEAKS - old_leaks
-            );
+        let old_errors = NB_ERRORS.load(Ordering::Relaxed);
+        let old_tests = NB_TESTS.load(Ordering::Relaxed);
+        let old_leaks = NB_LEAKS.load(Ordering::Relaxed);
+        if TESTS_QUIET == 0 {
+            println!("## {}", TEST_DESCRIPTIONS[i].desc);
         }
+        let res: c_int = launch_tests(&TEST_DESCRIPTIONS[i]);
+        if res != 0 {
+            ret += 1;
+        }
+        if VERBOSE != 0 {
+            if NB_ERRORS.load(Ordering::Relaxed) == old_errors
+                && NB_LEAKS.load(Ordering::Relaxed) == old_leaks
+            {
+                println!(
+                    "Ran {} tests, no errors",
+                    NB_TESTS.load(Ordering::Relaxed) - old_tests
+                );
+            } else {
+                println!(
+                    "Ran {} tests, {} errors, {} leaks",
+                    NB_TESTS.load(Ordering::Relaxed) - old_tests,
+                    NB_ERRORS.load(Ordering::Relaxed) - old_errors,
+                    NB_LEAKS.load(Ordering::Relaxed) - old_leaks
+                );
+            }
+        }
+        ret
     }
-    ret
 }
 
 #[test]
@@ -995,14 +1036,19 @@ fn main() {
                 ret += runtest(i);
             }
         }
-        if NB_ERRORS == 0 && NB_LEAKS == 0 {
+        if NB_ERRORS.load(Ordering::Relaxed) == 0 && NB_LEAKS.load(Ordering::Relaxed) == 0 {
             ret = 0;
-            println!("Total {} tests, no errors", NB_TESTS);
+            println!(
+                "Total {} tests, no errors",
+                NB_TESTS.load(Ordering::Relaxed)
+            );
         } else {
             ret = 1;
             println!(
                 "Total {} tests, {} errors, {} leaks",
-                NB_TESTS, NB_ERRORS, NB_LEAKS
+                NB_TESTS.load(Ordering::Relaxed),
+                NB_ERRORS.load(Ordering::Relaxed),
+                NB_LEAKS.load(Ordering::Relaxed)
             );
         }
         xml_cleanup_parser();

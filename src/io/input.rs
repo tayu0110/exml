@@ -20,16 +20,16 @@ use std::{
     io::{self, Cursor, Read},
     str::from_utf8_mut,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Mutex,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
 use crate::{
     buf::XmlBufRef,
     encoding::{
-        get_encoding_handler, xml_encoding_err, EncodingError, XmlCharEncoding,
-        XmlCharEncodingHandler,
+        EncodingError, XmlCharEncoding, XmlCharEncodingHandler, get_encoding_handler,
+        xml_encoding_err,
     },
     error::XmlParserErrors,
     globals::GLOBAL_STATE,
@@ -38,7 +38,7 @@ use crate::{
     tree::XmlBufferAllocationScheme,
 };
 
-use super::{xml_ioerr, xml_ioerr_memory, DefaultFileIOCallbacks, MINLEN};
+use super::{DefaultFileIOCallbacks, MINLEN, xml_ioerr, xml_ioerr_memory};
 
 #[repr(C)]
 pub struct XmlParserInputBuffer {
@@ -210,11 +210,7 @@ impl XmlParserInputBuffer {
             }
             _ => Ok(0),
         };
-        if c_out != 0 {
-            Ok(c_out)
-        } else {
-            ret
-        }
+        if c_out != 0 { Ok(c_out) } else { ret }
     }
 
     /// Refresh the content of the input buffer, the old data are considered consumed.  
@@ -259,7 +255,7 @@ impl XmlParserInputBuffer {
 
         // Call the read method for this I/O type.
         if let Some(context) = self.context.as_mut() {
-            if buf.map_or(true, |mut buf| buf.grow((len + 1) as usize).is_err()) {
+            if buf.is_none_or(|mut buf| buf.grow((len + 1) as usize).is_err()) {
                 unsafe {
                     xml_ioerr_memory("growing input buffer");
                 }
@@ -312,10 +308,7 @@ impl XmlParserInputBuffer {
             if self.raw.is_none() {
                 self.raw = XmlBufRef::new();
             }
-            if self
-                .raw
-                .map_or(true, |mut raw| raw.push_bytes(buf).is_err())
-            {
+            if self.raw.is_none_or(|mut raw| raw.push_bytes(buf).is_err()) {
                 return -1;
             }
 

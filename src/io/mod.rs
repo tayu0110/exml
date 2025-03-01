@@ -31,8 +31,8 @@ use std::io::Write;
 use std::{
     borrow::Cow,
     env::current_dir,
-    fs::{metadata, File},
-    io::{self, stdin, ErrorKind, Read},
+    fs::{File, metadata},
+    io::{self, ErrorKind, Read, stdin},
     path::{Path, PathBuf},
     ptr::null_mut,
 };
@@ -48,17 +48,17 @@ use url::Url;
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{
-    xml_catalog_get_defaults, xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
+    XmlCatalogAllow, xml_catalog_get_defaults, xml_catalog_resolve, xml_catalog_resolve_uri,
 };
 #[cfg(feature = "ftp")]
 use crate::libxml::nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read};
 use crate::{
     encoding::find_encoding_handler,
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
+    error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     libxml::parser::XmlParserOption,
     nanohttp::XmlNanoHTTPCtxt,
     parser::{
-        XmlParserCtxtPtr, XmlParserInputPtr, __xml_err_encoding, xml_free_input_stream,
+        __xml_err_encoding, XmlParserCtxtPtr, XmlParserInputPtr, xml_free_input_stream,
         xml_new_input_from_file,
     },
     uri::canonic_path,
@@ -71,7 +71,9 @@ pub use output::*;
 ///  Handle an out of memory condition
 #[doc(alias = "xmlIOErrMemory")]
 pub(crate) unsafe fn xml_ioerr_memory(extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromIO, None, Some(extra));
+    unsafe {
+        __xml_simple_oom_error(XmlErrorDomain::XmlFromIO, None, Some(extra));
+    }
 }
 
 const IOERR: &[&str] = &[
@@ -141,136 +143,140 @@ pub(crate) unsafe fn __xml_ioerr(
     mut code: XmlParserErrors,
     extra: Option<&str>,
 ) {
-    let mut idx: u32;
-    let errno = *__errno_location();
+    unsafe {
+        let mut idx: u32;
+        let errno = *__errno_location();
 
-    if code == XmlParserErrors::XmlErrOK {
-        if errno == 0 {
-            code = XmlParserErrors::XmlErrOK;
-        } else if errno == EACCES {
-            code = XmlParserErrors::XmlIOEACCES;
-        } else if errno == EAGAIN {
-            code = XmlParserErrors::XmlIOEAGAIN;
-        } else if errno == EBADF {
-            code = XmlParserErrors::XmlIOEBADF;
-        } else if errno == EBADMSG {
-            code = XmlParserErrors::XmlIOEBADMSG;
-        } else if errno == EBUSY {
-            code = XmlParserErrors::XmlIOEBUSY;
-        } else if errno == ECANCELED {
-            code = XmlParserErrors::XmlIOECANCELED;
-        } else if errno == ECHILD {
-            code = XmlParserErrors::XmlIOECHILD;
-        } else if errno == EDEADLK {
-            code = XmlParserErrors::XmlIOEDEADLK;
-        } else if errno == EDOM {
-            code = XmlParserErrors::XmlIOEDOM;
-        } else if errno == EEXIST {
-            code = XmlParserErrors::XmlIOEEXIST;
-        } else if errno == EFAULT {
-            code = XmlParserErrors::XmlIOEFAULT;
-        } else if errno == EFBIG {
-            code = XmlParserErrors::XmlIOEFBIG;
-        } else if errno == EINPROGRESS {
-            code = XmlParserErrors::XmlIOEINPROGRESS;
-        } else if errno == EINTR {
-            code = XmlParserErrors::XmlIOEINTR;
-        } else if errno == EINVAL {
-            code = XmlParserErrors::XmlIOEINVAL;
-        } else if errno == EIO {
-            code = XmlParserErrors::XmlIOEIO;
-        } else if errno == EISDIR {
-            code = XmlParserErrors::XmlIOEISDIR;
-        } else if errno == EMFILE {
-            code = XmlParserErrors::XmlIOEMFILE;
-        } else if errno == EMLINK {
-            code = XmlParserErrors::XmlIOEMLINK;
-        } else if errno == EMSGSIZE {
-            code = XmlParserErrors::XmlIOEMSGSIZE;
-        } else if errno == ENAMETOOLONG {
-            code = XmlParserErrors::XmlIOENAMETOOLONG;
-        } else if errno == ENFILE {
-            code = XmlParserErrors::XmlIOENFILE;
-        } else if errno == ENODEV {
-            code = XmlParserErrors::XmlIOENODEV;
-        } else if errno == ENOENT {
-            code = XmlParserErrors::XmlIOENOENT;
-        } else if errno == ENOEXEC {
-            code = XmlParserErrors::XmlIOENOEXEC;
-        } else if errno == ENOLCK {
-            code = XmlParserErrors::XmlIOENOLCK;
-        } else if errno == ENOMEM {
-            code = XmlParserErrors::XmlIOENOMEM;
-        } else if errno == ENOSPC {
-            code = XmlParserErrors::XmlIOENOSPC;
-        } else if errno == ENOSYS {
-            code = XmlParserErrors::XmlIOENOSYS;
-        } else if errno == ENOTDIR {
-            code = XmlParserErrors::XmlIOENOTDIR;
-        } else if errno == ENOTEMPTY {
-            code = XmlParserErrors::XmlIOENOTEMPTY;
-        } else if errno == ENOTSUP {
-            code = XmlParserErrors::XmlIOENOTSUP;
-        } else if errno == ENOTTY {
-            code = XmlParserErrors::XmlIOENOTTY;
-        } else if errno == ENXIO {
-            code = XmlParserErrors::XmlIOENXIO;
-        } else if errno == EPERM {
-            code = XmlParserErrors::XmlIOEPERM;
-        } else if errno == EPIPE {
-            code = XmlParserErrors::XmlIOEPIPE;
-        } else if errno == ERANGE {
-            code = XmlParserErrors::XmlIOERANGE;
-        } else if errno == EROFS {
-            code = XmlParserErrors::XmlIOEROFS;
-        } else if errno == ESPIPE {
-            code = XmlParserErrors::XmlIOESPIPE;
-        } else if errno == ESRCH {
-            code = XmlParserErrors::XmlIOESRCH;
-        } else if errno == ETIMEDOUT {
-            code = XmlParserErrors::XmlIOETIMEOUT;
-        } else if errno == EXDEV {
-            code = XmlParserErrors::XmlIOEXDEV;
-        } else if errno == ENOTSOCK {
-            code = XmlParserErrors::XmlIOENOTSOCK;
-        } else if errno == EISCONN {
-            code = XmlParserErrors::XmlIOEISCONN;
-        } else if errno == ECONNREFUSED {
-            code = XmlParserErrors::XmlIOECONNREFUSED;
-        } else if errno == EADDRINUSE {
-            code = XmlParserErrors::XmlIOEADDRINUSE;
-        } else if errno == EALREADY {
-            code = XmlParserErrors::XmlIOEALREADY;
-        } else if errno == EAFNOSUPPORT {
-            code = XmlParserErrors::XmlIOEAFNOSUPPORT;
-        } else {
-            code = XmlParserErrors::XmlIOUnknown;
+        if code == XmlParserErrors::XmlErrOK {
+            if errno == 0 {
+                code = XmlParserErrors::XmlErrOK;
+            } else if errno == EACCES {
+                code = XmlParserErrors::XmlIOEACCES;
+            } else if errno == EAGAIN {
+                code = XmlParserErrors::XmlIOEAGAIN;
+            } else if errno == EBADF {
+                code = XmlParserErrors::XmlIOEBADF;
+            } else if errno == EBADMSG {
+                code = XmlParserErrors::XmlIOEBADMSG;
+            } else if errno == EBUSY {
+                code = XmlParserErrors::XmlIOEBUSY;
+            } else if errno == ECANCELED {
+                code = XmlParserErrors::XmlIOECANCELED;
+            } else if errno == ECHILD {
+                code = XmlParserErrors::XmlIOECHILD;
+            } else if errno == EDEADLK {
+                code = XmlParserErrors::XmlIOEDEADLK;
+            } else if errno == EDOM {
+                code = XmlParserErrors::XmlIOEDOM;
+            } else if errno == EEXIST {
+                code = XmlParserErrors::XmlIOEEXIST;
+            } else if errno == EFAULT {
+                code = XmlParserErrors::XmlIOEFAULT;
+            } else if errno == EFBIG {
+                code = XmlParserErrors::XmlIOEFBIG;
+            } else if errno == EINPROGRESS {
+                code = XmlParserErrors::XmlIOEINPROGRESS;
+            } else if errno == EINTR {
+                code = XmlParserErrors::XmlIOEINTR;
+            } else if errno == EINVAL {
+                code = XmlParserErrors::XmlIOEINVAL;
+            } else if errno == EIO {
+                code = XmlParserErrors::XmlIOEIO;
+            } else if errno == EISDIR {
+                code = XmlParserErrors::XmlIOEISDIR;
+            } else if errno == EMFILE {
+                code = XmlParserErrors::XmlIOEMFILE;
+            } else if errno == EMLINK {
+                code = XmlParserErrors::XmlIOEMLINK;
+            } else if errno == EMSGSIZE {
+                code = XmlParserErrors::XmlIOEMSGSIZE;
+            } else if errno == ENAMETOOLONG {
+                code = XmlParserErrors::XmlIOENAMETOOLONG;
+            } else if errno == ENFILE {
+                code = XmlParserErrors::XmlIOENFILE;
+            } else if errno == ENODEV {
+                code = XmlParserErrors::XmlIOENODEV;
+            } else if errno == ENOENT {
+                code = XmlParserErrors::XmlIOENOENT;
+            } else if errno == ENOEXEC {
+                code = XmlParserErrors::XmlIOENOEXEC;
+            } else if errno == ENOLCK {
+                code = XmlParserErrors::XmlIOENOLCK;
+            } else if errno == ENOMEM {
+                code = XmlParserErrors::XmlIOENOMEM;
+            } else if errno == ENOSPC {
+                code = XmlParserErrors::XmlIOENOSPC;
+            } else if errno == ENOSYS {
+                code = XmlParserErrors::XmlIOENOSYS;
+            } else if errno == ENOTDIR {
+                code = XmlParserErrors::XmlIOENOTDIR;
+            } else if errno == ENOTEMPTY {
+                code = XmlParserErrors::XmlIOENOTEMPTY;
+            } else if errno == ENOTSUP {
+                code = XmlParserErrors::XmlIOENOTSUP;
+            } else if errno == ENOTTY {
+                code = XmlParserErrors::XmlIOENOTTY;
+            } else if errno == ENXIO {
+                code = XmlParserErrors::XmlIOENXIO;
+            } else if errno == EPERM {
+                code = XmlParserErrors::XmlIOEPERM;
+            } else if errno == EPIPE {
+                code = XmlParserErrors::XmlIOEPIPE;
+            } else if errno == ERANGE {
+                code = XmlParserErrors::XmlIOERANGE;
+            } else if errno == EROFS {
+                code = XmlParserErrors::XmlIOEROFS;
+            } else if errno == ESPIPE {
+                code = XmlParserErrors::XmlIOESPIPE;
+            } else if errno == ESRCH {
+                code = XmlParserErrors::XmlIOESRCH;
+            } else if errno == ETIMEDOUT {
+                code = XmlParserErrors::XmlIOETIMEOUT;
+            } else if errno == EXDEV {
+                code = XmlParserErrors::XmlIOEXDEV;
+            } else if errno == ENOTSOCK {
+                code = XmlParserErrors::XmlIOENOTSOCK;
+            } else if errno == EISCONN {
+                code = XmlParserErrors::XmlIOEISCONN;
+            } else if errno == ECONNREFUSED {
+                code = XmlParserErrors::XmlIOECONNREFUSED;
+            } else if errno == EADDRINUSE {
+                code = XmlParserErrors::XmlIOEADDRINUSE;
+            } else if errno == EALREADY {
+                code = XmlParserErrors::XmlIOEALREADY;
+            } else if errno == EAFNOSUPPORT {
+                code = XmlParserErrors::XmlIOEAFNOSUPPORT;
+            } else {
+                code = XmlParserErrors::XmlIOUnknown;
+            }
         }
-    }
-    idx = 0;
-    if code as i32 >= XmlParserErrors::XmlIOUnknown as i32 {
-        idx = code as u32 - XmlParserErrors::XmlIOUnknown as u32;
-    }
-    if idx >= IOERR.len() as u32 {
         idx = 0;
+        if code as i32 >= XmlParserErrors::XmlIOUnknown as i32 {
+            idx = code as u32 - XmlParserErrors::XmlIOUnknown as u32;
+        }
+        if idx >= IOERR.len() as u32 {
+            idx = 0;
+        }
+
+        let msg: Cow<'static, str> = match idx {
+            43 => format!(
+                "Attempt to load network entity {}",
+                extra.expect("Internal Error")
+            )
+            .into(), /* XML_IO_NETWORK_ATTEMPT */
+            index => IOERR[index as usize].into(),
+        };
+
+        __xml_simple_error!(domain, code, None, &msg);
     }
-
-    let msg: Cow<'static, str> = match idx {
-        43 => format!(
-            "Attempt to load network entity {}",
-            extra.expect("Internal Error")
-        )
-        .into(), /* XML_IO_NETWORK_ATTEMPT */
-        index => IOERR[index as usize].into(),
-    };
-
-    __xml_simple_error!(domain, code, None, &msg);
 }
 
 /// Handle an I/O error
 #[doc(alias = "xmlIOErr")]
 unsafe fn xml_ioerr(code: XmlParserErrors, extra: Option<&str>) {
-    __xml_ioerr(XmlErrorDomain::XmlFromIO, code, extra);
+    unsafe {
+        __xml_ioerr(XmlErrorDomain::XmlFromIO, code, extra);
+    }
 }
 
 #[cfg(feature = "libxml_output")]
@@ -409,57 +415,59 @@ pub unsafe fn xml_check_http_input(
     ctxt: XmlParserCtxtPtr,
     mut ret: XmlParserInputPtr,
 ) -> XmlParserInputPtr {
-    #[cfg(feature = "http")]
-    {
-        if !ret.is_null() {
-            if let Some(buf) = (*ret).buf.as_mut() {
-                if let Some(context) = buf.borrow_mut().nanohttp_context() {
-                    let code = context.return_code();
-                    if code >= 400 {
-                        // fatal error
-                        if let Some(filename) = (*ret).filename.as_deref() {
-                            __xml_loader_err!(
-                                ctxt,
-                                "failed to load HTTP resource \"{}\"\n",
-                                filename
-                            );
+    unsafe {
+        #[cfg(feature = "http")]
+        {
+            if !ret.is_null() {
+                if let Some(buf) = (*ret).buf.as_mut() {
+                    if let Some(context) = buf.borrow_mut().nanohttp_context() {
+                        let code = context.return_code();
+                        if code >= 400 {
+                            // fatal error
+                            if let Some(filename) = (*ret).filename.as_deref() {
+                                __xml_loader_err!(
+                                    ctxt,
+                                    "failed to load HTTP resource \"{}\"\n",
+                                    filename
+                                );
+                            } else {
+                                __xml_loader_err!(ctxt, "failed to load HTTP resource\n");
+                            }
+                            xml_free_input_stream(ret);
+                            ret = null_mut();
                         } else {
-                            __xml_loader_err!(ctxt, "failed to load HTTP resource\n");
-                        }
-                        xml_free_input_stream(ret);
-                        ret = null_mut();
-                    } else {
-                        if context
-                            .mime_type()
-                            .filter(|mime| mime.contains("/xml") || mime.contains("+xml"))
-                            .is_some()
-                        {
-                            if let Some(encoding) = context.encoding() {
-                                if let Some(handler) = find_encoding_handler(encoding) {
-                                    (*ctxt).switch_input_encoding(ret, handler);
-                                } else {
-                                    __xml_err_encoding!(
-                                        ctxt,
-                                        XmlParserErrors::XmlErrUnknownEncoding,
-                                        "Unknown encoding {}",
-                                        encoding
-                                    );
-                                }
-                                if (*ret).encoding.is_none() {
-                                    (*ret).encoding = Some(encoding.to_owned());
+                            if context
+                                .mime_type()
+                                .filter(|mime| mime.contains("/xml") || mime.contains("+xml"))
+                                .is_some()
+                            {
+                                if let Some(encoding) = context.encoding() {
+                                    if let Some(handler) = find_encoding_handler(encoding) {
+                                        (*ctxt).switch_input_encoding(ret, handler);
+                                    } else {
+                                        __xml_err_encoding!(
+                                            ctxt,
+                                            XmlParserErrors::XmlErrUnknownEncoding,
+                                            "Unknown encoding {}",
+                                            encoding
+                                        );
+                                    }
+                                    if (*ret).encoding.is_none() {
+                                        (*ret).encoding = Some(encoding.to_owned());
+                                    }
                                 }
                             }
-                        }
-                        if let Some(redir) = context.redirection() {
-                            (*ret).directory = None;
-                            (*ret).filename = Some(redir.to_owned());
+                            if let Some(redir) = context.redirection() {
+                                (*ret).directory = None;
+                                (*ret).filename = Some(redir.to_owned());
+                            }
                         }
                     }
                 }
             }
         }
+        ret
     }
-    ret
 }
 
 /// By default we don't load external entities, yet.
@@ -471,29 +479,31 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
-    let ret: XmlParserInputPtr;
+    unsafe {
+        let ret: XmlParserInputPtr;
 
-    if !ctxt.is_null() && (*ctxt).options & XmlParserOption::XmlParseNoNet as i32 != 0 {
-        let options = (*ctxt).options;
+        if !ctxt.is_null() && (*ctxt).options & XmlParserOption::XmlParseNoNet as i32 != 0 {
+            let options = (*ctxt).options;
 
-        (*ctxt).options -= XmlParserOption::XmlParseNoNet as i32;
-        ret = xml_no_net_external_entity_loader(url, id, ctxt);
-        (*ctxt).options = options;
-        return ret;
+            (*ctxt).options -= XmlParserOption::XmlParseNoNet as i32;
+            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+            (*ctxt).options = options;
+            return ret;
+        }
+        #[cfg(feature = "catalog")]
+        let resource =
+            xml_resolve_resource_from_catalog(url, id, ctxt).or_else(|| url.map(|u| u.to_owned()));
+        #[cfg(not(feature = "catalog"))]
+        let resource = url;
+
+        let Some(resource) = resource else {
+            let id = id.unwrap_or("NULL").to_owned();
+            __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", id);
+            return null_mut();
+        };
+        ret = xml_new_input_from_file(&mut *ctxt, &resource);
+        ret
     }
-    #[cfg(feature = "catalog")]
-    let resource =
-        xml_resolve_resource_from_catalog(url, id, ctxt).or_else(|| url.map(|u| u.to_owned()));
-    #[cfg(not(feature = "catalog"))]
-    let resource = url;
-
-    let Some(resource) = resource else {
-        let id = id.unwrap_or("NULL").to_owned();
-        __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", id);
-        return null_mut();
-    };
-    ret = xml_new_input_from_file(&mut *ctxt, &resource);
-    ret
 }
 
 pub(crate) fn xml_no_net_exists(url: Option<&str>) -> i32 {
@@ -538,50 +548,55 @@ unsafe fn xml_resolve_resource_from_catalog(
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> Option<String> {
-    let mut resource = None;
+    unsafe {
+        let mut resource = None;
 
-    // If the resource doesn't exists as a file,
-    // try to load it from the resource pointed in the catalogs
-    let pref: XmlCatalogAllow = xml_catalog_get_defaults();
+        // If the resource doesn't exists as a file,
+        // try to load it from the resource pointed in the catalogs
+        let pref: XmlCatalogAllow = xml_catalog_get_defaults();
 
-    if !matches!(pref, XmlCatalogAllow::None) && xml_no_net_exists(url) == 0 {
-        // Do a local lookup
-        if !ctxt.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document) {
-            if let Some(catalogs) = (*ctxt).catalogs.as_mut() {
-                resource = catalogs.local_resolve(id, url);
-            }
-        }
-        // Try a global lookup
-        if resource.is_none() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
-            resource = xml_catalog_resolve(id, url);
-        }
-        if resource.is_none() && url.is_some() {
-            resource = url.map(|url| url.to_owned());
-        }
-
-        // TODO: do an URI lookup on the reference
-        if let Some(rsrc) = resource
-            .as_deref()
-            .filter(|resource| xml_no_net_exists(Some(resource)) == 0)
-        {
-            let mut tmp = None;
-
+        if !matches!(pref, XmlCatalogAllow::None) && xml_no_net_exists(url) == 0 {
+            // Do a local lookup
             if !ctxt.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document) {
                 if let Some(catalogs) = (*ctxt).catalogs.as_mut() {
-                    tmp = catalogs.local_resolve_uri(rsrc);
+                    resource = catalogs.local_resolve(id, url);
                 }
             }
-            if tmp.is_none() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
-                tmp = xml_catalog_resolve_uri(rsrc);
+            // Try a global lookup
+            if resource.is_none() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global)
+            {
+                resource = xml_catalog_resolve(id, url);
+            }
+            if resource.is_none() && url.is_some() {
+                resource = url.map(|url| url.to_owned());
             }
 
-            if let Some(tmp) = tmp {
-                resource = Some(tmp);
+            // TODO: do an URI lookup on the reference
+            if let Some(rsrc) = resource
+                .as_deref()
+                .filter(|resource| xml_no_net_exists(Some(resource)) == 0)
+            {
+                let mut tmp = None;
+
+                if !ctxt.is_null()
+                    && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document)
+                {
+                    if let Some(catalogs) = (*ctxt).catalogs.as_mut() {
+                        tmp = catalogs.local_resolve_uri(rsrc);
+                    }
+                }
+                if tmp.is_none() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
+                    tmp = xml_catalog_resolve_uri(rsrc);
+                }
+
+                if let Some(tmp) = tmp {
+                    resource = Some(tmp);
+                }
             }
         }
-    }
 
-    resource
+        resource
+    }
 }
 
 /// A specific entity loader disabling network accesses,
@@ -594,22 +609,24 @@ pub unsafe fn xml_no_net_external_entity_loader(
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
-    #[cfg(feature = "catalog")]
-    let resource =
-        xml_resolve_resource_from_catalog(url, id, ctxt).or_else(|| url.map(|u| u.to_owned()));
-    #[cfg(not(feature = "catalog"))]
-    let resource = url.map(|u| u.to_owned());
+    unsafe {
+        #[cfg(feature = "catalog")]
+        let resource =
+            xml_resolve_resource_from_catalog(url, id, ctxt).or_else(|| url.map(|u| u.to_owned()));
+        #[cfg(not(feature = "catalog"))]
+        let resource = url.map(|u| u.to_owned());
 
-    if let Some(resource) = resource.as_deref().filter(|rsrc| {
-        (rsrc.len() >= 6 && rsrc[..6].eq_ignore_ascii_case("ftp://"))
-            || (rsrc.len() >= 7 && rsrc[..7].eq_ignore_ascii_case("http://"))
-    }) {
-        xml_ioerr(XmlParserErrors::XmlIONetworkAttempt, Some(resource));
-        return null_mut();
+        if let Some(resource) = resource.as_deref().filter(|rsrc| {
+            (rsrc.len() >= 6 && rsrc[..6].eq_ignore_ascii_case("ftp://"))
+                || (rsrc.len() >= 7 && rsrc[..7].eq_ignore_ascii_case("http://"))
+        }) {
+            xml_ioerr(XmlParserErrors::XmlIONetworkAttempt, Some(resource));
+            return null_mut();
+        }
+        let input: XmlParserInputPtr =
+            xml_default_external_entity_loader(resource.as_deref(), id, ctxt);
+        input
     }
-    let input: XmlParserInputPtr =
-        xml_default_external_entity_loader(resource.as_deref(), id, ctxt);
-    input
 }
 
 /// This function is obsolete.

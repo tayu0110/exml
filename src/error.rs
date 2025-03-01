@@ -15,15 +15,15 @@
 
 use std::{
     borrow::Cow,
-    ffi::{c_void, CStr},
-    io::{stderr, Stderr, Stdout, Write},
-    ptr::{null_mut, NonNull},
+    ffi::{CStr, c_void},
+    io::{Stderr, Stdout, Write, stderr},
+    ptr::{NonNull, null_mut},
     slice::from_raw_parts,
     sync::atomic::{AtomicBool, Ordering},
 };
 
 use crate::{
-    globals::{GenericError, GenericErrorContext, GLOBAL_STATE},
+    globals::{GLOBAL_STATE, GenericError, GenericErrorContext},
     parser::{XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{XmlElementType, XmlGenericNodePtr, XmlNodePtr},
 };
@@ -979,91 +979,97 @@ pub unsafe fn parser_print_file_context_internal(
     channel: GenericError,
     data: Option<GenericErrorContext>,
 ) {
-    let mut cur: *const u8;
-    const SIZE: usize = 80;
+    unsafe {
+        let mut cur: *const u8;
+        const SIZE: usize = 80;
 
-    if input.is_null() || (*input).cur.is_null() {
-        return;
-    }
+        if input.is_null() || (*input).cur.is_null() {
+            return;
+        }
 
-    cur = (*input).cur;
-    let base: *const u8 = (*input).base;
-    // skip backwards over any end-of-lines
-    while cur > base && (*cur == b'\n' || *cur == b'\r') {
-        cur = cur.sub(1);
-    }
-    let mut n = 0;
-    // search backwards for beginning-of-line (to max buff size)
-    while n < SIZE && cur > base && *cur != b'\n' && *cur != b'\r' {
-        cur = cur.sub(1);
-        n += 1;
-    }
-    if n > 0 && (*cur == b'\n' || *cur == b'\r') {
-        cur = cur.add(1);
-    } else {
-        // skip over continuation bytes
-        while cur < (*input).cur && *cur & 0xC0 == 0x80 {
+        cur = (*input).cur;
+        let base: *const u8 = (*input).base;
+        // skip backwards over any end-of-lines
+        while cur > base && (*cur == b'\n' || *cur == b'\r') {
+            cur = cur.sub(1);
+        }
+        let mut n = 0;
+        // search backwards for beginning-of-line (to max buff size)
+        while n < SIZE && cur > base && *cur != b'\n' && *cur != b'\r' {
+            cur = cur.sub(1);
+            n += 1;
+        }
+        if n > 0 && (*cur == b'\n' || *cur == b'\r') {
             cur = cur.add(1);
-        }
-    }
-    let col = (*input).cur.offset_from(cur) as usize;
-    let mut content = String::with_capacity(SIZE);
-
-    // search forward for end-of-line (to max buff size)
-    let mut n = 0;
-    let chunk = {
-        let mut i = 0;
-        let mut now = *cur;
-        while now != 0 && now != b'\n' && now != b'\r' && i < SIZE {
-            i += 1;
-            now = *cur.add(i);
-        }
-        from_raw_parts(cur, i)
-    };
-    if let Some(chunk) = chunk.utf8_chunks().next() {
-        for c in chunk
-            .valid()
-            .chars()
-            .take_while(|&c| c != '\n' && c != '\r')
-        {
-            n += c.len_utf8();
-            if n > SIZE {
-                break;
+        } else {
+            // skip over continuation bytes
+            while cur < (*input).cur && *cur & 0xC0 == 0x80 {
+                cur = cur.add(1);
             }
-            content.push(c);
         }
+        let col = (*input).cur.offset_from(cur) as usize;
+        let mut content = String::with_capacity(SIZE);
+
+        // search forward for end-of-line (to max buff size)
+        let mut n = 0;
+        let chunk = {
+            let mut i = 0;
+            let mut now = *cur;
+            while now != 0 && now != b'\n' && now != b'\r' && i < SIZE {
+                i += 1;
+                now = *cur.add(i);
+            }
+            from_raw_parts(cur, i)
+        };
+        if let Some(chunk) = chunk.utf8_chunks().next() {
+            for c in chunk
+                .valid()
+                .chars()
+                .take_while(|&c| c != '\n' && c != '\r')
+            {
+                n += c.len_utf8();
+                if n > SIZE {
+                    break;
+                }
+                content.push(c);
+            }
+        }
+        // print out the selected text
+        channel(data.clone(), format!("{content}\n").as_str());
+        // create blank line with problem pointer
+        let mut ptr = content
+            .bytes()
+            .take(col)
+            .map(|c| if c == b'\t' { '\t' } else { ' ' })
+            .collect::<String>();
+        if ptr.len() == SIZE {
+            ptr.pop();
+        }
+        ptr.push_str("^\n");
+        channel(data.clone(), ptr.as_str());
     }
-    // print out the selected text
-    channel(data.clone(), format!("{content}\n").as_str());
-    // create blank line with problem pointer
-    let mut ptr = content
-        .bytes()
-        .take(col)
-        .map(|c| if c == b'\t' { '\t' } else { ' ' })
-        .collect::<String>();
-    if ptr.len() == SIZE {
-        ptr.pop();
-    }
-    ptr.push_str("^\n");
-    channel(data.clone(), ptr.as_str());
 }
 
 pub unsafe fn parser_print_file_context(input: XmlParserInputPtr) {
-    let (channel, data) = GLOBAL_STATE
-        .with_borrow(|state| (state.generic_error, state.generic_error_context.clone()));
-    parser_print_file_context_internal(input, channel, data);
+    unsafe {
+        let (channel, data) = GLOBAL_STATE
+            .with_borrow(|state| (state.generic_error, state.generic_error_context.clone()));
+        parser_print_file_context_internal(input, channel, data);
+    }
 }
 
 pub unsafe fn parser_print_file_info(input: XmlParserInputPtr) {
-    if !input.is_null() {
-        if (*input).filename.is_some() {
-            generic_error!(
-                "{}:{}: ",
-                (*input).filename.as_deref().unwrap(),
-                (*input).line
-            );
-        } else {
-            generic_error!("Entity: line {}: ", (*input).line);
+    unsafe {
+        if !input.is_null() {
+            if (*input).filename.is_some() {
+                generic_error!(
+                    "{}:{}: ",
+                    (*input).filename.as_deref().unwrap(),
+                    (*input).line
+                );
+            } else {
+                generic_error!("Entity: line {}: ", (*input).line);
+            }
         }
     }
 }
@@ -1075,155 +1081,159 @@ pub unsafe fn report_error(
     channel: Option<GenericError>,
     data: Option<GenericErrorContext>,
 ) {
-    let mut name: *const u8 = null_mut();
-    let mut input: XmlParserInputPtr = null_mut();
-    let mut cur: XmlParserInputPtr = null_mut();
+    unsafe {
+        let mut name: *const u8 = null_mut();
+        let mut input: XmlParserInputPtr = null_mut();
+        let mut cur: XmlParserInputPtr = null_mut();
 
-    let channel = GLOBAL_STATE.with_borrow_mut(|state| {
-        if let Some(channel) = channel {
-            channel
-        } else {
-            state.generic_error
-        }
-    });
-    let file = err.file.as_ref();
-    let line = err.line;
-    let code = err.code;
-    let domain = err.domain;
-    let level = err.level;
-    let node = err.node;
-
-    if code.is_ok() {
-        return;
-    }
-
-    if let Some(node) = node
-        .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
-        .map(|node| XmlNodePtr::try_from(node).unwrap())
-    {
-        name = node.name;
-    }
-
-    // Maintain the compatibility with the legacy error handling
-    if !ctxt.is_null() {
-        input = (*ctxt).input;
-        if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
-            cur = input;
-            input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
-        }
-        if !input.is_null() {
-            if (*input).filename.is_some() {
-                channel(
-                    data.clone(),
-                    format!(
-                        "{}:{}: ",
-                        (*input).filename.as_deref().unwrap(),
-                        (*input).line
-                    )
-                    .as_str(),
-                );
-            } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                channel(
-                    data.clone(),
-                    format!("Entity: line {}: ", (*input).line).as_str(),
-                );
+        let channel = GLOBAL_STATE.with_borrow_mut(|state| {
+            if let Some(channel) = channel {
+                channel
+            } else {
+                state.generic_error
             }
-        }
-    } else if let Some(file) = file {
-        channel(data.clone(), format!("{file}:{line}: ").as_str());
-    } else if line != 0
-        && (domain == XmlErrorDomain::XmlFromParser
-            || domain == XmlErrorDomain::XmlFromSchemasv
-            || domain == XmlErrorDomain::XmlFromSchemasp
-            || domain == XmlErrorDomain::XmlFromDTD
-            || domain == XmlErrorDomain::XmlFromRelaxngp
-            || domain == XmlErrorDomain::XmlFromRelaxngv)
-    {
-        channel(data.clone(), format!("Entity: line {line}: ").as_str());
-    }
-    if !name.is_null() {
-        channel(
-            data.clone(),
-            format!(
-                "element {}: ",
-                CStr::from_ptr(name as *const i8).to_string_lossy()
-            )
-            .as_str(),
-        );
-    }
-    match domain {
-        XmlErrorDomain::XmlFromParser => channel(data.clone(), "parser "),
-        XmlErrorDomain::XmlFromNamespace => channel(data.clone(), "namespace "),
-        XmlErrorDomain::XmlFromDTD | XmlErrorDomain::XmlFromValid => {
-            channel(data.clone(), "validity ")
-        }
-        XmlErrorDomain::XmlFromHTML => channel(data.clone(), "HTML parser "),
-        XmlErrorDomain::XmlFromMemory => channel(data.clone(), "memory "),
-        XmlErrorDomain::XmlFromOutput => channel(data.clone(), "output "),
-        XmlErrorDomain::XmlFromIO => channel(data.clone(), "I/O "),
-        XmlErrorDomain::XmlFromXInclude => channel(data.clone(), "XInclude "),
-        XmlErrorDomain::XmlFromXPath => channel(data.clone(), "XPath "),
-        XmlErrorDomain::XmlFromXPointer => channel(data.clone(), "parser "),
-        XmlErrorDomain::XmlFromRegexp => channel(data.clone(), "regexp "),
-        XmlErrorDomain::XmlFromModule => channel(data.clone(), "module "),
-        XmlErrorDomain::XmlFromSchemasv => channel(data.clone(), "Schemas validity "),
-        XmlErrorDomain::XmlFromSchemasp => channel(data.clone(), "Schemas parser "),
-        XmlErrorDomain::XmlFromRelaxngp => channel(data.clone(), "Relax-NG parser "),
-        XmlErrorDomain::XmlFromRelaxngv => channel(data.clone(), "Relax-NG validity "),
-        XmlErrorDomain::XmlFromCatalog => channel(data.clone(), "Catalog "),
-        XmlErrorDomain::XmlFromC14N => channel(data.clone(), "C14N "),
-        XmlErrorDomain::XmlFromXSLT => channel(data.clone(), "XSLT "),
-        XmlErrorDomain::XmlFromI18N => channel(data.clone(), "encoding "),
-        XmlErrorDomain::XmlFromSchematronv => channel(data.clone(), "schematron "),
-        XmlErrorDomain::XmlFromBuffer => channel(data.clone(), "internal buffer "),
-        XmlErrorDomain::XmlFromURI => channel(data.clone(), "URI "),
-        _ => {}
-    };
-    match level {
-        XmlErrorLevel::XmlErrNone => channel(data.clone(), ": "),
-        XmlErrorLevel::XmlErrWarning => channel(data.clone(), "warning : "),
-        XmlErrorLevel::XmlErrError => channel(data.clone(), "error : "),
-        XmlErrorLevel::XmlErrFatal => channel(data.clone(), "error : "),
-    };
-    if let Some(msg) = msg {
-        if !msg.is_empty() && !msg.ends_with('\n') {
-            channel(data.clone(), format!("{msg}\n").as_str());
-        } else {
-            channel(data.clone(), msg);
-        }
-    } else {
-        channel(data.clone(), "out of memory error\n");
-    }
+        });
+        let file = err.file.as_ref();
+        let line = err.line;
+        let code = err.code;
+        let domain = err.domain;
+        let level = err.level;
+        let node = err.node;
 
-    if !ctxt.is_null() {
-        parser_print_file_context_internal(input, channel, data.clone());
-        if !cur.is_null() {
-            if (*cur).filename.is_some() {
-                channel(
-                    data.clone(),
-                    format!(
-                        "{}:{}: \n",
-                        (*cur).filename.as_deref().unwrap(),
-                        (*cur).line
-                    )
-                    .as_str(),
-                )
-            } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
-                channel(
-                    data.clone(),
-                    format!("Entity: line {}: \n", (*cur).line).as_str(),
-                );
-            }
-            parser_print_file_context_internal(cur, channel, data.clone());
+        if code.is_ok() {
+            return;
         }
-    }
-    if let Some(str1) = err.str1.as_ref() {
-        if domain == XmlErrorDomain::XmlFromXPath && err.int1 < 100 && err.int1 < str1.len() as i32
+
+        if let Some(node) = node
+            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+            .map(|node| XmlNodePtr::try_from(node).unwrap())
         {
-            channel(data.clone(), format!("{str1}\n").as_str());
-            let mut buf = " ".repeat(err.int1 as usize);
-            buf.push_str("^\n");
-            channel(data.clone(), buf.as_str());
+            name = node.name;
+        }
+
+        // Maintain the compatibility with the legacy error handling
+        if !ctxt.is_null() {
+            input = (*ctxt).input;
+            if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
+                cur = input;
+                input = (*ctxt).input_tab[(*ctxt).input_tab.len() - 2];
+            }
+            if !input.is_null() {
+                if (*input).filename.is_some() {
+                    channel(
+                        data.clone(),
+                        format!(
+                            "{}:{}: ",
+                            (*input).filename.as_deref().unwrap(),
+                            (*input).line
+                        )
+                        .as_str(),
+                    );
+                } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
+                    channel(
+                        data.clone(),
+                        format!("Entity: line {}: ", (*input).line).as_str(),
+                    );
+                }
+            }
+        } else if let Some(file) = file {
+            channel(data.clone(), format!("{file}:{line}: ").as_str());
+        } else if line != 0
+            && (domain == XmlErrorDomain::XmlFromParser
+                || domain == XmlErrorDomain::XmlFromSchemasv
+                || domain == XmlErrorDomain::XmlFromSchemasp
+                || domain == XmlErrorDomain::XmlFromDTD
+                || domain == XmlErrorDomain::XmlFromRelaxngp
+                || domain == XmlErrorDomain::XmlFromRelaxngv)
+        {
+            channel(data.clone(), format!("Entity: line {line}: ").as_str());
+        }
+        if !name.is_null() {
+            channel(
+                data.clone(),
+                format!(
+                    "element {}: ",
+                    CStr::from_ptr(name as *const i8).to_string_lossy()
+                )
+                .as_str(),
+            );
+        }
+        match domain {
+            XmlErrorDomain::XmlFromParser => channel(data.clone(), "parser "),
+            XmlErrorDomain::XmlFromNamespace => channel(data.clone(), "namespace "),
+            XmlErrorDomain::XmlFromDTD | XmlErrorDomain::XmlFromValid => {
+                channel(data.clone(), "validity ")
+            }
+            XmlErrorDomain::XmlFromHTML => channel(data.clone(), "HTML parser "),
+            XmlErrorDomain::XmlFromMemory => channel(data.clone(), "memory "),
+            XmlErrorDomain::XmlFromOutput => channel(data.clone(), "output "),
+            XmlErrorDomain::XmlFromIO => channel(data.clone(), "I/O "),
+            XmlErrorDomain::XmlFromXInclude => channel(data.clone(), "XInclude "),
+            XmlErrorDomain::XmlFromXPath => channel(data.clone(), "XPath "),
+            XmlErrorDomain::XmlFromXPointer => channel(data.clone(), "parser "),
+            XmlErrorDomain::XmlFromRegexp => channel(data.clone(), "regexp "),
+            XmlErrorDomain::XmlFromModule => channel(data.clone(), "module "),
+            XmlErrorDomain::XmlFromSchemasv => channel(data.clone(), "Schemas validity "),
+            XmlErrorDomain::XmlFromSchemasp => channel(data.clone(), "Schemas parser "),
+            XmlErrorDomain::XmlFromRelaxngp => channel(data.clone(), "Relax-NG parser "),
+            XmlErrorDomain::XmlFromRelaxngv => channel(data.clone(), "Relax-NG validity "),
+            XmlErrorDomain::XmlFromCatalog => channel(data.clone(), "Catalog "),
+            XmlErrorDomain::XmlFromC14N => channel(data.clone(), "C14N "),
+            XmlErrorDomain::XmlFromXSLT => channel(data.clone(), "XSLT "),
+            XmlErrorDomain::XmlFromI18N => channel(data.clone(), "encoding "),
+            XmlErrorDomain::XmlFromSchematronv => channel(data.clone(), "schematron "),
+            XmlErrorDomain::XmlFromBuffer => channel(data.clone(), "internal buffer "),
+            XmlErrorDomain::XmlFromURI => channel(data.clone(), "URI "),
+            _ => {}
+        };
+        match level {
+            XmlErrorLevel::XmlErrNone => channel(data.clone(), ": "),
+            XmlErrorLevel::XmlErrWarning => channel(data.clone(), "warning : "),
+            XmlErrorLevel::XmlErrError => channel(data.clone(), "error : "),
+            XmlErrorLevel::XmlErrFatal => channel(data.clone(), "error : "),
+        };
+        if let Some(msg) = msg {
+            if !msg.is_empty() && !msg.ends_with('\n') {
+                channel(data.clone(), format!("{msg}\n").as_str());
+            } else {
+                channel(data.clone(), msg);
+            }
+        } else {
+            channel(data.clone(), "out of memory error\n");
+        }
+
+        if !ctxt.is_null() {
+            parser_print_file_context_internal(input, channel, data.clone());
+            if !cur.is_null() {
+                if (*cur).filename.is_some() {
+                    channel(
+                        data.clone(),
+                        format!(
+                            "{}:{}: \n",
+                            (*cur).filename.as_deref().unwrap(),
+                            (*cur).line
+                        )
+                        .as_str(),
+                    )
+                } else if line != 0 && domain == XmlErrorDomain::XmlFromParser {
+                    channel(
+                        data.clone(),
+                        format!("Entity: line {}: \n", (*cur).line).as_str(),
+                    );
+                }
+                parser_print_file_context_internal(cur, channel, data.clone());
+            }
+        }
+        if let Some(str1) = err.str1.as_ref() {
+            if domain == XmlErrorDomain::XmlFromXPath
+                && err.int1 < 100
+                && err.int1 < str1.len() as i32
+            {
+                channel(data.clone(), format!("{str1}\n").as_str());
+                let mut buf = " ".repeat(err.int1 as usize);
+                buf.push_str("^\n");
+                channel(data.clone(), buf.as_str());
+            }
         }
     }
 }
@@ -1663,44 +1673,46 @@ pub(crate) unsafe fn __xml_simple_oom_error(
     node: Option<XmlGenericNodePtr>,
     msg: Option<&str>,
 ) {
-    if let Some(msg) = msg {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            node,
-            domain,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            Some(msg.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            format!("Memory allocation failed : {msg}\n").as_str(),
-        );
-    } else {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            node,
-            domain,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed\n",
-        );
+    unsafe {
+        if let Some(msg) = msg {
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                null_mut(),
+                node,
+                domain,
+                XmlParserErrors::XmlErrNoMemory,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                Some(msg.to_owned().into()),
+                None,
+                None,
+                0,
+                0,
+                format!("Memory allocation failed : {msg}\n").as_str(),
+            );
+        } else {
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                null_mut(),
+                node,
+                domain,
+                XmlParserErrors::XmlErrNoMemory,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                None,
+                None,
+                None,
+                0,
+                0,
+                "Memory allocation failed\n",
+            );
+        }
     }
 }
 

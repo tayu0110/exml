@@ -23,16 +23,18 @@ use std::{
 use anyhow::{bail, ensure};
 
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
+    error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     globals::GLOBAL_STATE,
     libxml::parser_internals::XML_MAX_TEXT_LENGTH,
-    tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
+    tree::{BASE_BUFFER_SIZE, XmlBufferAllocationScheme},
 };
 
 unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromBuffer, None, Some(extra));
-    if buf.error.is_ok() {
-        buf.error = XmlParserErrors::XmlErrNoMemory;
+    unsafe {
+        __xml_simple_oom_error(XmlErrorDomain::XmlFromBuffer, None, Some(extra));
+        if buf.error.is_ok() {
+            buf.error = XmlParserErrors::XmlErrNoMemory;
+        }
     }
 }
 
@@ -40,15 +42,17 @@ unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
 /// To be improved...
 #[doc(alias = "xmlBufOverflowError")]
 pub(crate) unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
-    __xml_simple_error!(
-        XmlErrorDomain::XmlFromBuffer,
-        XmlParserErrors::XmlBufOverflow,
-        None,
-        None,
-        extra
-    );
-    if buf.is_ok() {
-        buf.error = XmlParserErrors::XmlBufOverflow;
+    unsafe {
+        __xml_simple_error!(
+            XmlErrorDomain::XmlFromBuffer,
+            XmlParserErrors::XmlBufOverflow,
+            None,
+            None,
+            extra
+        );
+        if buf.is_ok() {
+            buf.error = XmlParserErrors::XmlBufOverflow;
+        }
     }
 }
 

@@ -20,8 +20,8 @@
 // Daniel Veillard <daniel@veillard.com>
 
 use std::{
-    ffi::{c_char, CStr, CString},
-    io::{stdout, Write},
+    ffi::{CStr, CString, c_char},
+    io::{Write, stdout},
     ptr::{addr_of_mut, null, null_mut},
 };
 
@@ -30,23 +30,23 @@ use libc::strlen;
 #[cfg(feature = "xpath")]
 use crate::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathObjectType};
 use crate::{
-    error::{XmlParserErrors, __xml_raise_error},
+    error::{__xml_raise_error, XmlParserErrors},
     generic_error,
     libxml::chvalid::xml_is_blank_char,
     tree::{
-        xml_free_node_list, xml_get_doc_entity, xml_validate_name, NodeCommon, XmlAttrPtr,
-        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtdPtr,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType,
-        XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
+        NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
+        XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntity,
+        XmlEntityPtr, XmlEntityType, XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_free_node_list, xml_get_doc_entity, xml_validate_name,
     },
 };
 
 use super::{
-    dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
-    parser::{xml_parse_in_node_context, XmlParserOption},
+    dict::{XmlDictPtr, xml_dict_lookup, xml_dict_owns},
+    parser::{XmlParserOption, xml_parse_in_node_context},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::xml_snprintf_element_content,
-    xmlstring::{xml_strchr, xml_strstr, XmlChar},
+    xmlstring::{XmlChar, xml_strchr, xml_strstr},
 };
 
 /// Handle a debug error.
@@ -134,37 +134,39 @@ impl XmlDebugCtxt<'_> {
     /// Report if a given namespace is is not in scope.
     #[doc(alias = "xmlCtxtNsCheckScope")]
     unsafe fn ns_check_scope(&mut self, node: XmlGenericNodePtr, ns: XmlNsPtr) {
-        let ret: i32 = xml_ns_check_scope(node, ns);
-        if ret == -2 {
-            if let Some(prefix) = ns.prefix() {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNsScope,
-                    "Reference to namespace '{}' not in scope\n",
-                    prefix
-                );
-            } else {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNsScope,
-                    "Reference to default namespace not in scope\n",
-                );
+        unsafe {
+            let ret: i32 = xml_ns_check_scope(node, ns);
+            if ret == -2 {
+                if let Some(prefix) = ns.prefix() {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckNsScope,
+                        "Reference to namespace '{}' not in scope\n",
+                        prefix
+                    );
+                } else {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckNsScope,
+                        "Reference to default namespace not in scope\n",
+                    );
+                }
             }
-        }
-        if ret == -3 {
-            if let Some(prefix) = ns.prefix() {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNsAncestor,
-                    "Reference to namespace '{}' not on ancestor\n",
-                    prefix
-                );
-            } else {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNsAncestor,
-                    "Reference to default namespace not on ancestor\n",
-                );
+            if ret == -3 {
+                if let Some(prefix) = ns.prefix() {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckNsAncestor,
+                        "Reference to namespace '{}' not on ancestor\n",
+                        prefix
+                    );
+                } else {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckNsAncestor,
+                        "Reference to default namespace not on ancestor\n",
+                    );
+                }
             }
         }
     }
@@ -172,12 +174,14 @@ impl XmlDebugCtxt<'_> {
     /// Do debugging on the string, currently it just checks the UTF-8 content
     #[doc(alias = "xmlCtxtCheckString")]
     unsafe fn check_string(&mut self, s: &str) {
-        if self.check != 0 {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNotUTF8,
-                "String is not UTF-8 {s}",
-            );
+        unsafe {
+            if self.check != 0 {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNotUTF8,
+                    "String is not UTF-8 {s}",
+                );
+            }
         }
     }
 
@@ -185,898 +189,682 @@ impl XmlDebugCtxt<'_> {
     /// conformance to the Name production.
     #[doc(alias = "xmlCtxtCheckName")]
     unsafe fn check_name(&mut self, name: Option<&str>) {
-        if self.check != 0 {
-            let Some(name) = name else {
-                xml_debug_err!(self, XmlParserErrors::XmlCheckNoName, "Name is NULL",);
-                return;
-            };
-            let cname = CString::new(name).unwrap();
-            #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-            if xml_validate_name(cname.as_ptr() as *const u8, 0) != 0 {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNotNCName,
-                    "Name is not an NCName '{name}'",
-                );
-            }
-            if !self.dict.is_null()
-                && xml_dict_owns(self.dict, cname.as_ptr() as *const u8) == 0
-                && self.doc.map_or(true, |doc| {
-                    doc.parse_flags
-                        & (XmlParserOption::XmlParseSAX1 as i32
-                            | XmlParserOption::XmlParseNoDict as i32)
-                        == 0
-                })
-            {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckOutsideDict,
-                    "Name is not from the document dictionary '{name}'",
-                );
+        unsafe {
+            if self.check != 0 {
+                let Some(name) = name else {
+                    xml_debug_err!(self, XmlParserErrors::XmlCheckNoName, "Name is NULL",);
+                    return;
+                };
+                let cname = CString::new(name).unwrap();
+                #[cfg(any(feature = "libxml_tree", feature = "schema"))]
+                if xml_validate_name(cname.as_ptr() as *const u8, 0) != 0 {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckNotNCName,
+                        "Name is not an NCName '{name}'",
+                    );
+                }
+                if !self.dict.is_null()
+                    && xml_dict_owns(self.dict, cname.as_ptr() as *const u8) == 0
+                    && self.doc.is_none_or(|doc| {
+                        doc.parse_flags
+                            & (XmlParserOption::XmlParseSAX1 as i32
+                                | XmlParserOption::XmlParseNoDict as i32)
+                            == 0
+                    })
+                {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckOutsideDict,
+                        "Name is not from the document dictionary '{name}'",
+                    );
+                }
             }
         }
     }
 
     #[doc(alias = "xmlCtxtGenericNodeCheck")]
     unsafe fn generic_node_check(&mut self, node: XmlGenericNodePtr) {
-        let doc = node.document();
+        unsafe {
+            let doc = node.document();
 
-        if node.parent().is_none() {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNoParent,
-                "Node has no parent\n",
-            );
-        }
-        if let Some(doc) = doc {
-            self.nodict = 1;
-            if self.doc.is_none() {
-                self.doc = Some(doc);
+            if node.parent().is_none() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoParent,
+                    "Node has no parent\n",
+                );
             }
-        } else {
-            xml_debug_err!(self, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n",);
-        }
-        if node
-            .parent()
-            .filter(|p| {
-                node.document() != p.document() && node.name().as_deref() != Some("pseudoroot")
-            })
-            .is_some()
-        {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckWrongDoc,
-                "Node doc differs from parent's one\n",
-            );
-        }
-        if node.prev().is_none() {
-            if let Ok(attr) = XmlAttrPtr::try_from(node) {
-                if attr
+            if let Some(doc) = doc {
+                self.nodict = 1;
+                if self.doc.is_none() {
+                    self.doc = Some(doc);
+                }
+            } else {
+                xml_debug_err!(self, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n",);
+            }
+            if node
+                .parent()
+                .filter(|p| {
+                    node.document() != p.document() && node.name().as_deref() != Some("pseudoroot")
+                })
+                .is_some()
+            {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckWrongDoc,
+                    "Node doc differs from parent's one\n",
+                );
+            }
+            if node.prev().is_none() {
+                if let Ok(attr) = XmlAttrPtr::try_from(node) {
+                    if attr
+                        .parent()
+                        .map(|parent| XmlNodePtr::try_from(parent).unwrap())
+                        .filter(|p| Some(attr) != p.properties)
+                        .is_some()
+                    {
+                        xml_debug_err!(
+                            self,
+                            XmlParserErrors::XmlCheckNoPrev,
+                            "Attr has no prev and not first of attr list\n",
+                        );
+                    }
+                } else if node
                     .parent()
-                    .map(|parent| XmlNodePtr::try_from(parent).unwrap())
-                    .filter(|p| Some(attr) != p.properties)
+                    .filter(|p| p.children() != Some(node))
                     .is_some()
                 {
                     xml_debug_err!(
                         self,
                         XmlParserErrors::XmlCheckNoPrev,
-                        "Attr has no prev and not first of attr list\n",
+                        "Node has no prev and not first of parent list\n",
+                    );
+                }
+            } else if node.prev().unwrap().next() != Some(node) {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckWrongPrev,
+                    "Node prev->next : back link wrong\n",
+                );
+            }
+            if let Some(next) = node.next() {
+                if next.prev() != Some(node) {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckWrongNext,
+                        "Node next->prev : forward link wrong\n",
+                    );
+                }
+                if next.parent() != node.parent() {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckWrongParent,
+                        "Node next->prev : forward link wrong\n",
                     );
                 }
             } else if node
                 .parent()
-                .filter(|p| p.children() != Some(node))
+                .filter(|p| {
+                    node.element_type() != XmlElementType::XmlAttributeNode
+                        && p.last() != Some(node)
+                        && p.element_type() == XmlElementType::XmlElementNode
+                })
                 .is_some()
             {
                 xml_debug_err!(
                     self,
-                    XmlParserErrors::XmlCheckNoPrev,
-                    "Node has no prev and not first of parent list\n",
+                    XmlParserErrors::XmlCheckNoNext,
+                    "Node has no next and not last of parent list\n",
                 );
             }
-        } else if node.prev().unwrap().next() != Some(node) {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckWrongPrev,
-                "Node prev->next : back link wrong\n",
-            );
-        }
-        if let Some(next) = node.next() {
-            if next.prev() != Some(node) {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckWrongNext,
-                    "Node next->prev : forward link wrong\n",
-                );
+            if node.element_type() == XmlElementType::XmlElementNode {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                let mut ns = node.ns_def;
+                while let Some(now) = ns {
+                    self.ns_check_scope(node.into(), now);
+                    ns = now.next;
+                }
+                if let Some(ns) = node.ns {
+                    self.ns_check_scope(node.into(), ns);
+                }
+            } else if let Some(ns) = XmlAttrPtr::try_from(node).ok().and_then(|attr| attr.ns) {
+                self.ns_check_scope(node, ns);
             }
-            if next.parent() != node.parent() {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckWrongParent,
-                    "Node next->prev : forward link wrong\n",
-                );
-            }
-        } else if node
-            .parent()
-            .filter(|p| {
-                node.element_type() != XmlElementType::XmlAttributeNode
-                    && p.last() != Some(node)
-                    && p.element_type() == XmlElementType::XmlElementNode
-            })
-            .is_some()
-        {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNoNext,
-                "Node has no next and not last of parent list\n",
-            );
-        }
-        if node.element_type() == XmlElementType::XmlElementNode {
-            let node = XmlNodePtr::try_from(node).unwrap();
-            let mut ns = node.ns_def;
-            while let Some(now) = ns {
-                self.ns_check_scope(node.into(), now);
-                ns = now.next;
-            }
-            if let Some(ns) = node.ns {
-                self.ns_check_scope(node.into(), ns);
-            }
-        } else if let Some(ns) = XmlAttrPtr::try_from(node).ok().and_then(|attr| attr.ns) {
-            self.ns_check_scope(node, ns);
-        }
 
-        if !matches!(
-            node.element_type(),
-            XmlElementType::XmlElementNode
-                | XmlElementType::XmlAttributeNode
-                | XmlElementType::XmlElementDecl
-                | XmlElementType::XmlAttributeDecl
-                | XmlElementType::XmlDTDNode
-                | XmlElementType::XmlHTMLDocumentNode
-                | XmlElementType::XmlDocumentNode
-        ) {
-            let content = if let Ok(node) = XmlNodePtr::try_from(node) {
-                node.content
-            } else if let Ok(ent) = XmlEntityPtr::try_from(node) {
-                ent.content
-            } else {
-                todo!("What is this type ????: {:?}", node.element_type());
-            };
-            if !content.is_null() {
-                self.check_string(&CStr::from_ptr(content as *const i8).to_string_lossy());
+            if !matches!(
+                node.element_type(),
+                XmlElementType::XmlElementNode
+                    | XmlElementType::XmlAttributeNode
+                    | XmlElementType::XmlElementDecl
+                    | XmlElementType::XmlAttributeDecl
+                    | XmlElementType::XmlDTDNode
+                    | XmlElementType::XmlHTMLDocumentNode
+                    | XmlElementType::XmlDocumentNode
+            ) {
+                let content = if let Ok(node) = XmlNodePtr::try_from(node) {
+                    node.content
+                } else if let Ok(ent) = XmlEntityPtr::try_from(node) {
+                    ent.content
+                } else {
+                    todo!("What is this type ????: {:?}", node.element_type());
+                };
+                if !content.is_null() {
+                    self.check_string(&CStr::from_ptr(content as *const i8).to_string_lossy());
+                }
             }
-        }
-        match (*node).element_type() {
-            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-                self.check_name(node.name().as_deref());
-            }
-            XmlElementType::XmlTextNode => {
-                if node.name().map_or(null(), |n| n.as_ptr()) != XML_STRING_TEXT.as_ptr() as _
-                    && (*node).name().map_or(null(), |n| n.as_ptr())
-                        != XML_STRING_TEXT_NOENC.as_ptr() as _
-                {
-                    // some case of entity substitution can lead to this
-                    if self.dict.is_null()
-                        || ((*node).name().map_or(null(), |n| n.as_ptr())
-                            != xml_dict_lookup(self.dict, c"nbktext".as_ptr() as _, 7))
+            match (*node).element_type() {
+                XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
+                    self.check_name(node.name().as_deref());
+                }
+                XmlElementType::XmlTextNode => {
+                    if node.name().map_or(null(), |n| n.as_ptr()) != XML_STRING_TEXT.as_ptr() as _
+                        && (*node).name().map_or(null(), |n| n.as_ptr())
+                            != XML_STRING_TEXT_NOENC.as_ptr() as _
+                    {
+                        // some case of entity substitution can lead to this
+                        if self.dict.is_null()
+                            || ((*node).name().map_or(null(), |n| n.as_ptr())
+                                != xml_dict_lookup(self.dict, c"nbktext".as_ptr() as _, 7))
+                        {
+                            xml_debug_err!(
+                                self,
+                                XmlParserErrors::XmlCheckWrongName,
+                                "Text node has wrong name '{}'",
+                                (*node).name().unwrap()
+                            );
+                        }
+                    }
+                }
+                XmlElementType::XmlCommentNode => {
+                    if node.name().map_or(null(), |n| n.as_ptr())
+                        != XML_STRING_COMMENT.as_ptr() as _
                     {
                         xml_debug_err!(
                             self,
                             XmlParserErrors::XmlCheckWrongName,
-                            "Text node has wrong name '{}'",
-                            (*node).name().unwrap()
+                            "Comment node has wrong name '{}'",
+                            node.name().unwrap()
                         );
                     }
                 }
-            }
-            XmlElementType::XmlCommentNode => {
-                if node.name().map_or(null(), |n| n.as_ptr()) != XML_STRING_COMMENT.as_ptr() as _ {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckWrongName,
-                        "Comment node has wrong name '{}'",
-                        node.name().unwrap()
-                    );
+                XmlElementType::XmlPINode => {
+                    self.check_name(node.name().as_deref());
                 }
-            }
-            XmlElementType::XmlPINode => {
-                self.check_name(node.name().as_deref());
-            }
-            XmlElementType::XmlCDATASectionNode => {
-                if let Some(name) = node.name() {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckNameNotNull,
-                        "CData section has non NULL name '{name}'",
-                    );
+                XmlElementType::XmlCDATASectionNode => {
+                    if let Some(name) = node.name() {
+                        xml_debug_err!(
+                            self,
+                            XmlParserErrors::XmlCheckNameNotNull,
+                            "CData section has non NULL name '{name}'",
+                        );
+                    }
                 }
+                XmlElementType::XmlEntityRefNode
+                | XmlElementType::XmlEntityNode
+                | XmlElementType::XmlDocumentTypeNode
+                | XmlElementType::XmlDocumentFragNode
+                | XmlElementType::XmlNotationNode
+                | XmlElementType::XmlDTDNode
+                | XmlElementType::XmlElementDecl
+                | XmlElementType::XmlAttributeDecl
+                | XmlElementType::XmlEntityDecl
+                | XmlElementType::XmlNamespaceDecl
+                | XmlElementType::XmlXIncludeStart
+                | XmlElementType::XmlXIncludeEnd
+                | XmlElementType::XmlDocumentNode
+                | XmlElementType::XmlHTMLDocumentNode => {}
+                _ => unreachable!(),
             }
-            XmlElementType::XmlEntityRefNode
-            | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlDocumentTypeNode
-            | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlNotationNode
-            | XmlElementType::XmlDTDNode
-            | XmlElementType::XmlElementDecl
-            | XmlElementType::XmlAttributeDecl
-            | XmlElementType::XmlEntityDecl
-            | XmlElementType::XmlNamespaceDecl
-            | XmlElementType::XmlXIncludeStart
-            | XmlElementType::XmlXIncludeEnd
-            | XmlElementType::XmlDocumentNode
-            | XmlElementType::XmlHTMLDocumentNode => {}
-            _ => unreachable!(),
         }
     }
 
     #[doc(alias = "xmlCtxtDumpDtdNode")]
     unsafe fn dump_dtd_node(&mut self, dtd: Option<XmlDtdPtr>) {
-        self.dump_spaces();
+        unsafe {
+            self.dump_spaces();
 
-        let Some(dtd) = dtd else {
+            let Some(dtd) = dtd else {
+                if self.check == 0 {
+                    writeln!(self.output, "DTD node is NULL");
+                }
+                return;
+            };
+
+            if dtd.element_type() != XmlElementType::XmlDTDNode {
+                xml_debug_err!(self, XmlParserErrors::XmlCheckNotDTD, "Node is not a DTD",);
+                return;
+            }
             if self.check == 0 {
-                writeln!(self.output, "DTD node is NULL");
+                if let Some(name) = dtd.name() {
+                    write!(self.output, "DTD({name})");
+                } else {
+                    write!(self.output, "DTD");
+                }
+                if let Some(external_id) = dtd.external_id.as_deref() {
+                    write!(self.output, ", PUBLIC {external_id}");
+                }
+                if let Some(system_id) = dtd.system_id.as_deref() {
+                    write!(self.output, ", SYSTEM {system_id}");
+                }
+                writeln!(self.output);
             }
-            return;
-        };
-
-        if dtd.element_type() != XmlElementType::XmlDTDNode {
-            xml_debug_err!(self, XmlParserErrors::XmlCheckNotDTD, "Node is not a DTD",);
-            return;
+            // Do a bit of checking
+            self.generic_node_check(dtd.into());
         }
-        if self.check == 0 {
-            if let Some(name) = dtd.name() {
-                write!(self.output, "DTD({name})");
-            } else {
-                write!(self.output, "DTD");
-            }
-            if let Some(external_id) = dtd.external_id.as_deref() {
-                write!(self.output, ", PUBLIC {external_id}");
-            }
-            if let Some(system_id) = dtd.system_id.as_deref() {
-                write!(self.output, ", SYSTEM {system_id}");
-            }
-            writeln!(self.output);
-        }
-        // Do a bit of checking
-        self.generic_node_check(dtd.into());
     }
 
     /// Dumps debug information for the DTD
     #[doc(alias = "xmlCtxtDumpDTD")]
     unsafe fn dump_dtd(&mut self, dtd: Option<XmlDtdPtr>) {
-        let Some(dtd) = dtd else {
-            if self.check == 0 {
-                writeln!(self.output, "DTD is NULL");
+        unsafe {
+            let Some(dtd) = dtd else {
+                if self.check == 0 {
+                    writeln!(self.output, "DTD is NULL");
+                }
+                return;
+            };
+            self.dump_dtd_node(Some(dtd));
+            if let Some(children) = dtd.children() {
+                self.depth += 1;
+                self.dump_node_list(Some(children));
+                self.depth -= 1;
+            } else {
+                writeln!(self.output, "    DTD is empty");
             }
-            return;
-        };
-        self.dump_dtd_node(Some(dtd));
-        if let Some(children) = dtd.children() {
-            self.depth += 1;
-            self.dump_node_list(Some(children));
-            self.depth -= 1;
-        } else {
-            writeln!(self.output, "    DTD is empty");
         }
     }
 
     #[doc(alias = "xmlCtxtDumpElemDecl")]
     unsafe fn dump_elem_decl(&mut self, elem: Option<XmlElementPtr>) {
-        self.dump_spaces();
+        unsafe {
+            self.dump_spaces();
 
-        let Some(elem) = elem else {
+            let Some(elem) = elem else {
+                if self.check == 0 {
+                    writeln!(self.output, "Element declaration is NULL");
+                }
+                return;
+            };
+            if elem.element_type() != XmlElementType::XmlElementDecl {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNotElemDecl,
+                    "Node is not an element declaration",
+                );
+                return;
+            }
+            if let Some(name) = elem.name() {
+                if self.check == 0 {
+                    write!(self.output, "ELEMDECL(");
+                    self.dump_string(Some(&name));
+                    write!(self.output, ")");
+                }
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoName,
+                    "Element declaration has no name",
+                );
+            }
             if self.check == 0 {
-                writeln!(self.output, "Element declaration is NULL");
-            }
-            return;
-        };
-        if elem.element_type() != XmlElementType::XmlElementDecl {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNotElemDecl,
-                "Node is not an element declaration",
-            );
-            return;
-        }
-        if let Some(name) = elem.name() {
-            if self.check == 0 {
-                write!(self.output, "ELEMDECL(");
-                self.dump_string(Some(&name));
-                write!(self.output, ")");
-            }
-        } else {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNoName,
-                "Element declaration has no name",
-            );
-        }
-        if self.check == 0 {
-            match elem.etype {
-                XmlElementTypeVal::XmlElementTypeUndefined => {
-                    write!(self.output, ", UNDEFINED");
+                match elem.etype {
+                    XmlElementTypeVal::XmlElementTypeUndefined => {
+                        write!(self.output, ", UNDEFINED");
+                    }
+                    XmlElementTypeVal::XmlElementTypeEmpty => {
+                        write!(self.output, ", EMPTY");
+                    }
+                    XmlElementTypeVal::XmlElementTypeAny => {
+                        write!(self.output, ", ANY");
+                    }
+                    XmlElementTypeVal::XmlElementTypeMixed => {
+                        write!(self.output, ", MIXED ");
+                    }
+                    XmlElementTypeVal::XmlElementTypeElement => {
+                        write!(self.output, ", MIXED ");
+                    }
                 }
-                XmlElementTypeVal::XmlElementTypeEmpty => {
-                    write!(self.output, ", EMPTY");
-                }
-                XmlElementTypeVal::XmlElementTypeAny => {
-                    write!(self.output, ", ANY");
-                }
-                XmlElementTypeVal::XmlElementTypeMixed => {
-                    write!(self.output, ", MIXED ");
-                }
-                XmlElementTypeVal::XmlElementTypeElement => {
-                    write!(self.output, ", MIXED ");
-                }
-            }
-            if elem.element_type() != XmlElementType::XmlElementNode && !elem.content.is_null() {
-                let mut buf: [c_char; 5001] = [0; 5001];
+                if elem.element_type() != XmlElementType::XmlElementNode && !elem.content.is_null()
+                {
+                    let mut buf: [c_char; 5001] = [0; 5001];
 
-                buf[0] = 0;
-                xml_snprintf_element_content(buf.as_mut_ptr(), 5000, elem.content, 1);
-                buf[5000] = 0;
-                let elem = CStr::from_ptr(buf.as_ptr()).to_string_lossy();
-                write!(self.output, "{}", elem);
+                    buf[0] = 0;
+                    xml_snprintf_element_content(buf.as_mut_ptr(), 5000, elem.content, 1);
+                    buf[5000] = 0;
+                    let elem = CStr::from_ptr(buf.as_ptr()).to_string_lossy();
+                    write!(self.output, "{}", elem);
+                }
+                writeln!(self.output);
             }
-            writeln!(self.output);
-        }
 
-        // Do a bit of checking
-        self.generic_node_check(elem.into());
+            // Do a bit of checking
+            self.generic_node_check(elem.into());
+        }
     }
 
     #[doc(alias = "xmlCtxtDumpAttrDecl")]
     unsafe fn dump_attr_decl(&mut self, attr: Option<XmlAttributePtr>) {
-        self.dump_spaces();
+        unsafe {
+            self.dump_spaces();
 
-        let Some(attr) = attr else {
-            if self.check == 0 {
-                writeln!(self.output, "Attribute declaration is NULL");
-            }
-            return;
-        };
-        if attr.element_type() != XmlElementType::XmlAttributeDecl {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNotAttrDecl,
-                "Node is not an attribute declaration",
-            );
-            return;
-        }
-        if let Some(name) = attr.name() {
-            if self.check == 0 {
-                write!(self.output, "ATTRDECL({name})");
-            }
-        } else {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNoName,
-                "Node attribute declaration has no name",
-            );
-        }
-        if let Some(elem) = attr.elem.as_deref() {
-            if self.check == 0 {
-                write!(self.output, " for {elem}");
-            }
-        } else {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNoElem,
-                "Node attribute declaration has no element name",
-            );
-        }
-        if self.check == 0 {
-            match attr.atype {
-                XmlAttributeType::XmlAttributeCDATA => {
-                    write!(self.output, " CDATA");
+            let Some(attr) = attr else {
+                if self.check == 0 {
+                    writeln!(self.output, "Attribute declaration is NULL");
                 }
-                XmlAttributeType::XmlAttributeID => {
-                    write!(self.output, " ID");
-                }
-                XmlAttributeType::XmlAttributeIDREF => {
-                    write!(self.output, " IDREF");
-                }
-                XmlAttributeType::XmlAttributeIDREFS => {
-                    write!(self.output, " IDREFS");
-                }
-                XmlAttributeType::XmlAttributeEntity => {
-                    write!(self.output, " ENTITY");
-                }
-                XmlAttributeType::XmlAttributeEntities => {
-                    write!(self.output, " ENTITIES");
-                }
-                XmlAttributeType::XmlAttributeNmtoken => {
-                    write!(self.output, " NMTOKEN");
-                }
-                XmlAttributeType::XmlAttributeNmtokens => {
-                    write!(self.output, " NMTOKENS");
-                }
-                XmlAttributeType::XmlAttributeEnumeration => {
-                    write!(self.output, " ENUMERATION");
-                }
-                XmlAttributeType::XmlAttributeNotation => {
-                    write!(self.output, " NOTATION ");
-                }
-            }
-            if let Some(mut cur) = attr.tree.as_deref() {
-                let mut remain = true;
-                for indx in 0..5 {
-                    if indx != 0 {
-                        write!(self.output, "|{}", cur.name);
-                    } else {
-                        write!(self.output, " ({}", cur.name);
-                    }
-                    let Some(next) = cur.next.as_deref() else {
-                        remain = false;
-                        break;
-                    };
-                    cur = next;
-                }
-                if !remain {
-                    write!(self.output, ")");
-                } else {
-                    write!(self.output, "...)");
-                }
-            }
-            match attr.def {
-                XmlAttributeDefault::XmlAttributeNone => {}
-                XmlAttributeDefault::XmlAttributeRequired => {
-                    write!(self.output, " REQUIRED");
-                }
-                XmlAttributeDefault::XmlAttributeImplied => {
-                    write!(self.output, " IMPLIED");
-                }
-                XmlAttributeDefault::XmlAttributeFixed => {
-                    write!(self.output, " FIXED");
-                }
-            }
-            if !attr.default_value.is_null() {
-                write!(self.output, "\"");
-                let def_value = attr.default_value;
-                self.dump_string(
-                    Some(CStr::from_ptr(def_value as *const i8).to_string_lossy()).as_deref(),
+                return;
+            };
+            if attr.element_type() != XmlElementType::XmlAttributeDecl {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNotAttrDecl,
+                    "Node is not an attribute declaration",
                 );
-                write!(self.output, "\"");
+                return;
             }
-            writeln!(self.output);
-        }
+            if let Some(name) = attr.name() {
+                if self.check == 0 {
+                    write!(self.output, "ATTRDECL({name})");
+                }
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoName,
+                    "Node attribute declaration has no name",
+                );
+            }
+            if let Some(elem) = attr.elem.as_deref() {
+                if self.check == 0 {
+                    write!(self.output, " for {elem}");
+                }
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoElem,
+                    "Node attribute declaration has no element name",
+                );
+            }
+            if self.check == 0 {
+                match attr.atype {
+                    XmlAttributeType::XmlAttributeCDATA => {
+                        write!(self.output, " CDATA");
+                    }
+                    XmlAttributeType::XmlAttributeID => {
+                        write!(self.output, " ID");
+                    }
+                    XmlAttributeType::XmlAttributeIDREF => {
+                        write!(self.output, " IDREF");
+                    }
+                    XmlAttributeType::XmlAttributeIDREFS => {
+                        write!(self.output, " IDREFS");
+                    }
+                    XmlAttributeType::XmlAttributeEntity => {
+                        write!(self.output, " ENTITY");
+                    }
+                    XmlAttributeType::XmlAttributeEntities => {
+                        write!(self.output, " ENTITIES");
+                    }
+                    XmlAttributeType::XmlAttributeNmtoken => {
+                        write!(self.output, " NMTOKEN");
+                    }
+                    XmlAttributeType::XmlAttributeNmtokens => {
+                        write!(self.output, " NMTOKENS");
+                    }
+                    XmlAttributeType::XmlAttributeEnumeration => {
+                        write!(self.output, " ENUMERATION");
+                    }
+                    XmlAttributeType::XmlAttributeNotation => {
+                        write!(self.output, " NOTATION ");
+                    }
+                }
+                if let Some(mut cur) = attr.tree.as_deref() {
+                    let mut remain = true;
+                    for indx in 0..5 {
+                        if indx != 0 {
+                            write!(self.output, "|{}", cur.name);
+                        } else {
+                            write!(self.output, " ({}", cur.name);
+                        }
+                        let Some(next) = cur.next.as_deref() else {
+                            remain = false;
+                            break;
+                        };
+                        cur = next;
+                    }
+                    if !remain {
+                        write!(self.output, ")");
+                    } else {
+                        write!(self.output, "...)");
+                    }
+                }
+                match attr.def {
+                    XmlAttributeDefault::XmlAttributeNone => {}
+                    XmlAttributeDefault::XmlAttributeRequired => {
+                        write!(self.output, " REQUIRED");
+                    }
+                    XmlAttributeDefault::XmlAttributeImplied => {
+                        write!(self.output, " IMPLIED");
+                    }
+                    XmlAttributeDefault::XmlAttributeFixed => {
+                        write!(self.output, " FIXED");
+                    }
+                }
+                if !attr.default_value.is_null() {
+                    write!(self.output, "\"");
+                    let def_value = attr.default_value;
+                    self.dump_string(
+                        Some(CStr::from_ptr(def_value as *const i8).to_string_lossy()).as_deref(),
+                    );
+                    write!(self.output, "\"");
+                }
+                writeln!(self.output);
+            }
 
-        // Do a bit of checking
-        self.generic_node_check(attr.into());
+            // Do a bit of checking
+            self.generic_node_check(attr.into());
+        }
     }
 
     #[doc(alias = "xmlCtxtDumpEntityDecl")]
     unsafe fn dump_entity_decl(&mut self, ent: Option<XmlEntityPtr>) {
-        self.dump_spaces();
+        unsafe {
+            self.dump_spaces();
 
-        let Some(ent) = ent else {
+            let Some(ent) = ent else {
+                if self.check == 0 {
+                    writeln!(self.output, "Entity declaration is NULL");
+                }
+                return;
+            };
+            if ent.element_type() != XmlElementType::XmlEntityDecl {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNotEntityDecl,
+                    "Node is not an entity declaration",
+                );
+                return;
+            }
+            if let Some(name) = ent.name() {
+                if self.check == 0 {
+                    write!(self.output, "ENTITYDECL(");
+                    self.dump_string(Some(&name));
+                    write!(self.output, ")");
+                }
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoName,
+                    "Entity declaration has no name",
+                );
+            }
             if self.check == 0 {
-                writeln!(self.output, "Entity declaration is NULL");
-            }
-            return;
-        };
-        if ent.element_type() != XmlElementType::XmlEntityDecl {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNotEntityDecl,
-                "Node is not an entity declaration",
-            );
-            return;
-        }
-        if let Some(name) = ent.name() {
-            if self.check == 0 {
-                write!(self.output, "ENTITYDECL(");
-                self.dump_string(Some(&name));
-                write!(self.output, ")");
-            }
-        } else {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNoName,
-                "Entity declaration has no name",
-            );
-        }
-        if self.check == 0 {
-            match ent.etype {
-                XmlEntityType::XmlInternalGeneralEntity => {
-                    writeln!(self.output, ", internal");
+                match ent.etype {
+                    XmlEntityType::XmlInternalGeneralEntity => {
+                        writeln!(self.output, ", internal");
+                    }
+                    XmlEntityType::XmlExternalGeneralParsedEntity => {
+                        writeln!(self.output, ", external parsed");
+                    }
+                    XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+                        writeln!(self.output, ", unparsed");
+                    }
+                    XmlEntityType::XmlInternalParameterEntity => {
+                        writeln!(self.output, ", parameter");
+                    }
+                    XmlEntityType::XmlExternalParameterEntity => {
+                        writeln!(self.output, ", external parameter");
+                    }
+                    XmlEntityType::XmlInternalPredefinedEntity => {
+                        writeln!(self.output, ", predefined");
+                    }
+                    _ => unreachable!(),
                 }
-                XmlEntityType::XmlExternalGeneralParsedEntity => {
-                    writeln!(self.output, ", external parsed");
+                if !ent.external_id.is_null() {
+                    self.dump_spaces();
+                    let external_id =
+                        CStr::from_ptr(ent.external_id as *const i8).to_string_lossy();
+                    writeln!(self.output, " ExternalID={external_id}");
                 }
-                XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                    writeln!(self.output, ", unparsed");
+                if !ent.system_id.is_null() {
+                    self.dump_spaces();
+                    let system_id = CStr::from_ptr(ent.system_id as *const i8).to_string_lossy();
+                    writeln!(self.output, " SystemID={system_id}");
                 }
-                XmlEntityType::XmlInternalParameterEntity => {
-                    writeln!(self.output, ", parameter");
+                if !ent.uri.is_null() {
+                    self.dump_spaces();
+                    let uri = CStr::from_ptr(ent.uri as *const i8).to_string_lossy();
+                    writeln!(self.output, " URI={uri}");
                 }
-                XmlEntityType::XmlExternalParameterEntity => {
-                    writeln!(self.output, ", external parameter");
+                let content = ent.content;
+                if !content.is_null() {
+                    self.dump_spaces();
+                    write!(self.output, " content=");
+                    self.dump_string(Some(
+                        &CStr::from_ptr(content as *const i8).to_string_lossy(),
+                    ));
+                    writeln!(self.output);
                 }
-                XmlEntityType::XmlInternalPredefinedEntity => {
-                    writeln!(self.output, ", predefined");
-                }
-                _ => unreachable!(),
             }
-            if !ent.external_id.is_null() {
-                self.dump_spaces();
-                let external_id = CStr::from_ptr(ent.external_id as *const i8).to_string_lossy();
-                writeln!(self.output, " ExternalID={external_id}");
-            }
-            if !ent.system_id.is_null() {
-                self.dump_spaces();
-                let system_id = CStr::from_ptr(ent.system_id as *const i8).to_string_lossy();
-                writeln!(self.output, " SystemID={system_id}");
-            }
-            if !ent.uri.is_null() {
-                self.dump_spaces();
-                let uri = CStr::from_ptr(ent.uri as *const i8).to_string_lossy();
-                writeln!(self.output, " URI={uri}");
-            }
-            let content = ent.content;
-            if !content.is_null() {
-                self.dump_spaces();
-                write!(self.output, " content=");
-                self.dump_string(Some(
-                    &CStr::from_ptr(content as *const i8).to_string_lossy(),
-                ));
-                writeln!(self.output);
-            }
-        }
 
-        // Do a bit of checking
-        self.generic_node_check(ent.into());
+            // Do a bit of checking
+            self.generic_node_check(ent.into());
+        }
     }
 
     #[doc(alias = "xmlCtxtDumpNamespace")]
     unsafe fn dump_namespace(&mut self, ns: Option<&XmlNs>) {
-        self.dump_spaces();
+        unsafe {
+            self.dump_spaces();
 
-        let Some(ns) = ns else {
-            if self.check == 0 {
-                writeln!(self.output, "namespace node is NULL");
-            }
-            return;
-        };
-        if ns.element_type() != XmlElementType::XmlNamespaceDecl {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNotNsDecl,
-                "Node is not a namespace declaration",
-            );
-            return;
-        }
-        if ns.href.is_null() {
-            if let Some(prefix) = ns.prefix() {
+            let Some(ns) = ns else {
+                if self.check == 0 {
+                    writeln!(self.output, "namespace node is NULL");
+                }
+                return;
+            };
+            if ns.element_type() != XmlElementType::XmlNamespaceDecl {
                 xml_debug_err!(
                     self,
-                    XmlParserErrors::XmlCheckNoHref,
-                    "Incomplete namespace {} href=NULL\n",
-                    prefix
+                    XmlParserErrors::XmlCheckNotNsDecl,
+                    "Node is not a namespace declaration",
                 );
-            } else {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNoHref,
-                    "Incomplete default namespace href=NULL\n",
-                );
+                return;
             }
-        } else if self.check == 0 {
-            if let Some(prefix) = ns.prefix() {
-                write!(self.output, "namespace {prefix} href=");
-            } else {
-                write!(self.output, "default namespace href=");
-            }
+            if ns.href.is_null() {
+                if let Some(prefix) = ns.prefix() {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckNoHref,
+                        "Incomplete namespace {} href=NULL\n",
+                        prefix
+                    );
+                } else {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckNoHref,
+                        "Incomplete default namespace href=NULL\n",
+                    );
+                }
+            } else if self.check == 0 {
+                if let Some(prefix) = ns.prefix() {
+                    write!(self.output, "namespace {prefix} href=");
+                } else {
+                    write!(self.output, "default namespace href=");
+                }
 
-            let href = ns.href;
-            self.dump_string(
-                (!href.is_null())
-                    .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
-                    .as_deref(),
-            );
-            writeln!(self.output);
+                let href = ns.href;
+                self.dump_string(
+                    (!href.is_null())
+                        .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+                        .as_deref(),
+                );
+                writeln!(self.output);
+            }
         }
     }
 
     #[doc(alias = "xmlCtxtDumpNamespaceList")]
     unsafe fn dump_namespace_list(&mut self, mut ns: Option<XmlNsPtr>) {
-        while let Some(now) = ns {
-            self.dump_namespace(Some(&*now));
-            let next = now.next;
-            ns = next;
+        unsafe {
+            while let Some(now) = ns {
+                self.dump_namespace(Some(&*now));
+                let next = now.next;
+                ns = next;
+            }
         }
     }
 
     #[doc(alias = "xmlCtxtDumpEntity")]
     unsafe fn dump_entity(&mut self, ent: Option<&XmlEntity>) {
-        self.dump_spaces();
+        unsafe {
+            self.dump_spaces();
 
-        let Some(ent) = ent else {
-            if self.check == 0 {
-                writeln!(self.output, "Entity is NULL");
-            }
-            return;
-        };
-        if self.check == 0 {
-            match ent.etype {
-                XmlEntityType::XmlInternalGeneralEntity => {
-                    write!(self.output, "INTERNAL_GENERAL_ENTITY ");
-                }
-                XmlEntityType::XmlExternalGeneralParsedEntity => {
-                    write!(self.output, "EXTERNAL_GENERAL_PARSED_ENTITY ");
-                }
-                XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                    write!(self.output, "EXTERNAL_GENERAL_UNPARSED_ENTITY ");
-                }
-                XmlEntityType::XmlInternalParameterEntity => {
-                    write!(self.output, "INTERNAL_PARAMETER_ENTITY ");
-                }
-                XmlEntityType::XmlExternalParameterEntity => {
-                    write!(self.output, "EXTERNAL_PARAMETER_ENTITY ");
-                }
-                e => {
-                    write!(self.output, "ENTITY_{} ! ", e as i32);
-                }
-                _ => unreachable!(),
-            }
-            writeln!(self.output, "{}", ent.name().unwrap());
-            if !ent.external_id.is_null() {
-                self.dump_spaces();
-                let external_id = CStr::from_ptr(ent.external_id as *const i8).to_string_lossy();
-                writeln!(self.output, "ExternalID={external_id}");
-            }
-            if !ent.system_id.is_null() {
-                self.dump_spaces();
-                let system_id = CStr::from_ptr(ent.system_id as *const i8).to_string_lossy();
-                writeln!(self.output, "SystemID={system_id}");
-            }
-            if !ent.uri.is_null() {
-                self.dump_spaces();
-                let uri = CStr::from_ptr(ent.uri as *const i8).to_string_lossy();
-                writeln!(self.output, "URI={uri}");
-            }
-            let content = ent.content;
-            if !content.is_null() {
-                self.dump_spaces();
-                write!(self.output, "content=");
-                self.dump_string(Some(
-                    &CStr::from_ptr(content as *const i8).to_string_lossy(),
-                ));
-                writeln!(self.output);
-            }
-        }
-    }
-
-    /// Dumps debug information for the attribute
-    #[doc(alias = "xmlCtxtDumpAttr")]
-    unsafe fn dump_attr(&mut self, attr: Option<XmlAttrPtr>) {
-        self.dump_spaces();
-
-        let Some(attr) = attr else {
-            if self.check == 0 {
-                write!(self.output, "Attr is NULL");
-            }
-            return;
-        };
-        if self.check == 0 {
-            write!(self.output, "ATTRIBUTE ");
-            self.dump_string(attr.name().as_deref());
-            writeln!(self.output);
-            if let Some(children) = attr.children() {
-                self.depth += 1;
-                self.dump_node_list(Some(children));
-                self.depth -= 1;
-            }
-        }
-        if attr.name().is_none() {
-            xml_debug_err!(
-                self,
-                XmlParserErrors::XmlCheckNoName,
-                "Attribute has no name",
-            );
-        }
-
-        // Do a bit of checking
-        self.generic_node_check(attr.into());
-    }
-
-    /// Dumps debug information for the attribute list
-    #[doc(alias = "xmlCtxtDumpAttrList")]
-    unsafe fn dump_attr_list(&mut self, mut attr: Option<XmlAttrPtr>) {
-        while let Some(now) = attr {
-            self.dump_attr(Some(now));
-            attr = now.next;
-        }
-    }
-
-    /// Dumps debug information for the element node, it is not recursive
-    #[doc(alias = "xmlCtxtDumpOneNode")]
-    unsafe fn dump_one_node(&mut self, node: Option<XmlGenericNodePtr>) {
-        let Some(node) = node else {
-            if self.check == 0 {
-                self.dump_spaces();
-                writeln!(self.output, "node is NULL");
-            }
-            return;
-        };
-        self.node = Some(node);
-
-        match node.element_type() {
-            XmlElementType::XmlElementNode => {
+            let Some(ent) = ent else {
                 if self.check == 0 {
-                    self.dump_spaces();
-                    write!(self.output, "ELEMENT ");
-                    let node = XmlNodePtr::try_from(node).unwrap();
-                    if let Some(ns) = node.ns {
-                        if let Some(prefix) = ns.prefix() {
-                            self.dump_string(Some(&prefix));
-                        }
-                        write!(self.output, ":");
+                    writeln!(self.output, "Entity is NULL");
+                }
+                return;
+            };
+            if self.check == 0 {
+                match ent.etype {
+                    XmlEntityType::XmlInternalGeneralEntity => {
+                        write!(self.output, "INTERNAL_GENERAL_ENTITY ");
                     }
-                    self.dump_string(node.name().as_deref());
-                    writeln!(self.output);
-                }
-            }
-            XmlElementType::XmlAttributeNode => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                }
-                writeln!(self.output, "Error, ATTRIBUTE found here");
-                self.generic_node_check(node);
-                return;
-            }
-            XmlElementType::XmlTextNode => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                    let node = XmlNodePtr::try_from(node).unwrap();
-                    if node.name == XML_STRING_TEXT_NOENC.as_ptr() as *const XmlChar {
-                        write!(self.output, "TEXT no enc");
-                    } else {
-                        write!(self.output, "TEXT");
+                    XmlEntityType::XmlExternalGeneralParsedEntity => {
+                        write!(self.output, "EXTERNAL_GENERAL_PARSED_ENTITY ");
                     }
-                    if self.options & DUMP_TEXT_TYPE != 0 {
-                        if xml_dict_owns(self.dict, node.content) == 1 {
-                            writeln!(self.output, " interned");
-                        } else {
-                            writeln!(self.output);
-                        }
-                    } else {
-                        writeln!(self.output);
+                    XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+                        write!(self.output, "EXTERNAL_GENERAL_UNPARSED_ENTITY ");
                     }
+                    XmlEntityType::XmlInternalParameterEntity => {
+                        write!(self.output, "INTERNAL_PARAMETER_ENTITY ");
+                    }
+                    XmlEntityType::XmlExternalParameterEntity => {
+                        write!(self.output, "EXTERNAL_PARAMETER_ENTITY ");
+                    }
+                    e => {
+                        write!(self.output, "ENTITY_{} ! ", e as i32);
+                    }
+                    _ => unreachable!(),
                 }
-            }
-            XmlElementType::XmlCDATASectionNode => {
-                if self.check == 0 {
+                writeln!(self.output, "{}", ent.name().unwrap());
+                if !ent.external_id.is_null() {
                     self.dump_spaces();
-                    writeln!(self.output, "CDATA_SECTION");
+                    let external_id =
+                        CStr::from_ptr(ent.external_id as *const i8).to_string_lossy();
+                    writeln!(self.output, "ExternalID={external_id}");
                 }
-            }
-            XmlElementType::XmlEntityRefNode => {
-                if self.check == 0 {
+                if !ent.system_id.is_null() {
                     self.dump_spaces();
-                    writeln!(self.output, "ENTITY_REF({})", node.name().unwrap());
+                    let system_id = CStr::from_ptr(ent.system_id as *const i8).to_string_lossy();
+                    writeln!(self.output, "SystemID={system_id}");
                 }
-            }
-            XmlElementType::XmlEntityNode => {
-                if self.check == 0 {
+                if !ent.uri.is_null() {
                     self.dump_spaces();
-                    writeln!(self.output, "ENTITY");
+                    let uri = CStr::from_ptr(ent.uri as *const i8).to_string_lossy();
+                    writeln!(self.output, "URI={uri}");
                 }
-            }
-            XmlElementType::XmlPINode => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                    writeln!(self.output, "PI {}", node.name().unwrap());
-                }
-            }
-            XmlElementType::XmlCommentNode => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                    writeln!(self.output, "COMMENT");
-                }
-            }
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                }
-                writeln!(self.output, "Error, DOCUMENT found here");
-                self.generic_node_check(node);
-                return;
-            }
-            XmlElementType::XmlDocumentTypeNode => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                    writeln!(self.output, "DOCUMENT_TYPE");
-                }
-            }
-            XmlElementType::XmlDocumentFragNode => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                    writeln!(self.output, "DOCUMENT_FRAG");
-                }
-            }
-            XmlElementType::XmlNotationNode => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                    writeln!(self.output, "NOTATION");
-                }
-            }
-            XmlElementType::XmlDTDNode => {
-                self.dump_dtd_node(XmlDtdPtr::try_from(node).ok());
-                return;
-            }
-            XmlElementType::XmlElementDecl => {
-                self.dump_elem_decl(XmlElementPtr::try_from(node).ok());
-                return;
-            }
-            XmlElementType::XmlAttributeDecl => {
-                self.dump_attr_decl(XmlAttributePtr::try_from(node).ok());
-                return;
-            }
-            XmlElementType::XmlEntityDecl => {
-                self.dump_entity_decl(XmlEntityPtr::try_from(node).ok());
-                return;
-            }
-            XmlElementType::XmlNamespaceDecl => {
-                self.dump_namespace(XmlNsPtr::try_from(node).ok().as_deref());
-                return;
-            }
-            XmlElementType::XmlXIncludeStart => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                    writeln!(self.output, "INCLUDE START");
-                }
-                return;
-            }
-            XmlElementType::XmlXIncludeEnd => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                    writeln!(self.output, "INCLUDE END");
-                }
-                return;
-            }
-            _ => {
-                if self.check == 0 {
-                    self.dump_spaces();
-                }
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckUnknownNode,
-                    "Unknown node type {}\n",
-                    (*node).element_type() as i32
-                );
-                return;
-            }
-        }
-        if node.document().is_none() {
-            if self.check == 0 {
-                self.dump_spaces();
-            }
-            writeln!(self.output, "PBM: doc.is_null() !!!");
-        }
-        self.depth += 1;
-        if let Some(ns_def) = XmlNodePtr::try_from(node)
-            .ok()
-            .filter(|n| n.element_type() == XmlElementType::XmlElementNode)
-            .and_then(|node| node.ns_def)
-        {
-            self.dump_namespace_list(Some(ns_def));
-        }
-        if let Some(prop) = XmlNodePtr::try_from(node)
-            .ok()
-            .filter(|n| n.element_type() == XmlElementType::XmlElementNode)
-            .and_then(|n| n.properties)
-        {
-            self.dump_attr_list(Some(prop));
-        }
-        if node.element_type() != XmlElementType::XmlEntityRefNode {
-            if node.element_type() != XmlElementType::XmlElementNode && self.check == 0 {
-                let content = if let Ok(node) = XmlNodePtr::try_from(node) {
-                    node.content
-                } else {
-                    null()
-                };
+                let content = ent.content;
                 if !content.is_null() {
                     self.dump_spaces();
                     write!(self.output, "content=");
@@ -1086,150 +874,403 @@ impl XmlDebugCtxt<'_> {
                     writeln!(self.output);
                 }
             }
-        } else {
-            let name = node.name().unwrap();
-            if let Some(ent) = xml_get_doc_entity(node.document(), &name) {
-                self.dump_entity(Some(&*ent));
+        }
+    }
+
+    /// Dumps debug information for the attribute
+    #[doc(alias = "xmlCtxtDumpAttr")]
+    unsafe fn dump_attr(&mut self, attr: Option<XmlAttrPtr>) {
+        unsafe {
+            self.dump_spaces();
+
+            let Some(attr) = attr else {
+                if self.check == 0 {
+                    write!(self.output, "Attr is NULL");
+                }
+                return;
+            };
+            if self.check == 0 {
+                write!(self.output, "ATTRIBUTE ");
+                self.dump_string(attr.name().as_deref());
+                writeln!(self.output);
+                if let Some(children) = attr.children() {
+                    self.depth += 1;
+                    self.dump_node_list(Some(children));
+                    self.depth -= 1;
+                }
+            }
+            if attr.name().is_none() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoName,
+                    "Attribute has no name",
+                );
+            }
+
+            // Do a bit of checking
+            self.generic_node_check(attr.into());
+        }
+    }
+
+    /// Dumps debug information for the attribute list
+    #[doc(alias = "xmlCtxtDumpAttrList")]
+    unsafe fn dump_attr_list(&mut self, mut attr: Option<XmlAttrPtr>) {
+        unsafe {
+            while let Some(now) = attr {
+                self.dump_attr(Some(now));
+                attr = now.next;
             }
         }
-        self.depth -= 1;
+    }
 
-        // Do a bit of checking
-        self.generic_node_check(node);
+    /// Dumps debug information for the element node, it is not recursive
+    #[doc(alias = "xmlCtxtDumpOneNode")]
+    unsafe fn dump_one_node(&mut self, node: Option<XmlGenericNodePtr>) {
+        unsafe {
+            let Some(node) = node else {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "node is NULL");
+                }
+                return;
+            };
+            self.node = Some(node);
+
+            match node.element_type() {
+                XmlElementType::XmlElementNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        write!(self.output, "ELEMENT ");
+                        let node = XmlNodePtr::try_from(node).unwrap();
+                        if let Some(ns) = node.ns {
+                            if let Some(prefix) = ns.prefix() {
+                                self.dump_string(Some(&prefix));
+                            }
+                            write!(self.output, ":");
+                        }
+                        self.dump_string(node.name().as_deref());
+                        writeln!(self.output);
+                    }
+                }
+                XmlElementType::XmlAttributeNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                    }
+                    writeln!(self.output, "Error, ATTRIBUTE found here");
+                    self.generic_node_check(node);
+                    return;
+                }
+                XmlElementType::XmlTextNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        let node = XmlNodePtr::try_from(node).unwrap();
+                        if node.name == XML_STRING_TEXT_NOENC.as_ptr() as *const XmlChar {
+                            write!(self.output, "TEXT no enc");
+                        } else {
+                            write!(self.output, "TEXT");
+                        }
+                        if self.options & DUMP_TEXT_TYPE != 0 {
+                            if xml_dict_owns(self.dict, node.content) == 1 {
+                                writeln!(self.output, " interned");
+                            } else {
+                                writeln!(self.output);
+                            }
+                        } else {
+                            writeln!(self.output);
+                        }
+                    }
+                }
+                XmlElementType::XmlCDATASectionNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        writeln!(self.output, "CDATA_SECTION");
+                    }
+                }
+                XmlElementType::XmlEntityRefNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        writeln!(self.output, "ENTITY_REF({})", node.name().unwrap());
+                    }
+                }
+                XmlElementType::XmlEntityNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        writeln!(self.output, "ENTITY");
+                    }
+                }
+                XmlElementType::XmlPINode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        writeln!(self.output, "PI {}", node.name().unwrap());
+                    }
+                }
+                XmlElementType::XmlCommentNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        writeln!(self.output, "COMMENT");
+                    }
+                }
+                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                    }
+                    writeln!(self.output, "Error, DOCUMENT found here");
+                    self.generic_node_check(node);
+                    return;
+                }
+                XmlElementType::XmlDocumentTypeNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        writeln!(self.output, "DOCUMENT_TYPE");
+                    }
+                }
+                XmlElementType::XmlDocumentFragNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        writeln!(self.output, "DOCUMENT_FRAG");
+                    }
+                }
+                XmlElementType::XmlNotationNode => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        writeln!(self.output, "NOTATION");
+                    }
+                }
+                XmlElementType::XmlDTDNode => {
+                    self.dump_dtd_node(XmlDtdPtr::try_from(node).ok());
+                    return;
+                }
+                XmlElementType::XmlElementDecl => {
+                    self.dump_elem_decl(XmlElementPtr::try_from(node).ok());
+                    return;
+                }
+                XmlElementType::XmlAttributeDecl => {
+                    self.dump_attr_decl(XmlAttributePtr::try_from(node).ok());
+                    return;
+                }
+                XmlElementType::XmlEntityDecl => {
+                    self.dump_entity_decl(XmlEntityPtr::try_from(node).ok());
+                    return;
+                }
+                XmlElementType::XmlNamespaceDecl => {
+                    self.dump_namespace(XmlNsPtr::try_from(node).ok().as_deref());
+                    return;
+                }
+                XmlElementType::XmlXIncludeStart => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        writeln!(self.output, "INCLUDE START");
+                    }
+                    return;
+                }
+                XmlElementType::XmlXIncludeEnd => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                        writeln!(self.output, "INCLUDE END");
+                    }
+                    return;
+                }
+                _ => {
+                    if self.check == 0 {
+                        self.dump_spaces();
+                    }
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckUnknownNode,
+                        "Unknown node type {}\n",
+                        (*node).element_type() as i32
+                    );
+                    return;
+                }
+            }
+            if node.document().is_none() {
+                if self.check == 0 {
+                    self.dump_spaces();
+                }
+                writeln!(self.output, "PBM: doc.is_null() !!!");
+            }
+            self.depth += 1;
+            if let Some(ns_def) = XmlNodePtr::try_from(node)
+                .ok()
+                .filter(|n| n.element_type() == XmlElementType::XmlElementNode)
+                .and_then(|node| node.ns_def)
+            {
+                self.dump_namespace_list(Some(ns_def));
+            }
+            if let Some(prop) = XmlNodePtr::try_from(node)
+                .ok()
+                .filter(|n| n.element_type() == XmlElementType::XmlElementNode)
+                .and_then(|n| n.properties)
+            {
+                self.dump_attr_list(Some(prop));
+            }
+            if node.element_type() != XmlElementType::XmlEntityRefNode {
+                if node.element_type() != XmlElementType::XmlElementNode && self.check == 0 {
+                    let content = if let Ok(node) = XmlNodePtr::try_from(node) {
+                        node.content
+                    } else {
+                        null()
+                    };
+                    if !content.is_null() {
+                        self.dump_spaces();
+                        write!(self.output, "content=");
+                        self.dump_string(Some(
+                            &CStr::from_ptr(content as *const i8).to_string_lossy(),
+                        ));
+                        writeln!(self.output);
+                    }
+                }
+            } else {
+                let name = node.name().unwrap();
+                if let Some(ent) = xml_get_doc_entity(node.document(), &name) {
+                    self.dump_entity(Some(&*ent));
+                }
+            }
+            self.depth -= 1;
+
+            // Do a bit of checking
+            self.generic_node_check(node);
+        }
     }
 
     /// Dumps debug information for the element node, it is recursive
     #[doc(alias = "xmlCtxtDumpNode")]
     unsafe fn dump_node(&mut self, node: Option<XmlGenericNodePtr>) {
-        let Some(node) = node else {
-            if self.check == 0 {
-                self.dump_spaces();
-                writeln!(self.output, "node is NULL");
+        unsafe {
+            let Some(node) = node else {
+                if self.check == 0 {
+                    self.dump_spaces();
+                    writeln!(self.output, "node is NULL");
+                }
+                return;
+            };
+            self.dump_one_node(Some(node));
+            if let Some(children) = node.children().filter(|_| {
+                node.element_type() != XmlElementType::XmlNamespaceDecl
+                    && node.element_type() != XmlElementType::XmlEntityRefNode
+            }) {
+                self.depth += 1;
+                self.dump_node_list(Some(children));
+                self.depth -= 1;
             }
-            return;
-        };
-        self.dump_one_node(Some(node));
-        if let Some(children) = node.children().filter(|_| {
-            node.element_type() != XmlElementType::XmlNamespaceDecl
-                && node.element_type() != XmlElementType::XmlEntityRefNode
-        }) {
-            self.depth += 1;
-            self.dump_node_list(Some(children));
-            self.depth -= 1;
         }
     }
 
     /// Dumps debug information for the list of element node, it is recursive
     #[doc(alias = "xmlCtxtDumpNodeList")]
     unsafe fn dump_node_list(&mut self, node: Option<XmlGenericNodePtr>) {
-        if let Some(mut node) = node {
-            self.dump_node(Some(node));
-            while let Some(next) = node.next() {
-                self.dump_node(Some(next));
-                node = next;
+        unsafe {
+            if let Some(mut node) = node {
+                self.dump_node(Some(node));
+                while let Some(next) = node.next() {
+                    self.dump_node(Some(next));
+                    node = next;
+                }
             }
         }
     }
 
     #[doc(alias = "xmlCtxtDumpDocHead")]
     unsafe fn dump_doc_head(&mut self, doc: &XmlDoc) {
-        self.node = XmlGenericNodePtr::from_raw(doc as *const XmlDoc as *mut XmlDoc);
+        unsafe {
+            self.node = XmlGenericNodePtr::from_raw(doc as *const XmlDoc as *mut XmlDoc);
 
-        match doc.typ {
-            XmlElementType::XmlElementNode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundElement,
-                    "Misplaced ELEMENT node\n",
-                );
-            }
-            XmlElementType::XmlAttributeNode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundAttribute,
-                    "Misplaced ATTRIBUTE node\n",
-                );
-            }
-            XmlElementType::XmlTextNode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundText,
-                    "Misplaced TEXT node\n",
-                );
-            }
-            XmlElementType::XmlCDATASectionNode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundCDATA,
-                    "Misplaced CDATA node\n",
-                );
-            }
-            XmlElementType::XmlEntityRefNode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundEntityRef,
-                    "Misplaced ENTITYREF node\n",
-                );
-            }
-            XmlElementType::XmlEntityNode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundEntity,
-                    "Misplaced ENTITY node\n",
-                );
-            }
-            XmlElementType::XmlPINode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundPI,
-                    "Misplaced PI node\n",
-                );
-            }
-            XmlElementType::XmlCommentNode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundComment,
-                    "Misplaced COMMENT node\n",
-                );
-            }
-            XmlElementType::XmlDocumentNode => {
-                if self.check == 0 {
-                    writeln!(self.output, "DOCUMENT");
+            match doc.typ {
+                XmlElementType::XmlElementNode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundElement,
+                        "Misplaced ELEMENT node\n",
+                    );
                 }
-            }
-            XmlElementType::XmlHTMLDocumentNode => {
-                if self.check == 0 {
-                    writeln!(self.output, "HTML DOCUMENT");
+                XmlElementType::XmlAttributeNode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundAttribute,
+                        "Misplaced ATTRIBUTE node\n",
+                    );
                 }
-            }
-            XmlElementType::XmlDocumentTypeNode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundDoctype,
-                    "Misplaced DOCTYPE node\n",
-                );
-            }
-            XmlElementType::XmlDocumentFragNode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundFragment,
-                    "Misplaced FRAGMENT node\n",
-                );
-            }
-            XmlElementType::XmlNotationNode => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckFoundNotation,
-                    "Misplaced NOTATION node\n",
-                );
-            }
-            _ => {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckUnknownNode,
-                    "Unknown node type {}\n",
-                    doc.element_type() as i32
-                );
+                XmlElementType::XmlTextNode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundText,
+                        "Misplaced TEXT node\n",
+                    );
+                }
+                XmlElementType::XmlCDATASectionNode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundCDATA,
+                        "Misplaced CDATA node\n",
+                    );
+                }
+                XmlElementType::XmlEntityRefNode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundEntityRef,
+                        "Misplaced ENTITYREF node\n",
+                    );
+                }
+                XmlElementType::XmlEntityNode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundEntity,
+                        "Misplaced ENTITY node\n",
+                    );
+                }
+                XmlElementType::XmlPINode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundPI,
+                        "Misplaced PI node\n",
+                    );
+                }
+                XmlElementType::XmlCommentNode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundComment,
+                        "Misplaced COMMENT node\n",
+                    );
+                }
+                XmlElementType::XmlDocumentNode => {
+                    if self.check == 0 {
+                        writeln!(self.output, "DOCUMENT");
+                    }
+                }
+                XmlElementType::XmlHTMLDocumentNode => {
+                    if self.check == 0 {
+                        writeln!(self.output, "HTML DOCUMENT");
+                    }
+                }
+                XmlElementType::XmlDocumentTypeNode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundDoctype,
+                        "Misplaced DOCTYPE node\n",
+                    );
+                }
+                XmlElementType::XmlDocumentFragNode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundFragment,
+                        "Misplaced FRAGMENT node\n",
+                    );
+                }
+                XmlElementType::XmlNotationNode => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckFoundNotation,
+                        "Misplaced NOTATION node\n",
+                    );
+                }
+                _ => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckUnknownNode,
+                        "Unknown node type {}\n",
+                        doc.element_type() as i32
+                    );
+                }
             }
         }
     }
@@ -1237,35 +1278,37 @@ impl XmlDebugCtxt<'_> {
     /// Dumps debug information concerning the document, not recursive
     #[doc(alias = "xmlCtxtDumpDocumentHead")]
     unsafe fn dump_document_head(&mut self, doc: Option<&XmlDoc>) {
-        if let Some(doc) = doc {
-            self.dump_doc_head(doc);
-            if self.check == 0 {
-                if let Some(name) = doc.name() {
-                    write!(self.output, "name=");
-                    self.dump_string(Some(&name));
-                    writeln!(self.output);
+        unsafe {
+            if let Some(doc) = doc {
+                self.dump_doc_head(doc);
+                if self.check == 0 {
+                    if let Some(name) = doc.name() {
+                        write!(self.output, "name=");
+                        self.dump_string(Some(&name));
+                        writeln!(self.output);
+                    }
+                    if let Some(version) = doc.version.as_deref() {
+                        write!(self.output, "version=");
+                        self.dump_string(Some(version));
+                        writeln!(self.output);
+                    }
+                    if let Some(encoding) = doc.encoding.as_deref() {
+                        write!(self.output, "encoding=");
+                        self.dump_string(Some(encoding));
+                        writeln!(self.output);
+                    }
+                    if let Some(url) = doc.url.as_deref() {
+                        write!(self.output, "URL=");
+                        self.dump_string(Some(url));
+                        writeln!(self.output);
+                    }
+                    if doc.standalone != 0 {
+                        writeln!(self.output, "standalone=true");
+                    }
                 }
-                if let Some(version) = doc.version.as_deref() {
-                    write!(self.output, "version=");
-                    self.dump_string(Some(version));
-                    writeln!(self.output);
+                if let Some(old_ns) = doc.old_ns {
+                    self.dump_namespace_list(Some(old_ns));
                 }
-                if let Some(encoding) = doc.encoding.as_deref() {
-                    write!(self.output, "encoding=");
-                    self.dump_string(Some(encoding));
-                    writeln!(self.output);
-                }
-                if let Some(url) = doc.url.as_deref() {
-                    write!(self.output, "URL=");
-                    self.dump_string(Some(url));
-                    writeln!(self.output);
-                }
-                if doc.standalone != 0 {
-                    writeln!(self.output, "standalone=true");
-                }
-            }
-            if let Some(old_ns) = doc.old_ns {
-                self.dump_namespace_list(Some(old_ns));
             }
         }
     }
@@ -1273,111 +1316,118 @@ impl XmlDebugCtxt<'_> {
     /// Dumps debug information for the document, it's recursive
     #[doc(alias = "xmlCtxtDumpDocument")]
     unsafe fn dump_document(&mut self, doc: Option<&XmlDoc>) {
-        let Some(doc) = doc else {
-            if self.check == 0 {
-                writeln!(self.output, "DOCUMENT.is_null() !");
+        unsafe {
+            let Some(doc) = doc else {
+                if self.check == 0 {
+                    writeln!(self.output, "DOCUMENT.is_null() !");
+                }
+                return;
+            };
+            self.dump_document_head(Some(doc));
+            if let Some(children) = (*doc).children().filter(|_| {
+                matches!(
+                    doc.element_type(),
+                    XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
+                )
+            }) {
+                self.depth += 1;
+                self.dump_node_list(Some(children));
+                self.depth -= 1;
             }
-            return;
-        };
-        self.dump_document_head(Some(doc));
-        if let Some(children) = (*doc).children().filter(|_| {
-            matches!(
-                doc.element_type(),
-                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
-            )
-        }) {
-            self.depth += 1;
-            self.dump_node_list(Some(children));
-            self.depth -= 1;
         }
     }
 
     #[doc(alias = "xmlCtxtDumpEntityCallback")]
     unsafe fn dump_entities_callback(&mut self, cur: Option<&XmlEntity>) {
-        let Some(cur) = cur else {
+        unsafe {
+            let Some(cur) = cur else {
+                if self.check == 0 {
+                    write!(self.output, "Entity is NULL");
+                }
+                return;
+            };
             if self.check == 0 {
-                write!(self.output, "Entity is NULL");
-            }
-            return;
-        };
-        if self.check == 0 {
-            write!(self.output, "{} : ", cur.name().unwrap());
-            match cur.etype {
-                XmlEntityType::XmlInternalGeneralEntity => {
-                    write!(self.output, "INTERNAL GENERAL, ");
+                write!(self.output, "{} : ", cur.name().unwrap());
+                match cur.etype {
+                    XmlEntityType::XmlInternalGeneralEntity => {
+                        write!(self.output, "INTERNAL GENERAL, ");
+                    }
+                    XmlEntityType::XmlExternalGeneralParsedEntity => {
+                        write!(self.output, "EXTERNAL PARSED, ");
+                    }
+                    XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+                        write!(self.output, "EXTERNAL UNPARSED, ");
+                    }
+                    XmlEntityType::XmlInternalParameterEntity => {
+                        write!(self.output, "INTERNAL PARAMETER, ");
+                    }
+                    XmlEntityType::XmlExternalParameterEntity => {
+                        write!(self.output, "EXTERNAL PARAMETER, ");
+                    }
+                    e => {
+                        xml_debug_err!(
+                            self,
+                            XmlParserErrors::XmlCheckEntityType,
+                            "Unknown entity type {}\n",
+                            e as i32
+                        );
+                    }
+                    _ => unreachable!(),
                 }
-                XmlEntityType::XmlExternalGeneralParsedEntity => {
-                    write!(self.output, "EXTERNAL PARSED, ");
+                if !cur.external_id.is_null() {
+                    let external_id =
+                        CStr::from_ptr(cur.external_id as *const i8).to_string_lossy();
+                    write!(self.output, "ID \"{external_id}\"");
                 }
-                XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                    write!(self.output, "EXTERNAL UNPARSED, ");
+                if !cur.system_id.is_null() {
+                    let system_id = CStr::from_ptr(cur.system_id as *const i8).to_string_lossy();
+                    write!(self.output, "SYSTEM \"{system_id}\"");
                 }
-                XmlEntityType::XmlInternalParameterEntity => {
-                    write!(self.output, "INTERNAL PARAMETER, ");
+                if !cur.orig.is_null() {
+                    let orig = CStr::from_ptr(cur.orig as *const i8).to_string_lossy();
+                    write!(self.output, "\n orig \"{orig}\"");
                 }
-                XmlEntityType::XmlExternalParameterEntity => {
-                    write!(self.output, "EXTERNAL PARAMETER, ");
+                if cur.typ != XmlElementType::XmlElementNode && !cur.content.is_null() {
+                    let content = CStr::from_ptr(cur.content as *const i8).to_string_lossy();
+                    write!(self.output, "\n content \"{content}\"");
                 }
-                e => {
-                    xml_debug_err!(
-                        self,
-                        XmlParserErrors::XmlCheckEntityType,
-                        "Unknown entity type {}\n",
-                        e as i32
-                    );
-                }
-                _ => unreachable!(),
+                writeln!(self.output);
             }
-            if !cur.external_id.is_null() {
-                let external_id = CStr::from_ptr(cur.external_id as *const i8).to_string_lossy();
-                write!(self.output, "ID \"{external_id}\"");
-            }
-            if !cur.system_id.is_null() {
-                let system_id = CStr::from_ptr(cur.system_id as *const i8).to_string_lossy();
-                write!(self.output, "SYSTEM \"{system_id}\"");
-            }
-            if !cur.orig.is_null() {
-                let orig = CStr::from_ptr(cur.orig as *const i8).to_string_lossy();
-                write!(self.output, "\n orig \"{orig}\"");
-            }
-            if cur.typ != XmlElementType::XmlElementNode && !cur.content.is_null() {
-                let content = CStr::from_ptr(cur.content as *const i8).to_string_lossy();
-                write!(self.output, "\n content \"{content}\"");
-            }
-            writeln!(self.output);
         }
     }
 
     /// Dumps debug information for all the entities in use by the document
     #[doc(alias = "xmlCtxtDumpEntities")]
     unsafe fn dump_entities(&mut self, doc: Option<&XmlDoc>) {
-        if let Some(doc) = doc {
-            self.dump_doc_head(doc);
-            if let Some(int_subset) = doc.int_subset {
-                if let Some(table) = int_subset.entities {
-                    if self.check == 0 {
-                        writeln!(self.output, "Entities in internal subset");
+        unsafe {
+            if let Some(doc) = doc {
+                self.dump_doc_head(doc);
+                if let Some(int_subset) = doc.int_subset {
+                    if let Some(table) = int_subset.entities {
+                        if self.check == 0 {
+                            writeln!(self.output, "Entities in internal subset");
+                        }
+                        table.scan(|payload, _, _, _| {
+                            let entity = *payload;
+                            self.dump_entities_callback(Some(&*entity));
+                        });
                     }
-                    table.scan(|payload, _, _, _| {
-                        let entity = *payload;
-                        self.dump_entities_callback(Some(&*entity));
-                    });
+                } else {
+                    writeln!(self.output, "No entities in internal subset");
                 }
-            } else {
-                writeln!(self.output, "No entities in internal subset");
-            }
-            if let Some(ext_subset) = doc.ext_subset {
-                if let Some(table) = ext_subset.entities {
-                    if self.check == 0 {
-                        writeln!(self.output, "Entities in external subset");
+                if let Some(ext_subset) = doc.ext_subset {
+                    if let Some(table) = ext_subset.entities {
+                        if self.check == 0 {
+                            writeln!(self.output, "Entities in external subset");
+                        }
+                        table.scan(|payload, _, _, _| {
+                            let entity = *payload;
+                            self.dump_entities_callback(Some(&*entity));
+                        });
                     }
-                    table.scan(|payload, _, _, _| {
-                        let entity = *payload;
-                        self.dump_entities_callback(Some(&*entity));
-                    });
+                } else if self.check == 0 {
+                    writeln!(self.output, "No entities in external subset");
                 }
-            } else if self.check == 0 {
-                writeln!(self.output, "No entities in external subset");
             }
         }
     }
@@ -1435,53 +1485,55 @@ const DUMP_TEXT_TYPE: i32 = 1;
 /// and -3 if not on an ancestor node.
 #[doc(alias = "xmlNsCheckScope")]
 unsafe fn xml_ns_check_scope(node: XmlGenericNodePtr, ns: XmlNsPtr) -> i32 {
-    if !matches!(
-        node.element_type(),
-        XmlElementType::XmlElementNode
-            | XmlElementType::XmlAttributeNode
-            | XmlElementType::XmlDocumentNode
-            | XmlElementType::XmlTextNode
-            | XmlElementType::XmlHTMLDocumentNode
-            | XmlElementType::XmlXIncludeStart
-    ) {
-        return -2;
-    }
-
-    let mut node = Some(node);
-    while let Some(now) = node.filter(|n| {
-        matches!(
-            n.element_type(),
+    unsafe {
+        if !matches!(
+            node.element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlAttributeNode
+                | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlTextNode
+                | XmlElementType::XmlHTMLDocumentNode
                 | XmlElementType::XmlXIncludeStart
-        )
-    }) {
-        if matches!(
-            now.element_type(),
-            XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
         ) {
-            let mut cur = XmlNodePtr::try_from(now).unwrap().ns_def;
-            while let Some(now) = cur {
-                if now == ns {
-                    return 1;
+            return -2;
+        }
+
+        let mut node = Some(node);
+        while let Some(now) = node.filter(|n| {
+            matches!(
+                n.element_type(),
+                XmlElementType::XmlElementNode
+                    | XmlElementType::XmlAttributeNode
+                    | XmlElementType::XmlTextNode
+                    | XmlElementType::XmlXIncludeStart
+            )
+        }) {
+            if matches!(
+                now.element_type(),
+                XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
+            ) {
+                let mut cur = XmlNodePtr::try_from(now).unwrap().ns_def;
+                while let Some(now) = cur {
+                    if now == ns {
+                        return 1;
+                    }
+                    if now.prefix() == ns.prefix() {
+                        return -2;
+                    }
+                    cur = now.next;
                 }
-                if now.prefix() == ns.prefix() {
-                    return -2;
-                }
-                cur = now.next;
+            }
+            node = now.parent();
+        }
+        // the xml namespace may be declared on the document node
+        if let Some(node) = node.and_then(|node| XmlDocPtr::try_from(node).ok()) {
+            let old_ns = node.old_ns;
+            if old_ns == Some(ns) {
+                return 1;
             }
         }
-        node = now.parent();
+        -3
     }
-    // the xml namespace may be declared on the document node
-    if let Some(node) = node.and_then(|node| XmlDocPtr::try_from(node).ok()) {
-        let old_ns = node.old_ns;
-        if old_ns == Some(ns) {
-            return 1;
-        }
-    }
-    -3
 }
 
 /// Dumps debug information for the attribute
@@ -1491,12 +1543,14 @@ pub unsafe fn xml_debug_dump_attr<'a>(
     attr: Option<XmlAttrPtr>,
     depth: i32,
 ) {
-    let mut ctxt = XmlDebugCtxt {
-        output: Box::new(output),
-        depth,
-        ..Default::default()
-    };
-    ctxt.dump_attr(attr);
+    unsafe {
+        let mut ctxt = XmlDebugCtxt {
+            output: Box::new(output),
+            depth,
+            ..Default::default()
+        };
+        ctxt.dump_attr(attr);
+    }
 }
 
 /// Dumps debug information for the attribute list
@@ -1506,12 +1560,14 @@ pub unsafe fn xml_debug_dump_attr_list<'a>(
     attr: Option<XmlAttrPtr>,
     depth: i32,
 ) {
-    let mut ctxt = XmlDebugCtxt {
-        output: Box::new(output),
-        depth,
-        ..Default::default()
-    };
-    ctxt.dump_attr_list(attr);
+    unsafe {
+        let mut ctxt = XmlDebugCtxt {
+            output: Box::new(output),
+            depth,
+            ..Default::default()
+        };
+        ctxt.dump_attr_list(attr);
+    }
 }
 
 /// Dumps debug information for the element node, it is not recursive
@@ -1521,12 +1577,14 @@ pub unsafe fn xml_debug_dump_one_node<'a>(
     node: Option<XmlGenericNodePtr>,
     depth: i32,
 ) {
-    let mut ctxt = XmlDebugCtxt {
-        output: Box::new(output),
-        depth,
-        ..Default::default()
-    };
-    ctxt.dump_one_node(node);
+    unsafe {
+        let mut ctxt = XmlDebugCtxt {
+            output: Box::new(output),
+            depth,
+            ..Default::default()
+        };
+        ctxt.dump_one_node(node);
+    }
 }
 
 /// Dumps debug information for the element node, it is recursive
@@ -1536,12 +1594,14 @@ pub unsafe fn xml_debug_dump_node<'a>(
     node: Option<XmlGenericNodePtr>,
     depth: i32,
 ) {
-    let mut ctxt = XmlDebugCtxt {
-        output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
-        depth,
-        ..Default::default()
-    };
-    ctxt.dump_node(node);
+    unsafe {
+        let mut ctxt = XmlDebugCtxt {
+            output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
+            depth,
+            ..Default::default()
+        };
+        ctxt.dump_node(node);
+    }
 }
 
 /// Dumps debug information for the list of element node, it is recursive
@@ -1551,12 +1611,14 @@ pub unsafe fn xml_debug_dump_node_list<'a>(
     node: Option<XmlGenericNodePtr>,
     depth: i32,
 ) {
-    let mut ctxt = XmlDebugCtxt {
-        output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
-        depth,
-        ..Default::default()
-    };
-    ctxt.dump_node_list(node);
+    unsafe {
+        let mut ctxt = XmlDebugCtxt {
+            output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
+            depth,
+            ..Default::default()
+        };
+        ctxt.dump_node_list(node);
+    }
 }
 
 /// Dumps debug information concerning the document, not recursive
@@ -1565,41 +1627,49 @@ pub unsafe fn xml_debug_dump_document_head<'a>(
     output: Option<impl Write + 'a>,
     doc: Option<&XmlDoc>,
 ) {
-    let mut ctxt = XmlDebugCtxt::default();
+    unsafe {
+        let mut ctxt = XmlDebugCtxt::default();
 
-    ctxt.options |= DUMP_TEXT_TYPE;
-    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-    ctxt.dump_document_head(doc);
+        ctxt.options |= DUMP_TEXT_TYPE;
+        ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
+        ctxt.dump_document_head(doc);
+    }
 }
 
 /// Dumps debug information for the document, it's recursive
 #[doc(alias = "xmlDebugDumpDocument")]
 pub unsafe fn xml_debug_dump_document<'a>(output: Option<impl Write + 'a>, doc: Option<&XmlDoc>) {
-    let mut ctxt = XmlDebugCtxt::default();
+    unsafe {
+        let mut ctxt = XmlDebugCtxt::default();
 
-    ctxt.options |= DUMP_TEXT_TYPE;
-    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-    ctxt.dump_document(doc);
+        ctxt.options |= DUMP_TEXT_TYPE;
+        ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
+        ctxt.dump_document(doc);
+    }
 }
 
 /// Dumps debug information for the DTD
 #[doc(alias = "xmlDebugDumpDTD")]
 pub unsafe fn xml_debug_dump_dtd<'a>(output: Option<impl Write + 'a>, dtd: Option<XmlDtdPtr>) {
-    let mut ctxt = XmlDebugCtxt::default();
+    unsafe {
+        let mut ctxt = XmlDebugCtxt::default();
 
-    ctxt.options |= DUMP_TEXT_TYPE;
-    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-    ctxt.dump_dtd(dtd);
+        ctxt.options |= DUMP_TEXT_TYPE;
+        ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
+        ctxt.dump_dtd(dtd);
+    }
 }
 
 /// Dumps debug information for all the entities in use by the document
 #[doc(alias = "xmlDebugDumpEntities")]
 pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: Option<&XmlDoc>) {
-    let mut ctxt = XmlDebugCtxt {
-        output: Box::new(output),
-        ..Default::default()
-    };
-    ctxt.dump_entities(doc);
+    unsafe {
+        let mut ctxt = XmlDebugCtxt {
+            output: Box::new(output),
+            ..Default::default()
+        };
+        ctxt.dump_entities(doc);
+    }
 }
 
 /// Check the document for potential content problems, and output
@@ -1611,157 +1681,161 @@ pub unsafe fn xml_debug_check_document<'a>(
     output: Option<impl Write + 'a>,
     doc: Option<&XmlDoc>,
 ) -> i32 {
-    let mut ctxt = XmlDebugCtxt {
-        output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
-        check: 1,
-        ..Default::default()
-    };
-    ctxt.dump_document(doc);
-    ctxt.errors
+    unsafe {
+        let mut ctxt = XmlDebugCtxt {
+            output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
+            check: 1,
+            ..Default::default()
+        };
+        ctxt.dump_document(doc);
+        ctxt.errors
+    }
 }
 
 /// Dump to `output` the type and name of @node.
 #[doc(alias = "xmlLsOneNode")]
 pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: Option<XmlGenericNodePtr>) {
-    let Some(node) = node else {
-        writeln!(output, "NULL");
-        return;
-    };
-    match node.element_type() {
-        XmlElementType::XmlElementNode => {
-            write!(output, "-");
-        }
-        XmlElementType::XmlAttributeNode => {
-            write!(output, "a");
-        }
-        XmlElementType::XmlTextNode => {
-            write!(output, "t");
-        }
-        XmlElementType::XmlCDATASectionNode => {
-            write!(output, "C");
-        }
-        XmlElementType::XmlEntityRefNode => {
-            write!(output, "e");
-        }
-        XmlElementType::XmlEntityNode => {
-            write!(output, "E");
-        }
-        XmlElementType::XmlPINode => {
-            write!(output, "p");
-        }
-        XmlElementType::XmlCommentNode => {
-            write!(output, "c");
-        }
-        XmlElementType::XmlDocumentNode => {
-            write!(output, "d");
-        }
-        XmlElementType::XmlHTMLDocumentNode => {
-            write!(output, "h");
-        }
-        XmlElementType::XmlDocumentTypeNode => {
-            write!(output, "T");
-        }
-        XmlElementType::XmlDocumentFragNode => {
-            write!(output, "F");
-        }
-        XmlElementType::XmlNotationNode => {
-            write!(output, "N");
-        }
-        XmlElementType::XmlNamespaceDecl => {
-            write!(output, "n");
-        }
-        _ => {
-            write!(output, "?");
-        }
-    }
-    if node.element_type() != XmlElementType::XmlNamespaceDecl {
-        if let Ok(node) = XmlNodePtr::try_from(node) {
-            if node.properties.is_some() {
+    unsafe {
+        let Some(node) = node else {
+            writeln!(output, "NULL");
+            return;
+        };
+        match node.element_type() {
+            XmlElementType::XmlElementNode => {
+                write!(output, "-");
+            }
+            XmlElementType::XmlAttributeNode => {
                 write!(output, "a");
-            } else {
-                write!(output, "-");
             }
-            if node.ns_def.is_some() {
+            XmlElementType::XmlTextNode => {
+                write!(output, "t");
+            }
+            XmlElementType::XmlCDATASectionNode => {
+                write!(output, "C");
+            }
+            XmlElementType::XmlEntityRefNode => {
+                write!(output, "e");
+            }
+            XmlElementType::XmlEntityNode => {
+                write!(output, "E");
+            }
+            XmlElementType::XmlPINode => {
+                write!(output, "p");
+            }
+            XmlElementType::XmlCommentNode => {
+                write!(output, "c");
+            }
+            XmlElementType::XmlDocumentNode => {
+                write!(output, "d");
+            }
+            XmlElementType::XmlHTMLDocumentNode => {
+                write!(output, "h");
+            }
+            XmlElementType::XmlDocumentTypeNode => {
+                write!(output, "T");
+            }
+            XmlElementType::XmlDocumentFragNode => {
+                write!(output, "F");
+            }
+            XmlElementType::XmlNotationNode => {
+                write!(output, "N");
+            }
+            XmlElementType::XmlNamespaceDecl => {
                 write!(output, "n");
-            } else {
-                write!(output, "-");
             }
-        } else {
-            write!(output, "--");
+            _ => {
+                write!(output, "?");
+            }
         }
-    }
-
-    write!(output, " {} ", xml_ls_count_node(Some(node)));
-
-    match node.element_type() {
-        XmlElementType::XmlElementNode => {
-            let node = XmlNodePtr::try_from(node).unwrap();
-            if !node.name.is_null() {
-                if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
-                    write!(output, "{prefix}:");
+        if node.element_type() != XmlElementType::XmlNamespaceDecl {
+            if let Ok(node) = XmlNodePtr::try_from(node) {
+                if node.properties.is_some() {
+                    write!(output, "a");
+                } else {
+                    write!(output, "-");
                 }
-                let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                write!(output, "{name}");
-            }
-        }
-        XmlElementType::XmlAttributeNode => {
-            let node = XmlAttrPtr::try_from(node).unwrap();
-            if !node.name.is_null() {
-                let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                write!(output, "{name}");
-            }
-        }
-        XmlElementType::XmlTextNode => {
-            let node = XmlNodePtr::try_from(node).unwrap();
-            if !node.content.is_null() {
-                let content = CStr::from_ptr(node.content as *const i8).to_string_lossy();
-                xml_debug_dump_string(Some(output), Some(&content));
-            }
-        }
-        XmlElementType::XmlCDATASectionNode => {}
-        XmlElementType::XmlEntityRefNode => {
-            let node = XmlNodePtr::try_from(node).unwrap();
-            if !node.name.is_null() {
-                let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                write!(output, "{name}");
-            }
-        }
-        XmlElementType::XmlEntityNode => {
-            let node = XmlNodePtr::try_from(node).unwrap();
-            if !node.name.is_null() {
-                let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                write!(output, "{name}");
-            }
-        }
-        XmlElementType::XmlPINode => {
-            let node = XmlNodePtr::try_from(node).unwrap();
-            if !node.name.is_null() {
-                let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                write!(output, "{name}");
-            }
-        }
-        XmlElementType::XmlCommentNode => {}
-        XmlElementType::XmlDocumentNode => {}
-        XmlElementType::XmlHTMLDocumentNode => {}
-        XmlElementType::XmlDocumentTypeNode => {}
-        XmlElementType::XmlDocumentFragNode => {}
-        XmlElementType::XmlNotationNode => {}
-        XmlElementType::XmlNamespaceDecl => {
-            let ns = XmlNsPtr::try_from(node).unwrap();
-            let href = CStr::from_ptr(ns.href as *const i8).to_string_lossy();
-            if let Some(prefix) = ns.prefix() {
-                write!(output, "{prefix} -> {href}");
+                if node.ns_def.is_some() {
+                    write!(output, "n");
+                } else {
+                    write!(output, "-");
+                }
             } else {
-                write!(output, "default -> {href}");
+                write!(output, "--");
             }
         }
-        _ => {
-            if let Some(name) = node.name() {
-                write!(output, "{name}");
+
+        write!(output, " {} ", xml_ls_count_node(Some(node)));
+
+        match node.element_type() {
+            XmlElementType::XmlElementNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                if !node.name.is_null() {
+                    if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                        write!(output, "{prefix}:");
+                    }
+                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
+                    write!(output, "{name}");
+                }
+            }
+            XmlElementType::XmlAttributeNode => {
+                let node = XmlAttrPtr::try_from(node).unwrap();
+                if !node.name.is_null() {
+                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
+                    write!(output, "{name}");
+                }
+            }
+            XmlElementType::XmlTextNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                if !node.content.is_null() {
+                    let content = CStr::from_ptr(node.content as *const i8).to_string_lossy();
+                    xml_debug_dump_string(Some(output), Some(&content));
+                }
+            }
+            XmlElementType::XmlCDATASectionNode => {}
+            XmlElementType::XmlEntityRefNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                if !node.name.is_null() {
+                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
+                    write!(output, "{name}");
+                }
+            }
+            XmlElementType::XmlEntityNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                if !node.name.is_null() {
+                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
+                    write!(output, "{name}");
+                }
+            }
+            XmlElementType::XmlPINode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                if !node.name.is_null() {
+                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
+                    write!(output, "{name}");
+                }
+            }
+            XmlElementType::XmlCommentNode => {}
+            XmlElementType::XmlDocumentNode => {}
+            XmlElementType::XmlHTMLDocumentNode => {}
+            XmlElementType::XmlDocumentTypeNode => {}
+            XmlElementType::XmlDocumentFragNode => {}
+            XmlElementType::XmlNotationNode => {}
+            XmlElementType::XmlNamespaceDecl => {
+                let ns = XmlNsPtr::try_from(node).unwrap();
+                let href = CStr::from_ptr(ns.href as *const i8).to_string_lossy();
+                if let Some(prefix) = ns.prefix() {
+                    write!(output, "{prefix} -> {href}");
+                } else {
+                    write!(output, "default -> {href}");
+                }
+            }
+            _ => {
+                if let Some(name) = node.name() {
+                    write!(output, "{name}");
+                }
             }
         }
+        writeln!(output);
     }
-    writeln!(output);
 }
 
 /// Count the children of @node.
@@ -1769,50 +1843,52 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: Option<X
 /// Returns the number of children of @node.
 #[doc(alias = "xmlLsCountNode")]
 pub unsafe fn xml_ls_count_node(node: Option<XmlGenericNodePtr>) -> usize {
-    let Some(node) = node else {
-        return 0;
-    };
+    unsafe {
+        let Some(node) = node else {
+            return 0;
+        };
 
-    let mut list = match node.element_type() {
-        XmlElementType::XmlElementNode => node.children(),
-        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-            XmlDocPtr::try_from(node).unwrap().children()
+        let mut list = match node.element_type() {
+            XmlElementType::XmlElementNode => node.children(),
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                XmlDocPtr::try_from(node).unwrap().children()
+            }
+            XmlElementType::XmlAttributeNode => XmlAttrPtr::try_from(node).unwrap().children(),
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode => {
+                let node = XmlNodePtr::try_from(node).unwrap();
+                let content = node.content;
+                return if !content.is_null() {
+                    CStr::from_ptr(content as *const i8).to_bytes().len()
+                } else {
+                    0
+                };
+            }
+            XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {
+                return 1;
+            }
+            _ => unreachable!(),
+        };
+        let mut ret = 0;
+        while let Some(now) = list {
+            list = now.next();
+            ret += 1;
         }
-        XmlElementType::XmlAttributeNode => XmlAttrPtr::try_from(node).unwrap().children(),
-        XmlElementType::XmlTextNode
-        | XmlElementType::XmlCDATASectionNode
-        | XmlElementType::XmlPINode
-        | XmlElementType::XmlCommentNode => {
-            let node = XmlNodePtr::try_from(node).unwrap();
-            let content = node.content;
-            return if !content.is_null() {
-                CStr::from_ptr(content as *const i8).to_bytes().len()
-            } else {
-                0
-            };
-        }
-        XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDTDNode
-        | XmlElementType::XmlElementDecl
-        | XmlElementType::XmlAttributeDecl
-        | XmlElementType::XmlEntityDecl
-        | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXIncludeStart
-        | XmlElementType::XmlXIncludeEnd => {
-            return 1;
-        }
-        _ => unreachable!(),
-    };
-    let mut ret = 0;
-    while let Some(now) = list {
-        list = now.next();
-        ret += 1;
+        ret
     }
-    ret
 }
 
 /// Convenient way to turn bool into text
@@ -1820,11 +1896,7 @@ pub unsafe fn xml_ls_count_node(node: Option<XmlGenericNodePtr>) -> usize {
 /// Returns a pointer to either "True" or "False"
 #[doc(alias = "xmlBoolToText")]
 pub fn xml_bool_to_text(boolval: bool) -> &'static str {
-    if boolval {
-        "True"
-    } else {
-        "False"
-    }
+    if boolval { "True" } else { "False" }
 }
 
 /// This is a generic signature for the XML shell input function.
@@ -1910,68 +1982,72 @@ pub fn xml_shell_print_xpath_error(error_type: XmlXPathObjectType, arg: Option<&
 #[doc(alias = "xmlShellPrintNodeCtxt")]
 #[cfg(feature = "libxml_output")]
 unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlGenericNodePtr) {
-    // if node.is_null() {
-    //     return;
-    // }
+    unsafe {
+        // if node.is_null() {
+        //     return;
+        // }
 
-    let stdout = &mut stdout();
-    let fp = if ctxt.is_null() {
-        stdout as &mut dyn Write
-    } else {
-        (*ctxt).output.as_mut()
-    };
-    let mut boxed = Box::new(fp);
-    if let Some(mut doc) = XmlDocPtr::try_from(node)
-        .ok()
-        .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
-    {
-        doc.dump_file(&mut boxed);
-    } else if node.element_type() == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr_list(&mut boxed, XmlAttrPtr::try_from(node).ok(), 0);
-    } else {
-        // Is this `unwrap` OK ?????
-        XmlNodePtr::try_from(node)
-            .unwrap()
-            .dump_file(&mut boxed, node.document());
+        let stdout = &mut stdout();
+        let fp = if ctxt.is_null() {
+            stdout as &mut dyn Write
+        } else {
+            (*ctxt).output.as_mut()
+        };
+        let mut boxed = Box::new(fp);
+        if let Some(mut doc) = XmlDocPtr::try_from(node)
+            .ok()
+            .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
+        {
+            doc.dump_file(&mut boxed);
+        } else if node.element_type() == XmlElementType::XmlAttributeNode {
+            xml_debug_dump_attr_list(&mut boxed, XmlAttrPtr::try_from(node).ok(), 0);
+        } else {
+            // Is this `unwrap` OK ?????
+            XmlNodePtr::try_from(node)
+                .unwrap()
+                .dump_file(&mut boxed, node.document());
+        }
+
+        writeln!(boxed);
     }
-
-    writeln!(boxed);
 }
 
 /// Prints result to the output FILE
 #[doc(alias = "xmlShellPrintXPathResultCtxt")]
 unsafe fn xml_shell_print_xpath_result_ctxt(ctxt: XmlShellCtxtPtr, list: XmlXPathObjectPtr) {
-    if !ctxt.is_null() {
-        return;
-    }
+    unsafe {
+        if !ctxt.is_null() {
+            return;
+        }
 
-    if !list.is_null() {
-        match (*list).typ {
-            XmlXPathObjectType::XPathNodeset => {
-                #[cfg(feature = "libxml_output")]
-                if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                    for &node in &nodeset.node_tab {
-                        xml_shell_print_node_ctxt(ctxt, node);
+        if !list.is_null() {
+            match (*list).typ {
+                XmlXPathObjectType::XPathNodeset => {
+                    #[cfg(feature = "libxml_output")]
+                    if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                        for &node in &nodeset.node_tab {
+                            xml_shell_print_node_ctxt(ctxt, node);
+                        }
+                    } else {
+                        generic_error!("Empty node set\n");
                     }
-                } else {
-                    generic_error!("Empty node set\n");
+                    #[cfg(not(feature = "libxml_output"))]
+                    {
+                        generic_error!("Node set\n");
+                    }
                 }
-                #[cfg(not(feature = "libxml_output"))]
-                {
-                    generic_error!("Node set\n");
+                XmlXPathObjectType::XPathBoolean => {
+                    generic_error!("Is a Boolean:{}\n", xml_bool_to_text((*list).boolval));
                 }
-            }
-            XmlXPathObjectType::XPathBoolean => {
-                generic_error!("Is a Boolean:{}\n", xml_bool_to_text((*list).boolval));
-            }
-            XmlXPathObjectType::XPathNumber => {
-                generic_error!("Is a number:{}\n", (*list).floatval);
-            }
-            XmlXPathObjectType::XPathString => {
-                generic_error!("Is a string:{}\n", (*list).stringval.as_deref().unwrap());
-            }
-            _ => {
-                xml_shell_print_xpath_error((*list).typ, None);
+                XmlXPathObjectType::XPathNumber => {
+                    generic_error!("Is a number:{}\n", (*list).floatval);
+                }
+                XmlXPathObjectType::XPathString => {
+                    generic_error!("Is a string:{}\n", (*list).stringval.as_deref().unwrap());
+                }
+                _ => {
+                    xml_shell_print_xpath_error((*list).typ, None);
+                }
             }
         }
     }
@@ -1981,7 +2057,9 @@ unsafe fn xml_shell_print_xpath_result_ctxt(ctxt: XmlShellCtxtPtr, list: XmlXPat
 #[doc(alias = "xmlShellPrintXPathResult")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_shell_print_xpath_result(list: XmlXPathObjectPtr) {
-    xml_shell_print_xpath_result_ctxt(null_mut(), list);
+    unsafe {
+        xml_shell_print_xpath_result_ctxt(null_mut(), list);
+    }
 }
 
 /// Implements the XML shell function "ls"
@@ -1996,29 +2074,31 @@ pub unsafe fn xml_shell_list(
     node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    if ctxt.is_null() {
-        return 0;
+    unsafe {
+        if ctxt.is_null() {
+            return 0;
+        }
+        let Some(node) = node else {
+            writeln!((*ctxt).output, "NULL");
+            return 0;
+        };
+        let mut cur = if let Ok(doc) = XmlDocPtr::try_from(node) {
+            doc.children()
+        } else if let Ok(ns) = XmlNsPtr::try_from(node) {
+            xml_ls_one_node(&mut (*ctxt).output, Some(ns.into()));
+            return 0;
+        } else if let Some(children) = node.children() {
+            Some(children)
+        } else {
+            xml_ls_one_node(&mut (*ctxt).output, Some(node));
+            return 0;
+        };
+        while let Some(now) = cur {
+            xml_ls_one_node(&mut (*ctxt).output, Some(now));
+            cur = now.next();
+        }
+        0
     }
-    let Some(node) = node else {
-        writeln!((*ctxt).output, "NULL");
-        return 0;
-    };
-    let mut cur = if let Ok(doc) = XmlDocPtr::try_from(node) {
-        doc.children()
-    } else if let Ok(ns) = XmlNsPtr::try_from(node) {
-        xml_ls_one_node(&mut (*ctxt).output, Some(ns.into()));
-        return 0;
-    } else if let Some(children) = node.children() {
-        Some(children)
-    } else {
-        xml_ls_one_node(&mut (*ctxt).output, Some(node));
-        return 0;
-    };
-    while let Some(now) = cur {
-        xml_ls_one_node(&mut (*ctxt).output, Some(now));
-        cur = now.next();
-    }
-    0
 }
 
 /// Implements the XML shell function "base"
@@ -2033,20 +2113,22 @@ pub unsafe fn xml_shell_base(
     node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    if ctxt.is_null() {
-        return 0;
-    }
-    let Some(node) = node else {
-        writeln!((*ctxt).output, "NULL");
-        return 0;
-    };
+    unsafe {
+        if ctxt.is_null() {
+            return 0;
+        }
+        let Some(node) = node else {
+            writeln!((*ctxt).output, "NULL");
+            return 0;
+        };
 
-    if let Some(base) = node.get_base(node.document()) {
-        writeln!((*ctxt).output, "{base}");
-    } else {
-        writeln!((*ctxt).output, " No base found !!!");
+        if let Some(base) = node.get_base(node.document()) {
+            writeln!((*ctxt).output, "{base}");
+        } else {
+            writeln!((*ctxt).output, " No base found !!!");
+        }
+        0
     }
-    0
 }
 
 /// Implements the XML shell function "dir"
@@ -2061,21 +2143,23 @@ pub unsafe fn xml_shell_dir(
     node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    if ctxt.is_null() {
-        return 0;
+    unsafe {
+        if ctxt.is_null() {
+            return 0;
+        }
+        let Some(node) = node else {
+            writeln!((*ctxt).output, "NULL");
+            return 0;
+        };
+        if let Ok(doc) = XmlDocPtr::try_from(node) {
+            xml_debug_dump_document_head(Some(&mut (*ctxt).output), Some(&*doc));
+        } else if node.element_type() == XmlElementType::XmlAttributeNode {
+            xml_debug_dump_attr(&mut (*ctxt).output, XmlAttrPtr::try_from(node).ok(), 0);
+        } else {
+            xml_debug_dump_one_node(&mut (*ctxt).output, Some(node), 0);
+        }
+        0
     }
-    let Some(node) = node else {
-        writeln!((*ctxt).output, "NULL");
-        return 0;
-    };
-    if let Ok(doc) = XmlDocPtr::try_from(node) {
-        xml_debug_dump_document_head(Some(&mut (*ctxt).output), Some(&*doc));
-    } else if node.element_type() == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr(&mut (*ctxt).output, XmlAttrPtr::try_from(node).ok(), 0);
-    } else {
-        xml_debug_dump_one_node(&mut (*ctxt).output, Some(node), 0);
-    }
-    0
 }
 
 /// Implements the XML shell function "load"
@@ -2090,67 +2174,71 @@ pub unsafe fn xml_shell_load(
     _node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    use crate::{
-        libxml::{globals::xml_free, htmlparser::html_parse_file, xmlstring::xml_strdup},
-        parser::xml_read_file,
-        uri::canonic_path,
-        xpath::{xml_xpath_free_context, xml_xpath_new_context},
-    };
+    unsafe {
+        use crate::{
+            libxml::{globals::xml_free, htmlparser::html_parse_file, xmlstring::xml_strdup},
+            parser::xml_read_file,
+            uri::canonic_path,
+            xpath::{xml_xpath_free_context, xml_xpath_new_context},
+        };
 
-    use crate::tree::xml_free_doc;
+        use crate::tree::xml_free_doc;
 
-    let mut html: i32 = 0;
+        let mut html: i32 = 0;
 
-    if ctxt.is_null() {
-        return -1;
-    }
-    if let Some(doc) = (*ctxt).doc {
-        html = (doc.typ == XmlElementType::XmlHTMLDocumentNode) as i32;
-    }
-
-    let Some(doc) = (if html != 0 {
-        #[cfg(feature = "html")]
-        {
-            html_parse_file(filename, None)
+        if ctxt.is_null() {
+            return -1;
         }
-        #[cfg(not(feature = "html"))]
-        {
-            write!((*ctxt).output, "HTML support not compiled in\n".as_ptr());
-            None
-        }
-    } else {
-        xml_read_file(filename, None, 0)
-    }) else {
-        return -1;
-    };
-    if (*ctxt).loaded == 1 {
         if let Some(doc) = (*ctxt).doc {
-            xml_free_doc(doc);
+            html = (doc.typ == XmlElementType::XmlHTMLDocumentNode) as i32;
         }
+
+        let Some(doc) = (if html != 0 {
+            #[cfg(feature = "html")]
+            {
+                html_parse_file(filename, None)
+            }
+            #[cfg(not(feature = "html"))]
+            {
+                write!((*ctxt).output, "HTML support not compiled in\n".as_ptr());
+                None
+            }
+        } else {
+            xml_read_file(filename, None, 0)
+        }) else {
+            return -1;
+        };
+        if (*ctxt).loaded == 1 {
+            if let Some(doc) = (*ctxt).doc {
+                xml_free_doc(doc);
+            }
+        }
+        (*ctxt).loaded = 1;
+        #[cfg(feature = "xpath")]
+        {
+            xml_xpath_free_context((*ctxt).pctxt);
+        }
+        xml_free((*ctxt).filename as _);
+        (*ctxt).doc = Some(doc);
+        (*ctxt).node = Some(doc.into());
+        #[cfg(feature = "xpath")]
+        {
+            (*ctxt).pctxt = xml_xpath_new_context(Some(doc));
+        }
+        let canonic = canonic_path(filename);
+        let canonic = CString::new(canonic.as_ref()).unwrap();
+        (*ctxt).filename = xml_strdup(canonic.as_ptr() as *const u8) as *mut i8;
+        0
     }
-    (*ctxt).loaded = 1;
-    #[cfg(feature = "xpath")]
-    {
-        xml_xpath_free_context((*ctxt).pctxt);
-    }
-    xml_free((*ctxt).filename as _);
-    (*ctxt).doc = Some(doc);
-    (*ctxt).node = Some(doc.into());
-    #[cfg(feature = "xpath")]
-    {
-        (*ctxt).pctxt = xml_xpath_new_context(Some(doc));
-    }
-    let canonic = canonic_path(filename);
-    let canonic = CString::new(canonic.as_ref()).unwrap();
-    (*ctxt).filename = xml_strdup(canonic.as_ptr() as *const u8) as *mut i8;
-    0
 }
 
 /// Print node to the output FILE
 #[doc(alias = "xmlShellPrintNode")]
 #[cfg(all(feature = "xpath", feature = "libxml_output"))]
 pub unsafe fn xml_shell_print_node(node: XmlGenericNodePtr) {
-    xml_shell_print_node_ctxt(null_mut(), node);
+    unsafe {
+        xml_shell_print_node_ctxt(null_mut(), node);
+    }
 }
 
 /// Implements the XML shell function "cat"
@@ -2165,50 +2253,52 @@ pub unsafe fn xml_shell_cat(
     node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    use crate::libxml::htmltree::{html_doc_dump, html_node_dump_file};
+    unsafe {
+        use crate::libxml::htmltree::{html_doc_dump, html_node_dump_file};
 
-    if ctxt.is_null() {
-        return 0;
-    }
-    let Some(node) = node else {
-        writeln!((*ctxt).output, "NULL");
-        return 0;
-    };
-    if let Some(doc) = (*ctxt)
-        .doc
-        .filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode)
-    {
-        #[cfg(feature = "html")]
-        if let Some(doc) = XmlDocPtr::try_from(node)
-            .ok()
-            .filter(|doc| doc.element_type() == XmlElementType::XmlHTMLDocumentNode)
-        {
-            html_doc_dump(&mut (*ctxt).output, doc);
-        } else {
-            html_node_dump_file(&mut (*ctxt).output, Some(doc), Some(node));
+        if ctxt.is_null() {
+            return 0;
         }
-        #[cfg(not(feature = "html"))]
-        if let Some(mut doc) = XmlDocPtr::try_from(node)
+        let Some(node) = node else {
+            writeln!((*ctxt).output, "NULL");
+            return 0;
+        };
+        if let Some(doc) = (*ctxt)
+            .doc
+            .filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode)
+        {
+            #[cfg(feature = "html")]
+            if let Some(doc) = XmlDocPtr::try_from(node)
+                .ok()
+                .filter(|doc| doc.element_type() == XmlElementType::XmlHTMLDocumentNode)
+            {
+                html_doc_dump(&mut (*ctxt).output, doc);
+            } else {
+                html_node_dump_file(&mut (*ctxt).output, Some(doc), Some(node));
+            }
+            #[cfg(not(feature = "html"))]
+            if let Some(mut doc) = XmlDocPtr::try_from(node)
+                .ok()
+                .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
+            {
+                doc.dump_file((*ctxt).output);
+            } else {
+                xml_elem_dump((*ctxt).output, (*ctxt).doc, node);
+            }
+        } else if let Some(mut doc) = XmlDocPtr::try_from(node)
             .ok()
             .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
         {
-            doc.dump_file((*ctxt).output);
+            doc.dump_file(&mut (*ctxt).output);
         } else {
-            xml_elem_dump((*ctxt).output, (*ctxt).doc, node);
+            // Is this `unwrap` OK ????
+            XmlNodePtr::try_from(node)
+                .unwrap()
+                .dump_file(&mut (*ctxt).output, (*ctxt).doc);
         }
-    } else if let Some(mut doc) = XmlDocPtr::try_from(node)
-        .ok()
-        .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
-    {
-        doc.dump_file(&mut (*ctxt).output);
-    } else {
-        // Is this `unwrap` OK ????
-        XmlNodePtr::try_from(node)
-            .unwrap()
-            .dump_file(&mut (*ctxt).output, (*ctxt).doc);
+        writeln!((*ctxt).output);
+        0
     }
-    writeln!((*ctxt).output);
-    0
 }
 
 /// Implements the XML shell function "write"
@@ -2224,61 +2314,63 @@ pub unsafe fn xml_shell_write(
     node: XmlGenericNodePtr,
     _node2: Option<XmlNodePtr>,
 ) -> i32 {
-    use std::fs::File;
+    unsafe {
+        use std::fs::File;
 
-    use crate::libxml::htmltree::html_save_file;
+        use crate::libxml::htmltree::html_save_file;
 
-    // if node.is_null() {
-    //     return -1;
-    // }
-    if filename.is_empty() {
-        return -1;
-    }
-    let cfilename = CString::new(filename).unwrap();
-    match node.element_type() {
-        XmlElementType::XmlDocumentNode => {
-            if (*ctxt)
-                .doc
-                .map_or(true, |mut doc| doc.save_file(filename) < -1)
-            {
-                generic_error!("Failed to write to {filename}\n");
-                return -1;
-            }
+        // if node.is_null() {
+        //     return -1;
+        // }
+        if filename.is_empty() {
+            return -1;
         }
-        XmlElementType::XmlHTMLDocumentNode => {
-            #[cfg(feature = "html")]
-            if html_save_file(cfilename.as_ptr(), (*ctxt).doc.unwrap()) < 0 {
-                generic_error!("Failed to write to {filename}\n");
-                return -1;
-            }
-            #[cfg(not(feature = "html"))]
-            if xml_save_file(filename as *mut c_char, (*ctxt).doc) < -1 {
-                generic_error!(
-                    "Failed to write to {}\n",
-                    CStr::from_ptr(filename as *const i8).to_string_lossy()
-                );
-                return -1;
-            }
-        }
-        _ => {
-            match File::options()
-                .write(true)
-                .truncate(true)
-                .create(true)
-                .open(filename)
-            {
-                Ok(mut f) => {
-                    let mut node = XmlNodePtr::try_from(node).unwrap();
-                    node.dump_file(&mut f, (*ctxt).doc);
-                }
-                _ => {
+        let cfilename = CString::new(filename).unwrap();
+        match node.element_type() {
+            XmlElementType::XmlDocumentNode => {
+                if (*ctxt)
+                    .doc
+                    .is_none_or(|mut doc| doc.save_file(filename) < -1)
+                {
                     generic_error!("Failed to write to {filename}\n");
                     return -1;
                 }
             }
+            XmlElementType::XmlHTMLDocumentNode => {
+                #[cfg(feature = "html")]
+                if html_save_file(cfilename.as_ptr(), (*ctxt).doc.unwrap()) < 0 {
+                    generic_error!("Failed to write to {filename}\n");
+                    return -1;
+                }
+                #[cfg(not(feature = "html"))]
+                if xml_save_file(filename as *mut c_char, (*ctxt).doc) < -1 {
+                    generic_error!(
+                        "Failed to write to {}\n",
+                        CStr::from_ptr(filename as *const i8).to_string_lossy()
+                    );
+                    return -1;
+                }
+            }
+            _ => {
+                match File::options()
+                    .write(true)
+                    .truncate(true)
+                    .create(true)
+                    .open(filename)
+                {
+                    Ok(mut f) => {
+                        let mut node = XmlNodePtr::try_from(node).unwrap();
+                        node.dump_file(&mut f, (*ctxt).doc);
+                    }
+                    _ => {
+                        generic_error!("Failed to write to {filename}\n");
+                        return -1;
+                    }
+                }
+            }
         }
+        0
     }
-    0
 }
 
 /// Implements the XML shell function "save"
@@ -2293,51 +2385,53 @@ pub unsafe fn xml_shell_save(
     _node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    use crate::libxml::htmltree::html_save_file;
+    unsafe {
+        use crate::libxml::htmltree::html_save_file;
 
-    if ctxt.is_null() {
-        return -1;
-    }
-    let Some(mut doc) = (*ctxt).doc else {
-        return -1;
-    };
-    if filename.is_null() || *filename.add(0) == 0 {
-        filename = (*ctxt).filename;
-    }
-    if filename.is_null() {
-        return -1;
-    }
-    match doc.typ {
-        XmlElementType::XmlDocumentNode => {
-            if doc.save_file(CStr::from_ptr(filename).to_string_lossy().as_ref()) < 0 {
-                generic_error!(
-                    "Failed to save to {}\n",
-                    CStr::from_ptr(filename as *const i8).to_string_lossy()
-                );
-            }
-        }
-        XmlElementType::XmlHTMLDocumentNode => {
-            #[cfg(feature = "html")]
-            if html_save_file(filename as *mut c_char, doc) < 0 {
-                generic_error!(
-                    "Failed to save to {}\n",
-                    CStr::from_ptr(filename as *const i8).to_string_lossy()
-                );
-            }
-            #[cfg(not(feature = "html"))]
-            if (xml_save_file(filename as *mut c_char, (*ctxt).doc) < 0) {
-                generic_error!(
-                    "Failed to save to {}\n",
-                    CStr::from_ptr(filename as *const i8).to_string_lossy()
-                );
-            }
-        }
-        _ => {
-            generic_error!("To save to subparts of a document use the 'write' command\n");
+        if ctxt.is_null() {
             return -1;
         }
+        let Some(mut doc) = (*ctxt).doc else {
+            return -1;
+        };
+        if filename.is_null() || *filename.add(0) == 0 {
+            filename = (*ctxt).filename;
+        }
+        if filename.is_null() {
+            return -1;
+        }
+        match doc.typ {
+            XmlElementType::XmlDocumentNode => {
+                if doc.save_file(CStr::from_ptr(filename).to_string_lossy().as_ref()) < 0 {
+                    generic_error!(
+                        "Failed to save to {}\n",
+                        CStr::from_ptr(filename as *const i8).to_string_lossy()
+                    );
+                }
+            }
+            XmlElementType::XmlHTMLDocumentNode => {
+                #[cfg(feature = "html")]
+                if html_save_file(filename as *mut c_char, doc) < 0 {
+                    generic_error!(
+                        "Failed to save to {}\n",
+                        CStr::from_ptr(filename as *const i8).to_string_lossy()
+                    );
+                }
+                #[cfg(not(feature = "html"))]
+                if (xml_save_file(filename as *mut c_char, (*ctxt).doc) < 0) {
+                    generic_error!(
+                        "Failed to save to {}\n",
+                        CStr::from_ptr(filename as *const i8).to_string_lossy()
+                    );
+                }
+            }
+            _ => {
+                generic_error!("To save to subparts of a document use the 'write' command\n");
+                return -1;
+            }
+        }
+        0
     }
-    0
 }
 
 /// Implements the XML shell function "validate"
@@ -2353,44 +2447,46 @@ pub unsafe fn xml_shell_validate(
     _node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    use crate::{
-        globals::GLOBAL_STATE,
-        libxml::{
-            parser::xml_parse_dtd,
-            valid::{xml_validate_document, xml_validate_dtd},
-        },
-        tree::xml_free_dtd,
-    };
+    unsafe {
+        use crate::{
+            globals::GLOBAL_STATE,
+            libxml::{
+                parser::xml_parse_dtd,
+                valid::{xml_validate_document, xml_validate_dtd},
+            },
+            tree::xml_free_dtd,
+        };
 
-    use super::valid::XmlValidCtxt;
+        use super::valid::XmlValidCtxt;
 
-    let mut vctxt = XmlValidCtxt::default();
-    let mut res: i32 = -1;
+        let mut vctxt = XmlValidCtxt::default();
+        let mut res: i32 = -1;
 
-    if ctxt.is_null() {
-        return -1;
-    }
-    let Some(doc) = (*ctxt).doc else {
-        return -1;
-    };
-    vctxt.error = Some(GLOBAL_STATE.with_borrow(|state| state.generic_error));
-    vctxt.warning = vctxt.error;
-
-    if dtd.is_null() || *dtd.add(0) == 0 {
-        res = xml_validate_document(addr_of_mut!(vctxt), doc);
-    } else {
-        let subset = xml_parse_dtd(
-            None,
-            (!dtd.is_null())
-                .then(|| CStr::from_ptr(dtd as *const i8).to_string_lossy())
-                .as_deref(),
-        );
-        if let Some(subset) = subset {
-            res = xml_validate_dtd(addr_of_mut!(vctxt), doc, subset);
-            xml_free_dtd(subset);
+        if ctxt.is_null() {
+            return -1;
         }
+        let Some(doc) = (*ctxt).doc else {
+            return -1;
+        };
+        vctxt.error = Some(GLOBAL_STATE.with_borrow(|state| state.generic_error));
+        vctxt.warning = vctxt.error;
+
+        if dtd.is_null() || *dtd.add(0) == 0 {
+            res = xml_validate_document(addr_of_mut!(vctxt), doc);
+        } else {
+            let subset = xml_parse_dtd(
+                None,
+                (!dtd.is_null())
+                    .then(|| CStr::from_ptr(dtd as *const i8).to_string_lossy())
+                    .as_deref(),
+            );
+            if let Some(subset) = subset {
+                res = xml_validate_dtd(addr_of_mut!(vctxt), doc, subset);
+                xml_free_dtd(subset);
+            }
+        }
+        res
     }
-    res
 }
 
 /// Implements the XML shell function "du"
@@ -2406,77 +2502,79 @@ pub unsafe fn xml_shell_du(
     tree: XmlGenericNodePtr,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    let mut indent: i32 = 0;
+    unsafe {
+        let mut indent: i32 = 0;
 
-    if ctxt.is_null() {
-        return -1;
-    }
-
-    // if tree.is_null() {
-    //     return -1;
-    // }
-    let mut node = Some(tree);
-    while let Some(now) = node {
-        if now.element_type() == XmlElementType::XmlDocumentNode
-            || now.element_type() == XmlElementType::XmlHTMLDocumentNode
-        {
-            writeln!((*ctxt).output, "/");
-        } else if let Some(node) = XmlNodePtr::try_from(now)
-            .ok()
-            .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
-        {
-            for _ in 0..indent {
-                write!((*ctxt).output, "  ");
-            }
-            if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
-                write!((*ctxt).output, "{prefix}:");
-            }
-            let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-            writeln!((*ctxt).output, "{name}");
+        if ctxt.is_null() {
+            return -1;
         }
 
-        // Browse the full subtree, deep first
-        if let Ok(doc) = XmlDocPtr::try_from(now) {
-            node = doc.children;
-        } else if let Some(children) = now
-            .children()
-            .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
-        {
-            // deep first
-            node = Some(children);
-            indent += 1;
-        } else if let Some(next) = now.next().filter(|_| node != Some(tree)) {
-            // then siblings
-            node = Some(next);
-        } else if node != Some(tree) {
-            // go up to parents->next if needed
-            while node != Some(tree) {
-                if let Some(parent) = now.parent() {
-                    node = Some(parent);
-                    indent -= 1;
+        // if tree.is_null() {
+        //     return -1;
+        // }
+        let mut node = Some(tree);
+        while let Some(now) = node {
+            if now.element_type() == XmlElementType::XmlDocumentNode
+                || now.element_type() == XmlElementType::XmlHTMLDocumentNode
+            {
+                writeln!((*ctxt).output, "/");
+            } else if let Some(node) = XmlNodePtr::try_from(now)
+                .ok()
+                .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+            {
+                for _ in 0..indent {
+                    write!((*ctxt).output, "  ");
                 }
-                if let Some(next) = now.next().filter(|_| node != Some(tree)) {
-                    node = Some(next);
-                    break;
+                if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                    write!((*ctxt).output, "{prefix}:");
                 }
-                if now.parent().is_none() {
-                    node = None;
-                    break;
+                let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
+                writeln!((*ctxt).output, "{name}");
+            }
+
+            // Browse the full subtree, deep first
+            if let Ok(doc) = XmlDocPtr::try_from(now) {
+                node = doc.children;
+            } else if let Some(children) = now
+                .children()
+                .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
+            {
+                // deep first
+                node = Some(children);
+                indent += 1;
+            } else if let Some(next) = now.next().filter(|_| node != Some(tree)) {
+                // then siblings
+                node = Some(next);
+            } else if node != Some(tree) {
+                // go up to parents->next if needed
+                while node != Some(tree) {
+                    if let Some(parent) = now.parent() {
+                        node = Some(parent);
+                        indent -= 1;
+                    }
+                    if let Some(next) = now.next().filter(|_| node != Some(tree)) {
+                        node = Some(next);
+                        break;
+                    }
+                    if now.parent().is_none() {
+                        node = None;
+                        break;
+                    }
+                    if node == Some(tree) {
+                        node = None;
+                        break;
+                    }
                 }
+                // exit condition
                 if node == Some(tree) {
                     node = None;
-                    break;
                 }
-            }
-            // exit condition
-            if node == Some(tree) {
+            } else {
                 node = None;
             }
-        } else {
-            node = None;
         }
+        0
     }
-    0
 }
 
 /// Implements the XML shell function "pwd"
@@ -2493,29 +2591,31 @@ pub unsafe fn xml_shell_pwd(
     node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    use libc::snprintf;
+    unsafe {
+        use libc::snprintf;
 
-    if buffer.is_null() {
-        return -1;
+        if buffer.is_null() {
+            return -1;
+        }
+        let Some(node) = node else {
+            return -1;
+        };
+
+        let Some(path) = node.get_node_path() else {
+            return -1;
+        };
+
+        // This test prevents buffer overflow, because this routine
+        // is only called by xmlShell, in which the second argument is
+        // 500 chars long.
+        // It is a dirty hack before a cleaner solution is found.
+        // Documentation should mention that the second argument must
+        // be at least 500 chars long, and could be stripped if too long.
+        std::ptr::copy_nonoverlapping(path.as_ptr() as *const i8, buffer, path.len().min(499));
+        snprintf(buffer as _, 499, c"%s".as_ptr(), path);
+        *buffer.add(499) = b'0' as _;
+        0
     }
-    let Some(node) = node else {
-        return -1;
-    };
-
-    let Some(path) = node.get_node_path() else {
-        return -1;
-    };
-
-    // This test prevents buffer overflow, because this routine
-    // is only called by xmlShell, in which the second argument is
-    // 500 chars long.
-    // It is a dirty hack before a cleaner solution is found.
-    // Documentation should mention that the second argument must
-    // be at least 500 chars long, and could be stripped if too long.
-    std::ptr::copy_nonoverlapping(path.as_ptr() as *const i8, buffer, path.len().min(499));
-    snprintf(buffer as _, 499, c"%s".as_ptr(), path);
-    *buffer.add(499) = b'0' as _;
-    0
 }
 
 /// Implements the XML shell function "relaxng"
@@ -2530,56 +2630,58 @@ unsafe fn xml_shell_rng_validate(
     _node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    use crate::{
-        globals::GLOBAL_STATE,
-        libxml::relaxng::{
-            xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
-            xml_relaxng_validate_doc,
-        },
-        relaxng::{
-            xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt,
-            xml_relaxng_new_valid_ctxt,
-        },
-    };
+    unsafe {
+        use crate::{
+            globals::GLOBAL_STATE,
+            libxml::relaxng::{
+                xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
+                xml_relaxng_validate_doc,
+            },
+            relaxng::{
+                xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
+                xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt,
+            },
+        };
 
-    use super::relaxng::XmlRelaxNGPtr;
+        use super::relaxng::XmlRelaxNGPtr;
 
-    let ctxt = xml_relaxng_new_parser_ctxt(schemas);
-    let generic_error = GLOBAL_STATE.with_borrow(|state| state.generic_error);
-    (*ctxt).set_parser_errors(Some(generic_error), Some(generic_error), None);
-    let relaxngschemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
-    xml_relaxng_free_parser_ctxt(ctxt);
-    if relaxngschemas.is_null() {
-        generic_error!("Relax-NG schema {} failed to compile\n", schemas);
-        return -1;
-    }
-    let vctxt = xml_relaxng_new_valid_ctxt(relaxngschemas);
-    xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), None);
-    let ret = if let Some(doc) = (*sctxt).doc {
-        xml_relaxng_validate_doc(vctxt, doc)
-    } else {
-        -1
-    };
+        let ctxt = xml_relaxng_new_parser_ctxt(schemas);
+        let generic_error = GLOBAL_STATE.with_borrow(|state| state.generic_error);
+        (*ctxt).set_parser_errors(Some(generic_error), Some(generic_error), None);
+        let relaxngschemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
+        xml_relaxng_free_parser_ctxt(ctxt);
+        if relaxngschemas.is_null() {
+            generic_error!("Relax-NG schema {} failed to compile\n", schemas);
+            return -1;
+        }
+        let vctxt = xml_relaxng_new_valid_ctxt(relaxngschemas);
+        xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), None);
+        let ret = if let Some(doc) = (*sctxt).doc {
+            xml_relaxng_validate_doc(vctxt, doc)
+        } else {
+            -1
+        };
 
-    match ret.cmp(&0) {
-        std::cmp::Ordering::Equal => {
-            let filename = CStr::from_ptr((*sctxt).filename).to_string_lossy();
-            eprintln!("{filename} validates");
+        match ret.cmp(&0) {
+            std::cmp::Ordering::Equal => {
+                let filename = CStr::from_ptr((*sctxt).filename).to_string_lossy();
+                eprintln!("{filename} validates");
+            }
+            std::cmp::Ordering::Greater => {
+                let filename = CStr::from_ptr((*sctxt).filename).to_string_lossy();
+                eprintln!("{filename} fails to validate");
+            }
+            std::cmp::Ordering::Less => {
+                let filename = CStr::from_ptr((*sctxt).filename).to_string_lossy();
+                eprintln!("{filename} validation generated an internal error");
+            }
         }
-        std::cmp::Ordering::Greater => {
-            let filename = CStr::from_ptr((*sctxt).filename).to_string_lossy();
-            eprintln!("{filename} fails to validate");
+        xml_relaxng_free_valid_ctxt(vctxt);
+        if !relaxngschemas.is_null() {
+            xml_relaxng_free(relaxngschemas);
         }
-        std::cmp::Ordering::Less => {
-            let filename = CStr::from_ptr((*sctxt).filename).to_string_lossy();
-            eprintln!("{filename} validation generated an internal error");
-        }
+        0
     }
-    xml_relaxng_free_valid_ctxt(vctxt);
-    if !relaxngschemas.is_null() {
-        xml_relaxng_free(relaxngschemas);
-    }
-    0
 }
 
 /// Implements the XML shell function "grep"
@@ -2593,69 +2695,71 @@ unsafe fn xml_shell_grep(
     mut node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    if ctxt.is_null() {
-        return 0;
-    }
-    if node.is_none() {
-        return 0;
-    }
-    if arg.is_null() {
-        return 0;
-    }
-    // what does the following do... ?
-    // #[cfg(feature = "regexp")]
-    // if !xmlStrchr(arg as *mut xmlChar, b'?').is_null()
-    //     || !xmlStrchr(arg as *mut xmlChar, b'*').is_null()
-    //     || !xmlStrchr(arg as *mut xmlChar, b'.').is_null()
-    //     || !xmlStrchr(arg as *mut xmlChar, b'[').is_null()
-    // {}
-    while let Some(now) = node {
-        if let Ok(now) = XmlNodePtr::try_from(now) {
-            if now.element_type() == XmlElementType::XmlCommentNode {
-                if !xml_strstr(now.content, arg as *mut XmlChar).is_null() {
-                    let path = now.get_node_path().unwrap();
+    unsafe {
+        if ctxt.is_null() {
+            return 0;
+        }
+        if node.is_none() {
+            return 0;
+        }
+        if arg.is_null() {
+            return 0;
+        }
+        // what does the following do... ?
+        // #[cfg(feature = "regexp")]
+        // if !xmlStrchr(arg as *mut xmlChar, b'?').is_null()
+        //     || !xmlStrchr(arg as *mut xmlChar, b'*').is_null()
+        //     || !xmlStrchr(arg as *mut xmlChar, b'.').is_null()
+        //     || !xmlStrchr(arg as *mut xmlChar, b'[').is_null()
+        // {}
+        while let Some(now) = node {
+            if let Ok(now) = XmlNodePtr::try_from(now) {
+                if now.element_type() == XmlElementType::XmlCommentNode {
+                    if !xml_strstr(now.content, arg as *mut XmlChar).is_null() {
+                        let path = now.get_node_path().unwrap();
+                        write!((*ctxt).output, "{path} : ");
+                        xml_shell_list(ctxt, null_mut(), Some(now.into()), None);
+                    }
+                } else if now.element_type() == XmlElementType::XmlTextNode
+                    && !xml_strstr(now.content, arg as *mut XmlChar).is_null()
+                {
+                    let path = now.parent().unwrap().get_node_path().unwrap();
                     write!((*ctxt).output, "{path} : ");
-                    xml_shell_list(ctxt, null_mut(), Some(now.into()), None);
+                    xml_shell_list(ctxt, null_mut(), now.parent, None);
                 }
-            } else if now.element_type() == XmlElementType::XmlTextNode
-                && !xml_strstr(now.content, arg as *mut XmlChar).is_null()
-            {
-                let path = now.parent().unwrap().get_node_path().unwrap();
-                write!((*ctxt).output, "{path} : ");
-                xml_shell_list(ctxt, null_mut(), now.parent, None);
             }
-        }
 
-        // Browse the full subtree, deep first
-        if let Ok(doc) = XmlDocPtr::try_from(now) {
-            node = doc.children;
-        } else if let Some(children) = now
-            .children()
-            .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
-        {
-            // deep first
-            node = Some(children);
-        } else if let Some(next) = now.next() {
-            // then siblings
-            node = Some(next);
-        } else {
-            // go up to parents->next if needed
-            while let Some(now) = node {
-                if let Some(parent) = now.parent() {
-                    node = Some(parent);
-                }
-                if let Some(next) = now.next() {
-                    node = Some(next);
-                    break;
-                }
-                if now.parent().is_none() {
-                    node = None;
-                    break;
+            // Browse the full subtree, deep first
+            if let Ok(doc) = XmlDocPtr::try_from(now) {
+                node = doc.children;
+            } else if let Some(children) = now
+                .children()
+                .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
+            {
+                // deep first
+                node = Some(children);
+            } else if let Some(next) = now.next() {
+                // then siblings
+                node = Some(next);
+            } else {
+                // go up to parents->next if needed
+                while let Some(now) = node {
+                    if let Some(parent) = now.parent() {
+                        node = Some(parent);
+                    }
+                    if let Some(next) = now.next() {
+                        node = Some(next);
+                        break;
+                    }
+                    if now.parent().is_none() {
+                        node = None;
+                        break;
+                    }
                 }
             }
         }
+        0
     }
-    0
 }
 
 /// Implements the XML shell function "dir"
@@ -2669,36 +2773,38 @@ unsafe fn xml_shell_set_content(
     node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    if ctxt.is_null() {
-        return 0;
-    }
-    let Some(mut node) = node else {
-        writeln!((*ctxt).output, "NULL");
-        return 0;
-    };
-    if value.is_null() {
-        writeln!((*ctxt).output, "NULL");
-        return 0;
-    }
-
-    let mut results = None;
-    let ret = xml_parse_in_node_context(
-        node,
-        CStr::from_ptr(value).to_bytes().to_vec(),
-        0,
-        &mut results,
-    );
-    if ret == XmlParserErrors::XmlErrOK {
-        if let Some(children) = node.children() {
-            xml_free_node_list(Some(children));
-            node.set_children(None);
-            node.set_last(None);
+    unsafe {
+        if ctxt.is_null() {
+            return 0;
         }
-        node.add_child_list(results.unwrap());
-    } else {
-        writeln!((*ctxt).output, "failed to parse content");
+        let Some(mut node) = node else {
+            writeln!((*ctxt).output, "NULL");
+            return 0;
+        };
+        if value.is_null() {
+            writeln!((*ctxt).output, "NULL");
+            return 0;
+        }
+
+        let mut results = None;
+        let ret = xml_parse_in_node_context(
+            node,
+            CStr::from_ptr(value).to_bytes().to_vec(),
+            0,
+            &mut results,
+        );
+        if ret == XmlParserErrors::XmlErrOK {
+            if let Some(children) = node.children() {
+                xml_free_node_list(Some(children));
+                node.set_children(None);
+                node.set_last(None);
+            }
+            node.add_child_list(results.unwrap());
+        } else {
+            writeln!((*ctxt).output, "failed to parse content");
+        }
+        0
     }
-    0
 }
 
 /// Implements the XML shell function "setns"
@@ -2713,57 +2819,59 @@ unsafe fn xml_shell_register_namespace(
     _node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    use crate::{libxml::xmlstring::xml_strdup, xpath::internals::xml_xpath_register_ns};
+    unsafe {
+        use crate::{libxml::xmlstring::xml_strdup, xpath::internals::xml_xpath_register_ns};
 
-    use super::globals::xml_free;
+        use super::globals::xml_free;
 
-    let mut prefix: *mut XmlChar;
-    let mut href: *mut XmlChar;
-    let mut next: *mut XmlChar;
+        let mut prefix: *mut XmlChar;
+        let mut href: *mut XmlChar;
+        let mut next: *mut XmlChar;
 
-    let ns_list_dup: *mut XmlChar = xml_strdup(arg as *mut XmlChar);
-    next = ns_list_dup;
-    while !next.is_null() {
-        /* skip spaces */
-        /*while ((*next) == b' ') next++;*/
-        if (*next) == b'\0' {
-            break;
-        }
+        let ns_list_dup: *mut XmlChar = xml_strdup(arg as *mut XmlChar);
+        next = ns_list_dup;
+        while !next.is_null() {
+            /* skip spaces */
+            /*while ((*next) == b' ') next++;*/
+            if (*next) == b'\0' {
+                break;
+            }
 
-        /* find prefix */
-        prefix = next;
-        next = xml_strchr(next, b'=') as *mut XmlChar;
-        if next.is_null() {
-            writeln!((*ctxt).output, "setns: prefix=[nsuri] required");
-            xml_free(ns_list_dup as _);
-            return -1;
-        }
-        *next = b'\0';
-        next = next.add(1);
-
-        /* find href */
-        href = next;
-        next = xml_strchr(next, b' ') as *mut XmlChar;
-        if !next.is_null() {
+            /* find prefix */
+            prefix = next;
+            next = xml_strchr(next, b'=') as *mut XmlChar;
+            if next.is_null() {
+                writeln!((*ctxt).output, "setns: prefix=[nsuri] required");
+                xml_free(ns_list_dup as _);
+                return -1;
+            }
             *next = b'\0';
             next = next.add(1);
+
+            /* find href */
+            href = next;
+            next = xml_strchr(next, b' ') as *mut XmlChar;
+            if !next.is_null() {
+                *next = b'\0';
+                next = next.add(1);
+            }
+
+            /* do register namespace */
+            if xml_xpath_register_ns((*ctxt).pctxt, prefix, href) != 0 {
+                let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+                let href = CStr::from_ptr(href as *const i8).to_string_lossy();
+                writeln!(
+                    (*ctxt).output,
+                    "Error: unable to register NS with prefix=\"{prefix}\" and href=\"{href}\""
+                );
+                xml_free(ns_list_dup as _);
+                return -1;
+            }
         }
 
-        /* do register namespace */
-        if xml_xpath_register_ns((*ctxt).pctxt, prefix, href) != 0 {
-            let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
-            let href = CStr::from_ptr(href as *const i8).to_string_lossy();
-            writeln!(
-                (*ctxt).output,
-                "Error: unable to register NS with prefix=\"{prefix}\" and href=\"{href}\""
-            );
-            xml_free(ns_list_dup as _);
-            return -1;
-        }
+        xml_free(ns_list_dup as _);
+        0
     }
-
-    xml_free(ns_list_dup as _);
-    0
 }
 
 /// Implements the XML shell function "setrootns"
@@ -2778,29 +2886,31 @@ unsafe fn xml_shell_register_root_namespaces(
     root: XmlNodePtr,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    use crate::xpath::internals::xml_xpath_register_ns;
+    unsafe {
+        use crate::xpath::internals::xml_xpath_register_ns;
 
-    // if root.is_null() {
-    //     return -1;
-    // }
-    if root.element_type() != XmlElementType::XmlElementNode
-        || root.ns_def.is_none()
-        || ctxt.is_null()
-        || (*ctxt).pctxt.is_null()
-    {
-        return -1;
-    }
-    let mut ns = root.ns_def;
-    while let Some(now) = ns {
-        if let Some(prefix) = now.prefix() {
-            let prefix = CString::new(prefix.as_ref()).unwrap();
-            xml_xpath_register_ns((*ctxt).pctxt, prefix.as_ptr() as *const u8, now.href);
-        } else {
-            xml_xpath_register_ns((*ctxt).pctxt, c"defaultns".as_ptr() as _, now.href);
+        // if root.is_null() {
+        //     return -1;
+        // }
+        if root.element_type() != XmlElementType::XmlElementNode
+            || root.ns_def.is_none()
+            || ctxt.is_null()
+            || (*ctxt).pctxt.is_null()
+        {
+            return -1;
         }
-        ns = now.next;
+        let mut ns = root.ns_def;
+        while let Some(now) = ns {
+            if let Some(prefix) = now.prefix() {
+                let prefix = CString::new(prefix.as_ref()).unwrap();
+                xml_xpath_register_ns((*ctxt).pctxt, prefix.as_ptr() as *const u8, now.href);
+            } else {
+                xml_xpath_register_ns((*ctxt).pctxt, c"defaultns".as_ptr() as _, now.href);
+            }
+            ns = now.next;
+        }
+        0
     }
-    0
 }
 
 /// Implements the XML shell function "setbase"
@@ -2815,11 +2925,13 @@ unsafe fn xml_shell_set_base(
     node: XmlGenericNodePtr,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    // if node.is_null() {
-    //     return 0;
-    // }
-    node.set_base(arg);
-    0
+    unsafe {
+        // if node.is_null() {
+        //     return 0;
+        // }
+        node.set_base(arg);
+        0
+    }
 }
 
 /// Implements the XML shell
@@ -2833,949 +2945,968 @@ pub unsafe fn xml_shell<'a>(
     input: Option<XmlShellReadlineFunc>,
     output: Option<impl Write + 'a>,
 ) {
-    use std::mem::size_of;
+    unsafe {
+        use std::mem::size_of;
 
-    use libc::{free, snprintf, sscanf, strcmp};
+        use libc::{free, snprintf, sscanf, strcmp};
 
-    use crate::{
-        libxml::{
-            globals::{xml_free, xml_malloc},
-            xmlmemory::xml_mem_show,
-            xmlstring::xml_strdup,
-        },
-        tree::xml_free_doc,
-        xpath::{
-            xml_xpath_debug_dump_object, xml_xpath_eval, xml_xpath_free_context,
-            xml_xpath_free_object, xml_xpath_new_context,
-        },
-    };
+        use crate::{
+            libxml::{
+                globals::{xml_free, xml_malloc},
+                xmlmemory::xml_mem_show,
+                xmlstring::xml_strdup,
+            },
+            tree::xml_free_doc,
+            xpath::{
+                xml_xpath_debug_dump_object, xml_xpath_eval, xml_xpath_free_context,
+                xml_xpath_free_object, xml_xpath_new_context,
+            },
+        };
 
-    let mut prompt: [u8; 500] = [0; 500];
-    prompt[..c"/ > ".to_bytes().len()].copy_from_slice(c"/ > ".to_bytes());
-    let mut cmdline: *mut c_char;
-    let mut cur: *mut c_char;
-    let mut command: [c_char; 100] = [0; 100];
-    let mut arg: [c_char; 400] = [0; 400];
-    let mut i: i32;
-    let mut list: XmlXPathObjectPtr;
+        let mut prompt: [u8; 500] = [0; 500];
+        prompt[..c"/ > ".to_bytes().len()].copy_from_slice(c"/ > ".to_bytes());
+        let mut cmdline: *mut c_char;
+        let mut cur: *mut c_char;
+        let mut command: [c_char; 100] = [0; 100];
+        let mut arg: [c_char; 400] = [0; 400];
+        let mut i: i32;
+        let mut list: XmlXPathObjectPtr;
 
-    // if doc.is_null() {
-    //     return;
-    // }
-    if filename.is_null() {
-        return;
-    }
-    if input.is_none() {
-        return;
-    }
-
-    let ctxt: XmlShellCtxtPtr = xml_malloc(size_of::<XmlShellCtxt>()) as XmlShellCtxtPtr;
-    if ctxt.is_null() {
-        return;
-    }
-    (*ctxt).loaded = 0;
-    (*ctxt).doc = Some(doc);
-    (*ctxt).input = input.unwrap();
-    (*ctxt).output = output.map_or(Box::new(stdout()) as Box<dyn Write + 'a>, |o| Box::new(o));
-    (*ctxt).filename = xml_strdup(filename as *mut XmlChar) as *mut c_char;
-    (*ctxt).node = Some(doc.into());
-
-    #[cfg(feature = "xpath")]
-    {
-        (*ctxt).pctxt = xml_xpath_new_context(Some(doc));
-        if (*ctxt).pctxt.is_null() {
-            xml_free(ctxt as _);
+        // if doc.is_null() {
+        //     return;
+        // }
+        if filename.is_null() {
             return;
         }
-    }
-    loop {
-        if (*ctxt).node == Some(doc.into()) {
-            snprintf(
-                prompt.as_mut_ptr() as _,
-                prompt.len(),
-                c"%s > ".as_ptr(),
-                c"/".as_ptr(),
-            );
-        } else if let Some(node) = (*ctxt)
-            .node
-            .and_then(|node| XmlNodePtr::try_from(node).ok())
-            .filter(|node| !node.name.is_null() && node.ns.map_or(false, |ns| !ns.prefix.is_null()))
+        if input.is_none() {
+            return;
+        }
+
+        let ctxt: XmlShellCtxtPtr = xml_malloc(size_of::<XmlShellCtxt>()) as XmlShellCtxtPtr;
+        if ctxt.is_null() {
+            return;
+        }
+        (*ctxt).loaded = 0;
+        (*ctxt).doc = Some(doc);
+        (*ctxt).input = input.unwrap();
+        (*ctxt).output = output.map_or(Box::new(stdout()) as Box<dyn Write + 'a>, |o| Box::new(o));
+        (*ctxt).filename = xml_strdup(filename as *mut XmlChar) as *mut c_char;
+        (*ctxt).node = Some(doc.into());
+
+        #[cfg(feature = "xpath")]
         {
-            snprintf(
-                prompt.as_mut_ptr() as _,
-                prompt.len(),
-                c"%s:%s > ".as_ptr(),
-                node.ns.unwrap().prefix,
-                node.name,
-            );
-        } else if (*ctxt).node.map_or(false, |node| node.name().is_some()) {
-            snprintf(
-                prompt.as_mut_ptr() as _,
-                prompt.len(),
-                c"%s > ".as_ptr(),
-                (*ctxt).node.unwrap().name().unwrap().as_ptr(),
-            );
-        } else {
-            snprintf(prompt.as_mut_ptr() as _, prompt.len(), c"? > ".as_ptr());
-        }
-        prompt[prompt.len() - 1] = 0;
-
-        // Get a new command line
-        cmdline = ((*ctxt).input)(prompt.as_mut_ptr() as _);
-        if cmdline.is_null() {
-            break;
-        }
-
-        // Parse the command itself
-        cur = cmdline;
-        while *cur == b' ' as i8 || *cur == b'\t' as i8 {
-            cur = cur.add(1);
-        }
-        i = 0;
-        while *cur != b' ' as i8
-            && *cur != b'\t' as i8
-            && *cur != b'\n' as i8
-            && *cur != b'\r' as i8
-        {
-            if *cur == 0 {
-                break;
+            (*ctxt).pctxt = xml_xpath_new_context(Some(doc));
+            if (*ctxt).pctxt.is_null() {
+                xml_free(ctxt as _);
+                return;
             }
-            command[i as usize] = *cur;
-            i += 1;
-            cur = cur.add(1);
         }
-        command[i as usize] = 0;
-        if i == 0 {
-            continue;
-        }
-
-        // Parse the argument
-        while *cur == b' ' as i8 || *cur == b'\t' as i8 {
-            cur = cur.add(1);
-        }
-        i = 0;
-        while *cur != b'\n' as i8 && *cur != b'\r' as i8 && *cur != 0 {
-            if *cur == 0 {
-                break;
-            }
-            arg[i as usize] = *cur;
-            i += 1;
-            cur = cur.add(1);
-        }
-        arg[i as usize] = 0;
-
-        // start interpreting the command
-        if strcmp(command.as_mut_ptr(), c"exit".as_ptr()) == 0 {
-            break;
-        }
-        if strcmp(command.as_mut_ptr(), c"quit".as_ptr()) == 0 {
-            break;
-        }
-        if strcmp(command.as_mut_ptr(), c"bye".as_ptr()) == 0 {
-            break;
-        }
-        if strcmp(command.as_mut_ptr(), c"help".as_ptr()) == 0 {
-            writeln!(
-                (*ctxt).output,
-                "\tbase         display XML base of the node",
-            );
-            writeln!(
-                (*ctxt).output,
-                "\tsetbase URI  change the XML base of the node"
-            );
-            writeln!((*ctxt).output, "\tbye          leave shell");
-            writeln!(
-                (*ctxt).output,
-                "\tcat [node]   display node or current node"
-            );
-            writeln!(
-                (*ctxt).output,
-                "\tcd [path]    change directory to path or to root"
-            );
-            writeln!(
-                (*ctxt).output,
-                "\tdir [path]   dumps information about the node (namespace, attributes, content)"
-            );
-            writeln!(
-                (*ctxt).output,
-                "\tdu [path]    show the structure of the subtree under path or the current node"
-            );
-            writeln!((*ctxt).output, "\texit         leave shell");
-            writeln!((*ctxt).output, "\thelp         display this help");
-            writeln!((*ctxt).output, "\tfree         display memory usage");
-            writeln!(
-                (*ctxt).output,
-                "\tload [name]  load a new document with name"
-            );
-            writeln!(
-                (*ctxt).output,
-                "\tls [path]    list contents of path or the current directory"
-            );
-            writeln!((*ctxt).output, "\tset xml_fragment replace the current node content with the fragment parsed in context");
-            #[cfg(feature = "xpath")]
-            {
-                writeln!((*ctxt).output, "\txpath expr   evaluate the XPath expression in that context and print the result");
-                writeln!((*ctxt).output, "\tsetns nsreg  register a namespace to a prefix in the XPath evaluation context");
-                writeln!((*ctxt).output, "\t             format for nsreg is: prefix=[nsuri] (i.e. prefix= unsets a prefix)");
-                writeln!(
-                    (*ctxt).output,
-                    "\tsetrootns    register all namespace found on the root element"
+        loop {
+            if (*ctxt).node == Some(doc.into()) {
+                snprintf(
+                    prompt.as_mut_ptr() as _,
+                    prompt.len(),
+                    c"%s > ".as_ptr(),
+                    c"/".as_ptr(),
                 );
-                writeln!(
-                    (*ctxt).output,
-                    "\t             the default namespace if any uses 'defaultns' prefix"
+            } else if let Some(node) = (*ctxt)
+                .node
+                .and_then(|node| XmlNodePtr::try_from(node).ok())
+                .filter(|node| {
+                    !node.name.is_null() && node.ns.is_some_and(|ns| !ns.prefix.is_null())
+                })
+            {
+                snprintf(
+                    prompt.as_mut_ptr() as _,
+                    prompt.len(),
+                    c"%s:%s > ".as_ptr(),
+                    node.ns.unwrap().prefix,
+                    node.name,
                 );
-            }
-            writeln!(
-                (*ctxt).output,
-                "\tpwd          display current working directory"
-            );
-            writeln!(
-                (*ctxt).output,
-                "\twhereis      display absolute path of [path] or current working directory"
-            );
-            writeln!((*ctxt).output, "\tquit         leave shell");
-            #[cfg(feature = "libxml_output")]
-            {
-                writeln!(
-                    (*ctxt).output,
-                    "\tsave [name]  save this document to name or the original name"
+            } else if (*ctxt).node.is_some_and(|node| node.name().is_some()) {
+                snprintf(
+                    prompt.as_mut_ptr() as _,
+                    prompt.len(),
+                    c"%s > ".as_ptr(),
+                    (*ctxt).node.unwrap().name().unwrap().as_ptr(),
                 );
-                writeln!(
-                    (*ctxt).output,
-                    "\twrite [name] write the current node to the filename"
-                );
-            }
-            #[cfg(feature = "libxml_valid")]
-            {
-                writeln!(
-                    (*ctxt).output,
-                    "\tvalidate     check the document for errors"
-                );
-            }
-            #[cfg(feature = "schema")]
-            {
-                writeln!(
-                    (*ctxt).output,
-                    "\trelaxng rng  validate the document against the Relax-NG schemas"
-                );
-            }
-            writeln!(
-                (*ctxt).output,
-                "\tgrep string  search for a string in the subtree"
-            );
-        } else if {
-            #[cfg(feature = "libxml_valid")]
-            {
-                strcmp(command.as_ptr(), c"validate".as_ptr()) == 0
-            }
-            #[cfg(not(feature = "libxml_valid"))]
-            {
-                false
-            }
-        } {
-            #[cfg(feature = "libxml_valid")]
-            {
-                xml_shell_validate(ctxt, arg.as_mut_ptr(), None, None);
-            }
-        } else if strcmp(command.as_ptr(), c"load".as_ptr()) == 0 {
-            xml_shell_load(
-                ctxt,
-                CStr::from_ptr(arg.as_ptr()).to_string_lossy().as_ref(),
-                None,
-                None,
-            );
-        } else if {
-            #[cfg(feature = "schema")]
-            {
-                strcmp(command.as_ptr(), c"relaxng".as_ptr()) == 0
-            }
-            #[cfg(not(feature = "schema"))]
-            {
-                false
-            }
-        } {
-            #[cfg(feature = "schema")]
-            {
-                xml_shell_rng_validate(
-                    ctxt,
-                    CStr::from_ptr(arg.as_mut_ptr()).to_string_lossy().as_ref(),
-                    None,
-                    None,
-                );
-            }
-        } else if {
-            #[cfg(feature = "libxml_output")]
-            {
-                strcmp(command.as_ptr(), c"save".as_ptr()) == 0
-            }
-            #[cfg(not(feature = "libxml_output"))]
-            {
-                false
-            }
-        } {
-            #[cfg(feature = "libxml_output")]
-            {
-                xml_shell_save(ctxt, arg.as_mut_ptr(), None, None);
-            }
-        } else if {
-            #[cfg(feature = "libxml_output")]
-            {
-                strcmp(command.as_ptr(), c"write".as_ptr()) == 0
-            }
-            #[cfg(not(feature = "libxml_output"))]
-            {
-                false
-            }
-        } {
-            #[cfg(feature = "libxml_output")]
-            if arg[0] == 0 {
-                generic_error!("Write command requires a filename argument\n");
             } else {
-                xml_shell_write(
+                snprintf(prompt.as_mut_ptr() as _, prompt.len(), c"? > ".as_ptr());
+            }
+            prompt[prompt.len() - 1] = 0;
+
+            // Get a new command line
+            cmdline = ((*ctxt).input)(prompt.as_mut_ptr() as _);
+            if cmdline.is_null() {
+                break;
+            }
+
+            // Parse the command itself
+            cur = cmdline;
+            while *cur == b' ' as i8 || *cur == b'\t' as i8 {
+                cur = cur.add(1);
+            }
+            i = 0;
+            while *cur != b' ' as i8
+                && *cur != b'\t' as i8
+                && *cur != b'\n' as i8
+                && *cur != b'\r' as i8
+            {
+                if *cur == 0 {
+                    break;
+                }
+                command[i as usize] = *cur;
+                i += 1;
+                cur = cur.add(1);
+            }
+            command[i as usize] = 0;
+            if i == 0 {
+                continue;
+            }
+
+            // Parse the argument
+            while *cur == b' ' as i8 || *cur == b'\t' as i8 {
+                cur = cur.add(1);
+            }
+            i = 0;
+            while *cur != b'\n' as i8 && *cur != b'\r' as i8 && *cur != 0 {
+                if *cur == 0 {
+                    break;
+                }
+                arg[i as usize] = *cur;
+                i += 1;
+                cur = cur.add(1);
+            }
+            arg[i as usize] = 0;
+
+            // start interpreting the command
+            if strcmp(command.as_mut_ptr(), c"exit".as_ptr()) == 0 {
+                break;
+            }
+            if strcmp(command.as_mut_ptr(), c"quit".as_ptr()) == 0 {
+                break;
+            }
+            if strcmp(command.as_mut_ptr(), c"bye".as_ptr()) == 0 {
+                break;
+            }
+            if strcmp(command.as_mut_ptr(), c"help".as_ptr()) == 0 {
+                writeln!(
+                    (*ctxt).output,
+                    "\tbase         display XML base of the node",
+                );
+                writeln!(
+                    (*ctxt).output,
+                    "\tsetbase URI  change the XML base of the node"
+                );
+                writeln!((*ctxt).output, "\tbye          leave shell");
+                writeln!(
+                    (*ctxt).output,
+                    "\tcat [node]   display node or current node"
+                );
+                writeln!(
+                    (*ctxt).output,
+                    "\tcd [path]    change directory to path or to root"
+                );
+                writeln!(
+                    (*ctxt).output,
+                    "\tdir [path]   dumps information about the node (namespace, attributes, content)"
+                );
+                writeln!(
+                    (*ctxt).output,
+                    "\tdu [path]    show the structure of the subtree under path or the current node"
+                );
+                writeln!((*ctxt).output, "\texit         leave shell");
+                writeln!((*ctxt).output, "\thelp         display this help");
+                writeln!((*ctxt).output, "\tfree         display memory usage");
+                writeln!(
+                    (*ctxt).output,
+                    "\tload [name]  load a new document with name"
+                );
+                writeln!(
+                    (*ctxt).output,
+                    "\tls [path]    list contents of path or the current directory"
+                );
+                writeln!(
+                    (*ctxt).output,
+                    "\tset xml_fragment replace the current node content with the fragment parsed in context"
+                );
+                #[cfg(feature = "xpath")]
+                {
+                    writeln!(
+                        (*ctxt).output,
+                        "\txpath expr   evaluate the XPath expression in that context and print the result"
+                    );
+                    writeln!(
+                        (*ctxt).output,
+                        "\tsetns nsreg  register a namespace to a prefix in the XPath evaluation context"
+                    );
+                    writeln!(
+                        (*ctxt).output,
+                        "\t             format for nsreg is: prefix=[nsuri] (i.e. prefix= unsets a prefix)"
+                    );
+                    writeln!(
+                        (*ctxt).output,
+                        "\tsetrootns    register all namespace found on the root element"
+                    );
+                    writeln!(
+                        (*ctxt).output,
+                        "\t             the default namespace if any uses 'defaultns' prefix"
+                    );
+                }
+                writeln!(
+                    (*ctxt).output,
+                    "\tpwd          display current working directory"
+                );
+                writeln!(
+                    (*ctxt).output,
+                    "\twhereis      display absolute path of [path] or current working directory"
+                );
+                writeln!((*ctxt).output, "\tquit         leave shell");
+                #[cfg(feature = "libxml_output")]
+                {
+                    writeln!(
+                        (*ctxt).output,
+                        "\tsave [name]  save this document to name or the original name"
+                    );
+                    writeln!(
+                        (*ctxt).output,
+                        "\twrite [name] write the current node to the filename"
+                    );
+                }
+                #[cfg(feature = "libxml_valid")]
+                {
+                    writeln!(
+                        (*ctxt).output,
+                        "\tvalidate     check the document for errors"
+                    );
+                }
+                #[cfg(feature = "schema")]
+                {
+                    writeln!(
+                        (*ctxt).output,
+                        "\trelaxng rng  validate the document against the Relax-NG schemas"
+                    );
+                }
+                writeln!(
+                    (*ctxt).output,
+                    "\tgrep string  search for a string in the subtree"
+                );
+            } else if {
+                #[cfg(feature = "libxml_valid")]
+                {
+                    strcmp(command.as_ptr(), c"validate".as_ptr()) == 0
+                }
+                #[cfg(not(feature = "libxml_valid"))]
+                {
+                    false
+                }
+            } {
+                #[cfg(feature = "libxml_valid")]
+                {
+                    xml_shell_validate(ctxt, arg.as_mut_ptr(), None, None);
+                }
+            } else if strcmp(command.as_ptr(), c"load".as_ptr()) == 0 {
+                xml_shell_load(
                     ctxt,
                     CStr::from_ptr(arg.as_ptr()).to_string_lossy().as_ref(),
-                    (*ctxt).node.unwrap(),
+                    None,
                     None,
                 );
-            }
-        } else if strcmp(command.as_ptr(), c"grep".as_ptr()) == 0 {
-            xml_shell_grep(ctxt, arg.as_mut_ptr(), (*ctxt).node, None);
-        } else if strcmp(command.as_ptr(), c"free".as_ptr()) == 0 {
-            if arg[0] == 0 {
-                xml_mem_show(&mut (*ctxt).output, 0);
-            } else {
-                let mut len: i32 = 0;
-
-                sscanf(arg.as_mut_ptr(), c"%d".as_ptr(), addr_of_mut!(len));
-                xml_mem_show(&mut (*ctxt).output, len);
-            }
-        } else if strcmp(command.as_ptr(), c"pwd".as_ptr()) == 0 {
-            let mut dir: [c_char; 500] = [0; 500];
-
-            if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, None) == 0 {
-                let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
-                writeln!((*ctxt).output, "{dir}");
-            }
-        } else if strcmp(command.as_ptr(), c"du".as_ptr()) == 0 {
-            if arg[0] == 0 {
-                xml_shell_du(ctxt, null_mut(), (*ctxt).node.unwrap(), None);
-            } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node;
-                #[cfg(feature = "xpath")]
+            } else if {
+                #[cfg(feature = "schema")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node;
-                    list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
+                    strcmp(command.as_ptr(), c"relaxng".as_ptr()) == 0
                 }
-                #[cfg(not(feature = "xpath"))]
+                #[cfg(not(feature = "schema"))]
                 {
-                    list = null_mut();
+                    false
                 }
-                if !list.is_null() {
-                    match (*list).typ {
-                        XmlXPathObjectType::XPathUndefined => {
-                            generic_error!(
-                                "{}: no such node\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathNodeset => {
-                            if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                                for &node in &nodeset.node_tab {
-                                    xml_shell_du(ctxt, null_mut(), node, None);
-                                }
-                            }
-                        }
-                        XmlXPathObjectType::XPathBoolean => {
-                            generic_error!(
-                                "{} is a Boolean\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathNumber => {
-                            generic_error!(
-                                "{} is a number\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathString => {
-                            generic_error!(
-                                "{} is a string\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathPoint => {
-                            generic_error!(
-                                "{} is a point\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathRange => {
-                            generic_error!(
-                                "{} is a range\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathLocationset => {
-                            generic_error!(
-                                "{} is a range\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathUsers => {
-                            generic_error!(
-                                "{} is user-defined\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathXSLTTree => {
-                            generic_error!(
-                                "{} is an XSLT value tree\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                    }
-                    #[cfg(feature = "xpath")]
-                    {
-                        xml_xpath_free_object(list);
-                    }
-                } else {
-                    generic_error!(
-                        "{}: no such node\n",
-                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+            } {
+                #[cfg(feature = "schema")]
+                {
+                    xml_shell_rng_validate(
+                        ctxt,
+                        CStr::from_ptr(arg.as_mut_ptr()).to_string_lossy().as_ref(),
+                        None,
+                        None,
                     );
                 }
-                (*(*ctxt).pctxt).node = None;
-            }
-        } else if strcmp(command.as_ptr(), c"base".as_ptr()) == 0 {
-            xml_shell_base(ctxt, null_mut(), (*ctxt).node, None);
-        } else if strcmp(command.as_ptr(), c"set".as_ptr()) == 0 {
-            xml_shell_set_content(ctxt, arg.as_mut_ptr(), (*ctxt).node, None);
-        } else if {
-            #[cfg(feature = "xpath")]
-            {
-                strcmp(command.as_ptr(), c"setns".as_ptr()) == 0
-            }
-            #[cfg(not(feature = "xpath"))]
-            {
-                false
-            }
-        } {
-            #[cfg(feature = "xpath")]
-            if arg[0] == 0 {
-                generic_error!("setns: prefix=[nsuri] required\n");
-            } else {
-                xml_shell_register_namespace(ctxt, arg.as_mut_ptr(), None, None);
-            }
-        } else if {
-            #[cfg(feature = "xpath")]
-            {
-                strcmp(command.as_ptr(), c"setrootns".as_ptr()) == 0
-            }
-            #[cfg(not(feature = "xpath"))]
-            {
-                false
-            }
-        } {
-            #[cfg(feature = "xpath")]
-            {
-                let root = doc.get_root_element();
-                xml_shell_register_root_namespaces(ctxt, null_mut(), root.unwrap(), None);
-            }
-        } else if {
-            #[cfg(feature = "xpath")]
-            {
-                strcmp(command.as_ptr(), c"xpath".as_ptr()) == 0
-            }
-            #[cfg(not(feature = "xpath"))]
-            {
-                false
-            }
-        } {
-            #[cfg(feature = "xpath")]
-            if arg[0] == 0 {
-                generic_error!("xpath: expression required\n");
-            } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node;
-                list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
-                xml_xpath_debug_dump_object(&mut (*ctxt).output, list, 0);
-                xml_xpath_free_object(list);
-            }
-        } else if {
-            #[cfg(feature = "libxml_tree")]
-            {
-                strcmp(command.as_ptr(), c"setbase".as_ptr()) == 0
-            }
-            #[cfg(not(feature = "libxml_tree"))]
-            {
-                false
-            }
-        } {
-            #[cfg(feature = "libxml_tree")]
-            {
-                xml_shell_set_base(
-                    ctxt,
-                    Some(CStr::from_ptr(arg.as_mut_ptr()).to_string_lossy().as_ref()),
-                    (*ctxt).node.unwrap(),
-                    None,
-                );
-            }
-        } else if strcmp(command.as_ptr(), c"ls".as_ptr()) == 0
-            || strcmp(command.as_ptr(), c"dir".as_ptr()) == 0
-        {
-            let dir: i32 = (strcmp(command.as_ptr(), c"dir".as_ptr()) == 0) as i32;
-
-            if arg[0] == 0 {
-                if dir != 0 {
-                    xml_shell_dir(ctxt, null_mut(), (*ctxt).node, None);
-                } else {
-                    xml_shell_list(ctxt, null_mut(), (*ctxt).node, None);
-                }
-            } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node;
-                #[cfg(feature = "xpath")]
+            } else if {
+                #[cfg(feature = "libxml_output")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node;
-                    list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
+                    strcmp(command.as_ptr(), c"save".as_ptr()) == 0
                 }
-                #[cfg(not(feature = "xpath"))]
+                #[cfg(not(feature = "libxml_output"))]
                 {
-                    list = null_mut();
+                    false
                 }
-                if !list.is_null() {
-                    match (*list).typ {
-                        XmlXPathObjectType::XPathUndefined => {
-                            generic_error!(
-                                "{}: no such node\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathNodeset => {
-                            let Some(nodeset) = (*list).nodesetval.as_deref() else {
-                                break;
-                            };
-
-                            for &node in &nodeset.node_tab {
-                                if dir != 0 {
-                                    xml_shell_dir(ctxt, null_mut(), Some(node), None);
-                                } else {
-                                    xml_shell_list(ctxt, null_mut(), Some(node), None);
-                                }
-                            }
-                        }
-                        XmlXPathObjectType::XPathBoolean => {
-                            generic_error!(
-                                "{} is a Boolean\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathNumber => {
-                            generic_error!(
-                                "{} is a number\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathString => {
-                            generic_error!(
-                                "{} is a string\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathPoint => {
-                            generic_error!(
-                                "{} is a point\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathRange => {
-                            generic_error!(
-                                "{} is a range\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathLocationset => {
-                            generic_error!(
-                                "{} is a range\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathUsers => {
-                            generic_error!(
-                                "{} is user-defined\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathXSLTTree => {
-                            generic_error!(
-                                "{} is an XSLT value tree\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                    }
-                    #[cfg(feature = "xpath")]
-                    {
-                        xml_xpath_free_object(list);
-                    }
+            } {
+                #[cfg(feature = "libxml_output")]
+                {
+                    xml_shell_save(ctxt, arg.as_mut_ptr(), None, None);
+                }
+            } else if {
+                #[cfg(feature = "libxml_output")]
+                {
+                    strcmp(command.as_ptr(), c"write".as_ptr()) == 0
+                }
+                #[cfg(not(feature = "libxml_output"))]
+                {
+                    false
+                }
+            } {
+                #[cfg(feature = "libxml_output")]
+                if arg[0] == 0 {
+                    generic_error!("Write command requires a filename argument\n");
                 } else {
-                    generic_error!(
-                        "{}: no such node\n",
-                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                    xml_shell_write(
+                        ctxt,
+                        CStr::from_ptr(arg.as_ptr()).to_string_lossy().as_ref(),
+                        (*ctxt).node.unwrap(),
+                        None,
                     );
                 }
-                (*(*ctxt).pctxt).node = None;
-            }
-        } else if strcmp(command.as_ptr(), c"whereis".as_ptr()) == 0 {
-            let mut dir: [c_char; 500] = [0; 500];
+            } else if strcmp(command.as_ptr(), c"grep".as_ptr()) == 0 {
+                xml_shell_grep(ctxt, arg.as_mut_ptr(), (*ctxt).node, None);
+            } else if strcmp(command.as_ptr(), c"free".as_ptr()) == 0 {
+                if arg[0] == 0 {
+                    xml_mem_show(&mut (*ctxt).output, 0);
+                } else {
+                    let mut len: i32 = 0;
 
-            if arg[0] == 0 {
+                    sscanf(arg.as_mut_ptr(), c"%d".as_ptr(), addr_of_mut!(len));
+                    xml_mem_show(&mut (*ctxt).output, len);
+                }
+            } else if strcmp(command.as_ptr(), c"pwd".as_ptr()) == 0 {
+                let mut dir: [c_char; 500] = [0; 500];
+
                 if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, None) == 0 {
                     let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
                     writeln!((*ctxt).output, "{dir}");
                 }
-            } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node;
-                #[cfg(feature = "xpath")]
-                {
-                    list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
-                }
-                #[cfg(not(feature = "xpath"))]
-                {
-                    list = null_mut();
-                }
-                if !list.is_null() {
-                    match (*list).typ {
-                        XmlXPathObjectType::XPathUndefined => {
-                            generic_error!(
-                                "{}: no such node\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathNodeset => {
-                            if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                                for &node in &nodeset.node_tab {
-                                    if xml_shell_pwd(ctxt, dir.as_mut_ptr(), Some(node), None) == 0
-                                    {
-                                        let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
-                                        writeln!((*ctxt).output, "{dir}");
+            } else if strcmp(command.as_ptr(), c"du".as_ptr()) == 0 {
+                if arg[0] == 0 {
+                    xml_shell_du(ctxt, null_mut(), (*ctxt).node.unwrap(), None);
+                } else {
+                    (*(*ctxt).pctxt).node = (*ctxt).node;
+                    #[cfg(feature = "xpath")]
+                    {
+                        (*(*ctxt).pctxt).node = (*ctxt).node;
+                        list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
+                    }
+                    #[cfg(not(feature = "xpath"))]
+                    {
+                        list = null_mut();
+                    }
+                    if !list.is_null() {
+                        match (*list).typ {
+                            XmlXPathObjectType::XPathUndefined => {
+                                generic_error!(
+                                    "{}: no such node\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathNodeset => {
+                                if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                                    for &node in &nodeset.node_tab {
+                                        xml_shell_du(ctxt, null_mut(), node, None);
                                     }
                                 }
                             }
-                        }
-                        XmlXPathObjectType::XPathBoolean => {
-                            generic_error!(
-                                "{} is a Boolean\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathNumber => {
-                            generic_error!(
-                                "{} is a number\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathString => {
-                            generic_error!(
-                                "{} is a string\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathPoint => {
-                            generic_error!(
-                                "{} is a point\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathRange => {
-                            generic_error!(
-                                "{} is a range\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathLocationset => {
-                            generic_error!(
-                                "{} is a range\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathUsers => {
-                            generic_error!(
-                                "{} is user-defined\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathXSLTTree => {
-                            generic_error!(
-                                "{} is an XSLT value tree\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                    }
-                    #[cfg(feature = "xpath")]
-                    {
-                        xml_xpath_free_object(list);
-                    }
-                } else {
-                    generic_error!(
-                        "{}: no such node\n",
-                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                    );
-                }
-                (*(*ctxt).pctxt).node = None;
-            }
-        } else if strcmp(command.as_ptr(), c"cd".as_ptr()) == 0 {
-            if arg[0] == 0 {
-                (*ctxt).node = Some(doc.into());
-            } else {
-                #[cfg(feature = "xpath")]
-                {
-                    (*(*ctxt).pctxt).node = (*ctxt).node;
-                    let l = strlen(arg.as_ptr());
-                    if l >= 2 && arg[l - 1] == b'/' as _ {
-                        arg[l - 1] = 0;
-                    }
-                    list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
-                }
-                #[cfg(not(feature = "xpath"))]
-                {
-                    list = null_mut();
-                }
-                if !list.is_null() {
-                    match (*list).typ {
-                        XmlXPathObjectType::XPathUndefined => {
-                            generic_error!(
-                                "{}: no such node\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathNodeset => {
-                            if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                                if nodeset.node_tab.len() == 1 {
-                                    (*ctxt).node = Some(nodeset.node_tab[0]);
-                                    if (*ctxt)
-                                        .node
-                                        .take_if(|node| {
-                                            node.element_type() == XmlElementType::XmlNamespaceDecl
-                                        })
-                                        .is_some()
-                                    {
-                                        generic_error!("cannot cd to namespace\n");
-                                    }
-                                } else {
-                                    generic_error!(
-                                        "{} is a {} Node Set\n",
-                                        CStr::from_ptr(arg.as_ptr()).to_string_lossy(),
-                                        nodeset.node_tab.len()
-                                    );
-                                }
-                            } else {
+                            XmlXPathObjectType::XPathBoolean => {
                                 generic_error!(
-                                    "{} is an empty Node Set\n",
+                                    "{} is a Boolean\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathNumber => {
+                                generic_error!(
+                                    "{} is a number\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathString => {
+                                generic_error!(
+                                    "{} is a string\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathPoint => {
+                                generic_error!(
+                                    "{} is a point\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathRange => {
+                                generic_error!(
+                                    "{} is a range\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathLocationset => {
+                                generic_error!(
+                                    "{} is a range\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathUsers => {
+                                generic_error!(
+                                    "{} is user-defined\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathXSLTTree => {
+                                generic_error!(
+                                    "{} is an XSLT value tree\n",
                                     CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                                 );
                             }
                         }
-                        XmlXPathObjectType::XPathBoolean => {
-                            generic_error!(
-                                "{} is a Boolean\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
+                        #[cfg(feature = "xpath")]
+                        {
+                            xml_xpath_free_object(list);
                         }
-                        XmlXPathObjectType::XPathNumber => {
-                            generic_error!(
-                                "{} is a number\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathString => {
-                            generic_error!(
-                                "{} is a string\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathPoint => {
-                            generic_error!(
-                                "{} is a point\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathRange => {
-                            generic_error!(
-                                "{} is a range\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathLocationset => {
-                            generic_error!(
-                                "{} is a range\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathUsers => {
-                            generic_error!(
-                                "{} is user-defined\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathXSLTTree => {
-                            generic_error!(
-                                "{} is an XSLT value tree\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
+                    } else {
+                        generic_error!(
+                            "{}: no such node\n",
+                            CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                        );
                     }
-                    #[cfg(feature = "xpath")]
-                    {
-                        xml_xpath_free_object(list);
-                    }
-                } else {
-                    generic_error!(
-                        "{}: no such node\n",
-                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                    );
+                    (*(*ctxt).pctxt).node = None;
                 }
-
-                (*(*ctxt).pctxt).node = None;
-            }
-        } else if {
-            #[cfg(feature = "libxml_output")]
-            {
-                strcmp(command.as_ptr(), c"cat".as_ptr()) == 0
-            }
-            #[cfg(not(feature = "libxml_output"))]
-            {
-                false
-            }
-        } {
-            #[cfg(feature = "libxml_output")]
-            if arg[0] == 0 {
-                xml_shell_cat(ctxt, null_mut(), (*ctxt).node, None);
-            } else {
-                (*(*ctxt).pctxt).node = (*ctxt).node;
+            } else if strcmp(command.as_ptr(), c"base".as_ptr()) == 0 {
+                xml_shell_base(ctxt, null_mut(), (*ctxt).node, None);
+            } else if strcmp(command.as_ptr(), c"set".as_ptr()) == 0 {
+                xml_shell_set_content(ctxt, arg.as_mut_ptr(), (*ctxt).node, None);
+            } else if {
                 #[cfg(feature = "xpath")]
                 {
-                    (*(*ctxt).pctxt).node = (*ctxt).node;
-                    list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
+                    strcmp(command.as_ptr(), c"setns".as_ptr()) == 0
                 }
                 #[cfg(not(feature = "xpath"))]
                 {
-                    list = null_mut();
+                    false
                 }
-                if !list.is_null() {
-                    match (*list).typ {
-                        XmlXPathObjectType::XPathUndefined => {
-                            generic_error!(
-                                "{}: no such node\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathNodeset => {
-                            if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                                for &node in &nodeset.node_tab {
-                                    if i > 0 {
-                                        writeln!((*ctxt).output, " -------");
-                                    }
-                                    xml_shell_cat(ctxt, null_mut(), Some(node), None);
-                                }
-                            }
-                        }
-                        XmlXPathObjectType::XPathBoolean => {
-                            generic_error!(
-                                "{} is a Boolean\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathNumber => {
-                            generic_error!(
-                                "{} is a number\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathString => {
-                            generic_error!(
-                                "{} is a string\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathPoint => {
-                            generic_error!(
-                                "{} is a point\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathRange => {
-                            generic_error!(
-                                "{} is a range\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XPathLocationset => {
-                            generic_error!(
-                                "{} is a range\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathUsers => {
-                            generic_error!(
-                                "{} is user-defined\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                        XmlXPathObjectType::XPathXSLTTree => {
-                            generic_error!(
-                                "{} is an XSLT value tree\n",
-                                CStr::from_ptr(arg.as_ptr()).to_string_lossy()
-                            );
-                        }
-                    }
-                    #[cfg(feature = "xpath")]
-                    {
-                        xml_xpath_free_object(list);
-                    }
+            } {
+                #[cfg(feature = "xpath")]
+                if arg[0] == 0 {
+                    generic_error!("setns: prefix=[nsuri] required\n");
                 } else {
-                    generic_error!(
-                        "{}: no such node\n",
-                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                    xml_shell_register_namespace(ctxt, arg.as_mut_ptr(), None, None);
+                }
+            } else if {
+                #[cfg(feature = "xpath")]
+                {
+                    strcmp(command.as_ptr(), c"setrootns".as_ptr()) == 0
+                }
+                #[cfg(not(feature = "xpath"))]
+                {
+                    false
+                }
+            } {
+                #[cfg(feature = "xpath")]
+                {
+                    let root = doc.get_root_element();
+                    xml_shell_register_root_namespaces(ctxt, null_mut(), root.unwrap(), None);
+                }
+            } else if {
+                #[cfg(feature = "xpath")]
+                {
+                    strcmp(command.as_ptr(), c"xpath".as_ptr()) == 0
+                }
+                #[cfg(not(feature = "xpath"))]
+                {
+                    false
+                }
+            } {
+                #[cfg(feature = "xpath")]
+                if arg[0] == 0 {
+                    generic_error!("xpath: expression required\n");
+                } else {
+                    (*(*ctxt).pctxt).node = (*ctxt).node;
+                    list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
+                    xml_xpath_debug_dump_object(&mut (*ctxt).output, list, 0);
+                    xml_xpath_free_object(list);
+                }
+            } else if {
+                #[cfg(feature = "libxml_tree")]
+                {
+                    strcmp(command.as_ptr(), c"setbase".as_ptr()) == 0
+                }
+                #[cfg(not(feature = "libxml_tree"))]
+                {
+                    false
+                }
+            } {
+                #[cfg(feature = "libxml_tree")]
+                {
+                    xml_shell_set_base(
+                        ctxt,
+                        Some(CStr::from_ptr(arg.as_mut_ptr()).to_string_lossy().as_ref()),
+                        (*ctxt).node.unwrap(),
+                        None,
                     );
                 }
-                (*(*ctxt).pctxt).node = None;
+            } else if strcmp(command.as_ptr(), c"ls".as_ptr()) == 0
+                || strcmp(command.as_ptr(), c"dir".as_ptr()) == 0
+            {
+                let dir: i32 = (strcmp(command.as_ptr(), c"dir".as_ptr()) == 0) as i32;
+
+                if arg[0] == 0 {
+                    if dir != 0 {
+                        xml_shell_dir(ctxt, null_mut(), (*ctxt).node, None);
+                    } else {
+                        xml_shell_list(ctxt, null_mut(), (*ctxt).node, None);
+                    }
+                } else {
+                    (*(*ctxt).pctxt).node = (*ctxt).node;
+                    #[cfg(feature = "xpath")]
+                    {
+                        (*(*ctxt).pctxt).node = (*ctxt).node;
+                        list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
+                    }
+                    #[cfg(not(feature = "xpath"))]
+                    {
+                        list = null_mut();
+                    }
+                    if !list.is_null() {
+                        match (*list).typ {
+                            XmlXPathObjectType::XPathUndefined => {
+                                generic_error!(
+                                    "{}: no such node\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathNodeset => {
+                                let Some(nodeset) = (*list).nodesetval.as_deref() else {
+                                    break;
+                                };
+
+                                for &node in &nodeset.node_tab {
+                                    if dir != 0 {
+                                        xml_shell_dir(ctxt, null_mut(), Some(node), None);
+                                    } else {
+                                        xml_shell_list(ctxt, null_mut(), Some(node), None);
+                                    }
+                                }
+                            }
+                            XmlXPathObjectType::XPathBoolean => {
+                                generic_error!(
+                                    "{} is a Boolean\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathNumber => {
+                                generic_error!(
+                                    "{} is a number\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathString => {
+                                generic_error!(
+                                    "{} is a string\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathPoint => {
+                                generic_error!(
+                                    "{} is a point\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathRange => {
+                                generic_error!(
+                                    "{} is a range\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathLocationset => {
+                                generic_error!(
+                                    "{} is a range\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathUsers => {
+                                generic_error!(
+                                    "{} is user-defined\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathXSLTTree => {
+                                generic_error!(
+                                    "{} is an XSLT value tree\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                        }
+                        #[cfg(feature = "xpath")]
+                        {
+                            xml_xpath_free_object(list);
+                        }
+                    } else {
+                        generic_error!(
+                            "{}: no such node\n",
+                            CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                        );
+                    }
+                    (*(*ctxt).pctxt).node = None;
+                }
+            } else if strcmp(command.as_ptr(), c"whereis".as_ptr()) == 0 {
+                let mut dir: [c_char; 500] = [0; 500];
+
+                if arg[0] == 0 {
+                    if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, None) == 0 {
+                        let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
+                        writeln!((*ctxt).output, "{dir}");
+                    }
+                } else {
+                    (*(*ctxt).pctxt).node = (*ctxt).node;
+                    #[cfg(feature = "xpath")]
+                    {
+                        list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
+                    }
+                    #[cfg(not(feature = "xpath"))]
+                    {
+                        list = null_mut();
+                    }
+                    if !list.is_null() {
+                        match (*list).typ {
+                            XmlXPathObjectType::XPathUndefined => {
+                                generic_error!(
+                                    "{}: no such node\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathNodeset => {
+                                if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                                    for &node in &nodeset.node_tab {
+                                        if xml_shell_pwd(ctxt, dir.as_mut_ptr(), Some(node), None)
+                                            == 0
+                                        {
+                                            let dir =
+                                                CStr::from_ptr(dir.as_ptr()).to_string_lossy();
+                                            writeln!((*ctxt).output, "{dir}");
+                                        }
+                                    }
+                                }
+                            }
+                            XmlXPathObjectType::XPathBoolean => {
+                                generic_error!(
+                                    "{} is a Boolean\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathNumber => {
+                                generic_error!(
+                                    "{} is a number\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathString => {
+                                generic_error!(
+                                    "{} is a string\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathPoint => {
+                                generic_error!(
+                                    "{} is a point\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathRange => {
+                                generic_error!(
+                                    "{} is a range\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathLocationset => {
+                                generic_error!(
+                                    "{} is a range\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathUsers => {
+                                generic_error!(
+                                    "{} is user-defined\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathXSLTTree => {
+                                generic_error!(
+                                    "{} is an XSLT value tree\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                        }
+                        #[cfg(feature = "xpath")]
+                        {
+                            xml_xpath_free_object(list);
+                        }
+                    } else {
+                        generic_error!(
+                            "{}: no such node\n",
+                            CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                        );
+                    }
+                    (*(*ctxt).pctxt).node = None;
+                }
+            } else if strcmp(command.as_ptr(), c"cd".as_ptr()) == 0 {
+                if arg[0] == 0 {
+                    (*ctxt).node = Some(doc.into());
+                } else {
+                    #[cfg(feature = "xpath")]
+                    {
+                        (*(*ctxt).pctxt).node = (*ctxt).node;
+                        let l = strlen(arg.as_ptr());
+                        if l >= 2 && arg[l - 1] == b'/' as _ {
+                            arg[l - 1] = 0;
+                        }
+                        list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
+                    }
+                    #[cfg(not(feature = "xpath"))]
+                    {
+                        list = null_mut();
+                    }
+                    if !list.is_null() {
+                        match (*list).typ {
+                            XmlXPathObjectType::XPathUndefined => {
+                                generic_error!(
+                                    "{}: no such node\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathNodeset => {
+                                if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                                    if nodeset.node_tab.len() == 1 {
+                                        (*ctxt).node = Some(nodeset.node_tab[0]);
+                                        if (*ctxt)
+                                            .node
+                                            .take_if(|node| {
+                                                node.element_type()
+                                                    == XmlElementType::XmlNamespaceDecl
+                                            })
+                                            .is_some()
+                                        {
+                                            generic_error!("cannot cd to namespace\n");
+                                        }
+                                    } else {
+                                        generic_error!(
+                                            "{} is a {} Node Set\n",
+                                            CStr::from_ptr(arg.as_ptr()).to_string_lossy(),
+                                            nodeset.node_tab.len()
+                                        );
+                                    }
+                                } else {
+                                    generic_error!(
+                                        "{} is an empty Node Set\n",
+                                        CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                    );
+                                }
+                            }
+                            XmlXPathObjectType::XPathBoolean => {
+                                generic_error!(
+                                    "{} is a Boolean\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathNumber => {
+                                generic_error!(
+                                    "{} is a number\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathString => {
+                                generic_error!(
+                                    "{} is a string\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathPoint => {
+                                generic_error!(
+                                    "{} is a point\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathRange => {
+                                generic_error!(
+                                    "{} is a range\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathLocationset => {
+                                generic_error!(
+                                    "{} is a range\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathUsers => {
+                                generic_error!(
+                                    "{} is user-defined\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathXSLTTree => {
+                                generic_error!(
+                                    "{} is an XSLT value tree\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                        }
+                        #[cfg(feature = "xpath")]
+                        {
+                            xml_xpath_free_object(list);
+                        }
+                    } else {
+                        generic_error!(
+                            "{}: no such node\n",
+                            CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                        );
+                    }
+
+                    (*(*ctxt).pctxt).node = None;
+                }
+            } else if {
+                #[cfg(feature = "libxml_output")]
+                {
+                    strcmp(command.as_ptr(), c"cat".as_ptr()) == 0
+                }
+                #[cfg(not(feature = "libxml_output"))]
+                {
+                    false
+                }
+            } {
+                #[cfg(feature = "libxml_output")]
+                if arg[0] == 0 {
+                    xml_shell_cat(ctxt, null_mut(), (*ctxt).node, None);
+                } else {
+                    (*(*ctxt).pctxt).node = (*ctxt).node;
+                    #[cfg(feature = "xpath")]
+                    {
+                        (*(*ctxt).pctxt).node = (*ctxt).node;
+                        list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
+                    }
+                    #[cfg(not(feature = "xpath"))]
+                    {
+                        list = null_mut();
+                    }
+                    if !list.is_null() {
+                        match (*list).typ {
+                            XmlXPathObjectType::XPathUndefined => {
+                                generic_error!(
+                                    "{}: no such node\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathNodeset => {
+                                if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                                    for &node in &nodeset.node_tab {
+                                        if i > 0 {
+                                            writeln!((*ctxt).output, " -------");
+                                        }
+                                        xml_shell_cat(ctxt, null_mut(), Some(node), None);
+                                    }
+                                }
+                            }
+                            XmlXPathObjectType::XPathBoolean => {
+                                generic_error!(
+                                    "{} is a Boolean\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathNumber => {
+                                generic_error!(
+                                    "{} is a number\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathString => {
+                                generic_error!(
+                                    "{} is a string\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathPoint => {
+                                generic_error!(
+                                    "{} is a point\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathRange => {
+                                generic_error!(
+                                    "{} is a range\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathLocationset => {
+                                generic_error!(
+                                    "{} is a range\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathUsers => {
+                                generic_error!(
+                                    "{} is user-defined\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                            XmlXPathObjectType::XPathXSLTTree => {
+                                generic_error!(
+                                    "{} is an XSLT value tree\n",
+                                    CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                                );
+                            }
+                        }
+                        #[cfg(feature = "xpath")]
+                        {
+                            xml_xpath_free_object(list);
+                        }
+                    } else {
+                        generic_error!(
+                            "{}: no such node\n",
+                            CStr::from_ptr(arg.as_ptr()).to_string_lossy()
+                        );
+                    }
+                    (*(*ctxt).pctxt).node = None;
+                }
+            } else {
+                generic_error!(
+                    "Unknown command {}\n",
+                    CStr::from_ptr(command.as_ptr()).to_string_lossy()
+                );
             }
-        } else {
-            generic_error!(
-                "Unknown command {}\n",
-                CStr::from_ptr(command.as_ptr()).to_string_lossy()
-            );
+            free(cmdline as _); /* not xmlFree here ! */
+            // cmdline = null_mut();
         }
-        free(cmdline as _); /* not xmlFree here ! */
-        // cmdline = null_mut();
-    }
-    #[cfg(feature = "xpath")]
-    {
-        xml_xpath_free_context((*ctxt).pctxt);
-    }
-    if (*ctxt).loaded != 0 {
-        xml_free_doc(doc);
-    }
-    if !(*ctxt).filename.is_null() {
-        xml_free((*ctxt).filename as _);
-    }
-    xml_free(ctxt as _);
-    if !cmdline.is_null() {
-        free(cmdline as _); /* not xmlFree here ! */
+        #[cfg(feature = "xpath")]
+        {
+            xml_xpath_free_context((*ctxt).pctxt);
+        }
+        if (*ctxt).loaded != 0 {
+            xml_free_doc(doc);
+        }
+        if !(*ctxt).filename.is_null() {
+            xml_free((*ctxt).filename as _);
+        }
+        xml_free(ctxt as _);
+        if !cmdline.is_null() {
+            free(cmdline as _); /* not xmlFree here ! */
+        }
     }
 }
 

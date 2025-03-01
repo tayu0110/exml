@@ -27,25 +27,27 @@ pub unsafe fn split_qname<'a>(
     ctxt: &mut XmlParserCtxt,
     name: &'a str,
 ) -> (Option<&'a str>, &'a str) {
-    // nasty but well=formed
-    if name.starts_with(':') {
-        return (None, name);
+    unsafe {
+        // nasty but well=formed
+        if name.starts_with(':') {
+            return (None, name);
+        }
+        let Some((prefix, local)) = name.split_once(':').filter(|qname| !qname.1.is_empty()) else {
+            return (None, name);
+        };
+        if local.starts_with(|c| {
+            // Check that the first character is proper to start a new name
+            !xml_is_letter(c as u32) && c != '_'
+        }) {
+            xml_fatal_err_msg_str!(
+                ctxt,
+                XmlParserErrors::XmlNsErrQname,
+                "Name {} is not XML Namespace compliant\n",
+                name
+            );
+        }
+        (Some(prefix), local)
     }
-    let Some((prefix, local)) = name.split_once(':').filter(|qname| !qname.1.is_empty()) else {
-        return (None, name);
-    };
-    if local.starts_with(|c| {
-        // Check that the first character is proper to start a new name
-        !xml_is_letter(c as u32) && c != '_'
-    }) {
-        xml_fatal_err_msg_str!(
-            ctxt,
-            XmlParserErrors::XmlNsErrQname,
-            "Name {} is not XML Namespace compliant\n",
-            name
-        );
-    }
-    (Some(prefix), local)
 }
 
 /// Parse an XML qualified name string

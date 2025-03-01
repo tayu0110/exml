@@ -26,12 +26,12 @@
 use std::{
     borrow::Cow,
     fs::File,
-    io::{self, stdout, ErrorKind, Read, Write},
+    io::{self, ErrorKind, Read, Write, stdout},
     net::{TcpStream, ToSocketAddrs},
     str::from_utf8,
     sync::{
-        atomic::{AtomicBool, AtomicI32, Ordering},
         Mutex,
+        atomic::{AtomicBool, AtomicI32, Ordering},
     },
 };
 
@@ -428,7 +428,7 @@ fn xml_nanohttp_hostname_match(pattern: &str, hostname: &str) -> bool {
     let mut hc = hostname.chars().rev();
 
     for (p, h) in pc.by_ref().zip(hc.by_ref()) {
-        if p.to_ascii_lowercase() != h.to_ascii_lowercase() {
+        if !p.eq_ignore_ascii_case(&h) {
             return false;
         }
     }

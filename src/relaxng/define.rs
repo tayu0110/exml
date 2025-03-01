@@ -1,16 +1,16 @@
 use std::{ffi::c_void, ptr::null_mut};
 
 use crate::{
-    hash::{xml_hash_free, XmlHashTablePtr},
+    hash::{XmlHashTablePtr, xml_hash_free},
     libxml::{
         globals::{xml_free, xml_malloc},
-        relaxng::{xml_relaxng_free_partition, XmlRelaxNGPartitionPtr, XmlRelaxNGType},
-        xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr},
+        relaxng::{XmlRelaxNGPartitionPtr, XmlRelaxNGType, xml_relaxng_free_partition},
+        xmlregexp::{XmlRegexpPtr, xml_reg_free_regexp},
     },
     tree::XmlNodePtr,
 };
 
-use super::{xml_rng_perr_memory, XmlRelaxNGParserCtxtPtr, XmlRelaxNGTypeLibraryPtr};
+use super::{XmlRelaxNGParserCtxtPtr, XmlRelaxNGTypeLibraryPtr, xml_rng_perr_memory};
 
 pub type XmlRelaxNGDefinePtr = *mut XmlRelaxNGDefine;
 
@@ -94,50 +94,54 @@ pub(crate) unsafe fn xml_relaxng_new_define(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: Option<XmlNodePtr>,
 ) -> XmlRelaxNGDefinePtr {
-    let ret: XmlRelaxNGDefinePtr = xml_malloc(size_of::<XmlRelaxNGDefine>()) as _;
-    if ret.is_null() {
-        xml_rng_perr_memory(ctxt, Some("allocating define\n"));
-        return null_mut();
+    unsafe {
+        let ret: XmlRelaxNGDefinePtr = xml_malloc(size_of::<XmlRelaxNGDefine>()) as _;
+        if ret.is_null() {
+            xml_rng_perr_memory(ctxt, Some("allocating define\n"));
+            return null_mut();
+        }
+        std::ptr::write(&mut *ret, XmlRelaxNGDefine::default());
+        (*ctxt).def_tab.push(ret);
+        (*ret).node = node;
+        (*ret).depth = -1;
+        ret
     }
-    std::ptr::write(&mut *ret, XmlRelaxNGDefine::default());
-    (*ctxt).def_tab.push(ret);
-    (*ret).node = node;
-    (*ret).depth = -1;
-    ret
 }
 
 /// Deallocate a RelaxNG define structure.
 #[doc(alias = "xmlRelaxNGFreeDefine")]
 pub(crate) unsafe fn xml_relaxng_free_define(define: XmlRelaxNGDefinePtr) {
-    if define.is_null() {
-        return;
-    }
+    unsafe {
+        if define.is_null() {
+            return;
+        }
 
-    if (*define).typ == XmlRelaxNGType::Value && !(*define).attrs.is_null() {
-        let lib: XmlRelaxNGTypeLibraryPtr = (*define).data as _;
-        if !lib.is_null() {
-            if let Some(freef) = (*lib).freef {
-                freef((*lib).data, (*define).attrs as _);
+        if (*define).typ == XmlRelaxNGType::Value && !(*define).attrs.is_null() {
+            let lib: XmlRelaxNGTypeLibraryPtr = (*define).data as _;
+            if !lib.is_null() {
+                if let Some(freef) = (*lib).freef {
+                    freef((*lib).data, (*define).attrs as _);
+                }
             }
         }
+        if !(*define).data.is_null() && (*define).typ == XmlRelaxNGType::Interleave {
+            xml_relaxng_free_partition((*define).data as XmlRelaxNGPartitionPtr);
+        }
+        if !(*define).data.is_null() && (*define).typ == XmlRelaxNGType::Choice {
+            xml_hash_free((*define).data as XmlHashTablePtr, None);
+        }
+        if !(*define).name.is_null() {
+            xml_free((*define).name as _);
+        }
+        if !(*define).ns.is_null() {
+            xml_free((*define).ns as _);
+        }
+        if !(*define).value.is_null() {
+            xml_free((*define).value as _);
+        }
+        if !(*define).cont_model.is_null() {
+            xml_reg_free_regexp((*define).cont_model);
+        }
+        xml_free(define as _);
     }
-    if !(*define).data.is_null() && (*define).typ == XmlRelaxNGType::Interleave {
-        xml_relaxng_free_partition((*define).data as XmlRelaxNGPartitionPtr);
-    }
-    if !(*define).data.is_null() && (*define).typ == XmlRelaxNGType::Choice {
-        xml_hash_free((*define).data as XmlHashTablePtr, None);
-    }
-    if !(*define).name.is_null() {
-        xml_free((*define).name as _);
-    }
-    if !(*define).ns.is_null() {
-        xml_free((*define).ns as _);
-    }
-    if !(*define).value.is_null() {
-        xml_free((*define).value as _);
-    }
-    if !(*define).cont_model.is_null() {
-        xml_reg_free_regexp((*define).cont_model);
-    }
-    xml_free(define as _);
 }

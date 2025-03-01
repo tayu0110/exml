@@ -43,7 +43,7 @@ use crate::{
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
     tree::{
-        XmlBufferAllocationScheme, XmlGenericNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS,
+        __XML_REGISTER_CALLBACKS, BASE_BUFFER_SIZE, XmlBufferAllocationScheme, XmlGenericNodePtr,
     },
 };
 
@@ -54,16 +54,16 @@ use super::{
         xml_sax2_get_system_id,
     },
     threads::{
-        xml_cleanup_mutex, xml_get_global_state, xml_init_mutex, xml_mutex_lock, xml_mutex_unlock,
-        XmlMutex, __xml_global_init_mutex_destroy,
+        __xml_global_init_mutex_destroy, XmlMutex, xml_cleanup_mutex, xml_get_global_state,
+        xml_init_mutex, xml_mutex_lock, xml_mutex_unlock,
     },
-    xmlstring::{xml_char_strdup, xml_strdup, XmlChar},
+    xmlstring::{XmlChar, xml_char_strdup, xml_strdup},
 };
 
 #[doc(alias = "xmlInitGlobals")]
 #[deprecated = "Alias for xmlInitParser"]
 pub unsafe extern "C" fn xml_init_globals() {
-    xml_init_parser();
+    unsafe { xml_init_parser() };
 }
 
 /// DEPRECATED: This function is a no-op. Call xmlCleanupParser
@@ -177,14 +177,6 @@ pub(crate) static _XML_INDENT_TREE_OUTPUT: AtomicI32 = AtomicI32::new(1);
 static mut XML_INDENT_TREE_OUTPUT_THR_DEF: i32 = 1;
 
 /**
- * xmlTreeIndentString:
- *
- * The string used to do one-level indent. By default is equal to "  " (two spaces)
- */
-// pub(crate) static _XML_TREE_INDENT_STRING: AtomicPtr<c_char> = AtomicPtr::new(c"  ".as_ptr() as _);
-// static XML_TREE_INDENT_STRING_THR_DEF: AtomicPtr<c_char> = AtomicPtr::new(c"  ".as_ptr() as _);
-
-/**
  * xmlKeepBlanksDefaultValue:
  *
  * DEPRECATED: Use the modern options API with XML_PARSE_NOBLANKS.
@@ -271,24 +263,6 @@ static mut XML_SAVE_NO_EMPTY_TAGS_THR_DEF: i32 = 0;
 pub(crate) static _XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(0);
 static mut XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF: i32 = 0;
 
-// /**
-//  * xmlGenericError:
-//  *
-//  * Global setting: function used for generic error callbacks
-//  */
-// pub(crate) static mut _XML_GENERIC_ERROR: Option<XmlGenericErrorFunc> =
-//     Some(xml_generic_error_default_func);
-// static mut XML_GENERIC_ERROR_THR_DEF: Option<XmlGenericErrorFunc> =
-//     Some(xml_generic_error_default_func);
-
-/**
- * xmlStructuredError:
- *
- * Global setting: function used for structured error callbacks
- */
-// pub(crate) static mut _XML_STRUCTURED_ERROR: Option<XmlStructuredErrorFunc> = None;
-// static mut XML_STRUCTURED_ERROR_THR_DEF: Option<XmlStructuredErrorFunc> = None;
-
 /**
  * xmlGenericErrorContext:
  *
@@ -303,7 +277,7 @@ static mut XML_GENERIC_ERROR_CONTEXT_THR_DEF: AtomicPtr<c_void> = AtomicPtr::new
  * Global setting passed to structured error callbacks
  */
 pub(crate) static _XML_STRUCTURED_ERROR_CONTEXT: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
-static mut XML_STRUCTURED_ERROR_CONTEXT_THR_DEF: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
+static XML_STRUCTURED_ERROR_CONTEXT_THR_DEF: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
 
 /**
  * xmlRegisterNodeDefaultValue:
@@ -325,43 +299,46 @@ static mut XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF: Option<XmlDeregisterNodeFu
 /// default values of the library.
 #[doc(alias = "xmlInitializeGlobalState")]
 pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
-    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    unsafe {
+        xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
-    (*gs).old_xml_wd_compatibility = 0;
-    (*gs).xml_buffer_alloc_scheme = XML_BUFFER_ALLOC_SCHEME_THR_DEF;
-    (*gs).xml_default_buffer_size = XML_DEFAULT_BUFFER_SIZE_THR_DEF;
-    (*gs).xml_default_sax_locator.get_public_id = xml_sax2_get_public_id;
-    (*gs).xml_default_sax_locator.get_system_id = xml_sax2_get_system_id;
-    (*gs).xml_default_sax_locator.get_line_number = xml_sax2_get_line_number;
-    (*gs).xml_default_sax_locator.get_column_number = xml_sax2_get_column_number;
-    (*gs).xml_do_validity_checking_default_value = XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF;
-    (*gs).xml_free = Some(free as XmlFreeFunc);
-    (*gs).xml_malloc = Some(malloc as XmlMallocFunc);
-    (*gs).xml_malloc_atomic = Some(malloc as XmlMallocFunc);
-    (*gs).xml_realloc = Some(realloc as XmlReallocFunc);
-    (*gs).xml_mem_strdup = Some(xml_strdup as XmlStrdupFunc);
-    (*gs).xml_get_warnings_default_value = XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF;
-    (*gs).xml_indent_tree_output = XML_INDENT_TREE_OUTPUT_THR_DEF;
-    (*gs).xml_keep_blanks_default_value = XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF;
-    (*gs).xml_line_numbers_default_value = XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF;
-    (*gs).xml_load_ext_dtd_default_value = XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF;
-    (*gs).xml_parser_debug_entities = XML_PARSER_DEBUG_ENTITIES_THR_DEF;
-    (*gs).xml_pedantic_parser_default_value = XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF;
-    (*gs).xml_substitute_entities_default_value = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
-    (*gs).xml_structured_error_context.store(
-        XML_STRUCTURED_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
-        Ordering::Relaxed,
-    );
-    (*gs).xml_register_node_default_value = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
-    (*gs).xml_deregister_node_default_value = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
+        (*gs).old_xml_wd_compatibility = 0;
+        (*gs).xml_buffer_alloc_scheme = XML_BUFFER_ALLOC_SCHEME_THR_DEF;
+        (*gs).xml_default_buffer_size = XML_DEFAULT_BUFFER_SIZE_THR_DEF;
+        (*gs).xml_default_sax_locator.get_public_id = xml_sax2_get_public_id;
+        (*gs).xml_default_sax_locator.get_system_id = xml_sax2_get_system_id;
+        (*gs).xml_default_sax_locator.get_line_number = xml_sax2_get_line_number;
+        (*gs).xml_default_sax_locator.get_column_number = xml_sax2_get_column_number;
+        (*gs).xml_do_validity_checking_default_value =
+            XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF;
+        (*gs).xml_free = Some(free as XmlFreeFunc);
+        (*gs).xml_malloc = Some(malloc as XmlMallocFunc);
+        (*gs).xml_malloc_atomic = Some(malloc as XmlMallocFunc);
+        (*gs).xml_realloc = Some(realloc as XmlReallocFunc);
+        (*gs).xml_mem_strdup = Some(xml_strdup as XmlStrdupFunc);
+        (*gs).xml_get_warnings_default_value = XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF;
+        (*gs).xml_indent_tree_output = XML_INDENT_TREE_OUTPUT_THR_DEF;
+        (*gs).xml_keep_blanks_default_value = XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF;
+        (*gs).xml_line_numbers_default_value = XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF;
+        (*gs).xml_load_ext_dtd_default_value = XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF;
+        (*gs).xml_parser_debug_entities = XML_PARSER_DEBUG_ENTITIES_THR_DEF;
+        (*gs).xml_pedantic_parser_default_value = XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF;
+        (*gs).xml_substitute_entities_default_value = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
+        (*gs).xml_structured_error_context.store(
+            XML_STRUCTURED_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
+            Ordering::Relaxed,
+        );
+        (*gs).xml_register_node_default_value = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
+        (*gs).xml_deregister_node_default_value = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
 
-    memset(
-        addr_of_mut!((*gs).xml_last_error) as _,
-        0,
-        size_of::<XmlError>(),
-    );
+        memset(
+            addr_of_mut!((*gs).xml_last_error) as _,
+            0,
+            size_of::<XmlError>(),
+        );
 
-    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+        xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    }
 }
 
 /// Registers a callback for node creation
@@ -371,22 +348,22 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
 pub unsafe fn xml_register_node_default(
     func: Option<XmlRegisterNodeFunc>,
 ) -> Option<XmlRegisterNodeFunc> {
-    let old = _XML_REGISTER_NODE_DEFAULT_VALUE;
+    let old = unsafe { _XML_REGISTER_NODE_DEFAULT_VALUE };
 
     __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
-    _XML_REGISTER_NODE_DEFAULT_VALUE = func;
+    unsafe { _XML_REGISTER_NODE_DEFAULT_VALUE = func };
     old
 }
 
 pub unsafe fn xml_thr_def_register_node_default(
     func: XmlRegisterNodeFunc,
 ) -> Option<XmlRegisterNodeFunc> {
-    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    let old = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
+    unsafe { xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX)) };
+    let old = unsafe { XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF };
 
     __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
-    XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF = Some(func);
-    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+    unsafe { XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF = Some(func) };
+    unsafe { xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX)) };
 
     old
 }
@@ -398,24 +375,26 @@ pub unsafe fn xml_thr_def_register_node_default(
 pub unsafe fn xml_deregister_node_default(
     func: XmlDeregisterNodeFunc,
 ) -> Option<XmlDeregisterNodeFunc> {
-    let old = _XML_DEREGISTER_NODE_DEFAULT_VALUE;
+    let old = unsafe { _XML_DEREGISTER_NODE_DEFAULT_VALUE };
 
     __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
-    _XML_DEREGISTER_NODE_DEFAULT_VALUE = Some(func);
+    unsafe { _XML_DEREGISTER_NODE_DEFAULT_VALUE = Some(func) };
     old
 }
 
 pub unsafe fn xml_thr_def_deregister_node_default(
     func: XmlDeregisterNodeFunc,
 ) -> Option<XmlDeregisterNodeFunc> {
-    xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-    let old = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
+    unsafe {
+        xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
+        let old = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
 
-    __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
-    XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF = Some(func);
-    xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
+        __XML_REGISTER_CALLBACKS.store(1, Ordering::Relaxed);
+        XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF = Some(func);
+        xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
-    old
+        old
+    }
 }
 
 // Helpful Macro
@@ -433,7 +412,7 @@ macro_rules! IS_MAIN_THREAD {
 #[doc(alias = "xmlMalloc")]
 pub(in crate::libxml) static mut _XML_MALLOC: Option<XmlMallocFunc> = Some(malloc);
 pub unsafe extern "C" fn xml_malloc(size: usize) -> *mut c_void {
-    _XML_MALLOC.expect("Failed to allocate memory : _XML_MALLOC is None")(size)
+    unsafe { _XML_MALLOC.expect("Failed to allocate memory : _XML_MALLOC is None")(size) }
 }
 
 pub fn set_xml_malloc(malloc: Option<XmlMallocFunc>) {
@@ -450,7 +429,7 @@ pub fn set_xml_malloc(malloc: Option<XmlMallocFunc>) {
 #[doc(alias = "xmlMallocAtomic")]
 pub(in crate::libxml) static mut _XML_MALLOC_ATOMIC: XmlMallocFunc = malloc;
 pub unsafe extern "C" fn xml_malloc_atomic(size: usize) -> *mut c_void {
-    _XML_MALLOC_ATOMIC(size)
+    unsafe { _XML_MALLOC_ATOMIC(size) }
 }
 /// The variable holding the libxml realloc() implementation
 ///
@@ -458,7 +437,7 @@ pub unsafe extern "C" fn xml_malloc_atomic(size: usize) -> *mut c_void {
 #[doc(alias = "xmlRealloc")]
 pub(in crate::libxml) static mut _XML_REALLOC: Option<XmlReallocFunc> = Some(realloc);
 pub unsafe extern "C" fn xml_realloc(mem: *mut c_void, size: usize) -> *mut c_void {
-    _XML_REALLOC.expect("Failed to reallocate memory : _XML_REALLOC is None")(mem, size)
+    unsafe { _XML_REALLOC.expect("Failed to reallocate memory : _XML_REALLOC is None")(mem, size) }
 }
 pub fn set_xml_realloc(realloc: Option<XmlReallocFunc>) {
     unsafe {
@@ -470,7 +449,9 @@ pub fn set_xml_realloc(realloc: Option<XmlReallocFunc>) {
 #[doc(alias = "xmlFree")]
 pub(in crate::libxml) static mut _XML_FREE: Option<XmlFreeFunc> = Some(free);
 pub unsafe extern "C" fn xml_free(mem: *mut c_void) {
-    _XML_FREE.expect("Failed to deallocate memory : _XML_FREE is None")(mem);
+    unsafe {
+        _XML_FREE.expect("Failed to deallocate memory : _XML_FREE is None")(mem);
+    }
 }
 pub fn set_xml_free(free: Option<XmlFreeFunc>) {
     unsafe {
@@ -484,7 +465,7 @@ pub fn set_xml_free(free: Option<XmlFreeFunc>) {
 /// Returns a new xmlChar * or NULL
 #[doc(alias = "xmlPosixStrdup")]
 unsafe extern "C" fn xml_posix_strdup(cur: *const XmlChar) -> *mut XmlChar {
-    xml_char_strdup(cur as _) as _
+    unsafe { xml_char_strdup(cur as _) as _ }
 }
 /// The variable holding the libxml strdup() implementation
 ///
@@ -492,7 +473,9 @@ unsafe extern "C" fn xml_posix_strdup(cur: *const XmlChar) -> *mut XmlChar {
 #[doc(alias = "xmlMemStrdup")]
 pub(in crate::libxml) static mut _XML_MEM_STRDUP: Option<XmlStrdupFunc> = Some(xml_posix_strdup);
 pub unsafe extern "C" fn xml_mem_strdup(str: *const XmlChar) -> *mut XmlChar {
-    _XML_MEM_STRDUP.expect("Failed to duplicate xml string : _XML_MEM_STRDUP is None")(str)
+    unsafe {
+        _XML_MEM_STRDUP.expect("Failed to duplicate xml string : _XML_MEM_STRDUP is None")(str)
+    }
 }
 pub fn set_xml_mem_strdup(mem_strdup: Option<XmlStrdupFunc>) {
     unsafe {
@@ -503,10 +486,12 @@ pub fn set_xml_mem_strdup(mem_strdup: Option<XmlStrdupFunc>) {
 
 #[deprecated]
 pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSAXLocator {
-    if IS_MAIN_THREAD!() != 0 {
-        addr_of_mut!(_XML_DEFAULT_SAXLOCATOR)
-    } else {
-        addr_of_mut!((*xml_get_global_state()).xml_default_sax_locator)
+    unsafe {
+        if IS_MAIN_THREAD!() != 0 {
+            addr_of_mut!(_XML_DEFAULT_SAXLOCATOR)
+        } else {
+            addr_of_mut!((*xml_get_global_state()).xml_default_sax_locator)
+        }
     }
 }
 
@@ -526,37 +511,41 @@ static mut _XML_DEFAULT_SAXLOCATOR: XmlSAXLocator = XmlSAXLocator {
 };
 
 pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSAXLocator {
-    __xml_default_sax_locator()
+    unsafe { __xml_default_sax_locator() }
 }
 
 #[deprecated]
 pub unsafe fn __xml_register_node_default_value() -> XmlRegisterNodeFunc {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_REGISTER_NODE_DEFAULT_VALUE.unwrap()
-    } else {
-        (*xml_get_global_state())
-            .xml_register_node_default_value
-            .unwrap()
+    unsafe {
+        if IS_MAIN_THREAD!() != 0 {
+            _XML_REGISTER_NODE_DEFAULT_VALUE.unwrap()
+        } else {
+            (*xml_get_global_state())
+                .xml_register_node_default_value
+                .unwrap()
+        }
     }
 }
 
 pub unsafe fn xml_register_node_default_value(node: XmlGenericNodePtr) {
-    __xml_register_node_default_value()(node)
+    unsafe { __xml_register_node_default_value()(node) }
 }
 
 #[deprecated]
 pub unsafe fn __xml_deregister_node_default_value() -> XmlDeregisterNodeFunc {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()
-    } else {
-        (*xml_get_global_state())
-            .xml_deregister_node_default_value
-            .unwrap()
+    unsafe {
+        if IS_MAIN_THREAD!() != 0 {
+            _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()
+        } else {
+            (*xml_get_global_state())
+                .xml_deregister_node_default_value
+                .unwrap()
+        }
     }
 }
 
 pub unsafe fn xml_deregister_node_default_value(node: XmlGenericNodePtr) {
-    __xml_deregister_node_default_value()(node)
+    unsafe { __xml_deregister_node_default_value()(node) }
 }
 
 /**
@@ -565,7 +554,9 @@ pub unsafe fn xml_deregister_node_default_value(node: XmlGenericNodePtr) {
  * Additional initialisation for multi-threading
  */
 pub(crate) unsafe extern "C" fn xml_init_globals_internal() {
-    xml_init_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
+    unsafe {
+        xml_init_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
+    }
 }
 
 /**
@@ -574,8 +565,10 @@ pub(crate) unsafe extern "C" fn xml_init_globals_internal() {
  * Additional cleanup for multi-threading
  */
 pub(crate) unsafe extern "C" fn xml_cleanup_globals_internal() {
-    reset_last_error();
+    unsafe {
+        reset_last_error();
 
-    xml_cleanup_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
-    __xml_global_init_mutex_destroy();
+        xml_cleanup_mutex(addr_of_mut!(XML_THR_DEF_MUTEX));
+        __xml_global_init_mutex_destroy();
+    }
 }

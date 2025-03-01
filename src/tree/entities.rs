@@ -24,27 +24,27 @@ use std::io::Write;
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::{c_char, CStr, CString},
+    ffi::{CStr, CString, c_char},
     ops::{Deref, DerefMut},
     os::raw::c_void,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
 };
 
 use libc::{size_t, snprintf, strchr};
 
 use crate::{
     error::{
-        XmlErrorDomain, XmlParserErrors, __xml_raise_error, __xml_simple_error,
-        __xml_simple_oom_error,
+        __xml_raise_error, __xml_simple_error, __xml_simple_oom_error, XmlErrorDomain,
+        XmlParserErrors,
     },
     hash::{CVoidWrapper, XmlHashTableRef},
     libxml::{
         chvalid::xml_is_char,
         globals::{xml_free, xml_malloc},
-        hash::{xml_hash_create, XmlHashTable},
-        xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
+        hash::{XmlHashTable, xml_hash_create},
+        xmlstring::{XmlChar, xml_strchr, xml_strdup, xml_strndup, xml_strstr},
     },
-    tree::{xml_free_node_list, NodeCommon, XmlElementType},
+    tree::{NodeCommon, XmlElementType, xml_free_node_list},
 };
 
 use super::{InvalidNodePointerCastError, XmlDocPtr, XmlDtdPtr, XmlGenericNodePtr, XmlNodePtr};
@@ -202,15 +202,17 @@ impl XmlEntityPtr {
     pub(crate) unsafe fn from_raw(
         ptr: *mut XmlEntity,
     ) -> Result<Option<Self>, InvalidNodePointerCastError> {
-        if ptr.is_null() {
-            return Ok(None);
-        }
-        match (*ptr).element_type() {
-            XmlElementType::XmlEntityDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
-            _ => Err(InvalidNodePointerCastError {
-                from: (*ptr).element_type(),
-                to: type_name::<Self>(),
-            }),
+        unsafe {
+            if ptr.is_null() {
+                return Ok(None);
+            }
+            match (*ptr).element_type() {
+                XmlElementType::XmlEntityDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+                _ => Err(InvalidNodePointerCastError {
+                    from: (*ptr).element_type(),
+                    to: type_name::<Self>(),
+                }),
+            }
         }
     }
 
@@ -224,7 +226,9 @@ impl XmlEntityPtr {
     /// This method should be called only once.  
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn free(self) {
-        let _ = *Box::from_raw(self.0.as_ptr());
+        unsafe {
+            let _ = *Box::from_raw(self.0.as_ptr());
+        }
     }
 
     /// Acquire the ownership of the inner value.  
@@ -234,7 +238,7 @@ impl XmlEntityPtr {
     /// This method should be called only once.  
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn into_inner(self) -> Box<XmlEntity> {
-        Box::from_raw(self.0.as_ptr())
+        unsafe { Box::from_raw(self.0.as_ptr()) }
     }
 }
 
@@ -330,7 +334,9 @@ pub type XmlEntitiesTablePtr = *mut XmlEntitiesTable;
 /// Handle an out of memory condition
 #[doc(alias = "xmlEntitiesErrMemory")]
 unsafe fn xml_entities_err_memory(extra: &str) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, None, Some(extra));
+    unsafe {
+        __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, None, Some(extra));
+    }
 }
 
 /// internal routine doing the entity node structures allocations
@@ -342,39 +348,41 @@ unsafe fn xml_create_entity(
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    let Some(mut ret) = XmlEntityPtr::new(XmlEntity {
-        typ: XmlElementType::XmlEntityDecl,
-        etype: typ,
-        name: xml_strndup(name.as_ptr(), name.len() as i32),
-        ..Default::default()
-    }) else {
-        xml_entities_err_memory("xmlCreateEntity: malloc failed");
-        return None;
-    };
+    unsafe {
+        let Some(mut ret) = XmlEntityPtr::new(XmlEntity {
+            typ: XmlElementType::XmlEntityDecl,
+            etype: typ,
+            name: xml_strndup(name.as_ptr(), name.len() as i32),
+            ..Default::default()
+        }) else {
+            xml_entities_err_memory("xmlCreateEntity: malloc failed");
+            return None;
+        };
 
-    // fill the structure.
-    if let Some(external_id) = external_id {
-        let external_id = CString::new(external_id).unwrap();
-        ret.external_id = xml_strdup(external_id.as_ptr() as *const u8);
-    }
-    if let Some(system_id) = system_id {
-        let system_id = CString::new(system_id).unwrap();
-        ret.system_id = xml_strdup(system_id.as_ptr() as *const u8);
-    }
-    if let Some(content) = content {
-        ret.length = content.len() as i32;
-        let content = CString::new(content).unwrap();
-        ret.content = xml_strndup(content.as_ptr() as *const u8, ret.length);
-    } else {
-        ret.length = 0;
-        ret.content = null_mut();
-    }
-    // to be computed by the layer knowing the defining entity
-    ret.uri = null_mut();
-    ret.orig = null_mut();
-    ret.owner = 0;
+        // fill the structure.
+        if let Some(external_id) = external_id {
+            let external_id = CString::new(external_id).unwrap();
+            ret.external_id = xml_strdup(external_id.as_ptr() as *const u8);
+        }
+        if let Some(system_id) = system_id {
+            let system_id = CString::new(system_id).unwrap();
+            ret.system_id = xml_strdup(system_id.as_ptr() as *const u8);
+        }
+        if let Some(content) = content {
+            ret.length = content.len() as i32;
+            let content = CString::new(content).unwrap();
+            ret.content = xml_strndup(content.as_ptr() as *const u8, ret.length);
+        } else {
+            ret.length = 0;
+            ret.content = null_mut();
+        }
+        // to be computed by the layer knowing the defining entity
+        ret.uri = null_mut();
+        ret.orig = null_mut();
+        ret.owner = 0;
 
-    Some(ret)
+        Some(ret)
+    }
 }
 
 /// Create a new entity, this differs from xmlAddDocEntity() that if
@@ -393,18 +401,22 @@ pub unsafe fn xml_new_entity(
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    if let Some(doc) = doc.filter(|doc| doc.int_subset.is_some()) {
-        return xml_add_doc_entity(doc, name, typ, external_id, system_id, content);
+    unsafe {
+        if let Some(doc) = doc.filter(|doc| doc.int_subset.is_some()) {
+            return xml_add_doc_entity(doc, name, typ, external_id, system_id, content);
+        }
+        let mut ret = xml_create_entity(name, typ, external_id, system_id, content)?;
+        ret.doc = doc;
+        Some(ret)
     }
-    let mut ret = xml_create_entity(name, typ, external_id, system_id, content)?;
-    ret.doc = doc;
-    Some(ret)
 }
 
 /// Raise an error.
 #[doc(alias = "xmlEntitiesErr")]
 unsafe fn xml_entities_err(code: XmlParserErrors, msg: &str) {
-    __xml_simple_error!(XmlErrorDomain::XmlFromTree, code, None, msg);
+    unsafe {
+        __xml_simple_error!(XmlErrorDomain::XmlFromTree, code, None, msg);
+    }
 }
 
 /// Raise a warning.
@@ -442,40 +454,42 @@ macro_rules! xml_entities_warn {
 /// clean-up an entity record.
 #[doc(alias = "xmlFreeEntity")]
 unsafe fn xml_free_entity(mut entity: XmlEntityPtr) {
-    if entity.owner == 1 {
-        if let Some(children) = entity
-            .children
-            .filter(|&children| children.parent() == Some(entity.into()))
-        {
-            xml_free_node_list(Some(children));
-            entity.children = None;
+    unsafe {
+        if entity.owner == 1 {
+            if let Some(children) = entity
+                .children
+                .filter(|&children| children.parent() == Some(entity.into()))
+            {
+                xml_free_node_list(Some(children));
+                entity.children = None;
+            }
         }
+        if !entity.name.is_null() {
+            xml_free(entity.name as _);
+            entity.name = null_mut();
+        }
+        if !entity.external_id.is_null() {
+            xml_free(entity.external_id as _);
+            entity.external_id = null_mut();
+        }
+        if !entity.system_id.is_null() {
+            xml_free(entity.system_id as _);
+            entity.system_id = null_mut();
+        }
+        if !entity.uri.is_null() {
+            xml_free(entity.uri as _);
+            entity.uri = null_mut();
+        }
+        if !entity.content.is_null() {
+            xml_free(entity.content as _);
+            entity.content = null_mut();
+        }
+        if !entity.orig.is_null() {
+            xml_free(entity.orig as _);
+            entity.orig = null_mut();
+        }
+        entity.free();
     }
-    if !entity.name.is_null() {
-        xml_free(entity.name as _);
-        entity.name = null_mut();
-    }
-    if !entity.external_id.is_null() {
-        xml_free(entity.external_id as _);
-        entity.external_id = null_mut();
-    }
-    if !entity.system_id.is_null() {
-        xml_free(entity.system_id as _);
-        entity.system_id = null_mut();
-    }
-    if !entity.uri.is_null() {
-        xml_free(entity.uri as _);
-        entity.uri = null_mut();
-    }
-    if !entity.content.is_null() {
-        xml_free(entity.content as _);
-        entity.content = null_mut();
-    }
-    if !entity.orig.is_null() {
-        xml_free(entity.orig as _);
-        entity.orig = null_mut();
-    }
-    entity.free();
 }
 
 /// Register a new entity for an entities table.
@@ -488,76 +502,79 @@ unsafe fn xml_add_entity(
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    let mut table = None;
+    unsafe {
+        let mut table = None;
 
-    match typ {
-        XmlEntityType::XmlInternalGeneralEntity
-        | XmlEntityType::XmlExternalGeneralParsedEntity
-        | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-            if let Some(predef) = xml_get_predefined_entity(name) {
-                let mut valid: i32 = 0;
+        match typ {
+            XmlEntityType::XmlInternalGeneralEntity
+            | XmlEntityType::XmlExternalGeneralParsedEntity
+            | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+                if let Some(predef) = xml_get_predefined_entity(name) {
+                    let mut valid: i32 = 0;
 
-                // 4.6 Predefined Entities
-                if typ == XmlEntityType::XmlInternalGeneralEntity {
-                    if let Some(content) = content {
-                        let c = *predef.content.add(0);
-                        if content.as_bytes() == [c]
-                            && (content == ">" || content == "\'" || content == "\"")
-                        {
-                            valid = 1;
-                        } else if let Some(content) = content.strip_prefix("&#") {
-                            if content.starts_with('x') {
-                                let hex = b"0123456789ABCDEF";
-                                let refe = [hex[c as usize >> 4], hex[c as usize & 0xF], b';'];
-                                if content.as_bytes()[1..].eq_ignore_ascii_case(&refe) {
-                                    valid = 1;
-                                }
-                            } else {
-                                let refe = [b'0' + (c / 10 % 10), b'0' + (c % 10), b';'];
-                                if content.as_bytes() == refe {
-                                    valid = 1;
+                    // 4.6 Predefined Entities
+                    if typ == XmlEntityType::XmlInternalGeneralEntity {
+                        if let Some(content) = content {
+                            let c = *predef.content.add(0);
+                            if content.as_bytes() == [c]
+                                && (content == ">" || content == "\'" || content == "\"")
+                            {
+                                valid = 1;
+                            } else if let Some(content) = content.strip_prefix("&#") {
+                                if content.starts_with('x') {
+                                    let hex = b"0123456789ABCDEF";
+                                    let refe = [hex[c as usize >> 4], hex[c as usize & 0xF], b';'];
+                                    if content.as_bytes()[1..].eq_ignore_ascii_case(&refe) {
+                                        valid = 1;
+                                    }
+                                } else {
+                                    let refe = [b'0' + (c / 10 % 10), b'0' + (c % 10), b';'];
+                                    if content.as_bytes() == refe {
+                                        valid = 1;
+                                    }
                                 }
                             }
                         }
                     }
+                    if valid == 0 {
+                        xml_entities_warn!(
+                            XmlParserErrors::XmlErrEntityProcessing,
+                            "xmlAddEntity: invalid redeclaration of predefined entity '{}'",
+                            name
+                        );
+                        return None;
+                    }
                 }
-                if valid == 0 {
-                    xml_entities_warn!(
-                        XmlParserErrors::XmlErrEntityProcessing,
-                        "xmlAddEntity: invalid redeclaration of predefined entity '{}'",
-                        name
-                    );
-                    return None;
+                if dtd.entities.is_none() {
+                    let table = XmlHashTable::with_capacity(0);
+                    dtd.entities = XmlHashTableRef::from_table(table);
                 }
+                table = dtd.entities;
             }
-            if dtd.entities.is_none() {
-                let table = XmlHashTable::with_capacity(0);
-                dtd.entities = XmlHashTableRef::from_table(table);
+            XmlEntityType::XmlInternalParameterEntity
+            | XmlEntityType::XmlExternalParameterEntity => {
+                if dtd.pentities.is_none() {
+                    let table = XmlHashTable::with_capacity(0);
+                    dtd.pentities = XmlHashTableRef::from_table(table);
+                }
+                table = dtd.pentities;
             }
-            table = dtd.entities;
+            XmlEntityType::XmlInternalPredefinedEntity => {
+                return None;
+            }
+            _ => {}
         }
-        XmlEntityType::XmlInternalParameterEntity | XmlEntityType::XmlExternalParameterEntity => {
-            if dtd.pentities.is_none() {
-                let table = XmlHashTable::with_capacity(0);
-                dtd.pentities = XmlHashTableRef::from_table(table);
-            }
-            table = dtd.pentities;
-        }
-        XmlEntityType::XmlInternalPredefinedEntity => {
+        let mut table = table?;
+        let mut ret = xml_create_entity(name, typ, external_id, system_id, content)?;
+        ret.doc = dtd.doc;
+
+        if table.add_entry(name, ret).is_err() {
+            // entity was already defined at another level.
+            xml_free_entity(ret);
             return None;
         }
-        _ => {}
+        Some(ret)
     }
-    let mut table = table?;
-    let mut ret = xml_create_entity(name, typ, external_id, system_id, content)?;
-    ret.doc = dtd.doc;
-
-    if table.add_entry(name, ret).is_err() {
-        // entity was already defined at another level.
-        xml_free_entity(ret);
-        return None;
-    }
-    Some(ret)
 }
 
 /// Register a new entity for this document.
@@ -572,27 +589,29 @@ pub unsafe fn xml_add_doc_entity(
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    let Some(mut dtd) = doc.int_subset else {
-        xml_entities_err(
-            XmlParserErrors::XmlDTDNoDTD,
-            "xmlAddDocEntity: document without internal subset",
-        );
-        return None;
-    };
-    let mut ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
+    unsafe {
+        let Some(mut dtd) = doc.int_subset else {
+            xml_entities_err(
+                XmlParserErrors::XmlDTDNoDTD,
+                "xmlAddDocEntity: document without internal subset",
+            );
+            return None;
+        };
+        let mut ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
 
-    // Link it to the DTD
-    ret.set_parent(Some(dtd.into()));
-    ret.set_document(dtd.doc);
-    if let Some(mut last) = dtd.last() {
-        last.set_next(Some(ret.into()));
-        ret.set_prev(Some(last));
-        dtd.set_last(Some(ret.into()));
-    } else {
-        dtd.set_children(Some(ret.into()));
-        dtd.set_last(Some(ret.into()));
+        // Link it to the DTD
+        ret.set_parent(Some(dtd.into()));
+        ret.set_document(dtd.doc);
+        if let Some(mut last) = dtd.last() {
+            last.set_next(Some(ret.into()));
+            ret.set_prev(Some(last));
+            dtd.set_last(Some(ret.into()));
+        } else {
+            dtd.set_children(Some(ret.into()));
+            dtd.set_last(Some(ret.into()));
+        }
+        Some(ret)
     }
-    Some(ret)
 }
 
 /// Register a new entity for this document DTD external subset.
@@ -607,26 +626,28 @@ pub unsafe fn xml_add_dtd_entity(
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> Option<XmlEntityPtr> {
-    let Some(mut dtd) = doc.ext_subset else {
-        xml_entities_err(
-            XmlParserErrors::XmlDTDNoDTD,
-            "xmlAddDtdEntity: document without external subset",
-        );
-        return None;
-    };
-    let mut ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
-    // Link it to the DTD
-    ret.set_parent(Some(dtd.into()));
-    ret.set_document(dtd.doc);
-    if let Some(mut last) = dtd.last() {
-        last.set_next(Some(ret.into()));
-        ret.set_prev(Some(last));
-        dtd.set_last(Some(ret.into()));
-    } else {
-        dtd.set_children(Some(ret.into()));
-        dtd.set_last(Some(ret.into()));
+    unsafe {
+        let Some(mut dtd) = doc.ext_subset else {
+            xml_entities_err(
+                XmlParserErrors::XmlDTDNoDTD,
+                "xmlAddDtdEntity: document without external subset",
+            );
+            return None;
+        };
+        let mut ret = xml_add_entity(dtd, name, typ, external_id, system_id, content)?;
+        // Link it to the DTD
+        ret.set_parent(Some(dtd.into()));
+        ret.set_document(dtd.doc);
+        if let Some(mut last) = dtd.last() {
+            last.set_next(Some(ret.into()));
+            ret.set_prev(Some(last));
+            dtd.set_last(Some(ret.into()));
+        } else {
+            dtd.set_children(Some(ret.into()));
+            dtd.set_last(Some(ret.into()));
+        }
+        Some(ret)
     }
-    Some(ret)
 }
 
 // The XML predefined entities.
@@ -748,18 +769,25 @@ thread_local! {
 /// Returns NULL if not, otherwise the entity
 #[doc(alias = "xmlGetPredefinedEntity")]
 pub unsafe fn xml_get_predefined_entity(name: &str) -> Option<XmlEntityPtr> {
-    match name {
-        "lt" => XML_ENTITY_LT
-            .with(|ptr| XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()),
-        "gt" => XML_ENTITY_GT
-            .with(|ptr| XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()),
-        "amp" => XML_ENTITY_AMP
-            .with(|ptr| XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()),
-        "apos" => XML_ENTITY_APOS
-            .with(|ptr| XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()),
-        "quot" => XML_ENTITY_QUOT
-            .with(|ptr| XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()),
-        _ => None,
+    unsafe {
+        match name {
+            "lt" => XML_ENTITY_LT.with(|ptr| {
+                XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()
+            }),
+            "gt" => XML_ENTITY_GT.with(|ptr| {
+                XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()
+            }),
+            "amp" => XML_ENTITY_AMP.with(|ptr| {
+                XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()
+            }),
+            "apos" => XML_ENTITY_APOS.with(|ptr| {
+                XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()
+            }),
+            "quot" => XML_ENTITY_QUOT.with(|ptr| {
+                XmlEntityPtr::from_raw(ptr as *const XmlEntity as *mut XmlEntity).unwrap()
+            }),
+            _ => None,
+        }
     }
 }
 
@@ -782,27 +810,29 @@ unsafe fn xml_get_entity_from_table(
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDocEntity")]
 pub unsafe fn xml_get_doc_entity(doc: Option<XmlDocPtr>, name: &str) -> Option<XmlEntityPtr> {
-    if let Some(doc) = doc {
-        if let Some(int_subset) = doc.int_subset {
-            if let Some(table) = int_subset.entities {
-                let cur = xml_get_entity_from_table(table, name);
-                if cur.is_some() {
-                    return cur;
-                }
-            }
-        }
-        if doc.standalone != 1 {
-            if let Some(ext_subset) = doc.ext_subset {
-                if let Some(table) = ext_subset.entities {
+    unsafe {
+        if let Some(doc) = doc {
+            if let Some(int_subset) = doc.int_subset {
+                if let Some(table) = int_subset.entities {
                     let cur = xml_get_entity_from_table(table, name);
                     if cur.is_some() {
                         return cur;
                     }
                 }
             }
+            if doc.standalone != 1 {
+                if let Some(ext_subset) = doc.ext_subset {
+                    if let Some(table) = ext_subset.entities {
+                        let cur = xml_get_entity_from_table(table, name);
+                        if cur.is_some() {
+                            return cur;
+                        }
+                    }
+                }
+            }
         }
+        xml_get_predefined_entity(name)
     }
-    xml_get_predefined_entity(name)
 }
 
 /// Do an entity lookup in the DTD entity hash table and
@@ -812,15 +842,17 @@ pub unsafe fn xml_get_doc_entity(doc: Option<XmlDocPtr>, name: &str) -> Option<X
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDtdEntity")]
 pub unsafe fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
-    // if doc.is_null() {
-    //     return None;
-    // }
-    if let Some(ext_subset) = doc.ext_subset {
-        if let Some(table) = ext_subset.entities {
-            return xml_get_entity_from_table(table, name);
+    unsafe {
+        // if doc.is_null() {
+        //     return None;
+        // }
+        if let Some(ext_subset) = doc.ext_subset {
+            if let Some(table) = ext_subset.entities {
+                return xml_get_entity_from_table(table, name);
+            }
         }
+        None
     }
-    None
 }
 
 /// Do an entity lookup in the internal and external subsets and
@@ -829,23 +861,25 @@ pub unsafe fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntity
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetParameterEntity")]
 pub unsafe fn xml_get_parameter_entity(doc: XmlDocPtr, name: &str) -> Option<XmlEntityPtr> {
-    // if doc.is_null() {
-    //     return None;
-    // }
-    if let Some(int_subset) = doc.int_subset {
-        if let Some(table) = int_subset.pentities {
-            let ret = xml_get_entity_from_table(table, name);
-            if ret.is_some() {
-                return ret;
+    unsafe {
+        // if doc.is_null() {
+        //     return None;
+        // }
+        if let Some(int_subset) = doc.int_subset {
+            if let Some(table) = int_subset.pentities {
+                let ret = xml_get_entity_from_table(table, name);
+                if ret.is_some() {
+                    return ret;
+                }
             }
         }
-    }
-    if let Some(ext_subset) = doc.ext_subset {
-        if let Some(table) = ext_subset.pentities {
-            return xml_get_entity_from_table(table, name);
+        if let Some(ext_subset) = doc.ext_subset {
+            if let Some(table) = ext_subset.pentities {
+                return xml_get_entity_from_table(table, name);
+            }
         }
+        None
     }
-    None
 }
 
 // Macro used to grow the current buffer.
@@ -877,221 +911,239 @@ pub(crate) unsafe fn xml_encode_entities_internal(
     input: *const XmlChar,
     attr: i32,
 ) -> *mut XmlChar {
-    let mut cur: *const XmlChar = input;
-    let mut buffer: *mut XmlChar;
-    let mut out: *mut XmlChar;
-    let mut buffer_size: size_t;
-    let mut html: i32 = 0;
+    unsafe {
+        let mut cur: *const XmlChar = input;
+        let mut buffer: *mut XmlChar;
+        let mut out: *mut XmlChar;
+        let mut buffer_size: size_t;
+        let mut html: i32 = 0;
 
-    if input.is_null() {
-        return null_mut();
-    }
-    if let Some(doc) = doc {
-        html = matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) as i32;
-    }
+        if input.is_null() {
+            return null_mut();
+        }
+        if let Some(doc) = doc {
+            html = matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) as i32;
+        }
 
-    // allocate an translation buffer.
-    buffer_size = 1000;
-    buffer = xml_malloc(buffer_size) as *mut XmlChar;
-    if buffer.is_null() {
-        xml_entities_err_memory("xmlEncodeEntities: malloc failed");
-        return null_mut();
-    }
-    out = buffer;
+        // allocate an translation buffer.
+        buffer_size = 1000;
+        buffer = xml_malloc(buffer_size) as *mut XmlChar;
+        if buffer.is_null() {
+            xml_entities_err_memory("xmlEncodeEntities: malloc failed");
+            return null_mut();
+        }
+        out = buffer;
 
-    'mem_error: {
-        while *cur != b'\0' {
-            let mut indx: size_t = out.offset_from(buffer) as _;
-            if indx + 100 > buffer_size {
-                grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
-                out = buffer.add(indx);
-            }
-
-            // By default one have to encode at least '<', '>', '"' and '&' !
-            if *cur == b'<' {
-                let end: *const XmlChar;
-
-                // Special handling of server side include in HTML attributes
-                if html != 0
-                    && attr != 0
-                    && *cur.add(1) == b'!'
-                    && *cur.add(2) == b'-'
-                    && *cur.add(3) == b'-'
-                    && {
-                        end = xml_strstr(cur, c"-->".as_ptr() as _);
-                        !end.is_null()
-                    }
-                {
-                    while cur != end {
-                        *out = *cur;
-                        cur = cur.add(1);
-                        out = out.add(1);
-                        indx = out.offset_from(buffer) as _;
-                        if indx + 100 > buffer_size {
-                            grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
-                            out = buffer.add(indx);
-                        }
-                    }
-                    *out = *cur;
-                    cur = cur.add(1);
-                    out = out.add(1);
-                    *out = *cur;
-                    cur = cur.add(1);
-                    out = out.add(1);
-                    *out = *cur;
-                    cur = cur.add(1);
-                    out = out.add(1);
-                    continue;
+        'mem_error: {
+            while *cur != b'\0' {
+                let mut indx: size_t = out.offset_from(buffer) as _;
+                if indx + 100 > buffer_size {
+                    grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
+                    out = buffer.add(indx);
                 }
-                *out = b'&';
-                out = out.add(1);
-                *out = b'l';
-                out = out.add(1);
-                *out = b't';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'>' {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'g';
-                out = out.add(1);
-                *out = b't';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'&' {
-                // Special handling of &{...} construct from HTML 4, see
-                // http://www.w3.org/TR/html401/appendix/notes.html#h-B.7.1
-                if html != 0
-                    && attr != 0
-                    && *cur.add(1) == b'{'
-                    && !strchr(cur as _, b'}' as _).is_null()
-                {
-                    while *cur != b'}' {
-                        *out = *cur;
-                        cur = cur.add(1);
-                        out = out.add(1);
-                        indx = out.offset_from(buffer) as _;
-                        if indx + 100 > buffer_size {
-                            grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
-                            out = buffer.add(indx as usize);
-                        }
-                    }
-                    *out = *cur;
-                    cur = cur.add(1);
-                    out = out.add(1);
-                    continue;
-                }
-                *out = b'&';
-                out = out.add(1);
-                *out = b'a';
-                out = out.add(1);
-                *out = b'm';
-                out = out.add(1);
-                *out = b'p';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if (*cur >= 0x20 && *cur < 0x80)
-                || *cur == b'\n'
-                || *cur == b'\t'
-                || (html != 0 && *cur == b'\r')
-            {
-                // default case, just copy !
-                *out = *cur;
-                out = out.add(1);
-            } else if *cur >= 0x80 {
-                if doc.map_or(false, |doc| doc.encoding.is_some()) || html != 0 {
-                    // Bjørn Reese <br@sseusa.com> provided the patch
-                    // XmlChar xc;
-                    // xc = (*cur & 0x3F) << 6;
-                    // if (*cur.add(1) != 0) {
-                    //     xc += *(++cur) & 0x3F;
-                    //     *out++ = xc;
-                    // } else
-                    *out = *cur;
-                    out = out.add(1);
-                } else {
-                    // We assume we have UTF-8 input.
-                    // It must match either:
-                    //   110xxxxx 10xxxxxx
-                    //   1110xxxx 10xxxxxx 10xxxxxx
-                    //   11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-                    // That is:
-                    //   *cur.add(0) is 11xxxxxx
-                    //   *cur.add(1) is 10xxxxxx
-                    //   *cur.add(2) is 10xxxxxx if *cur.add(0) is 111xxxxx
-                    //   *cur.add(3) is 10xxxxxx if *cur.add(0) is 1111xxxx
-                    //   *cur.add(0) is not 11111xxx
-                    let mut buf: [c_char; 11] = [0; 11];
-                    let mut ptr: *mut c_char;
-                    let mut val: i32 = 0;
-                    let mut l: i32 = 1;
 
-                    if *cur.add(0) & 0xC0 != 0xC0
-                        || *cur.add(1) & 0xC0 != 0x80
-                        || (*cur.add(0) & 0xE0 == 0xE0 && *cur.add(2) & 0xC0 != 0x80)
-                        || (*cur.add(0) & 0xF0 == 0xF0 && *cur.add(3) & 0xC0 != 0x80)
-                        || *cur.add(0) & 0xF8 == 0xF8
+                // By default one have to encode at least '<', '>', '"' and '&' !
+                if *cur == b'<' {
+                    let end: *const XmlChar;
+
+                    // Special handling of server side include in HTML attributes
+                    if html != 0
+                        && attr != 0
+                        && *cur.add(1) == b'!'
+                        && *cur.add(2) == b'-'
+                        && *cur.add(3) == b'-'
+                        && {
+                            end = xml_strstr(cur, c"-->".as_ptr() as _);
+                            !end.is_null()
+                        }
                     {
-                        xml_entities_err(
-                            XmlParserErrors::XmlCheckNotUTF8,
-                            "xmlEncodeEntities: input not UTF-8",
-                        );
-                        if let Some(mut doc) = doc {
-                            doc.encoding = Some("ISO-8859-1".to_owned());
-                        }
-                        snprintf(
-                            buf.as_mut_ptr() as _,
-                            buf.len(),
-                            c"&#%d;".as_ptr() as _,
-                            *cur as u32,
-                        );
-                        *buf.last_mut().unwrap() = 0;
-                        ptr = buf.as_ptr() as _;
-                        while *ptr != 0 {
-                            *out = *ptr as _;
+                        while cur != end {
+                            *out = *cur;
+                            cur = cur.add(1);
                             out = out.add(1);
-                            ptr = ptr.add(1);
+                            indx = out.offset_from(buffer) as _;
+                            if indx + 100 > buffer_size {
+                                grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
+                                out = buffer.add(indx);
+                            }
                         }
+                        *out = *cur;
                         cur = cur.add(1);
+                        out = out.add(1);
+                        *out = *cur;
+                        cur = cur.add(1);
+                        out = out.add(1);
+                        *out = *cur;
+                        cur = cur.add(1);
+                        out = out.add(1);
                         continue;
-                    } else if *cur < 0xE0 {
-                        val = *cur.add(0) as i32 & 0x1F;
-                        val <<= 6;
-                        val |= *cur.add(1) as i32 & 0x3F;
-                        l = 2;
-                    } else if *cur < 0xF0 {
-                        val = *cur.add(0) as i32 & 0x0F;
-                        val <<= 6;
-                        val |= *cur.add(1) as i32 & 0x3F;
-                        val <<= 6;
-                        val |= *cur.add(2) as i32 & 0x3F;
-                        l = 3;
-                    } else if *cur < 0xF8 {
-                        val = *cur.add(0) as i32 & 0x07;
-                        val <<= 6;
-                        val |= *cur.add(1) as i32 & 0x3F;
-                        val <<= 6;
-                        val |= *cur.add(2) as i32 & 0x3F;
-                        val <<= 6;
-                        val |= *cur.add(3) as i32 & 0x3F;
-                        l = 4;
                     }
-                    if l == 1 || !xml_is_char(val as u32) {
-                        xml_entities_err(
-                            XmlParserErrors::XmlErrInvalidChar,
-                            "xmlEncodeEntities: char out of range\n",
-                        );
-                        if let Some(mut doc) = doc {
-                            doc.encoding = Some("ISO-8859-1".to_owned());
+                    *out = b'&';
+                    out = out.add(1);
+                    *out = b'l';
+                    out = out.add(1);
+                    *out = b't';
+                    out = out.add(1);
+                    *out = b';';
+                    out = out.add(1);
+                } else if *cur == b'>' {
+                    *out = b'&';
+                    out = out.add(1);
+                    *out = b'g';
+                    out = out.add(1);
+                    *out = b't';
+                    out = out.add(1);
+                    *out = b';';
+                    out = out.add(1);
+                } else if *cur == b'&' {
+                    // Special handling of &{...} construct from HTML 4, see
+                    // http://www.w3.org/TR/html401/appendix/notes.html#h-B.7.1
+                    if html != 0
+                        && attr != 0
+                        && *cur.add(1) == b'{'
+                        && !strchr(cur as _, b'}' as _).is_null()
+                    {
+                        while *cur != b'}' {
+                            *out = *cur;
+                            cur = cur.add(1);
+                            out = out.add(1);
+                            indx = out.offset_from(buffer) as _;
+                            if indx + 100 > buffer_size {
+                                grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
+                                out = buffer.add(indx as usize);
+                            }
                         }
+                        *out = *cur;
+                        cur = cur.add(1);
+                        out = out.add(1);
+                        continue;
+                    }
+                    *out = b'&';
+                    out = out.add(1);
+                    *out = b'a';
+                    out = out.add(1);
+                    *out = b'm';
+                    out = out.add(1);
+                    *out = b'p';
+                    out = out.add(1);
+                    *out = b';';
+                    out = out.add(1);
+                } else if (*cur >= 0x20 && *cur < 0x80)
+                    || *cur == b'\n'
+                    || *cur == b'\t'
+                    || (html != 0 && *cur == b'\r')
+                {
+                    // default case, just copy !
+                    *out = *cur;
+                    out = out.add(1);
+                } else if *cur >= 0x80 {
+                    if doc.is_some_and(|doc| doc.encoding.is_some()) || html != 0 {
+                        // Bjørn Reese <br@sseusa.com> provided the patch
+                        // XmlChar xc;
+                        // xc = (*cur & 0x3F) << 6;
+                        // if (*cur.add(1) != 0) {
+                        //     xc += *(++cur) & 0x3F;
+                        //     *out++ = xc;
+                        // } else
+                        *out = *cur;
+                        out = out.add(1);
+                    } else {
+                        // We assume we have UTF-8 input.
+                        // It must match either:
+                        //   110xxxxx 10xxxxxx
+                        //   1110xxxx 10xxxxxx 10xxxxxx
+                        //   11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+                        // That is:
+                        //   *cur.add(0) is 11xxxxxx
+                        //   *cur.add(1) is 10xxxxxx
+                        //   *cur.add(2) is 10xxxxxx if *cur.add(0) is 111xxxxx
+                        //   *cur.add(3) is 10xxxxxx if *cur.add(0) is 1111xxxx
+                        //   *cur.add(0) is not 11111xxx
+                        let mut buf: [c_char; 11] = [0; 11];
+                        let mut ptr: *mut c_char;
+                        let mut val: i32 = 0;
+                        let mut l: i32 = 1;
+
+                        if *cur.add(0) & 0xC0 != 0xC0
+                            || *cur.add(1) & 0xC0 != 0x80
+                            || (*cur.add(0) & 0xE0 == 0xE0 && *cur.add(2) & 0xC0 != 0x80)
+                            || (*cur.add(0) & 0xF0 == 0xF0 && *cur.add(3) & 0xC0 != 0x80)
+                            || *cur.add(0) & 0xF8 == 0xF8
+                        {
+                            xml_entities_err(
+                                XmlParserErrors::XmlCheckNotUTF8,
+                                "xmlEncodeEntities: input not UTF-8",
+                            );
+                            if let Some(mut doc) = doc {
+                                doc.encoding = Some("ISO-8859-1".to_owned());
+                            }
+                            snprintf(
+                                buf.as_mut_ptr() as _,
+                                buf.len(),
+                                c"&#%d;".as_ptr() as _,
+                                *cur as u32,
+                            );
+                            *buf.last_mut().unwrap() = 0;
+                            ptr = buf.as_ptr() as _;
+                            while *ptr != 0 {
+                                *out = *ptr as _;
+                                out = out.add(1);
+                                ptr = ptr.add(1);
+                            }
+                            cur = cur.add(1);
+                            continue;
+                        } else if *cur < 0xE0 {
+                            val = *cur.add(0) as i32 & 0x1F;
+                            val <<= 6;
+                            val |= *cur.add(1) as i32 & 0x3F;
+                            l = 2;
+                        } else if *cur < 0xF0 {
+                            val = *cur.add(0) as i32 & 0x0F;
+                            val <<= 6;
+                            val |= *cur.add(1) as i32 & 0x3F;
+                            val <<= 6;
+                            val |= *cur.add(2) as i32 & 0x3F;
+                            l = 3;
+                        } else if *cur < 0xF8 {
+                            val = *cur.add(0) as i32 & 0x07;
+                            val <<= 6;
+                            val |= *cur.add(1) as i32 & 0x3F;
+                            val <<= 6;
+                            val |= *cur.add(2) as i32 & 0x3F;
+                            val <<= 6;
+                            val |= *cur.add(3) as i32 & 0x3F;
+                            l = 4;
+                        }
+                        if l == 1 || !xml_is_char(val as u32) {
+                            xml_entities_err(
+                                XmlParserErrors::XmlErrInvalidChar,
+                                "xmlEncodeEntities: char out of range\n",
+                            );
+                            if let Some(mut doc) = doc {
+                                doc.encoding = Some("ISO-8859-1".to_owned());
+                            }
+                            snprintf(
+                                buf.as_mut_ptr() as _,
+                                buf.len(),
+                                c"&#%d;".as_ptr() as _,
+                                *cur as u32,
+                            );
+                            buf[buf.len() - 1] = 0;
+                            ptr = buf.as_ptr() as _;
+                            while *ptr != 0 {
+                                *out = *ptr as _;
+                                out = out.add(1);
+                                ptr = ptr.add(1);
+                            }
+                            cur = cur.add(1);
+                            continue;
+                        }
+                        // We could do multiple things here. Just save as a c_char ref
                         snprintf(
                             buf.as_mut_ptr() as _,
                             buf.len(),
-                            c"&#%d;".as_ptr() as _,
-                            *cur as u32,
+                            c"&#x%X;".as_ptr() as _,
+                            val,
                         );
                         buf[buf.len() - 1] = 0;
                         ptr = buf.as_ptr() as _;
@@ -1100,15 +1152,18 @@ pub(crate) unsafe fn xml_encode_entities_internal(
                             out = out.add(1);
                             ptr = ptr.add(1);
                         }
-                        cur = cur.add(1);
+                        cur = cur.add(l as usize);
                         continue;
                     }
-                    // We could do multiple things here. Just save as a c_char ref
+                } else if xml_is_char(*cur as u32) {
+                    let mut buf: [c_char; 11] = [0; 11];
+                    let mut ptr: *mut c_char;
+
                     snprintf(
                         buf.as_mut_ptr() as _,
                         buf.len(),
-                        c"&#x%X;".as_ptr() as _,
-                        val,
+                        c"&#%d;".as_ptr() as _,
+                        *cur as u32,
                     );
                     buf[buf.len() - 1] = 0;
                     ptr = buf.as_ptr() as _;
@@ -1117,37 +1172,18 @@ pub(crate) unsafe fn xml_encode_entities_internal(
                         out = out.add(1);
                         ptr = ptr.add(1);
                     }
-                    cur = cur.add(l as usize);
-                    continue;
                 }
-            } else if xml_is_char(*cur as u32) {
-                let mut buf: [c_char; 11] = [0; 11];
-                let mut ptr: *mut c_char;
-
-                snprintf(
-                    buf.as_mut_ptr() as _,
-                    buf.len(),
-                    c"&#%d;".as_ptr() as _,
-                    *cur as u32,
-                );
-                buf[buf.len() - 1] = 0;
-                ptr = buf.as_ptr() as _;
-                while *ptr != 0 {
-                    *out = *ptr as _;
-                    out = out.add(1);
-                    ptr = ptr.add(1);
-                }
+                cur = cur.add(1);
             }
-            cur = cur.add(1);
+            *out = 0;
+            return buffer;
         }
-        *out = 0;
-        return buffer;
-    }
 
-    // mem_error:
-    xml_entities_err_memory("xmlEncodeEntities: realloc failed");
-    xml_free(buffer as _);
-    null_mut()
+        // mem_error:
+        xml_entities_err_memory("xmlEncodeEntities: realloc failed");
+        xml_free(buffer as _);
+        null_mut()
+    }
 }
 
 /// Do a global encoding of a string, replacing the predefined entities
@@ -1161,7 +1197,7 @@ pub unsafe fn xml_encode_entities_reentrant(
     doc: Option<XmlDocPtr>,
     input: *const XmlChar,
 ) -> *mut XmlChar {
-    xml_encode_entities_internal(doc, input, 0)
+    unsafe { xml_encode_entities_internal(doc, input, 0) }
 }
 
 /// Do a global encoding of a string, replacing the predefined entities
@@ -1173,101 +1209,103 @@ pub unsafe fn xml_encode_special_chars(
     _doc: Option<XmlDocPtr>,
     input: *const XmlChar,
 ) -> *mut XmlChar {
-    let mut cur: *const XmlChar = input;
-    let mut buffer: *mut XmlChar;
-    let mut out: *mut XmlChar;
-    let mut buffer_size: size_t;
-    if input.is_null() {
-        return null_mut();
-    }
-
-    // allocate an translation buffer.
-    buffer_size = 1000;
-    buffer = xml_malloc(buffer_size) as *mut XmlChar;
-    if buffer.is_null() {
-        xml_entities_err_memory("xmlEncodeSpecialChars: malloc failed");
-        return null_mut();
-    }
-    out = buffer;
-
-    'mem_error: {
-        while *cur != b'\0' {
-            let indx: size_t = out.offset_from(buffer) as _;
-            if indx + 10 > buffer_size {
-                grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
-                out = buffer.add(indx as usize);
-            }
-
-            // By default one have to encode at least '<', '>', '"' and '&' !
-            if *cur == b'<' {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'l';
-                out = out.add(1);
-                *out = b't';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'>' {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'g';
-                out = out.add(1);
-                *out = b't';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'&' {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'a';
-                out = out.add(1);
-                *out = b'm';
-                out = out.add(1);
-                *out = b'p';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'"' {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'q';
-                out = out.add(1);
-                *out = b'u';
-                out = out.add(1);
-                *out = b'o';
-                out = out.add(1);
-                *out = b't';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'\r' {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'#';
-                out = out.add(1);
-                *out = b'1';
-                out = out.add(1);
-                *out = b'3';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else {
-                // Works because on UTF-8, all extended sequences cannot
-                // result in bytes in the ASCII range.
-                *out = *cur;
-                out = out.add(1);
-            }
-            cur = cur.add(1);
+    unsafe {
+        let mut cur: *const XmlChar = input;
+        let mut buffer: *mut XmlChar;
+        let mut out: *mut XmlChar;
+        let mut buffer_size: size_t;
+        if input.is_null() {
+            return null_mut();
         }
-        *out = 0;
-        return buffer;
-    }
 
-    // mem_error:
-    xml_entities_err_memory("xmlEncodeSpecialChars: realloc failed");
-    xml_free(buffer as _);
-    null_mut()
+        // allocate an translation buffer.
+        buffer_size = 1000;
+        buffer = xml_malloc(buffer_size) as *mut XmlChar;
+        if buffer.is_null() {
+            xml_entities_err_memory("xmlEncodeSpecialChars: malloc failed");
+            return null_mut();
+        }
+        out = buffer;
+
+        'mem_error: {
+            while *cur != b'\0' {
+                let indx: size_t = out.offset_from(buffer) as _;
+                if indx + 10 > buffer_size {
+                    grow_buffer_reentrant!(buffer, buffer_size, 'mem_error);
+                    out = buffer.add(indx as usize);
+                }
+
+                // By default one have to encode at least '<', '>', '"' and '&' !
+                if *cur == b'<' {
+                    *out = b'&';
+                    out = out.add(1);
+                    *out = b'l';
+                    out = out.add(1);
+                    *out = b't';
+                    out = out.add(1);
+                    *out = b';';
+                    out = out.add(1);
+                } else if *cur == b'>' {
+                    *out = b'&';
+                    out = out.add(1);
+                    *out = b'g';
+                    out = out.add(1);
+                    *out = b't';
+                    out = out.add(1);
+                    *out = b';';
+                    out = out.add(1);
+                } else if *cur == b'&' {
+                    *out = b'&';
+                    out = out.add(1);
+                    *out = b'a';
+                    out = out.add(1);
+                    *out = b'm';
+                    out = out.add(1);
+                    *out = b'p';
+                    out = out.add(1);
+                    *out = b';';
+                    out = out.add(1);
+                } else if *cur == b'"' {
+                    *out = b'&';
+                    out = out.add(1);
+                    *out = b'q';
+                    out = out.add(1);
+                    *out = b'u';
+                    out = out.add(1);
+                    *out = b'o';
+                    out = out.add(1);
+                    *out = b't';
+                    out = out.add(1);
+                    *out = b';';
+                    out = out.add(1);
+                } else if *cur == b'\r' {
+                    *out = b'&';
+                    out = out.add(1);
+                    *out = b'#';
+                    out = out.add(1);
+                    *out = b'1';
+                    out = out.add(1);
+                    *out = b'3';
+                    out = out.add(1);
+                    *out = b';';
+                    out = out.add(1);
+                } else {
+                    // Works because on UTF-8, all extended sequences cannot
+                    // result in bytes in the ASCII range.
+                    *out = *cur;
+                    out = out.add(1);
+                }
+                cur = cur.add(1);
+            }
+            *out = 0;
+            return buffer;
+        }
+
+        // mem_error:
+        xml_entities_err_memory("xmlEncodeSpecialChars: realloc failed");
+        xml_free(buffer as _);
+        null_mut()
+    }
 }
 
 /// create and initialize an empty entities hash table.
@@ -1285,31 +1323,33 @@ pub unsafe fn xml_create_entities_table() -> XmlEntitiesTablePtr {
 #[doc(alias = "xmlCopyEntity")]
 #[cfg(feature = "libxml_tree")]
 unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
-    let mut cur = XmlEntityPtr::new(XmlEntity {
-        typ: XmlElementType::XmlEntityDecl,
-        etype: ent.etype,
-        ..Default::default()
-    })
-    .unwrap();
-    if !ent.name.is_null() {
-        cur.name = xml_strdup(ent.name);
+    unsafe {
+        let mut cur = XmlEntityPtr::new(XmlEntity {
+            typ: XmlElementType::XmlEntityDecl,
+            etype: ent.etype,
+            ..Default::default()
+        })
+        .unwrap();
+        if !ent.name.is_null() {
+            cur.name = xml_strdup(ent.name);
+        }
+        if !ent.external_id.is_null() {
+            cur.external_id = xml_strdup(ent.external_id);
+        }
+        if !ent.system_id.is_null() {
+            cur.system_id = xml_strdup(ent.system_id);
+        }
+        if !ent.content.is_null() {
+            cur.content = xml_strdup(ent.content);
+        }
+        if !ent.orig.is_null() {
+            cur.orig = xml_strdup(ent.orig);
+        }
+        if !ent.uri.is_null() {
+            cur.uri = xml_strdup(ent.uri);
+        }
+        Some(cur)
     }
-    if !ent.external_id.is_null() {
-        cur.external_id = xml_strdup(ent.external_id);
-    }
-    if !ent.system_id.is_null() {
-        cur.system_id = xml_strdup(ent.system_id);
-    }
-    if !ent.content.is_null() {
-        cur.content = xml_strdup(ent.content);
-    }
-    if !ent.orig.is_null() {
-        cur.orig = xml_strdup(ent.orig);
-    }
-    if !ent.uri.is_null() {
-        cur.uri = xml_strdup(ent.uri);
-    }
-    Some(cur)
 }
 
 /// Build a copy of an entity table.
@@ -1320,34 +1360,40 @@ unsafe fn xml_copy_entity(ent: XmlEntityPtr) -> Option<XmlEntityPtr> {
 pub unsafe fn xml_copy_entities_table(
     table: XmlHashTableRef<'static, XmlEntityPtr>,
 ) -> Option<XmlHashTableRef<'static, XmlEntityPtr>> {
-    let new = table.clone_with(|&ent, _| xml_copy_entity(ent).unwrap());
-    XmlHashTableRef::from_table(new)
+    unsafe {
+        let new = table.clone_with(|&ent, _| xml_copy_entity(ent).unwrap());
+        XmlHashTableRef::from_table(new)
+    }
 }
 
 /// Deallocate the memory used by an entities hash table.
 #[doc(alias = "xmlFreeEntitiesTable")]
 pub unsafe fn xml_free_entities_table(table: XmlHashTableRef<'static, XmlEntityPtr>) {
-    let mut table = table.into_inner();
-    table.clear_with(|payload, _| {
-        xml_free_entity(payload);
-    });
+    unsafe {
+        let mut table = table.into_inner();
+        table.clear_with(|payload, _| {
+            xml_free_entity(payload);
+        });
+    }
 }
 
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlDumpEntitiesTable")]
 #[cfg(feature = "libxml_output")]
 pub unsafe fn xml_dump_entities_table<'a>(buf: &mut (impl Write + 'a), table: XmlEntitiesTablePtr) {
-    let Some(table) = XmlHashTableRef::from_raw(table) else {
-        return;
-    };
-    table.scan(|data, _, _, _| {
-        xml_dump_entity_decl(
-            buf,
-            XmlEntityPtr::from_raw(data.0 as *mut XmlEntity)
-                .unwrap()
-                .unwrap(),
-        )
-    });
+    unsafe {
+        let Some(table) = XmlHashTableRef::from_raw(table) else {
+            return;
+        };
+        table.scan(|data, _, _, _| {
+            xml_dump_entity_decl(
+                buf,
+                XmlEntityPtr::from_raw(data.0 as *mut XmlEntity)
+                    .unwrap()
+                    .unwrap(),
+            )
+        });
+    }
 }
 
 /// This will dump the quoted string value, taking care of the special
@@ -1355,59 +1401,61 @@ pub unsafe fn xml_dump_entities_table<'a>(buf: &mut (impl Write + 'a), table: Xm
 #[doc(alias = "xmlDumpEntityContent")]
 #[cfg(feature = "libxml_output")]
 unsafe fn xml_dump_entity_content<'a>(buf: &mut (impl Write + 'a), content: *const XmlChar) {
-    use std::{slice::from_raw_parts, str::from_utf8};
+    unsafe {
+        use std::{slice::from_raw_parts, str::from_utf8};
 
-    use crate::io::write_quoted;
+        use crate::io::write_quoted;
 
-    if !xml_strchr(content, b'%').is_null() {
-        let mut base: *const XmlChar;
-        let mut cur: *const XmlChar;
+        if !xml_strchr(content, b'%').is_null() {
+            let mut base: *const XmlChar;
+            let mut cur: *const XmlChar;
 
-        write!(buf, "\"");
-        base = content;
-        cur = content;
-        while *cur != 0 {
-            if *cur == b'"' {
-                if base != cur {
-                    write!(
-                        buf,
-                        "{}",
-                        from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
-                    );
+            write!(buf, "\"");
+            base = content;
+            cur = content;
+            while *cur != 0 {
+                if *cur == b'"' {
+                    if base != cur {
+                        write!(
+                            buf,
+                            "{}",
+                            from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
+                        );
+                    }
+                    write!(buf, "&quot;");
+                    cur = cur.add(1);
+                    base = cur;
+                } else if *cur == b'%' {
+                    if base != cur {
+                        write!(
+                            buf,
+                            "{}",
+                            from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
+                        );
+                    }
+                    write!(buf, "&#x25;");
+                    cur = cur.add(1);
+                    base = cur;
+                } else {
+                    cur = cur.add(1);
                 }
-                write!(buf, "&quot;");
-                cur = cur.add(1);
-                base = cur;
-            } else if *cur == b'%' {
-                if base != cur {
-                    write!(
-                        buf,
-                        "{}",
-                        from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
-                    );
-                }
-                write!(buf, "&#x25;");
-                cur = cur.add(1);
-                base = cur;
-            } else {
-                cur = cur.add(1);
             }
-        }
-        if base != cur {
-            write!(
+            if base != cur {
+                write!(
+                    buf,
+                    "{}",
+                    from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
+                );
+            }
+            write!(buf, "\"");
+        } else {
+            write_quoted(
                 buf,
-                "{}",
-                from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
+                CStr::from_ptr(content as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
             );
         }
-        write!(buf, "\"");
-    } else {
-        write_quoted(
-            buf,
-            CStr::from_ptr(content as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-        );
     }
 }
 
@@ -1415,140 +1463,142 @@ unsafe fn xml_dump_entity_content<'a>(buf: &mut (impl Write + 'a), content: *con
 #[doc(alias = "xmlDumpEntityDecl")]
 #[cfg(feature = "libxml_output")]
 pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
-    use crate::io::write_quoted;
+    unsafe {
+        use crate::io::write_quoted;
 
-    let name = CStr::from_ptr(ent.name as _).to_string_lossy();
-    match ent.etype {
-        XmlEntityType::XmlInternalGeneralEntity => {
-            write!(buf, "<!ENTITY {name} ");
-            if !ent.orig.is_null() {
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref(),
-                );
-            } else {
-                xml_dump_entity_content(buf, ent.content as _);
-            }
-            writeln!(buf, ">");
-        }
-        XmlEntityType::XmlExternalGeneralParsedEntity => {
-            write!(buf, "<!ENTITY {name}");
-            if !ent.external_id.is_null() {
-                write!(buf, " PUBLIC ");
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.external_id as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-                write!(buf, " ");
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.system_id as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-            } else {
-                write!(buf, " SYSTEM ");
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.system_id as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-            }
-            writeln!(buf, ">");
-        }
-        XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-            write!(buf, "<!ENTITY {name}");
-            if !ent.external_id.is_null() {
-                write!(buf, " PUBLIC ");
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.external_id as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-                write!(buf, " ");
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.system_id as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-            } else {
-                write!(buf, " SYSTEM ");
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.system_id as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-            }
-            if !ent.content.is_null() {
-                /* Should be true ! */
-                write!(buf, " NDATA ");
+        let name = CStr::from_ptr(ent.name as _).to_string_lossy();
+        match ent.etype {
+            XmlEntityType::XmlInternalGeneralEntity => {
+                write!(buf, "<!ENTITY {name} ");
                 if !ent.orig.is_null() {
-                    write!(
+                    write_quoted(
                         buf,
-                        "{}",
-                        CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref()
+                        CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref(),
                     );
                 } else {
-                    write!(
+                    xml_dump_entity_content(buf, ent.content as _);
+                }
+                writeln!(buf, ">");
+            }
+            XmlEntityType::XmlExternalGeneralParsedEntity => {
+                write!(buf, "<!ENTITY {name}");
+                if !ent.external_id.is_null() {
+                    write!(buf, " PUBLIC ");
+                    write_quoted(
                         buf,
-                        "{}",
-                        CStr::from_ptr(ent.content as _).to_string_lossy().as_ref()
+                        CStr::from_ptr(ent.external_id as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                    write!(buf, " ");
+                    write_quoted(
+                        buf,
+                        CStr::from_ptr(ent.system_id as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                } else {
+                    write!(buf, " SYSTEM ");
+                    write_quoted(
+                        buf,
+                        CStr::from_ptr(ent.system_id as _)
+                            .to_string_lossy()
+                            .as_ref(),
                     );
                 }
+                writeln!(buf, ">");
             }
-            writeln!(buf, ">");
-        }
-        XmlEntityType::XmlInternalParameterEntity => {
-            write!(buf, "<!ENTITY % {name} ");
-            if ent.orig.is_null() {
-                xml_dump_entity_content(buf, ent.content as _);
-            } else {
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref(),
+            XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+                write!(buf, "<!ENTITY {name}");
+                if !ent.external_id.is_null() {
+                    write!(buf, " PUBLIC ");
+                    write_quoted(
+                        buf,
+                        CStr::from_ptr(ent.external_id as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                    write!(buf, " ");
+                    write_quoted(
+                        buf,
+                        CStr::from_ptr(ent.system_id as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                } else {
+                    write!(buf, " SYSTEM ");
+                    write_quoted(
+                        buf,
+                        CStr::from_ptr(ent.system_id as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                }
+                if !ent.content.is_null() {
+                    /* Should be true ! */
+                    write!(buf, " NDATA ");
+                    if !ent.orig.is_null() {
+                        write!(
+                            buf,
+                            "{}",
+                            CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref()
+                        );
+                    } else {
+                        write!(
+                            buf,
+                            "{}",
+                            CStr::from_ptr(ent.content as _).to_string_lossy().as_ref()
+                        );
+                    }
+                }
+                writeln!(buf, ">");
+            }
+            XmlEntityType::XmlInternalParameterEntity => {
+                write!(buf, "<!ENTITY % {name} ");
+                if ent.orig.is_null() {
+                    xml_dump_entity_content(buf, ent.content as _);
+                } else {
+                    write_quoted(
+                        buf,
+                        CStr::from_ptr(ent.orig as _).to_string_lossy().as_ref(),
+                    );
+                }
+                writeln!(buf, ">");
+            }
+            XmlEntityType::XmlExternalParameterEntity => {
+                write!(buf, "<!ENTITY % {name}");
+                if !ent.external_id.is_null() {
+                    write!(buf, " PUBLIC ");
+                    write_quoted(
+                        buf,
+                        CStr::from_ptr(ent.external_id as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                    write!(buf, " ");
+                    write_quoted(
+                        buf,
+                        CStr::from_ptr(ent.system_id as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                } else {
+                    write!(buf, " SYSTEM ");
+                    write_quoted(
+                        buf,
+                        CStr::from_ptr(ent.system_id as _)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                }
+                writeln!(buf, ">");
+            }
+            _ => {
+                xml_entities_err(
+                    XmlParserErrors::XmlDTDUnknownEntity,
+                    "xmlDumpEntitiesDecl: internal: unknown type entity type",
                 );
             }
-            writeln!(buf, ">");
-        }
-        XmlEntityType::XmlExternalParameterEntity => {
-            write!(buf, "<!ENTITY % {name}");
-            if !ent.external_id.is_null() {
-                write!(buf, " PUBLIC ");
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.external_id as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-                write!(buf, " ");
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.system_id as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-            } else {
-                write!(buf, " SYSTEM ");
-                write_quoted(
-                    buf,
-                    CStr::from_ptr(ent.system_id as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-            }
-            writeln!(buf, ">");
-        }
-        _ => {
-            xml_entities_err(
-                XmlParserErrors::XmlDTDUnknownEntity,
-                "xmlDumpEntitiesDecl: internal: unknown type entity type",
-            );
         }
     }
 }
@@ -1572,5 +1622,5 @@ pub(crate) unsafe fn xml_encode_attribute_entities(
     doc: Option<XmlDocPtr>,
     input: *const XmlChar,
 ) -> *mut XmlChar {
-    xml_encode_entities_internal(doc, input, 1)
+    unsafe { xml_encode_entities_internal(doc, input, 1) }
 }

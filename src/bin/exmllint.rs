@@ -10,8 +10,9 @@
 #![allow(unused)]
 
 use std::{
+    cell::RefCell,
     env::args,
-    ffi::{c_char, c_long, c_void, CStr, CString},
+    ffi::{CStr, CString, c_char, c_long, c_void},
     fs::File,
     io::{stderr, stdin, stdout},
     mem::zeroed,
@@ -19,8 +20,8 @@ use std::{
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
     sync::{
-        atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
         LazyLock, Mutex,
+        atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
     },
     time::Instant,
 };
@@ -29,41 +30,40 @@ use clap::Parser;
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
 use exml::{
-    encoding::{add_encoding_alias, XmlCharEncoding},
+    encoding::{XmlCharEncoding, add_encoding_alias},
     error::generic_error_default,
     generic_error,
     globals::{
-        get_load_ext_dtd_default_value, set_load_ext_dtd_default_value, set_parser_debug_entities,
-        set_tree_indent_string, GenericError, GenericErrorContext,
+        GenericError, GenericErrorContext, get_load_ext_dtd_default_value,
+        set_load_ext_dtd_default_value, set_parser_debug_entities, set_tree_indent_string,
     },
-    io::{xml_no_net_external_entity_loader, XmlParserInputBuffer},
+    io::{XmlParserInputBuffer, xml_no_net_external_entity_loader},
     libxml::{
-        c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
+        c14n::{XmlC14NMode, xml_c14n_doc_dump_memory},
         debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
         globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
         htmlparser::{
-            html_create_push_parser_ctxt, html_ctxt_use_options, html_free_parser_ctxt,
-            html_parse_chunk, html_read_file, html_read_memory, HtmlParserCtxtPtr,
-            HtmlParserOption,
+            HtmlParserCtxtPtr, HtmlParserOption, html_create_push_parser_ctxt,
+            html_ctxt_use_options, html_free_parser_ctxt, html_parse_chunk, html_read_file,
+            html_read_memory,
         },
         htmltree::{html_doc_dump, html_save_file_format},
         parser::{
-            xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_use_options,
-            xml_get_external_entity_loader, xml_parse_chunk, xml_parse_dtd,
-            xml_set_external_entity_loader, XmlExternalEntityLoader, XmlParserOption,
-            XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-            XML_SAX2_MAGIC,
+            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC, XmlExternalEntityLoader,
+            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, xml_cleanup_parser,
+            xml_create_push_parser_ctxt, xml_ctxt_use_options, xml_get_external_entity_loader,
+            xml_parse_chunk, xml_parse_dtd, xml_set_external_entity_loader,
         },
-        pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
+        pattern::{XmlPattern, XmlStreamCtxt, xml_free_pattern, xml_patterncompile},
         relaxng::{
-            xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
-            xml_relaxng_validate_doc, XmlRelaxNG,
+            XmlRelaxNG, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
+            xml_relaxng_validate_doc,
         },
         schematron::{
-            xml_schematron_free, xml_schematron_free_parser_ctxt, xml_schematron_free_valid_ctxt,
-            xml_schematron_new_parser_ctxt, xml_schematron_new_valid_ctxt, xml_schematron_parse,
-            xml_schematron_validate_doc, XmlSchematron, XmlSchematronParserCtxtPtr,
-            XmlSchematronValidCtxtPtr, XmlSchematronValidOptions,
+            XmlSchematron, XmlSchematronParserCtxtPtr, XmlSchematronValidCtxtPtr,
+            XmlSchematronValidOptions, xml_schematron_free, xml_schematron_free_parser_ctxt,
+            xml_schematron_free_valid_ctxt, xml_schematron_new_parser_ctxt,
+            xml_schematron_new_valid_ctxt, xml_schematron_parse, xml_schematron_validate_doc,
         },
         valid::{
             xml_free_valid_ctxt, xml_new_valid_ctxt, xml_valid_get_valid_elements,
@@ -76,18 +76,18 @@ use exml::{
         },
         xmlreader::XmlTextReaderPtr,
         xmlschemas::{
-            xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
-            xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt, xml_schema_parse,
-            xml_schema_set_parser_errors, xml_schema_set_valid_errors, xml_schema_validate_doc,
-            xml_schema_validate_set_filename, xml_schema_validate_stream, XmlSchema,
-            XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr,
+            XmlSchema, XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free,
+            xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt, xml_schema_new_parser_ctxt,
+            xml_schema_new_valid_ctxt, xml_schema_parse, xml_schema_set_parser_errors,
+            xml_schema_set_valid_errors, xml_schema_validate_doc, xml_schema_validate_set_filename,
+            xml_schema_validate_stream,
         },
         xmlstring::XmlChar,
     },
     parser::{
-        xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory, xml_free_parser_ctxt,
-        xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_read_file, xml_read_io, xml_read_memory,
-        XmlParserCtxtPtr, XmlParserInputPtr,
+        XmlParserCtxtPtr, XmlParserInputPtr, xml_ctxt_read_file, xml_ctxt_read_io,
+        xml_ctxt_read_memory, xml_free_parser_ctxt, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
+        xml_read_file, xml_read_io, xml_read_memory,
     },
     relaxng::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt,
@@ -95,17 +95,17 @@ use exml::{
     },
     save::{XmlSaveCtxt, XmlSaveOption},
     tree::{
-        xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc,
-        xml_new_doc_node, NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
-        XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr,
-        XmlElementPtr, XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType, XmlEnumeration,
-        XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNsPtr,
+        NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
+        XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementPtr, XmlElementTypeVal,
+        XmlEntity, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
+        XmlNodePtr, XmlNsPtr, xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc,
+        xml_free_dtd, xml_new_doc, xml_new_doc_node,
     },
-    xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
+    xpath::{XmlXPathObjectPtr, xml_xpath_order_doc_elems},
 };
 use libc::{
-    close, fclose, fopen, fread, free, malloc, memset, mmap, munmap, open, snprintf, stat, strlen,
-    write, FILE, MAP_FAILED, MAP_SHARED, O_RDONLY, PROT_READ,
+    FILE, MAP_FAILED, MAP_SHARED, O_RDONLY, PROT_READ, close, fclose, fopen, fread, free, malloc,
+    memset, mmap, munmap, open, snprintf, stat, strlen, write,
 };
 
 // Error codes.
@@ -808,55 +808,32 @@ unsafe fn xmllint_external_entity_loader(
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
-    let mut ret: XmlParserInputPtr;
-    let mut warning: Option<GenericError> = None;
-    let mut err: Option<GenericError> = None;
-    let paths = PATHS.lock().unwrap();
-    let mut lastsegment = url;
-    let iter = url;
+    unsafe {
+        let mut ret: XmlParserInputPtr;
+        let mut warning: Option<GenericError> = None;
+        let mut err: Option<GenericError> = None;
+        let paths = PATHS.lock().unwrap();
+        let mut lastsegment = url;
+        let iter = url;
 
-    if let Some(mut iter) = iter.filter(|_| !paths.is_empty()) {
-        while !iter.is_empty() {
-            if let Some(rem) = iter.strip_prefix('/') {
-                lastsegment = Some(rem);
+        if let Some(mut iter) = iter.filter(|_| !paths.is_empty()) {
+            while !iter.is_empty() {
+                if let Some(rem) = iter.strip_prefix('/') {
+                    lastsegment = Some(rem);
+                }
+                iter = &iter[1..];
             }
-            iter = &iter[1..];
         }
-    }
 
-    if !ctxt.is_null() {
-        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-            warning = sax.warning.take();
-            err = sax.error.take();
-        }
-    }
-
-    if let Some(loader) = DEFAULT_ENTITY_LOADER {
-        ret = loader(url, id, ctxt);
-        if !ret.is_null() {
+        if !ctxt.is_null() {
             if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-                if warning.is_some() {
-                    sax.warning = warning;
-                }
-                if err.is_some() {
-                    sax.error = err;
-                }
+                warning = sax.warning.take();
+                err = sax.error.take();
             }
-            if CMD_ARGS.load_trace {
-                eprintln!(
-                    "Loaded URL=\"{}\" ID=\"{}\"",
-                    url.unwrap_or("(null)"),
-                    id.unwrap_or("(null)"),
-                );
-            }
-            return ret;
         }
 
-        for path in paths.iter() {
-            let mut new_url = path.clone();
-            new_url.push('/');
-            new_url.push_str(lastsegment.unwrap());
-            ret = loader(Some(&new_url), id, ctxt);
+        if let Some(loader) = DEFAULT_ENTITY_LOADER {
+            ret = loader(url, id, ctxt);
             if !ret.is_null() {
                 if let Some(sax) = (*ctxt).sax.as_deref_mut() {
                     if warning.is_some() {
@@ -869,42 +846,67 @@ unsafe fn xmllint_external_entity_loader(
                 if CMD_ARGS.load_trace {
                     eprintln!(
                         "Loaded URL=\"{}\" ID=\"{}\"",
-                        new_url,
+                        url.unwrap_or("(null)"),
                         id.unwrap_or("(null)"),
                     );
                 }
                 return ret;
             }
+
+            for path in paths.iter() {
+                let mut new_url = path.clone();
+                new_url.push('/');
+                new_url.push_str(lastsegment.unwrap());
+                ret = loader(Some(&new_url), id, ctxt);
+                if !ret.is_null() {
+                    if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                        if warning.is_some() {
+                            sax.warning = warning;
+                        }
+                        if err.is_some() {
+                            sax.error = err;
+                        }
+                    }
+                    if CMD_ARGS.load_trace {
+                        eprintln!(
+                            "Loaded URL=\"{}\" ID=\"{}\"",
+                            new_url,
+                            id.unwrap_or("(null)"),
+                        );
+                    }
+                    return ret;
+                }
+            }
         }
+        if err.is_some() {
+            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                sax.error = err;
+            }
+        }
+        if let Some(warning) = warning {
+            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                sax.warning = Some(warning);
+            }
+            if url.is_some() {
+                todo!()
+                // xml_error_with_format!(
+                //     warning,
+                //     ctxt as _,
+                //     c"failed to load external entity \"%s\"\n".as_ptr(),
+                //     url
+                // );
+            } else if id.is_some() {
+                todo!()
+                // xml_error_with_format!(
+                //     warning,
+                //     ctxt as _,
+                //     c"failed to load external entity \"%s\"\n".as_ptr(),
+                //     id
+                // );
+            }
+        }
+        null_mut()
     }
-    if err.is_some() {
-        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-            sax.error = err;
-        }
-    }
-    if let Some(warning) = warning {
-        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-            sax.warning = Some(warning);
-        }
-        if url.is_some() {
-            todo!()
-            // xml_error_with_format!(
-            //     warning,
-            //     ctxt as _,
-            //     c"failed to load external entity \"%s\"\n".as_ptr(),
-            //     url
-            // );
-        } else if id.is_some() {
-            todo!()
-            // xml_error_with_format!(
-            //     warning,
-            //     ctxt as _,
-            //     c"failed to load external entity \"%s\"\n".as_ptr(),
-            //     id
-            // );
-        }
-    }
-    null_mut()
 }
 
 // Memory allocation consumption debugging
@@ -916,160 +918,182 @@ unsafe fn oom() {
 }
 
 unsafe extern "C" fn my_free_func(mem: *mut c_void) {
-    xml_mem_free(mem);
+    unsafe {
+        xml_mem_free(mem);
+    }
 }
 unsafe extern "C" fn my_malloc_func(size: usize) -> *mut c_void {
-    let ret: *mut c_void = xml_mem_malloc(size);
-    let maxmem = CMD_ARGS.maxmem.unwrap_or(0);
-    if !ret.is_null() && xml_mem_used() > maxmem as i32 {
-        oom();
-        xml_mem_free(ret);
-        return null_mut();
+    unsafe {
+        let ret: *mut c_void = xml_mem_malloc(size);
+        let maxmem = CMD_ARGS.maxmem.unwrap_or(0);
+        if !ret.is_null() && xml_mem_used() > maxmem as i32 {
+            oom();
+            xml_mem_free(ret);
+            return null_mut();
+        }
+        ret
     }
-    ret
 }
 unsafe extern "C" fn my_realloc_func(mem: *mut c_void, size: usize) -> *mut c_void {
-    let oldsize: usize = xml_mem_size(mem);
-    let maxmem = CMD_ARGS.maxmem.unwrap_or(0);
+    unsafe {
+        let oldsize: usize = xml_mem_size(mem);
+        let maxmem = CMD_ARGS.maxmem.unwrap_or(0);
 
-    if xml_mem_used() as usize + size - oldsize > maxmem {
-        oom();
-        return null_mut();
+        if xml_mem_used() as usize + size - oldsize > maxmem {
+            oom();
+            return null_mut();
+        }
+
+        xml_mem_realloc(mem, size)
     }
-
-    xml_mem_realloc(mem, size)
 }
 unsafe extern "C" fn my_strdup_func(str: *const u8) -> *mut u8 {
-    let ret = xml_memory_strdup(str);
-    let maxmem = CMD_ARGS.maxmem.unwrap_or(0);
+    unsafe {
+        let ret = xml_memory_strdup(str);
+        let maxmem = CMD_ARGS.maxmem.unwrap_or(0);
 
-    if !ret.is_null() && xml_mem_used() > maxmem as i32 {
-        oom();
-        xml_free(ret as _);
-        return null_mut();
+        if !ret.is_null() && xml_mem_used() > maxmem as i32 {
+            oom();
+            xml_free(ret as _);
+            return null_mut();
+        }
+        ret
     }
-    ret
 }
 
 // HTML output
-static mut BUFFER: [c_char; 50000] = [0; 50000];
+thread_local! {
+    static BUFFER: RefCell<[i8; 50000]> = const { RefCell::new([0; 50000]) };
+}
 
 unsafe fn xml_htmlencode_send() {
-    // xmlEncodeEntitiesReentrant assumes valid UTF-8, but the buffer might
-    // end with a truncated UTF-8 sequence. This is a hack to at least avoid
-    // an out-of-bounds read.
-    memset(addr_of_mut!(BUFFER[BUFFER.len() - 4]) as _, 0, 4);
-    let result: *mut c_char =
-        xml_encode_entities_reentrant(None, BUFFER.as_ptr() as _) as *mut c_char;
-    if !result.is_null() {
-        let s = CStr::from_ptr(result).to_string_lossy().into_owned();
-        generic_error!("{s}");
-        xml_free(result as _);
+    unsafe {
+        // xmlEncodeEntitiesReentrant assumes valid UTF-8, but the buffer might
+        // end with a truncated UTF-8 sequence. This is a hack to at least avoid
+        // an out-of-bounds read.
+        BUFFER.with_borrow_mut(|buffer| {
+            memset(addr_of_mut!(buffer[buffer.len() - 4]) as _, 0, 4);
+            let result: *mut c_char =
+                xml_encode_entities_reentrant(None, buffer.as_ptr() as _) as *mut c_char;
+            if !result.is_null() {
+                let s = CStr::from_ptr(result).to_string_lossy().into_owned();
+                generic_error!("{s}");
+                xml_free(result as _);
+            }
+            buffer[0] = 0;
+        })
     }
-    BUFFER[0] = 0;
 }
 
 /// Displays the associated file and line information for the current input
 #[doc(alias = "xmlHTMLPrintFileInfo")]
 unsafe fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
-    generic_error!("<p>");
+    unsafe {
+        generic_error!("<p>");
 
-    let len = strlen(BUFFER.as_ptr());
-    if !input.is_null() {
-        if (*input).filename.is_some() {
-            let filename = CString::new((*input).filename.as_deref().unwrap()).unwrap();
-            snprintf(
-                addr_of_mut!(BUFFER[len]) as _,
-                BUFFER.len() - len,
-                c"%s:%d: ".as_ptr(),
-                filename.as_ptr(),
-                (*input).line,
-            );
-        } else {
-            snprintf(
-                addr_of_mut!(BUFFER[len]) as _,
-                BUFFER.len() - len,
-                c"Entity: line %d: ".as_ptr(),
-                (*input).line,
-            );
-        }
+        BUFFER.with_borrow_mut(|buffer| {
+            let len = strlen(buffer.as_ptr());
+            if !input.is_null() {
+                if (*input).filename.is_some() {
+                    let filename = CString::new((*input).filename.as_deref().unwrap()).unwrap();
+                    snprintf(
+                        addr_of_mut!(buffer[len]) as _,
+                        buffer.len() - len,
+                        c"%s:%d: ".as_ptr(),
+                        filename.as_ptr(),
+                        (*input).line,
+                    );
+                } else {
+                    snprintf(
+                        addr_of_mut!(buffer[len]) as _,
+                        buffer.len() - len,
+                        c"Entity: line %d: ".as_ptr(),
+                        (*input).line,
+                    );
+                }
+            }
+            xml_htmlencode_send();
+        });
     }
-    xml_htmlencode_send();
 }
 
 /// Displays current context within the input content for error tracking
 #[doc(alias = "xmlHTMLPrintFileContext")]
 unsafe fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
-    let mut cur: *const XmlChar;
-    let mut base: *const XmlChar;
-    let mut n: i32;
+    unsafe {
+        let mut cur: *const XmlChar;
+        let mut base: *const XmlChar;
+        let mut n: i32;
 
-    if input.is_null() {
-        return;
+        if input.is_null() {
+            return;
+        }
+        generic_error!("<pre>\n");
+        cur = (*input).cur;
+        base = (*input).base;
+        while cur > base && (*cur == b'\n' || *cur == b'\r') {
+            cur = cur.sub(1);
+        }
+        n = 0;
+        while {
+            n += 1;
+            n - 1 < 80
+        } && cur > base
+            && *cur != b'\n'
+            && *cur != b'\r'
+        {
+            cur = cur.sub(1);
+        }
+        if *cur == b'\n' || *cur == b'\r' {
+            cur = cur.add(1);
+        }
+        base = cur;
+        n = 0;
+        BUFFER.with_borrow_mut(|buffer| {
+            while *cur != 0 && *cur != b'\n' && *cur != b'\r' && n < 79 {
+                let len = strlen(buffer.as_ptr());
+                snprintf(
+                    addr_of_mut!(buffer[len]) as _,
+                    buffer.len() - len,
+                    c"%c".as_ptr(),
+                    *cur as i32,
+                );
+                cur = cur.add(1);
+                n += 1;
+            }
+            let len = strlen(buffer.as_ptr());
+            snprintf(
+                addr_of_mut!(buffer[len]) as _,
+                buffer.len() - len,
+                c"\n".as_ptr(),
+            );
+            cur = (*input).cur;
+            while cur > base && (*cur == b'\n' || *cur == b'\r') {
+                cur = cur.sub(1);
+            }
+            n = 0;
+            while cur != base && {
+                n += 1;
+                n - 1 < 80
+            } {
+                let len = strlen(buffer.as_ptr());
+                snprintf(
+                    addr_of_mut!(buffer[len]) as _,
+                    buffer.len() - len,
+                    c" ".as_ptr(),
+                );
+                base = base.add(1);
+            }
+            let len = strlen(buffer.as_ptr());
+            snprintf(
+                addr_of_mut!(buffer[len]) as _,
+                buffer.len() - len,
+                c"^\n".as_ptr(),
+            );
+            xml_htmlencode_send();
+        });
+        generic_error!("</pre>");
     }
-    generic_error!("<pre>\n");
-    cur = (*input).cur;
-    base = (*input).base;
-    while cur > base && (*cur == b'\n' || *cur == b'\r') {
-        cur = cur.sub(1);
-    }
-    n = 0;
-    while {
-        n += 1;
-        n - 1 < 80
-    } && cur > base
-        && *cur != b'\n'
-        && *cur != b'\r'
-    {
-        cur = cur.sub(1);
-    }
-    if *cur == b'\n' || *cur == b'\r' {
-        cur = cur.add(1);
-    }
-    base = cur;
-    n = 0;
-    while *cur != 0 && *cur != b'\n' && *cur != b'\r' && n < 79 {
-        let len = strlen(BUFFER.as_ptr());
-        snprintf(
-            addr_of_mut!(BUFFER[len]) as _,
-            BUFFER.len() - len,
-            c"%c".as_ptr(),
-            *cur as i32,
-        );
-        cur = cur.add(1);
-        n += 1;
-    }
-    let len = strlen(BUFFER.as_ptr());
-    snprintf(
-        addr_of_mut!(BUFFER[len]) as _,
-        BUFFER.len() - len,
-        c"\n".as_ptr(),
-    );
-    cur = (*input).cur;
-    while cur > base && (*cur == b'\n' || *cur == b'\r') {
-        cur = cur.sub(1);
-    }
-    n = 0;
-    while cur != base && {
-        n += 1;
-        n - 1 < 80
-    } {
-        let len = strlen(BUFFER.as_ptr());
-        snprintf(
-            addr_of_mut!(BUFFER[len]) as _,
-            BUFFER.len() - len,
-            c" ".as_ptr(),
-        );
-        base = base.add(1);
-    }
-    let len = strlen(BUFFER.as_ptr());
-    snprintf(
-        addr_of_mut!(BUFFER[len]) as _,
-        BUFFER.len() - len,
-        c"^\n".as_ptr(),
-    );
-    xml_htmlencode_send();
-    generic_error!("</pre>");
 }
 
 /// Display and format an error messages, gives file, line, position and
@@ -1192,42 +1216,46 @@ fn xml_html_validity_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
 #[doc(alias = "xmlShellReadline")]
 #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
 unsafe fn xml_shell_readline(prompt: *mut c_char) -> *mut c_char {
-    use std::io::{stdin, stdout, Write};
+    unsafe {
+        use std::io::{Write, stdin, stdout};
 
-    use libc::{malloc, memcpy};
+        use libc::{malloc, memcpy};
 
-    if !prompt.is_null() {
-        print!("{}", CStr::from_ptr(prompt).to_string_lossy());
-    }
-    stdout().flush().ok();
-    let mut line_read = String::new();
-    match stdin().read_line(&mut line_read) {
-        Ok(len) if len > 0 => {
-            let ret = malloc(len + 1) as *mut c_char;
-            if !ret.is_null() {
-                memcpy(ret as _, line_read.as_ptr() as _, len);
-            }
-            *ret.add(len) = 0;
-            ret
+        if !prompt.is_null() {
+            print!("{}", CStr::from_ptr(prompt).to_string_lossy());
         }
-        _ => null_mut(),
+        stdout().flush().ok();
+        let mut line_read = String::new();
+        match stdin().read_line(&mut line_read) {
+            Ok(len) if len > 0 => {
+                let ret = malloc(len + 1) as *mut c_char;
+                if !ret.is_null() {
+                    memcpy(ret as _, line_read.as_ptr() as _, len);
+                }
+                *ret.add(len) = 0;
+                ret
+            }
+            _ => null_mut(),
+        }
     }
 }
 
 // I/O Interfaces
 
 unsafe fn my_read(f: *mut c_void, buf: *mut c_char, len: i32) -> i32 {
-    fread(buf as _, 1, len as _, f as *mut FILE) as _
+    unsafe { fread(buf as _, 1, len as _, f as *mut FILE) as _ }
 }
 unsafe fn my_close(context: *mut c_void) -> i32 {
-    let f: *mut FILE = context as *mut FILE;
-    extern "C" {
-        static stdin: *mut FILE;
+    unsafe {
+        let f: *mut FILE = context as *mut FILE;
+        unsafe extern "C" {
+            static stdin: *mut FILE;
+        }
+        if f == stdin {
+            return 0;
+        }
+        fclose(f)
     }
-    if f == stdin {
-        return 0;
-    }
-    fclose(f)
 }
 
 // SAX based tests
@@ -1853,104 +1881,107 @@ static mut DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 // static xmlSAXHandlerPtr debugSAX2Handler = &debugSAX2HandlerStruct;
 
 unsafe fn test_sax(filename: &str) {
-    let handler: XmlSAXHandlerPtr;
-    let user_data: &CStr = c"user_data"; /* mostly for debugging */
+    unsafe {
+        let handler: XmlSAXHandlerPtr;
+        let user_data: &CStr = c"user_data"; /* mostly for debugging */
 
-    CALLBACKS.store(0, Ordering::Relaxed);
+        CALLBACKS.store(0, Ordering::Relaxed);
 
-    if CMD_ARGS.noout {
-        handler = addr_of_mut!(EMPTY_SAXHANDLER_STRUCT);
-    } else {
-        #[cfg(feature = "sax1")]
-        if CMD_ARGS.sax1 {
-            handler = addr_of_mut!(DEBUG_SAXHANDLER_STRUCT);
+        if CMD_ARGS.noout {
+            handler = addr_of_mut!(EMPTY_SAXHANDLER_STRUCT);
         } else {
-            handler = addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT);
-        }
-        #[cfg(not(feature = "sax1"))]
-        {
-            handler = addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT);
-        }
-    }
-
-    #[cfg(not(feature = "schema"))]
-    let f = false;
-    #[cfg(feature = "schema")]
-    let f = !WXSCHEMAS.load(Ordering::Relaxed).is_null();
-    if f {
-        #[cfg(feature = "schema")]
-        {
-            let Some(buf) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None) else {
-                return;
-            };
-
-            let vctxt: XmlSchemaValidCtxtPtr =
-                xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
-            if vctxt.is_null() {
-                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                return;
+            #[cfg(feature = "sax1")]
+            if CMD_ARGS.sax1 {
+                handler = addr_of_mut!(DEBUG_SAXHANDLER_STRUCT);
+            } else {
+                handler = addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT);
             }
-            xml_schema_set_valid_errors(
-                vctxt,
-                Some(generic_error_default),
-                Some(generic_error_default),
-                None,
-            );
-            let cfilename = CString::new(filename).unwrap();
-            xml_schema_validate_set_filename(vctxt, cfilename.as_ptr());
+            #[cfg(not(feature = "sax1"))]
+            {
+                handler = addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT);
+            }
+        }
+
+        #[cfg(not(feature = "schema"))]
+        let f = false;
+        #[cfg(feature = "schema")]
+        let f = !WXSCHEMAS.load(Ordering::Relaxed).is_null();
+        if f {
+            #[cfg(feature = "schema")]
+            {
+                let Some(buf) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None)
+                else {
+                    return;
+                };
+
+                let vctxt: XmlSchemaValidCtxtPtr =
+                    xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
+                if vctxt.is_null() {
+                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                    return;
+                }
+                xml_schema_set_valid_errors(
+                    vctxt,
+                    Some(generic_error_default),
+                    Some(generic_error_default),
+                    None,
+                );
+                let cfilename = CString::new(filename).unwrap();
+                xml_schema_validate_set_filename(vctxt, cfilename.as_ptr());
+                let handler = {
+                    let mut hdl = XmlSAXHandler::default();
+                    std::ptr::copy(handler, &mut hdl, 1);
+                    hdl
+                };
+
+                let ret: i32 = xml_schema_validate_stream(
+                    vctxt,
+                    buf,
+                    XmlCharEncoding::None,
+                    Some(Box::new(handler)),
+                    Some(GenericErrorContext::new(user_data.as_ptr())),
+                );
+                if REPEAT.load(Ordering::Relaxed) == 0 {
+                    match ret.cmp(&0) {
+                        std::cmp::Ordering::Equal => {
+                            if !CMD_ARGS.quiet {
+                                eprintln!("{} validates", filename);
+                            }
+                        }
+                        std::cmp::Ordering::Greater => {
+                            eprintln!("{} fails to validate", filename);
+                            PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+                        }
+                        std::cmp::Ordering::Less => {
+                            eprintln!("{} validation generated an internal error", filename);
+                            PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+                        }
+                    }
+                }
+                xml_schema_free_valid_ctxt(vctxt);
+            }
+        } else {
             let handler = {
                 let mut hdl = XmlSAXHandler::default();
                 std::ptr::copy(handler, &mut hdl, 1);
                 hdl
             };
-
-            let ret: i32 = xml_schema_validate_stream(
-                vctxt,
-                buf,
-                XmlCharEncoding::None,
+            // Create the parser context amd hook the input
+            let Ok(ctxt) = xml_new_sax_parser_ctxt(
                 Some(Box::new(handler)),
                 Some(GenericErrorContext::new(user_data.as_ptr())),
-            );
-            if REPEAT.load(Ordering::Relaxed) == 0 {
-                match ret.cmp(&0) {
-                    std::cmp::Ordering::Equal => {
-                        if !CMD_ARGS.quiet {
-                            eprintln!("{} validates", filename);
-                        }
-                    }
-                    std::cmp::Ordering::Greater => {
-                        eprintln!("{} fails to validate", filename);
-                        PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
-                    }
-                    std::cmp::Ordering::Less => {
-                        eprintln!("{} validation generated an internal error", filename);
-                        PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
-                    }
-                }
-            }
-            xml_schema_free_valid_ctxt(vctxt);
-        }
-    } else {
-        let handler = {
-            let mut hdl = XmlSAXHandler::default();
-            std::ptr::copy(handler, &mut hdl, 1);
-            hdl
-        };
-        // Create the parser context amd hook the input
-        let Ok(ctxt) = xml_new_sax_parser_ctxt(
-            Some(Box::new(handler)),
-            Some(GenericErrorContext::new(user_data.as_ptr())),
-        ) else {
-            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            return;
-        };
-        xml_ctxt_read_file(ctxt, filename, None, OPTIONS.load(Ordering::Relaxed));
+            ) else {
+                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                return;
+            };
+            xml_ctxt_read_file(ctxt, filename, None, OPTIONS.load(Ordering::Relaxed));
 
-        if let Some(my_doc) = (*ctxt).my_doc.take() {
-            eprintln!("SAX generated a doc !");
-            xml_free_doc(my_doc);
+            if let Some(my_doc) = (*ctxt).my_doc.take() {
+                eprintln!("SAX generated a doc !");
+                xml_free_doc(my_doc);
+            }
+            xml_free_parser_ctxt(ctxt);
         }
-        xml_free_parser_ctxt(ctxt);
     }
 }
 
@@ -1958,115 +1989,119 @@ unsafe fn test_sax(filename: &str) {
 
 #[cfg(feature = "libxml_reader")]
 unsafe fn process_node(reader: XmlTextReaderPtr) {
-    use exml::{
-        libxml::{
-            pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
-            xmlreader::{
-                xml_text_reader_const_local_name, xml_text_reader_const_name,
-                xml_text_reader_const_namespace_uri, xml_text_reader_const_value, XmlReaderTypes,
+    unsafe {
+        use exml::{
+            libxml::{
+                pattern::{
+                    xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push,
+                },
+                xmlreader::{
+                    XmlReaderTypes, xml_text_reader_const_local_name, xml_text_reader_const_name,
+                    xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
+                },
             },
-        },
-        tree::XmlGenericNodePtr,
-    };
+            tree::XmlGenericNodePtr,
+        };
 
-    let mut name: *const XmlChar;
-    let value: *const XmlChar;
+        let mut name: *const XmlChar;
+        let value: *const XmlChar;
 
-    let typ = (*reader).node_type();
-    let empty = (*reader).is_empty_element();
+        let typ = (*reader).node_type();
+        let empty = (*reader).is_empty_element();
 
-    if CMD_ARGS.debug {
-        name = xml_text_reader_const_name(&mut *reader);
-        if name.is_null() {
-            name = c"--".as_ptr() as _;
-        }
+        if CMD_ARGS.debug {
+            name = xml_text_reader_const_name(&mut *reader);
+            if name.is_null() {
+                name = c"--".as_ptr() as _;
+            }
 
-        value = xml_text_reader_const_value(&mut *reader);
+            value = xml_text_reader_const_value(&mut *reader);
 
-        print!(
-            "{} {} {} {} {}",
-            (*reader).depth(),
-            typ as i32,
-            CStr::from_ptr(name as _).to_string_lossy(),
-            empty.map_or(-1, |e| e as i32),
-            (*reader).has_value() as i32
-        );
-        if value.is_null() {
-            println!();
-        } else {
-            println!(" {}", CStr::from_ptr(value as _).to_string_lossy());
-        }
-    }
-    #[cfg(feature = "libxml_pattern")]
-    if !PATTERNC.load(Ordering::Relaxed).is_null() {
-        let mut path = None;
-        let mut is_match: i32 = -1;
-
-        if typ == XmlReaderTypes::XmlReaderTypeElement {
-            // do the check only on element start
-            is_match = xml_pattern_match(
-                PATTERNC.load(Ordering::Relaxed),
-                (*reader).current_node().unwrap(),
+            print!(
+                "{} {} {} {} {}",
+                (*reader).depth(),
+                typ as i32,
+                CStr::from_ptr(name as _).to_string_lossy(),
+                empty.map_or(-1, |e| e as i32),
+                (*reader).has_value() as i32
             );
-
-            if is_match != 0 {
-                let pattern = CMD_ARGS.pattern.as_deref().unwrap_or("(null)");
-                #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
-                {
-                    path = (*reader).current_node().unwrap().get_node_path();
-                    println!(
-                        "Node {} matches pattern {pattern}",
-                        path.as_deref().unwrap()
-                    );
-                }
-                #[cfg(not(any(feature = "libxml_tree", feature = "libxml_debug")))]
-                {
-                    println!(
-                        "Node {} matches pattern {pattern}",
-                        CStr::from_ptr(xml_text_reader_const_name(reader)).to_string_lossy(),
-                    );
-                }
+            if value.is_null() {
+                println!();
+            } else {
+                println!(" {}", CStr::from_ptr(value as _).to_string_lossy());
             }
         }
-        if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-            let mut ret: i32;
+        #[cfg(feature = "libxml_pattern")]
+        if !PATTERNC.load(Ordering::Relaxed).is_null() {
+            let mut path = None;
+            let mut is_match: i32 = -1;
 
             if typ == XmlReaderTypes::XmlReaderTypeElement {
-                ret = xml_stream_push(
-                    PATSTREAM.load(Ordering::Relaxed),
-                    xml_text_reader_const_local_name(&mut *reader),
-                    xml_text_reader_const_namespace_uri(&mut *reader),
+                // do the check only on element start
+                is_match = xml_pattern_match(
+                    PATTERNC.load(Ordering::Relaxed),
+                    (*reader).current_node().unwrap(),
                 );
-                if ret < 0 {
-                    eprintln!("xmlStreamPush() failure");
-                    xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-                    PATSTREAM.store(null_mut(), Ordering::Relaxed);
-                } else if ret != is_match {
-                    #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
-                    if path.is_none() {
-                        path = (*reader).current_node().unwrap().get_node_path();
-                    }
-                    eprintln!("xmlPatternMatch and xmlStreamPush disagree");
+
+                if is_match != 0 {
                     let pattern = CMD_ARGS.pattern.as_deref().unwrap_or("(null)");
-                    if let Some(path) = path.as_deref() {
-                        eprintln!("  pattern {pattern} node {path}",);
-                    } else {
-                        eprintln!(
-                            "  pattern {pattern} node {}",
-                            CStr::from_ptr(xml_text_reader_const_name(&mut *reader) as _)
-                                .to_string_lossy()
+                    #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
+                    {
+                        path = (*reader).current_node().unwrap().get_node_path();
+                        println!(
+                            "Node {} matches pattern {pattern}",
+                            path.as_deref().unwrap()
+                        );
+                    }
+                    #[cfg(not(any(feature = "libxml_tree", feature = "libxml_debug")))]
+                    {
+                        println!(
+                            "Node {} matches pattern {pattern}",
+                            CStr::from_ptr(xml_text_reader_const_name(reader)).to_string_lossy(),
                         );
                     }
                 }
             }
-            if typ == XmlReaderTypes::XmlReaderTypeEndElement
-                || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap())
-            {
-                ret = xml_stream_pop(PATSTREAM.load(Ordering::Relaxed));
-                if ret < 0 {
-                    eprintln!("xmlStreamPop() failure");
-                    xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-                    PATSTREAM.store(null_mut(), Ordering::Relaxed);
+            if !PATSTREAM.load(Ordering::Relaxed).is_null() {
+                let mut ret: i32;
+
+                if typ == XmlReaderTypes::XmlReaderTypeElement {
+                    ret = xml_stream_push(
+                        PATSTREAM.load(Ordering::Relaxed),
+                        xml_text_reader_const_local_name(&mut *reader),
+                        xml_text_reader_const_namespace_uri(&mut *reader),
+                    );
+                    if ret < 0 {
+                        eprintln!("xmlStreamPush() failure");
+                        xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
+                        PATSTREAM.store(null_mut(), Ordering::Relaxed);
+                    } else if ret != is_match {
+                        #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
+                        if path.is_none() {
+                            path = (*reader).current_node().unwrap().get_node_path();
+                        }
+                        eprintln!("xmlPatternMatch and xmlStreamPush disagree");
+                        let pattern = CMD_ARGS.pattern.as_deref().unwrap_or("(null)");
+                        if let Some(path) = path.as_deref() {
+                            eprintln!("  pattern {pattern} node {path}",);
+                        } else {
+                            eprintln!(
+                                "  pattern {pattern} node {}",
+                                CStr::from_ptr(xml_text_reader_const_name(&mut *reader) as _)
+                                    .to_string_lossy()
+                            );
+                        }
+                    }
+                }
+                if typ == XmlReaderTypes::XmlReaderTypeEndElement
+                    || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap())
+                {
+                    ret = xml_stream_pop(PATSTREAM.load(Ordering::Relaxed));
+                    if ret < 0 {
+                        eprintln!("xmlStreamPop() failure");
+                        xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
+                        PATSTREAM.store(null_mut(), Ordering::Relaxed);
+                    }
                 }
             }
         }
@@ -2075,255 +2110,61 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
 
 #[cfg(feature = "libxml_reader")]
 unsafe fn stream_file(filename: *mut c_char) {
-    use std::{ptr::null, slice::from_raw_parts};
+    unsafe {
+        use std::{ptr::null, slice::from_raw_parts};
 
-    use exml::libxml::{
-        pattern::{xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_stream_push},
-        xmlreader::{
-            xml_free_text_reader, xml_reader_for_file, xml_reader_for_memory,
-            xml_text_reader_relaxng_validate, xml_text_reader_schema_validate,
-            xml_text_reader_set_parser_prop, XmlParserProperties,
-        },
-    };
-    use libc::{close, mmap, munmap, stat, MAP_FAILED, MAP_SHARED, PROT_READ};
+        use exml::libxml::{
+            pattern::{xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_stream_push},
+            xmlreader::{
+                XmlParserProperties, xml_free_text_reader, xml_reader_for_file,
+                xml_reader_for_memory, xml_text_reader_relaxng_validate,
+                xml_text_reader_schema_validate, xml_text_reader_set_parser_prop,
+            },
+        };
+        use libc::{MAP_FAILED, MAP_SHARED, PROT_READ, close, mmap, munmap, stat};
 
-    let reader: XmlTextReaderPtr;
-    let mut ret: i32;
-    let mut fd: i32 = -1;
-    let mut info: stat = unsafe { zeroed() };
-    let mut base: *const c_char = null();
+        let reader: XmlTextReaderPtr;
+        let mut ret: i32;
+        let mut fd: i32 = -1;
+        let mut info: stat = unsafe { zeroed() };
+        let mut base: *const c_char = null();
 
-    if CMD_ARGS.memory {
-        if stat(filename, addr_of_mut!(info)) < 0 {
-            return;
-        }
-        fd = open(filename, O_RDONLY);
-        if fd < 0 {
-            return;
-        }
-        base = mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
-        if base == MAP_FAILED as _ {
-            close(fd);
-            eprintln!(
-                "mmap failure for file {}",
-                CStr::from_ptr(filename).to_string_lossy()
-            );
-            PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
-            return;
-        }
-
-        let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-        reader = xml_reader_for_memory(
-            mem,
-            (!filename.is_null())
-                .then(|| CStr::from_ptr(filename as *const i8).to_string_lossy())
-                .as_deref(),
-            null_mut(),
-            OPTIONS.load(Ordering::Relaxed),
-        );
-    } else {
-        reader = xml_reader_for_file(
-            &CStr::from_ptr(filename as *const i8).to_string_lossy(),
-            null_mut(),
-            OPTIONS.load(Ordering::Relaxed),
-        );
-    }
-    #[cfg(feature = "libxml_pattern")]
-    if !PATTERNC.load(Ordering::Relaxed).is_null() {
-        PATSTREAM.store(
-            xml_pattern_get_stream_ctxt(PATTERNC.load(Ordering::Relaxed)),
-            Ordering::Relaxed,
-        );
-        if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-            ret = xml_stream_push(PATSTREAM.load(Ordering::Relaxed), null_mut(), null_mut());
-            if ret < 0 {
-                eprintln!("xmlStreamPush() failure");
-                xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-                PATSTREAM.store(null_mut(), Ordering::Relaxed);
+        if CMD_ARGS.memory {
+            if stat(filename, addr_of_mut!(info)) < 0 {
+                return;
             }
-        }
-    }
-
-    if !reader.is_null() {
-        #[cfg(feature = "libxml_valid")]
-        if CMD_ARGS.valid {
-            xml_text_reader_set_parser_prop(
-                &mut *reader,
-                XmlParserProperties::XmlParserValidate as i32,
-                1,
-            );
-        } else if CMD_ARGS.loaddtd {
-            xml_text_reader_set_parser_prop(
-                &mut *reader,
-                XmlParserProperties::XmlParserLoadDTD as i32,
-                1,
-            );
-        }
-        #[cfg(not(feature = "libxml_valid"))]
-        if CMD_ARGS.loaddtd {
-            xml_text_reader_set_parser_prop(reader, XmlParserProperties::XmlParserLoadDTD, 1);
-        }
-        #[cfg(feature = "schema")]
-        if let Some(relaxng) = CMD_ARGS.relaxng.as_deref() {
-            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-                start_timer();
+            fd = open(filename, O_RDONLY);
+            if fd < 0 {
+                return;
             }
-            let crelaxng = CString::new(relaxng).unwrap();
-            ret = xml_text_reader_relaxng_validate(reader, crelaxng.as_ptr());
-            if ret < 0 {
-                generic_error!("Relax-NG schema {relaxng} failed to compile\n");
-                PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
-            }
-            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-                end_timer!("Compiling the schemas");
-            }
-        }
-        #[cfg(feature = "schema")]
-        if let Some(schema) = CMD_ARGS.schema.as_deref() {
-            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-                start_timer();
-            }
-            let cschema = CString::new(schema).unwrap();
-            ret = xml_text_reader_schema_validate(reader, cschema.as_ptr());
-            if ret < 0 {
-                generic_error!("XSD schema {schema} failed to compile\n");
-                PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
-            }
-            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-                end_timer!("Compiling the schemas");
-            }
-        }
-
-        // Process all nodes in sequence
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            start_timer();
-        }
-        ret = (*reader).read();
-        while ret == 1 {
-            #[cfg(feature = "libxml_pattern")]
-            let f = !PATTERNC.load(Ordering::Relaxed).is_null();
-            #[cfg(not(feature = "libxml_pattern"))]
-            let f = false;
-            if CMD_ARGS.debug || f {
-                process_node(reader);
-            }
-            ret = (*reader).read();
-        }
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            #[cfg(any(feature = "schema", feature = "libxml_valid"))]
-            {
-                let mut is_validating = false;
-                #[cfg(feature = "schema")]
-                {
-                    is_validating |= CMD_ARGS.relaxng.is_some();
-                }
-                #[cfg(feature = "libxml_valid")]
-                {
-                    is_validating |= CMD_ARGS.valid;
-                }
-                if is_validating {
-                    end_timer!("Parsing and validating");
-                } else {
-                    end_timer!("Parsing");
-                }
-            }
-            #[cfg(not(any(feature = "schema", feature = "libxml_valid")))]
-            {
-                end_timer!("Parsing");
-            }
-        }
-
-        #[cfg(feature = "libxml_valid")]
-        if CMD_ARGS.valid && !(*reader).is_valid().unwrap_or(false) {
-            let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
-            generic_error!("Document {filename} does not validate\n");
-            PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
-        }
-        #[cfg(feature = "schema")]
-        if CMD_ARGS.relaxng.is_some() || CMD_ARGS.schema.is_some() {
-            if !(*reader).is_valid().unwrap_or(false) {
+            base = mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
+            if base == MAP_FAILED as _ {
+                close(fd);
                 eprintln!(
-                    "{} fails to validate",
+                    "mmap failure for file {}",
                     CStr::from_ptr(filename).to_string_lossy()
                 );
-                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
-            } else if !CMD_ARGS.quiet {
-                eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
+                PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
+                return;
             }
-        }
-        // Done, cleanup and status
-        xml_free_text_reader(reader);
-        if ret != 0 {
-            eprintln!(
-                "{} : failed to parse",
-                CStr::from_ptr(filename).to_string_lossy()
+
+            let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
+            reader = xml_reader_for_memory(
+                mem,
+                (!filename.is_null())
+                    .then(|| CStr::from_ptr(filename as *const i8).to_string_lossy())
+                    .as_deref(),
+                null_mut(),
+                OPTIONS.load(Ordering::Relaxed),
             );
-            PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
-        }
-    } else {
-        eprintln!(
-            "Unable to open {}",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
-        PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
-    }
-    #[cfg(feature = "libxml_pattern")]
-    if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-        xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-        PATSTREAM.store(null_mut(), Ordering::Relaxed);
-    }
-    if CMD_ARGS.memory {
-        // xml_free_parser_input_buffer(input);
-        munmap(base as _, info.st_size as _);
-        close(fd);
-    }
-}
-
-#[cfg(feature = "libxml_reader")]
-unsafe fn walk_doc(doc: XmlDocPtr) {
-    use std::{ptr::null, sync::atomic::Ordering};
-
-    use exml::libxml::{
-        pattern::{
-            xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile, xml_stream_push,
-        },
-        xmlreader::{xml_free_text_reader, xml_reader_walker},
-    };
-
-    let mut ret: i32;
-
-    #[cfg(feature = "libxml_pattern")]
-    {
-        let mut namespaces: [(*const u8, *const u8); 22] = [(null(), null()); 22];
-
-        let Some(root) = doc.get_root_element() else {
-            generic_error!("Document does not have a root element");
-            PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
-            return;
-        };
-        let mut i = 0;
-        let mut ns = root.ns_def;
-        while let Some(now) = ns.filter(|_| i < 10) {
-            namespaces[i] = (now.href, now.prefix);
-            i += 1;
-            ns = now.next;
-        }
-
-        if let Some(pattern) = CMD_ARGS.path.as_deref() {
-            let cpattern = CString::new(pattern).unwrap();
-            PATTERNC.store(
-                xml_patterncompile(
-                    cpattern.as_ptr() as *const u8,
-                    0,
-                    Some(namespaces[..=i].to_vec()),
-                ),
-                Ordering::Relaxed,
+        } else {
+            reader = xml_reader_for_file(
+                &CStr::from_ptr(filename as *const i8).to_string_lossy(),
+                null_mut(),
+                OPTIONS.load(Ordering::Relaxed),
             );
-            if PATTERNC.load(Ordering::Relaxed).is_null() {
-                generic_error!("Pattern {pattern} failed to compile\n");
-                PROGRESULT.store(ERR_SCHEMAPAT, Ordering::Relaxed);
-            }
         }
+        #[cfg(feature = "libxml_pattern")]
         if !PATTERNC.load(Ordering::Relaxed).is_null() {
             PATSTREAM.store(
                 xml_pattern_get_stream_ctxt(PATTERNC.load(Ordering::Relaxed)),
@@ -2338,1022 +2179,1241 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
                 }
             }
         }
-    }
-    let reader: XmlTextReaderPtr = xml_reader_walker(doc);
-    if !reader.is_null() {
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            start_timer();
-        }
-        ret = (*reader).read();
-        while ret == 1 {
-            #[cfg(feature = "libxml_pattern")]
-            let f = !PATTERNC.load(Ordering::Relaxed).is_null();
-            #[cfg(not(feature = "libxml_pattern"))]
-            let f = false;
-            if CMD_ARGS.debug || f {
-                process_node(reader);
+
+        if !reader.is_null() {
+            #[cfg(feature = "libxml_valid")]
+            if CMD_ARGS.valid {
+                xml_text_reader_set_parser_prop(
+                    &mut *reader,
+                    XmlParserProperties::XmlParserValidate as i32,
+                    1,
+                );
+            } else if CMD_ARGS.loaddtd {
+                xml_text_reader_set_parser_prop(
+                    &mut *reader,
+                    XmlParserProperties::XmlParserLoadDTD as i32,
+                    1,
+                );
+            }
+            #[cfg(not(feature = "libxml_valid"))]
+            if CMD_ARGS.loaddtd {
+                xml_text_reader_set_parser_prop(reader, XmlParserProperties::XmlParserLoadDTD, 1);
+            }
+            #[cfg(feature = "schema")]
+            if let Some(relaxng) = CMD_ARGS.relaxng.as_deref() {
+                if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                    start_timer();
+                }
+                let crelaxng = CString::new(relaxng).unwrap();
+                ret = xml_text_reader_relaxng_validate(reader, crelaxng.as_ptr());
+                if ret < 0 {
+                    generic_error!("Relax-NG schema {relaxng} failed to compile\n");
+                    PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
+                }
+                if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                    end_timer!("Compiling the schemas");
+                }
+            }
+            #[cfg(feature = "schema")]
+            if let Some(schema) = CMD_ARGS.schema.as_deref() {
+                if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                    start_timer();
+                }
+                let cschema = CString::new(schema).unwrap();
+                ret = xml_text_reader_schema_validate(reader, cschema.as_ptr());
+                if ret < 0 {
+                    generic_error!("XSD schema {schema} failed to compile\n");
+                    PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
+                }
+                if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                    end_timer!("Compiling the schemas");
+                }
+            }
+
+            // Process all nodes in sequence
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                start_timer();
             }
             ret = (*reader).read();
-        }
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            end_timer!("walking through the doc");
-        }
-        xml_free_text_reader(reader);
-        if ret != 0 {
-            eprintln!("failed to walk through the doc");
+            while ret == 1 {
+                #[cfg(feature = "libxml_pattern")]
+                let f = !PATTERNC.load(Ordering::Relaxed).is_null();
+                #[cfg(not(feature = "libxml_pattern"))]
+                let f = false;
+                if CMD_ARGS.debug || f {
+                    process_node(reader);
+                }
+                ret = (*reader).read();
+            }
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                #[cfg(any(feature = "schema", feature = "libxml_valid"))]
+                {
+                    let mut is_validating = false;
+                    #[cfg(feature = "schema")]
+                    {
+                        is_validating |= CMD_ARGS.relaxng.is_some();
+                    }
+                    #[cfg(feature = "libxml_valid")]
+                    {
+                        is_validating |= CMD_ARGS.valid;
+                    }
+                    if is_validating {
+                        end_timer!("Parsing and validating");
+                    } else {
+                        end_timer!("Parsing");
+                    }
+                }
+                #[cfg(not(any(feature = "schema", feature = "libxml_valid")))]
+                {
+                    end_timer!("Parsing");
+                }
+            }
+
+            #[cfg(feature = "libxml_valid")]
+            if CMD_ARGS.valid && !(*reader).is_valid().unwrap_or(false) {
+                let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
+                generic_error!("Document {filename} does not validate\n");
+                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+            }
+            #[cfg(feature = "schema")]
+            if CMD_ARGS.relaxng.is_some() || CMD_ARGS.schema.is_some() {
+                if !(*reader).is_valid().unwrap_or(false) {
+                    eprintln!(
+                        "{} fails to validate",
+                        CStr::from_ptr(filename).to_string_lossy()
+                    );
+                    PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+                } else if !CMD_ARGS.quiet {
+                    eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
+                }
+            }
+            // Done, cleanup and status
+            xml_free_text_reader(reader);
+            if ret != 0 {
+                eprintln!(
+                    "{} : failed to parse",
+                    CStr::from_ptr(filename).to_string_lossy()
+                );
+                PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
+            }
+        } else {
+            eprintln!(
+                "Unable to open {}",
+                CStr::from_ptr(filename).to_string_lossy()
+            );
             PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         }
-    } else {
-        eprintln!("Failed to crate a reader from the document");
-        PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
+        #[cfg(feature = "libxml_pattern")]
+        if !PATSTREAM.load(Ordering::Relaxed).is_null() {
+            xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
+            PATSTREAM.store(null_mut(), Ordering::Relaxed);
+        }
+        if CMD_ARGS.memory {
+            // xml_free_parser_input_buffer(input);
+            munmap(base as _, info.st_size as _);
+            close(fd);
+        }
     }
-    #[cfg(feature = "libxml_pattern")]
-    if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-        xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-        PATSTREAM.store(null_mut(), Ordering::Relaxed);
+}
+
+#[cfg(feature = "libxml_reader")]
+unsafe fn walk_doc(doc: XmlDocPtr) {
+    unsafe {
+        use std::{ptr::null, sync::atomic::Ordering};
+
+        use exml::libxml::{
+            pattern::{
+                xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile,
+                xml_stream_push,
+            },
+            xmlreader::{xml_free_text_reader, xml_reader_walker},
+        };
+
+        let mut ret: i32;
+
+        #[cfg(feature = "libxml_pattern")]
+        {
+            let mut namespaces: [(*const u8, *const u8); 22] = [(null(), null()); 22];
+
+            let Some(root) = doc.get_root_element() else {
+                generic_error!("Document does not have a root element");
+                PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
+                return;
+            };
+            let mut i = 0;
+            let mut ns = root.ns_def;
+            while let Some(now) = ns.filter(|_| i < 10) {
+                namespaces[i] = (now.href, now.prefix);
+                i += 1;
+                ns = now.next;
+            }
+
+            if let Some(pattern) = CMD_ARGS.path.as_deref() {
+                let cpattern = CString::new(pattern).unwrap();
+                PATTERNC.store(
+                    xml_patterncompile(
+                        cpattern.as_ptr() as *const u8,
+                        0,
+                        Some(namespaces[..=i].to_vec()),
+                    ),
+                    Ordering::Relaxed,
+                );
+                if PATTERNC.load(Ordering::Relaxed).is_null() {
+                    generic_error!("Pattern {pattern} failed to compile\n");
+                    PROGRESULT.store(ERR_SCHEMAPAT, Ordering::Relaxed);
+                }
+            }
+            if !PATTERNC.load(Ordering::Relaxed).is_null() {
+                PATSTREAM.store(
+                    xml_pattern_get_stream_ctxt(PATTERNC.load(Ordering::Relaxed)),
+                    Ordering::Relaxed,
+                );
+                if !PATSTREAM.load(Ordering::Relaxed).is_null() {
+                    ret =
+                        xml_stream_push(PATSTREAM.load(Ordering::Relaxed), null_mut(), null_mut());
+                    if ret < 0 {
+                        eprintln!("xmlStreamPush() failure");
+                        xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
+                        PATSTREAM.store(null_mut(), Ordering::Relaxed);
+                    }
+                }
+            }
+        }
+        let reader: XmlTextReaderPtr = xml_reader_walker(doc);
+        if !reader.is_null() {
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                start_timer();
+            }
+            ret = (*reader).read();
+            while ret == 1 {
+                #[cfg(feature = "libxml_pattern")]
+                let f = !PATTERNC.load(Ordering::Relaxed).is_null();
+                #[cfg(not(feature = "libxml_pattern"))]
+                let f = false;
+                if CMD_ARGS.debug || f {
+                    process_node(reader);
+                }
+                ret = (*reader).read();
+            }
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                end_timer!("walking through the doc");
+            }
+            xml_free_text_reader(reader);
+            if ret != 0 {
+                eprintln!("failed to walk through the doc");
+                PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
+            }
+        } else {
+            eprintln!("Failed to crate a reader from the document");
+            PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
+        }
+        #[cfg(feature = "libxml_pattern")]
+        if !PATSTREAM.load(Ordering::Relaxed).is_null() {
+            xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
+            PATSTREAM.store(null_mut(), Ordering::Relaxed);
+        }
     }
 }
 
 // XPath Query
 #[cfg(feature = "xpath")]
 unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
-    use std::{cell::RefCell, io::stdout, rc::Rc};
+    unsafe {
+        use std::{cell::RefCell, io::stdout, rc::Rc};
 
-    use exml::{
-        io::XmlOutputBuffer,
-        xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
-    };
+        use exml::{
+            io::XmlOutputBuffer,
+            xpath::{XmlXPathObjectType, xml_xpath_is_inf, xml_xpath_is_nan},
+        };
 
-    match (*cur).typ {
-        XmlXPathObjectType::XPathNodeset => {
-            #[cfg(feature = "libxml_output")]
-            {
-                if let Some(nodeset) = (*cur).nodesetval.as_deref() {
-                    if !nodeset.node_tab.is_empty() {
-                        let Some(buf) = XmlOutputBuffer::from_writer(stdout(), None) else {
-                            eprintln!("Out of memory for XPath");
-                            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                            return;
-                        };
-                        let buf = Rc::new(RefCell::new(buf));
-                        for &node in &nodeset.node_tab {
-                            node.dump_output(buf.clone(), None, 0, 0, None);
-                            buf.borrow_mut().write_bytes(b"\n").ok();
+        match (*cur).typ {
+            XmlXPathObjectType::XPathNodeset => {
+                #[cfg(feature = "libxml_output")]
+                {
+                    if let Some(nodeset) = (*cur).nodesetval.as_deref() {
+                        if !nodeset.node_tab.is_empty() {
+                            let Some(buf) = XmlOutputBuffer::from_writer(stdout(), None) else {
+                                eprintln!("Out of memory for XPath");
+                                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                                return;
+                            };
+                            let buf = Rc::new(RefCell::new(buf));
+                            for &node in &nodeset.node_tab {
+                                node.dump_output(buf.clone(), None, 0, 0, None);
+                                buf.borrow_mut().write_bytes(b"\n").ok();
+                            }
+                            buf.borrow_mut().flush();
+                        } else if !CMD_ARGS.quiet {
+                            eprintln!("XPath set is empty");
                         }
-                        buf.borrow_mut().flush();
                     } else if !CMD_ARGS.quiet {
                         eprintln!("XPath set is empty");
                     }
-                } else if !CMD_ARGS.quiet {
-                    eprintln!("XPath set is empty");
+                }
+                #[cfg(not(feature = "libxml_output"))]
+                {
+                    println!("xpath returned {} nodes", (*(*cur).nodesetval).node_nr);
                 }
             }
-            #[cfg(not(feature = "libxml_output"))]
-            {
-                println!("xpath returned {} nodes", (*(*cur).nodesetval).node_nr);
+            XmlXPathObjectType::XPathBoolean => {
+                if (*cur).boolval {
+                    println!("true");
+                } else {
+                    println!("false");
+                }
             }
-        }
-        XmlXPathObjectType::XPathBoolean => {
-            if (*cur).boolval {
-                println!("true");
-            } else {
-                println!("false");
+            XmlXPathObjectType::XPathNumber => match xml_xpath_is_inf((*cur).floatval) {
+                1 => {
+                    println!("Infinity");
+                }
+                -1 => {
+                    println!("-Infinity");
+                }
+                _ => {
+                    if xml_xpath_is_nan((*cur).floatval) {
+                        println!("NaN");
+                    } else {
+                        println!("{}", (*cur).floatval);
+                    }
+                }
+            },
+            XmlXPathObjectType::XPathString => {
+                println!("{}", (*cur).stringval.as_deref().unwrap());
             }
-        }
-        XmlXPathObjectType::XPathNumber => match xml_xpath_is_inf((*cur).floatval) {
-            1 => {
-                println!("Infinity");
-            }
-            -1 => {
-                println!("-Infinity");
+            XmlXPathObjectType::XPathUndefined => {
+                eprintln!("XPath Object is uninitialized");
+                PROGRESULT.store(ERR_XPATH, Ordering::Relaxed);
             }
             _ => {
-                if xml_xpath_is_nan((*cur).floatval) {
-                    println!("NaN");
-                } else {
-                    println!("{}", (*cur).floatval);
-                }
+                eprintln!("XPath object of unexpected type");
+                PROGRESULT.store(ERR_XPATH, Ordering::Relaxed);
             }
-        },
-        XmlXPathObjectType::XPathString => {
-            println!("{}", (*cur).stringval.as_deref().unwrap());
-        }
-        XmlXPathObjectType::XPathUndefined => {
-            eprintln!("XPath Object is uninitialized");
-            PROGRESULT.store(ERR_XPATH, Ordering::Relaxed);
-        }
-        _ => {
-            eprintln!("XPath object of unexpected type");
-            PROGRESULT.store(ERR_XPATH, Ordering::Relaxed);
         }
     }
 }
 
 #[cfg(feature = "xpath")]
 unsafe fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
-    use exml::xpath::{
-        xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object, xml_xpath_new_context,
-        XmlXPathContextPtr,
-    };
+    unsafe {
+        use exml::xpath::{
+            XmlXPathContextPtr, xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object,
+            xml_xpath_new_context,
+        };
 
-    let ctxt: XmlXPathContextPtr = xml_xpath_new_context(Some(doc));
-    if ctxt.is_null() {
-        eprintln!("Out of memory for XPath");
-        PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-        return;
-    }
-    (*ctxt).node = Some(doc.into());
-    let res: XmlXPathObjectPtr = xml_xpath_eval(query as _, ctxt);
-    xml_xpath_free_context(ctxt);
+        let ctxt: XmlXPathContextPtr = xml_xpath_new_context(Some(doc));
+        if ctxt.is_null() {
+            eprintln!("Out of memory for XPath");
+            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+            return;
+        }
+        (*ctxt).node = Some(doc.into());
+        let res: XmlXPathObjectPtr = xml_xpath_eval(query as _, ctxt);
+        xml_xpath_free_context(ctxt);
 
-    if res.is_null() {
-        eprintln!("XPath evaluation failure");
-        PROGRESULT.store(ERR_XPATH, Ordering::Relaxed);
-        return;
+        if res.is_null() {
+            eprintln!("XPath evaluation failure");
+            PROGRESULT.store(ERR_XPATH, Ordering::Relaxed);
+            return;
+        }
+        do_xpath_dump(res);
+        xml_xpath_free_object(res);
     }
-    do_xpath_dump(res);
-    xml_xpath_free_object(res);
 }
 
 // Tree Test processing
 
 unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr) {
-    if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-        start_timer();
-    }
-
-    let doc = match filename {
-        #[cfg(feature = "libxml_tree")]
-        None => {
-            if CMD_ARGS.auto {
-                let mut doc = xml_new_doc(Some("1.0")).unwrap();
-                let mut n = xml_new_doc_node(Some(doc), None, "info", null_mut()).unwrap();
-                n.set_content(c"abc".as_ptr() as _);
-                doc.set_root_element(n);
-                Some(doc)
-            } else {
-                None
-            }
+    unsafe {
+        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+            start_timer();
         }
-        #[cfg(all(feature = "html", feature = "libxml_push"))]
-        _ if CMD_ARGS.html && CMD_ARGS.push => {
-            extern "C" {
-                static stdin: *mut FILE;
+
+        let doc = match filename {
+            #[cfg(feature = "libxml_tree")]
+            None => {
+                if CMD_ARGS.auto {
+                    let mut doc = xml_new_doc(Some("1.0")).unwrap();
+                    let mut n = xml_new_doc_node(Some(doc), None, "info", null_mut()).unwrap();
+                    n.set_content(c"abc".as_ptr() as _);
+                    doc.set_root_element(n);
+                    Some(doc)
+                } else {
+                    None
+                }
             }
+            #[cfg(all(feature = "html", feature = "libxml_push"))]
+            _ if CMD_ARGS.html && CMD_ARGS.push => {
+                unsafe extern "C" {
+                    static stdin: *mut FILE;
+                }
 
-            let f = if filename == Some("-") {
-                stdin
-            } else {
-                let f = CString::new(filename.unwrap()).unwrap();
-                fopen(f.as_ptr(), c"rb".as_ptr())
-            };
-            let mut doc = None;
-            if !f.is_null() {
-                let mut res: i32;
-                let mut chars: [c_char; 4096] = [0; 4096];
-                let ctxt: HtmlParserCtxtPtr;
+                let f = if filename == Some("-") {
+                    stdin
+                } else {
+                    let f = CString::new(filename.unwrap()).unwrap();
+                    fopen(f.as_ptr(), c"rb".as_ptr())
+                };
+                let mut doc = None;
+                if !f.is_null() {
+                    let mut res: i32;
+                    let mut chars: [c_char; 4096] = [0; 4096];
+                    let ctxt: HtmlParserCtxtPtr;
 
-                res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
-                if res > 0 {
-                    ctxt = html_create_push_parser_ctxt(
-                        None,
-                        None,
-                        chars.as_ptr(),
-                        res,
-                        filename,
-                        XmlCharEncoding::None,
-                    );
-                    if ctxt.is_null() {
-                        PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                        if f != stdin {
-                            fclose(f);
+                    res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
+                    if res > 0 {
+                        ctxt = html_create_push_parser_ctxt(
+                            None,
+                            None,
+                            chars.as_ptr(),
+                            res,
+                            filename,
+                            XmlCharEncoding::None,
+                        );
+                        if ctxt.is_null() {
+                            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                            if f != stdin {
+                                fclose(f);
+                            }
+                            return;
                         }
-                        return;
+                        html_ctxt_use_options(ctxt, OPTIONS.load(Ordering::Relaxed));
+                        while {
+                            res = fread(
+                                chars.as_mut_ptr() as _,
+                                1,
+                                PUSHSIZE.load(Ordering::Relaxed),
+                                f,
+                            ) as _;
+                            res > 0
+                        } {
+                            html_parse_chunk(ctxt, chars.as_ptr(), res, 0);
+                        }
+                        html_parse_chunk(ctxt, chars.as_ptr(), 0, 1);
+                        doc = (*ctxt).my_doc;
+                        html_free_parser_ctxt(ctxt);
                     }
-                    html_ctxt_use_options(ctxt, OPTIONS.load(Ordering::Relaxed));
-                    while {
-                        res = fread(
-                            chars.as_mut_ptr() as _,
-                            1,
-                            PUSHSIZE.load(Ordering::Relaxed),
-                            f,
-                        ) as _;
-                        res > 0
-                    } {
-                        html_parse_chunk(ctxt, chars.as_ptr(), res, 0);
+                    if f != stdin {
+                        fclose(f);
                     }
-                    html_parse_chunk(ctxt, chars.as_ptr(), 0, 1);
-                    doc = (*ctxt).my_doc;
-                    html_free_parser_ctxt(ctxt);
                 }
-                if f != stdin {
-                    fclose(f);
+                doc
+            }
+            #[cfg(feature = "html")]
+            _ if CMD_ARGS.html && CMD_ARGS.memory => {
+                let mut info: stat = unsafe { zeroed() };
+                let fname = CString::new(filename.unwrap()).unwrap();
+                if stat(fname.as_ptr(), addr_of_mut!(info)) < 0 {
+                    return;
                 }
-            }
-            doc
-        }
-        #[cfg(feature = "html")]
-        _ if CMD_ARGS.html && CMD_ARGS.memory => {
-            let mut info: stat = unsafe { zeroed() };
-            let fname = CString::new(filename.unwrap()).unwrap();
-            if stat(fname.as_ptr(), addr_of_mut!(info)) < 0 {
-                return;
-            }
-            let fd: i32 = open(fname.as_ptr(), O_RDONLY);
-            if fd < 0 {
-                return;
-            }
-            let base: *const c_char =
-                mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
-            if base == MAP_FAILED as _ {
+                let fd: i32 = open(fname.as_ptr(), O_RDONLY);
+                if fd < 0 {
+                    return;
+                }
+                let base: *const c_char =
+                    mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
+                if base == MAP_FAILED as _ {
+                    close(fd);
+                    eprintln!("mmap failure for file {}", filename.unwrap());
+                    PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
+                    return;
+                }
+
+                let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
+                let doc = html_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed));
+
+                munmap(base as _, info.st_size as _);
                 close(fd);
-                eprintln!("mmap failure for file {}", filename.unwrap());
-                PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
-                return;
+                doc
             }
-
-            let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-            let doc = html_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed));
-
-            munmap(base as _, info.st_size as _);
-            close(fd);
-            doc
-        }
-        #[cfg(feature = "html")]
-        _ if CMD_ARGS.html => {
-            html_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed))
-        }
-        #[cfg(feature = "libxml_push")]
-        _ if CMD_ARGS.push => {
-            // build an XML tree from a string;
-
-            extern "C" {
-                static stdin: *mut FILE;
+            #[cfg(feature = "html")]
+            _ if CMD_ARGS.html => {
+                html_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed))
             }
+            #[cfg(feature = "libxml_push")]
+            _ if CMD_ARGS.push => {
+                // build an XML tree from a string;
 
-            let fname = filename.map(|f| CString::new(f).unwrap());
-            // '-' Usually means stdin -<sven@zen.org>
-            let f = if filename == Some("-") {
-                stdin
-            } else {
-                fopen(
-                    fname.as_ref().map_or(null(), |f| f.as_ptr()),
-                    c"rb".as_ptr(),
-                )
-            };
-            let mut doc = None;
-            if !f.is_null() {
-                let ret: i32;
-                let mut res: i32;
-                let size: i32 = 1024;
-                let mut chars: [c_char; 1024] = [0; 1024];
+                unsafe extern "C" {
+                    static stdin: *mut FILE;
+                }
+
+                let fname = filename.map(|f| CString::new(f).unwrap());
+                // '-' Usually means stdin -<sven@zen.org>
+                let f = if filename == Some("-") {
+                    stdin
+                } else {
+                    fopen(
+                        fname.as_ref().map_or(null(), |f| f.as_ptr()),
+                        c"rb".as_ptr(),
+                    )
+                };
+                let mut doc = None;
+                if !f.is_null() {
+                    let ret: i32;
+                    let mut res: i32;
+                    let size: i32 = 1024;
+                    let mut chars: [c_char; 1024] = [0; 1024];
+                    let ctxt: XmlParserCtxtPtr;
+
+                    // if (repeat) size = 1024;
+                    res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
+                    if res > 0 {
+                        ctxt =
+                            xml_create_push_parser_ctxt(None, None, chars.as_ptr(), res, filename);
+                        if ctxt.is_null() {
+                            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                            if f != stdin {
+                                fclose(f);
+                            }
+                            return;
+                        }
+                        xml_ctxt_use_options(ctxt, OPTIONS.load(Ordering::Relaxed));
+                        while {
+                            res = fread(chars.as_mut_ptr() as _, 1, size as _, f) as i32;
+                            res > 0
+                        } {
+                            xml_parse_chunk(ctxt, chars.as_ptr(), res, 0);
+                        }
+                        xml_parse_chunk(ctxt, chars.as_ptr(), 0, 1);
+                        doc = (*ctxt).my_doc;
+                        ret = (*ctxt).well_formed;
+                        xml_free_parser_ctxt(ctxt);
+                        if ret == 0 && !CMD_ARGS.recover {
+                            if let Some(doc) = doc.take() {
+                                xml_free_doc(doc);
+                            }
+                        }
+                    }
+                    if f != stdin {
+                        fclose(f);
+                    }
+                }
+                doc
+            }
+            _ if CMD_ARGS.test_io => {
+                if filename == Some("-") {
+                    xml_read_io(stdin(), None, None, OPTIONS.load(Ordering::Relaxed))
+                } else if let Some(Ok(f)) = filename.map(File::open) {
+                    if rectxt.is_null() {
+                        xml_read_io(f, filename, None, OPTIONS.load(Ordering::Relaxed))
+                    } else {
+                        xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS.load(Ordering::Relaxed))
+                    }
+                } else {
+                    None
+                }
+            }
+            _ if CMD_ARGS.htmlout => {
                 let ctxt: XmlParserCtxtPtr;
 
-                // if (repeat) size = 1024;
-                res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
-                if res > 0 {
-                    ctxt = xml_create_push_parser_ctxt(None, None, chars.as_ptr(), res, filename);
+                if rectxt.is_null() {
+                    ctxt = xml_new_parser_ctxt();
                     if ctxt.is_null() {
                         PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                        if f != stdin {
-                            fclose(f);
-                        }
                         return;
                     }
-                    xml_ctxt_use_options(ctxt, OPTIONS.load(Ordering::Relaxed));
-                    while {
-                        res = fread(chars.as_mut_ptr() as _, 1, size as _, f) as i32;
-                        res > 0
-                    } {
-                        xml_parse_chunk(ctxt, chars.as_ptr(), res, 0);
-                    }
-                    xml_parse_chunk(ctxt, chars.as_ptr(), 0, 1);
-                    doc = (*ctxt).my_doc;
-                    ret = (*ctxt).well_formed;
-                    xml_free_parser_ctxt(ctxt);
-                    if ret == 0 && !CMD_ARGS.recover {
-                        if let Some(doc) = doc.take() {
-                            xml_free_doc(doc);
-                        }
-                    }
-                }
-                if f != stdin {
-                    fclose(f);
-                }
-            }
-            doc
-        }
-        _ if CMD_ARGS.test_io => {
-            if filename == Some("-") {
-                xml_read_io(stdin(), None, None, OPTIONS.load(Ordering::Relaxed))
-            } else if let Some(Ok(f)) = filename.map(File::open) {
-                if rectxt.is_null() {
-                    xml_read_io(f, filename, None, OPTIONS.load(Ordering::Relaxed))
                 } else {
-                    xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS.load(Ordering::Relaxed))
+                    ctxt = rectxt;
                 }
-            } else {
-                None
-            }
-        }
-        _ if CMD_ARGS.htmlout => {
-            let ctxt: XmlParserCtxtPtr;
 
-            if rectxt.is_null() {
-                ctxt = xml_new_parser_ctxt();
-                if ctxt.is_null() {
-                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                    return;
+                if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                    sax.error = Some(xml_html_error);
+                    sax.warning = Some(xml_html_warning);
                 }
-            } else {
-                ctxt = rectxt;
-            }
+                (*ctxt).vctxt.error = Some(xml_html_validity_error);
+                (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
 
-            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-                sax.error = Some(xml_html_error);
-                sax.warning = Some(xml_html_warning);
-            }
-            (*ctxt).vctxt.error = Some(xml_html_validity_error);
-            (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
-
-            let doc = xml_ctxt_read_file(
-                ctxt,
-                filename.unwrap(),
-                None,
-                OPTIONS.load(Ordering::Relaxed),
-            );
-
-            if rectxt.is_null() {
-                xml_free_parser_ctxt(ctxt);
-            }
-            doc
-        }
-        _ if CMD_ARGS.memory => {
-            let mut info: stat = unsafe { zeroed() };
-            let fname = filename.map(|f| CString::new(f).unwrap());
-
-            if stat(
-                fname.as_ref().map_or(null(), |f| f.as_ptr()),
-                addr_of_mut!(info),
-            ) < 0
-            {
-                return;
-            }
-            let fd: i32 = open(fname.map_or(null(), |f| f.as_ptr()), O_RDONLY);
-            if fd < 0 {
-                return;
-            }
-            let base: *const c_char =
-                mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
-            if base == MAP_FAILED as _ {
-                close(fd);
-                eprintln!("mmap failure for file {}", filename.unwrap());
-                PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
-                return;
-            }
-
-            let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-            let doc = if rectxt.is_null() {
-                xml_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
-            } else {
-                xml_ctxt_read_memory(rectxt, mem, filename, None, OPTIONS.load(Ordering::Relaxed))
-            };
-
-            munmap(base as _, info.st_size as _);
-            close(fd);
-            doc
-        }
-        #[cfg(feature = "libxml_valid")]
-        _ if CMD_ARGS.valid => {
-            let ctxt: XmlParserCtxtPtr;
-
-            if rectxt.is_null() {
-                ctxt = xml_new_parser_ctxt();
-                if ctxt.is_null() {
-                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                    return;
-                }
-            } else {
-                ctxt = rectxt;
-            }
-
-            let doc = xml_ctxt_read_file(
-                ctxt,
-                filename.unwrap(),
-                None,
-                OPTIONS.load(Ordering::Relaxed),
-            );
-
-            if (*ctxt).valid == 0 {
-                PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
-            }
-            if rectxt.is_null() {
-                xml_free_parser_ctxt(ctxt);
-            }
-            doc
-        }
-        _ => {
-            if !rectxt.is_null() {
-                xml_ctxt_read_file(
-                    rectxt,
+                let doc = xml_ctxt_read_file(
+                    ctxt,
                     filename.unwrap(),
                     None,
                     OPTIONS.load(Ordering::Relaxed),
-                )
-            } else {
-                xml_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed))
+                );
+
+                if rectxt.is_null() {
+                    xml_free_parser_ctxt(ctxt);
+                }
+                doc
+            }
+            _ if CMD_ARGS.memory => {
+                let mut info: stat = unsafe { zeroed() };
+                let fname = filename.map(|f| CString::new(f).unwrap());
+
+                if stat(
+                    fname.as_ref().map_or(null(), |f| f.as_ptr()),
+                    addr_of_mut!(info),
+                ) < 0
+                {
+                    return;
+                }
+                let fd: i32 = open(fname.map_or(null(), |f| f.as_ptr()), O_RDONLY);
+                if fd < 0 {
+                    return;
+                }
+                let base: *const c_char =
+                    mmap(null_mut(), info.st_size as _, PROT_READ, MAP_SHARED, fd, 0) as _;
+                if base == MAP_FAILED as _ {
+                    close(fd);
+                    eprintln!("mmap failure for file {}", filename.unwrap());
+                    PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
+                    return;
+                }
+
+                let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
+                let doc = if rectxt.is_null() {
+                    xml_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed))
+                } else {
+                    xml_ctxt_read_memory(
+                        rectxt,
+                        mem,
+                        filename,
+                        None,
+                        OPTIONS.load(Ordering::Relaxed),
+                    )
+                };
+
+                munmap(base as _, info.st_size as _);
+                close(fd);
+                doc
+            }
+            #[cfg(feature = "libxml_valid")]
+            _ if CMD_ARGS.valid => {
+                let ctxt: XmlParserCtxtPtr;
+
+                if rectxt.is_null() {
+                    ctxt = xml_new_parser_ctxt();
+                    if ctxt.is_null() {
+                        PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                        return;
+                    }
+                } else {
+                    ctxt = rectxt;
+                }
+
+                let doc = xml_ctxt_read_file(
+                    ctxt,
+                    filename.unwrap(),
+                    None,
+                    OPTIONS.load(Ordering::Relaxed),
+                );
+
+                if (*ctxt).valid == 0 {
+                    PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
+                }
+                if rectxt.is_null() {
+                    xml_free_parser_ctxt(ctxt);
+                }
+                doc
+            }
+            _ => {
+                if !rectxt.is_null() {
+                    xml_ctxt_read_file(
+                        rectxt,
+                        filename.unwrap(),
+                        None,
+                        OPTIONS.load(Ordering::Relaxed),
+                    )
+                } else {
+                    xml_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed))
+                }
+            }
+        };
+
+        // If we don't have a document we might as well give up.
+        // Do we want an error message here?  <sven@zen.org>
+        let Some(mut doc) = doc else {
+            PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
+            return;
+        };
+
+        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+            end_timer!("Parsing");
+        }
+
+        // Remove DOCTYPE nodes
+        if CMD_ARGS.dropdtd {
+            let dtd = doc.get_int_subset();
+            if let Some(mut dtd) = dtd {
+                (*dtd).unlink();
+                doc.int_subset = None;
+                xml_free_dtd(dtd);
             }
         }
-    };
 
-    // If we don't have a document we might as well give up.
-    // Do we want an error message here?  <sven@zen.org>
-    let Some(mut doc) = doc else {
-        PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
-        return;
-    };
-
-    if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-        end_timer!("Parsing");
-    }
-
-    // Remove DOCTYPE nodes
-    if CMD_ARGS.dropdtd {
-        let dtd = doc.get_int_subset();
-        if let Some(mut dtd) = dtd {
-            (*dtd).unlink();
-            doc.int_subset = None;
-            xml_free_dtd(dtd);
+        #[cfg(feature = "xinclude")]
+        if CMD_ARGS.xinclude {
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                start_timer();
+            }
+            if xml_xinclude_process_flags(doc, OPTIONS.load(Ordering::Relaxed)) < 0 {
+                PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
+            }
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                end_timer!("Xinclude processing");
+            }
         }
-    }
 
-    #[cfg(feature = "xinclude")]
-    if CMD_ARGS.xinclude {
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            start_timer();
+        #[cfg(feature = "xpath")]
+        if let Some(query) = CMD_ARGS.xpath.as_deref() {
+            let query = CString::new(query).unwrap();
+            do_xpath_query(doc, query.as_ptr());
         }
-        if xml_xinclude_process_flags(doc, OPTIONS.load(Ordering::Relaxed)) < 0 {
-            PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
-        }
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            end_timer!("Xinclude processing");
-        }
-    }
 
-    #[cfg(feature = "xpath")]
-    if let Some(query) = CMD_ARGS.xpath.as_deref() {
-        let query = CString::new(query).unwrap();
-        do_xpath_query(doc, query.as_ptr());
-    }
-
-    // shell interaction
-    #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
-    if CMD_ARGS.shell {
-        xml_xpath_order_doc_elems(doc);
-        let fname = filename.map(|f| CString::new(f).unwrap());
-        xml_shell(
-            doc,
-            fname.map_or(null_mut(), |f| f.as_ptr() as _),
-            Some(xml_shell_readline),
-            Some(stdout()),
-        );
-    }
-
-    // test intermediate copy if needed.
-    #[cfg(feature = "libxml_tree")]
-    if CMD_ARGS.copy {
-        let tmp = doc;
-        if CMD_ARGS.timing {
-            start_timer();
+        // shell interaction
+        #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
+        if CMD_ARGS.shell {
+            xml_xpath_order_doc_elems(doc);
+            let fname = filename.map(|f| CString::new(f).unwrap());
+            xml_shell(
+                doc,
+                fname.map_or(null_mut(), |f| f.as_ptr() as _),
+                Some(xml_shell_readline),
+                Some(stdout()),
+            );
         }
-        doc = xml_copy_doc(doc, 1).unwrap();
-        if CMD_ARGS.timing {
-            end_timer!("Copying");
-        }
-        if CMD_ARGS.timing {
-            start_timer();
-        }
-        xml_free_doc(tmp);
-        if CMD_ARGS.timing {
-            end_timer!("Freeing original");
-        }
-    }
 
-    if cfg!(feature = "libxml_valid") && CMD_ARGS.insert && !CMD_ARGS.html {
-        #[cfg(feature = "libxml_valid")]
-        {
-            let mut list: [*const XmlChar; 256] = [null(); 256];
+        // test intermediate copy if needed.
+        #[cfg(feature = "libxml_tree")]
+        if CMD_ARGS.copy {
+            let tmp = doc;
+            if CMD_ARGS.timing {
+                start_timer();
+            }
+            doc = xml_copy_doc(doc, 1).unwrap();
+            if CMD_ARGS.timing {
+                end_timer!("Copying");
+            }
+            if CMD_ARGS.timing {
+                start_timer();
+            }
+            xml_free_doc(tmp);
+            if CMD_ARGS.timing {
+                end_timer!("Freeing original");
+            }
+        }
 
-            if let Some(children) = doc.children() {
-                let mut node = Some(children);
-                while let Some(now) = node.filter(|n| n.last().is_none()) {
-                    node = now.next();
-                }
-                if let Some(node) = node {
-                    let nb =
-                        xml_valid_get_valid_elements(node.last(), None, list.as_mut_ptr(), 256);
-                    match nb.cmp(&0) {
-                        std::cmp::Ordering::Less => {
-                            eprintln!("could not get valid list of elements")
-                        }
-                        std::cmp::Ordering::Equal => {
-                            eprintln!("No element can be inserted under root")
-                        }
-                        std::cmp::Ordering::Greater => {
-                            eprintln!("{} element types can be inserted under root:", nb);
-                            for &l in list.iter().take(nb as usize) {
-                                eprintln!("{}", CStr::from_ptr(l as _).to_string_lossy());
+        if cfg!(feature = "libxml_valid") && CMD_ARGS.insert && !CMD_ARGS.html {
+            #[cfg(feature = "libxml_valid")]
+            {
+                let mut list: [*const XmlChar; 256] = [null(); 256];
+
+                if let Some(children) = doc.children() {
+                    let mut node = Some(children);
+                    while let Some(now) = node.filter(|n| n.last().is_none()) {
+                        node = now.next();
+                    }
+                    if let Some(node) = node {
+                        let nb =
+                            xml_valid_get_valid_elements(node.last(), None, list.as_mut_ptr(), 256);
+                        match nb.cmp(&0) {
+                            std::cmp::Ordering::Less => {
+                                eprintln!("could not get valid list of elements")
+                            }
+                            std::cmp::Ordering::Equal => {
+                                eprintln!("No element can be inserted under root")
+                            }
+                            std::cmp::Ordering::Greater => {
+                                eprintln!("{} element types can be inserted under root:", nb);
+                                for &l in list.iter().take(nb as usize) {
+                                    eprintln!("{}", CStr::from_ptr(l as _).to_string_lossy());
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-    } else if cfg!(feature = "libxml_reader") && CMD_ARGS.walker {
-        #[cfg(feature = "libxml_reader")]
-        {
-            walk_doc(doc);
-        }
-    }
-    #[cfg(feature = "libxml_output")]
-    if !CMD_ARGS.noout {
-        // print it.
-        if !cfg!(feature = "libxml_debug") || !CMD_ARGS.debug {
-            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-                start_timer();
+        } else if cfg!(feature = "libxml_reader") && CMD_ARGS.walker {
+            #[cfg(feature = "libxml_reader")]
+            {
+                walk_doc(doc);
             }
-            if cfg!(feature = "html") && CMD_ARGS.html && !CMD_ARGS.xmlout {
-                #[cfg(feature = "html")]
-                {
-                    // if COMPRESS != 0 {
-                    //     let o = OUTPUT
-                    //         .lock()
-                    //         .unwrap()
-                    //         .as_ref()
-                    //         .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                    //     html_save_file(o, doc);
-                    // } else
-                    if let Some(encoding) = CMD_ARGS.encode.as_deref() {
-                        let o = CMD_ARGS.output.as_deref().unwrap_or("-");
-                        if CMD_ARGS.format {
-                            html_save_file_format(o, doc, Some(encoding), 1);
-                        } else {
-                            html_save_file_format(o, doc, Some(encoding), 0);
-                        }
-                    } else if CMD_ARGS.format {
-                        let o = CMD_ARGS.output.as_deref().unwrap_or("-");
-                        html_save_file_format(o, doc, None, 1);
-                    } else if let Some(filename) = CMD_ARGS.output.as_deref() {
-                        match File::options().write(true).truncate(true).open(filename) {
-                            Ok(mut f) => {
-                                if html_doc_dump(&mut f, doc) < 0 {
+        }
+        #[cfg(feature = "libxml_output")]
+        if !CMD_ARGS.noout {
+            // print it.
+            if !cfg!(feature = "libxml_debug") || !CMD_ARGS.debug {
+                if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                    start_timer();
+                }
+                if cfg!(feature = "html") && CMD_ARGS.html && !CMD_ARGS.xmlout {
+                    #[cfg(feature = "html")]
+                    {
+                        // if COMPRESS != 0 {
+                        //     let o = OUTPUT
+                        //         .lock()
+                        //         .unwrap()
+                        //         .as_ref()
+                        //         .map_or(c"-".as_ptr(), |o| o.as_ptr());
+                        //     html_save_file(o, doc);
+                        // } else
+                        if let Some(encoding) = CMD_ARGS.encode.as_deref() {
+                            let o = CMD_ARGS.output.as_deref().unwrap_or("-");
+                            if CMD_ARGS.format {
+                                html_save_file_format(o, doc, Some(encoding), 1);
+                            } else {
+                                html_save_file_format(o, doc, Some(encoding), 0);
+                            }
+                        } else if CMD_ARGS.format {
+                            let o = CMD_ARGS.output.as_deref().unwrap_or("-");
+                            html_save_file_format(o, doc, None, 1);
+                        } else if let Some(filename) = CMD_ARGS.output.as_deref() {
+                            match File::options().write(true).truncate(true).open(filename) {
+                                Ok(mut f) => {
+                                    if html_doc_dump(&mut f, doc) < 0 {
+                                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                                    }
+                                }
+                                _ => {
+                                    eprintln!("failed to open {filename}");
                                     PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                                 }
+                            }
+                        } else if html_doc_dump(&mut stdout(), doc) < 0 {
+                            PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                        }
+                        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                            end_timer!("Saving");
+                        }
+                    }
+                } else if cfg!(feature = "c14n") && CMD_ARGS.c14n {
+                    #[cfg(feature = "c14n")]
+                    {
+                        let mut result = String::new();
+
+                        let size = xml_c14n_doc_dump_memory(
+                            &mut doc,
+                            None,
+                            XmlC14NMode::XmlC14N1_0,
+                            None,
+                            true,
+                            &mut result,
+                        );
+                        if size >= 0 {
+                            print!("{result}");
+                        } else {
+                            eprintln!("Failed to canonicalize");
+                            PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                        }
+                    }
+                } else if cfg!(feature = "c14n") && CMD_ARGS.c14n11 {
+                    #[cfg(feature = "c14n")]
+                    {
+                        let mut result = String::new();
+
+                        let size: i32 = xml_c14n_doc_dump_memory(
+                            &mut doc,
+                            None,
+                            XmlC14NMode::XmlC14N1_1,
+                            None,
+                            true,
+                            &mut result,
+                        );
+                        if size >= 0 {
+                            print!("{result}");
+                        } else {
+                            eprintln!("Failed to canonicalize");
+                            PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                        }
+                    }
+                } else if cfg!(feature = "c14n") && CMD_ARGS.exc_c14n {
+                    #[cfg(feature = "c14n")]
+                    {
+                        let mut result = String::new();
+
+                        let size: i32 = xml_c14n_doc_dump_memory(
+                            &mut doc,
+                            None,
+                            XmlC14NMode::XmlC14NExclusive1_0,
+                            None,
+                            true,
+                            &mut result,
+                        );
+                        if size >= 0 {
+                            print!("{result}");
+                        } else {
+                            eprintln!("Failed to canonicalize");
+                            PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                        }
+                    }
+                } else if CMD_ARGS.memory {
+                    let mut result: *mut XmlChar = null_mut();
+                    let mut len: i32 = 0;
+
+                    if let Some(encoding) = CMD_ARGS.encode.as_deref() {
+                        if CMD_ARGS.format {
+                            (*doc).dump_format_memory_enc(
+                                addr_of_mut!(result),
+                                addr_of_mut!(len),
+                                Some(encoding),
+                                1,
+                            );
+                        } else {
+                            (*doc).dump_memory_enc(
+                                addr_of_mut!(result),
+                                addr_of_mut!(len),
+                                Some(encoding),
+                            );
+                        }
+                    } else if CMD_ARGS.format {
+                        (*doc).dump_format_memory(addr_of_mut!(result), addr_of_mut!(len), 1);
+                    } else {
+                        (*doc).dump_memory(addr_of_mut!(result), addr_of_mut!(len));
+                    }
+                    if result.is_null() {
+                        eprintln!("Failed to save");
+                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                    } else {
+                        if write(1, result as _, len as _) == -1 {
+                            eprintln!("Can't write data");
+                        }
+                        xml_free(result as _);
+                    }
+                // } else if COMPRESS != 0 {
+                //     let o = OUTPUT.lock().unwrap();
+                //     let o = o.as_deref().unwrap_or(c"-");
+                //     (*doc).save_file(o.to_string_lossy().as_ref());
+                } else {
+                    let mut save_opts: i32 = 0;
+
+                    if CMD_ARGS.format {
+                        save_opts |= XmlSaveOption::XmlSaveFormat as i32;
+                    } else if CMD_ARGS.pretty == Some(2) {
+                        save_opts |= XmlSaveOption::XmlSaveWsNonSig as i32;
+                    }
+
+                    #[cfg(any(feature = "html", feature = "libxml_valid"))]
+                    if CMD_ARGS.xmlout {
+                        save_opts |= XmlSaveOption::XmlSaveAsXML as i32;
+                    }
+
+                    let encoding = CMD_ARGS.encode.as_deref();
+                    let ctxt = if let Some(o) = CMD_ARGS.output.as_deref() {
+                        XmlSaveCtxt::save_to_filename(o, encoding, save_opts)
+                    } else {
+                        XmlSaveCtxt::save_to_io(stdout(), encoding, save_opts)
+                    };
+
+                    if let Some(mut ctxt) = ctxt {
+                        if ctxt.save_doc(doc) < 0 {
+                            let o = CMD_ARGS.output.as_deref().unwrap_or("-");
+                            eprintln!("failed save to {o}");
+                            PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                        }
+                    } else {
+                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                    }
+                }
+                if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                    end_timer!("Saving");
+                }
+            } else {
+                #[cfg(feature = "libxml_debug")]
+                {
+                    if let Some(filename) = CMD_ARGS.output.as_deref() {
+                        match File::options().write(true).truncate(true).open(filename) {
+                            Ok(f) => {
+                                xml_debug_dump_document(Some(f), Some(&*doc));
                             }
                             _ => {
                                 eprintln!("failed to open {filename}");
                                 PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                             }
                         }
-                    } else if html_doc_dump(&mut stdout(), doc) < 0 {
-                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
-                    }
-                    if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-                        end_timer!("Saving");
-                    }
-                }
-            } else if cfg!(feature = "c14n") && CMD_ARGS.c14n {
-                #[cfg(feature = "c14n")]
-                {
-                    let mut result = String::new();
-
-                    let size = xml_c14n_doc_dump_memory(
-                        &mut doc,
-                        None,
-                        XmlC14NMode::XmlC14N1_0,
-                        None,
-                        true,
-                        &mut result,
-                    );
-                    if size >= 0 {
-                        print!("{result}");
                     } else {
-                        eprintln!("Failed to canonicalize");
-                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
+                        xml_debug_dump_document(Some(stdout()), Some(&*doc));
                     }
-                }
-            } else if cfg!(feature = "c14n") && CMD_ARGS.c14n11 {
-                #[cfg(feature = "c14n")]
-                {
-                    let mut result = String::new();
-
-                    let size: i32 = xml_c14n_doc_dump_memory(
-                        &mut doc,
-                        None,
-                        XmlC14NMode::XmlC14N1_1,
-                        None,
-                        true,
-                        &mut result,
-                    );
-                    if size >= 0 {
-                        print!("{result}");
-                    } else {
-                        eprintln!("Failed to canonicalize");
-                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
-                    }
-                }
-            } else if cfg!(feature = "c14n") && CMD_ARGS.exc_c14n {
-                #[cfg(feature = "c14n")]
-                {
-                    let mut result = String::new();
-
-                    let size: i32 = xml_c14n_doc_dump_memory(
-                        &mut doc,
-                        None,
-                        XmlC14NMode::XmlC14NExclusive1_0,
-                        None,
-                        true,
-                        &mut result,
-                    );
-                    if size >= 0 {
-                        print!("{result}");
-                    } else {
-                        eprintln!("Failed to canonicalize");
-                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
-                    }
-                }
-            } else if CMD_ARGS.memory {
-                let mut result: *mut XmlChar = null_mut();
-                let mut len: i32 = 0;
-
-                if let Some(encoding) = CMD_ARGS.encode.as_deref() {
-                    if CMD_ARGS.format {
-                        (*doc).dump_format_memory_enc(
-                            addr_of_mut!(result),
-                            addr_of_mut!(len),
-                            Some(encoding),
-                            1,
-                        );
-                    } else {
-                        (*doc).dump_memory_enc(
-                            addr_of_mut!(result),
-                            addr_of_mut!(len),
-                            Some(encoding),
-                        );
-                    }
-                } else if CMD_ARGS.format {
-                    (*doc).dump_format_memory(addr_of_mut!(result), addr_of_mut!(len), 1);
-                } else {
-                    (*doc).dump_memory(addr_of_mut!(result), addr_of_mut!(len));
-                }
-                if result.is_null() {
-                    eprintln!("Failed to save");
-                    PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
-                } else {
-                    if write(1, result as _, len as _) == -1 {
-                        eprintln!("Can't write data");
-                    }
-                    xml_free(result as _);
-                }
-            // } else if COMPRESS != 0 {
-            //     let o = OUTPUT.lock().unwrap();
-            //     let o = o.as_deref().unwrap_or(c"-");
-            //     (*doc).save_file(o.to_string_lossy().as_ref());
-            } else {
-                let mut save_opts: i32 = 0;
-
-                if CMD_ARGS.format {
-                    save_opts |= XmlSaveOption::XmlSaveFormat as i32;
-                } else if CMD_ARGS.pretty == Some(2) {
-                    save_opts |= XmlSaveOption::XmlSaveWsNonSig as i32;
-                }
-
-                #[cfg(any(feature = "html", feature = "libxml_valid"))]
-                if CMD_ARGS.xmlout {
-                    save_opts |= XmlSaveOption::XmlSaveAsXML as i32;
-                }
-
-                let encoding = CMD_ARGS.encode.as_deref();
-                let ctxt = if let Some(o) = CMD_ARGS.output.as_deref() {
-                    XmlSaveCtxt::save_to_filename(o, encoding, save_opts)
-                } else {
-                    XmlSaveCtxt::save_to_io(stdout(), encoding, save_opts)
-                };
-
-                if let Some(mut ctxt) = ctxt {
-                    if ctxt.save_doc(doc) < 0 {
-                        let o = CMD_ARGS.output.as_deref().unwrap_or("-");
-                        eprintln!("failed save to {o}");
-                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
-                    }
-                } else {
-                    PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
-                }
-            }
-            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-                end_timer!("Saving");
-            }
-        } else {
-            #[cfg(feature = "libxml_debug")]
-            {
-                if let Some(filename) = CMD_ARGS.output.as_deref() {
-                    match File::options().write(true).truncate(true).open(filename) {
-                        Ok(f) => {
-                            xml_debug_dump_document(Some(f), Some(&*doc));
-                        }
-                        _ => {
-                            eprintln!("failed to open {filename}");
-                            PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
-                        }
-                    }
-                } else {
-                    xml_debug_dump_document(Some(stdout()), Some(&*doc));
                 }
             }
         }
-    }
 
-    // A posteriori validation test
-    #[cfg(feature = "libxml_valid")]
-    if CMD_ARGS.dtdvalid.is_some() || CMD_ARGS.dtdvalidfpi.is_some() {
-        let dtd: *mut XmlDtd;
-
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            start_timer();
-        }
-        let dtd = if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
-            xml_parse_dtd(None, Some(dtd_valid))
-        } else {
-            xml_parse_dtd(CMD_ARGS.dtdvalidfpi.as_deref(), None)
-        };
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            end_timer!("Parsing DTD");
-        }
-        if let Some(dtd) = dtd {
-            let cvp = xml_new_valid_ctxt();
-            if cvp.is_null() {
-                generic_error!("Couldn't allocate validation context\n");
-                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-                xml_free_dtd(dtd);
-                return;
-            }
-            (*cvp).error = Some(generic_error_default);
-            (*cvp).warning = Some(generic_error_default);
+        // A posteriori validation test
+        #[cfg(feature = "libxml_valid")]
+        if CMD_ARGS.dtdvalid.is_some() || CMD_ARGS.dtdvalidfpi.is_some() {
+            let dtd: *mut XmlDtd;
 
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
-            if xml_validate_dtd(cvp, doc, dtd) == 0 {
-                let filename = filename.unwrap();
+            let dtd = if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
+                xml_parse_dtd(None, Some(dtd_valid))
+            } else {
+                xml_parse_dtd(CMD_ARGS.dtdvalidfpi.as_deref(), None)
+            };
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                end_timer!("Parsing DTD");
+            }
+            if let Some(dtd) = dtd {
+                let cvp = xml_new_valid_ctxt();
+                if cvp.is_null() {
+                    generic_error!("Couldn't allocate validation context\n");
+                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                    xml_free_dtd(dtd);
+                    return;
+                }
+                (*cvp).error = Some(generic_error_default);
+                (*cvp).warning = Some(generic_error_default);
+
+                if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                    start_timer();
+                }
+                if xml_validate_dtd(cvp, doc, dtd) == 0 {
+                    let filename = filename.unwrap();
+                    if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
+                        generic_error!(
+                            "Document {filename} does not validate against {dtd_valid}\n"
+                        );
+                    } else {
+                        generic_error!(
+                            "Document {filename} does not validate against {}\n",
+                            CMD_ARGS.dtdvalidfpi.as_deref().unwrap()
+                        );
+                    }
+                    PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+                }
+                if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                    end_timer!("Validating against DTD");
+                }
+                xml_free_valid_ctxt(cvp);
+                xml_free_dtd(dtd);
+            } else {
                 if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
-                    generic_error!("Document {filename} does not validate against {dtd_valid}\n");
+                    generic_error!("Could not parse DTD {}\n", dtd_valid);
                 } else {
                     generic_error!(
-                        "Document {filename} does not validate against {}\n",
+                        "Could not parse DTD {}\n",
                         CMD_ARGS.dtdvalidfpi.as_deref().unwrap()
                     );
                 }
+                PROGRESULT.store(ERR_DTD, Ordering::Relaxed);
+            }
+        } else if CMD_ARGS.postvalid {
+            let cvp = xml_new_valid_ctxt();
+            if cvp.is_null() {
+                generic_error!("Couldn't allocate validation context\n");
+                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                xml_free_doc(doc);
+                return;
+            }
+
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                start_timer();
+            }
+            (*cvp).error = Some(generic_error_default);
+            (*cvp).warning = Some(generic_error_default);
+            if xml_validate_document(cvp, doc) == 0 {
+                let filename = filename.unwrap();
+                generic_error!("Document {filename} does not validate\n");
                 PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
             }
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-                end_timer!("Validating against DTD");
+                end_timer!("Validating");
             }
             xml_free_valid_ctxt(cvp);
-            xml_free_dtd(dtd);
-        } else {
-            if let Some(dtd_valid) = CMD_ARGS.dtdvalid.as_deref() {
-                generic_error!("Could not parse DTD {}\n", dtd_valid);
+        }
+        #[cfg(feature = "schematron")]
+        if !WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                start_timer();
+            }
+
+            let mut flag = if CMD_ARGS.debug {
+                XmlSchematronValidOptions::XmlSchematronOutXml as i32
             } else {
-                generic_error!(
-                    "Could not parse DTD {}\n",
-                    CMD_ARGS.dtdvalidfpi.as_deref().unwrap()
-                );
+                XmlSchematronValidOptions::XmlSchematronOutText as i32
+            };
+            if CMD_ARGS.noout {
+                flag |= XmlSchematronValidOptions::XmlSchematronOutQuiet as i32;
             }
-            PROGRESULT.store(ERR_DTD, Ordering::Relaxed);
-        }
-    } else if CMD_ARGS.postvalid {
-        let cvp = xml_new_valid_ctxt();
-        if cvp.is_null() {
-            generic_error!("Couldn't allocate validation context\n");
-            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(doc);
-            return;
-        }
-
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            start_timer();
-        }
-        (*cvp).error = Some(generic_error_default);
-        (*cvp).warning = Some(generic_error_default);
-        if xml_validate_document(cvp, doc) == 0 {
-            let filename = filename.unwrap();
-            generic_error!("Document {filename} does not validate\n");
-            PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
-        }
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            end_timer!("Validating");
-        }
-        xml_free_valid_ctxt(cvp);
-    }
-    #[cfg(feature = "schematron")]
-    if !WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            start_timer();
-        }
-
-        let mut flag = if CMD_ARGS.debug {
-            XmlSchematronValidOptions::XmlSchematronOutXml as i32
-        } else {
-            XmlSchematronValidOptions::XmlSchematronOutText as i32
-        };
-        if CMD_ARGS.noout {
-            flag |= XmlSchematronValidOptions::XmlSchematronOutQuiet as i32;
-        }
-        let ctxt: XmlSchematronValidCtxtPtr =
-            xml_schematron_new_valid_ctxt(WXSCHEMATRON.load(Ordering::Relaxed), flag);
-        if ctxt.is_null() {
-            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(doc);
-            return;
-        }
-        match xml_schematron_validate_doc(ctxt, doc).cmp(&0) {
-            std::cmp::Ordering::Equal => {
-                if !CMD_ARGS.quiet {
-                    eprintln!("{} validates", filename.unwrap());
+            let ctxt: XmlSchematronValidCtxtPtr =
+                xml_schematron_new_valid_ctxt(WXSCHEMATRON.load(Ordering::Relaxed), flag);
+            if ctxt.is_null() {
+                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                xml_free_doc(doc);
+                return;
+            }
+            match xml_schematron_validate_doc(ctxt, doc).cmp(&0) {
+                std::cmp::Ordering::Equal => {
+                    if !CMD_ARGS.quiet {
+                        eprintln!("{} validates", filename.unwrap());
+                    }
+                }
+                std::cmp::Ordering::Greater => {
+                    eprintln!("{} fails to validate", filename.unwrap());
+                    PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+                }
+                std::cmp::Ordering::Less => {
+                    eprintln!(
+                        "{} validation generated an internal error",
+                        filename.unwrap()
+                    );
+                    PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
                 }
             }
-            std::cmp::Ordering::Greater => {
-                eprintln!("{} fails to validate", filename.unwrap());
-                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
-            }
-            std::cmp::Ordering::Less => {
-                eprintln!(
-                    "{} validation generated an internal error",
-                    filename.unwrap()
-                );
-                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+            xml_schematron_free_valid_ctxt(ctxt);
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                end_timer!("Validating");
             }
         }
-        xml_schematron_free_valid_ctxt(ctxt);
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            end_timer!("Validating");
+        #[cfg(feature = "schema")]
+        if !RELAXNGSCHEMAS.load(Ordering::Relaxed).is_null() {
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                start_timer();
+            }
+
+            let ctxt = xml_relaxng_new_valid_ctxt(RELAXNGSCHEMAS.load(Ordering::Relaxed));
+            if ctxt.is_null() {
+                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                xml_free_doc(doc);
+                return;
+            }
+            xml_relaxng_set_valid_errors(
+                ctxt,
+                Some(generic_error_default),
+                Some(generic_error_default),
+                None,
+            );
+            match xml_relaxng_validate_doc(ctxt, doc).cmp(&0) {
+                std::cmp::Ordering::Equal => {
+                    if !CMD_ARGS.quiet {
+                        eprintln!("{} validates", filename.unwrap());
+                    }
+                }
+                std::cmp::Ordering::Greater => {
+                    eprintln!("{} fails to validate", filename.unwrap());
+                    PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+                }
+                std::cmp::Ordering::Less => {
+                    eprintln!(
+                        "{} validation generated an internal error",
+                        filename.unwrap()
+                    );
+                    PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+                }
+            }
+            xml_relaxng_free_valid_ctxt(ctxt);
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                end_timer!("Validating");
+            }
+        } else if !WXSCHEMAS.load(Ordering::Relaxed).is_null() {
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                start_timer();
+            }
+
+            let ctxt: XmlSchemaValidCtxtPtr =
+                xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
+            if ctxt.is_null() {
+                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
+                xml_free_doc(doc);
+                return;
+            }
+            xml_schema_set_valid_errors(
+                ctxt,
+                Some(generic_error_default),
+                Some(generic_error_default),
+                None,
+            );
+            match xml_schema_validate_doc(ctxt, doc).cmp(&0) {
+                std::cmp::Ordering::Equal => {
+                    if !CMD_ARGS.quiet {
+                        eprintln!("{} validates", filename.unwrap());
+                    }
+                }
+                std::cmp::Ordering::Greater => {
+                    eprintln!("{} fails to validate", filename.unwrap());
+                    PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+                }
+                std::cmp::Ordering::Less => {
+                    eprintln!(
+                        "{} validation generated an internal error",
+                        filename.unwrap()
+                    );
+                    PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
+                }
+            }
+            xml_schema_free_valid_ctxt(ctxt);
+            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
+                end_timer!("Validating");
+            }
         }
-    }
-    #[cfg(feature = "schema")]
-    if !RELAXNGSCHEMAS.load(Ordering::Relaxed).is_null() {
+
+        #[cfg(all(
+            feature = "libxml_debug",
+            any(feature = "html", feature = "libxml_valid")
+        ))]
+        if CMD_ARGS.debugent && !CMD_ARGS.html {
+            xml_debug_dump_entities(stderr(), Some(&*doc));
+        }
+
+        // free it.
         if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
-
-        let ctxt = xml_relaxng_new_valid_ctxt(RELAXNGSCHEMAS.load(Ordering::Relaxed));
-        if ctxt.is_null() {
-            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(doc);
-            return;
-        }
-        xml_relaxng_set_valid_errors(
-            ctxt,
-            Some(generic_error_default),
-            Some(generic_error_default),
-            None,
-        );
-        match xml_relaxng_validate_doc(ctxt, doc).cmp(&0) {
-            std::cmp::Ordering::Equal => {
-                if !CMD_ARGS.quiet {
-                    eprintln!("{} validates", filename.unwrap());
-                }
-            }
-            std::cmp::Ordering::Greater => {
-                eprintln!("{} fails to validate", filename.unwrap());
-                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
-            }
-            std::cmp::Ordering::Less => {
-                eprintln!(
-                    "{} validation generated an internal error",
-                    filename.unwrap()
-                );
-                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
-            }
-        }
-        xml_relaxng_free_valid_ctxt(ctxt);
+        xml_free_doc(doc);
         if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            end_timer!("Validating");
+            end_timer!("Freeing");
         }
-    } else if !WXSCHEMAS.load(Ordering::Relaxed).is_null() {
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            start_timer();
-        }
-
-        let ctxt: XmlSchemaValidCtxtPtr =
-            xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
-        if ctxt.is_null() {
-            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
-            xml_free_doc(doc);
-            return;
-        }
-        xml_schema_set_valid_errors(
-            ctxt,
-            Some(generic_error_default),
-            Some(generic_error_default),
-            None,
-        );
-        match xml_schema_validate_doc(ctxt, doc).cmp(&0) {
-            std::cmp::Ordering::Equal => {
-                if !CMD_ARGS.quiet {
-                    eprintln!("{} validates", filename.unwrap());
-                }
-            }
-            std::cmp::Ordering::Greater => {
-                eprintln!("{} fails to validate", filename.unwrap());
-                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
-            }
-            std::cmp::Ordering::Less => {
-                eprintln!(
-                    "{} validation generated an internal error",
-                    filename.unwrap()
-                );
-                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
-            }
-        }
-        xml_schema_free_valid_ctxt(ctxt);
-        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-            end_timer!("Validating");
-        }
-    }
-
-    #[cfg(all(
-        feature = "libxml_debug",
-        any(feature = "html", feature = "libxml_valid")
-    ))]
-    if CMD_ARGS.debugent && !CMD_ARGS.html {
-        xml_debug_dump_entities(stderr(), Some(&*doc));
-    }
-
-    // free it.
-    if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-        start_timer();
-    }
-    xml_free_doc(doc);
-    if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
-        end_timer!("Freeing");
     }
 }
 
 // Usage and Main
 
 unsafe fn register_node(node: XmlGenericNodePtr) {
-    let private = malloc(size_of::<c_long>());
-    if private.is_null() {
-        eprintln!("Out of memory in xmllint:registerNode()");
-        exit(ERR_MEM);
-    }
-    *(private as *mut u64) = 0x81726354;
-    NBREGISTER.fetch_add(1, Ordering::Relaxed);
-    if let Ok(mut node) = XmlNodePtr::try_from(node) {
-        node._private = private;
-    } else if let Ok(mut node) = XmlAttrPtr::try_from(node) {
-        node._private = private;
-    } else if let Ok(mut node) = XmlDocPtr::try_from(node) {
-        node._private = private;
-    } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
-        node._private = private;
-    } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
-        node._private = private;
-    } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
-        node._private = private;
-    } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {
-        node._private = private;
-    } else if let Ok(mut node) = XmlElementPtr::try_from(node) {
-        node._private = private;
-    } else {
-        panic!("Unknown Node Type");
+    unsafe {
+        let private = malloc(size_of::<c_long>());
+        if private.is_null() {
+            eprintln!("Out of memory in xmllint:registerNode()");
+            exit(ERR_MEM);
+        }
+        *(private as *mut u64) = 0x81726354;
+        NBREGISTER.fetch_add(1, Ordering::Relaxed);
+        if let Ok(mut node) = XmlNodePtr::try_from(node) {
+            node._private = private;
+        } else if let Ok(mut node) = XmlAttrPtr::try_from(node) {
+            node._private = private;
+        } else if let Ok(mut node) = XmlDocPtr::try_from(node) {
+            node._private = private;
+        } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
+            node._private = private;
+        } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
+            node._private = private;
+        } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
+            node._private = private;
+        } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {
+            node._private = private;
+        } else if let Ok(mut node) = XmlElementPtr::try_from(node) {
+            node._private = private;
+        } else {
+            panic!("Unknown Node Type");
+        }
     }
 }
 
 unsafe fn deregister_node(node: XmlGenericNodePtr) {
-    let private = if let Ok(mut node) = XmlNodePtr::try_from(node) {
-        node._private
-    } else if let Ok(mut node) = XmlAttrPtr::try_from(node) {
-        node._private
-    } else if let Ok(mut node) = XmlDocPtr::try_from(node) {
-        node._private
-    } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
-        node._private
-    } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
-        node._private
-    } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
-        node._private
-    } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {
-        node._private
-    } else if let Ok(mut node) = XmlElementPtr::try_from(node) {
-        node._private
-    } else {
-        panic!("Unknown Node Type");
-    };
-    assert!(!private.is_null());
-    assert!(*(private as *mut c_long) == 0x81726354);
-    free(private);
-    NBREGISTER.fetch_sub(1, Ordering::Relaxed);
+    unsafe {
+        let private = if let Ok(mut node) = XmlNodePtr::try_from(node) {
+            node._private
+        } else if let Ok(mut node) = XmlAttrPtr::try_from(node) {
+            node._private
+        } else if let Ok(mut node) = XmlDocPtr::try_from(node) {
+            node._private
+        } else if let Ok(mut node) = XmlNsPtr::try_from(node) {
+            node._private
+        } else if let Ok(mut node) = XmlEntityPtr::try_from(node) {
+            node._private
+        } else if let Ok(mut node) = XmlDtdPtr::try_from(node) {
+            node._private
+        } else if let Ok(mut node) = XmlAttributePtr::try_from(node) {
+            node._private
+        } else if let Ok(mut node) = XmlElementPtr::try_from(node) {
+            node._private
+        } else {
+            panic!("Unknown Node Type");
+        };
+        assert!(!private.is_null());
+        assert!(*(private as *mut c_long) == 0x81726354);
+        free(private);
+        NBREGISTER.fetch_sub(1, Ordering::Relaxed);
+    }
 }
 
 fn main() {

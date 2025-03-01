@@ -4,15 +4,15 @@
 
 use std::{
     ffi::{c_int, c_void},
-    io::{stderr, stdout, Write},
-    mem::zeroed,
+    io::{Write, stderr, stdout},
     ptr::{addr_of_mut, null_mut},
+    sync::Mutex,
 };
 
 use exml::{
     globals::{
-        get_do_validity_checking_default_value, set_do_validity_checking_default_value,
-        set_generic_error, GenericErrorContext,
+        GenericErrorContext, get_do_validity_checking_default_value,
+        set_do_validity_checking_default_value, set_generic_error,
     },
     libxml::{
         catalog::{xml_catalog_cleanup, xml_load_catalog},
@@ -21,11 +21,11 @@ use exml::{
     },
     tree::xml_free_doc,
 };
-use libc::{memset, pthread_create, pthread_join, pthread_t};
+use libc::{pthread_create, pthread_join, pthread_t};
 
 const MAX_ARGC: usize = 20;
 const TEST_REPEAT_COUNT: usize = 500;
-static mut TID: [pthread_t; MAX_ARGC] = unsafe { zeroed() };
+static TID: Mutex<[pthread_t; MAX_ARGC]> = Mutex::new([0; MAX_ARGC]);
 
 struct XmlThreadParams<'a> {
     filename: &'a str,
@@ -33,7 +33,7 @@ struct XmlThreadParams<'a> {
 }
 
 const CATALOG: &str = "test/threads/complex.xml";
-static mut THREAD_PARAMS: [XmlThreadParams; 7] = [
+static THREAD_PARAMS: Mutex<[XmlThreadParams; 7]> = Mutex::new([
     XmlThreadParams {
         filename: "test/threads/abc.xml",
         okay: 0,
@@ -62,8 +62,7 @@ static mut THREAD_PARAMS: [XmlThreadParams; 7] = [
         filename: "test/threads/invalid.xml",
         okay: 0,
     },
-];
-static NUM_THREADS: usize = unsafe { THREAD_PARAMS.len() };
+]);
 
 extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     unsafe {
@@ -110,32 +109,31 @@ fn main() {
 
     unsafe {
         xml_init_parser();
+
+        let mut tid = TID.lock().unwrap();
+        let mut thread_params = THREAD_PARAMS.lock().unwrap();
+        let num_threads = thread_params.len();
         for _ in 0..TEST_REPEAT_COUNT {
             xml_load_catalog(CATALOG);
+            tid[..num_threads].fill(u64::MAX);
 
-            memset(
-                TID.as_mut_ptr() as _,
-                0xff,
-                size_of::<pthread_t>() * THREAD_PARAMS.len(),
-            );
-
-            for i in 0..NUM_THREADS {
+            for i in 0..num_threads {
                 ret = pthread_create(
-                    addr_of_mut!(TID[i]),
+                    &raw mut tid[i],
                     null_mut(),
                     thread_specific_data,
-                    addr_of_mut!(THREAD_PARAMS[i]) as _,
+                    &raw mut thread_params[i] as _,
                 );
                 assert_eq!(ret, 0, "pthread_create");
             }
-            for &tid in TID.iter().take(NUM_THREADS) {
+            for &tid in tid.iter().take(num_threads) {
                 let mut result: *mut c_void = null_mut();
                 ret = pthread_join(tid, addr_of_mut!(result));
                 assert_eq!(ret, 0, "pthread_join");
             }
 
             xml_catalog_cleanup();
-            for (i, param) in THREAD_PARAMS.iter().take(NUM_THREADS).enumerate() {
+            for (i, param) in thread_params.iter().take(num_threads).enumerate() {
                 assert_ne!(
                     param.okay, 0,
                     "Thread {i} handling {} failed",

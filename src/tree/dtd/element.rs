@@ -23,11 +23,11 @@ use std::{
     borrow::Cow,
     ops::{Deref, DerefMut},
     os::raw::c_void,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
 };
 
 #[cfg(feature = "libxml_regexp")]
-use crate::libxml::xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr};
+use crate::libxml::xmlregexp::{XmlRegexpPtr, xml_reg_free_regexp};
 use crate::{
     libxml::valid::xml_free_doc_element_content,
     tree::{
@@ -155,15 +155,17 @@ impl XmlElementPtr {
     pub(crate) unsafe fn from_raw(
         ptr: *mut XmlElement,
     ) -> Result<Option<Self>, InvalidNodePointerCastError> {
-        if ptr.is_null() {
-            return Ok(None);
-        }
-        match (*ptr).element_type() {
-            XmlElementType::XmlElementDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
-            _ => Err(InvalidNodePointerCastError {
-                from: (*ptr).element_type(),
-                to: type_name::<Self>(),
-            }),
+        unsafe {
+            if ptr.is_null() {
+                return Ok(None);
+            }
+            match (*ptr).element_type() {
+                XmlElementType::XmlElementDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+                _ => Err(InvalidNodePointerCastError {
+                    from: (*ptr).element_type(),
+                    to: type_name::<Self>(),
+                }),
+            }
         }
     }
 
@@ -177,7 +179,9 @@ impl XmlElementPtr {
     /// This method should be called only once.  
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn free(self) {
-        let _ = *Box::from_raw(self.0.as_ptr());
+        unsafe {
+            let _ = *Box::from_raw(self.0.as_ptr());
+        }
     }
 
     /// Acquire the ownership of the inner value.  
@@ -187,7 +191,7 @@ impl XmlElementPtr {
     /// This method should be called only once.  
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn into_inner(self) -> Box<XmlElement> {
-        Box::from_raw(self.0.as_ptr())
+        unsafe { Box::from_raw(self.0.as_ptr()) }
     }
 }
 
@@ -254,37 +258,41 @@ impl From<XmlElementPtr> for *mut XmlElement {
 #[doc(alias = "xmlCopyElement")]
 #[cfg(feature = "libxml_tree")]
 pub(crate) unsafe fn xml_copy_element(elem: XmlElementPtr) -> Option<XmlElementPtr> {
-    use crate::libxml::valid::{xml_copy_element_content, xml_verr_memory};
+    unsafe {
+        use crate::libxml::valid::{xml_copy_element_content, xml_verr_memory};
 
-    let res = XmlElementPtr::new(XmlElement {
-        typ: XmlElementType::XmlElementDecl,
-        etype: elem.etype,
-        name: elem.name.clone(),
-        prefix: elem.prefix.clone(),
-        content: xml_copy_element_content(elem.content),
-        // TODO : rebuild the attribute list on the copy
-        attributes: None,
-        ..Default::default()
-    });
-    if res.is_none() {
-        xml_verr_memory(null_mut(), Some("malloc failed"));
+        let res = XmlElementPtr::new(XmlElement {
+            typ: XmlElementType::XmlElementDecl,
+            etype: elem.etype,
+            name: elem.name.clone(),
+            prefix: elem.prefix.clone(),
+            content: xml_copy_element_content(elem.content),
+            // TODO : rebuild the attribute list on the copy
+            attributes: None,
+            ..Default::default()
+        });
+        if res.is_none() {
+            xml_verr_memory(null_mut(), Some("malloc failed"));
+        }
+        res
     }
-    res
 }
 
 /// Deallocate the memory used by an element definition
 #[doc(alias = "xmlFreeElement")]
 pub(crate) unsafe fn xml_free_element(elem: Option<XmlElementPtr>) {
-    let Some(mut elem) = elem else {
-        return;
-    };
-    elem.unlink();
-    xml_free_doc_element_content(elem.doc, elem.content);
-    elem.name = None;
-    elem.prefix = None;
-    #[cfg(feature = "libxml_regexp")]
-    if !elem.cont_model.is_null() {
-        xml_reg_free_regexp(elem.cont_model);
+    unsafe {
+        let Some(mut elem) = elem else {
+            return;
+        };
+        elem.unlink();
+        xml_free_doc_element_content(elem.doc, elem.content);
+        elem.name = None;
+        elem.prefix = None;
+        #[cfg(feature = "libxml_regexp")]
+        if !elem.cont_model.is_null() {
+            xml_reg_free_regexp(elem.cont_model);
+        }
+        elem.free();
     }
-    elem.free();
 }

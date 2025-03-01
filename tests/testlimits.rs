@@ -200,7 +200,7 @@ fn fill_filling() {
 ///
 /// Returns the number of bytes read or -1 in case of error
 #[doc(alias = "hugeRead")]
-unsafe fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 {
+unsafe fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 { unsafe {
     if context.is_null() || buffer.is_null() || len < 0 {
         return -1;
     }
@@ -252,7 +252,7 @@ unsafe fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 
         }
         len
     })
-}
+}}
 
 thread_local! {
     static CRAZY_INDX: Cell<usize> = const { Cell::new(0) };
@@ -305,7 +305,7 @@ fn crazy_close(context: *mut c_void) -> i32 {
 ///
 /// Returns the number of bytes read or -1 in case of error
 #[doc(alias = "crazyRead")]
-unsafe fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 {
+unsafe fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 { unsafe {
     if context.is_null() || buffer.is_null() || len < 0 {
         return -1;
     }
@@ -359,7 +359,7 @@ unsafe fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32
         }
         len
     })
-}
+}}
 
 thread_local! {
     static NB_TESTS: Cell<i32> = const { Cell::new(0) };
@@ -375,14 +375,14 @@ unsafe fn test_external_entity_loader(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> XmlParserInputPtr {
+) -> XmlParserInputPtr { unsafe {
     let memused: i32 = xml_mem_used();
 
     let ret: XmlParserInputPtr = xml_no_net_external_entity_loader(url, id, ctxt);
     EXTRA_MEMORY_FROM_RESOLVER.set(EXTRA_MEMORY_FROM_RESOLVER.get() + xml_mem_used() - memused);
 
     ret
-}
+}}
 
 // Trapping the error messages at the generic level to grab the equivalent of
 // stderr messages on CLI tools.
@@ -539,7 +539,7 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 }
 
-unsafe fn initialize_libxml2() {
+unsafe fn initialize_libxml2() { unsafe {
     set_get_warnings_default_value(0);
     set_pedantic_parser_default_value(0);
 
@@ -623,7 +623,7 @@ unsafe fn initialize_libxml2() {
     if register_input_callbacks(CrazyTestIO(null_mut())).is_err() {
         panic!("failed to register Crazy handlers");
     }
-}
+}}
 
 thread_local! {
     static CALLBACKS: AtomicU64 = const { AtomicU64::new(0) };
@@ -921,7 +921,7 @@ static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 ///
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "readerTest")]
-unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
+unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 { unsafe {
     let res: i32;
 
     NB_TESTS.set(NB_TESTS.get() + 1);
@@ -955,14 +955,14 @@ unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -
     xml_free_parser_ctxt(ctxt);
 
     res
-}
+}}
 
 /// Parse a memory generated file using the xmlReader
 ///
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "readerTest")]
 #[cfg(feature = "libxml_reader")]
-unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
+unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 { unsafe {
     use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file, XmlTextReaderPtr};
 
     let mut res: i32;
@@ -1027,7 +1027,7 @@ unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32
     xml_free_text_reader(reader);
 
     res
-}
+}}
 
 type Functest = unsafe fn(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32;
 
@@ -1157,7 +1157,7 @@ static TEST_EXCEPTIONS: &[TestException] = &[
     },
 ];
 
-unsafe fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
+unsafe fn launch_tests(tst: &TestDesc, test: u32) -> i32 { unsafe {
     let mut res: i32;
     let mut err: i32 = 0;
     let mut limit: usize;
@@ -1186,9 +1186,9 @@ unsafe fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
         }
     }
     err
-}
+}}
 
-unsafe fn runtest(i: u32) -> i32 {
+unsafe fn runtest(i: u32) -> i32 { unsafe {
     let mut ret: i32 = 0;
 
     let old_errors: i32 = NB_ERRORS.get();
@@ -1213,9 +1213,9 @@ unsafe fn runtest(i: u32) -> i32 {
         );
     }
     ret
-}
+}}
 
-unsafe fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
+unsafe fn launch_crazy_sax(test: u32, fail: i32) -> i32 { unsafe {
     let mut err: i32 = 0;
 
     CRAZY_INDX.set(test as usize);
@@ -1233,10 +1233,10 @@ unsafe fn launch_crazy_sax(test: u32, fail: i32) -> i32 {
     eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
 
     err
-}
+}}
 
 #[cfg(feature = "libxml_reader")]
-unsafe fn launch_crazy(test: u32, fail: i32) -> i32 {
+unsafe fn launch_crazy(test: u32, fail: i32) -> i32 { unsafe {
     let mut err: i32 = 0;
 
     CRAZY_INDX.set(test as usize);
@@ -1254,7 +1254,7 @@ unsafe fn launch_crazy(test: u32, fail: i32) -> i32 {
     eprintln!("{}", CRAZY.to_bytes()[test as usize] as char);
 
     err
-}
+}}
 
 unsafe extern "C" fn get_crazy_fail(test: i32) -> i32 {
     // adding 1000000 of character 'a' leads to parser failure mostly

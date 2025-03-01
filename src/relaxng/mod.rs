@@ -19,11 +19,13 @@ use crate::{
 pub(crate) const XML_RELAXNG_NS: &str = "http://relaxng.org/ns/structure/1.0";
 
 pub(crate) unsafe fn is_relaxng(node: XmlNodePtr, typ: &str) -> bool {
-    node.element_type() == XmlElementType::XmlElementNode
-        && node.name().as_deref() == Some(typ)
-        && node
-            .ns
-            .map_or(false, |ns| ns.href().as_deref() == Some(XML_RELAXNG_NS))
+    unsafe {
+        node.element_type() == XmlElementType::XmlElementNode
+            && node.name().as_deref() == Some(typ)
+            && node
+                .ns
+                .is_some_and(|ns| ns.href().as_deref() == Some(XML_RELAXNG_NS))
+    }
 }
 
 /// Removes the leading and ending spaces of the value.

@@ -29,7 +29,7 @@ use std::{
     ffi::CStr,
     ops::{Deref, DerefMut},
     os::raw::c_void,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
     sync::atomic::Ordering,
 };
 
@@ -38,15 +38,14 @@ use crate::{
     libxml::{
         globals::{xml_deregister_node_default_value, xml_free, xml_register_node_default_value},
         valid::xml_free_attribute_table,
-        xmlstring::{xml_strndup, XmlChar},
+        xmlstring::{XmlChar, xml_strndup},
     },
     parser::split_qname2,
 };
 
 use super::{
-    xml_free_entities_table, xml_free_node, xml_tree_err_memory, InvalidNodePointerCastError,
-    NodeCommon, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlGenericNodePtr,
-    __XML_REGISTER_CALLBACKS,
+    __XML_REGISTER_CALLBACKS, InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementType,
+    XmlEntityPtr, XmlGenericNodePtr, xml_free_entities_table, xml_free_node, xml_tree_err_memory,
 };
 
 pub use attribute::*;
@@ -126,13 +125,15 @@ impl XmlDtd {
     /// update all nodes under the tree to point to the right document
     #[doc(alias = "xmlSetTreeDoc")]
     pub unsafe fn set_doc(&mut self, doc: Option<XmlDocPtr>) {
-        if self.doc != doc {
-            if let Some(children) = self.children() {
-                children.set_doc_all_sibling(doc);
-            }
+        unsafe {
+            if self.doc != doc {
+                if let Some(children) = self.children() {
+                    children.set_doc_all_sibling(doc);
+                }
 
-            // FIXME: self.ns should be updated as in xmlStaticCopyNode().
-            self.doc = doc;
+                // FIXME: self.ns should be updated as in xmlStaticCopyNode().
+                self.doc = doc;
+            }
         }
     }
 }
@@ -215,74 +216,76 @@ pub unsafe fn xml_create_int_subset(
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<XmlDtdPtr> {
-    if doc.map_or(false, |doc| doc.get_int_subset().is_some()) {
-        return None;
-    }
-
-    // Allocate a new DTD and fill the fields.
-    let Some(mut cur) = XmlDtdPtr::new(XmlDtd {
-        typ: XmlElementType::XmlDTDNode,
-        external_id: external_id.map(|e| e.to_owned()),
-        system_id: system_id.map(|e| e.to_owned()),
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building internal subset");
-        return None;
-    };
-
-    if let Some(name) = name {
-        cur.name = xml_strndup(name.as_ptr(), name.len() as i32);
-        if cur.name.is_null() {
-            xml_tree_err_memory("building internal subset");
-            cur.free();
+    unsafe {
+        if doc.is_some_and(|doc| doc.get_int_subset().is_some()) {
             return None;
         }
-    }
-    if let Some(mut doc) = doc {
-        doc.int_subset = Some(cur);
-        cur.parent = Some(doc);
-        cur.doc = Some(doc);
-        if let Some(children) = doc.children() {
-            if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
-                let mut prev = children;
-                prev.set_prev(Some(cur.into()));
-                cur.set_next(Some(prev));
-                doc.set_children(Some(cur.into()));
-            } else {
-                let mut next = Some(children);
-                while let Some(now) =
-                    next.filter(|n| !matches!(n.element_type(), XmlElementType::XmlElementNode))
-                {
-                    next = now.next();
-                }
-                if let Some(mut next) = next {
-                    cur.set_next(Some(next));
-                    cur.set_prev(next.prev());
-                    if let Some(mut prev) = cur.prev() {
-                        prev.set_next(Some(cur.into()));
-                    } else {
-                        doc.set_children(Some(cur.into()));
-                    }
-                    next.set_prev(Some(cur.into()));
-                } else {
-                    cur.set_prev(doc.last());
-                    cur.prev().unwrap().set_next(Some(cur.into()));
-                    cur.set_next(None);
-                    doc.set_last(Some(cur.into()));
-                }
-            }
-        } else {
-            doc.children = Some(cur.into());
-            doc.last = Some(cur.into());
-        }
-    }
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        // Allocate a new DTD and fill the fields.
+        let Some(mut cur) = XmlDtdPtr::new(XmlDtd {
+            typ: XmlElementType::XmlDTDNode,
+            external_id: external_id.map(|e| e.to_owned()),
+            system_id: system_id.map(|e| e.to_owned()),
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building internal subset");
+            return None;
+        };
+
+        if let Some(name) = name {
+            cur.name = xml_strndup(name.as_ptr(), name.len() as i32);
+            if cur.name.is_null() {
+                xml_tree_err_memory("building internal subset");
+                cur.free();
+                return None;
+            }
+        }
+        if let Some(mut doc) = doc {
+            doc.int_subset = Some(cur);
+            cur.parent = Some(doc);
+            cur.doc = Some(doc);
+            if let Some(children) = doc.children() {
+                if matches!(doc.typ, XmlElementType::XmlHTMLDocumentNode) {
+                    let mut prev = children;
+                    prev.set_prev(Some(cur.into()));
+                    cur.set_next(Some(prev));
+                    doc.set_children(Some(cur.into()));
+                } else {
+                    let mut next = Some(children);
+                    while let Some(now) =
+                        next.filter(|n| !matches!(n.element_type(), XmlElementType::XmlElementNode))
+                    {
+                        next = now.next();
+                    }
+                    if let Some(mut next) = next {
+                        cur.set_next(Some(next));
+                        cur.set_prev(next.prev());
+                        if let Some(mut prev) = cur.prev() {
+                            prev.set_next(Some(cur.into()));
+                        } else {
+                            doc.set_children(Some(cur.into()));
+                        }
+                        next.set_prev(Some(cur.into()));
+                    } else {
+                        cur.set_prev(doc.last());
+                        cur.prev().unwrap().set_next(Some(cur.into()));
+                        cur.set_next(None);
+                        doc.set_last(Some(cur.into()));
+                    }
+                }
+            } else {
+                doc.children = Some(cur.into());
+                doc.last = Some(cur.into());
+            }
+        }
+
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Creation of a new DTD for the external subset.  
@@ -296,35 +299,37 @@ pub unsafe fn xml_new_dtd(
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) -> Option<XmlDtdPtr> {
-    if doc.map_or(false, |doc| doc.ext_subset.is_some()) {
-        return None;
-    }
+    unsafe {
+        if doc.is_some_and(|doc| doc.ext_subset.is_some()) {
+            return None;
+        }
 
-    // Allocate a new DTD and fill the fields.
-    let Some(mut cur) = XmlDtdPtr::new(XmlDtd {
-        typ: XmlElementType::XmlDTDNode,
-        external_id: external_id.map(|e| e.to_owned()),
-        system_id: system_id.map(|s| s.to_owned()),
-        doc,
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building DTD");
-        return None;
-    };
+        // Allocate a new DTD and fill the fields.
+        let Some(mut cur) = XmlDtdPtr::new(XmlDtd {
+            typ: XmlElementType::XmlDTDNode,
+            external_id: external_id.map(|e| e.to_owned()),
+            system_id: system_id.map(|s| s.to_owned()),
+            doc,
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building DTD");
+            return None;
+        };
 
-    if let Some(name) = name {
-        cur.name = xml_strndup(name.as_ptr(), name.len() as i32);
-    }
-    if let Some(mut doc) = doc {
-        doc.ext_subset = Some(cur);
-    }
+        if let Some(name) = name {
+            cur.name = xml_strndup(name.as_ptr(), name.len() as i32);
+        }
+        if let Some(mut doc) = doc {
+            doc.ext_subset = Some(cur);
+        }
 
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    //  && xmlRegisterNodeDefaultValue.is_some()
-    {
-        xml_register_node_default_value(cur.into());
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        //  && xmlRegisterNodeDefaultValue.is_some()
+        {
+            xml_register_node_default_value(cur.into());
+        }
+        Some(cur)
     }
-    Some(cur)
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -351,17 +356,19 @@ impl XmlDtdPtr {
     pub(crate) unsafe fn from_raw(
         ptr: *mut XmlDtd,
     ) -> Result<Option<Self>, InvalidNodePointerCastError> {
-        if ptr.is_null() {
-            return Ok(None);
-        }
-        match (*ptr).element_type() {
-            XmlElementType::XmlDTDNode | XmlElementType::XmlDocumentTypeNode => {
-                Ok(Some(Self(NonNull::new_unchecked(ptr))))
+        unsafe {
+            if ptr.is_null() {
+                return Ok(None);
             }
-            _ => Err(InvalidNodePointerCastError {
-                from: (*ptr).element_type(),
-                to: type_name::<Self>(),
-            }),
+            match (*ptr).element_type() {
+                XmlElementType::XmlDTDNode | XmlElementType::XmlDocumentTypeNode => {
+                    Ok(Some(Self(NonNull::new_unchecked(ptr))))
+                }
+                _ => Err(InvalidNodePointerCastError {
+                    from: (*ptr).element_type(),
+                    to: type_name::<Self>(),
+                }),
+            }
         }
     }
 
@@ -375,7 +382,9 @@ impl XmlDtdPtr {
     /// This method should be called only once.  
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn free(self) {
-        let _ = *Box::from_raw(self.0.as_ptr());
+        unsafe {
+            let _ = *Box::from_raw(self.0.as_ptr());
+        }
     }
 
     /// Acquire the ownership of the inner value.  
@@ -385,7 +394,7 @@ impl XmlDtdPtr {
     /// This method should be called only once.  
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn into_inner(self) -> Box<XmlDtd> {
-        Box::from_raw(self.0.as_ptr())
+        unsafe { Box::from_raw(self.0.as_ptr()) }
     }
 }
 
@@ -451,50 +460,52 @@ impl From<XmlDtdPtr> for *mut XmlDtd {
 /// Free a DTD structure.
 #[doc(alias = "xmlFreeDtd")]
 pub unsafe fn xml_free_dtd(mut cur: XmlDtdPtr) {
-    if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
-    // && xmlDeregisterNodeDefaultValue.is_some()
-    {
-        xml_deregister_node_default_value(cur.into());
-    }
-
-    if let Some(children) = (*cur).children() {
-        // Cleanup all nodes which are not part of the specific lists
-        // of notations, elements, attributes and entities.
-        let mut c = Some(children);
-        while let Some(mut now) = c {
-            let next = now.next();
-            if !matches!(
-                now.element_type(),
-                XmlElementType::XmlNotationNode
-                    | XmlElementType::XmlElementDecl
-                    | XmlElementType::XmlAttributeDecl
-                    | XmlElementType::XmlEntityDecl
-            ) {
-                now.unlink();
-                xml_free_node(now);
-            }
-            c = next;
+    unsafe {
+        if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
+        // && xmlDeregisterNodeDefaultValue.is_some()
+        {
+            xml_deregister_node_default_value(cur.into());
         }
-    }
-    if !cur.name.is_null() {
-        xml_free(cur.name as _);
-    }
-    cur.system_id = None;
-    cur.external_id = None;
-    // TODO !!!
 
-    if let Some(table) = cur.elements.take() {
-        table.scan(|data, _, _, _| xml_free_element(Some(*data)));
-    }
-    if let Some(table) = cur.attributes.take().map(|t| t.into_inner()) {
-        xml_free_attribute_table(table);
-    }
-    if let Some(entities) = cur.entities.take() {
-        xml_free_entities_table(entities);
-    }
-    if let Some(pentities) = cur.pentities.take() {
-        xml_free_entities_table(pentities);
-    }
+        if let Some(children) = (*cur).children() {
+            // Cleanup all nodes which are not part of the specific lists
+            // of notations, elements, attributes and entities.
+            let mut c = Some(children);
+            while let Some(mut now) = c {
+                let next = now.next();
+                if !matches!(
+                    now.element_type(),
+                    XmlElementType::XmlNotationNode
+                        | XmlElementType::XmlElementDecl
+                        | XmlElementType::XmlAttributeDecl
+                        | XmlElementType::XmlEntityDecl
+                ) {
+                    now.unlink();
+                    xml_free_node(now);
+                }
+                c = next;
+            }
+        }
+        if !cur.name.is_null() {
+            xml_free(cur.name as _);
+        }
+        cur.system_id = None;
+        cur.external_id = None;
+        // TODO !!!
 
-    cur.free();
+        if let Some(table) = cur.elements.take() {
+            table.scan(|data, _, _, _| xml_free_element(Some(*data)));
+        }
+        if let Some(table) = cur.attributes.take().map(|t| t.into_inner()) {
+            xml_free_attribute_table(table);
+        }
+        if let Some(entities) = cur.entities.take() {
+            xml_free_entities_table(entities);
+        }
+        if let Some(pentities) = cur.pentities.take() {
+            xml_free_entities_table(pentities);
+        }
+
+        cur.free();
+    }
 }

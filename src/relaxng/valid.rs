@@ -4,24 +4,24 @@ use std::{
 };
 
 use crate::{
-    globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
+    globals::{GLOBAL_STATE, GenericError, GenericErrorContext, StructuredError},
     libxml::{
         chvalid::xml_is_blank_char,
         globals::{xml_free, xml_malloc},
         relaxng::{
-            xml_relaxng_add_states_uniq, xml_relaxng_validate_progressive_callback,
             XmlRelaxNGGrammarPtr, XmlRelaxNGPtr, XmlRelaxNGValidErr, XmlRelaxNGValidError,
+            xml_relaxng_add_states_uniq, xml_relaxng_validate_progressive_callback,
         },
         xmlregexp::{
-            xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_free_exec_ctxt,
-            xml_reg_new_exec_ctxt, XmlRegExecCtxtPtr,
+            XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_exec_push_string2,
+            xml_reg_free_exec_ctxt, xml_reg_new_exec_ctxt,
         },
     },
     relaxng::{VALID_ERR, VALID_ERR2},
     tree::{XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr},
 };
 
-use super::{xml_rng_verr_memory, XmlRelaxNGDefinePtr};
+use super::{XmlRelaxNGDefinePtr, xml_rng_verr_memory};
 
 const MAX_ATTR: usize = 20;
 
@@ -133,51 +133,58 @@ impl XmlRelaxNGValidCtxt {
     /// element requires a full node, and -1 in case of error.
     #[doc(alias = "xmlRelaxNGValidatePushElement")]
     pub unsafe fn push_element(&mut self, _doc: Option<XmlDocPtr>, elem: XmlNodePtr) -> i32 {
-        let mut ret: i32;
+        unsafe {
+            let mut ret: i32;
 
-        if self.elem.is_null() {
-            let schema: XmlRelaxNGPtr = self.schema;
-            if schema.is_null() {
-                VALID_ERR!(self, XmlRelaxNGValidErr::XmlRelaxngErrNogrammar);
-                return -1;
+            if self.elem.is_null() {
+                let schema: XmlRelaxNGPtr = self.schema;
+                if schema.is_null() {
+                    VALID_ERR!(self, XmlRelaxNGValidErr::XmlRelaxngErrNogrammar);
+                    return -1;
+                }
+                let grammar: XmlRelaxNGGrammarPtr = (*schema).topgrammar;
+                if grammar.is_null() || (*grammar).start.is_null() {
+                    VALID_ERR!(self, XmlRelaxNGValidErr::XmlRelaxngErrNogrammar);
+                    return -1;
+                }
+                let define: XmlRelaxNGDefinePtr = (*grammar).start;
+                if (*define).cont_model.is_null() {
+                    self.pdef = define;
+                    return 0;
+                }
+                let exec: XmlRegExecCtxtPtr = xml_reg_new_exec_ctxt(
+                    (*define).cont_model,
+                    Some(xml_relaxng_validate_progressive_callback),
+                    self as *mut Self as _,
+                );
+                if exec.is_null() {
+                    return -1;
+                }
+                self.elem_push(exec);
             }
-            let grammar: XmlRelaxNGGrammarPtr = (*schema).topgrammar;
-            if grammar.is_null() || (*grammar).start.is_null() {
-                VALID_ERR!(self, XmlRelaxNGValidErr::XmlRelaxngErrNogrammar);
-                return -1;
+            self.pnode = Some(elem);
+            self.pstate = 0;
+            if let Some(ns) = elem.ns {
+                ret = xml_reg_exec_push_string2(
+                    self.elem,
+                    elem.name,
+                    ns.href,
+                    self as *mut Self as _,
+                );
+            } else {
+                ret = xml_reg_exec_push_string(self.elem, elem.name, self as *mut Self as _);
             }
-            let define: XmlRelaxNGDefinePtr = (*grammar).start;
-            if (*define).cont_model.is_null() {
-                self.pdef = define;
-                return 0;
+            if ret < 0 {
+                VALID_ERR2!(self, XmlRelaxNGValidErr::XmlRelaxngErrElemwrong, elem.name);
+            } else if self.pstate == 0 {
+                ret = 0;
+            } else if self.pstate < 0 {
+                ret = -1;
+            } else {
+                ret = 1;
             }
-            let exec: XmlRegExecCtxtPtr = xml_reg_new_exec_ctxt(
-                (*define).cont_model,
-                Some(xml_relaxng_validate_progressive_callback),
-                self as *mut Self as _,
-            );
-            if exec.is_null() {
-                return -1;
-            }
-            self.elem_push(exec);
+            ret
         }
-        self.pnode = Some(elem);
-        self.pstate = 0;
-        if let Some(ns) = elem.ns {
-            ret = xml_reg_exec_push_string2(self.elem, elem.name, ns.href, self as *mut Self as _);
-        } else {
-            ret = xml_reg_exec_push_string(self.elem, elem.name, self as *mut Self as _);
-        }
-        if ret < 0 {
-            VALID_ERR2!(self, XmlRelaxNGValidErr::XmlRelaxngErrElemwrong, elem.name);
-        } else if self.pstate == 0 {
-            ret = 0;
-        } else if self.pstate < 0 {
-            ret = -1;
-        } else {
-            ret = 1;
-        }
-        ret
     }
 
     /// Pop the element end from the RelaxNG validation stack.
@@ -185,33 +192,35 @@ impl XmlRelaxNGValidCtxt {
     /// returns 1 if no validation problem was found or 0 otherwise
     #[doc(alias = "xmlRelaxNGValidatePopElement")]
     pub unsafe fn pop_element(&mut self, _doc: Option<XmlDocPtr>, _elem: XmlNodePtr) -> i32 {
-        let mut ret: i32;
+        unsafe {
+            let mut ret: i32;
 
-        if self.elem.is_null() {
-            return -1;
+            if self.elem.is_null() {
+                return -1;
+            }
+            // verify that we reached a terminal state of the content model.
+            let exec: XmlRegExecCtxtPtr = self.elem_pop();
+            ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
+            match ret.cmp(&0) {
+                std::cmp::Ordering::Equal => {
+                    // TODO: get some of the names needed to exit the current state of exec
+                    VALID_ERR2!(
+                        self,
+                        XmlRelaxNGValidErr::XmlRelaxngErrNoelem,
+                        c"".as_ptr() as _
+                    );
+                    ret = -1;
+                }
+                std::cmp::Ordering::Less => {
+                    ret = -1;
+                }
+                std::cmp::Ordering::Greater => {
+                    ret = 1;
+                }
+            }
+            xml_reg_free_exec_ctxt(exec);
+            ret
         }
-        // verify that we reached a terminal state of the content model.
-        let exec: XmlRegExecCtxtPtr = self.elem_pop();
-        ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
-        match ret.cmp(&0) {
-            std::cmp::Ordering::Equal => {
-                // TODO: get some of the names needed to exit the current state of exec
-                VALID_ERR2!(
-                    self,
-                    XmlRelaxNGValidErr::XmlRelaxngErrNoelem,
-                    c"".as_ptr() as _
-                );
-                ret = -1;
-            }
-            std::cmp::Ordering::Less => {
-                ret = -1;
-            }
-            std::cmp::Ordering::Greater => {
-                ret = 1;
-            }
-        }
-        xml_reg_free_exec_ctxt(exec);
-        ret
     }
 }
 
@@ -249,51 +258,55 @@ impl Default for XmlRelaxNGValidCtxt {
 /// Returns the validation context or NULL in case of error
 #[doc(alias = "xmlRelaxNGNewValidCtxt")]
 pub unsafe fn xml_relaxng_new_valid_ctxt(schema: XmlRelaxNGPtr) -> XmlRelaxNGValidCtxtPtr {
-    let ret: XmlRelaxNGValidCtxtPtr = xml_malloc(size_of::<XmlRelaxNGValidCtxt>()) as _;
-    if ret.is_null() {
-        xml_rng_verr_memory(null_mut(), "building context\n");
-        return null_mut();
+    unsafe {
+        let ret: XmlRelaxNGValidCtxtPtr = xml_malloc(size_of::<XmlRelaxNGValidCtxt>()) as _;
+        if ret.is_null() {
+            xml_rng_verr_memory(null_mut(), "building context\n");
+            return null_mut();
+        }
+        std::ptr::write(&mut *ret, XmlRelaxNGValidCtxt::default());
+        (*ret).schema = schema;
+        GLOBAL_STATE.with_borrow(|state| {
+            (*ret).error = Some(state.generic_error);
+            (*ret).user_data = state.generic_error_context.clone();
+        });
+        if !schema.is_null() {
+            (*ret).idref = (*schema).idref;
+        }
+        (*ret).states = null_mut();
+        (*ret).free_state = null_mut();
+        (*ret).err_no = XmlRelaxNGValidErr::XmlRelaxngOk as i32;
+        ret
     }
-    std::ptr::write(&mut *ret, XmlRelaxNGValidCtxt::default());
-    (*ret).schema = schema;
-    GLOBAL_STATE.with_borrow(|state| {
-        (*ret).error = Some(state.generic_error);
-        (*ret).user_data = state.generic_error_context.clone();
-    });
-    if !schema.is_null() {
-        (*ret).idref = (*schema).idref;
-    }
-    (*ret).states = null_mut();
-    (*ret).free_state = null_mut();
-    (*ret).err_no = XmlRelaxNGValidErr::XmlRelaxngOk as i32;
-    ret
 }
 
 /// Free the resources associated to the schema validation context
 #[doc(alias = "xmlRelaxNGFreeValidCtxt")]
 pub unsafe fn xml_relaxng_free_valid_ctxt(ctxt: XmlRelaxNGValidCtxtPtr) {
-    if ctxt.is_null() {
-        return;
-    }
-    if !(*ctxt).states.is_null() {
-        xml_relaxng_free_states(null_mut(), (*ctxt).states);
-    }
-    if !(*ctxt).free_state.is_null() {
-        for state in (*(*ctxt).free_state).tab_state.drain(..) {
-            xml_relaxng_free_valid_state(null_mut(), state);
+    unsafe {
+        if ctxt.is_null() {
+            return;
         }
-        xml_relaxng_free_states(null_mut(), (*ctxt).free_state);
+        if !(*ctxt).states.is_null() {
+            xml_relaxng_free_states(null_mut(), (*ctxt).states);
+        }
+        if !(*ctxt).free_state.is_null() {
+            for state in (*(*ctxt).free_state).tab_state.drain(..) {
+                xml_relaxng_free_valid_state(null_mut(), state);
+            }
+            xml_relaxng_free_states(null_mut(), (*ctxt).free_state);
+        }
+        for state in (*ctxt).free_states.drain(..) {
+            xml_relaxng_free_states(null_mut(), state);
+        }
+        let mut exec = (*ctxt).elem_pop();
+        while !exec.is_null() {
+            xml_reg_free_exec_ctxt(exec);
+            exec = (*ctxt).elem_pop();
+        }
+        drop_in_place(ctxt);
+        xml_free(ctxt as _);
     }
-    for state in (*ctxt).free_states.drain(..) {
-        xml_relaxng_free_states(null_mut(), state);
-    }
-    let mut exec = (*ctxt).elem_pop();
-    while !exec.is_null() {
-        xml_reg_free_exec_ctxt(exec);
-        exec = (*ctxt).elem_pop();
-    }
-    drop_in_place(ctxt);
-    xml_free(ctxt as _);
 }
 
 /// Allocate a new RelaxNG validation state container
@@ -304,26 +317,29 @@ pub(crate) unsafe fn xml_relaxng_new_states(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut size: i32,
 ) -> XmlRelaxNGStatesPtr {
-    if !ctxt.is_null() {
-        if let Some(ret) = (*ctxt).free_states.pop() {
-            (*ret).tab_state.clear();
-            return ret;
+    unsafe {
+        if !ctxt.is_null() {
+            if let Some(ret) = (*ctxt).free_states.pop() {
+                (*ret).tab_state.clear();
+                return ret;
+            }
         }
-    }
-    if size < 16 {
-        size = 16;
-    }
+        if size < 16 {
+            size = 16;
+        }
 
-    let ret: XmlRelaxNGStatesPtr = xml_malloc(
-        size_of::<XmlRelaxNGStates>() + (size as usize - 1) * size_of::<XmlRelaxNGValidStatePtr>(),
-    ) as _;
-    if ret.is_null() {
-        xml_rng_verr_memory(ctxt, "allocating states\n");
-        return null_mut();
+        let ret: XmlRelaxNGStatesPtr = xml_malloc(
+            size_of::<XmlRelaxNGStates>()
+                + (size as usize - 1) * size_of::<XmlRelaxNGValidStatePtr>(),
+        ) as _;
+        if ret.is_null() {
+            xml_rng_verr_memory(ctxt, "allocating states\n");
+            return null_mut();
+        }
+        std::ptr::write(&mut *ret, XmlRelaxNGStates::default());
+        (*ret).tab_state.reserve(size as usize);
+        ret
     }
-    std::ptr::write(&mut *ret, XmlRelaxNGStates::default());
-    (*ret).tab_state.reserve(size as usize);
-    ret
 }
 
 /// Free a RelaxNG validation state container
@@ -332,15 +348,17 @@ pub(crate) unsafe fn xml_relaxng_free_states(
     ctxt: XmlRelaxNGValidCtxtPtr,
     states: XmlRelaxNGStatesPtr,
 ) {
-    if states.is_null() {
-        return;
-    }
+    unsafe {
+        if states.is_null() {
+            return;
+        }
 
-    if ctxt.is_null() {
-        drop_in_place(states);
-        xml_free(states as _);
-    } else {
-        (*ctxt).free_states.push(states);
+        if ctxt.is_null() {
+            drop_in_place(states);
+            xml_free(states as _);
+        } else {
+            (*ctxt).free_states.push(states);
+        }
     }
 }
 
@@ -352,71 +370,73 @@ pub(crate) unsafe fn xml_relaxng_new_valid_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     node: Option<XmlGenericNodePtr>,
 ) -> XmlRelaxNGValidStatePtr {
-    let ret: XmlRelaxNGValidStatePtr;
-    let mut attrs: [Option<XmlAttrPtr>; MAX_ATTR] = [None; MAX_ATTR];
-    let mut nb_attrs: usize = 0;
-    let mut root = None;
+    unsafe {
+        let ret: XmlRelaxNGValidStatePtr;
+        let mut attrs: [Option<XmlAttrPtr>; MAX_ATTR] = [None; MAX_ATTR];
+        let mut nb_attrs: usize = 0;
+        let mut root = None;
 
-    if let Some(node) = node {
-        if node.element_type() != XmlElementType::XmlDocumentNode {
-            // In original libxml2, `node` is treats as truly `XmlNode`,
-            // but it may actually be `XmlDoc`.
-            // If the `node` is `XmlDoc`,
-            // this may be a misbehavior because it erroneously collects an external subset.
-            // Therefore, insert a check to see if the `node` is an `XmlNode`.
+        if let Some(node) = node {
+            if node.element_type() != XmlElementType::XmlDocumentNode {
+                // In original libxml2, `node` is treats as truly `XmlNode`,
+                // but it may actually be `XmlDoc`.
+                // If the `node` is `XmlDoc`,
+                // this may be a misbehavior because it erroneously collects an external subset.
+                // Therefore, insert a check to see if the `node` is an `XmlNode`.
 
-            let node = XmlNodePtr::try_from(node).unwrap();
-            let mut attr = node.properties;
-            while let Some(now) = attr {
-                if nb_attrs < MAX_ATTR {
-                    attrs[nb_attrs] = Some(now);
-                    nb_attrs += 1;
-                } else {
-                    nb_attrs += 1;
+                let node = XmlNodePtr::try_from(node).unwrap();
+                let mut attr = node.properties;
+                while let Some(now) = attr {
+                    if nb_attrs < MAX_ATTR {
+                        attrs[nb_attrs] = Some(now);
+                        nb_attrs += 1;
+                    } else {
+                        nb_attrs += 1;
+                    }
+                    attr = now.next;
                 }
-                attr = now.next;
             }
-        }
-    } else {
-        root = (*ctxt).doc.and_then(|doc| doc.get_root_element());
-        if root.is_none() {
-            return null_mut();
-        }
-    }
-    if !(*ctxt).free_state.is_null() && !(*(*ctxt).free_state).tab_state.is_empty() {
-        ret = (*(*ctxt).free_state).tab_state.pop().unwrap();
-    } else {
-        ret = xml_malloc(size_of::<XmlRelaxNGValidState>()) as _;
-        if ret.is_null() {
-            xml_rng_verr_memory(ctxt, "allocating states\n");
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlRelaxNGValidState::default());
-    }
-    (*ret).value = null_mut();
-    (*ret).endvalue = null_mut();
-    if let Some(node) = node {
-        (*ret).node = Some(node);
-        (*ret).seq = node.children();
-    } else {
-        (*ret).node = (*ctxt).doc.map(|doc| doc.into());
-        (*ret).seq = root.map(|root| root.into());
-    }
-    (*ret).attrs.clear();
-    if nb_attrs > 0 {
-        if nb_attrs < MAX_ATTR {
-            (*ret).attrs.extend(attrs.iter().copied().take(nb_attrs));
         } else {
-            let node = XmlNodePtr::try_from(node.unwrap()).unwrap();
-            let mut attr = node.properties;
-            while let Some(now) = attr {
-                (*ret).attrs.push(Some(now));
-                attr = now.next;
+            root = (*ctxt).doc.and_then(|doc| doc.get_root_element());
+            if root.is_none() {
+                return null_mut();
             }
         }
+        if !(*ctxt).free_state.is_null() && !(*(*ctxt).free_state).tab_state.is_empty() {
+            ret = (*(*ctxt).free_state).tab_state.pop().unwrap();
+        } else {
+            ret = xml_malloc(size_of::<XmlRelaxNGValidState>()) as _;
+            if ret.is_null() {
+                xml_rng_verr_memory(ctxt, "allocating states\n");
+                return null_mut();
+            }
+            std::ptr::write(&mut *ret, XmlRelaxNGValidState::default());
+        }
+        (*ret).value = null_mut();
+        (*ret).endvalue = null_mut();
+        if let Some(node) = node {
+            (*ret).node = Some(node);
+            (*ret).seq = node.children();
+        } else {
+            (*ret).node = (*ctxt).doc.map(|doc| doc.into());
+            (*ret).seq = root.map(|root| root.into());
+        }
+        (*ret).attrs.clear();
+        if nb_attrs > 0 {
+            if nb_attrs < MAX_ATTR {
+                (*ret).attrs.extend(attrs.iter().copied().take(nb_attrs));
+            } else {
+                let node = XmlNodePtr::try_from(node.unwrap()).unwrap();
+                let mut attr = node.properties;
+                while let Some(now) = attr {
+                    (*ret).attrs.push(Some(now));
+                    attr = now.next;
+                }
+            }
+        }
+        (*ret).nb_attr_left = (*ret).attrs.len() as i32;
+        ret
     }
-    (*ret).nb_attr_left = (*ret).attrs.len() as i32;
-    ret
 }
 
 /// Deallocate a RelaxNG validation state structure.
@@ -425,18 +445,20 @@ pub(crate) unsafe fn xml_relaxng_free_valid_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     state: XmlRelaxNGValidStatePtr,
 ) {
-    if state.is_null() {
-        return;
-    }
+    unsafe {
+        if state.is_null() {
+            return;
+        }
 
-    if !ctxt.is_null() && (*ctxt).free_state.is_null() {
-        (*ctxt).free_state = xml_relaxng_new_states(ctxt, 40);
-    }
-    if ctxt.is_null() || (*ctxt).free_state.is_null() {
-        drop_in_place(state);
-        xml_free(state as _);
-    } else {
-        xml_relaxng_add_states_uniq(ctxt, (*ctxt).free_state, state);
+        if !ctxt.is_null() && (*ctxt).free_state.is_null() {
+            (*ctxt).free_state = xml_relaxng_new_states(ctxt, 40);
+        }
+        if ctxt.is_null() || (*ctxt).free_state.is_null() {
+            drop_in_place(state);
+            xml_free(state as _);
+        } else {
+            xml_relaxng_add_states_uniq(ctxt, (*ctxt).free_state, state);
+        }
     }
 }
 

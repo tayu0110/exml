@@ -23,14 +23,14 @@
 
 use std::{ffi::c_char, mem::size_of, ptr::null_mut};
 
-use libc::{memcpy, memset, snprintf, strlen, INT_MAX};
+use libc::{INT_MAX, memcpy, memset, snprintf, strlen};
 
 use crate::error::__xml_raise_error;
 
 use super::{
     globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
     xmlstring::{
-        xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, xml_strlen, xml_strndup, XmlChar,
+        XmlChar, xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, xml_strlen, xml_strndup,
     },
 };
 
@@ -62,25 +62,27 @@ const PORT_EMPTY: i32 = 0;
 const PORT_EMPTY_SERVER: i32 = -1;
 
 unsafe fn xml_uri_err_memory(extra: &str) {
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        null_mut(),
-        None,
-        XmlErrorDomain::XmlFromURI,
-        XmlParserErrors::XmlErrNoMemory,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        Some(extra.to_owned().into()),
-        None,
-        None,
-        0,
-        0,
-        "Memory allocation failed : {}\n",
-        extra
-    );
+    unsafe {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            None,
+            XmlErrorDomain::XmlFromURI,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            Some(extra.to_owned().into()),
+            None,
+            None,
+            0,
+            0,
+            "Memory allocation failed : {}\n",
+            extra
+        );
+    }
 }
 
 /// Simply creates an empty xmlURI
@@ -88,14 +90,16 @@ unsafe fn xml_uri_err_memory(extra: &str) {
 /// Returns the new structure or NULL in case of error
 #[doc(alias = "xmlCreateURI")]
 pub unsafe extern "C" fn xml_create_uri() -> XmlURIPtr {
-    let ret: XmlURIPtr = xml_malloc(size_of::<XmlURI>()) as XmlURIPtr;
-    if ret.is_null() {
-        xml_uri_err_memory("creating URI structure\n");
-        return null_mut();
+    unsafe {
+        let ret: XmlURIPtr = xml_malloc(size_of::<XmlURI>()) as XmlURIPtr;
+        if ret.is_null() {
+            xml_uri_err_memory("creating URI structure\n");
+            return null_mut();
+        }
+        memset(ret as _, 0, size_of::<XmlURI>());
+        (*ret).port = PORT_EMPTY;
+        ret
     }
-    memset(ret as _, 0, size_of::<XmlURI>());
-    (*ret).port = PORT_EMPTY;
-    ret
 }
 
 /// Expresses the URI of the reference in terms relative to the base.  
@@ -131,271 +135,276 @@ pub unsafe extern "C" fn xml_build_relative_uri(
     uri: *const XmlChar,
     base: *const XmlChar,
 ) -> *mut XmlChar {
-    let mut val: *mut XmlChar = null_mut();
-    let mut ret: i32;
-    let mut ix: i32;
-    let mut nbslash: i32 = 0;
-    let len: i32;
-    let mut bas: XmlURIPtr = null_mut();
-    let mut bptr: *mut XmlChar;
-    let uptr: *mut XmlChar;
-    let mut vptr: *mut XmlChar;
-    let mut remove_path: i32 = 0;
+    unsafe {
+        let mut val: *mut XmlChar = null_mut();
+        let mut ret: i32;
+        let mut ix: i32;
+        let mut nbslash: i32 = 0;
+        let len: i32;
+        let mut bas: XmlURIPtr = null_mut();
+        let mut bptr: *mut XmlChar;
+        let uptr: *mut XmlChar;
+        let mut vptr: *mut XmlChar;
+        let mut remove_path: i32 = 0;
 
-    if uri.is_null() || *uri == 0 {
-        return null_mut();
-    }
+        if uri.is_null() || *uri == 0 {
+            return null_mut();
+        }
 
-    /*
-     * First parse URI into a standard form
-     */
-    let refe: XmlURIPtr = xml_create_uri();
-    if refe.is_null() {
-        return null_mut();
-    }
-    'done: {
-        /* If URI not already in "relative" form */
-        if *uri.add(0) != b'.' {
-            ret = xml_parse_uri_reference(refe as _, uri as _);
-            if ret != 0 {
-                break 'done; /* Error in URI, return NULL */
+        /*
+         * First parse URI into a standard form
+         */
+        let refe: XmlURIPtr = xml_create_uri();
+        if refe.is_null() {
+            return null_mut();
+        }
+        'done: {
+            /* If URI not already in "relative" form */
+            if *uri.add(0) != b'.' {
+                ret = xml_parse_uri_reference(refe as _, uri as _);
+                if ret != 0 {
+                    break 'done; /* Error in URI, return NULL */
+                }
+            } else {
+                (*refe).path = xml_strdup(uri as _) as *mut c_char;
             }
-        } else {
-            (*refe).path = xml_strdup(uri as _) as *mut c_char;
-        }
-
-        /*
-         * Next parse base into the same standard form
-         */
-        if base.is_null() || *base == 0 {
-            val = xml_strdup(uri);
-            break 'done;
-        }
-        bas = xml_create_uri();
-        if bas.is_null() {
-            break 'done;
-        }
-        if *base.add(0) != b'.' {
-            ret = xml_parse_uri_reference(bas, base as *const c_char);
-            if ret != 0 {
-                break 'done; /* Error in base, return NULL */
-            }
-        } else {
-            (*bas).path = xml_strdup(base) as *mut c_char;
-        }
-
-        /*
-         * If the scheme / server on the URI differs from the base,
-         * just return the URI
-         */
-        if !(*refe).scheme.is_null()
-            && ((*bas).scheme.is_null()
-                || xml_strcmp(
-                    (*bas).scheme as *mut XmlChar,
-                    (*refe).scheme as *mut XmlChar,
-                ) != 0
-                || xml_strcmp(
-                    (*bas).server as *mut XmlChar,
-                    (*refe).server as *mut XmlChar,
-                ) != 0
-                || (*bas).port != (*refe).port)
-        {
-            val = xml_strdup(uri);
-            break 'done;
-        }
-        if xml_str_equal((*bas).path as *mut XmlChar, (*refe).path as *mut XmlChar) {
-            val = xml_strdup(c"".as_ptr() as _);
-            break 'done;
-        }
-        if (*bas).path.is_null() {
-            val = xml_strdup((*refe).path as *mut XmlChar);
-            break 'done;
-        }
-        if (*refe).path.is_null() {
-            (*refe).path = c"/".as_ptr() as _;
-            remove_path = 1;
-        }
-
-        /*
-         * At this point (at last!) we can compare the two paths
-         *
-         * First we take care of the special case where either of the
-         * two path components may be missing (bug 316224)
-         */
-        bptr = (*bas).path as *mut XmlChar;
-        {
-            let mut rptr: *mut XmlChar = (*refe).path as *mut XmlChar;
-            let mut pos: i32 = 0;
 
             /*
-             * Next we compare the two strings and find where they first differ
+             * Next parse base into the same standard form
              */
-            if *rptr == b'.' && *rptr.add(1) == b'/' {
-                rptr = rptr.add(2);
+            if base.is_null() || *base == 0 {
+                val = xml_strdup(uri);
+                break 'done;
             }
-            if *bptr == b'.' && *bptr.add(1) == b'/' {
-                bptr = bptr.add(2);
-            } else if *bptr == b'/' && *rptr != b'/' {
-                bptr = bptr.add(1);
+            bas = xml_create_uri();
+            if bas.is_null() {
+                break 'done;
             }
-            while *bptr.add(pos as usize) == *rptr.add(pos as usize) && *bptr.add(pos as usize) != 0
-            {
-                pos += 1;
+            if *base.add(0) != b'.' {
+                ret = xml_parse_uri_reference(bas, base as *const c_char);
+                if ret != 0 {
+                    break 'done; /* Error in base, return NULL */
+                }
+            } else {
+                (*bas).path = xml_strdup(base) as *mut c_char;
             }
 
-            if *bptr.add(pos as usize) == *rptr.add(pos as usize) {
+            /*
+             * If the scheme / server on the URI differs from the base,
+             * just return the URI
+             */
+            if !(*refe).scheme.is_null()
+                && ((*bas).scheme.is_null()
+                    || xml_strcmp(
+                        (*bas).scheme as *mut XmlChar,
+                        (*refe).scheme as *mut XmlChar,
+                    ) != 0
+                    || xml_strcmp(
+                        (*bas).server as *mut XmlChar,
+                        (*refe).server as *mut XmlChar,
+                    ) != 0
+                    || (*bas).port != (*refe).port)
+            {
+                val = xml_strdup(uri);
+                break 'done;
+            }
+            if xml_str_equal((*bas).path as *mut XmlChar, (*refe).path as *mut XmlChar) {
                 val = xml_strdup(c"".as_ptr() as _);
                 break 'done;
             }
-
-            /*
-             * In URI, "back up" to the last '/' encountered.  This will be the
-             * beginning of the "unique" suffix of URI
-             */
-            ix = pos;
-            while ix > 0 {
-                if *rptr.add(ix as usize - 1) == b'/' {
-                    break;
-                }
-                ix -= 1;
+            if (*bas).path.is_null() {
+                val = xml_strdup((*refe).path as *mut XmlChar);
+                break 'done;
             }
-            uptr = rptr.add(ix as usize) as *mut XmlChar;
-
-            /*
-             * In base, count the number of '/' from the differing point
-             */
-            while *bptr.add(ix as usize) != 0 {
-                if *bptr.add(ix as usize) == b'/' {
-                    nbslash += 1;
-                }
-
-                ix += 1;
+            if (*refe).path.is_null() {
+                (*refe).path = c"/".as_ptr() as _;
+                remove_path = 1;
             }
 
             /*
-             * e.g: URI="foo/" base="foo/bar" -> "./"
+             * At this point (at last!) we can compare the two paths
+             *
+             * First we take care of the special case where either of the
+             * two path components may be missing (bug 316224)
              */
-            if nbslash == 0 && *uptr.add(0) == 0 {
-                val = xml_strdup(c"./".as_ptr() as _);
+            bptr = (*bas).path as *mut XmlChar;
+            {
+                let mut rptr: *mut XmlChar = (*refe).path as *mut XmlChar;
+                let mut pos: i32 = 0;
+
+                /*
+                 * Next we compare the two strings and find where they first differ
+                 */
+                if *rptr == b'.' && *rptr.add(1) == b'/' {
+                    rptr = rptr.add(2);
+                }
+                if *bptr == b'.' && *bptr.add(1) == b'/' {
+                    bptr = bptr.add(2);
+                } else if *bptr == b'/' && *rptr != b'/' {
+                    bptr = bptr.add(1);
+                }
+                while *bptr.add(pos as usize) == *rptr.add(pos as usize)
+                    && *bptr.add(pos as usize) != 0
+                {
+                    pos += 1;
+                }
+
+                if *bptr.add(pos as usize) == *rptr.add(pos as usize) {
+                    val = xml_strdup(c"".as_ptr() as _);
+                    break 'done;
+                }
+
+                /*
+                 * In URI, "back up" to the last '/' encountered.  This will be the
+                 * beginning of the "unique" suffix of URI
+                 */
+                ix = pos;
+                while ix > 0 {
+                    if *rptr.add(ix as usize - 1) == b'/' {
+                        break;
+                    }
+                    ix -= 1;
+                }
+                uptr = rptr.add(ix as usize) as *mut XmlChar;
+
+                /*
+                 * In base, count the number of '/' from the differing point
+                 */
+                while *bptr.add(ix as usize) != 0 {
+                    if *bptr.add(ix as usize) == b'/' {
+                        nbslash += 1;
+                    }
+
+                    ix += 1;
+                }
+
+                /*
+                 * e.g: URI="foo/" base="foo/bar" -> "./"
+                 */
+                if nbslash == 0 && *uptr.add(0) == 0 {
+                    val = xml_strdup(c"./".as_ptr() as _);
+                    break 'done;
+                }
+
+                len = xml_strlen(uptr as _) + 1;
+            }
+
+            if nbslash == 0 {
+                if !uptr.is_null() {
+                    /* exception characters from xmlSaveUri */
+                    val = xml_uri_escape_str(uptr, c"/;&=+$,".as_ptr() as _);
+                }
                 break 'done;
             }
 
-            len = xml_strlen(uptr as _) + 1;
-        }
-
-        if nbslash == 0 {
-            if !uptr.is_null() {
-                /* exception characters from xmlSaveUri */
-                val = xml_uri_escape_str(uptr, c"/;&=+$,".as_ptr() as _);
+            /*
+             * Allocate just enough space for the returned string -
+             * length of the remainder of the URI, plus enough space
+             * for the "../" groups, plus one for the terminator
+             */
+            val = xml_malloc(len as usize + 3 * nbslash as usize) as *mut XmlChar;
+            if val.is_null() {
+                xml_uri_err_memory("building relative URI\n");
+                break 'done;
             }
-            break 'done;
-        }
-
-        /*
-         * Allocate just enough space for the returned string -
-         * length of the remainder of the URI, plus enough space
-         * for the "../" groups, plus one for the terminator
-         */
-        val = xml_malloc(len as usize + 3 * nbslash as usize) as *mut XmlChar;
-        if val.is_null() {
-            xml_uri_err_memory("building relative URI\n");
-            break 'done;
-        }
-        vptr = val;
-        /*
-         * Put in as many "../" as needed
-         */
-        while nbslash > 0 {
-            *vptr = b'.';
-            vptr = vptr.add(1);
-            *vptr = b'.';
-            vptr = vptr.add(1);
-            *vptr = b'/';
-            vptr = vptr.add(1);
-            nbslash -= 1;
-        }
-        /*
-         * Finish up with the end of the URI
-         */
-        if !uptr.is_null() {
-            if vptr > val && len > 0 && *uptr.add(0) == b'/' && *vptr.sub(1) == b'/' {
-                memcpy(vptr as _, uptr.add(1) as _, len as usize - 1);
-                *vptr.add(len as usize - 2) = 0;
+            vptr = val;
+            /*
+             * Put in as many "../" as needed
+             */
+            while nbslash > 0 {
+                *vptr = b'.';
+                vptr = vptr.add(1);
+                *vptr = b'.';
+                vptr = vptr.add(1);
+                *vptr = b'/';
+                vptr = vptr.add(1);
+                nbslash -= 1;
+            }
+            /*
+             * Finish up with the end of the URI
+             */
+            if !uptr.is_null() {
+                if vptr > val && len > 0 && *uptr.add(0) == b'/' && *vptr.sub(1) == b'/' {
+                    memcpy(vptr as _, uptr.add(1) as _, len as usize - 1);
+                    *vptr.add(len as usize - 2) = 0;
+                } else {
+                    memcpy(vptr as _, uptr as _, len as usize);
+                    *vptr.add(len as usize - 1) = 0;
+                }
             } else {
-                memcpy(vptr as _, uptr as _, len as usize);
                 *vptr.add(len as usize - 1) = 0;
             }
-        } else {
-            *vptr.add(len as usize - 1) = 0;
+
+            /* escape the freshly-built path */
+            vptr = val;
+            /* exception characters from xmlSaveUri */
+            val = xml_uri_escape_str(vptr, c"/;&=+$,".as_ptr() as _);
+            xml_free(vptr as _);
         }
 
-        /* escape the freshly-built path */
-        vptr = val;
-        /* exception characters from xmlSaveUri */
-        val = xml_uri_escape_str(vptr, c"/;&=+$,".as_ptr() as _);
-        xml_free(vptr as _);
-    }
+        // done:
+        /*
+         * Free the working variables
+         */
+        if remove_path != 0 {
+            (*refe).path = null_mut();
+        }
+        if !refe.is_null() {
+            xml_free_uri(refe);
+        }
+        if !bas.is_null() {
+            xml_free_uri(bas);
+        }
 
-    // done:
-    /*
-     * Free the working variables
-     */
-    if remove_path != 0 {
-        (*refe).path = null_mut();
+        val
     }
-    if !refe.is_null() {
-        xml_free_uri(refe);
-    }
-    if !bas.is_null() {
-        xml_free_uri(bas);
-    }
-
-    val
 }
 
 /// Make sure the xmlURI struct is free of content
 #[doc(alias = "xmlCleanURI")]
 unsafe extern "C" fn xml_clean_uri(uri: XmlURIPtr) {
-    if uri.is_null() {
-        return;
-    }
+    unsafe {
+        if uri.is_null() {
+            return;
+        }
 
-    if !(*uri).scheme.is_null() {
-        xml_free((*uri).scheme as _);
+        if !(*uri).scheme.is_null() {
+            xml_free((*uri).scheme as _);
+        }
+        (*uri).scheme = null_mut();
+        if !(*uri).server.is_null() {
+            xml_free((*uri).server as _);
+        }
+        (*uri).server = null_mut();
+        if !(*uri).user.is_null() {
+            xml_free((*uri).user as _);
+        }
+        (*uri).user = null_mut();
+        if !(*uri).path.is_null() {
+            xml_free((*uri).path as _);
+        }
+        (*uri).path = null_mut();
+        if !(*uri).fragment.is_null() {
+            xml_free((*uri).fragment as _);
+        }
+        (*uri).fragment = null_mut();
+        if !(*uri).opaque.is_null() {
+            xml_free((*uri).opaque as _);
+        }
+        (*uri).opaque = null_mut();
+        if !(*uri).authority.is_null() {
+            xml_free((*uri).authority as _);
+        }
+        (*uri).authority = null_mut();
+        if !(*uri).query.is_null() {
+            xml_free((*uri).query as _);
+        }
+        (*uri).query = null_mut();
+        if !(*uri).query_raw.is_null() {
+            xml_free((*uri).query_raw as _);
+        }
+        (*uri).query_raw = null_mut();
     }
-    (*uri).scheme = null_mut();
-    if !(*uri).server.is_null() {
-        xml_free((*uri).server as _);
-    }
-    (*uri).server = null_mut();
-    if !(*uri).user.is_null() {
-        xml_free((*uri).user as _);
-    }
-    (*uri).user = null_mut();
-    if !(*uri).path.is_null() {
-        xml_free((*uri).path as _);
-    }
-    (*uri).path = null_mut();
-    if !(*uri).fragment.is_null() {
-        xml_free((*uri).fragment as _);
-    }
-    (*uri).fragment = null_mut();
-    if !(*uri).opaque.is_null() {
-        xml_free((*uri).opaque as _);
-    }
-    (*uri).opaque = null_mut();
-    if !(*uri).authority.is_null() {
-        xml_free((*uri).authority as _);
-    }
-    (*uri).authority = null_mut();
-    if !(*uri).query.is_null() {
-        xml_free((*uri).query as _);
-    }
-    (*uri).query = null_mut();
-    if !(*uri).query_raw.is_null() {
-        xml_free((*uri).query_raw as _);
-    }
-    (*uri).query_raw = null_mut();
 }
 
 macro_rules! ISA_ALPHA {
@@ -423,33 +432,35 @@ macro_rules! STRNDUP {
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986Scheme")]
 unsafe extern "C" fn xml_parse3986_scheme(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char;
+    unsafe {
+        let mut cur: *const c_char;
 
-    if str.is_null() {
-        return -1;
-    }
-
-    cur = *str;
-    if !ISA_ALPHA!(cur) {
-        return 2;
-    }
-    cur = cur.add(1);
-    while ISA_ALPHA!(cur)
-        || ISA_DIGIT!(cur)
-        || *cur == b'+' as _
-        || *cur == b'-' as _
-        || *cur == b'.' as _
-    {
-        cur = cur.add(1);
-    }
-    if !uri.is_null() {
-        if !(*uri).scheme.is_null() {
-            xml_free((*uri).scheme as _);
+        if str.is_null() {
+            return -1;
         }
-        (*uri).scheme = STRNDUP!(*str, cur.offset_from(*str) as _);
+
+        cur = *str;
+        if !ISA_ALPHA!(cur) {
+            return 2;
+        }
+        cur = cur.add(1);
+        while ISA_ALPHA!(cur)
+            || ISA_DIGIT!(cur)
+            || *cur == b'+' as _
+            || *cur == b'-' as _
+            || *cur == b'.' as _
+        {
+            cur = cur.add(1);
+        }
+        if !uri.is_null() {
+            if !(*uri).scheme.is_null() {
+                xml_free((*uri).scheme as _);
+            }
+            (*uri).scheme = STRNDUP!(*str, cur.offset_from(*str) as _);
+        }
+        *str = cur;
+        0
     }
-    *str = cur;
-    0
 }
 
 /*
@@ -531,28 +542,34 @@ macro_rules! NEXT {
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986Userinfo")]
 unsafe extern "C" fn xml_parse3986_userinfo(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char;
+    unsafe {
+        let mut cur: *const c_char;
 
-    cur = *str;
-    while ISA_UNRESERVED!(cur) || ISA_PCT_ENCODED!(cur) || ISA_SUB_DELIM!(cur) || *cur == b':' as i8
-    {
-        NEXT!(cur);
-    }
-    if *cur == b'@' as i8 {
-        if !uri.is_null() {
-            if !(*uri).user.is_null() {
-                xml_free((*uri).user as _);
-            }
-            if (*uri).cleanup & 2 != 0 {
-                (*uri).user = STRNDUP!(*str, cur.offset_from(*str) as _);
-            } else {
-                (*uri).user = xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
-            }
+        cur = *str;
+        while ISA_UNRESERVED!(cur)
+            || ISA_PCT_ENCODED!(cur)
+            || ISA_SUB_DELIM!(cur)
+            || *cur == b':' as i8
+        {
+            NEXT!(cur);
         }
-        *str = cur;
-        return 0;
+        if *cur == b'@' as i8 {
+            if !uri.is_null() {
+                if !(*uri).user.is_null() {
+                    xml_free((*uri).user as _);
+                }
+                if (*uri).cleanup & 2 != 0 {
+                    (*uri).user = STRNDUP!(*str, cur.offset_from(*str) as _);
+                } else {
+                    (*uri).user =
+                        xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+                }
+            }
+            *str = cur;
+            return 0;
+        }
+        1
     }
-    1
 }
 
 ///```ignore
@@ -568,31 +585,33 @@ unsafe extern "C" fn xml_parse3986_userinfo(uri: XmlURIPtr, str: *mut *const c_c
 /// Returns 0 if found and skipped, 1 otherwise
 #[doc(alias = "xmlParse3986DecOctet")]
 unsafe extern "C" fn xml_parse3986_dec_octet(str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char = *str;
+    unsafe {
+        let mut cur: *const c_char = *str;
 
-    if !ISA_DIGIT!(cur) {
-        return 1;
+        if !ISA_DIGIT!(cur) {
+            return 1;
+        }
+        if !ISA_DIGIT!(cur.add(1)) {
+            cur = cur.add(1);
+        } else if *cur != b'0' as i8 && ISA_DIGIT!(cur.add(1)) && !ISA_DIGIT!(cur.add(2)) {
+            cur = cur.add(2);
+        } else if (*cur == b'1' as i8 && ISA_DIGIT!(cur.add(1)) && ISA_DIGIT!(cur.add(2)))
+            || (*cur == b'2' as i8
+                && *cur.add(1) >= b'0' as i8
+                && *cur.add(1) <= b'4' as i8
+                && ISA_DIGIT!(cur.add(2)))
+            || (*cur == b'2' as i8
+                && *cur.add(1) == b'5' as i8
+                && *cur.add(2) >= b'0' as i8
+                && *cur.add(1) <= b'5' as i8)
+        {
+            cur = cur.add(3);
+        } else {
+            return 1;
+        }
+        *str = cur;
+        0
     }
-    if !ISA_DIGIT!(cur.add(1)) {
-        cur = cur.add(1);
-    } else if *cur != b'0' as i8 && ISA_DIGIT!(cur.add(1)) && !ISA_DIGIT!(cur.add(2)) {
-        cur = cur.add(2);
-    } else if (*cur == b'1' as i8 && ISA_DIGIT!(cur.add(1)) && ISA_DIGIT!(cur.add(2)))
-        || (*cur == b'2' as i8
-            && *cur.add(1) >= b'0' as i8
-            && *cur.add(1) <= b'4' as i8
-            && ISA_DIGIT!(cur.add(2)))
-        || (*cur == b'2' as i8
-            && *cur.add(1) == b'5' as i8
-            && *cur.add(2) >= b'0' as i8
-            && *cur.add(1) <= b'5' as i8)
-    {
-        cur = cur.add(3);
-    } else {
-        return 1;
-    }
-    *str = cur;
-    0
 }
 
 /// Parse an host part and fills in the appropriate fields
@@ -608,85 +627,87 @@ unsafe extern "C" fn xml_parse3986_dec_octet(str: *mut *const c_char) -> i32 {
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986Host")]
 unsafe extern "C" fn xml_parse3986_host(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char = *str;
+    unsafe {
+        let mut cur: *const c_char = *str;
 
-    let host: *const c_char = cur;
-    /*
-     * IPv6 and future addressing scheme are enclosed between brackets
-     */
-    'found: {
-        if *cur == b'[' as i8 {
-            cur = cur.add(1);
-            while *cur != b']' as i8 && *cur != 0 {
-                cur = cur.add(1);
-            }
-            if *cur != b']' as i8 {
-                return 1;
-            }
-            cur = cur.add(1);
-            break 'found;
-        }
+        let host: *const c_char = cur;
         /*
-         * try to parse an IPv4
+         * IPv6 and future addressing scheme are enclosed between brackets
          */
-        if ISA_DIGIT!(cur) {
-            'not_ipv4: {
-                if xml_parse3986_dec_octet(&raw mut cur) != 0 {
-                    break 'not_ipv4;
+        'found: {
+            if *cur == b'[' as i8 {
+                cur = cur.add(1);
+                while *cur != b']' as i8 && *cur != 0 {
+                    cur = cur.add(1);
                 }
-                if *cur != b'.' as i8 {
-                    break 'not_ipv4;
+                if *cur != b']' as i8 {
+                    return 1;
                 }
                 cur = cur.add(1);
-                if xml_parse3986_dec_octet(&raw mut cur) != 0 {
-                    break 'not_ipv4;
-                }
-                if *cur != b'.' as i8 {
-                    break 'not_ipv4;
-                }
-                if xml_parse3986_dec_octet(&raw mut cur) != 0 {
-                    break 'not_ipv4;
-                }
-                if *cur != b'.' as i8 {
-                    break 'not_ipv4;
-                }
-                if xml_parse3986_dec_octet(&raw mut cur) != 0 {
-                    break 'not_ipv4;
-                }
                 break 'found;
             }
-            // not_ipv4:
-            cur = *str;
-        }
-        /*
-         * then this should be a hostname which can be empty
-         */
-        while ISA_UNRESERVED!(cur) || ISA_PCT_ENCODED!(cur) || ISA_SUB_DELIM!(cur) {
-            NEXT!(cur);
-        }
-    }
-    // found:
-    if !uri.is_null() {
-        if !(*uri).authority.is_null() {
-            xml_free((*uri).authority as _);
-        }
-        (*uri).authority = null_mut();
-        if !(*uri).server.is_null() {
-            xml_free((*uri).server as _);
-        }
-        if cur != host {
-            if (*uri).cleanup & 2 != 0 {
-                (*uri).server = STRNDUP!(host, cur.offset_from(host) as _);
-            } else {
-                (*uri).server =
-                    xml_uri_unescape_string(host, cur.offset_from(host) as _, null_mut());
+            /*
+             * try to parse an IPv4
+             */
+            if ISA_DIGIT!(cur) {
+                'not_ipv4: {
+                    if xml_parse3986_dec_octet(&raw mut cur) != 0 {
+                        break 'not_ipv4;
+                    }
+                    if *cur != b'.' as i8 {
+                        break 'not_ipv4;
+                    }
+                    cur = cur.add(1);
+                    if xml_parse3986_dec_octet(&raw mut cur) != 0 {
+                        break 'not_ipv4;
+                    }
+                    if *cur != b'.' as i8 {
+                        break 'not_ipv4;
+                    }
+                    if xml_parse3986_dec_octet(&raw mut cur) != 0 {
+                        break 'not_ipv4;
+                    }
+                    if *cur != b'.' as i8 {
+                        break 'not_ipv4;
+                    }
+                    if xml_parse3986_dec_octet(&raw mut cur) != 0 {
+                        break 'not_ipv4;
+                    }
+                    break 'found;
+                }
+                // not_ipv4:
+                cur = *str;
             }
-        } else {
-            (*uri).server = null_mut();
+            /*
+             * then this should be a hostname which can be empty
+             */
+            while ISA_UNRESERVED!(cur) || ISA_PCT_ENCODED!(cur) || ISA_SUB_DELIM!(cur) {
+                NEXT!(cur);
+            }
         }
+        // found:
+        if !uri.is_null() {
+            if !(*uri).authority.is_null() {
+                xml_free((*uri).authority as _);
+            }
+            (*uri).authority = null_mut();
+            if !(*uri).server.is_null() {
+                xml_free((*uri).server as _);
+            }
+            if cur != host {
+                if (*uri).cleanup & 2 != 0 {
+                    (*uri).server = STRNDUP!(host, cur.offset_from(host) as _);
+                } else {
+                    (*uri).server =
+                        xml_uri_unescape_string(host, cur.offset_from(host) as _, null_mut());
+                }
+            } else {
+                (*uri).server = null_mut();
+            }
+        }
+        *str = cur;
+        0
     }
-    *str = cur;
-    0
 }
 
 /// Parse a port part and fills in the appropriate fields of the @uri structure
@@ -696,31 +717,33 @@ unsafe extern "C" fn xml_parse3986_host(uri: XmlURIPtr, str: *mut *const c_char)
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986Port")]
 unsafe extern "C" fn xml_parse3986_port(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char = *str;
-    let mut port: i32 = 0;
+    unsafe {
+        let mut cur: *const c_char = *str;
+        let mut port: i32 = 0;
 
-    if ISA_DIGIT!(cur) {
-        while ISA_DIGIT!(cur) {
-            let digit: i32 = *cur as i32 - b'0' as i32;
+        if ISA_DIGIT!(cur) {
+            while ISA_DIGIT!(cur) {
+                let digit: i32 = *cur as i32 - b'0' as i32;
 
-            if port > INT_MAX / 10 {
-                return 1;
+                if port > INT_MAX / 10 {
+                    return 1;
+                }
+                port *= 10;
+                if port > INT_MAX - digit {
+                    return 1;
+                }
+                port += digit;
+
+                cur = cur.add(1);
             }
-            port *= 10;
-            if port > INT_MAX - digit {
-                return 1;
+            if !uri.is_null() {
+                (*uri).port = port;
             }
-            port += digit;
-
-            cur = cur.add(1);
+            *str = cur;
+            return 0;
         }
-        if !uri.is_null() {
-            (*uri).port = port;
-        }
-        *str = cur;
-        return 0;
+        1
     }
-    1
 }
 
 /// Parse an authority part and fills in the appropriate fields
@@ -731,32 +754,34 @@ unsafe extern "C" fn xml_parse3986_port(uri: XmlURIPtr, str: *mut *const c_char)
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986Authority")]
 unsafe extern "C" fn xml_parse3986_authority(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char;
-    let mut ret: i32;
+    unsafe {
+        let mut cur: *const c_char;
+        let mut ret: i32;
 
-    cur = *str;
-    /*
-     * try to parse an userinfo and check for the trailing @
-     */
-    ret = xml_parse3986_userinfo(uri, &raw mut cur);
-    if ret != 0 || *cur != b'@' as i8 {
         cur = *str;
-    } else {
-        cur = cur.add(1);
-    }
-    ret = xml_parse3986_host(uri, &raw mut cur);
-    if ret != 0 {
-        return ret;
-    }
-    if *cur == b':' as i8 {
-        cur = cur.add(1);
-        ret = xml_parse3986_port(uri, &raw mut cur);
+        /*
+         * try to parse an userinfo and check for the trailing @
+         */
+        ret = xml_parse3986_userinfo(uri, &raw mut cur);
+        if ret != 0 || *cur != b'@' as i8 {
+            cur = *str;
+        } else {
+            cur = cur.add(1);
+        }
+        ret = xml_parse3986_host(uri, &raw mut cur);
         if ret != 0 {
             return ret;
         }
+        if *cur == b':' as i8 {
+            cur = cur.add(1);
+            ret = xml_parse3986_port(uri, &raw mut cur);
+            if ret != 0 {
+                return ret;
+            }
+        }
+        *str = cur;
+        0
     }
-    *str = cur;
-    0
 }
 
 /// Parse a segment and fills in the appropriate fields
@@ -776,20 +801,22 @@ unsafe extern "C" fn xml_parse3986_segment(
     forbid: c_char,
     empty: i32,
 ) -> i32 {
-    let mut cur: *const c_char;
+    unsafe {
+        let mut cur: *const c_char;
 
-    cur = *str;
-    if !ISA_PCHAR!(cur) {
-        if empty != 0 {
-            return 0;
+        cur = *str;
+        if !ISA_PCHAR!(cur) {
+            if empty != 0 {
+                return 0;
+            }
+            return 1;
         }
-        return 1;
+        while ISA_PCHAR!(cur) && *cur != forbid {
+            NEXT!(cur);
+        }
+        *str = cur;
+        0
     }
-    while ISA_PCHAR!(cur) && *cur != forbid {
-        NEXT!(cur);
-    }
-    *str = cur;
-    0
 }
 
 /// Parse an path absolute or empty and fills in the appropriate fields of the @uri structure
@@ -799,34 +826,37 @@ unsafe extern "C" fn xml_parse3986_segment(
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986PathAbEmpty")]
 unsafe extern "C" fn xml_parse3986_path_ab_empty(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char;
-    let mut ret: i32;
+    unsafe {
+        let mut cur: *const c_char;
+        let mut ret: i32;
 
-    cur = *str;
+        cur = *str;
 
-    while *cur == b'/' as i8 {
-        cur = cur.add(1);
-        ret = xml_parse3986_segment(&raw mut cur, 0, 1);
-        if ret != 0 {
-            return ret;
-        }
-    }
-    if !uri.is_null() {
-        if !(*uri).path.is_null() {
-            xml_free((*uri).path as _);
-        }
-        if *str != cur {
-            if (*uri).cleanup & 2 != 0 {
-                (*uri).path = STRNDUP!(*str, cur.offset_from(*str) as _);
-            } else {
-                (*uri).path = xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+        while *cur == b'/' as i8 {
+            cur = cur.add(1);
+            ret = xml_parse3986_segment(&raw mut cur, 0, 1);
+            if ret != 0 {
+                return ret;
             }
-        } else {
-            (*uri).path = null_mut();
         }
+        if !uri.is_null() {
+            if !(*uri).path.is_null() {
+                xml_free((*uri).path as _);
+            }
+            if *str != cur {
+                if (*uri).cleanup & 2 != 0 {
+                    (*uri).path = STRNDUP!(*str, cur.offset_from(*str) as _);
+                } else {
+                    (*uri).path =
+                        xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+                }
+            } else {
+                (*uri).path = null_mut();
+            }
+        }
+        *str = cur;
+        0
     }
-    *str = cur;
-    0
 }
 
 /// Parse an path absolute and fills in the appropriate fields of the @uri structure
@@ -836,41 +866,44 @@ unsafe extern "C" fn xml_parse3986_path_ab_empty(uri: XmlURIPtr, str: *mut *cons
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986PathAbsolute")]
 unsafe extern "C" fn xml_parse3986_path_absolute(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char;
-    let mut ret: i32;
+    unsafe {
+        let mut cur: *const c_char;
+        let mut ret: i32;
 
-    cur = *str;
+        cur = *str;
 
-    if *cur != b'/' as i8 {
-        return 1;
-    }
-    cur = cur.add(1);
-    ret = xml_parse3986_segment(&raw mut cur, 0, 0);
-    if ret == 0 {
-        while *cur == b'/' as i8 {
-            cur = cur.add(1);
-            ret = xml_parse3986_segment(&raw mut cur, 0, 1);
-            if ret != 0 {
-                return ret;
+        if *cur != b'/' as i8 {
+            return 1;
+        }
+        cur = cur.add(1);
+        ret = xml_parse3986_segment(&raw mut cur, 0, 0);
+        if ret == 0 {
+            while *cur == b'/' as i8 {
+                cur = cur.add(1);
+                ret = xml_parse3986_segment(&raw mut cur, 0, 1);
+                if ret != 0 {
+                    return ret;
+                }
             }
         }
-    }
-    if !uri.is_null() {
-        if !(*uri).path.is_null() {
-            xml_free((*uri).path as _);
-        }
-        if cur != *str {
-            if (*uri).cleanup & 2 != 0 {
-                (*uri).path = STRNDUP!(*str, cur.offset_from(*str) as _);
+        if !uri.is_null() {
+            if !(*uri).path.is_null() {
+                xml_free((*uri).path as _);
+            }
+            if cur != *str {
+                if (*uri).cleanup & 2 != 0 {
+                    (*uri).path = STRNDUP!(*str, cur.offset_from(*str) as _);
+                } else {
+                    (*uri).path =
+                        xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+                }
             } else {
-                (*uri).path = xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+                (*uri).path = null_mut();
             }
-        } else {
-            (*uri).path = null_mut();
         }
+        *str = cur;
+        0
     }
-    *str = cur;
-    0
 }
 
 /// Parse an path without root and fills in the appropriate fields
@@ -881,38 +914,41 @@ unsafe extern "C" fn xml_parse3986_path_absolute(uri: XmlURIPtr, str: *mut *cons
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986PathRootless")]
 unsafe extern "C" fn xml_parse3986_path_rootless(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char;
-    let mut ret: i32;
+    unsafe {
+        let mut cur: *const c_char;
+        let mut ret: i32;
 
-    cur = *str;
+        cur = *str;
 
-    ret = xml_parse3986_segment(&raw mut cur, 0, 0);
-    if ret != 0 {
-        return ret;
-    }
-    while *cur == b'/' as i8 {
-        cur = cur.add(1);
-        ret = xml_parse3986_segment(&raw mut cur, 0, 1);
+        ret = xml_parse3986_segment(&raw mut cur, 0, 0);
         if ret != 0 {
             return ret;
         }
-    }
-    if !uri.is_null() {
-        if !(*uri).path.is_null() {
-            xml_free((*uri).path as _);
-        }
-        if cur != *str {
-            if (*uri).cleanup & 2 != 0 {
-                (*uri).path = STRNDUP!(*str, cur.offset_from(*str) as _);
-            } else {
-                (*uri).path = xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+        while *cur == b'/' as i8 {
+            cur = cur.add(1);
+            ret = xml_parse3986_segment(&raw mut cur, 0, 1);
+            if ret != 0 {
+                return ret;
             }
-        } else {
-            (*uri).path = null_mut();
         }
+        if !uri.is_null() {
+            if !(*uri).path.is_null() {
+                xml_free((*uri).path as _);
+            }
+            if cur != *str {
+                if (*uri).cleanup & 2 != 0 {
+                    (*uri).path = STRNDUP!(*str, cur.offset_from(*str) as _);
+                } else {
+                    (*uri).path =
+                        xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+                }
+            } else {
+                (*uri).path = null_mut();
+            }
+        }
+        *str = cur;
+        0
     }
-    *str = cur;
-    0
 }
 
 /// Parse an hierarchical part and fills in the appropriate fields
@@ -928,50 +964,52 @@ unsafe extern "C" fn xml_parse3986_path_rootless(uri: XmlURIPtr, str: *mut *cons
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986HierPart")]
 unsafe extern "C" fn xml_parse3986_hier_part(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char;
-    let mut ret: i32;
+    unsafe {
+        let mut cur: *const c_char;
+        let mut ret: i32;
 
-    cur = *str;
+        cur = *str;
 
-    if *cur == b'/' as i8 && *cur.add(1) == b'/' as i8 {
-        cur = cur.add(2);
-        ret = xml_parse3986_authority(uri, &raw mut cur);
-        if ret != 0 {
-            return ret;
-        }
-        /*
-         * An empty server is marked with a special URI value.
-         */
-        if (*uri).server.is_null() && (*uri).port == PORT_EMPTY {
-            (*uri).port = PORT_EMPTY_SERVER;
-        }
-        ret = xml_parse3986_path_ab_empty(uri, &raw mut cur);
-        if ret != 0 {
-            return ret;
+        if *cur == b'/' as i8 && *cur.add(1) == b'/' as i8 {
+            cur = cur.add(2);
+            ret = xml_parse3986_authority(uri, &raw mut cur);
+            if ret != 0 {
+                return ret;
+            }
+            /*
+             * An empty server is marked with a special URI value.
+             */
+            if (*uri).server.is_null() && (*uri).port == PORT_EMPTY {
+                (*uri).port = PORT_EMPTY_SERVER;
+            }
+            ret = xml_parse3986_path_ab_empty(uri, &raw mut cur);
+            if ret != 0 {
+                return ret;
+            }
+            *str = cur;
+            return 0;
+        } else if *cur == b'/' as i8 {
+            ret = xml_parse3986_path_absolute(uri, &raw mut cur);
+            if ret != 0 {
+                return ret;
+            }
+        } else if ISA_PCHAR!(cur) {
+            ret = xml_parse3986_path_rootless(uri, &raw mut cur);
+            if ret != 0 {
+                return ret;
+            }
+        } else {
+            /* path-empty is effectively empty */
+            if !uri.is_null() {
+                if !(*uri).path.is_null() {
+                    xml_free((*uri).path as _);
+                }
+                (*uri).path = null_mut();
+            }
         }
         *str = cur;
-        return 0;
-    } else if *cur == b'/' as i8 {
-        ret = xml_parse3986_path_absolute(uri, &raw mut cur);
-        if ret != 0 {
-            return ret;
-        }
-    } else if ISA_PCHAR!(cur) {
-        ret = xml_parse3986_path_rootless(uri, &raw mut cur);
-        if ret != 0 {
-            return ret;
-        }
-    } else {
-        /* path-empty is effectively empty */
-        if !uri.is_null() {
-            if !(*uri).path.is_null() {
-                xml_free((*uri).path as _);
-            }
-            (*uri).path = null_mut();
-        }
+        0
     }
-    *str = cur;
-    0
 }
 
 /*
@@ -997,41 +1035,44 @@ macro_rules! IS_UNWISE {
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986Query")]
 unsafe extern "C" fn xml_parse3986_query(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char;
+    unsafe {
+        let mut cur: *const c_char;
 
-    if str.is_null() {
-        return -1;
-    }
-
-    cur = *str;
-
-    while ISA_PCHAR!(cur)
-        || *cur == b'/' as i8
-        || *cur == b'?' as i8
-        || (!uri.is_null() && (*uri).cleanup & 1 != 0 && IS_UNWISE!(cur))
-    {
-        NEXT!(cur);
-    }
-    if !uri.is_null() {
-        if !(*uri).query.is_null() {
-            xml_free((*uri).query as _);
-        }
-        if (*uri).cleanup & 2 != 0 {
-            (*uri).query = STRNDUP!(*str, cur.offset_from(*str) as _);
-        } else {
-            (*uri).query = xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+        if str.is_null() {
+            return -1;
         }
 
-        /* Save the raw bytes of the query as well.
-         * See: http://mail.gnome.org/archives/xml/2007-April/thread.html#00114
-         */
-        if !(*uri).query_raw.is_null() {
-            xml_free((*uri).query_raw as _);
+        cur = *str;
+
+        while ISA_PCHAR!(cur)
+            || *cur == b'/' as i8
+            || *cur == b'?' as i8
+            || (!uri.is_null() && (*uri).cleanup & 1 != 0 && IS_UNWISE!(cur))
+        {
+            NEXT!(cur);
         }
-        (*uri).query_raw = STRNDUP!(*str, cur.offset_from(*str) as _);
+        if !uri.is_null() {
+            if !(*uri).query.is_null() {
+                xml_free((*uri).query as _);
+            }
+            if (*uri).cleanup & 2 != 0 {
+                (*uri).query = STRNDUP!(*str, cur.offset_from(*str) as _);
+            } else {
+                (*uri).query =
+                    xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+            }
+
+            /* Save the raw bytes of the query as well.
+             * See: http://mail.gnome.org/archives/xml/2007-April/thread.html#00114
+             */
+            if !(*uri).query_raw.is_null() {
+                xml_free((*uri).query_raw as _);
+            }
+            (*uri).query_raw = STRNDUP!(*str, cur.offset_from(*str) as _);
+        }
+        *str = cur;
+        0
     }
-    *str = cur;
-    0
 }
 
 /// Parse the query part of an URI
@@ -1047,35 +1088,38 @@ unsafe extern "C" fn xml_parse3986_query(uri: XmlURIPtr, str: *mut *const c_char
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986Fragment")]
 unsafe extern "C" fn xml_parse3986_fragment(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char;
+    unsafe {
+        let mut cur: *const c_char;
 
-    if str.is_null() {
-        return -1;
-    }
-
-    cur = *str;
-
-    while ISA_PCHAR!(cur)
-        || *cur == b'/' as i8
-        || *cur == b'?' as i8
-        || *cur == b'[' as i8
-        || *cur == b']' as i8
-        || (!uri.is_null() && (*uri).cleanup & 1 != 0 && IS_UNWISE!(cur))
-    {
-        NEXT!(cur);
-    }
-    if !uri.is_null() {
-        if !(*uri).fragment.is_null() {
-            xml_free((*uri).fragment as _);
+        if str.is_null() {
+            return -1;
         }
-        if (*uri).cleanup & 2 != 0 {
-            (*uri).fragment = STRNDUP!(*str, cur.offset_from(*str) as _);
-        } else {
-            (*uri).fragment = xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+
+        cur = *str;
+
+        while ISA_PCHAR!(cur)
+            || *cur == b'/' as i8
+            || *cur == b'?' as i8
+            || *cur == b'[' as i8
+            || *cur == b']' as i8
+            || (!uri.is_null() && (*uri).cleanup & 1 != 0 && IS_UNWISE!(cur))
+        {
+            NEXT!(cur);
         }
+        if !uri.is_null() {
+            if !(*uri).fragment.is_null() {
+                xml_free((*uri).fragment as _);
+            }
+            if (*uri).cleanup & 2 != 0 {
+                (*uri).fragment = STRNDUP!(*str, cur.offset_from(*str) as _);
+            } else {
+                (*uri).fragment =
+                    xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+            }
+        }
+        *str = cur;
+        0
     }
-    *str = cur;
-    0
 }
 
 /// Parse an URI string and fills in the appropriate fields of the @uri structure
@@ -1085,39 +1129,41 @@ unsafe extern "C" fn xml_parse3986_fragment(uri: XmlURIPtr, str: *mut *const c_c
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986URI")]
 unsafe extern "C" fn xml_parse3986_uri(uri: XmlURIPtr, mut str: *const c_char) -> i32 {
-    let mut ret: i32;
+    unsafe {
+        let mut ret: i32;
 
-    ret = xml_parse3986_scheme(uri, &raw mut str);
-    if ret != 0 {
-        return ret;
-    }
-    if *str != b':' as i8 {
-        return 1;
-    }
-    str = str.add(1);
-    ret = xml_parse3986_hier_part(uri, &raw mut str);
-    if ret != 0 {
-        return ret;
-    }
-    if *str == b'?' as i8 {
-        str = str.add(1);
-        ret = xml_parse3986_query(uri, &raw mut str);
+        ret = xml_parse3986_scheme(uri, &raw mut str);
         if ret != 0 {
             return ret;
         }
-    }
-    if *str == b'#' as i8 {
+        if *str != b':' as i8 {
+            return 1;
+        }
         str = str.add(1);
-        ret = xml_parse3986_fragment(uri, &raw mut str);
+        ret = xml_parse3986_hier_part(uri, &raw mut str);
         if ret != 0 {
             return ret;
         }
+        if *str == b'?' as i8 {
+            str = str.add(1);
+            ret = xml_parse3986_query(uri, &raw mut str);
+            if ret != 0 {
+                return ret;
+            }
+        }
+        if *str == b'#' as i8 {
+            str = str.add(1);
+            ret = xml_parse3986_fragment(uri, &raw mut str);
+            if ret != 0 {
+                return ret;
+            }
+        }
+        if *str != 0 {
+            xml_clean_uri(uri);
+            return 1;
+        }
+        0
     }
-    if *str != 0 {
-        xml_clean_uri(uri);
-        return 1;
-    }
-    0
 }
 
 /// Parse an path which is not a scheme and fills in the appropriate fields of the @uri structure
@@ -1127,38 +1173,41 @@ unsafe extern "C" fn xml_parse3986_uri(uri: XmlURIPtr, mut str: *const c_char) -
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986PathNoScheme")]
 unsafe extern "C" fn xml_parse3986_path_no_scheme(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
-    let mut cur: *const c_char;
-    let mut ret: i32;
+    unsafe {
+        let mut cur: *const c_char;
+        let mut ret: i32;
 
-    cur = *str;
+        cur = *str;
 
-    ret = xml_parse3986_segment(&raw mut cur, b':' as i8, 0);
-    if ret != 0 {
-        return ret;
-    }
-    while *cur == b'/' as i8 {
-        cur = cur.add(1);
-        ret = xml_parse3986_segment(&raw mut cur, 0, 1);
+        ret = xml_parse3986_segment(&raw mut cur, b':' as i8, 0);
         if ret != 0 {
             return ret;
         }
-    }
-    if !uri.is_null() {
-        if !(*uri).path.is_null() {
-            xml_free((*uri).path as _);
-        }
-        if cur != *str {
-            if (*uri).cleanup & 2 != 0 {
-                (*uri).path = STRNDUP!(*str, cur.offset_from(*str) as _);
-            } else {
-                (*uri).path = xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+        while *cur == b'/' as i8 {
+            cur = cur.add(1);
+            ret = xml_parse3986_segment(&raw mut cur, 0, 1);
+            if ret != 0 {
+                return ret;
             }
-        } else {
-            (*uri).path = null_mut();
         }
+        if !uri.is_null() {
+            if !(*uri).path.is_null() {
+                xml_free((*uri).path as _);
+            }
+            if cur != *str {
+                if (*uri).cleanup & 2 != 0 {
+                    (*uri).path = STRNDUP!(*str, cur.offset_from(*str) as _);
+                } else {
+                    (*uri).path =
+                        xml_uri_unescape_string(*str, cur.offset_from(*str) as _, null_mut());
+                }
+            } else {
+                (*uri).path = null_mut();
+            }
+        }
+        *str = cur;
+        0
     }
-    *str = cur;
-    0
 }
 
 /// Parse an URI string and fills in the appropriate fields
@@ -1175,57 +1224,59 @@ unsafe extern "C" fn xml_parse3986_path_no_scheme(uri: XmlURIPtr, str: *mut *con
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986RelativeRef")]
 unsafe extern "C" fn xml_parse3986_relative_ref(uri: XmlURIPtr, mut str: *const c_char) -> i32 {
-    let mut ret: i32;
+    unsafe {
+        let mut ret: i32;
 
-    if *str == b'/' as i8 && *str.add(1) == b'/' as i8 {
-        str = str.add(2);
-        ret = xml_parse3986_authority(uri, &raw mut str);
-        if ret != 0 {
-            return ret;
-        }
-        ret = xml_parse3986_path_ab_empty(uri, &raw mut str);
-        if ret != 0 {
-            return ret;
-        }
-    } else if *str == b'/' as i8 {
-        ret = xml_parse3986_path_absolute(uri, &raw mut str);
-        if ret != 0 {
-            return ret;
-        }
-    } else if ISA_PCHAR!(str) {
-        ret = xml_parse3986_path_no_scheme(uri, &raw mut str);
-        if ret != 0 {
-            return ret;
-        }
-    } else {
-        /* path-empty is effectively empty */
-        if !uri.is_null() {
-            if !(*uri).path.is_null() {
-                xml_free((*uri).path as _);
+        if *str == b'/' as i8 && *str.add(1) == b'/' as i8 {
+            str = str.add(2);
+            ret = xml_parse3986_authority(uri, &raw mut str);
+            if ret != 0 {
+                return ret;
             }
-            (*uri).path = null_mut();
+            ret = xml_parse3986_path_ab_empty(uri, &raw mut str);
+            if ret != 0 {
+                return ret;
+            }
+        } else if *str == b'/' as i8 {
+            ret = xml_parse3986_path_absolute(uri, &raw mut str);
+            if ret != 0 {
+                return ret;
+            }
+        } else if ISA_PCHAR!(str) {
+            ret = xml_parse3986_path_no_scheme(uri, &raw mut str);
+            if ret != 0 {
+                return ret;
+            }
+        } else {
+            /* path-empty is effectively empty */
+            if !uri.is_null() {
+                if !(*uri).path.is_null() {
+                    xml_free((*uri).path as _);
+                }
+                (*uri).path = null_mut();
+            }
         }
-    }
 
-    if *str == b'?' as i8 {
-        str = str.add(1);
-        ret = xml_parse3986_query(uri, &raw mut str);
-        if ret != 0 {
-            return ret;
+        if *str == b'?' as i8 {
+            str = str.add(1);
+            ret = xml_parse3986_query(uri, &raw mut str);
+            if ret != 0 {
+                return ret;
+            }
         }
-    }
-    if *str == b'#' as i8 {
-        str = str.add(1);
-        ret = xml_parse3986_fragment(uri, &raw mut str);
-        if ret != 0 {
-            return ret;
+        if *str == b'#' as i8 {
+            str = str.add(1);
+            ret = xml_parse3986_fragment(uri, &raw mut str);
+            if ret != 0 {
+                return ret;
+            }
         }
+        if *str != 0 {
+            xml_clean_uri(uri);
+            return 1;
+        }
+        0
     }
-    if *str != 0 {
-        xml_clean_uri(uri);
-        return 1;
-    }
-    0
 }
 
 /// Parse an URI reference string and fills in the appropriate fields of the @uri structure
@@ -1235,27 +1286,29 @@ unsafe extern "C" fn xml_parse3986_relative_ref(uri: XmlURIPtr, mut str: *const 
 /// Returns 0 or the error code
 #[doc(alias = "xmlParse3986URIReference")]
 unsafe extern "C" fn xml_parse3986_uri_reference(uri: XmlURIPtr, str: *const c_char) -> i32 {
-    let mut ret: i32;
+    unsafe {
+        let mut ret: i32;
 
-    if str.is_null() {
-        return -1;
-    }
-    xml_clean_uri(uri);
-
-    /*
-     * Try first to parse absolute refs, then fallback to relative if
-     * it fails.
-     */
-    ret = xml_parse3986_uri(uri, str);
-    if ret != 0 {
+        if str.is_null() {
+            return -1;
+        }
         xml_clean_uri(uri);
-        ret = xml_parse3986_relative_ref(uri, str);
+
+        /*
+         * Try first to parse absolute refs, then fallback to relative if
+         * it fails.
+         */
+        ret = xml_parse3986_uri(uri, str);
         if ret != 0 {
             xml_clean_uri(uri);
-            return ret;
+            ret = xml_parse3986_relative_ref(uri, str);
+            if ret != 0 {
+                xml_clean_uri(uri);
+                return ret;
+            }
         }
+        0
     }
-    0
 }
 
 /// Parse an URI based on RFC 3986
@@ -1265,20 +1318,22 @@ unsafe extern "C" fn xml_parse3986_uri_reference(uri: XmlURIPtr, str: *const c_c
 /// Returns a newly built xmlURIPtr or NULL in case of error
 #[doc(alias = "xmlParseURI")]
 pub unsafe extern "C" fn xml_parse_uri(str: *const c_char) -> XmlURIPtr {
-    let ret: i32;
+    unsafe {
+        let ret: i32;
 
-    if str.is_null() {
-        return null_mut();
-    }
-    let uri: XmlURIPtr = xml_create_uri();
-    if !uri.is_null() {
-        ret = xml_parse3986_uri_reference(uri, str);
-        if ret != 0 {
-            xml_free_uri(uri);
+        if str.is_null() {
             return null_mut();
         }
+        let uri: XmlURIPtr = xml_create_uri();
+        if !uri.is_null() {
+            ret = xml_parse3986_uri_reference(uri, str);
+            if ret != 0 {
+                xml_free_uri(uri);
+                return null_mut();
+            }
+        }
+        uri
     }
-    uri
 }
 
 /// Parse an URI but allows to keep intact the original fragments.
@@ -1288,23 +1343,25 @@ pub unsafe extern "C" fn xml_parse_uri(str: *const c_char) -> XmlURIPtr {
 /// Returns a newly built xmlURIPtr or NULL in case of error
 #[doc(alias = "xmlParseURIRaw")]
 pub unsafe extern "C" fn xml_parse_uri_raw(str: *const c_char, raw: i32) -> XmlURIPtr {
-    let ret: i32;
+    unsafe {
+        let ret: i32;
 
-    if str.is_null() {
-        return null_mut();
-    }
-    let uri: XmlURIPtr = xml_create_uri();
-    if !uri.is_null() {
-        if raw != 0 {
-            (*uri).cleanup |= 2;
-        }
-        ret = xml_parse_uri_reference(uri, str);
-        if ret != 0 {
-            xml_free_uri(uri);
+        if str.is_null() {
             return null_mut();
         }
+        let uri: XmlURIPtr = xml_create_uri();
+        if !uri.is_null() {
+            if raw != 0 {
+                (*uri).cleanup |= 2;
+            }
+            ret = xml_parse_uri_reference(uri, str);
+            if ret != 0 {
+                xml_free_uri(uri);
+                return null_mut();
+            }
+        }
+        uri
     }
-    uri
 }
 
 /// Parse an URI reference string based on RFC 3986 and fills in the
@@ -1315,7 +1372,7 @@ pub unsafe extern "C" fn xml_parse_uri_raw(str: *const c_char, raw: i32) -> XmlU
 /// Returns 0 or the error code
 #[doc(alias = "xmlParseURIReference")]
 pub unsafe extern "C" fn xml_parse_uri_reference(uri: XmlURIPtr, str: *const c_char) -> i32 {
-    xml_parse3986_uri_reference(uri, str)
+    unsafe { xml_parse3986_uri_reference(uri, str) }
 }
 
 /*
@@ -1420,18 +1477,20 @@ const MAX_URI_LENGTH: usize = 1024 * 1024;
 /// Also imposes some limit on the length of an URI string output
 #[doc(alias = "xmlSaveUriRealloc")]
 unsafe extern "C" fn xml_save_uri_realloc(ret: *mut XmlChar, max: *mut i32) -> *mut XmlChar {
-    if *max > MAX_URI_LENGTH as i32 {
-        xml_uri_err_memory("reaching arbitrary MAX_URI_LENGTH limit\n");
-        return null_mut();
+    unsafe {
+        if *max > MAX_URI_LENGTH as i32 {
+            xml_uri_err_memory("reaching arbitrary MAX_URI_LENGTH limit\n");
+            return null_mut();
+        }
+        let tmp: i32 = *max * 2;
+        let temp: *mut XmlChar = xml_realloc(ret as _, tmp as usize + 1) as *mut XmlChar;
+        if temp.is_null() {
+            xml_uri_err_memory("saving URI\n");
+            return null_mut();
+        }
+        *max = tmp;
+        temp
     }
-    let tmp: i32 = *max * 2;
-    let temp: *mut XmlChar = xml_realloc(ret as _, tmp as usize + 1) as *mut XmlChar;
-    if temp.is_null() {
-        xml_uri_err_memory("saving URI\n");
-        return null_mut();
-    }
-    *max = tmp;
-    temp
 }
 
 /// Save the URI as an escaped string
@@ -1439,28 +1498,40 @@ unsafe extern "C" fn xml_save_uri_realloc(ret: *mut XmlChar, max: *mut i32) -> *
 /// Returns a new string (to be deallocated by caller)
 #[doc(alias = "xmlSaveUri")]
 pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
-    let mut ret: *mut XmlChar;
-    let mut temp: *mut XmlChar;
-    let mut p: *const c_char;
-    let mut len: i32;
-    let mut max: i32;
+    unsafe {
+        let mut ret: *mut XmlChar;
+        let mut temp: *mut XmlChar;
+        let mut p: *const c_char;
+        let mut len: i32;
+        let mut max: i32;
 
-    if uri.is_null() {
-        return null_mut();
-    }
+        if uri.is_null() {
+            return null_mut();
+        }
 
-    max = 80;
-    ret = xml_malloc_atomic(max as usize + 1) as *mut XmlChar;
-    if ret.is_null() {
-        xml_uri_err_memory("saving URI\n");
-        return null_mut();
-    }
-    len = 0;
+        max = 80;
+        ret = xml_malloc_atomic(max as usize + 1) as *mut XmlChar;
+        if ret.is_null() {
+            xml_uri_err_memory("saving URI\n");
+            return null_mut();
+        }
+        len = 0;
 
-    'mem_error: {
-        if !(*uri).scheme.is_null() {
-            p = (*uri).scheme;
-            while *p != 0 {
+        'mem_error: {
+            if !(*uri).scheme.is_null() {
+                p = (*uri).scheme;
+                while *p != 0 {
+                    if len >= max {
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
+                        if temp.is_null() {
+                            break 'mem_error;
+                        }
+                        ret = temp;
+                    }
+                    *ret.add(len as usize) = *p as _;
+                    len += 1;
+                    p = p.add(1);
+                }
                 if len >= max {
                     temp = xml_save_uri_realloc(ret, &raw mut max);
                     if temp.is_null() {
@@ -1468,62 +1539,140 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                     }
                     ret = temp;
                 }
-                *ret.add(len as usize) = *p as _;
+                *ret.add(len as usize) = b':';
                 len += 1;
-                p = p.add(1);
             }
-            if len >= max {
-                temp = xml_save_uri_realloc(ret, &raw mut max);
-                if temp.is_null() {
-                    break 'mem_error;
-                }
-                ret = temp;
-            }
-            *ret.add(len as usize) = b':';
-            len += 1;
-        }
-        if !(*uri).opaque.is_null() {
-            p = (*uri).opaque;
-            while *p != 0 {
-                if len + 3 >= max {
-                    temp = xml_save_uri_realloc(ret, &raw mut max);
-                    if temp.is_null() {
-                        break 'mem_error;
+            if !(*uri).opaque.is_null() {
+                p = (*uri).opaque;
+                while *p != 0 {
+                    if len + 3 >= max {
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
+                        if temp.is_null() {
+                            break 'mem_error;
+                        }
+                        ret = temp;
                     }
-                    ret = temp;
-                }
-                if IS_RESERVED!(*p) || IS_UNRESERVED!(*p) {
-                    *ret.add(len as usize) = *p as _;
-                    len += 1;
-                    p = p.add(1);
-                } else {
-                    let val: i32 = *(p as *mut u8) as i32;
-                    p = p.add(1);
-                    let hi: i32 = val / 0x10;
-                    let lo: i32 = val % 0x10;
-                    *ret.add(len as usize) = b'%';
-                    len += 1;
-                    *ret.add(len as usize) = hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
-                    len += 1;
-                    *ret.add(len as usize) = lo as u8 + if lo > 9 { b'A' - 10 } else { b'0' };
-                    len += 1;
-                }
-            }
-        } else {
-            if !(*uri).server.is_null() || (*uri).port != PORT_EMPTY {
-                if len + 3 >= max {
-                    temp = xml_save_uri_realloc(ret, &raw mut max);
-                    if temp.is_null() {
-                        break 'mem_error;
+                    if IS_RESERVED!(*p) || IS_UNRESERVED!(*p) {
+                        *ret.add(len as usize) = *p as _;
+                        len += 1;
+                        p = p.add(1);
+                    } else {
+                        let val: i32 = *(p as *mut u8) as i32;
+                        p = p.add(1);
+                        let hi: i32 = val / 0x10;
+                        let lo: i32 = val % 0x10;
+                        *ret.add(len as usize) = b'%';
+                        len += 1;
+                        *ret.add(len as usize) = hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
+                        len += 1;
+                        *ret.add(len as usize) = lo as u8 + if lo > 9 { b'A' - 10 } else { b'0' };
+                        len += 1;
                     }
-                    ret = temp;
                 }
-                *ret.add(len as usize) = b'/';
-                len += 1;
-                *ret.add(len as usize) = b'/';
-                len += 1;
-                if !(*uri).user.is_null() {
-                    p = (*uri).user;
+            } else {
+                if !(*uri).server.is_null() || (*uri).port != PORT_EMPTY {
+                    if len + 3 >= max {
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
+                        if temp.is_null() {
+                            break 'mem_error;
+                        }
+                        ret = temp;
+                    }
+                    *ret.add(len as usize) = b'/';
+                    len += 1;
+                    *ret.add(len as usize) = b'/';
+                    len += 1;
+                    if !(*uri).user.is_null() {
+                        p = (*uri).user;
+                        while *p != 0 {
+                            if len + 3 >= max {
+                                temp = xml_save_uri_realloc(ret, &raw mut max);
+                                if temp.is_null() {
+                                    break 'mem_error;
+                                }
+                                ret = temp;
+                            }
+                            if IS_UNRESERVED!(*p)
+                                || *p == b';' as i8
+                                || *p == b':' as i8
+                                || *p == b'&' as i8
+                                || *p == b'=' as i8
+                                || *p == b'+' as i8
+                                || *p == b'$' as i8
+                                || *p == b',' as i8
+                            {
+                                *ret.add(len as usize) = *p as _;
+                                len += 1;
+                                p = p.add(1);
+                            } else {
+                                let val: i32 = *(p as *mut u8) as i32;
+                                p = p.add(1);
+                                let hi: i32 = val / 0x10;
+                                let lo: i32 = val % 0x10;
+                                *ret.add(len as usize) = b'%';
+                                len += 1;
+                                *ret.add(len as usize) =
+                                    hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
+                                len += 1;
+                                *ret.add(len as usize) =
+                                    lo as u8 + if lo > 9 { b'A' - 10 } else { b'0' };
+                                len += 1;
+                            }
+                        }
+                        if len + 3 >= max {
+                            temp = xml_save_uri_realloc(ret, &raw mut max);
+                            if temp.is_null() {
+                                break 'mem_error;
+                            }
+                            ret = temp;
+                        }
+                        *ret.add(len as usize) = b'@';
+                        len += 1;
+                    }
+                    if !(*uri).server.is_null() {
+                        p = (*uri).server;
+                        while *p != 0 {
+                            if len >= max {
+                                temp = xml_save_uri_realloc(ret, &raw mut max);
+                                if temp.is_null() {
+                                    break 'mem_error;
+                                }
+                                ret = temp;
+                            }
+                            /* TODO: escaping? */
+                            *ret.add(len as usize) = *p as XmlChar;
+                            len += 1;
+                            p = p.add(1);
+                        }
+                    }
+                    if (*uri).port > 0 {
+                        if len + 10 >= max {
+                            temp = xml_save_uri_realloc(ret, &raw mut max);
+                            if temp.is_null() {
+                                break 'mem_error;
+                            }
+                            ret = temp;
+                        }
+                        len += snprintf(
+                            ret.add(len as usize) as _,
+                            max as usize - len as usize,
+                            c":%d".as_ptr() as _,
+                            (*uri).port,
+                        );
+                    }
+                } else if !(*uri).authority.is_null() {
+                    if len + 3 >= max {
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
+                        if temp.is_null() {
+                            break 'mem_error;
+                        }
+                        ret = temp;
+                    }
+                    *ret.add(len as usize) = b'/';
+                    len += 1;
+                    *ret.add(len as usize) = b'/';
+                    len += 1;
+                    p = (*uri).authority;
                     while *p != 0 {
                         if len + 3 >= max {
                             temp = xml_save_uri_realloc(ret, &raw mut max);
@@ -1533,8 +1682,82 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                             ret = temp;
                         }
                         if IS_UNRESERVED!(*p)
+                            || *p == b'$' as i8
+                            || *p == b',' as i8
                             || *p == b';' as i8
                             || *p == b':' as i8
+                            || *p == b'@' as i8
+                            || *p == b'&' as i8
+                            || *p == b'=' as i8
+                            || *p == b'+' as i8
+                        {
+                            *ret.add(len as usize) = *p as _;
+                            len += 1;
+                            p = p.add(1);
+                        } else {
+                            let val: i32 = *(p as *mut u8) as i32;
+                            p = p.add(1);
+                            let hi: i32 = val / 0x10;
+                            let lo: i32 = val % 0x10;
+                            *ret.add(len as usize) = b'%';
+                            len += 1;
+                            *ret.add(len as usize) =
+                                hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
+                            len += 1;
+                            *ret.add(len as usize) =
+                                lo as u8 + if lo > 9 { b'A' - 10 } else { b'0' };
+                            len += 1;
+                        }
+                    }
+                } else if !(*uri).scheme.is_null() && len + 3 >= max {
+                    temp = xml_save_uri_realloc(ret, &raw mut max);
+                    if temp.is_null() {
+                        break 'mem_error;
+                    }
+                    ret = temp;
+                }
+                if !(*uri).path.is_null() {
+                    p = (*uri).path;
+                    /*
+                     * the colon in file:///d: should not be escaped or
+                     * Windows accesses fail later.
+                     */
+                    if !(*uri).scheme.is_null()
+                        && *p.add(0) == b'/' as i8
+                        && ((*p.add(1) >= b'a' as i8 && *p.add(1) <= b'z' as i8)
+                            || (*p.add(1) >= b'A' as i8 && *p.add(1) <= b'Z' as i8))
+                        && *p.add(2) == b':' as i8
+                        && xml_str_equal((*uri).scheme as _, c"file".as_ptr() as _)
+                    {
+                        if len + 3 >= max {
+                            temp = xml_save_uri_realloc(ret, &raw mut max);
+                            if temp.is_null() {
+                                break 'mem_error;
+                            }
+                            ret = temp;
+                        }
+                        *ret.add(len as usize) = *p as _;
+                        len += 1;
+                        p = p.add(1);
+                        *ret.add(len as usize) = *p as _;
+                        len += 1;
+                        p = p.add(1);
+                        *ret.add(len as usize) = *p as _;
+                        len += 1;
+                        p = p.add(1);
+                    }
+                    while *p != 0 {
+                        if len + 3 >= max {
+                            temp = xml_save_uri_realloc(ret, &raw mut max);
+                            if temp.is_null() {
+                                break 'mem_error;
+                            }
+                            ret = temp;
+                        }
+                        if IS_UNRESERVED!(*p)
+                            || *p == b'/' as i8
+                            || *p == b';' as i8
+                            || *p == b'@' as i8
                             || *p == b'&' as i8
                             || *p == b'=' as i8
                             || *p == b'+' as i8
@@ -1559,178 +1782,8 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                             len += 1;
                         }
                     }
-                    if len + 3 >= max {
-                        temp = xml_save_uri_realloc(ret, &raw mut max);
-                        if temp.is_null() {
-                            break 'mem_error;
-                        }
-                        ret = temp;
-                    }
-                    *ret.add(len as usize) = b'@';
-                    len += 1;
                 }
-                if !(*uri).server.is_null() {
-                    p = (*uri).server;
-                    while *p != 0 {
-                        if len >= max {
-                            temp = xml_save_uri_realloc(ret, &raw mut max);
-                            if temp.is_null() {
-                                break 'mem_error;
-                            }
-                            ret = temp;
-                        }
-                        /* TODO: escaping? */
-                        *ret.add(len as usize) = *p as XmlChar;
-                        len += 1;
-                        p = p.add(1);
-                    }
-                }
-                if (*uri).port > 0 {
-                    if len + 10 >= max {
-                        temp = xml_save_uri_realloc(ret, &raw mut max);
-                        if temp.is_null() {
-                            break 'mem_error;
-                        }
-                        ret = temp;
-                    }
-                    len += snprintf(
-                        ret.add(len as usize) as _,
-                        max as usize - len as usize,
-                        c":%d".as_ptr() as _,
-                        (*uri).port,
-                    );
-                }
-            } else if !(*uri).authority.is_null() {
-                if len + 3 >= max {
-                    temp = xml_save_uri_realloc(ret, &raw mut max);
-                    if temp.is_null() {
-                        break 'mem_error;
-                    }
-                    ret = temp;
-                }
-                *ret.add(len as usize) = b'/';
-                len += 1;
-                *ret.add(len as usize) = b'/';
-                len += 1;
-                p = (*uri).authority;
-                while *p != 0 {
-                    if len + 3 >= max {
-                        temp = xml_save_uri_realloc(ret, &raw mut max);
-                        if temp.is_null() {
-                            break 'mem_error;
-                        }
-                        ret = temp;
-                    }
-                    if IS_UNRESERVED!(*p)
-                        || *p == b'$' as i8
-                        || *p == b',' as i8
-                        || *p == b';' as i8
-                        || *p == b':' as i8
-                        || *p == b'@' as i8
-                        || *p == b'&' as i8
-                        || *p == b'=' as i8
-                        || *p == b'+' as i8
-                    {
-                        *ret.add(len as usize) = *p as _;
-                        len += 1;
-                        p = p.add(1);
-                    } else {
-                        let val: i32 = *(p as *mut u8) as i32;
-                        p = p.add(1);
-                        let hi: i32 = val / 0x10;
-                        let lo: i32 = val % 0x10;
-                        *ret.add(len as usize) = b'%';
-                        len += 1;
-                        *ret.add(len as usize) = hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
-                        len += 1;
-                        *ret.add(len as usize) = lo as u8 + if lo > 9 { b'A' - 10 } else { b'0' };
-                        len += 1;
-                    }
-                }
-            } else if !(*uri).scheme.is_null() && len + 3 >= max {
-                temp = xml_save_uri_realloc(ret, &raw mut max);
-                if temp.is_null() {
-                    break 'mem_error;
-                }
-                ret = temp;
-            }
-            if !(*uri).path.is_null() {
-                p = (*uri).path;
-                /*
-                 * the colon in file:///d: should not be escaped or
-                 * Windows accesses fail later.
-                 */
-                if !(*uri).scheme.is_null()
-                    && *p.add(0) == b'/' as i8
-                    && ((*p.add(1) >= b'a' as i8 && *p.add(1) <= b'z' as i8)
-                        || (*p.add(1) >= b'A' as i8 && *p.add(1) <= b'Z' as i8))
-                    && *p.add(2) == b':' as i8
-                    && xml_str_equal((*uri).scheme as _, c"file".as_ptr() as _)
-                {
-                    if len + 3 >= max {
-                        temp = xml_save_uri_realloc(ret, &raw mut max);
-                        if temp.is_null() {
-                            break 'mem_error;
-                        }
-                        ret = temp;
-                    }
-                    *ret.add(len as usize) = *p as _;
-                    len += 1;
-                    p = p.add(1);
-                    *ret.add(len as usize) = *p as _;
-                    len += 1;
-                    p = p.add(1);
-                    *ret.add(len as usize) = *p as _;
-                    len += 1;
-                    p = p.add(1);
-                }
-                while *p != 0 {
-                    if len + 3 >= max {
-                        temp = xml_save_uri_realloc(ret, &raw mut max);
-                        if temp.is_null() {
-                            break 'mem_error;
-                        }
-                        ret = temp;
-                    }
-                    if IS_UNRESERVED!(*p)
-                        || *p == b'/' as i8
-                        || *p == b';' as i8
-                        || *p == b'@' as i8
-                        || *p == b'&' as i8
-                        || *p == b'=' as i8
-                        || *p == b'+' as i8
-                        || *p == b'$' as i8
-                        || *p == b',' as i8
-                    {
-                        *ret.add(len as usize) = *p as _;
-                        len += 1;
-                        p = p.add(1);
-                    } else {
-                        let val: i32 = *(p as *mut u8) as i32;
-                        p = p.add(1);
-                        let hi: i32 = val / 0x10;
-                        let lo: i32 = val % 0x10;
-                        *ret.add(len as usize) = b'%';
-                        len += 1;
-                        *ret.add(len as usize) = hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
-                        len += 1;
-                        *ret.add(len as usize) = lo as u8 + if lo > 9 { b'A' - 10 } else { b'0' };
-                        len += 1;
-                    }
-                }
-            }
-            if !(*uri).query_raw.is_null() {
-                if len + 1 >= max {
-                    temp = xml_save_uri_realloc(ret, &raw mut max);
-                    if temp.is_null() {
-                        break 'mem_error;
-                    }
-                    ret = temp;
-                }
-                *ret.add(len as usize) = b'?';
-                len += 1;
-                p = (*uri).query_raw;
-                while *p != 0 {
+                if !(*uri).query_raw.is_null() {
                     if len + 1 >= max {
                         temp = xml_save_uri_realloc(ret, &raw mut max);
                         if temp.is_null() {
@@ -1738,11 +1791,62 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                         }
                         ret = temp;
                     }
-                    *ret.add(len as usize) = *p as _;
+                    *ret.add(len as usize) = b'?';
                     len += 1;
-                    p = p.add(1);
+                    p = (*uri).query_raw;
+                    while *p != 0 {
+                        if len + 1 >= max {
+                            temp = xml_save_uri_realloc(ret, &raw mut max);
+                            if temp.is_null() {
+                                break 'mem_error;
+                            }
+                            ret = temp;
+                        }
+                        *ret.add(len as usize) = *p as _;
+                        len += 1;
+                        p = p.add(1);
+                    }
+                } else if !(*uri).query.is_null() {
+                    if len + 3 >= max {
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
+                        if temp.is_null() {
+                            break 'mem_error;
+                        }
+                        ret = temp;
+                    }
+                    *ret.add(len as usize) = b'?';
+                    len += 1;
+                    p = (*uri).query;
+                    while *p != 0 {
+                        if len + 3 >= max {
+                            temp = xml_save_uri_realloc(ret, &raw mut max);
+                            if temp.is_null() {
+                                break 'mem_error;
+                            }
+                            ret = temp;
+                        }
+                        if IS_UNRESERVED!(*p) || IS_RESERVED!(*p) {
+                            *ret.add(len as usize) = *p as _;
+                            len += 1;
+                            p = p.add(1);
+                        } else {
+                            let val: i32 = *(p as *mut u8) as i32;
+                            p = p.add(1);
+                            let hi: i32 = val / 0x10;
+                            let lo: i32 = val % 0x10;
+                            *ret.add(len as usize) = b'%';
+                            len += 1;
+                            *ret.add(len as usize) =
+                                hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
+                            len += 1;
+                            *ret.add(len as usize) =
+                                lo as u8 + if lo > 9 { b'A' - 10 } else { b'0' };
+                            len += 1;
+                        }
+                    }
                 }
-            } else if !(*uri).query.is_null() {
+            }
+            if !(*uri).fragment.is_null() {
                 if len + 3 >= max {
                     temp = xml_save_uri_realloc(ret, &raw mut max);
                     if temp.is_null() {
@@ -1750,9 +1854,9 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                     }
                     ret = temp;
                 }
-                *ret.add(len as usize) = b'?';
+                *ret.add(len as usize) = b'#';
                 len += 1;
-                p = (*uri).query;
+                p = (*uri).fragment;
                 while *p != 0 {
                     if len + 3 >= max {
                         temp = xml_save_uri_realloc(ret, &raw mut max);
@@ -1779,58 +1883,21 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                     }
                 }
             }
-        }
-        if !(*uri).fragment.is_null() {
-            if len + 3 >= max {
+            if len >= max {
                 temp = xml_save_uri_realloc(ret, &raw mut max);
                 if temp.is_null() {
                     break 'mem_error;
                 }
                 ret = temp;
             }
-            *ret.add(len as usize) = b'#';
-            len += 1;
-            p = (*uri).fragment;
-            while *p != 0 {
-                if len + 3 >= max {
-                    temp = xml_save_uri_realloc(ret, &raw mut max);
-                    if temp.is_null() {
-                        break 'mem_error;
-                    }
-                    ret = temp;
-                }
-                if IS_UNRESERVED!(*p) || IS_RESERVED!(*p) {
-                    *ret.add(len as usize) = *p as _;
-                    len += 1;
-                    p = p.add(1);
-                } else {
-                    let val: i32 = *(p as *mut u8) as i32;
-                    p = p.add(1);
-                    let hi: i32 = val / 0x10;
-                    let lo: i32 = val % 0x10;
-                    *ret.add(len as usize) = b'%';
-                    len += 1;
-                    *ret.add(len as usize) = hi as u8 + if hi > 9 { b'A' - 10 } else { b'0' };
-                    len += 1;
-                    *ret.add(len as usize) = lo as u8 + if lo > 9 { b'A' - 10 } else { b'0' };
-                    len += 1;
-                }
-            }
+            *ret.add(len as usize) = 0;
+            return ret;
         }
-        if len >= max {
-            temp = xml_save_uri_realloc(ret, &raw mut max);
-            if temp.is_null() {
-                break 'mem_error;
-            }
-            ret = temp;
-        }
-        *ret.add(len as usize) = 0;
-        return ret;
-    }
 
-    // mem_error:
-    xml_free(ret as _);
-    null_mut()
+        // mem_error:
+        xml_free(ret as _);
+        null_mut()
+    }
 }
 
 /// This routine escapes a string to hex, ignoring reserved characters
@@ -1842,74 +1909,76 @@ pub unsafe extern "C" fn xml_uri_escape_str(
     str: *const XmlChar,
     list: *const XmlChar,
 ) -> *mut XmlChar {
-    let mut ret: *mut XmlChar;
-    let mut ch: XmlChar;
-    let mut temp: *mut XmlChar;
-    let mut input: *const XmlChar;
-    let mut len: i32;
-    let mut out: i32;
+    unsafe {
+        let mut ret: *mut XmlChar;
+        let mut ch: XmlChar;
+        let mut temp: *mut XmlChar;
+        let mut input: *const XmlChar;
+        let mut len: i32;
+        let mut out: i32;
 
-    if str.is_null() {
-        return null_mut();
-    }
-    if *str.add(0) == 0 {
-        return xml_strdup(str);
-    }
-    len = xml_strlen(str);
-    if len <= 0 {
-        return null_mut();
-    }
-
-    len += 20;
-    ret = xml_malloc_atomic(len as usize) as *mut XmlChar;
-    if ret.is_null() {
-        xml_uri_err_memory("escaping URI value\n");
-        return null_mut();
-    }
-    input = str as *const XmlChar;
-    out = 0;
-    while *input != 0 {
-        if len - out <= 3 {
-            temp = xml_save_uri_realloc(ret, &raw mut len);
-            if temp.is_null() {
-                xml_uri_err_memory("escaping URI value\n");
-                xml_free(ret as _);
-                return null_mut();
-            }
-            ret = temp;
+        if str.is_null() {
+            return null_mut();
+        }
+        if *str.add(0) == 0 {
+            return xml_strdup(str);
+        }
+        len = xml_strlen(str);
+        if len <= 0 {
+            return null_mut();
         }
 
-        ch = *input;
-
-        if ch != b'@' && !IS_UNRESERVED!(ch as i8) && xml_strchr(list, ch).is_null() {
-            let mut val: u8;
-            *ret.add(out as usize) = b'%';
-            out += 1;
-            val = ch >> 4;
-            if val <= 9 {
-                *ret.add(out as usize) = b'0' + val;
-                out += 1;
-            } else {
-                *ret.add(out as usize) = b'A' + val - 0xA;
-                out += 1;
-            }
-            val = ch & 0xF;
-            if val <= 9 {
-                *ret.add(out as usize) = b'0' + val;
-                out += 1;
-            } else {
-                *ret.add(out as usize) = b'A' + val - 0xA;
-                out += 1;
-            }
-            input = input.add(1);
-        } else {
-            *ret.add(out as usize) = *input;
-            out += 1;
-            input = input.add(1);
+        len += 20;
+        ret = xml_malloc_atomic(len as usize) as *mut XmlChar;
+        if ret.is_null() {
+            xml_uri_err_memory("escaping URI value\n");
+            return null_mut();
         }
+        input = str as *const XmlChar;
+        out = 0;
+        while *input != 0 {
+            if len - out <= 3 {
+                temp = xml_save_uri_realloc(ret, &raw mut len);
+                if temp.is_null() {
+                    xml_uri_err_memory("escaping URI value\n");
+                    xml_free(ret as _);
+                    return null_mut();
+                }
+                ret = temp;
+            }
+
+            ch = *input;
+
+            if ch != b'@' && !IS_UNRESERVED!(ch as i8) && xml_strchr(list, ch).is_null() {
+                let mut val: u8;
+                *ret.add(out as usize) = b'%';
+                out += 1;
+                val = ch >> 4;
+                if val <= 9 {
+                    *ret.add(out as usize) = b'0' + val;
+                    out += 1;
+                } else {
+                    *ret.add(out as usize) = b'A' + val - 0xA;
+                    out += 1;
+                }
+                val = ch & 0xF;
+                if val <= 9 {
+                    *ret.add(out as usize) = b'0' + val;
+                    out += 1;
+                } else {
+                    *ret.add(out as usize) = b'A' + val - 0xA;
+                    out += 1;
+                }
+                input = input.add(1);
+            } else {
+                *ret.add(out as usize) = *input;
+                out += 1;
+                input = input.add(1);
+            }
+        }
+        *ret.add(out as usize) = 0;
+        ret
     }
-    *ret.add(out as usize) = 0;
-    ret
 }
 
 unsafe extern "C" fn is_hex(c: c_char) -> i32 {
@@ -1934,105 +2003,109 @@ pub unsafe extern "C" fn xml_uri_unescape_string(
     mut len: i32,
     target: *mut c_char,
 ) -> *mut c_char {
-    let ret: *mut c_char;
-    let mut out: *mut c_char;
-    let mut input: *const c_char;
+    unsafe {
+        let ret: *mut c_char;
+        let mut out: *mut c_char;
+        let mut input: *const c_char;
 
-    if str.is_null() {
-        return null_mut();
-    }
-    if len <= 0 {
-        len = strlen(str) as _;
-    }
-    if len < 0 {
-        return null_mut();
-    }
-
-    if target.is_null() {
-        ret = xml_malloc_atomic(len as usize + 1) as *mut c_char;
-        if ret.is_null() {
-            xml_uri_err_memory("unescaping URI value\n");
+        if str.is_null() {
             return null_mut();
         }
-    } else {
-        ret = target;
-    }
-    input = str;
-    out = ret;
-    while len > 0 {
-        if len > 2
-            && *input == b'%' as i8
-            && is_hex(*input.add(1)) != 0
-            && is_hex(*input.add(2)) != 0
-        {
-            let mut c: i32 = 0;
-            input = input.add(1);
-            if *input >= b'0' as i8 && *input <= b'9' as i8 {
-                c = (*input - b'0' as i8) as i32;
-            } else if *input >= b'a' as i8 && *input <= b'f' as i8 {
-                c = (*input - b'a' as i8) as i32 + 10;
-            } else if *input >= b'A' as i8 && *input <= b'F' as i8 {
-                c = (*input - b'A' as i8) as i32 + 10;
-            }
-            input = input.add(1);
-            if *input >= b'0' as i8 && *input <= b'9' as i8 {
-                c = c * 16 + (*input - b'0' as i8) as i32;
-            } else if *input >= b'a' as i8 && *input <= b'f' as i8 {
-                c = c * 16 + (*input - b'a' as i8) as i32 + 10;
-            } else if *input >= b'A' as i8 && *input <= b'F' as i8 {
-                c = c * 16 + (*input - b'A' as i8) as i32 + 10;
-            }
-            input = input.add(1);
-            len -= 3;
-            /* Explicit sign change */
-            *out = c as c_char;
-            out = out.add(1);
-        } else {
-            *out = *input;
-            out = out.add(1);
-            input = input.add(1);
-            len -= 1;
+        if len <= 0 {
+            len = strlen(str) as _;
         }
+        if len < 0 {
+            return null_mut();
+        }
+
+        if target.is_null() {
+            ret = xml_malloc_atomic(len as usize + 1) as *mut c_char;
+            if ret.is_null() {
+                xml_uri_err_memory("unescaping URI value\n");
+                return null_mut();
+            }
+        } else {
+            ret = target;
+        }
+        input = str;
+        out = ret;
+        while len > 0 {
+            if len > 2
+                && *input == b'%' as i8
+                && is_hex(*input.add(1)) != 0
+                && is_hex(*input.add(2)) != 0
+            {
+                let mut c: i32 = 0;
+                input = input.add(1);
+                if *input >= b'0' as i8 && *input <= b'9' as i8 {
+                    c = (*input - b'0' as i8) as i32;
+                } else if *input >= b'a' as i8 && *input <= b'f' as i8 {
+                    c = (*input - b'a' as i8) as i32 + 10;
+                } else if *input >= b'A' as i8 && *input <= b'F' as i8 {
+                    c = (*input - b'A' as i8) as i32 + 10;
+                }
+                input = input.add(1);
+                if *input >= b'0' as i8 && *input <= b'9' as i8 {
+                    c = c * 16 + (*input - b'0' as i8) as i32;
+                } else if *input >= b'a' as i8 && *input <= b'f' as i8 {
+                    c = c * 16 + (*input - b'a' as i8) as i32 + 10;
+                } else if *input >= b'A' as i8 && *input <= b'F' as i8 {
+                    c = c * 16 + (*input - b'A' as i8) as i32 + 10;
+                }
+                input = input.add(1);
+                len -= 3;
+                /* Explicit sign change */
+                *out = c as c_char;
+                out = out.add(1);
+            } else {
+                *out = *input;
+                out = out.add(1);
+                input = input.add(1);
+                len -= 1;
+            }
+        }
+        *out = 0;
+        ret
     }
-    *out = 0;
-    ret
 }
 
 /// Free up the xmlURI struct
 #[doc(alias = "xmlFreeURI")]
 pub unsafe extern "C" fn xml_free_uri(uri: XmlURIPtr) {
-    if uri.is_null() {
-        return;
-    }
+    unsafe {
+        if uri.is_null() {
+            return;
+        }
 
-    if !(*uri).scheme.is_null() {
-        xml_free((*uri).scheme as _);
+        if !(*uri).scheme.is_null() {
+            xml_free((*uri).scheme as _);
+        }
+        if !(*uri).server.is_null() {
+            xml_free((*uri).server as _);
+        }
+        if !(*uri).user.is_null() {
+            xml_free((*uri).user as _);
+        }
+        if !(*uri).path.is_null() {
+            xml_free((*uri).path as _);
+        }
+        if !(*uri).fragment.is_null() {
+            xml_free((*uri).fragment as _);
+        }
+        if !(*uri).opaque.is_null() {
+            xml_free((*uri).opaque as _);
+        }
+        if !(*uri).authority.is_null() {
+            xml_free((*uri).authority as _);
+        }
+        if !(*uri).query.is_null() {
+            xml_free((*uri).query as _);
+        }
+        if !(*uri).query_raw.is_null() {
+            xml_free((*uri).query_raw as _);
+        }
+        xml_free(uri as _);
     }
-    if !(*uri).server.is_null() {
-        xml_free((*uri).server as _);
-    }
-    if !(*uri).user.is_null() {
-        xml_free((*uri).user as _);
-    }
-    if !(*uri).path.is_null() {
-        xml_free((*uri).path as _);
-    }
-    if !(*uri).fragment.is_null() {
-        xml_free((*uri).fragment as _);
-    }
-    if !(*uri).opaque.is_null() {
-        xml_free((*uri).opaque as _);
-    }
-    if !(*uri).authority.is_null() {
-        xml_free((*uri).authority as _);
-    }
-    if !(*uri).query.is_null() {
-        xml_free((*uri).query as _);
-    }
-    if !(*uri).query_raw.is_null() {
-        xml_free((*uri).query_raw as _);
-    }
-    xml_free(uri as _);
 }
 
 #[cfg(test)]

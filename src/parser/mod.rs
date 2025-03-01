@@ -60,8 +60,8 @@ use crate::{
     libxml::{
         chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser::{
-            xml_create_doc_parser_ctxt, xml_init_parser, xml_load_external_entity,
-            xml_new_io_input_stream, XmlParserOption,
+            XmlParserOption, xml_create_doc_parser_ctxt, xml_init_parser, xml_load_external_entity,
+            xml_new_io_input_stream,
         },
         parser_internals::xml_is_letter,
     },
@@ -233,66 +233,68 @@ pub(crate) unsafe fn xml_string_current_char(
     ctxt: Option<&mut XmlParserCtxt>,
     cur: &[u8],
 ) -> Result<char, (u8, usize)> {
-    assert!(!cur.is_empty());
-    if ctxt
-        .as_ref()
-        .map_or(true, |ctxt| ctxt.charset == XmlCharEncoding::UTF8)
-    {
-        // We are supposed to handle UTF8, check it's valid
-        // From rfc2044: encoding of the Unicode values on UTF-8:
-        let cur = &cur[..cur.len().min(4)];
-        let c = match from_utf8(cur) {
-            Ok(s) => s.chars().next().ok_or((0, 0))?,
-            Err(e) if e.valid_up_to() > 0 => {
-                let s = from_utf8_unchecked(&cur[..e.valid_up_to()]);
-                s.chars().next().ok_or((0, 0))?
-            }
-            Err(_) => {
-                // An encoding problem may arise from a truncated input buffer
-                // splitting a character in the middle. In that case do not raise
-                // an error but return 0 to indicate an end of stream problem
-                let Some(ctxt) =
-                    ctxt.filter(|ctxt| !ctxt.input.is_null() && (*ctxt.input).remainder_len() >= 4)
-                else {
-                    return Err((0, 0));
-                };
-
-                // If we detect an UTF8 error that probably mean that the
-                // input encoding didn't get properly advertised in the
-                // declaration header. Report the error and switch the encoding
-                // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-                {
-                    let buffer = format!(
-                        "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
-                        *(*ctxt.input).cur.add(0),
-                        *(*ctxt.input).cur.add(1),
-                        *(*ctxt.input).cur.add(2),
-                        *(*ctxt.input).cur.add(3),
-                    );
-                    __xml_err_encoding!(
-                        ctxt as *mut XmlParserCtxt,
-                        XmlParserErrors::XmlErrInvalidChar,
-                        "Input is not proper UTF-8, indicate encoding !\n{}",
-                        buffer
-                    );
+    unsafe {
+        assert!(!cur.is_empty());
+        if ctxt
+            .as_ref()
+            .is_none_or(|ctxt| ctxt.charset == XmlCharEncoding::UTF8)
+        {
+            // We are supposed to handle UTF8, check it's valid
+            // From rfc2044: encoding of the Unicode values on UTF-8:
+            let cur = &cur[..cur.len().min(4)];
+            let c = match from_utf8(cur) {
+                Ok(s) => s.chars().next().ok_or((0, 0))?,
+                Err(e) if e.valid_up_to() > 0 => {
+                    let s = from_utf8_unchecked(&cur[..e.valid_up_to()]);
+                    s.chars().next().ok_or((0, 0))?
                 }
-                return Ok(cur[0] as char);
+                Err(_) => {
+                    // An encoding problem may arise from a truncated input buffer
+                    // splitting a character in the middle. In that case do not raise
+                    // an error but return 0 to indicate an end of stream problem
+                    let Some(ctxt) = ctxt
+                        .filter(|ctxt| !ctxt.input.is_null() && (*ctxt.input).remainder_len() >= 4)
+                    else {
+                        return Err((0, 0));
+                    };
+
+                    // If we detect an UTF8 error that probably mean that the
+                    // input encoding didn't get properly advertised in the
+                    // declaration header. Report the error and switch the encoding
+                    // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
+                    {
+                        let buffer = format!(
+                            "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
+                            *(*ctxt.input).cur.add(0),
+                            *(*ctxt.input).cur.add(1),
+                            *(*ctxt.input).cur.add(2),
+                            *(*ctxt.input).cur.add(3),
+                        );
+                        __xml_err_encoding!(
+                            ctxt as *mut XmlParserCtxt,
+                            XmlParserErrors::XmlErrInvalidChar,
+                            "Input is not proper UTF-8, indicate encoding !\n{}",
+                            buffer
+                        );
+                    }
+                    return Ok(cur[0] as char);
+                }
+            };
+            if !xml_is_char(c as u32) {
+                xml_err_encoding_int!(
+                    ctxt.map_or(null_mut(), |ctxt| ctxt as *mut XmlParserCtxt),
+                    XmlParserErrors::XmlErrInvalidChar,
+                    "Char 0x{:X} out of allowed range\n",
+                    c as i32
+                );
             }
-        };
-        if !xml_is_char(c as u32) {
-            xml_err_encoding_int!(
-                ctxt.map_or(null_mut(), |ctxt| ctxt as *mut XmlParserCtxt),
-                XmlParserErrors::XmlErrInvalidChar,
-                "Char 0x{:X} out of allowed range\n",
-                c as i32
-            );
+            return Ok(c);
         }
-        return Ok(c);
+        // Assume it's a fixed length encoding (1) with
+        // a compatible encoding for the ASCII set, since
+        // XML constructs only use < 128 chars
+        Ok(cur[0] as char)
     }
-    // Assume it's a fixed length encoding (1) with
-    // a compatible encoding for the ASCII set, since
-    // XML constructs only use < 128 chars
-    Ok(cur[0] as char)
 }
 
 /// Parse an XML in-memory document and build a tree.
@@ -305,18 +307,20 @@ pub unsafe fn xml_read_doc(
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    if cur.is_null() {
-        return None;
-    }
-    xml_init_parser();
+    unsafe {
+        if cur.is_null() {
+            return None;
+        }
+        xml_init_parser();
 
-    let ctxt: XmlParserCtxtPtr = xml_create_doc_parser_ctxt(cur);
-    if ctxt.is_null() {
-        return None;
+        let ctxt: XmlParserCtxtPtr = xml_create_doc_parser_ctxt(cur);
+        if ctxt.is_null() {
+            return None;
+        }
+        let res = (*ctxt).do_read(url, encoding, options);
+        xml_free_parser_ctxt(ctxt);
+        res
     }
-    let res = (*ctxt).do_read(url, encoding, options);
-    xml_free_parser_ctxt(ctxt);
-    res
 }
 
 /// Parse an XML file from the filesystem or the network.
@@ -328,14 +332,16 @@ pub unsafe fn xml_read_file(
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    xml_init_parser();
-    let ctxt: XmlParserCtxtPtr = xml_create_url_parser_ctxt(Some(filename), options);
-    if ctxt.is_null() {
-        return None;
+    unsafe {
+        xml_init_parser();
+        let ctxt: XmlParserCtxtPtr = xml_create_url_parser_ctxt(Some(filename), options);
+        if ctxt.is_null() {
+            return None;
+        }
+        let res = (*ctxt).do_read(None, encoding, options);
+        xml_free_parser_ctxt(ctxt);
+        res
     }
-    let res = (*ctxt).do_read(None, encoding, options);
-    xml_free_parser_ctxt(ctxt);
-    res
 }
 
 /// Parse an XML in-memory document and build a tree.
@@ -348,15 +354,17 @@ pub unsafe fn xml_read_memory(
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    xml_init_parser();
-    let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(buffer);
+    unsafe {
+        xml_init_parser();
+        let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(buffer);
 
-    if ctxt.is_null() {
-        return None;
+        if ctxt.is_null() {
+            return None;
+        }
+        let res = (*ctxt).do_read(url, encoding, options);
+        xml_free_parser_ctxt(ctxt);
+        res
     }
-    let res = (*ctxt).do_read(url, encoding, options);
-    xml_free_parser_ctxt(ctxt);
-    res
 }
 
 /// Parse an XML document from I/O functions and source and build a tree.
@@ -369,23 +377,25 @@ pub unsafe fn xml_read_io(
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    xml_init_parser();
+    unsafe {
+        xml_init_parser();
 
-    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-    let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-    if ctxt.is_null() {
-        return None;
-    }
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
-    if stream.is_null() {
+        let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
+        let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+        if ctxt.is_null() {
+            return None;
+        }
+        let stream: XmlParserInputPtr =
+            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
+        if stream.is_null() {
+            xml_free_parser_ctxt(ctxt);
+            return None;
+        }
+        (*ctxt).input_push(stream);
+        let res = (*ctxt).do_read(url, encoding, options);
         xml_free_parser_ctxt(ctxt);
-        return None;
+        res
     }
-    (*ctxt).input_push(stream);
-    let res = (*ctxt).do_read(url, encoding, options);
-    xml_free_parser_ctxt(ctxt);
-    res
 }
 
 /// Parse an XML in-memory document and build a tree.
@@ -400,16 +410,18 @@ pub unsafe fn xml_ctxt_read_doc(
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    if cur.is_null() {
-        return None;
+    unsafe {
+        if cur.is_null() {
+            return None;
+        }
+        xml_ctxt_read_memory(
+            ctxt,
+            CStr::from_ptr(cur as *const i8).to_bytes().to_vec(),
+            url,
+            encoding,
+            options,
+        )
     }
-    xml_ctxt_read_memory(
-        ctxt,
-        CStr::from_ptr(cur as *const i8).to_bytes().to_vec(),
-        url,
-        encoding,
-        options,
-    )
 }
 
 /// Parse an XML file from the filesystem or the network.
@@ -423,19 +435,21 @@ pub unsafe fn xml_ctxt_read_file(
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    if ctxt.is_null() {
-        return None;
-    }
-    xml_init_parser();
+    unsafe {
+        if ctxt.is_null() {
+            return None;
+        }
+        xml_init_parser();
 
-    (*ctxt).reset();
+        (*ctxt).reset();
 
-    let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), None, ctxt);
-    if stream.is_null() {
-        return None;
+        let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), None, ctxt);
+        if stream.is_null() {
+            return None;
+        }
+        (*ctxt).input_push(stream);
+        (*ctxt).do_read(None, encoding, options)
     }
-    (*ctxt).input_push(stream);
-    (*ctxt).do_read(None, encoding, options)
 }
 
 /// Parse an XML in-memory document and build a tree.
@@ -450,21 +464,23 @@ pub unsafe fn xml_ctxt_read_memory(
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    if ctxt.is_null() {
-        return None;
-    }
-    xml_init_parser();
-    (*ctxt).reset();
+    unsafe {
+        if ctxt.is_null() {
+            return None;
+        }
+        xml_init_parser();
+        (*ctxt).reset();
 
-    let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
-    if stream.is_null() {
-        return None;
-    }
+        let input = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None)?;
+        let stream: XmlParserInputPtr =
+            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
+        if stream.is_null() {
+            return None;
+        }
 
-    (*ctxt).input_push(stream);
-    (*ctxt).do_read(url, encoding, options)
+        (*ctxt).input_push(stream);
+        (*ctxt).do_read(url, encoding, options)
+    }
 }
 
 /// Parse an XML document from I/O functions and source and build a tree.
@@ -479,18 +495,20 @@ pub unsafe fn xml_ctxt_read_io(
     encoding: Option<&str>,
     options: i32,
 ) -> Option<XmlDocPtr> {
-    if ctxt.is_null() {
-        return None;
-    }
-    xml_init_parser();
-    (*ctxt).reset();
+    unsafe {
+        if ctxt.is_null() {
+            return None;
+        }
+        xml_init_parser();
+        (*ctxt).reset();
 
-    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
-    let stream: XmlParserInputPtr =
-        xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
-    if stream.is_null() {
-        return None;
+        let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
+        let stream: XmlParserInputPtr =
+            xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
+        if stream.is_null() {
+            return None;
+        }
+        (*ctxt).input_push(stream);
+        (*ctxt).do_read(url, encoding, options)
     }
-    (*ctxt).input_push(stream);
-    (*ctxt).do_read(url, encoding, options)
 }

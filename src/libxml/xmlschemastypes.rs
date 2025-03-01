@@ -21,7 +21,7 @@
 
 use std::{
     cell::Cell,
-    ffi::{c_char, CStr, CString},
+    ffi::{CStr, CString, c_char},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -30,42 +30,43 @@ use std::{
 use libc::{memcpy, memmove, memset, snprintf, sscanf};
 
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
+    error::{__xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
         hash::{
-            xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2, XmlHashTable,
+            XmlHashTable, xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2,
         },
         schemas_internals::{
-            xml_schema_free_annot, xml_schema_free_type, xml_schema_free_wildcard,
-            XmlSchemaContentType, XmlSchemaFacet, XmlSchemaFacetPtr, XmlSchemaType,
-            XmlSchemaTypePtr, XmlSchemaTypeType, XmlSchemaValType, XmlSchemaWildcard,
-            XmlSchemaWildcardPtr, XML_SCHEMAS_ANY_LAX, XML_SCHEMAS_FACET_COLLAPSE,
-            XML_SCHEMAS_FACET_PRESERVE, XML_SCHEMAS_FACET_REPLACE,
-            XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE, XML_SCHEMAS_TYPE_HAS_FACETS,
-            XML_SCHEMAS_TYPE_VARIETY_ATOMIC, XML_SCHEMAS_TYPE_VARIETY_LIST,
+            XML_SCHEMAS_ANY_LAX, XML_SCHEMAS_FACET_COLLAPSE, XML_SCHEMAS_FACET_PRESERVE,
+            XML_SCHEMAS_FACET_REPLACE, XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE,
+            XML_SCHEMAS_TYPE_HAS_FACETS, XML_SCHEMAS_TYPE_VARIETY_ATOMIC,
+            XML_SCHEMAS_TYPE_VARIETY_LIST, XmlSchemaContentType, XmlSchemaFacet, XmlSchemaFacetPtr,
+            XmlSchemaType, XmlSchemaTypePtr, XmlSchemaTypeType, XmlSchemaValType,
+            XmlSchemaWildcard, XmlSchemaWildcardPtr, xml_schema_free_annot, xml_schema_free_type,
+            xml_schema_free_wildcard,
         },
-        uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
+        uri::{XmlURIPtr, xml_free_uri, xml_parse_uri},
         valid::{xml_add_id, xml_add_ref, xml_validate_notation_use},
         xmlregexp::{xml_reg_free_regexp, xml_regexp_compile, xml_regexp_exec},
         xmlschemas::{
-            xml_schema_custom_err, xml_schema_custom_err4, xml_schema_facet_type_to_string,
-            xml_schema_format_qname, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
-            xml_schema_vcheck_cvc_simple_type, XmlSchemaAbstractCtxtPtr, XmlSchemaBasicItemPtr,
-            XmlSchemaModelGroup, XmlSchemaModelGroupPtr, XmlSchemaParserCtxtPtr, XmlSchemaParticle,
-            XmlSchemaParticlePtr, XmlSchemaTreeItemPtr,
+            XmlSchemaAbstractCtxtPtr, XmlSchemaBasicItemPtr, XmlSchemaModelGroup,
+            XmlSchemaModelGroupPtr, XmlSchemaParserCtxtPtr, XmlSchemaParticle,
+            XmlSchemaParticlePtr, XmlSchemaTreeItemPtr, xml_schema_custom_err,
+            xml_schema_custom_err4, xml_schema_facet_type_to_string, xml_schema_format_qname,
+            xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+            xml_schema_vcheck_cvc_simple_type,
         },
         xmlstring::{
-            xml_str_equal, xml_strcat, xml_strcmp, xml_strdup, xml_strndup, xml_utf8_strlen,
-            XmlChar,
+            XmlChar, xml_str_equal, xml_strcat, xml_strcmp, xml_strdup, xml_strndup,
+            xml_utf8_strlen,
         },
     },
     tree::{
-        xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
-        xml_validate_nmtoken, xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlEntityType,
-        XmlGenericNodePtr,
+        XmlAttrPtr, XmlAttributeType, XmlEntityType, XmlGenericNodePtr, xml_get_doc_entity,
+        xml_split_qname2, xml_validate_name, xml_validate_ncname, xml_validate_nmtoken,
+        xml_validate_qname,
     },
-    xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
+    xpath::{XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF, xml_xpath_is_nan},
 };
 
 use super::{
@@ -388,39 +389,43 @@ extern "C" fn xml_schema_free_type_entry(typ: *mut c_void, _name: *const XmlChar
 /// Cleanup the default XML Schemas type library
 #[doc(alias = "xmlSchemaCleanupTypesInternal")]
 unsafe fn xml_schema_cleanup_types_internal() {
-    let particle: XmlSchemaParticlePtr;
+    unsafe {
+        let particle: XmlSchemaParticlePtr;
 
-    // Free xs:anyType.
-    let anytype_def = XML_SCHEMA_TYPE_ANY_TYPE_DEF.get();
-    if !anytype_def.is_null() {
-        // Attribute wildcard.
-        xml_schema_free_wildcard((*anytype_def).attribute_wildcard);
-        // Content type.
-        particle = (*anytype_def).subtypes as XmlSchemaParticlePtr;
-        // Wildcard.
-        xml_schema_free_wildcard(
-            (*(*(*particle).children).children).children as XmlSchemaWildcardPtr,
+        // Free xs:anyType.
+        let anytype_def = XML_SCHEMA_TYPE_ANY_TYPE_DEF.get();
+        if !anytype_def.is_null() {
+            // Attribute wildcard.
+            xml_schema_free_wildcard((*anytype_def).attribute_wildcard);
+            // Content type.
+            particle = (*anytype_def).subtypes as XmlSchemaParticlePtr;
+            // Wildcard.
+            xml_schema_free_wildcard(
+                (*(*(*particle).children).children).children as XmlSchemaWildcardPtr,
+            );
+            xml_free((*(*particle).children).children as _);
+            // Sequence model group.
+            xml_free((*particle).children as _);
+            xml_free(particle as _);
+            (*anytype_def).subtypes = null_mut();
+            XML_SCHEMA_TYPE_ANY_TYPE_DEF.set(null_mut());
+        }
+
+        xml_hash_free(
+            XML_SCHEMA_TYPES_BANK.get(),
+            Some(xml_schema_free_type_entry),
         );
-        xml_free((*(*particle).children).children as _);
-        // Sequence model group.
-        xml_free((*particle).children as _);
-        xml_free(particle as _);
-        (*anytype_def).subtypes = null_mut();
-        XML_SCHEMA_TYPE_ANY_TYPE_DEF.set(null_mut());
+        XML_SCHEMA_TYPES_BANK.set(null_mut());
+        // Note that the xmlSchemaType*Def pointers aren't set to NULL.
     }
-
-    xml_hash_free(
-        XML_SCHEMA_TYPES_BANK.get(),
-        Some(xml_schema_free_type_entry),
-    );
-    XML_SCHEMA_TYPES_BANK.set(null_mut());
-    // Note that the xmlSchemaType*Def pointers aren't set to NULL.
 }
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchemaTypeErrMemory")]
 unsafe fn xml_schema_type_err_memory(node: Option<XmlGenericNodePtr>, extra: Option<&str>) {
-    __xml_simple_oom_error(XmlErrorDomain::XmlFromDatatype, node, extra);
+    unsafe {
+        __xml_simple_oom_error(XmlErrorDomain::XmlFromDatatype, node, extra);
+    }
 }
 
 /// Allocate a new simple type value
@@ -428,28 +433,32 @@ unsafe fn xml_schema_type_err_memory(node: Option<XmlGenericNodePtr>, extra: Opt
 /// Returns a pointer to the new value or NULL in case of error
 #[doc(alias = "xmlSchemaNewValue")]
 unsafe fn xml_schema_new_value(typ: XmlSchemaValType) -> XmlSchemaValPtr {
-    let value: XmlSchemaValPtr = xml_malloc(size_of::<XmlSchemaVal>()) as XmlSchemaValPtr;
-    if value.is_null() {
-        return null_mut();
+    unsafe {
+        let value: XmlSchemaValPtr = xml_malloc(size_of::<XmlSchemaVal>()) as XmlSchemaValPtr;
+        if value.is_null() {
+            return null_mut();
+        }
+        memset(value as _, 0, size_of::<XmlSchemaVal>());
+        (*value).typ = typ;
+        value
     }
-    memset(value as _, 0, size_of::<XmlSchemaVal>());
-    (*value).typ = typ;
-    value
 }
 
 unsafe fn xml_schema_new_min_length_facet(value: i32) -> XmlSchemaFacetPtr {
-    let ret: XmlSchemaFacetPtr = xml_schema_new_facet();
-    if ret.is_null() {
-        return null_mut();
+    unsafe {
+        let ret: XmlSchemaFacetPtr = xml_schema_new_facet();
+        if ret.is_null() {
+            return null_mut();
+        }
+        (*ret).typ = XmlSchemaTypeType::XmlSchemaFacetMinlength;
+        (*ret).val = xml_schema_new_value(XmlSchemaValType::XmlSchemasNNInteger);
+        if (*ret).val.is_null() {
+            xml_free(ret as _);
+            return null_mut();
+        }
+        (*(*ret).val).value.decimal.lo = value as _;
+        ret
     }
-    (*ret).typ = XmlSchemaTypeType::XmlSchemaFacetMinlength;
-    (*ret).val = xml_schema_new_value(XmlSchemaValType::XmlSchemasNNInteger);
-    if (*ret).val.is_null() {
-        xml_free(ret as _);
-        return null_mut();
-    }
-    (*(*ret).val).value.decimal.lo = value as _;
-    ret
 }
 
 /// Initialize one primitive built-in type
@@ -459,78 +468,82 @@ unsafe fn xml_schema_init_basic_type(
     typ: XmlSchemaValType,
     base_type: XmlSchemaTypePtr,
 ) -> XmlSchemaTypePtr {
-    let ret: XmlSchemaTypePtr = xml_malloc(size_of::<XmlSchemaType>()) as XmlSchemaTypePtr;
-    if ret.is_null() {
-        xml_schema_type_err_memory(None, Some("could not initialize basic types"));
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlSchemaType>());
-    (*ret).name = name as *const XmlChar;
-    (*ret).target_namespace = XML_SCHEMAS_NAMESPACE_NAME.as_ptr() as _;
-    (*ret).typ = XmlSchemaTypeType::XmlSchemaTypeBasic;
-    (*ret).base_type = base_type;
-    (*ret).content_type = XmlSchemaContentType::XmlSchemaContentBasic;
-    // Primitive types.
-    match typ {
-        XmlSchemaValType::XmlSchemasString
-        | XmlSchemaValType::XmlSchemasDecimal
-        | XmlSchemaValType::XmlSchemasDate
-        | XmlSchemaValType::XmlSchemasDatetime
-        | XmlSchemaValType::XmlSchemasTime
-        | XmlSchemaValType::XmlSchemasGyear
-        | XmlSchemaValType::XmlSchemasGyearmonth
-        | XmlSchemaValType::XmlSchemasGmonth
-        | XmlSchemaValType::XmlSchemasGmonthday
-        | XmlSchemaValType::XmlSchemasGday
-        | XmlSchemaValType::XmlSchemasDuration
-        | XmlSchemaValType::XmlSchemasFloat
-        | XmlSchemaValType::XmlSchemasDouble
-        | XmlSchemaValType::XmlSchemasBoolean
-        | XmlSchemaValType::XmlSchemasAnyURI
-        | XmlSchemaValType::XmlSchemasHexbinary
-        | XmlSchemaValType::XmlSchemasBase64binary
-        | XmlSchemaValType::XmlSchemasQname
-        | XmlSchemaValType::XmlSchemasNotation => {
-            (*ret).flags |= XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE;
+    unsafe {
+        let ret: XmlSchemaTypePtr = xml_malloc(size_of::<XmlSchemaType>()) as XmlSchemaTypePtr;
+        if ret.is_null() {
+            xml_schema_type_err_memory(None, Some("could not initialize basic types"));
+            return null_mut();
         }
-        _ => {}
-    }
-    // Set variety.
-    match typ {
-        XmlSchemaValType::XmlSchemasAnytype | XmlSchemaValType::XmlSchemasAnysimpletype => {}
-        XmlSchemaValType::XmlSchemasIDREFS
-        | XmlSchemaValType::XmlSchemasNmtokens
-        | XmlSchemaValType::XmlSchemasEntities => {
-            (*ret).flags |= XML_SCHEMAS_TYPE_VARIETY_LIST;
-            (*ret).facets = xml_schema_new_min_length_facet(1);
-            (*ret).flags |= XML_SCHEMAS_TYPE_HAS_FACETS;
+        memset(ret as _, 0, size_of::<XmlSchemaType>());
+        (*ret).name = name as *const XmlChar;
+        (*ret).target_namespace = XML_SCHEMAS_NAMESPACE_NAME.as_ptr() as _;
+        (*ret).typ = XmlSchemaTypeType::XmlSchemaTypeBasic;
+        (*ret).base_type = base_type;
+        (*ret).content_type = XmlSchemaContentType::XmlSchemaContentBasic;
+        // Primitive types.
+        match typ {
+            XmlSchemaValType::XmlSchemasString
+            | XmlSchemaValType::XmlSchemasDecimal
+            | XmlSchemaValType::XmlSchemasDate
+            | XmlSchemaValType::XmlSchemasDatetime
+            | XmlSchemaValType::XmlSchemasTime
+            | XmlSchemaValType::XmlSchemasGyear
+            | XmlSchemaValType::XmlSchemasGyearmonth
+            | XmlSchemaValType::XmlSchemasGmonth
+            | XmlSchemaValType::XmlSchemasGmonthday
+            | XmlSchemaValType::XmlSchemasGday
+            | XmlSchemaValType::XmlSchemasDuration
+            | XmlSchemaValType::XmlSchemasFloat
+            | XmlSchemaValType::XmlSchemasDouble
+            | XmlSchemaValType::XmlSchemasBoolean
+            | XmlSchemaValType::XmlSchemasAnyURI
+            | XmlSchemaValType::XmlSchemasHexbinary
+            | XmlSchemaValType::XmlSchemasBase64binary
+            | XmlSchemaValType::XmlSchemasQname
+            | XmlSchemaValType::XmlSchemasNotation => {
+                (*ret).flags |= XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE;
+            }
+            _ => {}
         }
-        _ => {
-            (*ret).flags |= XML_SCHEMAS_TYPE_VARIETY_ATOMIC;
+        // Set variety.
+        match typ {
+            XmlSchemaValType::XmlSchemasAnytype | XmlSchemaValType::XmlSchemasAnysimpletype => {}
+            XmlSchemaValType::XmlSchemasIDREFS
+            | XmlSchemaValType::XmlSchemasNmtokens
+            | XmlSchemaValType::XmlSchemasEntities => {
+                (*ret).flags |= XML_SCHEMAS_TYPE_VARIETY_LIST;
+                (*ret).facets = xml_schema_new_min_length_facet(1);
+                (*ret).flags |= XML_SCHEMAS_TYPE_HAS_FACETS;
+            }
+            _ => {
+                (*ret).flags |= XML_SCHEMAS_TYPE_VARIETY_ATOMIC;
+            }
         }
+        xml_hash_add_entry2(
+            XML_SCHEMA_TYPES_BANK.get(),
+            (*ret).name,
+            XML_SCHEMAS_NAMESPACE_NAME.as_ptr() as _,
+            ret as _,
+        );
+        (*ret).built_in_type = typ as i32;
+        ret
     }
-    xml_hash_add_entry2(
-        XML_SCHEMA_TYPES_BANK.get(),
-        (*ret).name,
-        XML_SCHEMAS_NAMESPACE_NAME.as_ptr() as _,
-        ret as _,
-    );
-    (*ret).built_in_type = typ as i32;
-    ret
 }
 
 unsafe fn xml_schema_add_particle() -> XmlSchemaParticlePtr {
-    let ret: XmlSchemaParticlePtr =
-        xml_malloc(size_of::<XmlSchemaParticle>()) as XmlSchemaParticlePtr;
-    if ret.is_null() {
-        xml_schema_type_err_memory(None, Some("allocating particle component"));
-        return null_mut();
+    unsafe {
+        let ret: XmlSchemaParticlePtr =
+            xml_malloc(size_of::<XmlSchemaParticle>()) as XmlSchemaParticlePtr;
+        if ret.is_null() {
+            xml_schema_type_err_memory(None, Some("allocating particle component"));
+            return null_mut();
+        }
+        memset(ret as _, 0, size_of::<XmlSchemaParticle>());
+        (*ret).typ = XmlSchemaTypeType::XmlSchemaTypeParticle;
+        (*ret).min_occurs = 1;
+        (*ret).max_occurs = 1;
+        ret
     }
-    memset(ret as _, 0, size_of::<XmlSchemaParticle>());
-    (*ret).typ = XmlSchemaTypeType::XmlSchemaTypeParticle;
-    (*ret).min_occurs = 1;
-    (*ret).max_occurs = 1;
-    ret
 }
 
 /// Initialize the default XML Schemas type library
@@ -538,461 +551,463 @@ unsafe fn xml_schema_add_particle() -> XmlSchemaParticlePtr {
 /// Returns 0 on success, -1 on error.
 #[doc(alias = "xmlSchemaInitTypes")]
 pub unsafe fn xml_schema_init_types() -> i32 {
-    if XML_SCHEMA_TYPES_INITIALIZED.get() {
-        return 0;
+    unsafe {
+        if XML_SCHEMA_TYPES_INITIALIZED.get() {
+            return 0;
+        }
+
+        'error: {
+            XML_SCHEMA_TYPES_BANK.set(xml_hash_create(40));
+            if XML_SCHEMA_TYPES_BANK.get().is_null() {
+                xml_schema_type_err_memory(None, None);
+                break 'error;
+            }
+
+            // 3.4.7 Built-in Complex Type Definition
+            XML_SCHEMA_TYPE_ANY_TYPE_DEF.set(xml_schema_init_basic_type(
+                c"anyType".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasAnytype,
+                null_mut(),
+            ));
+            if XML_SCHEMA_TYPE_ANY_TYPE_DEF.get().is_null() {
+                break 'error;
+            }
+            // Init the content type.
+            let anytype_def = XML_SCHEMA_TYPE_ANY_TYPE_DEF.get();
+            (*anytype_def).base_type = anytype_def;
+            (*anytype_def).content_type = XmlSchemaContentType::XmlSchemaContentMixed;
+            {
+                let mut particle: XmlSchemaParticlePtr;
+                let mut wild: XmlSchemaWildcardPtr;
+                // First particle.
+                particle = xml_schema_add_particle();
+                if particle.is_null() {
+                    break 'error;
+                }
+                (*anytype_def).subtypes = particle as XmlSchemaTypePtr;
+                // Sequence model group.
+                let sequence: XmlSchemaModelGroupPtr =
+                    xml_malloc(size_of::<XmlSchemaModelGroup>()) as XmlSchemaModelGroupPtr;
+                if sequence.is_null() {
+                    xml_schema_type_err_memory(None, Some("allocating model group component"));
+                    break 'error;
+                }
+                memset(sequence as _, 0, size_of::<XmlSchemaModelGroup>());
+                (*sequence).typ = XmlSchemaTypeType::XmlSchemaTypeSequence;
+                (*particle).children = sequence as _;
+                // Second particle.
+                particle = xml_schema_add_particle();
+                if particle.is_null() {
+                    break 'error;
+                }
+                (*particle).min_occurs = 0;
+                (*particle).max_occurs = UNBOUNDED;
+                (*sequence).children = particle as _;
+                // The wildcard
+                wild = xml_malloc(size_of::<XmlSchemaWildcard>()) as XmlSchemaWildcardPtr;
+                if wild.is_null() {
+                    xml_schema_type_err_memory(None, Some("allocating wildcard component"));
+                    break 'error;
+                }
+                memset(wild as _, 0, size_of::<XmlSchemaWildcard>());
+                (*wild).typ = XmlSchemaTypeType::XmlSchemaTypeAny;
+                (*wild).any = 1;
+                (*wild).process_contents = XML_SCHEMAS_ANY_LAX;
+                (*particle).children = wild as XmlSchemaTreeItemPtr;
+                // Create the attribute wildcard.
+                wild = xml_malloc(size_of::<XmlSchemaWildcard>()) as XmlSchemaWildcardPtr;
+                if wild.is_null() {
+                    xml_schema_type_err_memory(
+                        None,
+                        Some("could not create an attribute wildcard on anyType"),
+                    );
+                    break 'error;
+                }
+                memset(wild as _, 0, size_of::<XmlSchemaWildcard>());
+                (*wild).any = 1;
+                (*wild).process_contents = XML_SCHEMAS_ANY_LAX;
+                (*anytype_def).attribute_wildcard = wild;
+            }
+            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.set(xml_schema_init_basic_type(
+                c"anySimpleType".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasAnysimpletype,
+                XML_SCHEMA_TYPE_ANY_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get().is_null() {
+                break 'error;
+            }
+            // primitive datatypes
+            XML_SCHEMA_TYPE_STRING_DEF.set(xml_schema_init_basic_type(
+                c"string".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasString,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_STRING_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_DECIMAL_DEF.set(xml_schema_init_basic_type(
+                c"decimal".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasDecimal,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_DECIMAL_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_DATE_DEF.set(xml_schema_init_basic_type(
+                c"date".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasDate,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_DATE_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_DATETIME_DEF.set(xml_schema_init_basic_type(
+                c"dateTime".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasDatetime,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_DATETIME_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_TIME_DEF.set(xml_schema_init_basic_type(
+                c"time".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasTime,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_TIME_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_GYEAR_DEF.set(xml_schema_init_basic_type(
+                c"gYear".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasGyear,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_GYEAR_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.set(xml_schema_init_basic_type(
+                c"gYearMonth".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasGyearmonth,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_GMONTH_DEF.set(xml_schema_init_basic_type(
+                c"gMonth".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasGmonth,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_GMONTH_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_GMONTH_DAY_DEF.set(xml_schema_init_basic_type(
+                c"gMonthDay".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasGmonthday,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_GMONTH_DAY_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_GDAY_DEF.set(xml_schema_init_basic_type(
+                c"gDay".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasGday,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_GDAY_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_DURATION_DEF.set(xml_schema_init_basic_type(
+                c"duration".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasDuration,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_DURATION_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_FLOAT_DEF.set(xml_schema_init_basic_type(
+                c"float".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasFloat,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_FLOAT_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_DOUBLE_DEF.set(xml_schema_init_basic_type(
+                c"double".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasDouble,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_DOUBLE_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_BOOLEAN_DEF.set(xml_schema_init_basic_type(
+                c"boolean".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasBoolean,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_BOOLEAN_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_ANY_URIDEF.set(xml_schema_init_basic_type(
+                c"anyURI".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasAnyURI,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_ANY_URIDEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_HEX_BINARY_DEF.set(xml_schema_init_basic_type(
+                c"hexBinary".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasHexbinary,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_HEX_BINARY_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_BASE64_BINARY_DEF.set(xml_schema_init_basic_type(
+                c"base64Binary".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasBase64binary,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_BASE64_BINARY_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_NOTATION_DEF.set(xml_schema_init_basic_type(
+                c"NOTATION".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasNotation,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_NOTATION_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_QNAME_DEF.set(xml_schema_init_basic_type(
+                c"QName".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasQname,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_QNAME_DEF.get().is_null() {
+                break 'error;
+            }
+
+            // derived datatypes
+            XML_SCHEMA_TYPE_INTEGER_DEF.set(xml_schema_init_basic_type(
+                c"integer".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasInteger,
+                XML_SCHEMA_TYPE_DECIMAL_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_INTEGER_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
+                c"nonPositiveInteger".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasNPInteger,
+                XML_SCHEMA_TYPE_INTEGER_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
+                c"negativeInteger".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasNInteger,
+                XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_LONG_DEF.set(xml_schema_init_basic_type(
+                c"long".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasLong,
+                XML_SCHEMA_TYPE_INTEGER_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_LONG_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_INT_DEF.set(xml_schema_init_basic_type(
+                c"int".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasInt,
+                XML_SCHEMA_TYPE_LONG_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_INT_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_SHORT_DEF.set(xml_schema_init_basic_type(
+                c"short".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasShort,
+                XML_SCHEMA_TYPE_INT_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_SHORT_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_BYTE_DEF.set(xml_schema_init_basic_type(
+                c"byte".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasByte,
+                XML_SCHEMA_TYPE_SHORT_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_BYTE_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
+                c"nonNegativeInteger".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasNNInteger,
+                XML_SCHEMA_TYPE_INTEGER_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.set(xml_schema_init_basic_type(
+                c"unsignedLong".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasULong,
+                XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.set(xml_schema_init_basic_type(
+                c"unsignedInt".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasUInt,
+                XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.set(xml_schema_init_basic_type(
+                c"unsignedShort".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasUShort,
+                XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.set(xml_schema_init_basic_type(
+                c"unsignedByte".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasUByte,
+                XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
+                c"positiveInteger".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasPInteger,
+                XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_NORM_STRING_DEF.set(xml_schema_init_basic_type(
+                c"normalizedString".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasNormstring,
+                XML_SCHEMA_TYPE_STRING_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_NORM_STRING_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_TOKEN_DEF.set(xml_schema_init_basic_type(
+                c"token".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasToken,
+                XML_SCHEMA_TYPE_NORM_STRING_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_TOKEN_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_LANGUAGE_DEF.set(xml_schema_init_basic_type(
+                c"language".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasLanguage,
+                XML_SCHEMA_TYPE_TOKEN_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_LANGUAGE_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_NAME_DEF.set(xml_schema_init_basic_type(
+                c"Name".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasName,
+                XML_SCHEMA_TYPE_TOKEN_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_NAME_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_NMTOKEN_DEF.set(xml_schema_init_basic_type(
+                c"NMTOKEN".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasNmtoken,
+                XML_SCHEMA_TYPE_TOKEN_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_NMTOKEN_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_NCNAME_DEF.set(xml_schema_init_basic_type(
+                c"NCName".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasNcname,
+                XML_SCHEMA_TYPE_NAME_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_NCNAME_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_ID_DEF.set(xml_schema_init_basic_type(
+                c"ID".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasID,
+                XML_SCHEMA_TYPE_NCNAME_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_ID_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_IDREF_DEF.set(xml_schema_init_basic_type(
+                c"IDREF".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasIDREF,
+                XML_SCHEMA_TYPE_NCNAME_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_IDREF_DEF.get().is_null() {
+                break 'error;
+            }
+            XML_SCHEMA_TYPE_ENTITY_DEF.set(xml_schema_init_basic_type(
+                c"ENTITY".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasEntity,
+                XML_SCHEMA_TYPE_NCNAME_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_ENTITY_DEF.get().is_null() {
+                break 'error;
+            }
+            // Derived list types.
+            // ENTITIES
+            XML_SCHEMA_TYPE_ENTITIES_DEF.set(xml_schema_init_basic_type(
+                c"ENTITIES".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasEntities,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_ENTITIES_DEF.get().is_null() {
+                break 'error;
+            }
+            (*XML_SCHEMA_TYPE_ENTITIES_DEF.get()).subtypes = XML_SCHEMA_TYPE_ENTITY_DEF.get();
+            // IDREFS
+            XML_SCHEMA_TYPE_IDREFS_DEF.set(xml_schema_init_basic_type(
+                c"IDREFS".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasIDREFS,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_IDREFS_DEF.get().is_null() {
+                break 'error;
+            }
+            (*XML_SCHEMA_TYPE_IDREFS_DEF.get()).subtypes = XML_SCHEMA_TYPE_IDREF_DEF.get();
+
+            // NMTOKENS
+            XML_SCHEMA_TYPE_NMTOKENS_DEF.set(xml_schema_init_basic_type(
+                c"NMTOKENS".as_ptr() as _,
+                XmlSchemaValType::XmlSchemasNmtokens,
+                XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            ));
+            if XML_SCHEMA_TYPE_NMTOKENS_DEF.get().is_null() {
+                break 'error;
+            }
+            (*XML_SCHEMA_TYPE_NMTOKENS_DEF.get()).subtypes = XML_SCHEMA_TYPE_NMTOKEN_DEF.get();
+
+            XML_SCHEMA_TYPES_INITIALIZED.set(true);
+            return 0;
+        }
+
+        // error:
+        xml_schema_cleanup_types_internal();
+        -1
     }
-
-    'error: {
-        XML_SCHEMA_TYPES_BANK.set(xml_hash_create(40));
-        if XML_SCHEMA_TYPES_BANK.get().is_null() {
-            xml_schema_type_err_memory(None, None);
-            break 'error;
-        }
-
-        // 3.4.7 Built-in Complex Type Definition
-        XML_SCHEMA_TYPE_ANY_TYPE_DEF.set(xml_schema_init_basic_type(
-            c"anyType".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasAnytype,
-            null_mut(),
-        ));
-        if XML_SCHEMA_TYPE_ANY_TYPE_DEF.get().is_null() {
-            break 'error;
-        }
-        // Init the content type.
-        let anytype_def = XML_SCHEMA_TYPE_ANY_TYPE_DEF.get();
-        (*anytype_def).base_type = anytype_def;
-        (*anytype_def).content_type = XmlSchemaContentType::XmlSchemaContentMixed;
-        {
-            let mut particle: XmlSchemaParticlePtr;
-            let mut wild: XmlSchemaWildcardPtr;
-            // First particle.
-            particle = xml_schema_add_particle();
-            if particle.is_null() {
-                break 'error;
-            }
-            (*anytype_def).subtypes = particle as XmlSchemaTypePtr;
-            // Sequence model group.
-            let sequence: XmlSchemaModelGroupPtr =
-                xml_malloc(size_of::<XmlSchemaModelGroup>()) as XmlSchemaModelGroupPtr;
-            if sequence.is_null() {
-                xml_schema_type_err_memory(None, Some("allocating model group component"));
-                break 'error;
-            }
-            memset(sequence as _, 0, size_of::<XmlSchemaModelGroup>());
-            (*sequence).typ = XmlSchemaTypeType::XmlSchemaTypeSequence;
-            (*particle).children = sequence as _;
-            // Second particle.
-            particle = xml_schema_add_particle();
-            if particle.is_null() {
-                break 'error;
-            }
-            (*particle).min_occurs = 0;
-            (*particle).max_occurs = UNBOUNDED;
-            (*sequence).children = particle as _;
-            // The wildcard
-            wild = xml_malloc(size_of::<XmlSchemaWildcard>()) as XmlSchemaWildcardPtr;
-            if wild.is_null() {
-                xml_schema_type_err_memory(None, Some("allocating wildcard component"));
-                break 'error;
-            }
-            memset(wild as _, 0, size_of::<XmlSchemaWildcard>());
-            (*wild).typ = XmlSchemaTypeType::XmlSchemaTypeAny;
-            (*wild).any = 1;
-            (*wild).process_contents = XML_SCHEMAS_ANY_LAX;
-            (*particle).children = wild as XmlSchemaTreeItemPtr;
-            // Create the attribute wildcard.
-            wild = xml_malloc(size_of::<XmlSchemaWildcard>()) as XmlSchemaWildcardPtr;
-            if wild.is_null() {
-                xml_schema_type_err_memory(
-                    None,
-                    Some("could not create an attribute wildcard on anyType"),
-                );
-                break 'error;
-            }
-            memset(wild as _, 0, size_of::<XmlSchemaWildcard>());
-            (*wild).any = 1;
-            (*wild).process_contents = XML_SCHEMAS_ANY_LAX;
-            (*anytype_def).attribute_wildcard = wild;
-        }
-        XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.set(xml_schema_init_basic_type(
-            c"anySimpleType".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasAnysimpletype,
-            XML_SCHEMA_TYPE_ANY_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get().is_null() {
-            break 'error;
-        }
-        // primitive datatypes
-        XML_SCHEMA_TYPE_STRING_DEF.set(xml_schema_init_basic_type(
-            c"string".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasString,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_STRING_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_DECIMAL_DEF.set(xml_schema_init_basic_type(
-            c"decimal".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasDecimal,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_DECIMAL_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_DATE_DEF.set(xml_schema_init_basic_type(
-            c"date".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasDate,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_DATE_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_DATETIME_DEF.set(xml_schema_init_basic_type(
-            c"dateTime".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasDatetime,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_DATETIME_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_TIME_DEF.set(xml_schema_init_basic_type(
-            c"time".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasTime,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_TIME_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_GYEAR_DEF.set(xml_schema_init_basic_type(
-            c"gYear".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasGyear,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_GYEAR_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.set(xml_schema_init_basic_type(
-            c"gYearMonth".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasGyearmonth,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_GMONTH_DEF.set(xml_schema_init_basic_type(
-            c"gMonth".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasGmonth,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_GMONTH_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_GMONTH_DAY_DEF.set(xml_schema_init_basic_type(
-            c"gMonthDay".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasGmonthday,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_GMONTH_DAY_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_GDAY_DEF.set(xml_schema_init_basic_type(
-            c"gDay".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasGday,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_GDAY_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_DURATION_DEF.set(xml_schema_init_basic_type(
-            c"duration".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasDuration,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_DURATION_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_FLOAT_DEF.set(xml_schema_init_basic_type(
-            c"float".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasFloat,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_FLOAT_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_DOUBLE_DEF.set(xml_schema_init_basic_type(
-            c"double".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasDouble,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_DOUBLE_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_BOOLEAN_DEF.set(xml_schema_init_basic_type(
-            c"boolean".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasBoolean,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_BOOLEAN_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_ANY_URIDEF.set(xml_schema_init_basic_type(
-            c"anyURI".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasAnyURI,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_ANY_URIDEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_HEX_BINARY_DEF.set(xml_schema_init_basic_type(
-            c"hexBinary".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasHexbinary,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_HEX_BINARY_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_BASE64_BINARY_DEF.set(xml_schema_init_basic_type(
-            c"base64Binary".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasBase64binary,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_BASE64_BINARY_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_NOTATION_DEF.set(xml_schema_init_basic_type(
-            c"NOTATION".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNotation,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_NOTATION_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_QNAME_DEF.set(xml_schema_init_basic_type(
-            c"QName".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasQname,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_QNAME_DEF.get().is_null() {
-            break 'error;
-        }
-
-        // derived datatypes
-        XML_SCHEMA_TYPE_INTEGER_DEF.set(xml_schema_init_basic_type(
-            c"integer".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasInteger,
-            XML_SCHEMA_TYPE_DECIMAL_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_INTEGER_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
-            c"nonPositiveInteger".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNPInteger,
-            XML_SCHEMA_TYPE_INTEGER_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
-            c"negativeInteger".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNInteger,
-            XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_LONG_DEF.set(xml_schema_init_basic_type(
-            c"long".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasLong,
-            XML_SCHEMA_TYPE_INTEGER_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_LONG_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_INT_DEF.set(xml_schema_init_basic_type(
-            c"int".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasInt,
-            XML_SCHEMA_TYPE_LONG_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_INT_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_SHORT_DEF.set(xml_schema_init_basic_type(
-            c"short".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasShort,
-            XML_SCHEMA_TYPE_INT_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_SHORT_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_BYTE_DEF.set(xml_schema_init_basic_type(
-            c"byte".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasByte,
-            XML_SCHEMA_TYPE_SHORT_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_BYTE_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
-            c"nonNegativeInteger".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNNInteger,
-            XML_SCHEMA_TYPE_INTEGER_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.set(xml_schema_init_basic_type(
-            c"unsignedLong".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasULong,
-            XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.set(xml_schema_init_basic_type(
-            c"unsignedInt".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasUInt,
-            XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.set(xml_schema_init_basic_type(
-            c"unsignedShort".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasUShort,
-            XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.set(xml_schema_init_basic_type(
-            c"unsignedByte".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasUByte,
-            XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.set(xml_schema_init_basic_type(
-            c"positiveInteger".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasPInteger,
-            XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_NORM_STRING_DEF.set(xml_schema_init_basic_type(
-            c"normalizedString".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNormstring,
-            XML_SCHEMA_TYPE_STRING_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_NORM_STRING_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_TOKEN_DEF.set(xml_schema_init_basic_type(
-            c"token".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasToken,
-            XML_SCHEMA_TYPE_NORM_STRING_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_TOKEN_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_LANGUAGE_DEF.set(xml_schema_init_basic_type(
-            c"language".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasLanguage,
-            XML_SCHEMA_TYPE_TOKEN_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_LANGUAGE_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_NAME_DEF.set(xml_schema_init_basic_type(
-            c"Name".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasName,
-            XML_SCHEMA_TYPE_TOKEN_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_NAME_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_NMTOKEN_DEF.set(xml_schema_init_basic_type(
-            c"NMTOKEN".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNmtoken,
-            XML_SCHEMA_TYPE_TOKEN_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_NMTOKEN_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_NCNAME_DEF.set(xml_schema_init_basic_type(
-            c"NCName".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNcname,
-            XML_SCHEMA_TYPE_NAME_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_NCNAME_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_ID_DEF.set(xml_schema_init_basic_type(
-            c"ID".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasID,
-            XML_SCHEMA_TYPE_NCNAME_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_ID_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_IDREF_DEF.set(xml_schema_init_basic_type(
-            c"IDREF".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasIDREF,
-            XML_SCHEMA_TYPE_NCNAME_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_IDREF_DEF.get().is_null() {
-            break 'error;
-        }
-        XML_SCHEMA_TYPE_ENTITY_DEF.set(xml_schema_init_basic_type(
-            c"ENTITY".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasEntity,
-            XML_SCHEMA_TYPE_NCNAME_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_ENTITY_DEF.get().is_null() {
-            break 'error;
-        }
-        // Derived list types.
-        // ENTITIES
-        XML_SCHEMA_TYPE_ENTITIES_DEF.set(xml_schema_init_basic_type(
-            c"ENTITIES".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasEntities,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_ENTITIES_DEF.get().is_null() {
-            break 'error;
-        }
-        (*XML_SCHEMA_TYPE_ENTITIES_DEF.get()).subtypes = XML_SCHEMA_TYPE_ENTITY_DEF.get();
-        // IDREFS
-        XML_SCHEMA_TYPE_IDREFS_DEF.set(xml_schema_init_basic_type(
-            c"IDREFS".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasIDREFS,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_IDREFS_DEF.get().is_null() {
-            break 'error;
-        }
-        (*XML_SCHEMA_TYPE_IDREFS_DEF.get()).subtypes = XML_SCHEMA_TYPE_IDREF_DEF.get();
-
-        // NMTOKENS
-        XML_SCHEMA_TYPE_NMTOKENS_DEF.set(xml_schema_init_basic_type(
-            c"NMTOKENS".as_ptr() as _,
-            XmlSchemaValType::XmlSchemasNmtokens,
-            XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        ));
-        if XML_SCHEMA_TYPE_NMTOKENS_DEF.get().is_null() {
-            break 'error;
-        }
-        (*XML_SCHEMA_TYPE_NMTOKENS_DEF.get()).subtypes = XML_SCHEMA_TYPE_NMTOKEN_DEF.get();
-
-        XML_SCHEMA_TYPES_INITIALIZED.set(true);
-        return 0;
-    }
-
-    // error:
-    xml_schema_cleanup_types_internal();
-    -1
 }
 
 /// DEPRECATED: This function will be made private. Call xmlCleanupParser
@@ -1003,9 +1018,11 @@ pub unsafe fn xml_schema_init_types() -> i32 {
 /// Cleanup the default XML Schemas type library
 #[doc(alias = "xmlSchemaCleanupTypes")]
 pub(crate) unsafe fn xml_schema_cleanup_types() {
-    if XML_SCHEMA_TYPES_INITIALIZED.get() {
-        xml_schema_cleanup_types_internal();
-        XML_SCHEMA_TYPES_INITIALIZED.set(false);
+    unsafe {
+        if XML_SCHEMA_TYPES_INITIALIZED.get() {
+            xml_schema_cleanup_types_internal();
+            XML_SCHEMA_TYPES_INITIALIZED.set(false);
+        }
     }
 }
 
@@ -1014,16 +1031,18 @@ pub(crate) unsafe fn xml_schema_cleanup_types() {
 /// Returns the type if found, NULL otherwise
 #[doc(alias = "xmlSchemaGetPredefinedType")]
 pub unsafe fn xml_schema_get_predefined_type(name: &str, ns: &str) -> XmlSchemaTypePtr {
-    if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
-        return null_mut();
+    unsafe {
+        if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
+            return null_mut();
+        }
+        let name = CString::new(name).unwrap();
+        let ns = CString::new(ns).unwrap();
+        xml_hash_lookup2(
+            XML_SCHEMA_TYPES_BANK.get(),
+            name.as_ptr() as *const u8,
+            ns.as_ptr() as *const u8,
+        ) as XmlSchemaTypePtr
     }
-    let name = CString::new(name).unwrap();
-    let ns = CString::new(ns).unwrap();
-    xml_hash_lookup2(
-        XML_SCHEMA_TYPES_BANK.get(),
-        name.as_ptr() as *const u8,
-        ns.as_ptr() as *const u8,
-    ) as XmlSchemaTypePtr
 }
 
 /// Check that a value conforms to the lexical space of the predefined type.
@@ -1037,7 +1056,7 @@ pub unsafe fn xml_schema_validate_predefined_type(
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
 ) -> i32 {
-    xml_schema_val_predef_type_node(typ, value, val, None)
+    unsafe { xml_schema_val_predef_type_node(typ, value, val, None) }
 }
 
 /// Parse an u64 into 3 fields.
@@ -1051,53 +1070,55 @@ unsafe fn xml_schema_parse_uint(
     lmi: *mut u64,
     lhi: *mut u64,
 ) -> i32 {
-    let mut lo: u64 = 0;
-    let mut mi: u64 = 0;
-    let mut hi: u64 = 0;
-    let mut tmp: *const XmlChar;
-    let mut cur: *const XmlChar = *str;
-    let mut ret: i32 = 0;
-    let mut i: i32 = 0;
+    unsafe {
+        let mut lo: u64 = 0;
+        let mut mi: u64 = 0;
+        let mut hi: u64 = 0;
+        let mut tmp: *const XmlChar;
+        let mut cur: *const XmlChar = *str;
+        let mut ret: i32 = 0;
+        let mut i: i32 = 0;
 
-    if !(*cur >= b'0' && *cur <= b'9') {
-        return -2;
-    }
+        if !(*cur >= b'0' && *cur <= b'9') {
+            return -2;
+        }
 
-    while *cur == b'0' {
-        // ignore leading zeroes
-        cur = cur.add(1);
-    }
-    tmp = cur;
-    while *tmp != 0 && *tmp >= b'0' && *tmp <= b'9' {
-        i += 1;
-        tmp = tmp.add(1);
-        ret += 1;
-    }
-    if i > 24 {
-        *str = tmp;
-        return -1;
-    }
-    while i > 16 {
-        hi = hi * 10 + (*cur - b'0') as u64;
-        cur = cur.add(1);
-        i -= 1;
-    }
-    while i > 8 {
-        mi = mi * 10 + (*cur - b'0') as u64;
-        cur = cur.add(1);
-        i -= 1;
-    }
-    while i > 0 {
-        lo = lo * 10 + (*cur - b'0') as u64;
-        cur = cur.add(1);
-        i -= 1;
-    }
+        while *cur == b'0' {
+            // ignore leading zeroes
+            cur = cur.add(1);
+        }
+        tmp = cur;
+        while *tmp != 0 && *tmp >= b'0' && *tmp <= b'9' {
+            i += 1;
+            tmp = tmp.add(1);
+            ret += 1;
+        }
+        if i > 24 {
+            *str = tmp;
+            return -1;
+        }
+        while i > 16 {
+            hi = hi * 10 + (*cur - b'0') as u64;
+            cur = cur.add(1);
+            i -= 1;
+        }
+        while i > 8 {
+            mi = mi * 10 + (*cur - b'0') as u64;
+            cur = cur.add(1);
+            i -= 1;
+        }
+        while i > 0 {
+            lo = lo * 10 + (*cur - b'0') as u64;
+            cur = cur.add(1);
+            i -= 1;
+        }
 
-    *str = cur;
-    *llo = lo;
-    *lmi = mi;
-    *lhi = hi;
-    ret
+        *str = cur;
+        *llo = lo;
+        *lmi = mi;
+        *lhi = hi;
+        ret
+    }
 }
 
 /// Parses a 2-digits integer and updates @num with the value. @cur is
@@ -1145,71 +1166,73 @@ macro_rules! PARSE_FLOAT {
 /// Returns 0 or the error code
 #[doc(alias = "_xmlSchemaParseTimeZone")]
 unsafe fn _xml_schema_parse_time_zone(dt: XmlSchemaValDatePtr, str: *mut *const XmlChar) -> i32 {
-    let mut cur: *const XmlChar;
-    let mut ret: i32 = 0;
+    unsafe {
+        let mut cur: *const XmlChar;
+        let mut ret: i32 = 0;
 
-    if str.is_null() {
-        return -1;
-    }
-    cur = *str;
-
-    match *cur {
-        0 => {
-            (*dt).tz_flag = 0;
-            (*dt).tzo = 0;
+        if str.is_null() {
+            return -1;
         }
-        b'Z' => {
-            (*dt).tz_flag = 1;
-            (*dt).tzo = 0;
-            cur = cur.add(1);
-        }
-        b'+' | b'-' => {
-            let mut tmp: i32 = 0;
-            let isneg: i32 = (*cur == b'-') as i32;
+        cur = *str;
 
-            cur = cur.add(1);
-
-            PARSE_2_DIGITS!(tmp, cur, ret);
-            if ret != 0 {
-                return ret;
+        match *cur {
+            0 => {
+                (*dt).tz_flag = 0;
+                (*dt).tzo = 0;
             }
-            if !VALID_HOUR!(tmp) {
-                return 2;
+            b'Z' => {
+                (*dt).tz_flag = 1;
+                (*dt).tzo = 0;
+                cur = cur.add(1);
             }
+            b'+' | b'-' => {
+                let mut tmp: i32 = 0;
+                let isneg: i32 = (*cur == b'-') as i32;
 
-            if *cur != b':' {
+                cur = cur.add(1);
+
+                PARSE_2_DIGITS!(tmp, cur, ret);
+                if ret != 0 {
+                    return ret;
+                }
+                if !VALID_HOUR!(tmp) {
+                    return 2;
+                }
+
+                if *cur != b':' {
+                    return 1;
+                }
+                cur = cur.add(1);
+
+                (*dt).tzo = tmp * 60;
+
+                PARSE_2_DIGITS!(tmp, cur, ret);
+                if ret != 0 {
+                    return ret;
+                }
+                if !VALID_MIN!(tmp) {
+                    return 2;
+                }
+
+                (*dt).tzo += tmp;
+                if isneg != 0 {
+                    (*dt).tzo = -(*dt).tzo;
+                }
+
+                if !VALID_TZO!((*dt).tzo) {
+                    return 2;
+                }
+
+                (*dt).tz_flag = 1;
+            }
+            _ => {
                 return 1;
             }
-            cur = cur.add(1);
-
-            (*dt).tzo = tmp * 60;
-
-            PARSE_2_DIGITS!(tmp, cur, ret);
-            if ret != 0 {
-                return ret;
-            }
-            if !VALID_MIN!(tmp) {
-                return 2;
-            }
-
-            (*dt).tzo += tmp;
-            if isneg != 0 {
-                (*dt).tzo = -(*dt).tzo;
-            }
-
-            if !VALID_TZO!((*dt).tzo) {
-                return 2;
-            }
-
-            (*dt).tz_flag = 1;
         }
-        _ => {
-            return 1;
-        }
+
+        *str = cur;
+        0
     }
-
-    *str = cur;
-    0
 }
 
 macro_rules! RETURN_TYPE_IF_VALID {
@@ -1249,22 +1272,24 @@ macro_rules! RETURN_TYPE_IF_VALID {
 /// Returns 0 or the error code
 #[doc(alias = "_xmlSchemaParseGDay")]
 unsafe fn _xml_schema_parse_gday(dt: XmlSchemaValDatePtr, str: *mut *const XmlChar) -> i32 {
-    let mut cur: *const XmlChar = *str;
-    let mut ret: i32 = 0;
-    let mut value: u32 = 0;
+    unsafe {
+        let mut cur: *const XmlChar = *str;
+        let mut ret: i32 = 0;
+        let mut value: u32 = 0;
 
-    PARSE_2_DIGITS!(value, cur, ret);
-    if ret != 0 {
-        return ret;
+        PARSE_2_DIGITS!(value, cur, ret);
+        if ret != 0 {
+            return ret;
+        }
+
+        if !VALID_DAY!(value) {
+            return 2;
+        }
+
+        (*dt).day = value;
+        *str = cur;
+        0
     }
-
-    if !VALID_DAY!(value) {
-        return 2;
-    }
-
-    (*dt).day = value;
-    *str = cur;
-    0
 }
 
 /// Parses a xs:gMonth without time zone and fills in the appropriate
@@ -1273,23 +1298,25 @@ unsafe fn _xml_schema_parse_gday(dt: XmlSchemaValDatePtr, str: *mut *const XmlCh
 /// Returns 0 or the error code
 #[doc(alias = "_xmlSchemaParseGMonth")]
 unsafe fn _xml_schema_parse_gmonth(dt: XmlSchemaValDatePtr, str: *mut *const XmlChar) -> i32 {
-    let mut cur: *const XmlChar = *str;
-    let mut ret: i32 = 0;
-    let mut value: u32 = 0;
+    unsafe {
+        let mut cur: *const XmlChar = *str;
+        let mut ret: i32 = 0;
+        let mut value: u32 = 0;
 
-    PARSE_2_DIGITS!(value, cur, ret);
-    if ret != 0 {
-        return ret;
+        PARSE_2_DIGITS!(value, cur, ret);
+        if ret != 0 {
+            return ret;
+        }
+
+        if !VALID_MONTH!(value) {
+            return 2;
+        }
+
+        (*dt).mon = value;
+
+        *str = cur;
+        0
     }
-
-    if !VALID_MONTH!(value) {
-        return 2;
-    }
-
-    (*dt).mon = value;
-
-    *str = cur;
-    0
 }
 
 /// Parses a xs:time without time zone and fills in the appropriate
@@ -1299,52 +1326,54 @@ unsafe fn _xml_schema_parse_gmonth(dt: XmlSchemaValDatePtr, str: *mut *const Xml
 /// Returns 0 or the error code
 #[doc(alias = "_xmlSchemaParseTime")]
 unsafe fn _xml_schema_parse_time(dt: XmlSchemaValDatePtr, str: *mut *const XmlChar) -> i32 {
-    let mut cur: *const XmlChar = *str;
-    let mut ret: i32 = 0;
-    let mut value: i32 = 0;
+    unsafe {
+        let mut cur: *const XmlChar = *str;
+        let mut ret: i32 = 0;
+        let mut value: i32 = 0;
 
-    PARSE_2_DIGITS!(value, cur, ret);
-    if ret != 0 {
-        return ret;
-    }
-    if *cur != b':' {
-        return 1;
-    }
+        PARSE_2_DIGITS!(value, cur, ret);
+        if ret != 0 {
+            return ret;
+        }
+        if *cur != b':' {
+            return 1;
+        }
 
-    // Allow end-of-day hour
-    if !VALID_HOUR!(value) && value != 24 {
-        return 2;
-    }
-    cur = cur.add(1);
+        // Allow end-of-day hour
+        if !VALID_HOUR!(value) && value != 24 {
+            return 2;
+        }
+        cur = cur.add(1);
 
-    // the ':' insures this string is xs:time
-    (*dt).hour = value as _;
+        // the ':' insures this string is xs:time
+        (*dt).hour = value as _;
 
-    PARSE_2_DIGITS!(value, cur, ret);
-    if ret != 0 {
-        return ret;
-    }
-    if !VALID_MIN!(value) {
-        return 2;
-    }
-    (*dt).min = value as _;
+        PARSE_2_DIGITS!(value, cur, ret);
+        if ret != 0 {
+            return ret;
+        }
+        if !VALID_MIN!(value) {
+            return 2;
+        }
+        (*dt).min = value as _;
 
-    if *cur != b':' {
-        return 1;
-    }
-    cur = cur.add(1);
+        if *cur != b':' {
+            return 1;
+        }
+        cur = cur.add(1);
 
-    PARSE_FLOAT!((*dt).sec, cur, ret);
-    if ret != 0 {
-        return ret;
-    }
+        PARSE_FLOAT!((*dt).sec, cur, ret);
+        if ret != 0 {
+            return ret;
+        }
 
-    if !VALID_TIME!(dt) {
-        return 2;
-    }
+        if !VALID_TIME!(dt) {
+            return 2;
+        }
 
-    *str = cur;
-    0
+        *str = cur;
+        0
+    }
 }
 
 /// Parses a xs:gYear without time zone and fills in the appropriate
@@ -1354,52 +1383,54 @@ unsafe fn _xml_schema_parse_time(dt: XmlSchemaValDatePtr, str: *mut *const XmlCh
 /// Returns 0 or the error code
 #[doc(alias = "_xmlSchemaParseGYear")]
 unsafe fn _xml_schema_parse_gyear(dt: XmlSchemaValDatePtr, str: *mut *const XmlChar) -> i32 {
-    let mut cur: *const XmlChar = *str;
-    let mut isneg: i32 = 0;
-    let mut digcnt: i32 = 0;
+    unsafe {
+        let mut cur: *const XmlChar = *str;
+        let mut isneg: i32 = 0;
+        let mut digcnt: i32 = 0;
 
-    if (*cur < b'0' || *cur > b'9') && *cur != b'-' && *cur != b'+' {
-        return -1;
-    }
+        if (*cur < b'0' || *cur > b'9') && *cur != b'-' && *cur != b'+' {
+            return -1;
+        }
 
-    if *cur == b'-' {
-        isneg = 1;
-        cur = cur.add(1);
-    }
+        if *cur == b'-' {
+            isneg = 1;
+            cur = cur.add(1);
+        }
 
-    let first_char: *const XmlChar = cur;
+        let first_char: *const XmlChar = cur;
 
-    while *cur >= b'0' && *cur <= b'9' {
-        let digit: i32 = (*cur - b'0') as _;
+        while *cur >= b'0' && *cur <= b'9' {
+            let digit: i32 = (*cur - b'0') as _;
 
-        if (*dt).year > i64::MAX / 10 {
+            if (*dt).year > i64::MAX / 10 {
+                return 2;
+            }
+            (*dt).year *= 10;
+            if (*dt).year > i64::MAX - digit as i64 {
+                return 2;
+            }
+            (*dt).year += digit as i64;
+            cur = cur.add(1);
+            digcnt += 1;
+        }
+
+        // year must be at least 4 digits (CCYY); over 4
+        // digits cannot have a leading zero.
+        if digcnt < 4 || (digcnt > 4 && *first_char == b'0') {
+            return 1;
+        }
+
+        if isneg != 0 {
+            (*dt).year = -(*dt).year;
+        }
+
+        if !VALID_YEAR!((*dt).year) {
             return 2;
         }
-        (*dt).year *= 10;
-        if (*dt).year > i64::MAX - digit as i64 {
-            return 2;
-        }
-        (*dt).year += digit as i64;
-        cur = cur.add(1);
-        digcnt += 1;
-    }
 
-    // year must be at least 4 digits (CCYY); over 4
-    // digits cannot have a leading zero.
-    if digcnt < 4 || (digcnt > 4 && *first_char == b'0') {
-        return 1;
+        *str = cur;
+        0
     }
-
-    if isneg != 0 {
-        (*dt).year = -(*dt).year;
-    }
-
-    if !VALID_YEAR!((*dt).year) {
-        return 2;
-    }
-
-    *str = cur;
-    0
 }
 
 /// Check that @dateTime conforms to the lexical space of one of the date types.
@@ -1414,221 +1445,223 @@ unsafe fn xml_schema_validate_dates(
     val: *mut XmlSchemaValPtr,
     collapse: i32,
 ) -> i32 {
-    let mut ret: i32;
-    let mut cur: *const XmlChar = date_time;
+    unsafe {
+        let mut ret: i32;
+        let mut cur: *const XmlChar = date_time;
 
-    if date_time.is_null() {
-        return -1;
-    }
-
-    if collapse != 0 {
-        while IS_WSP_BLANK_CH!(*cur) {
-            cur = cur.add(1);
-        }
-    }
-
-    if *cur != b'-' && *cur < b'0' && *cur > b'9' {
-        return 1;
-    }
-
-    let dt: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasUnknown);
-    if dt.is_null() {
-        return -1;
-    }
-
-    'error: {
-        if *cur.add(0) == b'-' && *cur.add(1) == b'-' {
-            // It's an incomplete date (xs:gMonthDay, xs:gMonth or xs:gDay)
-            cur = cur.add(2);
-
-            // is it an xs:gDay?
-            if *cur == b'-' {
-                if typ == XmlSchemaValType::XmlSchemasGmonth {
-                    break 'error;
-                }
-                cur = cur.add(1);
-                ret = _xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
-                if ret != 0 {
-                    break 'error;
-                }
-
-                RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGday);
-
-                break 'error;
-            }
-
-            // it should be an xs:gMonthDay or xs:gMonth
-            ret = _xml_schema_parse_gmonth(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
-            if ret != 0 {
-                break 'error;
-            }
-
-            // a '-' c_char could indicate this type is xs:gMonthDay or
-            // a negative time zone offset. Check for xs:gMonthDay first.
-            // Also the first three c_char's of a negative tzo (-MM:SS) can
-            // appear to be a valid day; so even if the day portion
-            // of the xs:gMonthDay verifies, we must insure it was not
-            // a tzo.
-            if *cur == b'-' {
-                let rewnd: *const XmlChar = cur;
-                cur = cur.add(1);
-
-                ret = _xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
-                if ret == 0 && (*cur == 0 || *cur != b':') {
-                    // we can use the VALID_MDAY macro to validate the month
-                    // and day because the leap year test will flag year zero
-                    // as a leap year (even though zero is an invalid year).
-                    // FUTURE TODO: Zero will become valid in XML Schema 1.1
-                    // probably.
-                    if VALID_MDAY!((addr_of_mut!((*dt).value.date))) {
-                        RETURN_TYPE_IF_VALID!(
-                            cur,
-                            ret,
-                            dt,
-                            typ,
-                            val,
-                            XmlSchemaValType::XmlSchemasGmonthday
-                        );
-
-                        break 'error;
-                    }
-                }
-
-                // not xs:gMonthDay so rewind and check if just xs:gMonth
-                // with an optional time zone.
-                cur = rewnd;
-            }
-
-            RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGmonth);
-
-            break 'error;
+        if date_time.is_null() {
+            return -1;
         }
 
-        // It's a right-truncated date or an xs:time.
-        // Try to parse an xs:time then fallback on right-truncated dates.
-        if *cur >= b'0' && *cur <= b'9' {
-            ret = _xml_schema_parse_time(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
-            if ret == 0 {
-                // it's an xs:time
-                RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasTime);
-            }
-        }
-
-        // fallback on date parsing
-        cur = date_time;
-
-        ret = _xml_schema_parse_gyear(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
-        if ret != 0 {
-            break 'error;
-        }
-
-        // is it an xs:gYear?
-        RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGyear);
-
-        if *cur != b'-' {
-            break 'error;
-        }
-        cur = cur.add(1);
-
-        ret = _xml_schema_parse_gmonth(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
-        if ret != 0 {
-            break 'error;
-        }
-
-        // is it an xs:gYearMonth?
-        RETURN_TYPE_IF_VALID!(
-            cur,
-            ret,
-            dt,
-            typ,
-            val,
-            XmlSchemaValType::XmlSchemasGyearmonth
-        );
-
-        if *cur != b'-' {
-            break 'error;
-        }
-        cur = cur.add(1);
-
-        ret = _xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
-        if ret != 0 || !VALID_DATE!((addr_of_mut!((*dt).value.date))) {
-            break 'error;
-        }
-
-        // is it an xs:date?
-        RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasDate);
-
-        if *cur != b'T' {
-            break 'error;
-        }
-        cur = cur.add(1);
-
-        // it should be an xs:dateTime
-        ret = _xml_schema_parse_time(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
-        if ret != 0 {
-            break 'error;
-        }
-
-        ret = _xml_schema_parse_time_zone(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
         if collapse != 0 {
             while IS_WSP_BLANK_CH!(*cur) {
                 cur = cur.add(1);
             }
         }
-        if ret != 0 || *cur != 0 || !VALID_DATETIME!(addr_of_mut!((*dt).value.date)) {
-            break 'error;
+
+        if *cur != b'-' && *cur < b'0' && *cur > b'9' {
+            return 1;
         }
 
-        (*dt).typ = XmlSchemaValType::XmlSchemasDatetime;
-
-        // done:
-        // #if 1
-        if typ != XmlSchemaValType::XmlSchemasUnknown && typ != (*dt).typ {
-            break 'error;
+        let dt: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasUnknown);
+        if dt.is_null() {
+            return -1;
         }
-        // #else
-        //     /*
-        //      * insure the parsed type is equal to or less significant (right
-        //      * truncated) than the desired type.
-        //      */
-        //     if ((type != XmlSchemaValType::XmlSchemasUnknown) && (type != (*dt).typ)) {
 
-        //         /* time only matches time */
-        //         if ((type == XmlSchemaValType::XML_SCHEMAS_TIME) && ((*dt).typ == XmlSchemaValType::XML_SCHEMAS_TIME))
-        // goto error;
-        //         if ((type == XmlSchemaValType::XML_SCHEMAS_DATETIME) &&
-        //             (((*dt).typ != XmlSchemaValType::XML_SCHEMAS_DATE) ||
-        //              ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEARMONTH) ||
-        //              ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEAR)))
-        // goto error;
+        'error: {
+            if *cur.add(0) == b'-' && *cur.add(1) == b'-' {
+                // It's an incomplete date (xs:gMonthDay, xs:gMonth or xs:gDay)
+                cur = cur.add(2);
 
-        //         if ((type == XmlSchemaValType::XML_SCHEMAS_DATE) &&
-        //             (((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEAR) ||
-        //              ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEARMONTH)))
-        // goto error;
+                // is it an xs:gDay?
+                if *cur == b'-' {
+                    if typ == XmlSchemaValType::XmlSchemasGmonth {
+                        break 'error;
+                    }
+                    cur = cur.add(1);
+                    ret = _xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+                    if ret != 0 {
+                        break 'error;
+                    }
 
-        //         if ((type == XmlSchemaValType::XML_SCHEMAS_GYEARMONTH) && ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEAR))
-        // goto error;
+                    RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGday);
 
-        //         if ((type == XmlSchemaValType::XML_SCHEMAS_GMONTHDAY) && ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GMONTH))
-        // goto error;
-        //     }
-        // #endif
+                    break 'error;
+                }
 
-        if !val.is_null() {
-            *val = dt;
-        } else {
+                // it should be an xs:gMonthDay or xs:gMonth
+                ret = _xml_schema_parse_gmonth(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+                if ret != 0 {
+                    break 'error;
+                }
+
+                // a '-' c_char could indicate this type is xs:gMonthDay or
+                // a negative time zone offset. Check for xs:gMonthDay first.
+                // Also the first three c_char's of a negative tzo (-MM:SS) can
+                // appear to be a valid day; so even if the day portion
+                // of the xs:gMonthDay verifies, we must insure it was not
+                // a tzo.
+                if *cur == b'-' {
+                    let rewnd: *const XmlChar = cur;
+                    cur = cur.add(1);
+
+                    ret = _xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+                    if ret == 0 && (*cur == 0 || *cur != b':') {
+                        // we can use the VALID_MDAY macro to validate the month
+                        // and day because the leap year test will flag year zero
+                        // as a leap year (even though zero is an invalid year).
+                        // FUTURE TODO: Zero will become valid in XML Schema 1.1
+                        // probably.
+                        if VALID_MDAY!((addr_of_mut!((*dt).value.date))) {
+                            RETURN_TYPE_IF_VALID!(
+                                cur,
+                                ret,
+                                dt,
+                                typ,
+                                val,
+                                XmlSchemaValType::XmlSchemasGmonthday
+                            );
+
+                            break 'error;
+                        }
+                    }
+
+                    // not xs:gMonthDay so rewind and check if just xs:gMonth
+                    // with an optional time zone.
+                    cur = rewnd;
+                }
+
+                RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGmonth);
+
+                break 'error;
+            }
+
+            // It's a right-truncated date or an xs:time.
+            // Try to parse an xs:time then fallback on right-truncated dates.
+            if *cur >= b'0' && *cur <= b'9' {
+                ret = _xml_schema_parse_time(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+                if ret == 0 {
+                    // it's an xs:time
+                    RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasTime);
+                }
+            }
+
+            // fallback on date parsing
+            cur = date_time;
+
+            ret = _xml_schema_parse_gyear(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+            if ret != 0 {
+                break 'error;
+            }
+
+            // is it an xs:gYear?
+            RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGyear);
+
+            if *cur != b'-' {
+                break 'error;
+            }
+            cur = cur.add(1);
+
+            ret = _xml_schema_parse_gmonth(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+            if ret != 0 {
+                break 'error;
+            }
+
+            // is it an xs:gYearMonth?
+            RETURN_TYPE_IF_VALID!(
+                cur,
+                ret,
+                dt,
+                typ,
+                val,
+                XmlSchemaValType::XmlSchemasGyearmonth
+            );
+
+            if *cur != b'-' {
+                break 'error;
+            }
+            cur = cur.add(1);
+
+            ret = _xml_schema_parse_gday(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+            if ret != 0 || !VALID_DATE!((addr_of_mut!((*dt).value.date))) {
+                break 'error;
+            }
+
+            // is it an xs:date?
+            RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasDate);
+
+            if *cur != b'T' {
+                break 'error;
+            }
+            cur = cur.add(1);
+
+            // it should be an xs:dateTime
+            ret = _xml_schema_parse_time(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+            if ret != 0 {
+                break 'error;
+            }
+
+            ret = _xml_schema_parse_time_zone(addr_of_mut!((*dt).value.date), addr_of_mut!(cur));
+            if collapse != 0 {
+                while IS_WSP_BLANK_CH!(*cur) {
+                    cur = cur.add(1);
+                }
+            }
+            if ret != 0 || *cur != 0 || !VALID_DATETIME!(addr_of_mut!((*dt).value.date)) {
+                break 'error;
+            }
+
+            (*dt).typ = XmlSchemaValType::XmlSchemasDatetime;
+
+            // done:
+            // #if 1
+            if typ != XmlSchemaValType::XmlSchemasUnknown && typ != (*dt).typ {
+                break 'error;
+            }
+            // #else
+            //     /*
+            //      * insure the parsed type is equal to or less significant (right
+            //      * truncated) than the desired type.
+            //      */
+            //     if ((type != XmlSchemaValType::XmlSchemasUnknown) && (type != (*dt).typ)) {
+
+            //         /* time only matches time */
+            //         if ((type == XmlSchemaValType::XML_SCHEMAS_TIME) && ((*dt).typ == XmlSchemaValType::XML_SCHEMAS_TIME))
+            // goto error;
+            //         if ((type == XmlSchemaValType::XML_SCHEMAS_DATETIME) &&
+            //             (((*dt).typ != XmlSchemaValType::XML_SCHEMAS_DATE) ||
+            //              ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEARMONTH) ||
+            //              ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEAR)))
+            // goto error;
+
+            //         if ((type == XmlSchemaValType::XML_SCHEMAS_DATE) &&
+            //             (((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEAR) ||
+            //              ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEARMONTH)))
+            // goto error;
+
+            //         if ((type == XmlSchemaValType::XML_SCHEMAS_GYEARMONTH) && ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GYEAR))
+            // goto error;
+
+            //         if ((type == XmlSchemaValType::XML_SCHEMAS_GMONTHDAY) && ((*dt).typ != XmlSchemaValType::XML_SCHEMAS_GMONTH))
+            // goto error;
+            //     }
+            // #endif
+
+            if !val.is_null() {
+                *val = dt;
+            } else {
+                xml_schema_free_value(dt);
+            }
+
+            return 0;
+        }
+
+        // error:
+        if !dt.is_null() {
             xml_schema_free_value(dt);
         }
-
-        return 0;
+        1
     }
-
-    // error:
-    if !dt.is_null() {
-        xml_schema_free_value(dt);
-    }
-    1
 }
 
 /// Check that @duration conforms to the lexical space of the duration type.
@@ -1643,189 +1676,191 @@ unsafe fn xml_schema_validate_duration(
     val: *mut XmlSchemaValPtr,
     collapse: i32,
 ) -> i32 {
-    let mut cur: *const XmlChar = duration;
-    let mut isneg: i32 = 0;
-    let mut seq: usize = 0;
-    let mut days: i64;
-    let mut secs: i64 = 0;
-    let mut sec_frac: f64 = 0.0;
+    unsafe {
+        let mut cur: *const XmlChar = duration;
+        let mut isneg: i32 = 0;
+        let mut seq: usize = 0;
+        let mut days: i64;
+        let mut secs: i64 = 0;
+        let mut sec_frac: f64 = 0.0;
 
-    if duration.is_null() {
-        return -1;
-    }
+        if duration.is_null() {
+            return -1;
+        }
 
-    if collapse != 0 {
-        while IS_WSP_BLANK_CH!(*cur) {
+        if collapse != 0 {
+            while IS_WSP_BLANK_CH!(*cur) {
+                cur = cur.add(1);
+            }
+        }
+
+        if *cur == b'-' {
+            isneg = 1;
             cur = cur.add(1);
         }
-    }
 
-    if *cur == b'-' {
-        isneg = 1;
+        // duration must start with 'P' (after sign)
+        let f = *cur != b'P';
         cur = cur.add(1);
-    }
+        if f {
+            return 1;
+        }
 
-    // duration must start with 'P' (after sign)
-    let f = *cur != b'P';
-    cur = cur.add(1);
-    if f {
-        return 1;
-    }
+        if *cur == 0 {
+            return 1;
+        }
 
-    if *cur == 0 {
-        return 1;
-    }
+        let dur: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasDuration);
+        if dur.is_null() {
+            return -1;
+        }
 
-    let dur: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasDuration);
-    if dur.is_null() {
-        return -1;
-    }
+        'error: {
+            while *cur != 0 {
+                let mut num: i64 = 0;
+                let mut has_digits: usize = 0;
+                let mut has_frac: i32 = 0;
+                let desig: &[XmlChar] = b"YMDHMS";
 
-    'error: {
-        while *cur != 0 {
-            let mut num: i64 = 0;
-            let mut has_digits: usize = 0;
-            let mut has_frac: i32 = 0;
-            let desig: &[XmlChar] = b"YMDHMS";
-
-            // input string should be empty or invalid date/time item
-            if seq >= desig.len() {
-                break 'error;
-            }
-
-            // T designator must be present for time items
-            if *cur == b'T' {
-                if seq > 3 {
+                // input string should be empty or invalid date/time item
+                if seq >= desig.len() {
                     break 'error;
                 }
-                cur = cur.add(1);
-                seq = 3;
-            } else if seq == 3 {
-                break 'error;
-            }
 
-            // Parse integral part.
-            while *cur >= b'0' && *cur <= b'9' {
-                let digit: i64 = (*cur - b'0') as _;
-
-                if num > i64::MAX / 10 {
+                // T designator must be present for time items
+                if *cur == b'T' {
+                    if seq > 3 {
+                        break 'error;
+                    }
+                    cur = cur.add(1);
+                    seq = 3;
+                } else if seq == 3 {
                     break 'error;
                 }
-                num *= 10;
-                if num > i64::MAX - digit {
-                    break 'error;
-                }
-                num += digit;
 
-                has_digits = 1;
-                cur = cur.add(1);
-            }
-
-            if *cur == b'.' {
-                // Parse fractional part.
-                let mut mult: f64 = 1.0;
-                cur = cur.add(1);
-                has_frac = 1;
+                // Parse integral part.
                 while *cur >= b'0' && *cur <= b'9' {
-                    mult /= 10.0;
-                    sec_frac += (*cur - b'0') as f64 * mult;
+                    let digit: i64 = (*cur - b'0') as _;
+
+                    if num > i64::MAX / 10 {
+                        break 'error;
+                    }
+                    num *= 10;
+                    if num > i64::MAX - digit {
+                        break 'error;
+                    }
+                    num += digit;
+
                     has_digits = 1;
                     cur = cur.add(1);
                 }
-            }
 
-            while *cur != desig[seq] {
-                seq += 1;
-                // No T designator or invalid c_char.
-                if seq == 3 || seq == desig.len() {
+                if *cur == b'.' {
+                    // Parse fractional part.
+                    let mut mult: f64 = 1.0;
+                    cur = cur.add(1);
+                    has_frac = 1;
+                    while *cur >= b'0' && *cur <= b'9' {
+                        mult /= 10.0;
+                        sec_frac += (*cur - b'0') as f64 * mult;
+                        has_digits = 1;
+                        cur = cur.add(1);
+                    }
+                }
+
+                while *cur != desig[seq] {
+                    seq += 1;
+                    // No T designator or invalid c_char.
+                    if seq == 3 || seq == desig.len() {
+                        break 'error;
+                    }
+                }
+                cur = cur.add(1);
+
+                if has_digits == 0 || (has_frac != 0 && seq != 5) {
                     break 'error;
                 }
-            }
-            cur = cur.add(1);
 
-            if has_digits == 0 || (has_frac != 0 && seq != 5) {
+                match seq {
+                    0 => {
+                        // Year
+                        if num > i64::MAX / 12 {
+                            break 'error;
+                        }
+                        (*dur).value.dur.mon = num * 12;
+                    }
+                    1 => {
+                        // Month
+                        if (*dur).value.dur.mon > i64::MAX - num {
+                            break 'error;
+                        }
+                        (*dur).value.dur.mon += num;
+                    }
+                    2 => {
+                        // Day
+                        (*dur).value.dur.day = num;
+                    }
+                    3 => {
+                        // Hour
+                        days = num / HOURS_PER_DAY as i64;
+                        if (*dur).value.dur.day > i64::MAX - days {
+                            break 'error;
+                        }
+                        (*dur).value.dur.day += days;
+                        secs = (num % HOURS_PER_DAY as i64) * SECS_PER_HOUR as i64;
+                    }
+                    4 => {
+                        // Minute
+                        days = num / MINS_PER_DAY as i64;
+                        if (*dur).value.dur.day > i64::MAX - days {
+                            break 'error;
+                        }
+                        (*dur).value.dur.day += days;
+                        secs += (num % MINS_PER_DAY as i64) * SECS_PER_MIN as i64;
+                    }
+                    5 => {
+                        // Second
+                        days = num / SECS_PER_DAY as i64;
+                        if (*dur).value.dur.day > i64::MAX - days {
+                            break 'error;
+                        }
+                        (*dur).value.dur.day += days;
+                        secs += num % SECS_PER_DAY as i64;
+                    }
+                    _ => {}
+                }
+
+                seq += 1;
+            }
+
+            days = secs / SECS_PER_DAY as i64;
+            if (*dur).value.dur.day > i64::MAX - days {
                 break 'error;
             }
+            (*dur).value.dur.day += days;
+            (*dur).value.dur.sec = (secs % SECS_PER_DAY as i64) as f64 + sec_frac;
 
-            match seq {
-                0 => {
-                    // Year
-                    if num > i64::MAX / 12 {
-                        break 'error;
-                    }
-                    (*dur).value.dur.mon = num * 12;
-                }
-                1 => {
-                    // Month
-                    if (*dur).value.dur.mon > i64::MAX - num {
-                        break 'error;
-                    }
-                    (*dur).value.dur.mon += num;
-                }
-                2 => {
-                    // Day
-                    (*dur).value.dur.day = num;
-                }
-                3 => {
-                    // Hour
-                    days = num / HOURS_PER_DAY as i64;
-                    if (*dur).value.dur.day > i64::MAX - days {
-                        break 'error;
-                    }
-                    (*dur).value.dur.day += days;
-                    secs = (num % HOURS_PER_DAY as i64) * SECS_PER_HOUR as i64;
-                }
-                4 => {
-                    // Minute
-                    days = num / MINS_PER_DAY as i64;
-                    if (*dur).value.dur.day > i64::MAX - days {
-                        break 'error;
-                    }
-                    (*dur).value.dur.day += days;
-                    secs += (num % MINS_PER_DAY as i64) * SECS_PER_MIN as i64;
-                }
-                5 => {
-                    // Second
-                    days = num / SECS_PER_DAY as i64;
-                    if (*dur).value.dur.day > i64::MAX - days {
-                        break 'error;
-                    }
-                    (*dur).value.dur.day += days;
-                    secs += num % SECS_PER_DAY as i64;
-                }
-                _ => {}
+            if isneg != 0 {
+                (*dur).value.dur.mon = -(*dur).value.dur.mon;
+                (*dur).value.dur.day = -(*dur).value.dur.day;
+                (*dur).value.dur.sec = -(*dur).value.dur.sec;
             }
 
-            seq += 1;
+            if !val.is_null() {
+                *val = dur;
+            } else {
+                xml_schema_free_value(dur);
+            }
+
+            return 0;
         }
 
-        days = secs / SECS_PER_DAY as i64;
-        if (*dur).value.dur.day > i64::MAX - days {
-            break 'error;
-        }
-        (*dur).value.dur.day += days;
-        (*dur).value.dur.sec = (secs % SECS_PER_DAY as i64) as f64 + sec_frac;
-
-        if isneg != 0 {
-            (*dur).value.dur.mon = -(*dur).value.dur.mon;
-            (*dur).value.dur.day = -(*dur).value.dur.day;
-            (*dur).value.dur.sec = -(*dur).value.dur.sec;
-        }
-
-        if !val.is_null() {
-            *val = dur;
-        } else {
+        // error:
+        if !dur.is_null() {
             xml_schema_free_value(dur);
         }
-
-        return 0;
+        1
     }
-
-    // error:
-    if !dur.is_null() {
-        xml_schema_free_value(dur);
-    }
-    1
 }
 
 /// Check that a value conforms to the lexical space of the language datatype.
@@ -1834,38 +1869,40 @@ unsafe fn xml_schema_validate_duration(
 /// Returns 1 if this validates, 0 otherwise.
 #[doc(alias = "xmlSchemaCheckLanguageType")]
 unsafe fn xml_schema_check_language_type(value: *const XmlChar) -> i32 {
-    let mut first: i32 = 1;
-    let mut len: i32 = 0;
-    let mut cur: *const XmlChar = value;
+    unsafe {
+        let mut first: i32 = 1;
+        let mut len: i32 = 0;
+        let mut cur: *const XmlChar = value;
 
-    if value.is_null() {
-        return 0;
-    }
-
-    while *cur.add(0) != 0 {
-        if !((*cur.add(0) >= b'a' && *cur.add(0) <= b'z')
-            || (*cur.add(0) >= b'A' && *cur.add(0) <= b'Z')
-            || *cur.add(0) == b'-'
-            || (first == 0 && xml_is_digit(*cur.add(0) as u32)))
-        {
+        if value.is_null() {
             return 0;
         }
-        if *cur.add(0) == b'-' {
-            if !(1..=8).contains(&len) {
+
+        while *cur.add(0) != 0 {
+            if !((*cur.add(0) >= b'a' && *cur.add(0) <= b'z')
+                || (*cur.add(0) >= b'A' && *cur.add(0) <= b'Z')
+                || *cur.add(0) == b'-'
+                || (first == 0 && xml_is_digit(*cur.add(0) as u32)))
+            {
                 return 0;
             }
-            len = 0;
-            first = 0;
-        } else {
-            len += 1;
+            if *cur.add(0) == b'-' {
+                if !(1..=8).contains(&len) {
+                    return 0;
+                }
+                len = 0;
+                first = 0;
+            } else {
+                len += 1;
+            }
+            cur = cur.add(1);
         }
-        cur = cur.add(1);
-    }
-    if !(1..=8).contains(&len) {
-        return 0;
-    }
+        if !(1..=8).contains(&len) {
+            return 0;
+        }
 
-    1
+        1
+    }
 }
 
 /// Check that a value conforms to the lexical space of the predefined
@@ -1879,72 +1916,74 @@ unsafe fn xml_schema_val_atomic_list_node(
     ret: *mut XmlSchemaValPtr,
     node: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    let mut cur: *mut XmlChar;
-    let mut nb_values: i32 = 0;
-    let mut tmp: i32 = 0;
+    unsafe {
+        let mut cur: *mut XmlChar;
+        let mut nb_values: i32 = 0;
+        let mut tmp: i32 = 0;
 
-    if value.is_null() {
-        return -1;
-    }
-    let val: *mut XmlChar = xml_strdup(value);
-    if val.is_null() {
-        return -1;
-    }
-    if !ret.is_null() {
-        *ret = null_mut();
-    }
-    cur = val;
-    // Split the list
-    while xml_is_blank_char(*cur as u32) {
-        *cur = 0;
-        cur = cur.add(1);
-    }
-    while *cur != 0 {
-        if xml_is_blank_char(*cur as u32) {
+        if value.is_null() {
+            return -1;
+        }
+        let val: *mut XmlChar = xml_strdup(value);
+        if val.is_null() {
+            return -1;
+        }
+        if !ret.is_null() {
+            *ret = null_mut();
+        }
+        cur = val;
+        // Split the list
+        while xml_is_blank_char(*cur as u32) {
             *cur = 0;
             cur = cur.add(1);
-            while xml_is_blank_char(*cur as u32) {
-                *cur = 0;
-                cur = cur.add(1);
-            }
-        } else {
-            nb_values += 1;
-            cur = cur.add(1);
-            while *cur != 0 && !xml_is_blank_char(*cur as u32) {
-                cur = cur.add(1);
-            }
-        }
-    }
-    if nb_values == 0 {
-        xml_free(val as _);
-        return nb_values;
-    }
-    let endval: *mut XmlChar = cur;
-    cur = val;
-    while *cur == 0 && cur != endval {
-        cur = cur.add(1);
-    }
-    while cur != endval {
-        tmp = xml_schema_val_predef_type_node(typ, cur, null_mut(), node);
-        if tmp != 0 {
-            break;
         }
         while *cur != 0 {
-            cur = cur.add(1);
+            if xml_is_blank_char(*cur as u32) {
+                *cur = 0;
+                cur = cur.add(1);
+                while xml_is_blank_char(*cur as u32) {
+                    *cur = 0;
+                    cur = cur.add(1);
+                }
+            } else {
+                nb_values += 1;
+                cur = cur.add(1);
+                while *cur != 0 && !xml_is_blank_char(*cur as u32) {
+                    cur = cur.add(1);
+                }
+            }
         }
+        if nb_values == 0 {
+            xml_free(val as _);
+            return nb_values;
+        }
+        let endval: *mut XmlChar = cur;
+        cur = val;
         while *cur == 0 && cur != endval {
             cur = cur.add(1);
         }
+        while cur != endval {
+            tmp = xml_schema_val_predef_type_node(typ, cur, null_mut(), node);
+            if tmp != 0 {
+                break;
+            }
+            while *cur != 0 {
+                cur = cur.add(1);
+            }
+            while *cur == 0 && cur != endval {
+                cur = cur.add(1);
+            }
+        }
+        /* TODO what return value ? c.f. bug #158628
+        if !ret.is_null() {
+        TODO
+        } */
+        xml_free(val as _);
+        if tmp == 0 {
+            return nb_values;
+        }
+        -1
     }
-    /* TODO what return value ? c.f. bug #158628
-    if !ret.is_null() {
-    TODO
-    } */
-    xml_free(val as _);
-    if tmp == 0 {
-        return nb_values;
-    }
-    -1
 }
 
 /// Removes the leading and ending spaces of a string
@@ -1952,29 +1991,31 @@ unsafe fn xml_schema_val_atomic_list_node(
 /// Returns the new string or NULL if no change was required.
 #[doc(alias = "xmlSchemaStrip")]
 unsafe fn xml_schema_strip(value: *const XmlChar) -> *mut XmlChar {
-    let mut start: *const XmlChar = value;
-    let mut end: *const XmlChar;
+    unsafe {
+        let mut start: *const XmlChar = value;
+        let mut end: *const XmlChar;
 
-    if value.is_null() {
-        return null_mut();
-    }
-    while *start != 0 && xml_is_blank_char(*start as u32) {
-        start = start.add(1);
-    }
-    end = start;
-    while *end != 0 {
-        end = end.add(1);
-    }
-    let f: *const XmlChar = end;
-    end = end.sub(1);
-    while end > start && xml_is_blank_char(*end as u32) {
+        if value.is_null() {
+            return null_mut();
+        }
+        while *start != 0 && xml_is_blank_char(*start as u32) {
+            start = start.add(1);
+        }
+        end = start;
+        while *end != 0 {
+            end = end.add(1);
+        }
+        let f: *const XmlChar = end;
         end = end.sub(1);
+        while end > start && xml_is_blank_char(*end as u32) {
+            end = end.sub(1);
+        }
+        end = end.add(1);
+        if start == value && f == end {
+            return null_mut();
+        }
+        xml_strndup(start, end.offset_from(start) as _)
     }
-    end = end.add(1);
-    if start == value && f == end {
-        return null_mut();
-    }
-    xml_strndup(start, end.offset_from(start) as _)
 }
 
 /// Converts a base64 encoded character to its base 64 value.
@@ -2018,71 +2059,72 @@ unsafe fn xml_schema_val_atomic_type(
     apply_norm: i32,
     create_string_value: i32,
 ) -> i32 {
-    let v: XmlSchemaValPtr;
-    let mut norm: *mut XmlChar = null_mut();
-    let mut ret: i32;
+    unsafe {
+        let v: XmlSchemaValPtr;
+        let mut norm: *mut XmlChar = null_mut();
+        let mut ret: i32;
 
-    if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
-        return -1;
-    }
-    if typ.is_null() {
-        return -1;
-    }
-
-    // validating a non existent text node is similar to validating
-    // an empty one.
-    if value.is_null() {
-        value = c"".as_ptr() as _;
-    }
-
-    if !val.is_null() {
-        *val = null_mut();
-    }
-    if flags == 0
-        && !value.is_null()
-        && ((*typ).built_in_type != XmlSchemaValType::XmlSchemasString as i32
-            && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnytype as i32
-            && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnysimpletype as i32)
-    {
-        if (*typ).built_in_type == XmlSchemaValType::XmlSchemasNormstring as i32 {
-            norm = xml_schema_white_space_replace(value);
-        } else {
-            norm = xml_schema_collapse_string(value);
+        if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
+            return -1;
         }
-        if !norm.is_null() {
-            value = norm;
+        if typ.is_null() {
+            return -1;
         }
-    }
 
-    'error: {
-        'return0: {
-            'return1: {
-                'return3: {
-                    'done: {
-                        match XmlSchemaValType::try_from((*typ).built_in_type).unwrap() {
-                            XmlSchemaValType::XmlSchemasUnknown => {
-                                break 'error;
-                            }
-                            XmlSchemaValType::XmlSchemasAnytype
-                            | XmlSchemaValType::XmlSchemasAnysimpletype => {
-                                if create_string_value != 0 && !val.is_null() {
-                                    v = xml_schema_new_value(
-                                        XmlSchemaValType::XmlSchemasAnysimpletype,
-                                    );
-                                    if !v.is_null() {
-                                        (*v).value.str = xml_strdup(value as _) as _;
-                                        *val = v;
-                                    } else {
-                                        break 'error;
-                                    }
+        // validating a non existent text node is similar to validating
+        // an empty one.
+        if value.is_null() {
+            value = c"".as_ptr() as _;
+        }
+
+        if !val.is_null() {
+            *val = null_mut();
+        }
+        if flags == 0
+            && !value.is_null()
+            && ((*typ).built_in_type != XmlSchemaValType::XmlSchemasString as i32
+                && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnytype as i32
+                && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnysimpletype as i32)
+        {
+            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasNormstring as i32 {
+                norm = xml_schema_white_space_replace(value);
+            } else {
+                norm = xml_schema_collapse_string(value);
+            }
+            if !norm.is_null() {
+                value = norm;
+            }
+        }
+
+        'error: {
+            'return0: {
+                'return1: {
+                    'return3: {
+                        'done: {
+                            match XmlSchemaValType::try_from((*typ).built_in_type).unwrap() {
+                                XmlSchemaValType::XmlSchemasUnknown => {
+                                    break 'error;
                                 }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasString => {
-                                if norm_on_the_fly == 0 {
-                                    let mut cur: *const XmlChar = value;
+                                XmlSchemaValType::XmlSchemasAnytype
+                                | XmlSchemaValType::XmlSchemasAnysimpletype => {
+                                    if create_string_value != 0 && !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            XmlSchemaValType::XmlSchemasAnysimpletype,
+                                        );
+                                        if !v.is_null() {
+                                            (*v).value.str = xml_strdup(value as _) as _;
+                                            *val = v;
+                                        } else {
+                                            break 'error;
+                                        }
+                                    }
+                                    break 'return0;
+                                }
+                                XmlSchemaValType::XmlSchemasString => {
+                                    if norm_on_the_fly == 0 {
+                                        let mut cur: *const XmlChar = value;
 
-                                    if ws
+                                        if ws
                                         == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace
                                     {
                                         while *cur != 0 {
@@ -2108,10 +2150,10 @@ unsafe fn xml_schema_val_atomic_type(
                                             }
                                         }
                                     }
-                                }
-                                if create_string_value != 0 && !val.is_null() {
-                                    if apply_norm != 0 {
-                                        if ws
+                                    }
+                                    if create_string_value != 0 && !val.is_null() {
+                                        if apply_norm != 0 {
+                                            if ws
                                         == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
                                     {
                                         norm = xml_schema_collapse_string(value);
@@ -2120,684 +2162,753 @@ unsafe fn xml_schema_val_atomic_type(
                                     {
                                         norm = xml_schema_white_space_replace(value);
                                     }
-                                        if !norm.is_null() {
-                                            value = norm;
+                                            if !norm.is_null() {
+                                                value = norm;
+                                            }
+                                        }
+                                        v = xml_schema_new_value(
+                                            XmlSchemaValType::XmlSchemasString,
+                                        );
+                                        if !v.is_null() {
+                                            (*v).value.str = xml_strdup(value);
+                                            *val = v;
+                                        } else {
+                                            break 'error;
                                         }
                                     }
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasString);
-                                    if !v.is_null() {
-                                        (*v).value.str = xml_strdup(value);
-                                        *val = v;
-                                    } else {
-                                        break 'error;
-                                    }
+                                    break 'return0;
                                 }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasNormstring => {
-                                if norm_on_the_fly != 0 {
-                                    if apply_norm != 0 {
-                                        if ws
+                                XmlSchemaValType::XmlSchemasNormstring => {
+                                    if norm_on_the_fly != 0 {
+                                        if apply_norm != 0 {
+                                            if ws
                                         == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
                                     {
                                         norm = xml_schema_collapse_string(value);
                                     } else {
                                         norm = xml_schema_white_space_replace(value);
                                     }
+                                            if !norm.is_null() {
+                                                value = norm;
+                                            }
+                                        }
+                                    } else {
+                                        let mut cur: *const XmlChar = value;
+                                        while *cur != 0 {
+                                            if *cur == 0xd || *cur == 0xa || *cur == 0x9 {
+                                                break 'return1;
+                                            } else {
+                                                cur = cur.add(1);
+                                            }
+                                        }
+                                    }
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            XmlSchemaValType::XmlSchemasNormstring,
+                                        );
+                                        if !v.is_null() {
+                                            (*v).value.str = xml_strdup(value);
+                                            *val = v;
+                                        } else {
+                                            break 'error;
+                                        }
+                                    }
+                                    break 'return0;
+                                }
+                                XmlSchemaValType::XmlSchemasDecimal => {
+                                    let mut cur: *const XmlChar = value;
+                                    let mut len: u32;
+                                    let mut neg: u32;
+                                    let mut integ: u32;
+                                    let mut has_leading_zeroes: u32;
+                                    let mut cval: [XmlChar; 25] = [0; 25];
+                                    let mut cptr: *mut XmlChar = cval.as_mut_ptr();
+
+                                    if cur.is_null() || *cur == 0 {
+                                        break 'return1;
+                                    }
+
+                                    // xs:decimal has a whitespace-facet value of 'collapse'.
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+
+                                    // First we handle an optional sign.
+                                    neg = 0;
+                                    if *cur == b'-' {
+                                        neg = 1;
+                                        cur = cur.add(1);
+                                    } else if *cur == b'+' {
+                                        cur = cur.add(1);
+                                    }
+                                    // Disallow: "", "-", "- "
+                                    if *cur == 0 {
+                                        break 'return1;
+                                    }
+                                    // Next we "pre-parse" the number, in preparation for calling
+                                    // the common routine xmlSchemaParseUInt.  We get rid of any
+                                    // leading zeroes (because we have reserved only 25 chars),
+                                    // and note the position of a decimal point.
+                                    len = 0;
+                                    integ = !0;
+                                    has_leading_zeroes = 0;
+                                    // Skip leading zeroes.
+                                    while *cur == b'0' {
+                                        cur = cur.add(1);
+                                        has_leading_zeroes = 1;
+                                    }
+                                    if *cur != 0 {
+                                        loop {
+                                            if *cur >= b'0' && *cur <= b'9' {
+                                                *cptr = *cur;
+                                                cptr = cptr.add(1);
+                                                cur = cur.add(1);
+                                                len += 1;
+                                            } else if *cur == b'.' {
+                                                cur = cur.add(1);
+                                                integ = len;
+                                                loop {
+                                                    if *cur >= b'0' && *cur <= b'9' {
+                                                        *cptr = *cur;
+                                                        cptr = cptr.add(1);
+                                                        cur = cur.add(1);
+                                                        len += 1;
+                                                    } else {
+                                                        break;
+                                                    }
+
+                                                    if len >= 24 {
+                                                        break;
+                                                    }
+                                                }
+                                                // Disallow "." but allow "00."
+                                                if len == 0 && has_leading_zeroes == 0 {
+                                                    break 'return1;
+                                                }
+                                                break;
+                                            } else {
+                                                break;
+                                            }
+
+                                            if len >= 24 {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+                                    if *cur != 0 {
+                                        break 'return1;
+                                        // error if any extraneous chars
+                                    }
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            XmlSchemaValType::XmlSchemasDecimal,
+                                        );
+                                        if !v.is_null() {
+                                            // Now evaluate the significant digits of the number
+                                            if len != 0 {
+                                                if integ != !0 {
+                                                    // Get rid of trailing zeroes in the
+                                                    // fractional part.
+                                                    while len != integ && *cptr.sub(1) == b'0' {
+                                                        cptr = cptr.sub(1);
+                                                        len = len.wrapping_sub(1);
+                                                    }
+                                                }
+                                                // Terminate the (preparsed) string.
+                                                if len != 0 {
+                                                    *cptr = 0;
+                                                    cptr = cval.as_mut_ptr();
+
+                                                    xml_schema_parse_uint(
+                                                        addr_of_mut!(cptr) as _,
+                                                        addr_of_mut!((*v).value.decimal.lo),
+                                                        addr_of_mut!((*v).value.decimal.mi),
+                                                        addr_of_mut!((*v).value.decimal.hi),
+                                                    );
+                                                }
+                                            }
+                                            // Set the total digits to 1 if a zero value.
+                                            (*v).value.decimal.sign = neg;
+                                            if len == 0 {
+                                                // Speedup for zero values.
+                                                (*v).value.decimal.total = 1;
+                                            } else {
+                                                (*v).value.decimal.total = len;
+                                                if integ == !0 {
+                                                    (*v).value.decimal.frac = 0;
+                                                } else {
+                                                    (*v).value.decimal.frac = len - integ;
+                                                }
+                                            }
+                                            *val = v;
+                                        }
+                                    }
+                                    break 'return0;
+                                }
+                                XmlSchemaValType::XmlSchemasTime
+                                | XmlSchemaValType::XmlSchemasGday
+                                | XmlSchemaValType::XmlSchemasGmonth
+                                | XmlSchemaValType::XmlSchemasGmonthday
+                                | XmlSchemaValType::XmlSchemasGyear
+                                | XmlSchemaValType::XmlSchemasGyearmonth
+                                | XmlSchemaValType::XmlSchemasDate
+                                | XmlSchemaValType::XmlSchemasDatetime => {
+                                    ret = xml_schema_validate_dates(
+                                        (*typ).built_in_type.try_into().unwrap(),
+                                        value,
+                                        val,
+                                        norm_on_the_fly,
+                                    );
+                                }
+                                XmlSchemaValType::XmlSchemasDuration => {
+                                    ret = xml_schema_validate_duration(
+                                        typ,
+                                        value,
+                                        val,
+                                        norm_on_the_fly,
+                                    );
+                                }
+                                XmlSchemaValType::XmlSchemasFloat
+                                | XmlSchemaValType::XmlSchemasDouble => {
+                                    let mut cur: *const XmlChar = value;
+                                    let mut neg: i32 = 0;
+                                    let mut digits_before: i32 = 0;
+                                    let mut digits_after: i32 = 0;
+
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+
+                                    if *cur.add(0) == b'N'
+                                        && *cur.add(1) == b'a'
+                                        && *cur.add(2) == b'N'
+                                    {
+                                        cur = cur.add(3);
+                                        if *cur != 0 {
+                                            break 'return1;
+                                        }
+                                        if !val.is_null() {
+                                            if typ == XML_SCHEMA_TYPE_FLOAT_DEF.get() {
+                                                v = xml_schema_new_value(
+                                                    XmlSchemaValType::XmlSchemasFloat,
+                                                );
+                                                if !v.is_null() {
+                                                    (*v).value.f = XML_XPATH_NAN as f32;
+                                                } else {
+                                                    xml_schema_free_value(v);
+                                                    break 'error;
+                                                }
+                                            } else {
+                                                v = xml_schema_new_value(
+                                                    XmlSchemaValType::XmlSchemasDouble,
+                                                );
+                                                if !v.is_null() {
+                                                    (*v).value.d = XML_XPATH_NAN;
+                                                } else {
+                                                    xml_schema_free_value(v);
+                                                    break 'error;
+                                                }
+                                            }
+                                            *val = v;
+                                        }
+                                        break 'return0;
+                                    }
+                                    if *cur == b'-' {
+                                        neg = 1;
+                                        cur = cur.add(1);
+                                    }
+                                    if *cur.add(0) == b'I'
+                                        && *cur.add(1) == b'N'
+                                        && *cur.add(2) == b'F'
+                                    {
+                                        cur = cur.add(3);
+                                        if *cur != 0 {
+                                            break 'return1;
+                                        }
+                                        if !val.is_null() {
+                                            if typ == XML_SCHEMA_TYPE_FLOAT_DEF.get() {
+                                                v = xml_schema_new_value(
+                                                    XmlSchemaValType::XmlSchemasFloat,
+                                                );
+                                                if !v.is_null() {
+                                                    if neg != 0 {
+                                                        (*v).value.f = XML_XPATH_NINF as f32;
+                                                    } else {
+                                                        (*v).value.f = XML_XPATH_PINF as f32;
+                                                    }
+                                                } else {
+                                                    xml_schema_free_value(v);
+                                                    break 'error;
+                                                }
+                                            } else {
+                                                v = xml_schema_new_value(
+                                                    XmlSchemaValType::XmlSchemasDouble,
+                                                );
+                                                if !v.is_null() {
+                                                    if neg != 0 {
+                                                        (*v).value.d = XML_XPATH_NINF;
+                                                    } else {
+                                                        (*v).value.d = XML_XPATH_PINF;
+                                                    }
+                                                } else {
+                                                    xml_schema_free_value(v);
+                                                    break 'error;
+                                                }
+                                            }
+                                            *val = v;
+                                        }
+                                        break 'return0;
+                                    }
+                                    if neg == 0 && *cur == b'+' {
+                                        cur = cur.add(1);
+                                    }
+                                    if *cur.add(0) == 0
+                                        || *cur.add(0) == b'+'
+                                        || *cur.add(0) == b'-'
+                                    {
+                                        break 'return1;
+                                    }
+                                    while *cur >= b'0' && *cur <= b'9' {
+                                        cur = cur.add(1);
+                                        digits_before += 1;
+                                    }
+                                    if *cur == b'.' {
+                                        cur = cur.add(1);
+                                        while *cur >= b'0' && *cur <= b'9' {
+                                            cur = cur.add(1);
+                                            digits_after += 1;
+                                        }
+                                    }
+                                    if digits_before == 0 && digits_after == 0 {
+                                        break 'return1;
+                                    }
+                                    if *cur == b'e' || *cur == b'E' {
+                                        cur = cur.add(1);
+                                        if *cur == b'-' || *cur == b'+' {
+                                            cur = cur.add(1);
+                                        }
+                                        while *cur >= b'0' && *cur <= b'9' {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+
+                                    if *cur != 0 {
+                                        break 'return1;
+                                    }
+                                    if !val.is_null() {
+                                        if typ == XML_SCHEMA_TYPE_FLOAT_DEF.get() {
+                                            v = xml_schema_new_value(
+                                                XmlSchemaValType::XmlSchemasFloat,
+                                            );
+                                            if !v.is_null() {
+                                                // TODO: sscanf seems not to give the correct
+                                                // value for extremely high/low values.
+                                                // E.g. "1E-149" results in zero.
+                                                if sscanf(
+                                                    value as _,
+                                                    c"%f".as_ptr() as _,
+                                                    addr_of_mut!((*v).value.f),
+                                                ) == 1
+                                                {
+                                                    *val = v;
+                                                } else {
+                                                    xml_schema_free_value(v);
+                                                    break 'return1;
+                                                }
+                                            } else {
+                                                break 'error;
+                                            }
+                                        } else {
+                                            v = xml_schema_new_value(
+                                                XmlSchemaValType::XmlSchemasDouble,
+                                            );
+                                            if !v.is_null() {
+                                                // TODO: sscanf seems not to give the correct
+                                                // value for extremely high/low values.
+                                                if sscanf(
+                                                    value as _,
+                                                    c"%lf".as_ptr() as _,
+                                                    addr_of_mut!((*v).value.d),
+                                                ) == 1
+                                                {
+                                                    *val = v;
+                                                } else {
+                                                    xml_schema_free_value(v);
+                                                    break 'return1;
+                                                }
+                                            } else {
+                                                break 'error;
+                                            }
+                                        }
+                                    }
+                                    break 'return0;
+                                }
+                                XmlSchemaValType::XmlSchemasBoolean => {
+                                    let mut cur: *const XmlChar = value;
+
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                        if *cur == b'0' {
+                                            ret = 0;
+                                            cur = cur.add(1);
+                                        } else if *cur == b'1' {
+                                            ret = 1;
+                                            cur = cur.add(1);
+                                        } else if *cur == b't' {
+                                            cur = cur.add(1);
+                                            if {
+                                                let f = *cur == b'r';
+                                                cur = cur.add(1);
+                                                f
+                                            } && {
+                                                let f = *cur == b'u';
+                                                cur = cur.add(1);
+                                                f
+                                            } && {
+                                                let f = *cur == b'e';
+                                                cur = cur.add(1);
+                                                f
+                                            } {
+                                                ret = 1;
+                                            } else {
+                                                break 'return1;
+                                            }
+                                        } else if *cur == b'f' {
+                                            cur = cur.add(1);
+                                            if {
+                                                let f = *cur == b'a';
+                                                cur = cur.add(1);
+                                                f
+                                            } && {
+                                                let f = *cur == b'l';
+                                                cur = cur.add(1);
+                                                f
+                                            } && {
+                                                let f = *cur == b's';
+                                                cur = cur.add(1);
+                                                f
+                                            } && {
+                                                let f = *cur == b'e';
+                                                cur = cur.add(1);
+                                                f
+                                            } {
+                                                ret = 0;
+                                            } else {
+                                                break 'return1;
+                                            }
+                                        } else {
+                                            break 'return1;
+                                        }
+                                        if *cur != 0 {
+                                            while IS_WSP_BLANK_CH!(*cur) {
+                                                cur = cur.add(1);
+                                            }
+                                            if *cur != 0 {
+                                                break 'return1;
+                                            }
+                                        }
+                                    } else if *cur.add(0) == b'0' && *cur.add(1) == 0 {
+                                        ret = 0;
+                                    } else if (*cur.add(0) == b'1' && *cur.add(1) == 0)
+                                        || (*cur.add(0) == b't'
+                                            && *cur.add(1) == b'r'
+                                            && *cur.add(2) == b'u'
+                                            && *cur.add(3) == b'e'
+                                            && *cur.add(4) == 0)
+                                    {
+                                        ret = 1;
+                                    } else if *cur.add(0) == b'f'
+                                        && *cur.add(1) == b'a'
+                                        && *cur.add(2) == b'l'
+                                        && *cur.add(3) == b's'
+                                        && *cur.add(4) == b'e'
+                                        && *cur.add(5) == 0
+                                    {
+                                        ret = 0;
+                                    } else {
+                                        break 'return1;
+                                    }
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            XmlSchemaValType::XmlSchemasBoolean,
+                                        );
+                                        if !v.is_null() {
+                                            (*v).value.b = ret;
+                                            *val = v;
+                                        } else {
+                                            break 'error;
+                                        }
+                                    }
+                                    break 'return0;
+                                }
+                                XmlSchemaValType::XmlSchemasToken => {
+                                    let mut cur: *const XmlChar = value;
+
+                                    if norm_on_the_fly == 0 {
+                                        while *cur != 0 {
+                                            if *cur == 0xd || *cur == 0xa || *cur == 0x9 {
+                                                break 'return1;
+                                            } else if *cur == b' ' {
+                                                cur = cur.add(1);
+                                                if *cur == 0 {
+                                                    break 'return1;
+                                                }
+                                                if *cur == b' ' {
+                                                    break 'return1;
+                                                }
+                                            } else {
+                                                cur = cur.add(1);
+                                            }
+                                        }
+                                    }
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(XmlSchemaValType::XmlSchemasToken);
+                                        if !v.is_null() {
+                                            (*v).value.str = xml_strdup(value);
+                                            *val = v;
+                                        } else {
+                                            break 'error;
+                                        }
+                                    }
+                                    break 'return0;
+                                }
+                                XmlSchemaValType::XmlSchemasLanguage => {
+                                    if norm.is_null() && norm_on_the_fly != 0 {
+                                        norm = xml_schema_collapse_string(value);
                                         if !norm.is_null() {
                                             value = norm;
                                         }
                                     }
-                                } else {
-                                    let mut cur: *const XmlChar = value;
-                                    while *cur != 0 {
-                                        if *cur == 0xd || *cur == 0xa || *cur == 0x9 {
-                                            break 'return1;
-                                        } else {
-                                            cur = cur.add(1);
+
+                                    if xml_schema_check_language_type(value) == 1 {
+                                        if !val.is_null() {
+                                            v = xml_schema_new_value(
+                                                XmlSchemaValType::XmlSchemasLanguage,
+                                            );
+                                            if !v.is_null() {
+                                                (*v).value.str = xml_strdup(value);
+                                                *val = v;
+                                            } else {
+                                                break 'error;
+                                            }
                                         }
+                                        break 'return0;
                                     }
+                                    break 'return1;
                                 }
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(
-                                        XmlSchemaValType::XmlSchemasNormstring,
+                                XmlSchemaValType::XmlSchemasNmtoken => {
+                                    if xml_validate_nmtoken(value, 1) == 0 {
+                                        if !val.is_null() {
+                                            v = xml_schema_new_value(
+                                                XmlSchemaValType::XmlSchemasNmtoken,
+                                            );
+                                            if !v.is_null() {
+                                                (*v).value.str = xml_strdup(value);
+                                                *val = v;
+                                            } else {
+                                                break 'error;
+                                            }
+                                        }
+                                        break 'return0;
+                                    }
+                                    break 'return1;
+                                }
+                                XmlSchemaValType::XmlSchemasNmtokens => {
+                                    ret = xml_schema_val_atomic_list_node(
+                                        XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
+                                        value,
+                                        val,
+                                        node,
                                     );
-                                    if !v.is_null() {
-                                        (*v).value.str = xml_strdup(value);
-                                        *val = v;
-                                    } else {
-                                        break 'error;
-                                    }
-                                }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasDecimal => {
-                                let mut cur: *const XmlChar = value;
-                                let mut len: u32;
-                                let mut neg: u32;
-                                let mut integ: u32;
-                                let mut has_leading_zeroes: u32;
-                                let mut cval: [XmlChar; 25] = [0; 25];
-                                let mut cptr: *mut XmlChar = cval.as_mut_ptr();
-
-                                if cur.is_null() || *cur == 0 {
-                                    break 'return1;
-                                }
-
-                                // xs:decimal has a whitespace-facet value of 'collapse'.
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
-                                        cur = cur.add(1);
-                                    }
-                                }
-
-                                // First we handle an optional sign.
-                                neg = 0;
-                                if *cur == b'-' {
-                                    neg = 1;
-                                    cur = cur.add(1);
-                                } else if *cur == b'+' {
-                                    cur = cur.add(1);
-                                }
-                                // Disallow: "", "-", "- "
-                                if *cur == 0 {
-                                    break 'return1;
-                                }
-                                // Next we "pre-parse" the number, in preparation for calling
-                                // the common routine xmlSchemaParseUInt.  We get rid of any
-                                // leading zeroes (because we have reserved only 25 chars),
-                                // and note the position of a decimal point.
-                                len = 0;
-                                integ = !0;
-                                has_leading_zeroes = 0;
-                                // Skip leading zeroes.
-                                while *cur == b'0' {
-                                    cur = cur.add(1);
-                                    has_leading_zeroes = 1;
-                                }
-                                if *cur != 0 {
-                                    loop {
-                                        if *cur >= b'0' && *cur <= b'9' {
-                                            *cptr = *cur;
-                                            cptr = cptr.add(1);
-                                            cur = cur.add(1);
-                                            len += 1;
-                                        } else if *cur == b'.' {
-                                            cur = cur.add(1);
-                                            integ = len;
-                                            loop {
-                                                if *cur >= b'0' && *cur <= b'9' {
-                                                    *cptr = *cur;
-                                                    cptr = cptr.add(1);
-                                                    cur = cur.add(1);
-                                                    len += 1;
-                                                } else {
-                                                    break;
-                                                }
-
-                                                if len >= 24 {
-                                                    break;
-                                                }
-                                            }
-                                            // Disallow "." but allow "00."
-                                            if len == 0 && has_leading_zeroes == 0 {
-                                                break 'return1;
-                                            }
-                                            break;
-                                        } else {
-                                            break;
-                                        }
-
-                                        if len >= 24 {
-                                            break;
-                                        }
-                                    }
-                                }
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
-                                        cur = cur.add(1);
-                                    }
-                                }
-                                if *cur != 0 {
-                                    break 'return1;
-                                    // error if any extraneous chars
-                                }
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasDecimal);
-                                    if !v.is_null() {
-                                        // Now evaluate the significant digits of the number
-                                        if len != 0 {
-                                            if integ != !0 {
-                                                // Get rid of trailing zeroes in the
-                                                // fractional part.
-                                                while len != integ && *cptr.sub(1) == b'0' {
-                                                    cptr = cptr.sub(1);
-                                                    len = len.wrapping_sub(1);
-                                                }
-                                            }
-                                            // Terminate the (preparsed) string.
-                                            if len != 0 {
-                                                *cptr = 0;
-                                                cptr = cval.as_mut_ptr();
-
-                                                xml_schema_parse_uint(
-                                                    addr_of_mut!(cptr) as _,
-                                                    addr_of_mut!((*v).value.decimal.lo),
-                                                    addr_of_mut!((*v).value.decimal.mi),
-                                                    addr_of_mut!((*v).value.decimal.hi),
-                                                );
-                                            }
-                                        }
-                                        // Set the total digits to 1 if a zero value.
-                                        (*v).value.decimal.sign = neg;
-                                        if len == 0 {
-                                            // Speedup for zero values.
-                                            (*v).value.decimal.total = 1;
-                                        } else {
-                                            (*v).value.decimal.total = len;
-                                            if integ == !0 {
-                                                (*v).value.decimal.frac = 0;
-                                            } else {
-                                                (*v).value.decimal.frac = len - integ;
-                                            }
-                                        }
-                                        *val = v;
-                                    }
-                                }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasTime
-                            | XmlSchemaValType::XmlSchemasGday
-                            | XmlSchemaValType::XmlSchemasGmonth
-                            | XmlSchemaValType::XmlSchemasGmonthday
-                            | XmlSchemaValType::XmlSchemasGyear
-                            | XmlSchemaValType::XmlSchemasGyearmonth
-                            | XmlSchemaValType::XmlSchemasDate
-                            | XmlSchemaValType::XmlSchemasDatetime => {
-                                ret = xml_schema_validate_dates(
-                                    (*typ).built_in_type.try_into().unwrap(),
-                                    value,
-                                    val,
-                                    norm_on_the_fly,
-                                );
-                            }
-                            XmlSchemaValType::XmlSchemasDuration => {
-                                ret =
-                                    xml_schema_validate_duration(typ, value, val, norm_on_the_fly);
-                            }
-                            XmlSchemaValType::XmlSchemasFloat
-                            | XmlSchemaValType::XmlSchemasDouble => {
-                                let mut cur: *const XmlChar = value;
-                                let mut neg: i32 = 0;
-                                let mut digits_before: i32 = 0;
-                                let mut digits_after: i32 = 0;
-
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
-                                        cur = cur.add(1);
-                                    }
-                                }
-
-                                if *cur.add(0) == b'N' && *cur.add(1) == b'a' && *cur.add(2) == b'N'
-                                {
-                                    cur = cur.add(3);
-                                    if *cur != 0 {
-                                        break 'return1;
-                                    }
-                                    if !val.is_null() {
-                                        if typ == XML_SCHEMA_TYPE_FLOAT_DEF.get() {
-                                            v = xml_schema_new_value(
-                                                XmlSchemaValType::XmlSchemasFloat,
-                                            );
-                                            if !v.is_null() {
-                                                (*v).value.f = XML_XPATH_NAN as f32;
-                                            } else {
-                                                xml_schema_free_value(v);
-                                                break 'error;
-                                            }
-                                        } else {
-                                            v = xml_schema_new_value(
-                                                XmlSchemaValType::XmlSchemasDouble,
-                                            );
-                                            if !v.is_null() {
-                                                (*v).value.d = XML_XPATH_NAN;
-                                            } else {
-                                                xml_schema_free_value(v);
-                                                break 'error;
-                                            }
-                                        }
-                                        *val = v;
-                                    }
-                                    break 'return0;
-                                }
-                                if *cur == b'-' {
-                                    neg = 1;
-                                    cur = cur.add(1);
-                                }
-                                if *cur.add(0) == b'I' && *cur.add(1) == b'N' && *cur.add(2) == b'F'
-                                {
-                                    cur = cur.add(3);
-                                    if *cur != 0 {
-                                        break 'return1;
-                                    }
-                                    if !val.is_null() {
-                                        if typ == XML_SCHEMA_TYPE_FLOAT_DEF.get() {
-                                            v = xml_schema_new_value(
-                                                XmlSchemaValType::XmlSchemasFloat,
-                                            );
-                                            if !v.is_null() {
-                                                if neg != 0 {
-                                                    (*v).value.f = XML_XPATH_NINF as f32;
-                                                } else {
-                                                    (*v).value.f = XML_XPATH_PINF as f32;
-                                                }
-                                            } else {
-                                                xml_schema_free_value(v);
-                                                break 'error;
-                                            }
-                                        } else {
-                                            v = xml_schema_new_value(
-                                                XmlSchemaValType::XmlSchemasDouble,
-                                            );
-                                            if !v.is_null() {
-                                                if neg != 0 {
-                                                    (*v).value.d = XML_XPATH_NINF;
-                                                } else {
-                                                    (*v).value.d = XML_XPATH_PINF;
-                                                }
-                                            } else {
-                                                xml_schema_free_value(v);
-                                                break 'error;
-                                            }
-                                        }
-                                        *val = v;
-                                    }
-                                    break 'return0;
-                                }
-                                if neg == 0 && *cur == b'+' {
-                                    cur = cur.add(1);
-                                }
-                                if *cur.add(0) == 0 || *cur.add(0) == b'+' || *cur.add(0) == b'-' {
-                                    break 'return1;
-                                }
-                                while *cur >= b'0' && *cur <= b'9' {
-                                    cur = cur.add(1);
-                                    digits_before += 1;
-                                }
-                                if *cur == b'.' {
-                                    cur = cur.add(1);
-                                    while *cur >= b'0' && *cur <= b'9' {
-                                        cur = cur.add(1);
-                                        digits_after += 1;
-                                    }
-                                }
-                                if digits_before == 0 && digits_after == 0 {
-                                    break 'return1;
-                                }
-                                if *cur == b'e' || *cur == b'E' {
-                                    cur = cur.add(1);
-                                    if *cur == b'-' || *cur == b'+' {
-                                        cur = cur.add(1);
-                                    }
-                                    while *cur >= b'0' && *cur <= b'9' {
-                                        cur = cur.add(1);
-                                    }
-                                }
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
-                                        cur = cur.add(1);
-                                    }
-                                }
-
-                                if *cur != 0 {
-                                    break 'return1;
-                                }
-                                if !val.is_null() {
-                                    if typ == XML_SCHEMA_TYPE_FLOAT_DEF.get() {
-                                        v = xml_schema_new_value(XmlSchemaValType::XmlSchemasFloat);
-                                        if !v.is_null() {
-                                            // TODO: sscanf seems not to give the correct
-                                            // value for extremely high/low values.
-                                            // E.g. "1E-149" results in zero.
-                                            if sscanf(
-                                                value as _,
-                                                c"%f".as_ptr() as _,
-                                                addr_of_mut!((*v).value.f),
-                                            ) == 1
-                                            {
-                                                *val = v;
-                                            } else {
-                                                xml_schema_free_value(v);
-                                                break 'return1;
-                                            }
-                                        } else {
-                                            break 'error;
-                                        }
-                                    } else {
-                                        v = xml_schema_new_value(
-                                            XmlSchemaValType::XmlSchemasDouble,
-                                        );
-                                        if !v.is_null() {
-                                            // TODO: sscanf seems not to give the correct
-                                            // value for extremely high/low values.
-                                            if sscanf(
-                                                value as _,
-                                                c"%lf".as_ptr() as _,
-                                                addr_of_mut!((*v).value.d),
-                                            ) == 1
-                                            {
-                                                *val = v;
-                                            } else {
-                                                xml_schema_free_value(v);
-                                                break 'return1;
-                                            }
-                                        } else {
-                                            break 'error;
-                                        }
-                                    }
-                                }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasBoolean => {
-                                let mut cur: *const XmlChar = value;
-
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
-                                        cur = cur.add(1);
-                                    }
-                                    if *cur == b'0' {
+                                    if ret > 0 {
                                         ret = 0;
-                                        cur = cur.add(1);
-                                    } else if *cur == b'1' {
+                                    } else {
                                         ret = 1;
-                                        cur = cur.add(1);
-                                    } else if *cur == b't' {
-                                        cur = cur.add(1);
-                                        if {
-                                            let f = *cur == b'r';
-                                            cur = cur.add(1);
-                                            f
-                                        } && {
-                                            let f = *cur == b'u';
-                                            cur = cur.add(1);
-                                            f
-                                        } && {
-                                            let f = *cur == b'e';
-                                            cur = cur.add(1);
-                                            f
-                                        } {
-                                            ret = 1;
-                                        } else {
-                                            break 'return1;
-                                        }
-                                    } else if *cur == b'f' {
-                                        cur = cur.add(1);
-                                        if {
-                                            let f = *cur == b'a';
-                                            cur = cur.add(1);
-                                            f
-                                        } && {
-                                            let f = *cur == b'l';
-                                            cur = cur.add(1);
-                                            f
-                                        } && {
-                                            let f = *cur == b's';
-                                            cur = cur.add(1);
-                                            f
-                                        } && {
-                                            let f = *cur == b'e';
-                                            cur = cur.add(1);
-                                            f
-                                        } {
-                                            ret = 0;
-                                        } else {
-                                            break 'return1;
-                                        }
-                                    } else {
-                                        break 'return1;
                                     }
-                                    if *cur != 0 {
-                                        while IS_WSP_BLANK_CH!(*cur) {
-                                            cur = cur.add(1);
-                                        }
-                                        if *cur != 0 {
-                                            break 'return1;
-                                        }
-                                    }
-                                } else if *cur.add(0) == b'0' && *cur.add(1) == 0 {
-                                    ret = 0;
-                                } else if (*cur.add(0) == b'1' && *cur.add(1) == 0)
-                                    || (*cur.add(0) == b't'
-                                        && *cur.add(1) == b'r'
-                                        && *cur.add(2) == b'u'
-                                        && *cur.add(3) == b'e'
-                                        && *cur.add(4) == 0)
-                                {
-                                    ret = 1;
-                                } else if *cur.add(0) == b'f'
-                                    && *cur.add(1) == b'a'
-                                    && *cur.add(2) == b'l'
-                                    && *cur.add(3) == b's'
-                                    && *cur.add(4) == b'e'
-                                    && *cur.add(5) == 0
-                                {
-                                    ret = 0;
-                                } else {
-                                    break 'return1;
-                                }
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasBoolean);
-                                    if !v.is_null() {
-                                        (*v).value.b = ret;
-                                        *val = v;
-                                    } else {
-                                        break 'error;
-                                    }
-                                }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasToken => {
-                                let mut cur: *const XmlChar = value;
-
-                                if norm_on_the_fly == 0 {
-                                    while *cur != 0 {
-                                        if *cur == 0xd || *cur == 0xa || *cur == 0x9 {
-                                            break 'return1;
-                                        } else if *cur == b' ' {
-                                            cur = cur.add(1);
-                                            if *cur == 0 {
-                                                break 'return1;
-                                            }
-                                            if *cur == b' ' {
-                                                break 'return1;
-                                            }
-                                        } else {
-                                            cur = cur.add(1);
-                                        }
-                                    }
-                                }
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasToken);
-                                    if !v.is_null() {
-                                        (*v).value.str = xml_strdup(value);
-                                        *val = v;
-                                    } else {
-                                        break 'error;
-                                    }
-                                }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasLanguage => {
-                                if norm.is_null() && norm_on_the_fly != 0 {
-                                    norm = xml_schema_collapse_string(value);
-                                    if !norm.is_null() {
-                                        value = norm;
-                                    }
-                                }
-
-                                if xml_schema_check_language_type(value) == 1 {
-                                    if !val.is_null() {
-                                        v = xml_schema_new_value(
-                                            XmlSchemaValType::XmlSchemasLanguage,
-                                        );
-                                        if !v.is_null() {
-                                            (*v).value.str = xml_strdup(value);
-                                            *val = v;
-                                        } else {
-                                            break 'error;
-                                        }
-                                    }
-                                    break 'return0;
-                                }
-                                break 'return1;
-                            }
-                            XmlSchemaValType::XmlSchemasNmtoken => {
-                                if xml_validate_nmtoken(value, 1) == 0 {
-                                    if !val.is_null() {
-                                        v = xml_schema_new_value(
-                                            XmlSchemaValType::XmlSchemasNmtoken,
-                                        );
-                                        if !v.is_null() {
-                                            (*v).value.str = xml_strdup(value);
-                                            *val = v;
-                                        } else {
-                                            break 'error;
-                                        }
-                                    }
-                                    break 'return0;
-                                }
-                                break 'return1;
-                            }
-                            XmlSchemaValType::XmlSchemasNmtokens => {
-                                ret = xml_schema_val_atomic_list_node(
-                                    XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
-                                    value,
-                                    val,
-                                    node,
-                                );
-                                if ret > 0 {
-                                    ret = 0;
-                                } else {
-                                    ret = 1;
-                                }
-                                break 'done;
-                            }
-                            XmlSchemaValType::XmlSchemasName => {
-                                ret = xml_validate_name(value, 1);
-                                if ret == 0 && !val.is_null() && !value.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasName);
-                                    if !v.is_null() {
-                                        let mut start: *const XmlChar = value;
-                                        let mut end: *const XmlChar;
-                                        while xml_is_blank_char(*start as u32) {
-                                            start = start.add(1);
-                                        }
-                                        end = start;
-                                        while *end != 0 && !xml_is_blank_char(*end as u32) {
-                                            end = end.add(1);
-                                        }
-                                        (*v).value.str =
-                                            xml_strndup(start, end.offset_from(start) as _) as _;
-                                        *val = v;
-                                    } else {
-                                        break 'error;
-                                    }
-                                }
-                                break 'done;
-                            }
-                            XmlSchemaValType::XmlSchemasQname => {
-                                let mut uri: *const XmlChar = null();
-                                let mut local: *mut XmlChar = null_mut();
-
-                                ret = xml_validate_qname(value, 1);
-                                if ret != 0 {
                                     break 'done;
                                 }
-                                if let Some(node) = node {
-                                    let mut prefix: *mut XmlChar = null_mut();
+                                XmlSchemaValType::XmlSchemasName => {
+                                    ret = xml_validate_name(value, 1);
+                                    if ret == 0 && !val.is_null() && !value.is_null() {
+                                        v = xml_schema_new_value(XmlSchemaValType::XmlSchemasName);
+                                        if !v.is_null() {
+                                            let mut start: *const XmlChar = value;
+                                            let mut end: *const XmlChar;
+                                            while xml_is_blank_char(*start as u32) {
+                                                start = start.add(1);
+                                            }
+                                            end = start;
+                                            while *end != 0 && !xml_is_blank_char(*end as u32) {
+                                                end = end.add(1);
+                                            }
+                                            (*v).value.str =
+                                                xml_strndup(start, end.offset_from(start) as _)
+                                                    as _;
+                                            *val = v;
+                                        } else {
+                                            break 'error;
+                                        }
+                                    }
+                                    break 'done;
+                                }
+                                XmlSchemaValType::XmlSchemasQname => {
+                                    let mut uri: *const XmlChar = null();
+                                    let mut local: *mut XmlChar = null_mut();
 
-                                    local = xml_split_qname2(value, addr_of_mut!(prefix));
-                                    let ns = node.search_ns(
-                                        node.document(),
-                                        (!prefix.is_null())
-                                            .then(|| {
-                                                CStr::from_ptr(prefix as *const i8)
-                                                    .to_string_lossy()
-                                            })
-                                            .as_deref(),
-                                    );
-                                    if ns.is_none() && !prefix.is_null() {
-                                        xml_free(prefix as _);
-                                        if !local.is_null() {
-                                            xml_free(local as _);
+                                    ret = xml_validate_qname(value, 1);
+                                    if ret != 0 {
+                                        break 'done;
+                                    }
+                                    if let Some(node) = node {
+                                        let mut prefix: *mut XmlChar = null_mut();
+
+                                        local = xml_split_qname2(value, addr_of_mut!(prefix));
+                                        let ns = node.search_ns(
+                                            node.document(),
+                                            (!prefix.is_null())
+                                                .then(|| {
+                                                    CStr::from_ptr(prefix as *const i8)
+                                                        .to_string_lossy()
+                                                })
+                                                .as_deref(),
+                                        );
+                                        if ns.is_none() && !prefix.is_null() {
+                                            xml_free(prefix as _);
+                                            if !local.is_null() {
+                                                xml_free(local as _);
+                                            }
+                                            break 'return1;
                                         }
-                                        break 'return1;
-                                    }
-                                    if let Some(ns) = ns {
-                                        uri = ns.href;
-                                    }
-                                    if !prefix.is_null() {
-                                        xml_free(prefix as _);
-                                    }
-                                }
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasQname);
-                                    if v.is_null() {
-                                        if !local.is_null() {
-                                            xml_free(local as _);
+                                        if let Some(ns) = ns {
+                                            uri = ns.href;
                                         }
-                                        break 'error;
+                                        if !prefix.is_null() {
+                                            xml_free(prefix as _);
+                                        }
                                     }
-                                    if !local.is_null() {
-                                        (*v).value.qname.name = local;
-                                    } else {
-                                        (*v).value.qname.name = xml_strdup(value);
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(XmlSchemaValType::XmlSchemasQname);
+                                        if v.is_null() {
+                                            if !local.is_null() {
+                                                xml_free(local as _);
+                                            }
+                                            break 'error;
+                                        }
+                                        if !local.is_null() {
+                                            (*v).value.qname.name = local;
+                                        } else {
+                                            (*v).value.qname.name = xml_strdup(value);
+                                        }
+                                        if !uri.is_null() {
+                                            (*v).value.qname.uri = xml_strdup(uri);
+                                        }
+                                        *val = v;
+                                    } else if !local.is_null() {
+                                        xml_free(local as _);
                                     }
-                                    if !uri.is_null() {
-                                        (*v).value.qname.uri = xml_strdup(uri);
-                                    }
-                                    *val = v;
-                                } else if !local.is_null() {
-                                    xml_free(local as _);
+                                    break 'done;
                                 }
-                                break 'done;
-                            }
-                            XmlSchemaValType::XmlSchemasNcname => {
-                                ret = xml_validate_ncname(value, 1);
-                                if ret == 0 && !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasNcname);
-                                    if !v.is_null() {
+                                XmlSchemaValType::XmlSchemasNcname => {
+                                    ret = xml_validate_ncname(value, 1);
+                                    if ret == 0 && !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            XmlSchemaValType::XmlSchemasNcname,
+                                        );
+                                        if !v.is_null() {
+                                            (*v).value.str = xml_strdup(value);
+                                            *val = v;
+                                        } else {
+                                            break 'error;
+                                        }
+                                    }
+                                    break 'done;
+                                }
+                                XmlSchemaValType::XmlSchemasID => {
+                                    ret = xml_validate_ncname(value, 1);
+                                    if ret == 0 && !val.is_null() {
+                                        v = xml_schema_new_value(XmlSchemaValType::XmlSchemasID);
+                                        if !v.is_null() {
+                                            (*v).value.str = xml_strdup(value);
+                                            *val = v;
+                                        } else {
+                                            break 'error;
+                                        }
+                                    }
+                                    if ret == 0 {
+                                        if let Some(mut attr) =
+                                            node.and_then(|node| XmlAttrPtr::try_from(node).ok())
+                                        {
+                                            // NOTE: the IDness might have already be declared in the DTD
+                                            if !matches!(
+                                                attr.atype,
+                                                Some(XmlAttributeType::XmlAttributeID)
+                                            ) {
+                                                let strip: *mut XmlChar = xml_schema_strip(value);
+                                                let res = if !strip.is_null() {
+                                                    let res = xml_add_id(
+                                                        null_mut(),
+                                                        attr.doc.unwrap(),
+                                                        CStr::from_ptr(strip as *const i8)
+                                                            .to_string_lossy()
+                                                            .as_ref(),
+                                                        attr,
+                                                    );
+                                                    xml_free(strip as _);
+                                                    res
+                                                } else {
+                                                    xml_add_id(
+                                                        null_mut(),
+                                                        attr.doc.unwrap(),
+                                                        CStr::from_ptr(value as *const i8)
+                                                            .to_string_lossy()
+                                                            .as_ref(),
+                                                        attr,
+                                                    )
+                                                };
+                                                if res.is_none() {
+                                                    ret = 2;
+                                                } else {
+                                                    attr.atype =
+                                                        Some(XmlAttributeType::XmlAttributeID);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    break 'done;
+                                }
+                                XmlSchemaValType::XmlSchemasIDREF => {
+                                    ret = xml_validate_ncname(value, 1);
+                                    if ret == 0 && !val.is_null() {
+                                        v = xml_schema_new_value(XmlSchemaValType::XmlSchemasIDREF);
+                                        if v.is_null() {
+                                            break 'error;
+                                        }
                                         (*v).value.str = xml_strdup(value);
                                         *val = v;
-                                    } else {
-                                        break 'error;
                                     }
-                                }
-                                break 'done;
-                            }
-                            XmlSchemaValType::XmlSchemasID => {
-                                ret = xml_validate_ncname(value, 1);
-                                if ret == 0 && !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasID);
-                                    if !v.is_null() {
-                                        (*v).value.str = xml_strdup(value);
-                                        *val = v;
-                                    } else {
-                                        break 'error;
-                                    }
-                                }
-                                if ret == 0 {
-                                    if let Some(mut attr) =
-                                        node.and_then(|node| XmlAttrPtr::try_from(node).ok())
-                                    {
-                                        // NOTE: the IDness might have already be declared in the DTD
-                                        if !matches!(
-                                            attr.atype,
-                                            Some(XmlAttributeType::XmlAttributeID)
-                                        ) {
+                                    if ret == 0 {
+                                        if let Some(mut attr) =
+                                            node.and_then(|node| XmlAttrPtr::try_from(node).ok())
+                                        {
                                             let strip: *mut XmlChar = xml_schema_strip(value);
-                                            let res = if !strip.is_null() {
-                                                let res = xml_add_id(
+                                            if !strip.is_null() {
+                                                xml_add_ref(
                                                     null_mut(),
                                                     attr.doc.unwrap(),
                                                     CStr::from_ptr(strip as *const i8)
@@ -2806,834 +2917,801 @@ unsafe fn xml_schema_val_atomic_type(
                                                     attr,
                                                 );
                                                 xml_free(strip as _);
-                                                res
                                             } else {
-                                                xml_add_id(
+                                                xml_add_ref(
                                                     null_mut(),
                                                     attr.doc.unwrap(),
                                                     CStr::from_ptr(value as *const i8)
                                                         .to_string_lossy()
                                                         .as_ref(),
                                                     attr,
+                                                );
+                                            }
+                                            attr.atype = Some(XmlAttributeType::XmlAttributeIDREF);
+                                        }
+                                    }
+                                    break 'done;
+                                }
+                                XmlSchemaValType::XmlSchemasIDREFS => {
+                                    ret = xml_schema_val_atomic_list_node(
+                                        XML_SCHEMA_TYPE_IDREF_DEF.get(),
+                                        value,
+                                        val,
+                                        node,
+                                    );
+                                    if ret < 0 {
+                                        ret = 2;
+                                    } else {
+                                        ret = 0;
+                                    }
+                                    if ret == 0 {
+                                        if let Some(mut attr) =
+                                            node.and_then(|node| XmlAttrPtr::try_from(node).ok())
+                                        {
+                                            attr.atype = Some(XmlAttributeType::XmlAttributeIDREFS);
+                                        }
+                                    }
+                                    break 'done;
+                                }
+                                XmlSchemaValType::XmlSchemasEntity => {
+                                    let strip: *mut XmlChar;
+
+                                    ret = xml_validate_ncname(value, 1);
+                                    if let Some(node) =
+                                        node.filter(|node| node.document().is_some())
+                                    {
+                                        if ret == 0 {
+                                            strip = xml_schema_strip(value);
+                                            let ent = if !strip.is_null() {
+                                                let e = xml_get_doc_entity(
+                                                    node.document(),
+                                                    &CStr::from_ptr(strip as *const i8)
+                                                        .to_string_lossy(),
+                                                );
+                                                xml_free(strip as _);
+                                                e
+                                            } else {
+                                                xml_get_doc_entity(
+                                                    node.document(),
+                                                    &CStr::from_ptr(value as *const i8)
+                                                        .to_string_lossy(),
                                                 )
                                             };
-                                            if res.is_none() {
-                                                ret = 2;
-                                            } else {
-                                                attr.atype = Some(XmlAttributeType::XmlAttributeID);
+                                            if ent.is_none_or(|ent| {
+                                                !matches!(
+                                                    ent.etype,
+                                                    XmlEntityType::XmlExternalGeneralUnparsedEntity
+                                                )
+                                            }) {
+                                                ret = 4;
                                             }
                                         }
-                                    }
-                                }
-                                break 'done;
-                            }
-                            XmlSchemaValType::XmlSchemasIDREF => {
-                                ret = xml_validate_ncname(value, 1);
-                                if ret == 0 && !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasIDREF);
-                                    if v.is_null() {
-                                        break 'error;
-                                    }
-                                    (*v).value.str = xml_strdup(value);
-                                    *val = v;
-                                }
-                                if ret == 0 {
-                                    if let Some(mut attr) =
-                                        node.and_then(|node| XmlAttrPtr::try_from(node).ok())
-                                    {
-                                        let strip: *mut XmlChar = xml_schema_strip(value);
-                                        if !strip.is_null() {
-                                            xml_add_ref(
-                                                null_mut(),
-                                                attr.doc.unwrap(),
-                                                CStr::from_ptr(strip as *const i8)
-                                                    .to_string_lossy()
-                                                    .as_ref(),
-                                                attr,
-                                            );
-                                            xml_free(strip as _);
-                                        } else {
-                                            xml_add_ref(
-                                                null_mut(),
-                                                attr.doc.unwrap(),
-                                                CStr::from_ptr(value as *const i8)
-                                                    .to_string_lossy()
-                                                    .as_ref(),
-                                                attr,
-                                            );
+                                        if ret == 0 && !val.is_null() {
+                                            // TODO;
+                                            todo!()
                                         }
-                                        attr.atype = Some(XmlAttributeType::XmlAttributeIDREF);
-                                    }
-                                }
-                                break 'done;
-                            }
-                            XmlSchemaValType::XmlSchemasIDREFS => {
-                                ret = xml_schema_val_atomic_list_node(
-                                    XML_SCHEMA_TYPE_IDREF_DEF.get(),
-                                    value,
-                                    val,
-                                    node,
-                                );
-                                if ret < 0 {
-                                    ret = 2;
-                                } else {
-                                    ret = 0;
-                                }
-                                if ret == 0 {
-                                    if let Some(mut attr) =
-                                        node.and_then(|node| XmlAttrPtr::try_from(node).ok())
-                                    {
-                                        attr.atype = Some(XmlAttributeType::XmlAttributeIDREFS);
-                                    }
-                                }
-                                break 'done;
-                            }
-                            XmlSchemaValType::XmlSchemasEntity => {
-                                let strip: *mut XmlChar;
-
-                                ret = xml_validate_ncname(value, 1);
-                                if let Some(node) = node.filter(|node| node.document().is_some()) {
-                                    if ret == 0 {
-                                        strip = xml_schema_strip(value);
-                                        let ent = if !strip.is_null() {
-                                            let e = xml_get_doc_entity(
-                                                node.document(),
-                                                &CStr::from_ptr(strip as *const i8)
-                                                    .to_string_lossy(),
-                                            );
-                                            xml_free(strip as _);
-                                            e
-                                        } else {
-                                            xml_get_doc_entity(
-                                                node.document(),
-                                                &CStr::from_ptr(value as *const i8)
-                                                    .to_string_lossy(),
-                                            )
-                                        };
-                                        if ent.map_or(true, |ent| {
-                                            !matches!(
-                                                ent.etype,
-                                                XmlEntityType::XmlExternalGeneralUnparsedEntity
-                                            )
-                                        }) {
-                                            ret = 4;
+                                        if ret == 0 {
+                                            if let Ok(mut attr) = XmlAttrPtr::try_from(node) {
+                                                attr.atype =
+                                                    Some(XmlAttributeType::XmlAttributeEntity);
+                                            }
                                         }
+                                    } else {
+                                        ret = 3;
                                     }
-                                    if ret == 0 && !val.is_null() {
-                                        // TODO;
-                                        todo!()
+                                    break 'done;
+                                }
+                                XmlSchemaValType::XmlSchemasEntities => {
+                                    let Some(node) = node.filter(|node| node.document().is_some())
+                                    else {
+                                        break 'return3;
+                                    };
+                                    ret = xml_schema_val_atomic_list_node(
+                                        XML_SCHEMA_TYPE_ENTITY_DEF.get(),
+                                        value,
+                                        val,
+                                        Some(node),
+                                    );
+                                    if ret <= 0 {
+                                        ret = 1;
+                                    } else {
+                                        ret = 0;
                                     }
                                     if ret == 0 {
                                         if let Ok(mut attr) = XmlAttrPtr::try_from(node) {
-                                            attr.atype = Some(XmlAttributeType::XmlAttributeEntity);
+                                            attr.atype =
+                                                Some(XmlAttributeType::XmlAttributeEntities);
                                         }
                                     }
-                                } else {
-                                    ret = 3;
+                                    break 'done;
                                 }
-                                break 'done;
-                            }
-                            XmlSchemaValType::XmlSchemasEntities => {
-                                let Some(node) = node.filter(|node| node.document().is_some())
-                                else {
-                                    break 'return3;
-                                };
-                                ret = xml_schema_val_atomic_list_node(
-                                    XML_SCHEMA_TYPE_ENTITY_DEF.get(),
-                                    value,
-                                    val,
-                                    Some(node),
-                                );
-                                if ret <= 0 {
-                                    ret = 1;
-                                } else {
-                                    ret = 0;
-                                }
-                                if ret == 0 {
-                                    if let Ok(mut attr) = XmlAttrPtr::try_from(node) {
-                                        attr.atype = Some(XmlAttributeType::XmlAttributeEntities);
+                                XmlSchemaValType::XmlSchemasNotation => {
+                                    let mut uri: *mut XmlChar = null_mut();
+                                    let mut local: *mut XmlChar = null_mut();
+
+                                    ret = xml_validate_qname(value, 1);
+                                    if let Some(node) = node.filter(|_| ret == 0) {
+                                        let mut prefix: *mut XmlChar = null_mut();
+
+                                        local = xml_split_qname2(value, addr_of_mut!(prefix));
+                                        if !prefix.is_null() {
+                                            if let Some(ns) = node.search_ns(
+                                                node.document(),
+                                                Some(
+                                                    CStr::from_ptr(prefix as *const i8)
+                                                        .to_string_lossy()
+                                                        .as_ref(),
+                                                ),
+                                            ) {
+                                                if !val.is_null() {
+                                                    uri = xml_strdup(ns.href);
+                                                }
+                                            } else {
+                                                ret = 1;
+                                            }
+                                        }
+                                        if !local.is_null() && (val.is_null() || ret != 0) {
+                                            xml_free(local as _);
+                                        }
+                                        if !prefix.is_null() {
+                                            xml_free(prefix as _);
+                                        }
                                     }
-                                }
-                                break 'done;
-                            }
-                            XmlSchemaValType::XmlSchemasNotation => {
-                                let mut uri: *mut XmlChar = null_mut();
-                                let mut local: *mut XmlChar = null_mut();
-
-                                ret = xml_validate_qname(value, 1);
-                                if let Some(node) = node.filter(|_| ret == 0) {
-                                    let mut prefix: *mut XmlChar = null_mut();
-
-                                    local = xml_split_qname2(value, addr_of_mut!(prefix));
-                                    if !prefix.is_null() {
-                                        if let Some(ns) = node.search_ns(
-                                            node.document(),
-                                            Some(
-                                                CStr::from_ptr(prefix as *const i8)
+                                    if let Some(doc) = node.and_then(|node| node.document()) {
+                                        if ret == 0 {
+                                            ret = xml_validate_notation_use(
+                                                null_mut(),
+                                                doc,
+                                                CStr::from_ptr(value as *const i8)
                                                     .to_string_lossy()
                                                     .as_ref(),
-                                            ),
-                                        ) {
-                                            if !val.is_null() {
-                                                uri = xml_strdup(ns.href);
-                                            }
-                                        } else {
-                                            ret = 1;
-                                        }
-                                    }
-                                    if !local.is_null() && (val.is_null() || ret != 0) {
-                                        xml_free(local as _);
-                                    }
-                                    if !prefix.is_null() {
-                                        xml_free(prefix as _);
-                                    }
-                                }
-                                if let Some(doc) = node.and_then(|node| node.document()) {
-                                    if ret == 0 {
-                                        ret = xml_validate_notation_use(
-                                            null_mut(),
-                                            doc,
-                                            CStr::from_ptr(value as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
-                                        );
-                                        if ret == 1 {
-                                            ret = 0;
-                                        } else {
-                                            ret = 1;
-                                        }
-                                    }
-                                    if ret == 0 && !val.is_null() {
-                                        v = xml_schema_new_value(
-                                            XmlSchemaValType::XmlSchemasNotation,
-                                        );
-                                        if !v.is_null() {
-                                            if !local.is_null() {
-                                                (*v).value.qname.name = local;
+                                            );
+                                            if ret == 1 {
+                                                ret = 0;
                                             } else {
-                                                (*v).value.qname.name = xml_strdup(value);
+                                                ret = 1;
                                             }
-                                            if !uri.is_null() {
-                                                (*v).value.qname.uri = uri;
-                                            }
+                                        }
+                                        if ret == 0 && !val.is_null() {
+                                            v = xml_schema_new_value(
+                                                XmlSchemaValType::XmlSchemasNotation,
+                                            );
+                                            if !v.is_null() {
+                                                if !local.is_null() {
+                                                    (*v).value.qname.name = local;
+                                                } else {
+                                                    (*v).value.qname.name = xml_strdup(value);
+                                                }
+                                                if !uri.is_null() {
+                                                    (*v).value.qname.uri = uri;
+                                                }
 
-                                            *val = v;
-                                        } else {
-                                            if !local.is_null() {
-                                                xml_free(local as _);
+                                                *val = v;
+                                            } else {
+                                                if !local.is_null() {
+                                                    xml_free(local as _);
+                                                }
+                                                if !uri.is_null() {
+                                                    xml_free(uri as _);
+                                                }
+                                                break 'error;
                                             }
-                                            if !uri.is_null() {
-                                                xml_free(uri as _);
+                                        }
+                                    } else {
+                                        ret = 3;
+                                    }
+                                    break 'done;
+                                }
+                                XmlSchemaValType::XmlSchemasAnyURI => {
+                                    if *value != 0 {
+                                        let mut cur: *mut XmlChar;
+                                        if norm.is_null() && norm_on_the_fly != 0 {
+                                            norm = xml_schema_collapse_string(value);
+                                            if !norm.is_null() {
+                                                value = norm;
                                             }
+                                        }
+                                        let tmpval: *mut XmlChar = xml_strdup(value);
+                                        if tmpval.is_null() {
                                             break 'error;
                                         }
-                                    }
-                                } else {
-                                    ret = 3;
-                                }
-                                break 'done;
-                            }
-                            XmlSchemaValType::XmlSchemasAnyURI => {
-                                if *value != 0 {
-                                    let mut cur: *mut XmlChar;
-                                    if norm.is_null() && norm_on_the_fly != 0 {
-                                        norm = xml_schema_collapse_string(value);
-                                        if !norm.is_null() {
-                                            value = norm;
+                                        cur = tmpval;
+                                        while *cur != 0 {
+                                            if *cur < 32
+                                                || *cur >= 127
+                                                || *cur == b' '
+                                                || *cur == b'<'
+                                                || *cur == b'>'
+                                                || *cur == b'"'
+                                                || *cur == b'{'
+                                                || *cur == b'}'
+                                                || *cur == b'|'
+                                                || *cur == b'\\'
+                                                || *cur == b'^'
+                                                || *cur == b'`'
+                                                || *cur == b'\''
+                                            {
+                                                *cur = b'_';
+                                            }
+                                            cur = cur.add(1);
                                         }
-                                    }
-                                    let tmpval: *mut XmlChar = xml_strdup(value);
-                                    if tmpval.is_null() {
-                                        break 'error;
-                                    }
-                                    cur = tmpval;
-                                    while *cur != 0 {
-                                        if *cur < 32
-                                            || *cur >= 127
-                                            || *cur == b' '
-                                            || *cur == b'<'
-                                            || *cur == b'>'
-                                            || *cur == b'"'
-                                            || *cur == b'{'
-                                            || *cur == b'}'
-                                            || *cur == b'|'
-                                            || *cur == b'\\'
-                                            || *cur == b'^'
-                                            || *cur == b'`'
-                                            || *cur == b'\''
-                                        {
-                                            *cur = b'_';
+                                        let uri: XmlURIPtr = xml_parse_uri(tmpval as _);
+                                        xml_free(tmpval as _);
+                                        if uri.is_null() {
+                                            break 'return1;
                                         }
-                                        cur = cur.add(1);
+                                        xml_free_uri(uri as _);
                                     }
-                                    let uri: XmlURIPtr = xml_parse_uri(tmpval as _);
-                                    xml_free(tmpval as _);
-                                    if uri.is_null() {
-                                        break 'return1;
+
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            XmlSchemaValType::XmlSchemasAnyURI,
+                                        );
+                                        if v.is_null() {
+                                            break 'error;
+                                        }
+                                        (*v).value.str = xml_strdup(value);
+                                        *val = v;
                                     }
-                                    xml_free_uri(uri as _);
+                                    break 'return0;
                                 }
+                                XmlSchemaValType::XmlSchemasHexbinary => {
+                                    let mut cur: *const XmlChar = value;
+                                    let mut base: *mut XmlChar;
+                                    let total: i32;
+                                    let mut i: i32 = 0;
 
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasAnyURI);
-                                    if v.is_null() {
-                                        break 'error;
-                                    }
-                                    (*v).value.str = xml_strdup(value);
-                                    *val = v;
-                                }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasHexbinary => {
-                                let mut cur: *const XmlChar = value;
-                                let mut base: *mut XmlChar;
-                                let total: i32;
-                                let mut i: i32 = 0;
-
-                                if cur.is_null() {
-                                    break 'return1;
-                                }
-
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
-                                        cur = cur.add(1);
-                                    }
-                                }
-
-                                let start: *const XmlChar = cur;
-                                while (*cur >= b'0' && *cur <= b'9')
-                                    || (*cur >= b'A' && *cur <= b'F')
-                                    || (*cur >= b'a' && *cur <= b'f')
-                                {
-                                    i += 1;
-                                    cur = cur.add(1);
-                                }
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
-                                        cur = cur.add(1);
-                                    }
-                                }
-
-                                if *cur != 0 {
-                                    break 'return1;
-                                }
-                                if i % 2 != 0 {
-                                    break 'return1;
-                                }
-
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(XmlSchemaValType::XmlSchemasHexbinary);
-                                    if v.is_null() {
-                                        break 'error;
-                                    }
-                                    // Copy only the normalized piece.
-                                    // CRITICAL TODO: Check this.
-                                    cur = xml_strndup(start, i);
                                     if cur.is_null() {
-                                        xml_schema_type_err_memory(
-                                            node,
-                                            Some("allocating hexbin data"),
-                                        );
-                                        xml_free(v as _);
                                         break 'return1;
                                     }
 
-                                    total = i / 2; /* number of octets */
-
-                                    base = cur as _;
-                                    while i > 0 {
-                                        i -= 1;
-                                        if *base >= b'a' {
-                                            *base -= b'a' - b'A';
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
                                         }
-                                        base = base.add(1);
                                     }
 
-                                    (*v).value.hex.str = cur as _;
-                                    (*v).value.hex.total = total as _;
-                                    *val = v;
-                                }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasBase64binary => {
-                                // ISSUE:
-                                //
-                                // Ignore all stray characters? (yes, currently)
-                                // Worry about long lines? (no, currently)
-                                //
-                                // rfc2045.txt:
-                                //
-                                // "The encoded output stream must be represented in lines of
-                                // no more than 76 characters each.  All line breaks or other
-                                // characters not found in Table 1 must be ignored by decoding
-                                // software.  In base64 data, characters other than those in
-                                // Table 1, line breaks, and other white space probably
-                                // indicate a transmission error, about which a warning
-                                // message or even a message rejection might be appropriate
-                                // under some circumstances."
-                                let mut cur: *const XmlChar = value;
-                                let mut base: *mut XmlChar;
-                                let mut total: i32;
-                                let mut i: i32 = 0;
-                                let mut pad: i32 = 0;
-
-                                if cur.is_null() {
-                                    break 'return1;
-                                }
-
-                                while *cur != 0 {
-                                    let decc: i32 = _xml_schema_base64_decode(*cur);
-                                    if decc < 0 {
-                                    } else if decc < 64 {
+                                    let start: *const XmlChar = cur;
+                                    while (*cur >= b'0' && *cur <= b'9')
+                                        || (*cur >= b'A' && *cur <= b'F')
+                                        || (*cur >= b'a' && *cur <= b'f')
+                                    {
                                         i += 1;
-                                    } else {
-                                        break;
+                                        cur = cur.add(1);
                                     }
-                                    cur = cur.add(1);
-                                }
-                                while *cur != 0 {
-                                    let decc: i32 = _xml_schema_base64_decode(*cur);
-                                    if decc < 0 {
-                                    } else if decc < 64 {
-                                        break 'return1;
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
                                     }
-                                    if decc == 64 {
-                                        pad += 1;
-                                    }
-                                    cur = cur.add(1);
-                                }
 
-                                // rfc2045.txt: "Special processing is performed if fewer than
-                                // 24 bits are available at the end of the data being encoded.
-                                // A full encoding quantum is always completed at the end of a
-                                // body.  When fewer than 24 input bits are available in an
-                                // input group, zero bits are added (on the right) to form an
-                                // integral number of 6-bit groups.  Padding at the end of the
-                                // data is performed using the "=" character.  Since all
-                                // base64 input is an integral number of octets, only the
-                                // following cases can arise: (1) the final quantum of
-                                // encoding input is an integral multiple of 24 bits; here,
-                                // the final unit of encoded output will be an integral
-                                // multiple of indent: Standard input:701: Warning:old style
-                                // assignment ambiguity in "=*".  Assuming "= *" 4 characters
-                                // with no "=" padding, (2) the final
-                                // quantum of encoding input is exactly 8 bits; here, the
-                                // final unit of encoded output will be two characters
-                                // followed by two "=" padding characters, or (3) the final
-                                // quantum of encoding input is exactly 16 bits; here, the
-                                // final unit of encoded output will be three characters
-                                // followed by one "=" padding character."
+                                    if *cur != 0 {
+                                        break 'return1;
+                                    }
+                                    if i % 2 != 0 {
+                                        break 'return1;
+                                    }
 
-                                total = 3 * (i / 4);
-                                if pad == 0 {
-                                    if i % 4 != 0 {
-                                        break 'return1;
-                                    }
-                                } else if pad == 1 {
-                                    let mut decc: i32;
-
-                                    if i % 4 != 3 {
-                                        break 'return1;
-                                    }
-                                    decc = _xml_schema_base64_decode(*cur);
-                                    while !(0..=63).contains(&decc) {
-                                        cur = cur.sub(1);
-                                        decc = _xml_schema_base64_decode(*cur)
-                                    }
-                                    // 16bits in 24bits means 2 pad bits: nnnnnn nnmmmm mmmm00
-                                    // 00111100 -> 0x3c
-                                    if decc & !0x3c != 0 {
-                                        break 'return1;
-                                    }
-                                    total += 2;
-                                } else if pad == 2 {
-                                    let mut decc: i32;
-
-                                    if i % 4 != 2 {
-                                        break 'return1;
-                                    }
-                                    decc = _xml_schema_base64_decode(*cur);
-                                    while !(0..=63).contains(&decc) {
-                                        cur = cur.sub(1);
-                                        decc = _xml_schema_base64_decode(*cur)
-                                    }
-                                    // 8bits in 12bits means 4 pad bits: nnnnnn nn0000
-                                    // 00110000 -> 0x30
-                                    if decc & !0x30 != 0 {
-                                        break 'return1;
-                                    }
-                                    total += 1;
-                                } else {
-                                    break 'return1;
-                                }
-
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(
-                                        XmlSchemaValType::XmlSchemasBase64binary,
-                                    );
-                                    if v.is_null() {
-                                        break 'error;
-                                    }
-                                    base = xml_malloc_atomic(i as usize + pad as usize + 1) as _;
-                                    if base.is_null() {
-                                        xml_schema_type_err_memory(
-                                            node,
-                                            Some("allocating base64 data"),
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            XmlSchemaValType::XmlSchemasHexbinary,
                                         );
-                                        xml_free(v as _);
-                                        break 'return1;
-                                    }
-                                    (*v).value.base64.str = base;
-                                    cur = value;
-                                    while *cur != 0 {
-                                        if _xml_schema_base64_decode(*cur) >= 0 {
-                                            *base = *cur;
+                                        if v.is_null() {
+                                            break 'error;
+                                        }
+                                        // Copy only the normalized piece.
+                                        // CRITICAL TODO: Check this.
+                                        cur = xml_strndup(start, i);
+                                        if cur.is_null() {
+                                            xml_schema_type_err_memory(
+                                                node,
+                                                Some("allocating hexbin data"),
+                                            );
+                                            xml_free(v as _);
+                                            break 'return1;
+                                        }
+
+                                        total = i / 2; /* number of octets */
+
+                                        base = cur as _;
+                                        while i > 0 {
+                                            i -= 1;
+                                            if *base >= b'a' {
+                                                *base -= b'a' - b'A';
+                                            }
                                             base = base.add(1);
                                         }
-                                        cur = cur.add(1);
-                                    }
-                                    *base = 0;
-                                    (*v).value.base64.total = total as _;
-                                    *val = v;
-                                }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasInteger
-                            | XmlSchemaValType::XmlSchemasPInteger
-                            | XmlSchemaValType::XmlSchemasNPInteger
-                            | XmlSchemaValType::XmlSchemasNInteger
-                            | XmlSchemaValType::XmlSchemasNNInteger => {
-                                let mut cur: *const XmlChar = value;
-                                let mut lo: u64 = 0;
-                                let mut mi: u64 = 0;
-                                let mut hi: u64 = 0;
-                                let mut sign: i32 = 0;
 
-                                if cur.is_null() {
-                                    break 'return1;
-                                }
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
-                                        cur = cur.add(1);
-                                    }
-                                }
-                                if *cur == b'-' {
-                                    sign = 1;
-                                    cur = cur.add(1);
-                                } else if *cur == b'+' {
-                                    cur = cur.add(1);
-                                }
-                                ret = xml_schema_parse_uint(
-                                    addr_of_mut!(cur),
-                                    addr_of_mut!(lo),
-                                    addr_of_mut!(mi),
-                                    addr_of_mut!(hi),
-                                );
-                                if ret < 0 {
-                                    break 'return1;
-                                }
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
-                                        cur = cur.add(1);
-                                    }
-                                }
-                                if *cur != 0 {
-                                    break 'return1;
-                                }
-                                if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasNPInteger as i32
-                                {
-                                    if sign == 0 && (hi != 0 || mi != 0 || lo != 0) {
-                                        break 'return1;
-                                    }
-                                } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasPInteger as i32
-                                {
-                                    if sign == 1 {
-                                        break 'return1;
-                                    }
-                                    if hi == 0 && mi == 0 && lo == 0 {
-                                        break 'return1;
-                                    }
-                                } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasNInteger as i32
-                                {
-                                    if sign == 0 {
-                                        break 'return1;
-                                    }
-                                    if hi == 0 && mi == 0 && lo == 0 {
-                                        break 'return1;
-                                    }
-                                } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasNNInteger as i32
-                                    && (sign == 1 && (hi != 0 || mi != 0 || lo != 0))
-                                {
-                                    break 'return1;
-                                }
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(
-                                        (*typ).built_in_type.try_into().unwrap(),
-                                    );
-                                    if !v.is_null() {
-                                        if ret == 0 {
-                                            ret += 1;
-                                        }
-                                        (*v).value.decimal.lo = lo;
-                                        (*v).value.decimal.mi = mi;
-                                        (*v).value.decimal.hi = hi;
-                                        (*v).value.decimal.sign = sign as _;
-                                        (*v).value.decimal.frac = 0;
-                                        (*v).value.decimal.total = ret as _;
+                                        (*v).value.hex.str = cur as _;
+                                        (*v).value.hex.total = total as _;
                                         *val = v;
                                     }
+                                    break 'return0;
                                 }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasLong
-                            | XmlSchemaValType::XmlSchemasByte
-                            | XmlSchemaValType::XmlSchemasShort
-                            | XmlSchemaValType::XmlSchemasInt => {
-                                let mut cur: *const XmlChar = value;
-                                let mut lo: u64 = 0;
-                                let mut mi: u64 = 0;
-                                let mut hi: u64 = 0;
-                                let mut sign: i32 = 0;
+                                XmlSchemaValType::XmlSchemasBase64binary => {
+                                    // ISSUE:
+                                    //
+                                    // Ignore all stray characters? (yes, currently)
+                                    // Worry about long lines? (no, currently)
+                                    //
+                                    // rfc2045.txt:
+                                    //
+                                    // "The encoded output stream must be represented in lines of
+                                    // no more than 76 characters each.  All line breaks or other
+                                    // characters not found in Table 1 must be ignored by decoding
+                                    // software.  In base64 data, characters other than those in
+                                    // Table 1, line breaks, and other white space probably
+                                    // indicate a transmission error, about which a warning
+                                    // message or even a message rejection might be appropriate
+                                    // under some circumstances."
+                                    let mut cur: *const XmlChar = value;
+                                    let mut base: *mut XmlChar;
+                                    let mut total: i32;
+                                    let mut i: i32 = 0;
+                                    let mut pad: i32 = 0;
 
-                                if cur.is_null() {
-                                    break 'return1;
-                                }
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
+                                    if cur.is_null() {
+                                        break 'return1;
+                                    }
+
+                                    while *cur != 0 {
+                                        let decc: i32 = _xml_schema_base64_decode(*cur);
+                                        if decc < 0 {
+                                        } else if decc < 64 {
+                                            i += 1;
+                                        } else {
+                                            break;
+                                        }
                                         cur = cur.add(1);
                                     }
-                                }
-                                if *cur == b'-' {
-                                    sign = 1;
-                                    cur = cur.add(1);
-                                } else if *cur == b'+' {
-                                    cur = cur.add(1);
-                                }
-                                ret = xml_schema_parse_uint(
-                                    addr_of_mut!(cur),
-                                    addr_of_mut!(lo),
-                                    addr_of_mut!(mi),
-                                    addr_of_mut!(hi),
-                                );
-                                if ret < 0 {
-                                    break 'return1;
-                                }
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
+                                    while *cur != 0 {
+                                        let decc: i32 = _xml_schema_base64_decode(*cur);
+                                        if decc < 0 {
+                                        } else if decc < 64 {
+                                            break 'return1;
+                                        }
+                                        if decc == 64 {
+                                            pad += 1;
+                                        }
                                         cur = cur.add(1);
                                     }
-                                }
-                                if *cur != 0 {
-                                    break 'return1;
-                                }
-                                if (*typ).built_in_type == XmlSchemaValType::XmlSchemasLong as i32 {
-                                    if hi >= 922 {
-                                        if hi > 922 {
+
+                                    // rfc2045.txt: "Special processing is performed if fewer than
+                                    // 24 bits are available at the end of the data being encoded.
+                                    // A full encoding quantum is always completed at the end of a
+                                    // body.  When fewer than 24 input bits are available in an
+                                    // input group, zero bits are added (on the right) to form an
+                                    // integral number of 6-bit groups.  Padding at the end of the
+                                    // data is performed using the "=" character.  Since all
+                                    // base64 input is an integral number of octets, only the
+                                    // following cases can arise: (1) the final quantum of
+                                    // encoding input is an integral multiple of 24 bits; here,
+                                    // the final unit of encoded output will be an integral
+                                    // multiple of indent: Standard input:701: Warning:old style
+                                    // assignment ambiguity in "=*".  Assuming "= *" 4 characters
+                                    // with no "=" padding, (2) the final
+                                    // quantum of encoding input is exactly 8 bits; here, the
+                                    // final unit of encoded output will be two characters
+                                    // followed by two "=" padding characters, or (3) the final
+                                    // quantum of encoding input is exactly 16 bits; here, the
+                                    // final unit of encoded output will be three characters
+                                    // followed by one "=" padding character."
+
+                                    total = 3 * (i / 4);
+                                    if pad == 0 {
+                                        if i % 4 != 0 {
                                             break 'return1;
                                         }
-                                        if mi >= 33720368 {
-                                            if mi > 33720368 {
-                                                break 'return1;
+                                    } else if pad == 1 {
+                                        let mut decc: i32;
+
+                                        if i % 4 != 3 {
+                                            break 'return1;
+                                        }
+                                        decc = _xml_schema_base64_decode(*cur);
+                                        while !(0..=63).contains(&decc) {
+                                            cur = cur.sub(1);
+                                            decc = _xml_schema_base64_decode(*cur)
+                                        }
+                                        // 16bits in 24bits means 2 pad bits: nnnnnn nnmmmm mmmm00
+                                        // 00111100 -> 0x3c
+                                        if decc & !0x3c != 0 {
+                                            break 'return1;
+                                        }
+                                        total += 2;
+                                    } else if pad == 2 {
+                                        let mut decc: i32;
+
+                                        if i % 4 != 2 {
+                                            break 'return1;
+                                        }
+                                        decc = _xml_schema_base64_decode(*cur);
+                                        while !(0..=63).contains(&decc) {
+                                            cur = cur.sub(1);
+                                            decc = _xml_schema_base64_decode(*cur)
+                                        }
+                                        // 8bits in 12bits means 4 pad bits: nnnnnn nn0000
+                                        // 00110000 -> 0x30
+                                        if decc & !0x30 != 0 {
+                                            break 'return1;
+                                        }
+                                        total += 1;
+                                    } else {
+                                        break 'return1;
+                                    }
+
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            XmlSchemaValType::XmlSchemasBase64binary,
+                                        );
+                                        if v.is_null() {
+                                            break 'error;
+                                        }
+                                        base =
+                                            xml_malloc_atomic(i as usize + pad as usize + 1) as _;
+                                        if base.is_null() {
+                                            xml_schema_type_err_memory(
+                                                node,
+                                                Some("allocating base64 data"),
+                                            );
+                                            xml_free(v as _);
+                                            break 'return1;
+                                        }
+                                        (*v).value.base64.str = base;
+                                        cur = value;
+                                        while *cur != 0 {
+                                            if _xml_schema_base64_decode(*cur) >= 0 {
+                                                *base = *cur;
+                                                base = base.add(1);
                                             }
-                                            if sign == 0 && lo > 54775807 {
-                                                break 'return1;
-                                            }
-                                            if sign == 1 && lo > 54775808 {
-                                                break 'return1;
-                                            }
+                                            cur = cur.add(1);
                                         }
-                                    }
-                                } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasInt as i32
-                                {
-                                    if hi != 0 {
-                                        break 'return1;
-                                    }
-                                    if mi >= 21 {
-                                        if mi > 21 {
-                                            break 'return1;
-                                        }
-                                        if sign == 0 && lo > 47483647 {
-                                            break 'return1;
-                                        }
-                                        if sign == 1 && lo > 47483648 {
-                                            break 'return1;
-                                        }
-                                    }
-                                } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasShort as i32
-                                {
-                                    if mi != 0 || hi != 0 {
-                                        break 'return1;
-                                    }
-                                    if sign == 1 && lo > 32768 {
-                                        break 'return1;
-                                    }
-                                    if sign == 0 && lo > 32767 {
-                                        break 'return1;
-                                    }
-                                } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasByte as i32
-                                {
-                                    if mi != 0 || hi != 0 {
-                                        break 'return1;
-                                    }
-                                    if sign == 1 && lo > 128 {
-                                        break 'return1;
-                                    }
-                                    if sign == 0 && lo > 127 {
-                                        break 'return1;
-                                    }
-                                }
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(
-                                        (*typ).built_in_type.try_into().unwrap(),
-                                    );
-                                    if !v.is_null() {
-                                        (*v).value.decimal.lo = lo;
-                                        (*v).value.decimal.mi = mi;
-                                        (*v).value.decimal.hi = hi;
-                                        (*v).value.decimal.sign = sign as _;
-                                        (*v).value.decimal.frac = 0;
-                                        (*v).value.decimal.total = ret as _;
+                                        *base = 0;
+                                        (*v).value.base64.total = total as _;
                                         *val = v;
                                     }
+                                    break 'return0;
                                 }
-                                break 'return0;
-                            }
-                            XmlSchemaValType::XmlSchemasUInt
-                            | XmlSchemaValType::XmlSchemasULong
-                            | XmlSchemaValType::XmlSchemasUShort
-                            | XmlSchemaValType::XmlSchemasUByte => {
-                                let mut cur: *const XmlChar = value;
-                                let mut lo: u64 = 0;
-                                let mut mi: u64 = 0;
-                                let mut hi: u64 = 0;
+                                XmlSchemaValType::XmlSchemasInteger
+                                | XmlSchemaValType::XmlSchemasPInteger
+                                | XmlSchemaValType::XmlSchemasNPInteger
+                                | XmlSchemaValType::XmlSchemasNInteger
+                                | XmlSchemaValType::XmlSchemasNNInteger => {
+                                    let mut cur: *const XmlChar = value;
+                                    let mut lo: u64 = 0;
+                                    let mut mi: u64 = 0;
+                                    let mut hi: u64 = 0;
+                                    let mut sign: i32 = 0;
 
-                                if cur.is_null() {
-                                    break 'return1;
-                                }
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
+                                    if cur.is_null() {
+                                        break 'return1;
+                                    }
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+                                    if *cur == b'-' {
+                                        sign = 1;
+                                        cur = cur.add(1);
+                                    } else if *cur == b'+' {
                                         cur = cur.add(1);
                                     }
-                                }
-                                ret = xml_schema_parse_uint(
-                                    addr_of_mut!(cur),
-                                    addr_of_mut!(lo),
-                                    addr_of_mut!(mi),
-                                    addr_of_mut!(hi),
-                                );
-                                if ret < 0 {
-                                    break 'return1;
-                                }
-                                if norm_on_the_fly != 0 {
-                                    while IS_WSP_BLANK_CH!(*cur) {
-                                        cur = cur.add(1);
-                                    }
-                                }
-                                if *cur != 0 {
-                                    break 'return1;
-                                }
-                                if (*typ).built_in_type == XmlSchemaValType::XmlSchemasULong as i32
-                                {
-                                    if hi >= 1844 {
-                                        if hi > 1844 {
-                                            break 'return1;
-                                        }
-                                        if mi >= 67440737 {
-                                            if mi > 67440737 {
-                                                break 'return1;
-                                            }
-                                            if lo > 9551615 {
-                                                break 'return1;
-                                            }
-                                        }
-                                    }
-                                } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasUInt as i32
-                                {
-                                    if hi != 0 {
-                                        break 'return1;
-                                    }
-                                    if mi >= 42 {
-                                        if mi > 42 {
-                                            break 'return1;
-                                        }
-                                        if lo > 94967295 {
-                                            break 'return1;
-                                        }
-                                    }
-                                } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasUShort as i32
-                                {
-                                    if mi != 0 || hi != 0 {
-                                        break 'return1;
-                                    }
-                                    if lo > 65535 {
-                                        break 'return1;
-                                    }
-                                } else if (*typ).built_in_type
-                                    == XmlSchemaValType::XmlSchemasUByte as i32
-                                {
-                                    if mi != 0 || hi != 0 {
-                                        break 'return1;
-                                    }
-                                    if lo > 255 {
-                                        break 'return1;
-                                    }
-                                }
-                                if !val.is_null() {
-                                    v = xml_schema_new_value(
-                                        (*typ).built_in_type.try_into().unwrap(),
+                                    ret = xml_schema_parse_uint(
+                                        addr_of_mut!(cur),
+                                        addr_of_mut!(lo),
+                                        addr_of_mut!(mi),
+                                        addr_of_mut!(hi),
                                     );
-                                    if !v.is_null() {
-                                        (*v).value.decimal.lo = lo;
-                                        (*v).value.decimal.mi = mi;
-                                        (*v).value.decimal.hi = hi;
-                                        (*v).value.decimal.sign = 0;
-                                        (*v).value.decimal.frac = 0;
-                                        (*v).value.decimal.total = ret as _;
-                                        *val = v;
+                                    if ret < 0 {
+                                        break 'return1;
                                     }
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+                                    if *cur != 0 {
+                                        break 'return1;
+                                    }
+                                    if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasNPInteger as i32
+                                    {
+                                        if sign == 0 && (hi != 0 || mi != 0 || lo != 0) {
+                                            break 'return1;
+                                        }
+                                    } else if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasPInteger as i32
+                                    {
+                                        if sign == 1 {
+                                            break 'return1;
+                                        }
+                                        if hi == 0 && mi == 0 && lo == 0 {
+                                            break 'return1;
+                                        }
+                                    } else if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasNInteger as i32
+                                    {
+                                        if sign == 0 {
+                                            break 'return1;
+                                        }
+                                        if hi == 0 && mi == 0 && lo == 0 {
+                                            break 'return1;
+                                        }
+                                    } else if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasNNInteger as i32
+                                        && (sign == 1 && (hi != 0 || mi != 0 || lo != 0))
+                                    {
+                                        break 'return1;
+                                    }
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            (*typ).built_in_type.try_into().unwrap(),
+                                        );
+                                        if !v.is_null() {
+                                            if ret == 0 {
+                                                ret += 1;
+                                            }
+                                            (*v).value.decimal.lo = lo;
+                                            (*v).value.decimal.mi = mi;
+                                            (*v).value.decimal.hi = hi;
+                                            (*v).value.decimal.sign = sign as _;
+                                            (*v).value.decimal.frac = 0;
+                                            (*v).value.decimal.total = ret as _;
+                                            *val = v;
+                                        }
+                                    }
+                                    break 'return0;
                                 }
-                                break 'return0;
+                                XmlSchemaValType::XmlSchemasLong
+                                | XmlSchemaValType::XmlSchemasByte
+                                | XmlSchemaValType::XmlSchemasShort
+                                | XmlSchemaValType::XmlSchemasInt => {
+                                    let mut cur: *const XmlChar = value;
+                                    let mut lo: u64 = 0;
+                                    let mut mi: u64 = 0;
+                                    let mut hi: u64 = 0;
+                                    let mut sign: i32 = 0;
+
+                                    if cur.is_null() {
+                                        break 'return1;
+                                    }
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+                                    if *cur == b'-' {
+                                        sign = 1;
+                                        cur = cur.add(1);
+                                    } else if *cur == b'+' {
+                                        cur = cur.add(1);
+                                    }
+                                    ret = xml_schema_parse_uint(
+                                        addr_of_mut!(cur),
+                                        addr_of_mut!(lo),
+                                        addr_of_mut!(mi),
+                                        addr_of_mut!(hi),
+                                    );
+                                    if ret < 0 {
+                                        break 'return1;
+                                    }
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+                                    if *cur != 0 {
+                                        break 'return1;
+                                    }
+                                    if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasLong as i32
+                                    {
+                                        if hi >= 922 {
+                                            if hi > 922 {
+                                                break 'return1;
+                                            }
+                                            if mi >= 33720368 {
+                                                if mi > 33720368 {
+                                                    break 'return1;
+                                                }
+                                                if sign == 0 && lo > 54775807 {
+                                                    break 'return1;
+                                                }
+                                                if sign == 1 && lo > 54775808 {
+                                                    break 'return1;
+                                                }
+                                            }
+                                        }
+                                    } else if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasInt as i32
+                                    {
+                                        if hi != 0 {
+                                            break 'return1;
+                                        }
+                                        if mi >= 21 {
+                                            if mi > 21 {
+                                                break 'return1;
+                                            }
+                                            if sign == 0 && lo > 47483647 {
+                                                break 'return1;
+                                            }
+                                            if sign == 1 && lo > 47483648 {
+                                                break 'return1;
+                                            }
+                                        }
+                                    } else if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasShort as i32
+                                    {
+                                        if mi != 0 || hi != 0 {
+                                            break 'return1;
+                                        }
+                                        if sign == 1 && lo > 32768 {
+                                            break 'return1;
+                                        }
+                                        if sign == 0 && lo > 32767 {
+                                            break 'return1;
+                                        }
+                                    } else if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasByte as i32
+                                    {
+                                        if mi != 0 || hi != 0 {
+                                            break 'return1;
+                                        }
+                                        if sign == 1 && lo > 128 {
+                                            break 'return1;
+                                        }
+                                        if sign == 0 && lo > 127 {
+                                            break 'return1;
+                                        }
+                                    }
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            (*typ).built_in_type.try_into().unwrap(),
+                                        );
+                                        if !v.is_null() {
+                                            (*v).value.decimal.lo = lo;
+                                            (*v).value.decimal.mi = mi;
+                                            (*v).value.decimal.hi = hi;
+                                            (*v).value.decimal.sign = sign as _;
+                                            (*v).value.decimal.frac = 0;
+                                            (*v).value.decimal.total = ret as _;
+                                            *val = v;
+                                        }
+                                    }
+                                    break 'return0;
+                                }
+                                XmlSchemaValType::XmlSchemasUInt
+                                | XmlSchemaValType::XmlSchemasULong
+                                | XmlSchemaValType::XmlSchemasUShort
+                                | XmlSchemaValType::XmlSchemasUByte => {
+                                    let mut cur: *const XmlChar = value;
+                                    let mut lo: u64 = 0;
+                                    let mut mi: u64 = 0;
+                                    let mut hi: u64 = 0;
+
+                                    if cur.is_null() {
+                                        break 'return1;
+                                    }
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+                                    ret = xml_schema_parse_uint(
+                                        addr_of_mut!(cur),
+                                        addr_of_mut!(lo),
+                                        addr_of_mut!(mi),
+                                        addr_of_mut!(hi),
+                                    );
+                                    if ret < 0 {
+                                        break 'return1;
+                                    }
+                                    if norm_on_the_fly != 0 {
+                                        while IS_WSP_BLANK_CH!(*cur) {
+                                            cur = cur.add(1);
+                                        }
+                                    }
+                                    if *cur != 0 {
+                                        break 'return1;
+                                    }
+                                    if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasULong as i32
+                                    {
+                                        if hi >= 1844 {
+                                            if hi > 1844 {
+                                                break 'return1;
+                                            }
+                                            if mi >= 67440737 {
+                                                if mi > 67440737 {
+                                                    break 'return1;
+                                                }
+                                                if lo > 9551615 {
+                                                    break 'return1;
+                                                }
+                                            }
+                                        }
+                                    } else if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasUInt as i32
+                                    {
+                                        if hi != 0 {
+                                            break 'return1;
+                                        }
+                                        if mi >= 42 {
+                                            if mi > 42 {
+                                                break 'return1;
+                                            }
+                                            if lo > 94967295 {
+                                                break 'return1;
+                                            }
+                                        }
+                                    } else if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasUShort as i32
+                                    {
+                                        if mi != 0 || hi != 0 {
+                                            break 'return1;
+                                        }
+                                        if lo > 65535 {
+                                            break 'return1;
+                                        }
+                                    } else if (*typ).built_in_type
+                                        == XmlSchemaValType::XmlSchemasUByte as i32
+                                    {
+                                        if mi != 0 || hi != 0 {
+                                            break 'return1;
+                                        }
+                                        if lo > 255 {
+                                            break 'return1;
+                                        }
+                                    }
+                                    if !val.is_null() {
+                                        v = xml_schema_new_value(
+                                            (*typ).built_in_type.try_into().unwrap(),
+                                        );
+                                        if !v.is_null() {
+                                            (*v).value.decimal.lo = lo;
+                                            (*v).value.decimal.mi = mi;
+                                            (*v).value.decimal.hi = hi;
+                                            (*v).value.decimal.sign = 0;
+                                            (*v).value.decimal.frac = 0;
+                                            (*v).value.decimal.total = ret as _;
+                                            *val = v;
+                                        }
+                                    }
+                                    break 'return0;
+                                }
                             }
                         }
+                        //   done:
+                        if !norm.is_null() {
+                            xml_free(norm as _);
+                        }
+                        return ret;
                     }
-                    //   done:
+                    //   return3:
                     if !norm.is_null() {
                         xml_free(norm as _);
                     }
-                    return ret;
+                    return 3;
                 }
-                //   return3:
+                //   return1:
                 if !norm.is_null() {
                     xml_free(norm as _);
                 }
-                return 3;
+                return 1;
             }
-            //   return1:
+            //   return0:
             if !norm.is_null() {
                 xml_free(norm as _);
             }
-            return 1;
+            return 0;
         }
-        //   return0:
+        //   error:
         if !norm.is_null() {
             xml_free(norm as _);
         }
-        return 0;
+        -1
     }
-    //   error:
-    if !norm.is_null() {
-        xml_free(norm as _);
-    }
-    -1
 }
 
 /// Check that a value conforms to the lexical space of the predefined type.
@@ -3648,17 +3726,19 @@ pub unsafe fn xml_schema_val_predef_type_node(
     val: *mut XmlSchemaValPtr,
     node: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    xml_schema_val_atomic_type(
-        typ,
-        value,
-        val,
-        node,
-        0,
-        XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
-        1,
-        1,
-        0,
-    )
+    unsafe {
+        xml_schema_val_atomic_type(
+            typ,
+            value,
+            val,
+            node,
+            0,
+            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
+            1,
+            1,
+            0,
+        )
+    }
 }
 
 /// Compare 2 decimals
@@ -3666,129 +3746,135 @@ pub unsafe fn xml_schema_val_predef_type_node(
 /// Returns -1 if x < y, 0 if x == y, 1 if x > y and -2 in case of error
 #[doc(alias = "xmlSchemaCompareDecimals")]
 unsafe fn xml_schema_compare_decimals(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i32 {
-    let swp: XmlSchemaValPtr;
-    let mut order: i32 = 1;
-    let mut dlen: i32;
-    let mut hi: u64;
-    let mut mi: u64;
-    let mut lo: u64;
+    unsafe {
+        let swp: XmlSchemaValPtr;
+        let mut order: i32 = 1;
+        let mut dlen: i32;
+        let mut hi: u64;
+        let mut mi: u64;
+        let mut lo: u64;
 
-    // First test: If x is -ve and not zero
-    if (*x).value.decimal.sign != 0
-        && ((*x).value.decimal.lo != 0 || (*x).value.decimal.mi != 0 || (*x).value.decimal.hi != 0)
-    {
-        // Then if y is -ve and not zero reverse the compare
-        if (*y).value.decimal.sign != 0
+        // First test: If x is -ve and not zero
+        if (*x).value.decimal.sign != 0
+            && ((*x).value.decimal.lo != 0
+                || (*x).value.decimal.mi != 0
+                || (*x).value.decimal.hi != 0)
+        {
+            // Then if y is -ve and not zero reverse the compare
+            if (*y).value.decimal.sign != 0
+                && ((*y).value.decimal.lo != 0
+                    || (*y).value.decimal.mi != 0
+                    || (*y).value.decimal.hi != 0)
+            {
+                order = -1;
+            }
+            // Otherwise (y >= 0) we have the answer
+            else {
+                return -1;
+            }
+        // If x is not -ve and y is -ve we have the answer
+        } else if (*y).value.decimal.sign != 0
             && ((*y).value.decimal.lo != 0
                 || (*y).value.decimal.mi != 0
                 || (*y).value.decimal.hi != 0)
         {
-            order = -1;
+            return 1;
         }
-        // Otherwise (y >= 0) we have the answer
-        else {
-            return -1;
+        // If it's not simply determined by a difference in sign,
+        // then we need to compare the actual values of the two nums.
+        // To do this, we start by looking at the integral parts.
+        // If the number of integral digits differ, then we have our
+        // answer.
+        let integx: i32 = ((*x).value.decimal.total - (*x).value.decimal.frac) as _;
+        let integy: i32 = ((*y).value.decimal.total - (*y).value.decimal.frac) as _;
+        // NOTE: We changed the "total" for values like "0.1"
+        //   (or "-0.1" or ".1") to be 1, which was 2 previously.
+        //   Therefore the special case, when such values are
+        //   compared with 0, needs to be handled separately;
+        //   otherwise a zero would be recognized incorrectly as
+        //   greater than those values. This has the nice side effect
+        //   that we gain an overall optimized comparison with zeroes.
+        // Note that a "0" has a "total" of 1 already.
+        if integx == 1 && (*x).value.decimal.lo == 0 {
+            if integy != 1 || (*y).value.decimal.lo != 0 {
+                return -order;
+            } else {
+                return 0;
+            }
         }
-    // If x is not -ve and y is -ve we have the answer
-    } else if (*y).value.decimal.sign != 0
-        && ((*y).value.decimal.lo != 0 || (*y).value.decimal.mi != 0 || (*y).value.decimal.hi != 0)
-    {
-        return 1;
-    }
-    // If it's not simply determined by a difference in sign,
-    // then we need to compare the actual values of the two nums.
-    // To do this, we start by looking at the integral parts.
-    // If the number of integral digits differ, then we have our
-    // answer.
-    let integx: i32 = ((*x).value.decimal.total - (*x).value.decimal.frac) as _;
-    let integy: i32 = ((*y).value.decimal.total - (*y).value.decimal.frac) as _;
-    // NOTE: We changed the "total" for values like "0.1"
-    //   (or "-0.1" or ".1") to be 1, which was 2 previously.
-    //   Therefore the special case, when such values are
-    //   compared with 0, needs to be handled separately;
-    //   otherwise a zero would be recognized incorrectly as
-    //   greater than those values. This has the nice side effect
-    //   that we gain an overall optimized comparison with zeroes.
-    // Note that a "0" has a "total" of 1 already.
-    if integx == 1 && (*x).value.decimal.lo == 0 {
-        if integy != 1 || (*y).value.decimal.lo != 0 {
-            return -order;
-        } else {
-            return 0;
+        if integy == 1 && (*y).value.decimal.lo == 0 {
+            if integx != 1 || (*x).value.decimal.lo != 0 {
+                return order;
+            } else {
+                return 0;
+            }
         }
-    }
-    if integy == 1 && (*y).value.decimal.lo == 0 {
-        if integx != 1 || (*x).value.decimal.lo != 0 {
-            return order;
-        } else {
-            return 0;
-        }
-    }
 
-    match integx.cmp(&integy) {
-        std::cmp::Ordering::Greater => return order,
-        std::cmp::Ordering::Less => return -order,
-        std::cmp::Ordering::Equal => {}
-    }
-
-    // If the number of integral digits is the same for both numbers,
-    // then things get a little more complicated.  We need to "normalize"
-    // the numbers in order to properly compare them.  To do this, we
-    // look at the total length of each number (length => number of
-    // significant digits), and divide the "shorter" by 10 (decreasing
-    // the length) until they are of equal length.
-    dlen = ((*x).value.decimal.total - (*y).value.decimal.total) as _;
-    if dlen < 0 {
-        // y has more digits than x
-        swp = x;
-        hi = (*y).value.decimal.hi;
-        mi = (*y).value.decimal.mi;
-        lo = (*y).value.decimal.lo;
-        dlen = -dlen;
-        order = -order;
-    } else {
-        // x has more digits than y
-        swp = y;
-        hi = (*x).value.decimal.hi;
-        mi = (*x).value.decimal.mi;
-        lo = (*x).value.decimal.lo;
-    }
-    while dlen > 8 {
-        // in effect, right shift by 10**8
-        lo = mi;
-        mi = hi;
-        hi = 0;
-        dlen -= 8;
-    }
-    while dlen > 0 {
-        let rem1: u64 = (hi % 10) * 100000000u64;
-        hi /= 10;
-        let rem2: u64 = (mi % 10) * 100000000u64;
-        mi = (mi + rem1) / 10;
-        lo = (lo + rem2) / 10;
-        dlen -= 1;
-    }
-
-    match hi.cmp(&(*swp).value.decimal.hi) {
-        std::cmp::Ordering::Greater => return order,
-        std::cmp::Ordering::Equal => match mi.cmp(&(*swp).value.decimal.mi) {
+        match integx.cmp(&integy) {
             std::cmp::Ordering::Greater => return order,
-            std::cmp::Ordering::Equal => match lo.cmp(&(*swp).value.decimal.lo) {
+            std::cmp::Ordering::Less => return -order,
+            std::cmp::Ordering::Equal => {}
+        }
+
+        // If the number of integral digits is the same for both numbers,
+        // then things get a little more complicated.  We need to "normalize"
+        // the numbers in order to properly compare them.  To do this, we
+        // look at the total length of each number (length => number of
+        // significant digits), and divide the "shorter" by 10 (decreasing
+        // the length) until they are of equal length.
+        dlen = ((*x).value.decimal.total - (*y).value.decimal.total) as _;
+        if dlen < 0 {
+            // y has more digits than x
+            swp = x;
+            hi = (*y).value.decimal.hi;
+            mi = (*y).value.decimal.mi;
+            lo = (*y).value.decimal.lo;
+            dlen = -dlen;
+            order = -order;
+        } else {
+            // x has more digits than y
+            swp = y;
+            hi = (*x).value.decimal.hi;
+            mi = (*x).value.decimal.mi;
+            lo = (*x).value.decimal.lo;
+        }
+        while dlen > 8 {
+            // in effect, right shift by 10**8
+            lo = mi;
+            mi = hi;
+            hi = 0;
+            dlen -= 8;
+        }
+        while dlen > 0 {
+            let rem1: u64 = (hi % 10) * 100000000u64;
+            hi /= 10;
+            let rem2: u64 = (mi % 10) * 100000000u64;
+            mi = (mi + rem1) / 10;
+            lo = (lo + rem2) / 10;
+            dlen -= 1;
+        }
+
+        match hi.cmp(&(*swp).value.decimal.hi) {
+            std::cmp::Ordering::Greater => return order,
+            std::cmp::Ordering::Equal => match mi.cmp(&(*swp).value.decimal.mi) {
                 std::cmp::Ordering::Greater => return order,
-                std::cmp::Ordering::Equal => {
-                    if (*x).value.decimal.total == (*y).value.decimal.total {
-                        return 0;
-                    } else {
-                        return order;
+                std::cmp::Ordering::Equal => match lo.cmp(&(*swp).value.decimal.lo) {
+                    std::cmp::Ordering::Greater => return order,
+                    std::cmp::Ordering::Equal => {
+                        if (*x).value.decimal.total == (*y).value.decimal.total {
+                            return 0;
+                        } else {
+                            return order;
+                        }
                     }
-                }
+                    std::cmp::Ordering::Less => {}
+                },
                 std::cmp::Ordering::Less => {}
             },
             std::cmp::Ordering::Less => {}
-        },
-        std::cmp::Ordering::Less => {}
+        }
+        -order
     }
-    -order
 }
 
 /// Compare 2 durations
@@ -3796,101 +3882,103 @@ unsafe fn xml_schema_compare_decimals(x: XmlSchemaValPtr, y: XmlSchemaValPtr) ->
 /// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in case of error
 #[doc(alias = "xmlSchemaCompareDurations")]
 unsafe fn xml_schema_compare_durations(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i32 {
-    let mut sec: f64;
-    let mut invert: i32 = 1;
-    let mut xmon: i64;
-    let xday: i64;
+    unsafe {
+        let mut sec: f64;
+        let mut invert: i32 = 1;
+        let mut xmon: i64;
+        let xday: i64;
 
-    let mut minday: i64;
-    let mut maxday: i64;
-    const DAY_RANGE: [[i64; 12]; 2] = [
-        [0, 28, 59, 89, 120, 150, 181, 212, 242, 273, 303, 334],
-        [0, 31, 62, 92, 123, 153, 184, 215, 245, 276, 306, 337],
-    ];
+        let mut minday: i64;
+        let mut maxday: i64;
+        const DAY_RANGE: [[i64; 12]; 2] = [
+            [0, 28, 59, 89, 120, 150, 181, 212, 242, 273, 303, 334],
+            [0, 31, 62, 92, 123, 153, 184, 215, 245, 276, 306, 337],
+        ];
 
-    if x.is_null() || y.is_null() {
-        return -2;
-    }
+        if x.is_null() || y.is_null() {
+            return -2;
+        }
 
-    // months
-    let mon: i64 = (*x).value.dur.mon - (*y).value.dur.mon;
+        // months
+        let mon: i64 = (*x).value.dur.mon - (*y).value.dur.mon;
 
-    // seconds
-    sec = (*x).value.dur.sec - (*y).value.dur.sec;
-    let carry: i64 = (sec / SECS_PER_DAY as f64) as i64;
-    sec -= carry as f64 * SECS_PER_DAY as f64;
+        // seconds
+        sec = (*x).value.dur.sec - (*y).value.dur.sec;
+        let carry: i64 = (sec / SECS_PER_DAY as f64) as i64;
+        sec -= carry as f64 * SECS_PER_DAY as f64;
 
-    // days
-    let day: i64 = (*x).value.dur.day - (*y).value.dur.day + carry;
+        // days
+        let day: i64 = (*x).value.dur.day - (*y).value.dur.day + carry;
 
-    // easy test
-    if mon == 0 {
-        match day.cmp(&0) {
-            std::cmp::Ordering::Equal => {
-                if sec == 0.0 {
-                    return 0;
-                } else if sec < 0.0 {
+        // easy test
+        if mon == 0 {
+            match day.cmp(&0) {
+                std::cmp::Ordering::Equal => {
+                    if sec == 0.0 {
+                        return 0;
+                    } else if sec < 0.0 {
+                        return -1;
+                    } else {
+                        return 1;
+                    }
+                }
+                std::cmp::Ordering::Less => {
                     return -1;
-                } else {
+                }
+                std::cmp::Ordering::Greater => {
                     return 1;
                 }
             }
-            std::cmp::Ordering::Less => {
-                return -1;
-            }
-            std::cmp::Ordering::Greater => {
+        }
+
+        if mon > 0 {
+            if day >= 0 && sec >= 0.0 {
                 return 1;
+            } else {
+                xmon = mon;
+                xday = -day;
             }
-        }
-    }
-
-    if mon > 0 {
-        if day >= 0 && sec >= 0.0 {
-            return 1;
+        } else if day <= 0 && sec <= 0.0 {
+            return -1;
         } else {
-            xmon = mon;
-            xday = -day;
+            invert = -1;
+            xmon = -mon;
+            xday = day;
         }
-    } else if day <= 0 && sec <= 0.0 {
-        return -1;
-    } else {
-        invert = -1;
-        xmon = -mon;
-        xday = day;
-    }
 
-    let myear: i64 = xmon / 12;
-    if myear == 0 {
-        minday = 0;
-        maxday = 0;
-    } else {
-        if myear > i64::MAX / 366 {
-            return -2;
+        let myear: i64 = xmon / 12;
+        if myear == 0 {
+            minday = 0;
+            maxday = 0;
+        } else {
+            if myear > i64::MAX / 366 {
+                return -2;
+            }
+            // FIXME: This doesn't take leap year exceptions every 100/400 years
+            // into account.
+            maxday = 365 * myear + (myear + 3) / 4;
+            // FIXME: Needs to be calculated separately
+            minday = maxday - 1;
         }
-        // FIXME: This doesn't take leap year exceptions every 100/400 years
-        // into account.
-        maxday = 365 * myear + (myear + 3) / 4;
-        // FIXME: Needs to be calculated separately
-        minday = maxday - 1;
-    }
 
-    xmon %= 12;
-    minday += DAY_RANGE[0][xmon as usize];
-    maxday += DAY_RANGE[1][xmon as usize];
+        xmon %= 12;
+        minday += DAY_RANGE[0][xmon as usize];
+        maxday += DAY_RANGE[1][xmon as usize];
 
-    if maxday == minday && maxday == xday {
-        // can this really happen ?
-        return 0;
-    }
-    if maxday < xday {
-        return -invert;
-    }
-    if minday > xday {
-        return invert;
-    }
+        if maxday == minday && maxday == xday {
+            // can this really happen ?
+            return 0;
+        }
+        if maxday < xday {
+            return -invert;
+        }
+        if minday > xday {
+            return invert;
+        }
 
-    // indeterminate
-    2
+        // indeterminate
+        2
+    }
 }
 
 /// Makes a copy of @v. The calling program is responsible for freeing the returned value.
@@ -3898,14 +3986,16 @@ unsafe fn xml_schema_compare_durations(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -
 /// returns a pointer to a duplicated #xmlSchemaValPtr or NULL if error.
 #[doc(alias = "xmlSchemaDupVal")]
 unsafe fn xml_schema_dup_val(v: XmlSchemaValPtr) -> XmlSchemaValPtr {
-    let ret: XmlSchemaValPtr = xml_schema_new_value((*v).typ);
-    if ret.is_null() {
-        return null_mut();
-    }
+    unsafe {
+        let ret: XmlSchemaValPtr = xml_schema_new_value((*v).typ);
+        if ret.is_null() {
+            return null_mut();
+        }
 
-    memcpy(ret as _, v as _, size_of::<XmlSchemaVal>());
-    (*ret).next = null_mut();
-    ret
+        memcpy(ret as _, v as _, size_of::<XmlSchemaVal>());
+        (*ret).next = null_mut();
+        ret
+    }
 }
 
 // macros for adding date/times and durations
@@ -3938,147 +4028,149 @@ macro_rules! MODULO_RANGE {
 /// Returns a pointer to a new #xmlSchemaVal or NULL if error.
 #[doc(alias = "_xmlSchemaDateAdd")]
 unsafe fn _xml_schema_date_add(dt: XmlSchemaValPtr, dur: XmlSchemaValPtr) -> XmlSchemaValPtr {
-    let mut carry: i64;
-    let mut tempdays: i64;
-    let mut temp: i64;
+    unsafe {
+        let mut carry: i64;
+        let mut tempdays: i64;
+        let mut temp: i64;
 
-    if dt.is_null() || dur.is_null() {
-        return null_mut();
-    }
-
-    let ret: XmlSchemaValPtr = xml_schema_new_value((*dt).typ);
-    if ret.is_null() {
-        return null_mut();
-    }
-
-    // make a copy so we don't alter the original value
-    let tmp: XmlSchemaValPtr = xml_schema_dup_val(dt);
-    if tmp.is_null() {
-        xml_schema_free_value(ret);
-        return null_mut();
-    }
-
-    let r: XmlSchemaValDatePtr = addr_of_mut!((*ret).value.date);
-    let d: XmlSchemaValDatePtr = addr_of_mut!((*tmp).value.date);
-    let u: XmlSchemaValDurationPtr = addr_of_mut!((*dur).value.dur);
-
-    // normalization
-    if (*d).mon == 0 {
-        (*d).mon = 1;
-    }
-
-    // normalize for time zone offset
-    (*u).sec -= (*d).tzo as f64 * 60.;
-    (*d).tzo = 0;
-
-    // normalization
-    if (*d).day == 0 {
-        (*d).day = 1;
-    }
-
-    // month
-    carry = (*d).mon as i64 + (*u).mon;
-    (*r).mon = MODULO_RANGE!(carry, 1, 13) as u32;
-    carry = FQUOTIENT_RANGE!(carry, 1, 13) as i64;
-
-    // year (may be modified later)
-    (*r).year = (*d).year + carry;
-    if (*r).year == 0 {
-        if (*d).year > 0 {
-            (*r).year -= 1;
-        } else {
-            (*r).year += 1;
-        }
-    }
-
-    // time zone
-    (*r).tzo = (*d).tzo;
-    (*r).tz_flag = (*d).tz_flag;
-
-    // seconds
-    (*r).sec = (*d).sec + (*u).sec;
-    carry = FQUOTIENT!((*r).sec as i64, 60) as i64;
-    if (*r).sec != 0.0 {
-        (*r).sec = MODULO!((*r).sec, 60.0);
-    }
-
-    // minute
-    carry += (*d).min as i64;
-    (*r).min = MODULO!(carry, 60) as u32;
-    carry = FQUOTIENT!(carry, 60) as i64;
-
-    // hours
-    carry += (*d).hour as i64;
-    (*r).hour = MODULO!(carry, 24) as u32;
-    carry = FQUOTIENT!(carry, 24) as i64;
-
-    // days
-    // Note we use tempdays because the temporary values may need more than 5 bits
-    if VALID_YEAR!((*r).year)
-        && VALID_MONTH!((*r).mon)
-        && (*d).day > MAX_DAYINMONTH!((*r).year, (*r).mon)
-    {
-        tempdays = MAX_DAYINMONTH!((*r).year, (*r).mon) as i64;
-    } else if (*d).day < 1 {
-        tempdays = 1;
-    } else {
-        tempdays = (*d).day as i64;
-    }
-
-    tempdays += (*u).day + carry;
-
-    loop {
-        if tempdays < 1 {
-            let mut tmon: i64 = MODULO_RANGE!((*r).mon as i32 - 1, 1, 13) as i64;
-            let mut tyr: i64 = (*r).year + FQUOTIENT_RANGE!((*r).mon as i32 - 1, 1, 13) as i64;
-            if tyr == 0 {
-                tyr -= 1;
-            }
-            // Coverity detected an overrun in DAYS_IN_MONTH
-            // of size 12 at position 12 with index variable "((r)->mon - 1)"
-            tmon = tmon.clamp(1, 12);
-            tempdays += MAX_DAYINMONTH!(tyr, tmon) as i64;
-            carry = -1;
-        } else if VALID_YEAR!((*r).year)
-            && VALID_MONTH!((*r).mon)
-            && tempdays > MAX_DAYINMONTH!((*r).year, (*r).mon) as i64
-        {
-            tempdays -= MAX_DAYINMONTH!((*r).year, (*r).mon) as i64;
-            carry = 1;
-        } else {
-            break;
+        if dt.is_null() || dur.is_null() {
+            return null_mut();
         }
 
-        temp = (*r).mon as i64 + carry;
-        (*r).mon = MODULO_RANGE!(temp, 1, 13) as u32;
-        (*r).year += FQUOTIENT_RANGE!(temp, 1, 13) as i64;
+        let ret: XmlSchemaValPtr = xml_schema_new_value((*dt).typ);
+        if ret.is_null() {
+            return null_mut();
+        }
+
+        // make a copy so we don't alter the original value
+        let tmp: XmlSchemaValPtr = xml_schema_dup_val(dt);
+        if tmp.is_null() {
+            xml_schema_free_value(ret);
+            return null_mut();
+        }
+
+        let r: XmlSchemaValDatePtr = addr_of_mut!((*ret).value.date);
+        let d: XmlSchemaValDatePtr = addr_of_mut!((*tmp).value.date);
+        let u: XmlSchemaValDurationPtr = addr_of_mut!((*dur).value.dur);
+
+        // normalization
+        if (*d).mon == 0 {
+            (*d).mon = 1;
+        }
+
+        // normalize for time zone offset
+        (*u).sec -= (*d).tzo as f64 * 60.;
+        (*d).tzo = 0;
+
+        // normalization
+        if (*d).day == 0 {
+            (*d).day = 1;
+        }
+
+        // month
+        carry = (*d).mon as i64 + (*u).mon;
+        (*r).mon = MODULO_RANGE!(carry, 1, 13) as u32;
+        carry = FQUOTIENT_RANGE!(carry, 1, 13) as i64;
+
+        // year (may be modified later)
+        (*r).year = (*d).year + carry;
         if (*r).year == 0 {
-            if temp < 1 {
+            if (*d).year > 0 {
                 (*r).year -= 1;
             } else {
                 (*r).year += 1;
             }
         }
-    }
 
-    (*r).day = tempdays as u32;
+        // time zone
+        (*r).tzo = (*d).tzo;
+        (*r).tz_flag = (*d).tz_flag;
 
-    // adjust the date/time type to the date values
-    if (*ret).typ != XmlSchemaValType::XmlSchemasDatetime {
-        if (*r).hour != 0 || (*r).min != 0 || (*r).sec != 0.0 {
-            (*ret).typ = XmlSchemaValType::XmlSchemasDatetime;
-        } else if (*ret).typ != XmlSchemaValType::XmlSchemasDate {
-            if (*r).mon != 1 && (*r).day != 1 {
-                (*ret).typ = XmlSchemaValType::XmlSchemasDate;
-            } else if (*ret).typ != XmlSchemaValType::XmlSchemasGyearmonth && (*r).mon != 1 {
-                (*ret).typ = XmlSchemaValType::XmlSchemasGyearmonth;
+        // seconds
+        (*r).sec = (*d).sec + (*u).sec;
+        carry = FQUOTIENT!((*r).sec as i64, 60) as i64;
+        if (*r).sec != 0.0 {
+            (*r).sec = MODULO!((*r).sec, 60.0);
+        }
+
+        // minute
+        carry += (*d).min as i64;
+        (*r).min = MODULO!(carry, 60) as u32;
+        carry = FQUOTIENT!(carry, 60) as i64;
+
+        // hours
+        carry += (*d).hour as i64;
+        (*r).hour = MODULO!(carry, 24) as u32;
+        carry = FQUOTIENT!(carry, 24) as i64;
+
+        // days
+        // Note we use tempdays because the temporary values may need more than 5 bits
+        if VALID_YEAR!((*r).year)
+            && VALID_MONTH!((*r).mon)
+            && (*d).day > MAX_DAYINMONTH!((*r).year, (*r).mon)
+        {
+            tempdays = MAX_DAYINMONTH!((*r).year, (*r).mon) as i64;
+        } else if (*d).day < 1 {
+            tempdays = 1;
+        } else {
+            tempdays = (*d).day as i64;
+        }
+
+        tempdays += (*u).day + carry;
+
+        loop {
+            if tempdays < 1 {
+                let mut tmon: i64 = MODULO_RANGE!((*r).mon as i32 - 1, 1, 13) as i64;
+                let mut tyr: i64 = (*r).year + FQUOTIENT_RANGE!((*r).mon as i32 - 1, 1, 13) as i64;
+                if tyr == 0 {
+                    tyr -= 1;
+                }
+                // Coverity detected an overrun in DAYS_IN_MONTH
+                // of size 12 at position 12 with index variable "((r)->mon - 1)"
+                tmon = tmon.clamp(1, 12);
+                tempdays += MAX_DAYINMONTH!(tyr, tmon) as i64;
+                carry = -1;
+            } else if VALID_YEAR!((*r).year)
+                && VALID_MONTH!((*r).mon)
+                && tempdays > MAX_DAYINMONTH!((*r).year, (*r).mon) as i64
+            {
+                tempdays -= MAX_DAYINMONTH!((*r).year, (*r).mon) as i64;
+                carry = 1;
+            } else {
+                break;
+            }
+
+            temp = (*r).mon as i64 + carry;
+            (*r).mon = MODULO_RANGE!(temp, 1, 13) as u32;
+            (*r).year += FQUOTIENT_RANGE!(temp, 1, 13) as i64;
+            if (*r).year == 0 {
+                if temp < 1 {
+                    (*r).year -= 1;
+                } else {
+                    (*r).year += 1;
+                }
             }
         }
+
+        (*r).day = tempdays as u32;
+
+        // adjust the date/time type to the date values
+        if (*ret).typ != XmlSchemaValType::XmlSchemasDatetime {
+            if (*r).hour != 0 || (*r).min != 0 || (*r).sec != 0.0 {
+                (*ret).typ = XmlSchemaValType::XmlSchemasDatetime;
+            } else if (*ret).typ != XmlSchemaValType::XmlSchemasDate {
+                if (*r).mon != 1 && (*r).day != 1 {
+                    (*ret).typ = XmlSchemaValType::XmlSchemasDate;
+                } else if (*ret).typ != XmlSchemaValType::XmlSchemasGyearmonth && (*r).mon != 1 {
+                    (*ret).typ = XmlSchemaValType::XmlSchemasGyearmonth;
+                }
+            }
+        }
+
+        xml_schema_free_value(tmp);
+
+        ret
     }
-
-    xml_schema_free_value(tmp);
-
-    ret
 }
 
 /// Normalize @dt to GMT time. The @offset parameter is subtracted from
@@ -4087,36 +4179,38 @@ unsafe fn _xml_schema_date_add(dt: XmlSchemaValPtr, dur: XmlSchemaValPtr) -> Xml
 /// Returns a normalized copy of @dt or NULL if error.
 #[doc(alias = "xmlSchemaDateNormalize")]
 unsafe fn xml_schema_date_normalize(dt: XmlSchemaValPtr, offset: f64) -> XmlSchemaValPtr {
-    if dt.is_null() {
-        return null_mut();
+    unsafe {
+        if dt.is_null() {
+            return null_mut();
+        }
+
+        if !matches!(
+            (*dt).typ,
+            XmlSchemaValType::XmlSchemasTime
+                | XmlSchemaValType::XmlSchemasDatetime
+                | XmlSchemaValType::XmlSchemasDate
+        ) || (*dt).value.date.tzo == 0
+        {
+            return xml_schema_dup_val(dt);
+        }
+
+        let dur: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasDuration);
+        if dur.is_null() {
+            return null_mut();
+        }
+
+        (*dur).value.date.sec -= offset;
+
+        let ret: XmlSchemaValPtr = _xml_schema_date_add(dt, dur);
+        if ret.is_null() {
+            return null_mut();
+        }
+
+        xml_schema_free_value(dur);
+
+        // (*ret).value.date.tzo = 0;
+        ret
     }
-
-    if !matches!(
-        (*dt).typ,
-        XmlSchemaValType::XmlSchemasTime
-            | XmlSchemaValType::XmlSchemasDatetime
-            | XmlSchemaValType::XmlSchemasDate
-    ) || (*dt).value.date.tzo == 0
-    {
-        return xml_schema_dup_val(dt);
-    }
-
-    let dur: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasDuration);
-    if dur.is_null() {
-        return null_mut();
-    }
-
-    (*dur).value.date.sec -= offset;
-
-    let ret: XmlSchemaValPtr = _xml_schema_date_add(dt, dur);
-    if ret.is_null() {
-        return null_mut();
-    }
-
-    xml_schema_free_value(dur);
-
-    // (*ret).value.date.tzo = 0;
-    ret
 }
 
 /// Convert mon and year of @dt to total number of days. Take the
@@ -4127,23 +4221,25 @@ unsafe fn xml_schema_date_normalize(dt: XmlSchemaValPtr, offset: f64) -> XmlSche
 /// Returns number of days.
 #[doc(alias = "_xmlSchemaDateCastYMToDays")]
 unsafe fn _xml_schema_date_cast_ymto_days(dt: XmlSchemaValPtr) -> i64 {
-    let mut mon: i32;
+    unsafe {
+        let mut mon: i32;
 
-    mon = (*dt).value.date.mon as _;
-    if mon <= 0 {
-        mon = 1; /* normalization */
-    }
+        mon = (*dt).value.date.mon as _;
+        if mon <= 0 {
+            mon = 1; /* normalization */
+        }
 
-    if (*dt).value.date.year <= 0 {
-        (*dt).value.date.year * 365
-            + (((*dt).value.date.year + 1) / 4 - ((*dt).value.date.year + 1) / 100
-                + ((*dt).value.date.year + 1) / 400)
-            + DAY_IN_YEAR!(0, mon, (*dt).value.date.year)
-    } else {
-        ((*dt).value.date.year - 1) * 365
-            + (((*dt).value.date.year - 1) / 4 - ((*dt).value.date.year - 1) / 100
-                + ((*dt).value.date.year - 1) / 400)
-            + DAY_IN_YEAR!(0, mon, (*dt).value.date.year)
+        if (*dt).value.date.year <= 0 {
+            (*dt).value.date.year * 365
+                + (((*dt).value.date.year + 1) / 4 - ((*dt).value.date.year + 1) / 100
+                    + ((*dt).value.date.year + 1) / 400)
+                + DAY_IN_YEAR!(0, mon, (*dt).value.date.year)
+        } else {
+            ((*dt).value.date.year - 1) * 365
+                + (((*dt).value.date.year - 1) / 4 - ((*dt).value.date.year - 1) / 100
+                    + ((*dt).value.date.year - 1) / 400)
+                + DAY_IN_YEAR!(0, mon, (*dt).value.date.year)
+        }
     }
 }
 
@@ -4164,43 +4260,111 @@ macro_rules! TIME_TO_NUMBER {
 /// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in case of error
 #[doc(alias = "xmlSchemaCompareDates")]
 unsafe fn xml_schema_compare_dates(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i32 {
-    let mut p1: XmlSchemaValPtr;
-    let p2: XmlSchemaValPtr;
-    let mut q1: XmlSchemaValPtr;
-    let q2: XmlSchemaValPtr;
-    let mut p1d: i64;
-    let p2d: i64;
-    let mut q1d: i64;
-    let q2d: i64;
+    unsafe {
+        let mut p1: XmlSchemaValPtr;
+        let p2: XmlSchemaValPtr;
+        let mut q1: XmlSchemaValPtr;
+        let q2: XmlSchemaValPtr;
+        let mut p1d: i64;
+        let p2d: i64;
+        let mut q1d: i64;
+        let q2d: i64;
 
-    if x.is_null() || y.is_null() {
-        return -2;
-    }
+        if x.is_null() || y.is_null() {
+            return -2;
+        }
 
-    if (*x).value.date.year > i64::MAX / 366
-        || (*x).value.date.year < i64::MIN / 366
-        || (*y).value.date.year > i64::MAX / 366
-        || (*y).value.date.year < i64::MIN / 366
-    {
-        // Possible overflow when converting to days.
-        return -2;
-    }
+        if (*x).value.date.year > i64::MAX / 366
+            || (*x).value.date.year < i64::MIN / 366
+            || (*y).value.date.year > i64::MAX / 366
+            || (*y).value.date.year < i64::MIN / 366
+        {
+            // Possible overflow when converting to days.
+            return -2;
+        }
 
-    if (*x).value.date.tz_flag != 0 {
-        if (*y).value.date.tz_flag == 0 {
-            p1 = xml_schema_date_normalize(x, 0.);
+        if (*x).value.date.tz_flag != 0 {
+            if (*y).value.date.tz_flag == 0 {
+                p1 = xml_schema_date_normalize(x, 0.);
+                if p1.is_null() {
+                    return -2;
+                }
+                p1d = _xml_schema_date_cast_ymto_days(p1) + (*p1).value.date.day as i64;
+                // normalize y + 14:00
+                q1 = xml_schema_date_normalize(y, 14. * SECS_PER_HOUR as f64);
+                if q1.is_null() {
+                    xml_schema_free_value(p1);
+                    return -2;
+                }
+
+                q1d = _xml_schema_date_cast_ymto_days(q1) + (*q1).value.date.day as i64;
+                match p1d.cmp(&q1d) {
+                    std::cmp::Ordering::Less => {
+                        xml_schema_free_value(p1);
+                        xml_schema_free_value(q1);
+                        return -1;
+                    }
+                    std::cmp::Ordering::Equal => {
+                        let mut sec: f64;
+
+                        sec = TIME_TO_NUMBER!(p1) - TIME_TO_NUMBER!(q1);
+                        if sec < 0.0 {
+                            xml_schema_free_value(p1);
+                            xml_schema_free_value(q1);
+                            return -1;
+                        } else {
+                            let mut ret: i32 = 0;
+                            // normalize y - 14:00
+                            q2 = xml_schema_date_normalize(y, -(14. * SECS_PER_HOUR as f64));
+                            if q2.is_null() {
+                                xml_schema_free_value(p1);
+                                xml_schema_free_value(q1);
+                                return -2;
+                            }
+                            q2d = _xml_schema_date_cast_ymto_days(q2) + (*q2).value.date.day as i64;
+                            match p1d.cmp(&q2d) {
+                                std::cmp::Ordering::Greater => {
+                                    ret = 1;
+                                }
+                                std::cmp::Ordering::Equal => {
+                                    sec = TIME_TO_NUMBER!(p1) - TIME_TO_NUMBER!(q2);
+                                    if sec > 0.0 {
+                                        ret = 1;
+                                    } else {
+                                        ret = 2; /* indeterminate */
+                                    }
+                                }
+                                std::cmp::Ordering::Less => {}
+                            }
+                            xml_schema_free_value(p1);
+                            xml_schema_free_value(q1);
+                            xml_schema_free_value(q2);
+                            if ret != 0 {
+                                return ret;
+                            }
+                        }
+                    }
+                    std::cmp::Ordering::Greater => {
+                        xml_schema_free_value(p1);
+                        xml_schema_free_value(q1);
+                    }
+                }
+            }
+        } else if (*y).value.date.tz_flag != 0 {
+            q1 = xml_schema_date_normalize(y, 0.);
+            if q1.is_null() {
+                return -2;
+            }
+            q1d = _xml_schema_date_cast_ymto_days(q1) + (*q1).value.date.day as i64;
+
+            // normalize x - 14:00
+            p1 = xml_schema_date_normalize(x, -(14. * SECS_PER_HOUR as f64));
             if p1.is_null() {
+                xml_schema_free_value(q1);
                 return -2;
             }
             p1d = _xml_schema_date_cast_ymto_days(p1) + (*p1).value.date.day as i64;
-            // normalize y + 14:00
-            q1 = xml_schema_date_normalize(y, 14. * SECS_PER_HOUR as f64);
-            if q1.is_null() {
-                xml_schema_free_value(p1);
-                return -2;
-            }
 
-            q1d = _xml_schema_date_cast_ymto_days(q1) + (*q1).value.date.day as i64;
             match p1d.cmp(&q1d) {
                 std::cmp::Ordering::Less => {
                     xml_schema_free_value(p1);
@@ -4217,20 +4381,21 @@ unsafe fn xml_schema_compare_dates(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i3
                         return -1;
                     } else {
                         let mut ret: i32 = 0;
-                        // normalize y - 14:00
-                        q2 = xml_schema_date_normalize(y, -(14. * SECS_PER_HOUR as f64));
-                        if q2.is_null() {
+                        // normalize x + 14:00
+                        p2 = xml_schema_date_normalize(x, 14.0 * SECS_PER_HOUR as f64);
+                        if p2.is_null() {
                             xml_schema_free_value(p1);
                             xml_schema_free_value(q1);
                             return -2;
                         }
-                        q2d = _xml_schema_date_cast_ymto_days(q2) + (*q2).value.date.day as i64;
-                        match p1d.cmp(&q2d) {
+                        p2d = _xml_schema_date_cast_ymto_days(p2) + (*p2).value.date.day as i64;
+
+                        match p2d.cmp(&q1d) {
                             std::cmp::Ordering::Greater => {
                                 ret = 1;
                             }
                             std::cmp::Ordering::Equal => {
-                                sec = TIME_TO_NUMBER!(p1) - TIME_TO_NUMBER!(q2);
+                                sec = TIME_TO_NUMBER!(p2) - TIME_TO_NUMBER!(q1);
                                 if sec > 0.0 {
                                     ret = 1;
                                 } else {
@@ -4241,7 +4406,7 @@ unsafe fn xml_schema_compare_dates(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i3
                         }
                         xml_schema_free_value(p1);
                         xml_schema_free_value(q1);
-                        xml_schema_free_value(q2);
+                        xml_schema_free_value(p2);
                         if ret != 0 {
                             return ret;
                         }
@@ -4253,204 +4418,137 @@ unsafe fn xml_schema_compare_dates(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i3
                 }
             }
         }
-    } else if (*y).value.date.tz_flag != 0 {
-        q1 = xml_schema_date_normalize(y, 0.);
-        if q1.is_null() {
-            return -2;
-        }
-        q1d = _xml_schema_date_cast_ymto_days(q1) + (*q1).value.date.day as i64;
 
-        // normalize x - 14:00
-        p1 = xml_schema_date_normalize(x, -(14. * SECS_PER_HOUR as f64));
-        if p1.is_null() {
-            xml_schema_free_value(q1);
-            return -2;
-        }
-        p1d = _xml_schema_date_cast_ymto_days(p1) + (*p1).value.date.day as i64;
+        // if the same type then calculate the difference
+        if (*x).typ == (*y).typ {
+            let mut ret: i32 = 0;
+            q1 = xml_schema_date_normalize(y, 0.);
+            if q1.is_null() {
+                return -2;
+            }
+            q1d = _xml_schema_date_cast_ymto_days(q1) + (*q1).value.date.day as i64;
 
-        match p1d.cmp(&q1d) {
-            std::cmp::Ordering::Less => {
-                xml_schema_free_value(p1);
+            p1 = xml_schema_date_normalize(x, 0.);
+            if p1.is_null() {
                 xml_schema_free_value(q1);
-                return -1;
+                return -2;
             }
-            std::cmp::Ordering::Equal => {
-                let mut sec: f64;
+            p1d = _xml_schema_date_cast_ymto_days(p1) + (*p1).value.date.day as i64;
 
-                sec = TIME_TO_NUMBER!(p1) - TIME_TO_NUMBER!(q1);
-                if sec < 0.0 {
-                    xml_schema_free_value(p1);
-                    xml_schema_free_value(q1);
-                    return -1;
-                } else {
-                    let mut ret: i32 = 0;
-                    // normalize x + 14:00
-                    p2 = xml_schema_date_normalize(x, 14.0 * SECS_PER_HOUR as f64);
-                    if p2.is_null() {
-                        xml_schema_free_value(p1);
-                        xml_schema_free_value(q1);
-                        return -2;
-                    }
-                    p2d = _xml_schema_date_cast_ymto_days(p2) + (*p2).value.date.day as i64;
-
-                    match p2d.cmp(&q1d) {
-                        std::cmp::Ordering::Greater => {
-                            ret = 1;
-                        }
-                        std::cmp::Ordering::Equal => {
-                            sec = TIME_TO_NUMBER!(p2) - TIME_TO_NUMBER!(q1);
-                            if sec > 0.0 {
-                                ret = 1;
-                            } else {
-                                ret = 2; /* indeterminate */
-                            }
-                        }
-                        std::cmp::Ordering::Less => {}
-                    }
-                    xml_schema_free_value(p1);
-                    xml_schema_free_value(q1);
-                    xml_schema_free_value(p2);
-                    if ret != 0 {
-                        return ret;
-                    }
-                }
-            }
-            std::cmp::Ordering::Greater => {
-                xml_schema_free_value(p1);
-                xml_schema_free_value(q1);
-            }
-        }
-    }
-
-    // if the same type then calculate the difference
-    if (*x).typ == (*y).typ {
-        let mut ret: i32 = 0;
-        q1 = xml_schema_date_normalize(y, 0.);
-        if q1.is_null() {
-            return -2;
-        }
-        q1d = _xml_schema_date_cast_ymto_days(q1) + (*q1).value.date.day as i64;
-
-        p1 = xml_schema_date_normalize(x, 0.);
-        if p1.is_null() {
-            xml_schema_free_value(q1);
-            return -2;
-        }
-        p1d = _xml_schema_date_cast_ymto_days(p1) + (*p1).value.date.day as i64;
-
-        match p1d.cmp(&q1d) {
-            std::cmp::Ordering::Less => {
-                ret = -1;
-            }
-            std::cmp::Ordering::Greater => {
-                ret = 1;
-            }
-            std::cmp::Ordering::Equal => {
-                let sec: f64 = TIME_TO_NUMBER!(p1) - TIME_TO_NUMBER!(q1);
-                if sec < 0.0 {
+            match p1d.cmp(&q1d) {
+                std::cmp::Ordering::Less => {
                     ret = -1;
-                } else if sec > 0.0 {
+                }
+                std::cmp::Ordering::Greater => {
                     ret = 1;
                 }
+                std::cmp::Ordering::Equal => {
+                    let sec: f64 = TIME_TO_NUMBER!(p1) - TIME_TO_NUMBER!(q1);
+                    if sec < 0.0 {
+                        ret = -1;
+                    } else if sec > 0.0 {
+                        ret = 1;
+                    }
+                }
+            }
+            xml_schema_free_value(p1);
+            xml_schema_free_value(q1);
+            return ret;
+        }
+
+        let xmask = match (*x).typ {
+            XmlSchemaValType::XmlSchemasDatetime => 0xf,
+            XmlSchemaValType::XmlSchemasDate => 0x7,
+            XmlSchemaValType::XmlSchemasGyear => 0x1,
+            XmlSchemaValType::XmlSchemasGmonth => 0x2,
+            XmlSchemaValType::XmlSchemasGday => 0x3,
+            XmlSchemaValType::XmlSchemasGyearmonth => 0x3,
+            XmlSchemaValType::XmlSchemasGmonthday => 0x6,
+            XmlSchemaValType::XmlSchemasTime => 0x8,
+            _ => 0,
+        };
+
+        let ymask = match (*y).typ {
+            XmlSchemaValType::XmlSchemasDatetime => 0xf,
+            XmlSchemaValType::XmlSchemasDate => 0x7,
+            XmlSchemaValType::XmlSchemasGyear => 0x1,
+            XmlSchemaValType::XmlSchemasGmonth => 0x2,
+            XmlSchemaValType::XmlSchemasGday => 0x3,
+            XmlSchemaValType::XmlSchemasGyearmonth => 0x3,
+            XmlSchemaValType::XmlSchemasGmonthday => 0x6,
+            XmlSchemaValType::XmlSchemasTime => 0x8,
+            _ => 0,
+        };
+
+        let xor_mask: u8 = xmask ^ ymask; /* mark type differences */
+        let and_mask: u8 = xmask & ymask; /* mark field specification */
+
+        // year
+        if xor_mask & 1 != 0 {
+            return 2; /* indeterminate */
+        } else if and_mask & 1 != 0 {
+            match (*x).value.date.year.cmp(&(*y).value.date.year) {
+                std::cmp::Ordering::Less => {
+                    return -1;
+                }
+                std::cmp::Ordering::Greater => {
+                    return 1;
+                }
+                std::cmp::Ordering::Equal => {}
             }
         }
-        xml_schema_free_value(p1);
-        xml_schema_free_value(q1);
-        return ret;
-    }
 
-    let xmask = match (*x).typ {
-        XmlSchemaValType::XmlSchemasDatetime => 0xf,
-        XmlSchemaValType::XmlSchemasDate => 0x7,
-        XmlSchemaValType::XmlSchemasGyear => 0x1,
-        XmlSchemaValType::XmlSchemasGmonth => 0x2,
-        XmlSchemaValType::XmlSchemasGday => 0x3,
-        XmlSchemaValType::XmlSchemasGyearmonth => 0x3,
-        XmlSchemaValType::XmlSchemasGmonthday => 0x6,
-        XmlSchemaValType::XmlSchemasTime => 0x8,
-        _ => 0,
-    };
-
-    let ymask = match (*y).typ {
-        XmlSchemaValType::XmlSchemasDatetime => 0xf,
-        XmlSchemaValType::XmlSchemasDate => 0x7,
-        XmlSchemaValType::XmlSchemasGyear => 0x1,
-        XmlSchemaValType::XmlSchemasGmonth => 0x2,
-        XmlSchemaValType::XmlSchemasGday => 0x3,
-        XmlSchemaValType::XmlSchemasGyearmonth => 0x3,
-        XmlSchemaValType::XmlSchemasGmonthday => 0x6,
-        XmlSchemaValType::XmlSchemasTime => 0x8,
-        _ => 0,
-    };
-
-    let xor_mask: u8 = xmask ^ ymask; /* mark type differences */
-    let and_mask: u8 = xmask & ymask; /* mark field specification */
-
-    // year
-    if xor_mask & 1 != 0 {
-        return 2; /* indeterminate */
-    } else if and_mask & 1 != 0 {
-        match (*x).value.date.year.cmp(&(*y).value.date.year) {
-            std::cmp::Ordering::Less => {
-                return -1;
+        // month
+        if xor_mask & 2 != 0 {
+            return 2; /* indeterminate */
+        } else if and_mask & 2 != 0 {
+            match (*x).value.date.mon.cmp(&(*y).value.date.mon) {
+                std::cmp::Ordering::Less => {
+                    return -1;
+                }
+                std::cmp::Ordering::Greater => {
+                    return 1;
+                }
+                std::cmp::Ordering::Equal => {}
             }
-            std::cmp::Ordering::Greater => {
+        }
+
+        // day
+        if xor_mask & 4 != 0 {
+            return 2; /* indeterminate */
+        } else if and_mask & 4 != 0 {
+            match (*x).value.date.day.cmp(&(*y).value.date.day) {
+                std::cmp::Ordering::Less => {
+                    return -1;
+                }
+                std::cmp::Ordering::Greater => {
+                    return 1;
+                }
+                std::cmp::Ordering::Equal => {}
+            }
+        }
+
+        // time
+        if xor_mask & 8 != 0 {
+            return 2; /* indeterminate */
+        } else if and_mask & 8 != 0 {
+            if (*x).value.date.hour < (*y).value.date.hour {
+                return -1;
+            } else if (*x).value.date.hour > (*y).value.date.hour {
+                return 1;
+            } else if (*x).value.date.min < (*y).value.date.min {
+                return -1;
+            } else if (*x).value.date.min > (*y).value.date.min {
+                return 1;
+            } else if (*x).value.date.sec < (*y).value.date.sec {
+                return -1;
+            } else if (*x).value.date.sec > (*y).value.date.sec {
                 return 1;
             }
-            std::cmp::Ordering::Equal => {}
         }
-    }
 
-    // month
-    if xor_mask & 2 != 0 {
-        return 2; /* indeterminate */
-    } else if and_mask & 2 != 0 {
-        match (*x).value.date.mon.cmp(&(*y).value.date.mon) {
-            std::cmp::Ordering::Less => {
-                return -1;
-            }
-            std::cmp::Ordering::Greater => {
-                return 1;
-            }
-            std::cmp::Ordering::Equal => {}
-        }
+        0
     }
-
-    // day
-    if xor_mask & 4 != 0 {
-        return 2; /* indeterminate */
-    } else if and_mask & 4 != 0 {
-        match (*x).value.date.day.cmp(&(*y).value.date.day) {
-            std::cmp::Ordering::Less => {
-                return -1;
-            }
-            std::cmp::Ordering::Greater => {
-                return 1;
-            }
-            std::cmp::Ordering::Equal => {}
-        }
-    }
-
-    // time
-    if xor_mask & 8 != 0 {
-        return 2; /* indeterminate */
-    } else if and_mask & 8 != 0 {
-        if (*x).value.date.hour < (*y).value.date.hour {
-            return -1;
-        } else if (*x).value.date.hour > (*y).value.date.hour {
-            return 1;
-        } else if (*x).value.date.min < (*y).value.date.min {
-            return -1;
-        } else if (*x).value.date.min > (*y).value.date.min {
-            return 1;
-        } else if (*x).value.date.sec < (*y).value.date.sec {
-            return -1;
-        } else if (*x).value.date.sec > (*y).value.date.sec {
-            return 1;
-        }
-    }
-
-    0
 }
 
 /// Compare 2 string for their normalized values.
@@ -4466,58 +4564,60 @@ unsafe fn xml_schema_compare_preserve_replace_strings(
     mut y: *const XmlChar,
     invert: i32,
 ) -> i32 {
-    let mut tmp: i32;
+    unsafe {
+        let mut tmp: i32;
 
-    while *x != 0 && *y != 0 {
-        if IS_WSP_REPLACE_CH!(*y) {
-            if !IS_WSP_SPACE_CH!(*x) {
-                if *x < 0x20 {
+        while *x != 0 && *y != 0 {
+            if IS_WSP_REPLACE_CH!(*y) {
+                if !IS_WSP_SPACE_CH!(*x) {
+                    if *x < 0x20 {
+                        if invert != 0 {
+                            return 1;
+                        } else {
+                            return -1;
+                        }
+                    } else if invert != 0 {
+                        return -1;
+                    } else {
+                        return 1;
+                    }
+                }
+            } else {
+                tmp = *x as i32 - *y as i32;
+                if tmp < 0 {
                     if invert != 0 {
                         return 1;
                     } else {
                         return -1;
                     }
-                } else if invert != 0 {
-                    return -1;
-                } else {
-                    return 1;
+                }
+                if tmp > 0 {
+                    if invert != 0 {
+                        return -1;
+                    } else {
+                        return 1;
+                    }
                 }
             }
-        } else {
-            tmp = *x as i32 - *y as i32;
-            if tmp < 0 {
-                if invert != 0 {
-                    return 1;
-                } else {
-                    return -1;
-                }
-            }
-            if tmp > 0 {
-                if invert != 0 {
-                    return -1;
-                } else {
-                    return 1;
-                }
+            x = x.add(1);
+            y = x.add(1);
+        }
+        if *x != 0 {
+            if invert != 0 {
+                return -1;
+            } else {
+                return 1;
             }
         }
-        x = x.add(1);
-        y = x.add(1);
-    }
-    if *x != 0 {
-        if invert != 0 {
-            return -1;
-        } else {
-            return 1;
+        if *y != 0 {
+            if invert != 0 {
+                return 1;
+            } else {
+                return -1;
+            }
         }
+        0
     }
-    if *y != 0 {
-        if invert != 0 {
-            return 1;
-        } else {
-            return -1;
-        }
-    }
-    0
 }
 
 /// Compare 2 string for their normalized values.
@@ -4533,82 +4633,84 @@ unsafe fn xml_schema_compare_replace_collapse_strings(
     mut y: *const XmlChar,
     invert: i32,
 ) -> i32 {
-    let mut tmp: i32;
+    unsafe {
+        let mut tmp: i32;
 
-    // Skip leading blank chars of the collapsed string.
-    while IS_WSP_BLANK_CH!(*y) {
-        y = y.add(1);
-    }
-
-    while *x != 0 && *y != 0 {
-        if IS_WSP_BLANK_CH!(*y) {
-            if !IS_WSP_BLANK_CH!(*x) {
-                // The yv character would have been replaced to 0x20.
-                if *x < 0x20 {
-                    if invert != 0 {
-                        return 1;
-                    } else {
-                        return -1;
-                    }
-                } else if invert != 0 {
-                    return -1;
-                } else {
-                    return 1;
-                }
-            }
-            x = x.add(1);
-            y = y.add(1);
-            // Skip contiguous blank chars of the collapsed string.
-            while IS_WSP_BLANK_CH!(*y) {
-                y = y.add(1);
-            }
-        } else {
-            if IS_WSP_BLANK_CH!(*x) {
-                // The xv character would have been replaced to 0x20.
-                if 0x20 < *y {
-                    if invert != 0 {
-                        return 1;
-                    } else {
-                        return -1;
-                    }
-                } else if invert != 0 {
-                    return -1;
-                } else {
-                    return 1;
-                }
-            }
-            tmp = *x as i32 - *y as i32;
-            x = x.add(1);
-            y = y.add(1);
-            if tmp < 0 {
-                return -1;
-            }
-            if tmp > 0 {
-                return 1;
-            }
-        }
-    }
-    if *x != 0 {
-        if invert != 0 {
-            return -1;
-        } else {
-            return 1;
-        }
-    }
-    if *y != 0 {
-        // Skip trailing blank chars of the collapsed string.
+        // Skip leading blank chars of the collapsed string.
         while IS_WSP_BLANK_CH!(*y) {
             y = y.add(1);
         }
-        if *y != 0 {
-            if invert != 0 {
-                return 1;
+
+        while *x != 0 && *y != 0 {
+            if IS_WSP_BLANK_CH!(*y) {
+                if !IS_WSP_BLANK_CH!(*x) {
+                    // The yv character would have been replaced to 0x20.
+                    if *x < 0x20 {
+                        if invert != 0 {
+                            return 1;
+                        } else {
+                            return -1;
+                        }
+                    } else if invert != 0 {
+                        return -1;
+                    } else {
+                        return 1;
+                    }
+                }
+                x = x.add(1);
+                y = y.add(1);
+                // Skip contiguous blank chars of the collapsed string.
+                while IS_WSP_BLANK_CH!(*y) {
+                    y = y.add(1);
+                }
             } else {
-                return -1;
+                if IS_WSP_BLANK_CH!(*x) {
+                    // The xv character would have been replaced to 0x20.
+                    if 0x20 < *y {
+                        if invert != 0 {
+                            return 1;
+                        } else {
+                            return -1;
+                        }
+                    } else if invert != 0 {
+                        return -1;
+                    } else {
+                        return 1;
+                    }
+                }
+                tmp = *x as i32 - *y as i32;
+                x = x.add(1);
+                y = y.add(1);
+                if tmp < 0 {
+                    return -1;
+                }
+                if tmp > 0 {
+                    return 1;
+                }
             }
         }
+        if *x != 0 {
+            if invert != 0 {
+                return -1;
+            } else {
+                return 1;
+            }
+        }
+        if *y != 0 {
+            // Skip trailing blank chars of the collapsed string.
+            while IS_WSP_BLANK_CH!(*y) {
+                y = y.add(1);
+            }
+            if *y != 0 {
+                if invert != 0 {
+                    return 1;
+                } else {
+                    return -1;
+                }
+            }
+        }
+        0
     }
-    0
 }
 
 /// Compare 2 string for their normalized values.
@@ -4623,76 +4725,78 @@ unsafe fn xml_schema_compare_preserve_collapse_strings(
     mut y: *const XmlChar,
     invert: i32,
 ) -> i32 {
-    let mut tmp: i32;
+    unsafe {
+        let mut tmp: i32;
 
-    // Skip leading blank chars of the collapsed string.
-    while IS_WSP_BLANK_CH!(*y) {
-        y = y.add(1);
-    }
+        // Skip leading blank chars of the collapsed string.
+        while IS_WSP_BLANK_CH!(*y) {
+            y = y.add(1);
+        }
 
-    while *x != 0 && *y != 0 {
-        if IS_WSP_BLANK_CH!(*y) {
-            if !IS_WSP_SPACE_CH!(*x) {
-                // The yv character would have been replaced to 0x20.
-                if *x < 0x20 {
+        while *x != 0 && *y != 0 {
+            if IS_WSP_BLANK_CH!(*y) {
+                if !IS_WSP_SPACE_CH!(*x) {
+                    // The yv character would have been replaced to 0x20.
+                    if *x < 0x20 {
+                        if invert != 0 {
+                            return 1;
+                        } else {
+                            return -1;
+                        }
+                    } else if invert != 0 {
+                        return -1;
+                    } else {
+                        return 1;
+                    }
+                }
+                x = x.add(1);
+                y = y.add(1);
+                // Skip contiguous blank chars of the collapsed string.
+                while IS_WSP_BLANK_CH!(*y) {
+                    y = y.add(1);
+                }
+            } else {
+                tmp = *x as i32 - *y as i32;
+                x = x.add(1);
+                y = y.add(1);
+                if tmp < 0 {
                     if invert != 0 {
                         return 1;
                     } else {
                         return -1;
                     }
-                } else if invert != 0 {
-                    return -1;
-                } else {
-                    return 1;
+                }
+                if tmp > 0 {
+                    if invert != 0 {
+                        return -1;
+                    } else {
+                        return 1;
+                    }
                 }
             }
-            x = x.add(1);
-            y = y.add(1);
-            // Skip contiguous blank chars of the collapsed string.
+        }
+        if *x != 0 {
+            if invert != 0 {
+                return -1;
+            } else {
+                return 1;
+            }
+        }
+        if *y != 0 {
+            // Skip trailing blank chars of the collapsed string.
             while IS_WSP_BLANK_CH!(*y) {
                 y = y.add(1);
             }
-        } else {
-            tmp = *x as i32 - *y as i32;
-            x = x.add(1);
-            y = y.add(1);
-            if tmp < 0 {
+            if *y != 0 {
                 if invert != 0 {
                     return 1;
                 } else {
                     return -1;
                 }
             }
-            if tmp > 0 {
-                if invert != 0 {
-                    return -1;
-                } else {
-                    return 1;
-                }
-            }
         }
+        0
     }
-    if *x != 0 {
-        if invert != 0 {
-            return -1;
-        } else {
-            return 1;
-        }
-    }
-    if *y != 0 {
-        // Skip trailing blank chars of the collapsed string.
-        while IS_WSP_BLANK_CH!(*y) {
-            y = y.add(1);
-        }
-        if *y != 0 {
-            if invert != 0 {
-                return 1;
-            } else {
-                return -1;
-            }
-        }
-    }
-    0
 }
 
 /// Compare 2 string for their normalized values.
@@ -4700,43 +4804,45 @@ unsafe fn xml_schema_compare_preserve_collapse_strings(
 /// Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in case of error
 #[doc(alias = "xmlSchemaCompareReplacedStrings")]
 unsafe fn xml_schema_compare_replaced_strings(mut x: *const XmlChar, mut y: *const XmlChar) -> i32 {
-    let mut tmp: i32;
+    unsafe {
+        let mut tmp: i32;
 
-    while *x != 0 && *y != 0 {
-        if IS_WSP_BLANK_CH!(*y) {
-            if !IS_WSP_BLANK_CH!(*x) {
-                if *x < 0x20 {
+        while *x != 0 && *y != 0 {
+            if IS_WSP_BLANK_CH!(*y) {
+                if !IS_WSP_BLANK_CH!(*x) {
+                    if *x < 0x20 {
+                        return -1;
+                    } else {
+                        return 1;
+                    }
+                }
+            } else {
+                if IS_WSP_BLANK_CH!(*x) {
+                    if 0x20 < *y {
+                        return -1;
+                    } else {
+                        return 1;
+                    }
+                }
+                tmp = *x as i32 - *y as i32;
+                if tmp < 0 {
                     return -1;
-                } else {
+                }
+                if tmp > 0 {
                     return 1;
                 }
             }
-        } else {
-            if IS_WSP_BLANK_CH!(*x) {
-                if 0x20 < *y {
-                    return -1;
-                } else {
-                    return 1;
-                }
-            }
-            tmp = *x as i32 - *y as i32;
-            if tmp < 0 {
-                return -1;
-            }
-            if tmp > 0 {
-                return 1;
-            }
+            x = x.add(1);
+            y = y.add(1);
         }
-        x = x.add(1);
-        y = y.add(1);
+        if *x != 0 {
+            return 1;
+        }
+        if *y != 0 {
+            return -1;
+        }
+        0
     }
-    if *x != 0 {
-        return 1;
-    }
-    if *y != 0 {
-        return -1;
-    }
-    0
 }
 
 /// Compare 2 string for their normalized values.
@@ -4744,55 +4850,57 @@ unsafe fn xml_schema_compare_replaced_strings(mut x: *const XmlChar, mut y: *con
 /// Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in case of error
 #[doc(alias = "xmlSchemaCompareNormStrings")]
 unsafe fn xml_schema_compare_norm_strings(mut x: *const XmlChar, mut y: *const XmlChar) -> i32 {
-    let mut tmp: i32;
+    unsafe {
+        let mut tmp: i32;
 
-    while xml_is_blank_char(*x as u32) {
-        x = x.add(1);
-    }
-    while xml_is_blank_char(*y as u32) {
-        y = y.add(1);
-    }
-    while *x != 0 && *y != 0 {
-        if xml_is_blank_char(*x as u32) {
-            if !xml_is_blank_char(*y as u32) {
-                tmp = *x as i32 - *y as i32;
-                return tmp;
-            }
-            while xml_is_blank_char(*x as u32) {
-                x = x.add(1);
-            }
-            while xml_is_blank_char(*y as u32) {
-                y = y.add(1);
-            }
-        } else {
-            tmp = *x as i32 - *y as i32;
-            x = x.add(1);
-            y = y.add(1);
-            if tmp < 0 {
-                return -1;
-            }
-            if tmp > 0 {
-                return 1;
-            }
-        }
-    }
-    if *x != 0 {
         while xml_is_blank_char(*x as u32) {
             x = x.add(1);
         }
-        if *x != 0 {
-            return 1;
-        }
-    }
-    if *y != 0 {
         while xml_is_blank_char(*y as u32) {
             y = y.add(1);
         }
-        if *y != 0 {
-            return -1;
+        while *x != 0 && *y != 0 {
+            if xml_is_blank_char(*x as u32) {
+                if !xml_is_blank_char(*y as u32) {
+                    tmp = *x as i32 - *y as i32;
+                    return tmp;
+                }
+                while xml_is_blank_char(*x as u32) {
+                    x = x.add(1);
+                }
+                while xml_is_blank_char(*y as u32) {
+                    y = y.add(1);
+                }
+            } else {
+                tmp = *x as i32 - *y as i32;
+                x = x.add(1);
+                y = y.add(1);
+                if tmp < 0 {
+                    return -1;
+                }
+                if tmp > 0 {
+                    return 1;
+                }
+            }
         }
+        if *x != 0 {
+            while xml_is_blank_char(*x as u32) {
+                x = x.add(1);
+            }
+            if *x != 0 {
+                return 1;
+            }
+        }
+        if *y != 0 {
+            while xml_is_blank_char(*y as u32) {
+                y = y.add(1);
+            }
+            if *y != 0 {
+                return -1;
+            }
+        }
+        0
     }
-    0
 }
 
 /// Compare 2 values
@@ -4800,72 +4908,74 @@ unsafe fn xml_schema_compare_norm_strings(mut x: *const XmlChar, mut y: *const X
 /// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in case of error
 #[doc(alias = "xmlSchemaCompareFloats")]
 unsafe fn xml_schema_compare_floats(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i32 {
-    let d1: f64;
-    let d2: f64;
+    unsafe {
+        let d1: f64;
+        let d2: f64;
 
-    if x.is_null() || y.is_null() {
-        return -2;
-    }
+        if x.is_null() || y.is_null() {
+            return -2;
+        }
 
-    // Cast everything to doubles.
-    if (*x).typ == XmlSchemaValType::XmlSchemasDouble {
-        d1 = (*x).value.d;
-    } else if (*x).typ == XmlSchemaValType::XmlSchemasFloat {
-        d1 = (*x).value.f as _;
-    } else {
-        return -2;
-    }
+        // Cast everything to doubles.
+        if (*x).typ == XmlSchemaValType::XmlSchemasDouble {
+            d1 = (*x).value.d;
+        } else if (*x).typ == XmlSchemaValType::XmlSchemasFloat {
+            d1 = (*x).value.f as _;
+        } else {
+            return -2;
+        }
 
-    if (*y).typ == XmlSchemaValType::XmlSchemasDouble {
-        d2 = (*y).value.d;
-    } else if (*y).typ == XmlSchemaValType::XmlSchemasFloat {
-        d2 = (*y).value.f as _;
-    } else {
-        return -2;
-    }
+        if (*y).typ == XmlSchemaValType::XmlSchemasDouble {
+            d2 = (*y).value.d;
+        } else if (*y).typ == XmlSchemaValType::XmlSchemasFloat {
+            d2 = (*y).value.f as _;
+        } else {
+            return -2;
+        }
 
-    // Check for special cases.
-    if xml_xpath_is_nan(d1) {
+        // Check for special cases.
+        if xml_xpath_is_nan(d1) {
+            if xml_xpath_is_nan(d2) {
+                return 0;
+            }
+            return 1;
+        }
         if xml_xpath_is_nan(d2) {
-            return 0;
+            return -1;
         }
-        return 1;
-    }
-    if xml_xpath_is_nan(d2) {
-        return -1;
-    }
-    if d1 == XML_XPATH_PINF {
+        if d1 == XML_XPATH_PINF {
+            if d2 == XML_XPATH_PINF {
+                return 0;
+            }
+            return 1;
+        }
         if d2 == XML_XPATH_PINF {
-            return 0;
+            return -1;
         }
-        return 1;
-    }
-    if d2 == XML_XPATH_PINF {
-        return -1;
-    }
-    if d1 == XML_XPATH_NINF {
+        if d1 == XML_XPATH_NINF {
+            if d2 == XML_XPATH_NINF {
+                return 0;
+            }
+            return -1;
+        }
         if d2 == XML_XPATH_NINF {
+            return 1;
+        }
+
+        // basic tests, the last one we should have equality, but
+        // portability is more important than speed and handling
+        // NaN or Inf in a portable way is always a challenge, so ...
+        if d1 < d2 {
+            return -1;
+        }
+        if d1 > d2 {
+            return 1;
+        }
+        if d1 == d2 {
             return 0;
         }
-        return -1;
+        2
     }
-    if d2 == XML_XPATH_NINF {
-        return 1;
-    }
-
-    // basic tests, the last one we should have equality, but
-    // portability is more important than speed and handling
-    // NaN or Inf in a portable way is always a challenge, so ...
-    if d1 < d2 {
-        return -1;
-    }
-    if d1 > d2 {
-        return 1;
-    }
-    if d1 == d2 {
-        return 0;
-    }
-    2
 }
 
 /// Compare 2 values
@@ -4884,273 +4994,275 @@ unsafe fn xml_schema_compare_values_internal(
     yvalue: *const XmlChar,
     yws: XmlSchemaWhitespaceValueType,
 ) -> i32 {
-    match xtype {
-        XmlSchemaValType::XmlSchemasUnknown | XmlSchemaValType::XmlSchemasAnytype => {
-            return -2;
-        }
-        XmlSchemaValType::XmlSchemasInteger
-        | XmlSchemaValType::XmlSchemasNPInteger
-        | XmlSchemaValType::XmlSchemasNInteger
-        | XmlSchemaValType::XmlSchemasNNInteger
-        | XmlSchemaValType::XmlSchemasPInteger
-        | XmlSchemaValType::XmlSchemasInt
-        | XmlSchemaValType::XmlSchemasUInt
-        | XmlSchemaValType::XmlSchemasLong
-        | XmlSchemaValType::XmlSchemasULong
-        | XmlSchemaValType::XmlSchemasShort
-        | XmlSchemaValType::XmlSchemasUShort
-        | XmlSchemaValType::XmlSchemasByte
-        | XmlSchemaValType::XmlSchemasUByte
-        | XmlSchemaValType::XmlSchemasDecimal => {
-            if x.is_null() || y.is_null() {
+    unsafe {
+        match xtype {
+            XmlSchemaValType::XmlSchemasUnknown | XmlSchemaValType::XmlSchemasAnytype => {
                 return -2;
             }
-            if ytype == xtype {
-                return xml_schema_compare_decimals(x, y);
-            }
-            if matches!(
-                ytype,
-                XmlSchemaValType::XmlSchemasDecimal
-                    | XmlSchemaValType::XmlSchemasInteger
-                    | XmlSchemaValType::XmlSchemasNPInteger
-                    | XmlSchemaValType::XmlSchemasNInteger
-                    | XmlSchemaValType::XmlSchemasNNInteger
-                    | XmlSchemaValType::XmlSchemasPInteger
-                    | XmlSchemaValType::XmlSchemasInt
-                    | XmlSchemaValType::XmlSchemasUInt
-                    | XmlSchemaValType::XmlSchemasLong
-                    | XmlSchemaValType::XmlSchemasULong
-                    | XmlSchemaValType::XmlSchemasShort
-                    | XmlSchemaValType::XmlSchemasUShort
-                    | XmlSchemaValType::XmlSchemasByte
-                    | XmlSchemaValType::XmlSchemasUByte
-            ) {
-                return xml_schema_compare_decimals(x, y);
-            }
-            return -2;
-        }
-        XmlSchemaValType::XmlSchemasDuration => {
-            if x.is_null() || y.is_null() {
-                return -2;
-            }
-            if ytype == XmlSchemaValType::XmlSchemasDuration {
-                return xml_schema_compare_durations(x, y);
-            }
-            return -2;
-        }
-        XmlSchemaValType::XmlSchemasTime
-        | XmlSchemaValType::XmlSchemasGday
-        | XmlSchemaValType::XmlSchemasGmonth
-        | XmlSchemaValType::XmlSchemasGmonthday
-        | XmlSchemaValType::XmlSchemasGyear
-        | XmlSchemaValType::XmlSchemasGyearmonth
-        | XmlSchemaValType::XmlSchemasDate
-        | XmlSchemaValType::XmlSchemasDatetime => {
-            if x.is_null() || y.is_null() {
-                return -2;
-            }
-            if matches!(
-                ytype,
-                XmlSchemaValType::XmlSchemasDatetime
-                    | XmlSchemaValType::XmlSchemasTime
-                    | XmlSchemaValType::XmlSchemasGday
-                    | XmlSchemaValType::XmlSchemasGmonth
-                    | XmlSchemaValType::XmlSchemasGmonthday
-                    | XmlSchemaValType::XmlSchemasGyear
-                    | XmlSchemaValType::XmlSchemasDate
-                    | XmlSchemaValType::XmlSchemasGyearmonth
-            ) {
-                return xml_schema_compare_dates(x, y);
-            }
-            return -2;
-        }
-        // Note that we will support comparison of string types against
-        // anySimpleType as well.
-        XmlSchemaValType::XmlSchemasAnysimpletype
-        | XmlSchemaValType::XmlSchemasString
-        | XmlSchemaValType::XmlSchemasNormstring
-        | XmlSchemaValType::XmlSchemasToken
-        | XmlSchemaValType::XmlSchemasLanguage
-        | XmlSchemaValType::XmlSchemasNmtoken
-        | XmlSchemaValType::XmlSchemasName
-        | XmlSchemaValType::XmlSchemasNcname
-        | XmlSchemaValType::XmlSchemasID
-        | XmlSchemaValType::XmlSchemasIDREF
-        | XmlSchemaValType::XmlSchemasEntity
-        | XmlSchemaValType::XmlSchemasAnyURI => {
-            let xv = if x.is_null() { xvalue } else { (*x).value.str };
-            let yv = if y.is_null() { yvalue } else { (*y).value.str };
-            // TODO: Compare those against QName.
-            if ytype == XmlSchemaValType::XmlSchemasQname {
-                // todo!();
-                if y.is_null() {
+            XmlSchemaValType::XmlSchemasInteger
+            | XmlSchemaValType::XmlSchemasNPInteger
+            | XmlSchemaValType::XmlSchemasNInteger
+            | XmlSchemaValType::XmlSchemasNNInteger
+            | XmlSchemaValType::XmlSchemasPInteger
+            | XmlSchemaValType::XmlSchemasInt
+            | XmlSchemaValType::XmlSchemasUInt
+            | XmlSchemaValType::XmlSchemasLong
+            | XmlSchemaValType::XmlSchemasULong
+            | XmlSchemaValType::XmlSchemasShort
+            | XmlSchemaValType::XmlSchemasUShort
+            | XmlSchemaValType::XmlSchemasByte
+            | XmlSchemaValType::XmlSchemasUByte
+            | XmlSchemaValType::XmlSchemasDecimal => {
+                if x.is_null() || y.is_null() {
                     return -2;
                 }
+                if ytype == xtype {
+                    return xml_schema_compare_decimals(x, y);
+                }
+                if matches!(
+                    ytype,
+                    XmlSchemaValType::XmlSchemasDecimal
+                        | XmlSchemaValType::XmlSchemasInteger
+                        | XmlSchemaValType::XmlSchemasNPInteger
+                        | XmlSchemaValType::XmlSchemasNInteger
+                        | XmlSchemaValType::XmlSchemasNNInteger
+                        | XmlSchemaValType::XmlSchemasPInteger
+                        | XmlSchemaValType::XmlSchemasInt
+                        | XmlSchemaValType::XmlSchemasUInt
+                        | XmlSchemaValType::XmlSchemasLong
+                        | XmlSchemaValType::XmlSchemasULong
+                        | XmlSchemaValType::XmlSchemasShort
+                        | XmlSchemaValType::XmlSchemasUShort
+                        | XmlSchemaValType::XmlSchemasByte
+                        | XmlSchemaValType::XmlSchemasUByte
+                ) {
+                    return xml_schema_compare_decimals(x, y);
+                }
                 return -2;
             }
-            if matches!(
-                ytype,
-                XmlSchemaValType::XmlSchemasAnysimpletype
-                    | XmlSchemaValType::XmlSchemasString
-                    | XmlSchemaValType::XmlSchemasNormstring
-                    | XmlSchemaValType::XmlSchemasToken
-                    | XmlSchemaValType::XmlSchemasLanguage
-                    | XmlSchemaValType::XmlSchemasNmtoken
-                    | XmlSchemaValType::XmlSchemasName
-                    | XmlSchemaValType::XmlSchemasNcname
-                    | XmlSchemaValType::XmlSchemasID
-                    | XmlSchemaValType::XmlSchemasIDREF
-                    | XmlSchemaValType::XmlSchemasEntity
-                    | XmlSchemaValType::XmlSchemasAnyURI
-            ) {
-                if xws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
-                    if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
-                        // TODO: What about x < y or x > y.
-                        if xml_str_equal(xv, yv) {
-                            return 0;
-                        } else {
-                            return 2;
-                        }
-                    } else if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
-                        return xml_schema_compare_preserve_replace_strings(xv, yv, 0);
-                    } else if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
-                        return xml_schema_compare_preserve_collapse_strings(xv, yv, 0);
-                    }
-                } else if xws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
-                    if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
-                        return xml_schema_compare_preserve_replace_strings(yv, xv, 1);
-                    }
-                    if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
-                        return xml_schema_compare_replaced_strings(xv, yv);
-                    }
-                    if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
-                        return xml_schema_compare_replace_collapse_strings(xv, yv, 0);
-                    }
-                } else if xws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
-                    if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
-                        return xml_schema_compare_preserve_collapse_strings(yv, xv, 1);
-                    }
-                    if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
-                        return xml_schema_compare_replace_collapse_strings(yv, xv, 1);
-                    }
-                    if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
-                        return xml_schema_compare_norm_strings(xv, yv);
-                    }
-                } else {
+            XmlSchemaValType::XmlSchemasDuration => {
+                if x.is_null() || y.is_null() {
                     return -2;
                 }
-            }
-            return -2;
-        }
-        XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation => {
-            if x.is_null() || y.is_null() {
-                return -2;
-            }
-            if matches!(
-                ytype,
-                XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation
-            ) {
-                if xml_str_equal((*x).value.qname.name, (*y).value.qname.name)
-                    && xml_str_equal((*x).value.qname.uri, (*y).value.qname.uri)
-                {
-                    return 0;
+                if ytype == XmlSchemaValType::XmlSchemasDuration {
+                    return xml_schema_compare_durations(x, y);
                 }
-                return 2;
-            }
-            return -2;
-        }
-        XmlSchemaValType::XmlSchemasFloat | XmlSchemaValType::XmlSchemasDouble => {
-            if x.is_null() || y.is_null() {
                 return -2;
             }
-            if matches!(
-                ytype,
-                XmlSchemaValType::XmlSchemasFloat | XmlSchemaValType::XmlSchemasDouble
-            ) {
-                return xml_schema_compare_floats(x, y);
-            }
-            return -2;
-        }
-        XmlSchemaValType::XmlSchemasBoolean => {
-            if x.is_null() || y.is_null() {
-                return -2;
-            }
-            if ytype == XmlSchemaValType::XmlSchemasBoolean {
-                if (*x).value.b == (*y).value.b {
-                    return 0;
+            XmlSchemaValType::XmlSchemasTime
+            | XmlSchemaValType::XmlSchemasGday
+            | XmlSchemaValType::XmlSchemasGmonth
+            | XmlSchemaValType::XmlSchemasGmonthday
+            | XmlSchemaValType::XmlSchemasGyear
+            | XmlSchemaValType::XmlSchemasGyearmonth
+            | XmlSchemaValType::XmlSchemasDate
+            | XmlSchemaValType::XmlSchemasDatetime => {
+                if x.is_null() || y.is_null() {
+                    return -2;
                 }
-                if (*x).value.b == 0 {
-                    return -1;
+                if matches!(
+                    ytype,
+                    XmlSchemaValType::XmlSchemasDatetime
+                        | XmlSchemaValType::XmlSchemasTime
+                        | XmlSchemaValType::XmlSchemasGday
+                        | XmlSchemaValType::XmlSchemasGmonth
+                        | XmlSchemaValType::XmlSchemasGmonthday
+                        | XmlSchemaValType::XmlSchemasGyear
+                        | XmlSchemaValType::XmlSchemasDate
+                        | XmlSchemaValType::XmlSchemasGyearmonth
+                ) {
+                    return xml_schema_compare_dates(x, y);
                 }
-                return 1;
-            }
-            return -2;
-        }
-        XmlSchemaValType::XmlSchemasHexbinary => {
-            if x.is_null() || y.is_null() {
                 return -2;
             }
-            if ytype == XmlSchemaValType::XmlSchemasHexbinary {
-                match (*x).value.hex.total.cmp(&(*y).value.hex.total) {
-                    std::cmp::Ordering::Equal => {
-                        let ret: i32 = xml_strcmp((*x).value.hex.str, (*y).value.hex.str);
-                        match ret.cmp(&0) {
-                            std::cmp::Ordering::Greater => {
-                                return 1;
-                            }
-                            std::cmp::Ordering::Equal => {
+            // Note that we will support comparison of string types against
+            // anySimpleType as well.
+            XmlSchemaValType::XmlSchemasAnysimpletype
+            | XmlSchemaValType::XmlSchemasString
+            | XmlSchemaValType::XmlSchemasNormstring
+            | XmlSchemaValType::XmlSchemasToken
+            | XmlSchemaValType::XmlSchemasLanguage
+            | XmlSchemaValType::XmlSchemasNmtoken
+            | XmlSchemaValType::XmlSchemasName
+            | XmlSchemaValType::XmlSchemasNcname
+            | XmlSchemaValType::XmlSchemasID
+            | XmlSchemaValType::XmlSchemasIDREF
+            | XmlSchemaValType::XmlSchemasEntity
+            | XmlSchemaValType::XmlSchemasAnyURI => {
+                let xv = if x.is_null() { xvalue } else { (*x).value.str };
+                let yv = if y.is_null() { yvalue } else { (*y).value.str };
+                // TODO: Compare those against QName.
+                if ytype == XmlSchemaValType::XmlSchemasQname {
+                    // todo!();
+                    if y.is_null() {
+                        return -2;
+                    }
+                    return -2;
+                }
+                if matches!(
+                    ytype,
+                    XmlSchemaValType::XmlSchemasAnysimpletype
+                        | XmlSchemaValType::XmlSchemasString
+                        | XmlSchemaValType::XmlSchemasNormstring
+                        | XmlSchemaValType::XmlSchemasToken
+                        | XmlSchemaValType::XmlSchemasLanguage
+                        | XmlSchemaValType::XmlSchemasNmtoken
+                        | XmlSchemaValType::XmlSchemasName
+                        | XmlSchemaValType::XmlSchemasNcname
+                        | XmlSchemaValType::XmlSchemasID
+                        | XmlSchemaValType::XmlSchemasIDREF
+                        | XmlSchemaValType::XmlSchemasEntity
+                        | XmlSchemaValType::XmlSchemasAnyURI
+                ) {
+                    if xws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
+                        if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
+                            // TODO: What about x < y or x > y.
+                            if xml_str_equal(xv, yv) {
                                 return 0;
+                            } else {
+                                return 2;
                             }
-                            std::cmp::Ordering::Less => {}
+                        } else if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
+                            return xml_schema_compare_preserve_replace_strings(xv, yv, 0);
+                        } else if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
+                            return xml_schema_compare_preserve_collapse_strings(xv, yv, 0);
                         }
+                    } else if xws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
+                        if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
+                            return xml_schema_compare_preserve_replace_strings(yv, xv, 1);
+                        }
+                        if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
+                            return xml_schema_compare_replaced_strings(xv, yv);
+                        }
+                        if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
+                            return xml_schema_compare_replace_collapse_strings(xv, yv, 0);
+                        }
+                    } else if xws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
+                        if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve {
+                            return xml_schema_compare_preserve_collapse_strings(yv, xv, 1);
+                        }
+                        if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
+                            return xml_schema_compare_replace_collapse_strings(yv, xv, 1);
+                        }
+                        if yws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
+                            return xml_schema_compare_norm_strings(xv, yv);
+                        }
+                    } else {
+                        return -2;
                     }
-                    std::cmp::Ordering::Greater => {
-                        return 1;
-                    }
-                    std::cmp::Ordering::Less => {}
                 }
-
-                return -1;
-            }
-            return -2;
-        }
-        XmlSchemaValType::XmlSchemasBase64binary => {
-            if x.is_null() || y.is_null() {
                 return -2;
             }
-            if ytype == XmlSchemaValType::XmlSchemasBase64binary {
-                match (*x).value.base64.total.cmp(&(*y).value.base64.total) {
-                    std::cmp::Ordering::Equal => {
-                        let ret: i32 = xml_strcmp((*x).value.base64.str, (*y).value.base64.str);
-                        match ret.cmp(&0) {
-                            std::cmp::Ordering::Greater => {
-                                return 1;
-                            }
-                            std::cmp::Ordering::Equal => {
-                                return 0;
-                            }
-                            std::cmp::Ordering::Less => {
-                                return -1;
-                            }
-                        }
+            XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation => {
+                if x.is_null() || y.is_null() {
+                    return -2;
+                }
+                if matches!(
+                    ytype,
+                    XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation
+                ) {
+                    if xml_str_equal((*x).value.qname.name, (*y).value.qname.name)
+                        && xml_str_equal((*x).value.qname.uri, (*y).value.qname.uri)
+                    {
+                        return 0;
                     }
-                    std::cmp::Ordering::Greater => {
-                        return 1;
+                    return 2;
+                }
+                return -2;
+            }
+            XmlSchemaValType::XmlSchemasFloat | XmlSchemaValType::XmlSchemasDouble => {
+                if x.is_null() || y.is_null() {
+                    return -2;
+                }
+                if matches!(
+                    ytype,
+                    XmlSchemaValType::XmlSchemasFloat | XmlSchemaValType::XmlSchemasDouble
+                ) {
+                    return xml_schema_compare_floats(x, y);
+                }
+                return -2;
+            }
+            XmlSchemaValType::XmlSchemasBoolean => {
+                if x.is_null() || y.is_null() {
+                    return -2;
+                }
+                if ytype == XmlSchemaValType::XmlSchemasBoolean {
+                    if (*x).value.b == (*y).value.b {
+                        return 0;
                     }
-                    std::cmp::Ordering::Less => {
+                    if (*x).value.b == 0 {
                         return -1;
                     }
+                    return 1;
                 }
+                return -2;
             }
-            return -2;
+            XmlSchemaValType::XmlSchemasHexbinary => {
+                if x.is_null() || y.is_null() {
+                    return -2;
+                }
+                if ytype == XmlSchemaValType::XmlSchemasHexbinary {
+                    match (*x).value.hex.total.cmp(&(*y).value.hex.total) {
+                        std::cmp::Ordering::Equal => {
+                            let ret: i32 = xml_strcmp((*x).value.hex.str, (*y).value.hex.str);
+                            match ret.cmp(&0) {
+                                std::cmp::Ordering::Greater => {
+                                    return 1;
+                                }
+                                std::cmp::Ordering::Equal => {
+                                    return 0;
+                                }
+                                std::cmp::Ordering::Less => {}
+                            }
+                        }
+                        std::cmp::Ordering::Greater => {
+                            return 1;
+                        }
+                        std::cmp::Ordering::Less => {}
+                    }
+
+                    return -1;
+                }
+                return -2;
+            }
+            XmlSchemaValType::XmlSchemasBase64binary => {
+                if x.is_null() || y.is_null() {
+                    return -2;
+                }
+                if ytype == XmlSchemaValType::XmlSchemasBase64binary {
+                    match (*x).value.base64.total.cmp(&(*y).value.base64.total) {
+                        std::cmp::Ordering::Equal => {
+                            let ret: i32 = xml_strcmp((*x).value.base64.str, (*y).value.base64.str);
+                            match ret.cmp(&0) {
+                                std::cmp::Ordering::Greater => {
+                                    return 1;
+                                }
+                                std::cmp::Ordering::Equal => {
+                                    return 0;
+                                }
+                                std::cmp::Ordering::Less => {
+                                    return -1;
+                                }
+                            }
+                        }
+                        std::cmp::Ordering::Greater => {
+                            return 1;
+                        }
+                        std::cmp::Ordering::Less => {
+                            return -1;
+                        }
+                    }
+                }
+                return -2;
+            }
+            XmlSchemaValType::XmlSchemasIDREFS
+            | XmlSchemaValType::XmlSchemasEntities
+            | XmlSchemaValType::XmlSchemasNmtokens => {
+                // todo!()
+            }
         }
-        XmlSchemaValType::XmlSchemasIDREFS
-        | XmlSchemaValType::XmlSchemasEntities
-        | XmlSchemaValType::XmlSchemasNmtokens => {
-            // todo!()
-        }
+        -2
     }
-    -2
 }
 
 /// Compare 2 values
@@ -5169,7 +5281,7 @@ unsafe fn xml_schema_compare_values_whtsp_ext(
     yvalue: *const XmlChar,
     yws: XmlSchemaWhitespaceValueType,
 ) -> i32 {
-    xml_schema_compare_values_internal(xtype, x, xvalue, xws, ytype, y, yvalue, yws)
+    unsafe { xml_schema_compare_values_internal(xtype, x, xvalue, xws, ytype, y, yvalue, yws) }
 }
 
 /// Computes the UTF8 length of the normalized value of the string
@@ -5177,49 +5289,51 @@ unsafe fn xml_schema_compare_values_whtsp_ext(
 /// Returns the length or -1 in case of error.
 #[doc(alias = "xmlSchemaNormLen")]
 unsafe fn xml_schema_norm_len(value: *const XmlChar) -> i32 {
-    let mut utf: *const XmlChar;
-    let mut ret: i32 = 0;
+    unsafe {
+        let mut utf: *const XmlChar;
+        let mut ret: i32 = 0;
 
-    if value.is_null() {
-        return -1;
-    }
-    utf = value;
-    while xml_is_blank_char(*utf as u32) {
-        utf = utf.add(1);
-    }
-    while *utf != 0 {
-        if *utf.add(0) & 0x80 != 0 {
-            if *utf.add(1) & 0xc0 != 0x80 {
-                return -1;
-            }
-            if *utf.add(0) & 0xe0 == 0xe0 {
-                if *utf.add(2) & 0xc0 != 0x80 {
-                    return -1;
-                }
-                if *utf.add(0) & 0xf0 == 0xf0 {
-                    if *utf.add(0) & 0xf8 != 0xf0 || *utf.add(3) & 0xc0 != 0x80 {
-                        return -1;
-                    }
-                    utf = utf.add(4);
-                } else {
-                    utf = utf.add(3);
-                }
-            } else {
-                utf = utf.add(2);
-            }
-        } else if xml_is_blank_char(*utf as u32) {
-            while xml_is_blank_char(*utf as u32) {
-                utf = utf.add(1);
-            }
-            if *utf == 0 {
-                break;
-            }
-        } else {
+        if value.is_null() {
+            return -1;
+        }
+        utf = value;
+        while xml_is_blank_char(*utf as u32) {
             utf = utf.add(1);
         }
-        ret += 1;
+        while *utf != 0 {
+            if *utf.add(0) & 0x80 != 0 {
+                if *utf.add(1) & 0xc0 != 0x80 {
+                    return -1;
+                }
+                if *utf.add(0) & 0xe0 == 0xe0 {
+                    if *utf.add(2) & 0xc0 != 0x80 {
+                        return -1;
+                    }
+                    if *utf.add(0) & 0xf0 == 0xf0 {
+                        if *utf.add(0) & 0xf8 != 0xf0 || *utf.add(3) & 0xc0 != 0x80 {
+                            return -1;
+                        }
+                        utf = utf.add(4);
+                    } else {
+                        utf = utf.add(3);
+                    }
+                } else {
+                    utf = utf.add(2);
+                }
+            } else if xml_is_blank_char(*utf as u32) {
+                while xml_is_blank_char(*utf as u32) {
+                    utf = utf.add(1);
+                }
+                if *utf == 0 {
+                    break;
+                }
+            } else {
+                utf = utf.add(1);
+            }
+            ret += 1;
+        }
+        ret
     }
-    ret
 }
 
 /// Check a value against a facet condition
@@ -5235,251 +5349,255 @@ unsafe fn xml_schema_validate_facet_internal(
     val: XmlSchemaValPtr,
     ws: XmlSchemaWhitespaceValueType,
 ) -> i32 {
-    let ret: i32;
+    unsafe {
+        let ret: i32;
 
-    if facet.is_null() {
-        return -1;
-    }
+        if facet.is_null() {
+            return -1;
+        }
 
-    match (*facet).typ {
-        XmlSchemaTypeType::XmlSchemaFacetPattern => {
-            // NOTE that for patterns, the @value needs to be the normalized
-            // value, *not* the lexical initial value or the canonical value.
-            if value.is_null() {
-                return -1;
-            }
-            // If string-derived type, regexp must be tested on the value space of
-            // the datatype.
-            // See https://www.w3.org/TR/xmlschema-2/#rf-pattern
-            if !val.is_null()
-                && !(*val).value.str.is_null()
-                && (((*val).typ as i32 >= XmlSchemaValType::XmlSchemasString as i32
-                    && (*val).typ as i32 <= XmlSchemaValType::XmlSchemasNormstring as i32)
-                    || ((*val).typ as i32 >= XmlSchemaValType::XmlSchemasToken as i32
-                        && (*val).typ as i32 <= XmlSchemaValType::XmlSchemasEntities as i32
-                        && (*val).typ as i32 != XmlSchemaValType::XmlSchemasQname as i32))
-            {
-                value = (*val).value.str;
-            }
-            ret = xml_regexp_exec((*facet).regexp, value);
-            if ret == 1 {
-                return 0;
-            }
-            if ret == 0 {
-                return XmlParserErrors::XmlSchemavCvcPatternValid as i32;
-            }
-            return ret;
-        }
-        XmlSchemaTypeType::XmlSchemaFacetMaxexclusive => {
-            ret = xml_schema_compare_values(val, (*facet).val);
-            if ret == -2 {
-                return -1;
-            }
-            if ret == -1 {
-                return 0;
-            }
-            return XmlParserErrors::XmlSchemavCvcMaxExclusiveValid as i32;
-        }
-        XmlSchemaTypeType::XmlSchemaFacetMaxinclusive => {
-            ret = xml_schema_compare_values(val, (*facet).val);
-            if ret == -2 {
-                return -1;
-            }
-            if ret == -1 || ret == 0 {
-                return 0;
-            }
-            return XmlParserErrors::XmlSchemavCvcMaxInclusiveValid as i32;
-        }
-        XmlSchemaTypeType::XmlSchemaFacetMinexclusive => {
-            ret = xml_schema_compare_values(val, (*facet).val);
-            if ret == -2 {
-                return -1;
-            }
-            if ret == 1 {
-                return 0;
-            }
-            return XmlParserErrors::XmlSchemavCvcMinExclusiveValid as i32;
-        }
-        XmlSchemaTypeType::XmlSchemaFacetMininclusive => {
-            ret = xml_schema_compare_values(val, (*facet).val);
-            if ret == -2 {
-                return -1;
-            }
-            if ret == 1 || ret == 0 {
-                return 0;
-            }
-            return XmlParserErrors::XmlSchemavCvcMinInclusiveValid as i32;
-        }
-        XmlSchemaTypeType::XmlSchemaFacetWhitespace => {
-            // TODO whitespaces
-            // NOTE: Whitespace should be handled to normalize
-            // the value to be validated against a the facets;
-            // not to normalize the value in-between.
-            return 0;
-        }
-        XmlSchemaTypeType::XmlSchemaFacetEnumeration => {
-            if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown {
-                // This is to ensure API compatibility with the old
-                // xmlSchemaValidateFacet().
-                // TODO: Get rid of this case.
-                if !(*facet).value.is_null() && xml_str_equal((*facet).value, value) {
+        match (*facet).typ {
+            XmlSchemaTypeType::XmlSchemaFacetPattern => {
+                // NOTE that for patterns, the @value needs to be the normalized
+                // value, *not* the lexical initial value or the canonical value.
+                if value.is_null() {
+                    return -1;
+                }
+                // If string-derived type, regexp must be tested on the value space of
+                // the datatype.
+                // See https://www.w3.org/TR/xmlschema-2/#rf-pattern
+                if !val.is_null()
+                    && !(*val).value.str.is_null()
+                    && (((*val).typ as i32 >= XmlSchemaValType::XmlSchemasString as i32
+                        && (*val).typ as i32 <= XmlSchemaValType::XmlSchemasNormstring as i32)
+                        || ((*val).typ as i32 >= XmlSchemaValType::XmlSchemasToken as i32
+                            && (*val).typ as i32 <= XmlSchemaValType::XmlSchemasEntities as i32
+                            && (*val).typ as i32 != XmlSchemaValType::XmlSchemasQname as i32))
+                {
+                    value = (*val).value.str;
+                }
+                ret = xml_regexp_exec((*facet).regexp, value);
+                if ret == 1 {
                     return 0;
                 }
-            } else {
-                ret = xml_schema_compare_values_whtsp_ext(
-                    (*(*facet).val).typ,
-                    (*facet).val,
-                    (*facet).value,
-                    fws,
-                    val_type,
-                    val,
-                    value,
-                    ws,
-                );
+                if ret == 0 {
+                    return XmlParserErrors::XmlSchemavCvcPatternValid as i32;
+                }
+                return ret;
+            }
+            XmlSchemaTypeType::XmlSchemaFacetMaxexclusive => {
+                ret = xml_schema_compare_values(val, (*facet).val);
                 if ret == -2 {
                     return -1;
                 }
-                if ret == 0 {
+                if ret == -1 {
                     return 0;
                 }
+                return XmlParserErrors::XmlSchemavCvcMaxExclusiveValid as i32;
             }
-            return XmlParserErrors::XmlSchemavCvcEnumerationValid as i32;
-        }
-        ty @ XmlSchemaTypeType::XmlSchemaFacetLength
-        | ty @ XmlSchemaTypeType::XmlSchemaFacetMaxlength
-        | ty @ XmlSchemaTypeType::XmlSchemaFacetMinlength => {
-            if matches!(ty, XmlSchemaTypeType::XmlSchemaFacetLength) {
-                // SPEC (1.3) "if {primitive type definition} is QName or NOTATION,
-                // then any {value} is facet-valid."
+            XmlSchemaTypeType::XmlSchemaFacetMaxinclusive => {
+                ret = xml_schema_compare_values(val, (*facet).val);
+                if ret == -2 {
+                    return -1;
+                }
+                if ret == -1 || ret == 0 {
+                    return 0;
+                }
+                return XmlParserErrors::XmlSchemavCvcMaxInclusiveValid as i32;
+            }
+            XmlSchemaTypeType::XmlSchemaFacetMinexclusive => {
+                ret = xml_schema_compare_values(val, (*facet).val);
+                if ret == -2 {
+                    return -1;
+                }
+                if ret == 1 {
+                    return 0;
+                }
+                return XmlParserErrors::XmlSchemavCvcMinExclusiveValid as i32;
+            }
+            XmlSchemaTypeType::XmlSchemaFacetMininclusive => {
+                ret = xml_schema_compare_values(val, (*facet).val);
+                if ret == -2 {
+                    return -1;
+                }
+                if ret == 1 || ret == 0 {
+                    return 0;
+                }
+                return XmlParserErrors::XmlSchemavCvcMinInclusiveValid as i32;
+            }
+            XmlSchemaTypeType::XmlSchemaFacetWhitespace => {
+                // TODO whitespaces
+                // NOTE: Whitespace should be handled to normalize
+                // the value to be validated against a the facets;
+                // not to normalize the value in-between.
+                return 0;
+            }
+            XmlSchemaTypeType::XmlSchemaFacetEnumeration => {
+                if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown {
+                    // This is to ensure API compatibility with the old
+                    // xmlSchemaValidateFacet().
+                    // TODO: Get rid of this case.
+                    if !(*facet).value.is_null() && xml_str_equal((*facet).value, value) {
+                        return 0;
+                    }
+                } else {
+                    ret = xml_schema_compare_values_whtsp_ext(
+                        (*(*facet).val).typ,
+                        (*facet).val,
+                        (*facet).value,
+                        fws,
+                        val_type,
+                        val,
+                        value,
+                        ws,
+                    );
+                    if ret == -2 {
+                        return -1;
+                    }
+                    if ret == 0 {
+                        return 0;
+                    }
+                }
+                return XmlParserErrors::XmlSchemavCvcEnumerationValid as i32;
+            }
+            ty @ XmlSchemaTypeType::XmlSchemaFacetLength
+            | ty @ XmlSchemaTypeType::XmlSchemaFacetMaxlength
+            | ty @ XmlSchemaTypeType::XmlSchemaFacetMinlength => {
+                if matches!(ty, XmlSchemaTypeType::XmlSchemaFacetLength) {
+                    // SPEC (1.3) "if {primitive type definition} is QName or NOTATION,
+                    // then any {value} is facet-valid."
+                    if matches!(
+                        val_type,
+                        XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation
+                    ) {
+                        return 0;
+                    }
+                }
+
+                let mut len: u32 = 0;
+
                 if matches!(
                     val_type,
                     XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation
                 ) {
                     return 0;
                 }
-            }
-
-            let mut len: u32 = 0;
-
-            if matches!(
-                val_type,
-                XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation
-            ) {
-                return 0;
-            }
-            // TODO: length, maxLength and minLength must be of type
-            // nonNegativeInteger only. Check if decimal is used somehow.
-            if (*facet).val.is_null()
-                || !matches!(
-                    (*(*facet).val).typ,
-                    XmlSchemaValType::XmlSchemasDecimal | XmlSchemaValType::XmlSchemasNNInteger
-                )
-                || (*(*facet).val).value.decimal.frac != 0
-            {
-                return -1;
-            }
-            if !val.is_null() && (*val).typ == XmlSchemaValType::XmlSchemasHexbinary {
-                len = (*val).value.hex.total;
-            } else if !val.is_null() && (*val).typ == XmlSchemaValType::XmlSchemasBase64binary {
-                len = (*val).value.base64.total;
-            } else {
-                match val_type {
-                    XmlSchemaValType::XmlSchemasString | XmlSchemaValType::XmlSchemasNormstring => {
-                        if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown {
-                            // This is to ensure API compatibility with the old
-                            // xmlSchemaValidateFacet(). Anyway, this was and
-                            // is not the correct handling.
-                            // TODO: Get rid of this case somehow.
-                            if val_type == XmlSchemaValType::XmlSchemasString {
-                                len = xml_utf8_strlen(value) as _;
-                            } else {
-                                len = xml_schema_norm_len(value) as _;
-                            }
-                        } else if !value.is_null() {
-                            if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
-                                len = xml_schema_norm_len(value) as _;
-                            } else {
-                                // Should be OK for "preserve" as well.
-                                len = xml_utf8_strlen(value) as _;
+                // TODO: length, maxLength and minLength must be of type
+                // nonNegativeInteger only. Check if decimal is used somehow.
+                if (*facet).val.is_null()
+                    || !matches!(
+                        (*(*facet).val).typ,
+                        XmlSchemaValType::XmlSchemasDecimal | XmlSchemaValType::XmlSchemasNNInteger
+                    )
+                    || (*(*facet).val).value.decimal.frac != 0
+                {
+                    return -1;
+                }
+                if !val.is_null() && (*val).typ == XmlSchemaValType::XmlSchemasHexbinary {
+                    len = (*val).value.hex.total;
+                } else if !val.is_null() && (*val).typ == XmlSchemaValType::XmlSchemasBase64binary {
+                    len = (*val).value.base64.total;
+                } else {
+                    match val_type {
+                        XmlSchemaValType::XmlSchemasString
+                        | XmlSchemaValType::XmlSchemasNormstring => {
+                            if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown {
+                                // This is to ensure API compatibility with the old
+                                // xmlSchemaValidateFacet(). Anyway, this was and
+                                // is not the correct handling.
+                                // TODO: Get rid of this case somehow.
+                                if val_type == XmlSchemaValType::XmlSchemasString {
+                                    len = xml_utf8_strlen(value) as _;
+                                } else {
+                                    len = xml_schema_norm_len(value) as _;
+                                }
+                            } else if !value.is_null() {
+                                if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
+                                    len = xml_schema_norm_len(value) as _;
+                                } else {
+                                    // Should be OK for "preserve" as well.
+                                    len = xml_utf8_strlen(value) as _;
+                                }
                             }
                         }
-                    }
-                    XmlSchemaValType::XmlSchemasIDREF
-                    | XmlSchemaValType::XmlSchemasToken
-                    | XmlSchemaValType::XmlSchemasLanguage
-                    | XmlSchemaValType::XmlSchemasNmtoken
-                    | XmlSchemaValType::XmlSchemasName
-                    | XmlSchemaValType::XmlSchemasNcname
-                    | XmlSchemaValType::XmlSchemasID
-                    | XmlSchemaValType::XmlSchemasAnyURI => {
-                        if !value.is_null() {
-                            len = xml_schema_norm_len(value) as _;
+                        XmlSchemaValType::XmlSchemasIDREF
+                        | XmlSchemaValType::XmlSchemasToken
+                        | XmlSchemaValType::XmlSchemasLanguage
+                        | XmlSchemaValType::XmlSchemasNmtoken
+                        | XmlSchemaValType::XmlSchemasName
+                        | XmlSchemaValType::XmlSchemasNcname
+                        | XmlSchemaValType::XmlSchemasID
+                        | XmlSchemaValType::XmlSchemasAnyURI => {
+                            if !value.is_null() {
+                                len = xml_schema_norm_len(value) as _;
+                            }
+                        }
+                        _ => {
+                            todo!()
                         }
                     }
-                    _ => {
-                        todo!()
+                }
+                if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetLength {
+                    if len as u64 != (*(*facet).val).value.decimal.lo {
+                        return XmlParserErrors::XmlSchemavCvcLengthValid as i32;
                     }
+                } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
+                    if (len as u64) < (*(*facet).val).value.decimal.lo {
+                        return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
+                    }
+                } else if len as u64 > (*(*facet).val).value.decimal.lo {
+                    return XmlParserErrors::XmlSchemavCvcMaxLengthValid as i32;
                 }
             }
-            if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetLength {
-                if len as u64 != (*(*facet).val).value.decimal.lo {
-                    return XmlParserErrors::XmlSchemavCvcLengthValid as i32;
+            XmlSchemaTypeType::XmlSchemaFacetTotaldigits
+            | XmlSchemaTypeType::XmlSchemaFacetFractiondigits => {
+                if (*facet).val.is_null()
+                    || !matches!(
+                        (*(*facet).val).typ,
+                        XmlSchemaValType::XmlSchemasPInteger
+                            | XmlSchemaValType::XmlSchemasNNInteger
+                    )
+                    || (*(*facet).val).value.decimal.frac != 0
+                {
+                    return -1;
                 }
-            } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
-                if (len as u64) < (*(*facet).val).value.decimal.lo {
-                    return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
+                if val.is_null()
+                    || !matches!(
+                        (*val).typ,
+                        XmlSchemaValType::XmlSchemasDecimal
+                            | XmlSchemaValType::XmlSchemasInteger
+                            | XmlSchemaValType::XmlSchemasNPInteger
+                            | XmlSchemaValType::XmlSchemasNInteger
+                            | XmlSchemaValType::XmlSchemasNNInteger
+                            | XmlSchemaValType::XmlSchemasPInteger
+                            | XmlSchemaValType::XmlSchemasInt
+                            | XmlSchemaValType::XmlSchemasUInt
+                            | XmlSchemaValType::XmlSchemasLong
+                            | XmlSchemaValType::XmlSchemasULong
+                            | XmlSchemaValType::XmlSchemasShort
+                            | XmlSchemaValType::XmlSchemasUShort
+                            | XmlSchemaValType::XmlSchemasByte
+                            | XmlSchemaValType::XmlSchemasUByte
+                    )
+                {
+                    return -1;
                 }
-            } else if len as u64 > (*(*facet).val).value.decimal.lo {
-                return XmlParserErrors::XmlSchemavCvcMaxLengthValid as i32;
+                if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
+                    if (*val).value.decimal.total as u64 > (*(*facet).val).value.decimal.lo {
+                        return XmlParserErrors::XmlSchemavCvcTotalDigitsValid as i32;
+                    }
+                } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetFractiondigits
+                    && (*val).value.decimal.frac as u64 > (*(*facet).val).value.decimal.lo
+                {
+                    return XmlParserErrors::XmlSchemavCvcFractionDigitsValid as i32;
+                }
+            }
+            _ => {
+                todo!()
             }
         }
-        XmlSchemaTypeType::XmlSchemaFacetTotaldigits
-        | XmlSchemaTypeType::XmlSchemaFacetFractiondigits => {
-            if (*facet).val.is_null()
-                || !matches!(
-                    (*(*facet).val).typ,
-                    XmlSchemaValType::XmlSchemasPInteger | XmlSchemaValType::XmlSchemasNNInteger
-                )
-                || (*(*facet).val).value.decimal.frac != 0
-            {
-                return -1;
-            }
-            if val.is_null()
-                || !matches!(
-                    (*val).typ,
-                    XmlSchemaValType::XmlSchemasDecimal
-                        | XmlSchemaValType::XmlSchemasInteger
-                        | XmlSchemaValType::XmlSchemasNPInteger
-                        | XmlSchemaValType::XmlSchemasNInteger
-                        | XmlSchemaValType::XmlSchemasNNInteger
-                        | XmlSchemaValType::XmlSchemasPInteger
-                        | XmlSchemaValType::XmlSchemasInt
-                        | XmlSchemaValType::XmlSchemasUInt
-                        | XmlSchemaValType::XmlSchemasLong
-                        | XmlSchemaValType::XmlSchemasULong
-                        | XmlSchemaValType::XmlSchemasShort
-                        | XmlSchemaValType::XmlSchemasUShort
-                        | XmlSchemaValType::XmlSchemasByte
-                        | XmlSchemaValType::XmlSchemasUByte
-                )
-            {
-                return -1;
-            }
-            if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
-                if (*val).value.decimal.total as u64 > (*(*facet).val).value.decimal.lo {
-                    return XmlParserErrors::XmlSchemavCvcTotalDigitsValid as i32;
-                }
-            } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetFractiondigits
-                && (*val).value.decimal.frac as u64 > (*(*facet).val).value.decimal.lo
-            {
-                return XmlParserErrors::XmlSchemavCvcFractionDigitsValid as i32;
-            }
-        }
-        _ => {
-            todo!()
-        }
+        0
     }
-    0
 }
 
 /// Check a value against a facet condition
@@ -5493,29 +5611,31 @@ pub unsafe fn xml_schema_validate_facet(
     value: *const XmlChar,
     val: XmlSchemaValPtr,
 ) -> i32 {
-    // This tries to ensure API compatibility regarding the old
-    // xmlSchemaValidateFacet() and the new xmlSchemaValidateFacetInternal() and
-    // xmlSchemaValidateFacetWhtsp().
-    if !val.is_null() {
-        return xml_schema_validate_facet_internal(
-            facet,
-            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
-            (*val).typ,
-            value,
-            val,
-            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
-        );
-    } else if !base.is_null() {
-        return xml_schema_validate_facet_internal(
-            facet,
-            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
-            (*base).built_in_type.try_into().unwrap(),
-            value,
-            val,
-            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
-        );
+    unsafe {
+        // This tries to ensure API compatibility regarding the old
+        // xmlSchemaValidateFacet() and the new xmlSchemaValidateFacetInternal() and
+        // xmlSchemaValidateFacetWhtsp().
+        if !val.is_null() {
+            return xml_schema_validate_facet_internal(
+                facet,
+                XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
+                (*val).typ,
+                value,
+                val,
+                XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
+            );
+        } else if !base.is_null() {
+            return xml_schema_validate_facet_internal(
+                facet,
+                XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
+                (*base).built_in_type.try_into().unwrap(),
+                value,
+                val,
+                XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
+            );
+        }
+        -1
     }
-    -1
 }
 
 /// Check a value against a facet condition. This takes value normalization
@@ -5534,58 +5654,60 @@ pub unsafe fn xml_schema_validate_facet_whtsp(
     val: XmlSchemaValPtr,
     ws: XmlSchemaWhitespaceValueType,
 ) -> i32 {
-    xml_schema_validate_facet_internal(facet, fws, val_type, value, val, ws)
+    unsafe { xml_schema_validate_facet_internal(facet, fws, val_type, value, val, ws) }
 }
 
 /// Cleanup the default XML Schemas type library
 #[doc(alias = "xmlSchemaFreeValue")]
 pub unsafe fn xml_schema_free_value(mut value: XmlSchemaValPtr) {
-    let mut prev: XmlSchemaValPtr;
+    unsafe {
+        let mut prev: XmlSchemaValPtr;
 
-    while !value.is_null() {
-        match (*value).typ {
-            XmlSchemaValType::XmlSchemasString
-            | XmlSchemaValType::XmlSchemasNormstring
-            | XmlSchemaValType::XmlSchemasToken
-            | XmlSchemaValType::XmlSchemasLanguage
-            | XmlSchemaValType::XmlSchemasNmtoken
-            | XmlSchemaValType::XmlSchemasNmtokens
-            | XmlSchemaValType::XmlSchemasName
-            | XmlSchemaValType::XmlSchemasNcname
-            | XmlSchemaValType::XmlSchemasID
-            | XmlSchemaValType::XmlSchemasIDREF
-            | XmlSchemaValType::XmlSchemasIDREFS
-            | XmlSchemaValType::XmlSchemasEntity
-            | XmlSchemaValType::XmlSchemasEntities
-            | XmlSchemaValType::XmlSchemasAnyURI
-            | XmlSchemaValType::XmlSchemasAnysimpletype => {
-                if !(*value).value.str.is_null() {
-                    xml_free((*value).value.str as _);
+        while !value.is_null() {
+            match (*value).typ {
+                XmlSchemaValType::XmlSchemasString
+                | XmlSchemaValType::XmlSchemasNormstring
+                | XmlSchemaValType::XmlSchemasToken
+                | XmlSchemaValType::XmlSchemasLanguage
+                | XmlSchemaValType::XmlSchemasNmtoken
+                | XmlSchemaValType::XmlSchemasNmtokens
+                | XmlSchemaValType::XmlSchemasName
+                | XmlSchemaValType::XmlSchemasNcname
+                | XmlSchemaValType::XmlSchemasID
+                | XmlSchemaValType::XmlSchemasIDREF
+                | XmlSchemaValType::XmlSchemasIDREFS
+                | XmlSchemaValType::XmlSchemasEntity
+                | XmlSchemaValType::XmlSchemasEntities
+                | XmlSchemaValType::XmlSchemasAnyURI
+                | XmlSchemaValType::XmlSchemasAnysimpletype => {
+                    if !(*value).value.str.is_null() {
+                        xml_free((*value).value.str as _);
+                    }
                 }
+                XmlSchemaValType::XmlSchemasNotation | XmlSchemaValType::XmlSchemasQname => {
+                    if !(*value).value.qname.uri.is_null() {
+                        xml_free((*value).value.qname.uri as _);
+                    }
+                    if !(*value).value.qname.name.is_null() {
+                        xml_free((*value).value.qname.name as _);
+                    }
+                }
+                XmlSchemaValType::XmlSchemasHexbinary => {
+                    if !(*value).value.hex.str.is_null() {
+                        xml_free((*value).value.hex.str as _);
+                    }
+                }
+                XmlSchemaValType::XmlSchemasBase64binary => {
+                    if !(*value).value.base64.str.is_null() {
+                        xml_free((*value).value.base64.str as _);
+                    }
+                }
+                _ => {}
             }
-            XmlSchemaValType::XmlSchemasNotation | XmlSchemaValType::XmlSchemasQname => {
-                if !(*value).value.qname.uri.is_null() {
-                    xml_free((*value).value.qname.uri as _);
-                }
-                if !(*value).value.qname.name.is_null() {
-                    xml_free((*value).value.qname.name as _);
-                }
-            }
-            XmlSchemaValType::XmlSchemasHexbinary => {
-                if !(*value).value.hex.str.is_null() {
-                    xml_free((*value).value.hex.str as _);
-                }
-            }
-            XmlSchemaValType::XmlSchemasBase64binary => {
-                if !(*value).value.base64.str.is_null() {
-                    xml_free((*value).value.base64.str as _);
-                }
-            }
-            _ => {}
+            prev = value;
+            value = (*value).next;
+            xml_free(prev as _);
         }
-        prev = value;
-        value = (*value).next;
-        xml_free(prev as _);
     }
 }
 
@@ -5594,13 +5716,15 @@ pub unsafe fn xml_schema_free_value(mut value: XmlSchemaValPtr) {
 /// Returns the newly allocated structure or NULL in case or error
 #[doc(alias = "xmlSchemaNewFacet")]
 pub unsafe fn xml_schema_new_facet() -> XmlSchemaFacetPtr {
-    let ret: XmlSchemaFacetPtr = xml_malloc(size_of::<XmlSchemaFacet>()) as _;
-    if ret.is_null() {
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlSchemaFacet>());
+    unsafe {
+        let ret: XmlSchemaFacetPtr = xml_malloc(size_of::<XmlSchemaFacet>()) as _;
+        if ret.is_null() {
+            return null_mut();
+        }
+        memset(ret as _, 0, size_of::<XmlSchemaFacet>());
 
-    ret
+        ret
+    }
 }
 
 // macro_rules! VERROR {
@@ -5675,83 +5799,85 @@ pub unsafe fn xml_schema_check_facet(
     mut pctxt: XmlSchemaParserCtxtPtr,
     _name: *const XmlChar,
 ) -> i32 {
-    let mut ret: i32 = 0;
+    unsafe {
+        let mut ret: i32 = 0;
 
-    if facet.is_null() || type_decl.is_null() {
-        return -1;
-    }
-    // TODO: will the parser context be given if used from
-    // the relaxNG module?
-    let ctxt_given = if pctxt.is_null() { 0 } else { 1 };
+        if facet.is_null() || type_decl.is_null() {
+            return -1;
+        }
+        // TODO: will the parser context be given if used from
+        // the relaxNG module?
+        let ctxt_given = if pctxt.is_null() { 0 } else { 1 };
 
-    match (*facet).typ {
-        XmlSchemaTypeType::XmlSchemaFacetMininclusive
-        | XmlSchemaTypeType::XmlSchemaFacetMinexclusive
-        | XmlSchemaTypeType::XmlSchemaFacetMaxinclusive
-        | XmlSchemaTypeType::XmlSchemaFacetMaxexclusive
-        | XmlSchemaTypeType::XmlSchemaFacetEnumeration => {
-            // Okay we need to validate the value at that point.
-            let base: XmlSchemaTypePtr;
+        match (*facet).typ {
+            XmlSchemaTypeType::XmlSchemaFacetMininclusive
+            | XmlSchemaTypeType::XmlSchemaFacetMinexclusive
+            | XmlSchemaTypeType::XmlSchemaFacetMaxinclusive
+            | XmlSchemaTypeType::XmlSchemaFacetMaxexclusive
+            | XmlSchemaTypeType::XmlSchemaFacetEnumeration => {
+                // Okay we need to validate the value at that point.
+                let base: XmlSchemaTypePtr;
 
-            // 4.3.5.5 Constraints on enumeration Schema Components
-            // Schema Component Constraint: enumeration valid restriction
-            // It is an `error` if any member of {value} is not in the
-            // `value space` of {base type definition}.
-            //
-            // minInclusive, maxInclusive, minExclusive, maxExclusive:
-            // The value `must` be in the
-            // `value space` of the `base type`.
+                // 4.3.5.5 Constraints on enumeration Schema Components
+                // Schema Component Constraint: enumeration valid restriction
+                // It is an `error` if any member of {value} is not in the
+                // `value space` of {base type definition}.
+                //
+                // minInclusive, maxInclusive, minExclusive, maxExclusive:
+                // The value `must` be in the
+                // `value space` of the `base type`.
 
-            // This function is intended to deliver a compiled value
-            // on the facet. In this implementation of XML Schemata the
-            // type holding a facet, won't be a built-in type.
-            // Thus to ensure that other API
-            // calls (relaxng) do work, if the given type is a built-in
-            // type, we will assume that the given built-in type *is
-            // already* the base type.
-            if (*type_decl).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
-                base = (*type_decl).base_type;
-                if base.is_null() {
-                    PERROR_INT!(
-                        pctxt,
-                        "xmlSchemaCheckFacet",
-                        "a type user derived type has no base type"
-                    );
-                    return -1;
+                // This function is intended to deliver a compiled value
+                // on the facet. In this implementation of XML Schemata the
+                // type holding a facet, won't be a built-in type.
+                // Thus to ensure that other API
+                // calls (relaxng) do work, if the given type is a built-in
+                // type, we will assume that the given built-in type *is
+                // already* the base type.
+                if (*type_decl).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
+                    base = (*type_decl).base_type;
+                    if base.is_null() {
+                        PERROR_INT!(
+                            pctxt,
+                            "xmlSchemaCheckFacet",
+                            "a type user derived type has no base type"
+                        );
+                        return -1;
+                    }
+                } else {
+                    base = type_decl;
                 }
-            } else {
-                base = type_decl;
-            }
 
-            if ctxt_given == 0 {
-                // A context is needed if called from RelaxNG.
-                pctxt = xml_schema_new_parser_ctxt(c"*".as_ptr() as _);
-                if pctxt.is_null() {
-                    return -1;
+                if ctxt_given == 0 {
+                    // A context is needed if called from RelaxNG.
+                    pctxt = xml_schema_new_parser_ctxt(c"*".as_ptr() as _);
+                    if pctxt.is_null() {
+                        return -1;
+                    }
                 }
-            }
-            // NOTE: This call does not check the content nodes,
-            // since they are not available:
-            // (*facet).node is just the node holding the facet
-            // definition, *not* the attribute holding the *value*
-            // of the facet.
-            ret = xml_schema_vcheck_cvc_simple_type(
-                pctxt as XmlSchemaAbstractCtxtPtr,
-                (*facet).node.map(|node| node.into()),
-                base,
-                (*facet).value,
-                addr_of_mut!((*facet).val),
-                1,
-                1,
-                0,
-            );
-            if ret != 0 {
-                if ret < 0 {
-                    // No error message for RelaxNG.
-                    if ctxt_given != 0 {
-                        let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
-                        let facet_type = xml_schema_facet_type_to_string((*facet).typ);
-                        xml_schema_custom_err(
+                // NOTE: This call does not check the content nodes,
+                // since they are not available:
+                // (*facet).node is just the node holding the facet
+                // definition, *not* the attribute holding the *value*
+                // of the facet.
+                ret = xml_schema_vcheck_cvc_simple_type(
+                    pctxt as XmlSchemaAbstractCtxtPtr,
+                    (*facet).node.map(|node| node.into()),
+                    base,
+                    (*facet).value,
+                    addr_of_mut!((*facet).val),
+                    1,
+                    1,
+                    0,
+                );
+                if ret != 0 {
+                    if ret < 0 {
+                        // No error message for RelaxNG.
+                        if ctxt_given != 0 {
+                            let value =
+                                CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
+                            let facet_type = xml_schema_facet_type_to_string((*facet).typ);
+                            xml_schema_custom_err(
                             pctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapInternal,
                             (*facet).node.map(|node| node.into()),
@@ -5760,26 +5886,26 @@ pub unsafe fn xml_schema_check_facet(
                             Some(&value),
                             Some(facet_type),
                             );
+                        }
+                        // goto internal_error;
+                        if ctxt_given == 0 && !pctxt.is_null() {
+                            xml_schema_free_parser_ctxt(pctxt);
+                        }
+                        return -1;
                     }
-                    // goto internal_error;
-                    if ctxt_given == 0 && !pctxt.is_null() {
-                        xml_schema_free_parser_ctxt(pctxt);
-                    }
-                    return -1;
-                }
-                ret = XmlParserErrors::XmlSchemapInvalidFacetValue as i32;
-                // No error message for RelaxNG.
-                if ctxt_given != 0 {
-                    let mut str: *mut XmlChar = null_mut();
-                    let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
-                    let qname = CStr::from_ptr(xml_schema_format_qname(
-                        addr_of_mut!(str),
-                        (*base).target_namespace,
-                        (*base).name,
-                    ) as *const i8)
-                    .to_string_lossy();
+                    ret = XmlParserErrors::XmlSchemapInvalidFacetValue as i32;
+                    // No error message for RelaxNG.
+                    if ctxt_given != 0 {
+                        let mut str: *mut XmlChar = null_mut();
+                        let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
+                        let qname = CStr::from_ptr(xml_schema_format_qname(
+                            addr_of_mut!(str),
+                            (*base).target_namespace,
+                            (*base).name,
+                        ) as *const i8)
+                        .to_string_lossy();
 
-                    xml_schema_custom_err(
+                        xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
                         (*facet).node.map(|node| node.into()),
@@ -5788,25 +5914,25 @@ pub unsafe fn xml_schema_check_facet(
                         Some(&value),
                         Some(&qname),
                     );
-                    FREE_AND_NULL!(str);
+                        FREE_AND_NULL!(str);
+                    }
+                    // goto exit;
+                    if ctxt_given == 0 && !pctxt.is_null() {
+                        xml_schema_free_parser_ctxt(pctxt);
+                    }
+                    return ret;
+                } else if (*facet).val.is_null() && ctxt_given != 0 {
+                    PERROR_INT!(pctxt, "xmlSchemaCheckFacet", "value was not computed");
                 }
-                // goto exit;
-                if ctxt_given == 0 && !pctxt.is_null() {
-                    xml_schema_free_parser_ctxt(pctxt);
-                }
-                return ret;
-            } else if (*facet).val.is_null() && ctxt_given != 0 {
-                PERROR_INT!(pctxt, "xmlSchemaCheckFacet", "value was not computed");
             }
-        }
-        XmlSchemaTypeType::XmlSchemaFacetPattern => {
-            (*facet).regexp = xml_regexp_compile((*facet).value);
-            if (*facet).regexp.is_null() {
-                ret = XmlParserErrors::XmlSchemapRegexpInvalid as i32;
-                // No error message for RelaxNG.
-                if ctxt_given != 0 {
-                    let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
-                    xml_schema_custom_err(
+            XmlSchemaTypeType::XmlSchemaFacetPattern => {
+                (*facet).regexp = xml_regexp_compile((*facet).value);
+                if (*facet).regexp.is_null() {
+                    ret = XmlParserErrors::XmlSchemapRegexpInvalid as i32;
+                    // No error message for RelaxNG.
+                    if ctxt_given != 0 {
+                        let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
+                        xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
                         (*facet).node.map(|node| node.into()),
@@ -5815,51 +5941,52 @@ pub unsafe fn xml_schema_check_facet(
                         Some(&value),
                         None,
                     );
+                    }
                 }
             }
-        }
-        XmlSchemaTypeType::XmlSchemaFacetTotaldigits
-        | XmlSchemaTypeType::XmlSchemaFacetFractiondigits
-        | XmlSchemaTypeType::XmlSchemaFacetLength
-        | XmlSchemaTypeType::XmlSchemaFacetMaxlength
-        | XmlSchemaTypeType::XmlSchemaFacetMinlength => {
-            if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
-                ret = xml_schema_validate_predefined_type(
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasPInteger),
-                    (*facet).value,
-                    addr_of_mut!((*facet).val),
-                );
-            } else {
-                ret = xml_schema_validate_predefined_type(
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNNInteger),
-                    (*facet).value,
-                    addr_of_mut!((*facet).val),
-                );
-            }
-            if ret != 0 {
-                if ret < 0 {
+            XmlSchemaTypeType::XmlSchemaFacetTotaldigits
+            | XmlSchemaTypeType::XmlSchemaFacetFractiondigits
+            | XmlSchemaTypeType::XmlSchemaFacetLength
+            | XmlSchemaTypeType::XmlSchemaFacetMaxlength
+            | XmlSchemaTypeType::XmlSchemaFacetMinlength => {
+                if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
+                    ret = xml_schema_validate_predefined_type(
+                        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasPInteger),
+                        (*facet).value,
+                        addr_of_mut!((*facet).val),
+                    );
+                } else {
+                    ret = xml_schema_validate_predefined_type(
+                        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNNInteger),
+                        (*facet).value,
+                        addr_of_mut!((*facet).val),
+                    );
+                }
+                if ret != 0 {
+                    if ret < 0 {
+                        // No error message for RelaxNG.
+                        if ctxt_given != 0 {
+                            PERROR_INT!(pctxt, "xmlSchemaCheckFacet", "validating facet value");
+                        }
+                        // goto internal_error;
+                        if ctxt_given == 0 && !pctxt.is_null() {
+                            xml_schema_free_parser_ctxt(pctxt);
+                        }
+                        return -1;
+                    }
+                    ret = XmlParserErrors::XmlSchemapInvalidFacetValue as i32;
                     // No error message for RelaxNG.
                     if ctxt_given != 0 {
-                        PERROR_INT!(pctxt, "xmlSchemaCheckFacet", "validating facet value");
-                    }
-                    // goto internal_error;
-                    if ctxt_given == 0 && !pctxt.is_null() {
-                        xml_schema_free_parser_ctxt(pctxt);
-                    }
-                    return -1;
-                }
-                ret = XmlParserErrors::XmlSchemapInvalidFacetValue as i32;
-                // No error message for RelaxNG.
-                if ctxt_given != 0 {
-                    let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
-                    let facet_type = xml_schema_facet_type_to_string((*facet).typ);
-                    let typename = if (*facet).typ != XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
-                        "nonNegativeInteger"
-                    } else {
-                        "positiveInteger"
-                    };
-                    // error code
-                    xml_schema_custom_err4(
+                        let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
+                        let facet_type = xml_schema_facet_type_to_string((*facet).typ);
+                        let typename =
+                            if (*facet).typ != XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
+                                "nonNegativeInteger"
+                            } else {
+                                "positiveInteger"
+                            };
+                        // error code
+                        xml_schema_custom_err4(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
                         (*facet).node.map(|node| node.into()),
@@ -5873,65 +6000,68 @@ pub unsafe fn xml_schema_check_facet(
                         Some(typename),
                         None,
                     );
+                    }
                 }
             }
-        }
-        XmlSchemaTypeType::XmlSchemaFacetWhitespace => {
-            if xml_str_equal((*facet).value, c"preserve".as_ptr() as _) {
-                (*facet).whitespace = XML_SCHEMAS_FACET_PRESERVE;
-            } else if xml_str_equal((*facet).value, c"replace".as_ptr() as _) {
-                (*facet).whitespace = XML_SCHEMAS_FACET_REPLACE;
-            } else if xml_str_equal((*facet).value, c"collapse".as_ptr() as _) {
-                (*facet).whitespace = XML_SCHEMAS_FACET_COLLAPSE;
-            } else {
-                ret = XmlParserErrors::XmlSchemapInvalidFacetValue as i32;
-                // No error message for RelaxNG.
-                if ctxt_given != 0 {
-                    let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
-                    // error was previously: XML_SCHEMAP_INVALID_WHITE_SPACE
-                    xml_schema_custom_err(
-                        pctxt as XmlSchemaAbstractCtxtPtr,
-                        ret.try_into().unwrap(),
-                        (*facet).node.map(|node| node.into()),
-                        type_decl as XmlSchemaBasicItemPtr,
-                        format!("The value '{value}' of the facet 'whitespace' is not valid")
-                            .as_str(),
-                        Some(&value),
-                        None,
-                    );
+            XmlSchemaTypeType::XmlSchemaFacetWhitespace => {
+                if xml_str_equal((*facet).value, c"preserve".as_ptr() as _) {
+                    (*facet).whitespace = XML_SCHEMAS_FACET_PRESERVE;
+                } else if xml_str_equal((*facet).value, c"replace".as_ptr() as _) {
+                    (*facet).whitespace = XML_SCHEMAS_FACET_REPLACE;
+                } else if xml_str_equal((*facet).value, c"collapse".as_ptr() as _) {
+                    (*facet).whitespace = XML_SCHEMAS_FACET_COLLAPSE;
+                } else {
+                    ret = XmlParserErrors::XmlSchemapInvalidFacetValue as i32;
+                    // No error message for RelaxNG.
+                    if ctxt_given != 0 {
+                        let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
+                        // error was previously: XML_SCHEMAP_INVALID_WHITE_SPACE
+                        xml_schema_custom_err(
+                            pctxt as XmlSchemaAbstractCtxtPtr,
+                            ret.try_into().unwrap(),
+                            (*facet).node.map(|node| node.into()),
+                            type_decl as XmlSchemaBasicItemPtr,
+                            format!("The value '{value}' of the facet 'whitespace' is not valid")
+                                .as_str(),
+                            Some(&value),
+                            None,
+                        );
+                    }
                 }
             }
+            _ => {}
         }
-        _ => {}
+        // exit:
+        if ctxt_given == 0 && !pctxt.is_null() {
+            xml_schema_free_parser_ctxt(pctxt);
+        }
+        ret
+        // internal_error:
+        //     if ((! ctxtGiven) && !pctxt.is_null()) {
+        // 		xmlSchemaFreeParserCtxt(pctxt);
+        // 	}
+        //     return -1;
     }
-    // exit:
-    if ctxt_given == 0 && !pctxt.is_null() {
-        xml_schema_free_parser_ctxt(pctxt);
-    }
-    ret
-    // internal_error:
-    //     if ((! ctxtGiven) && !pctxt.is_null()) {
-    // 		xmlSchemaFreeParserCtxt(pctxt);
-    // 	}
-    //     return -1;
 }
 
 /// Deallocate a Schema Facet structure.
 #[doc(alias = "xmlSchemaFreeFacet")]
 pub unsafe fn xml_schema_free_facet(facet: XmlSchemaFacetPtr) {
-    if facet.is_null() {
-        return;
+    unsafe {
+        if facet.is_null() {
+            return;
+        }
+        if !(*facet).val.is_null() {
+            xml_schema_free_value((*facet).val);
+        }
+        if !(*facet).regexp.is_null() {
+            xml_reg_free_regexp((*facet).regexp);
+        }
+        if !(*facet).annot.is_null() {
+            xml_schema_free_annot((*facet).annot);
+        }
+        xml_free(facet as _);
     }
-    if !(*facet).val.is_null() {
-        xml_schema_free_value((*facet).val);
-    }
-    if !(*facet).regexp.is_null() {
-        xml_reg_free_regexp((*facet).regexp);
-    }
-    if !(*facet).annot.is_null() {
-        xml_schema_free_annot((*facet).annot);
-    }
-    xml_free(facet as _);
 }
 
 /// Compare 2 values
@@ -5939,26 +6069,37 @@ pub unsafe fn xml_schema_free_facet(facet: XmlSchemaFacetPtr) {
 /// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in case of error
 #[doc(alias = "xmlSchemaCompareValues")]
 pub unsafe fn xml_schema_compare_values(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i32 {
-    if x.is_null() || y.is_null() {
-        return -2;
+    unsafe {
+        if x.is_null() || y.is_null() {
+            return -2;
+        }
+        let xws = if (*x).typ == XmlSchemaValType::XmlSchemasString {
+            XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve
+        } else if (*x).typ == XmlSchemaValType::XmlSchemasNormstring {
+            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace
+        } else {
+            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
+        };
+
+        let yws = if (*y).typ == XmlSchemaValType::XmlSchemasString {
+            XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve
+        } else if (*y).typ == XmlSchemaValType::XmlSchemasNormstring {
+            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace
+        } else {
+            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
+        };
+
+        xml_schema_compare_values_internal(
+            (*x).typ,
+            x,
+            null_mut(),
+            xws,
+            (*y).typ,
+            y,
+            null_mut(),
+            yws,
+        )
     }
-    let xws = if (*x).typ == XmlSchemaValType::XmlSchemasString {
-        XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve
-    } else if (*x).typ == XmlSchemaValType::XmlSchemasNormstring {
-        XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace
-    } else {
-        XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
-    };
-
-    let yws = if (*y).typ == XmlSchemaValType::XmlSchemasString {
-        XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve
-    } else if (*y).typ == XmlSchemaValType::XmlSchemasNormstring {
-        XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace
-    } else {
-        XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
-    };
-
-    xml_schema_compare_values_internal((*x).typ, x, null_mut(), xws, (*y).typ, y, null_mut(), yws)
 }
 
 /// Lookup function
@@ -5969,14 +6110,16 @@ pub unsafe fn xml_schema_compare_values(x: XmlSchemaValPtr, y: XmlSchemaValPtr) 
 pub unsafe fn xml_schema_get_built_in_list_simple_type_item_type(
     typ: XmlSchemaTypePtr,
 ) -> XmlSchemaTypePtr {
-    if typ.is_null() || (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
-        return null_mut();
-    }
-    match XmlSchemaValType::try_from((*typ).built_in_type) {
-        Ok(XmlSchemaValType::XmlSchemasNmtokens) => XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
-        Ok(XmlSchemaValType::XmlSchemasIDREFS) => XML_SCHEMA_TYPE_IDREF_DEF.get(),
-        Ok(XmlSchemaValType::XmlSchemasEntities) => XML_SCHEMA_TYPE_ENTITY_DEF.get(),
-        _ => null_mut(),
+    unsafe {
+        if typ.is_null() || (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
+            return null_mut();
+        }
+        match XmlSchemaValType::try_from((*typ).built_in_type) {
+            Ok(XmlSchemaValType::XmlSchemasNmtokens) => XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
+            Ok(XmlSchemaValType::XmlSchemasIDREFS) => XML_SCHEMA_TYPE_IDREF_DEF.get(),
+            Ok(XmlSchemaValType::XmlSchemasEntities) => XML_SCHEMA_TYPE_ENTITY_DEF.get(),
+            _ => null_mut(),
+        }
     }
 }
 
@@ -5991,39 +6134,41 @@ pub unsafe fn xml_schema_validate_list_simple_type_facet(
     actual_len: u64,
     expected_len: *mut u64,
 ) -> i32 {
-    if facet.is_null() {
-        return -1;
+    unsafe {
+        if facet.is_null() {
+            return -1;
+        }
+        // TODO: Check if this will work with large numbers.
+        // (compare value.decimal.mi and value.decimal.hi as well?).
+        if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetLength {
+            if actual_len != (*(*facet).val).value.decimal.lo {
+                if !expected_len.is_null() {
+                    *expected_len = (*(*facet).val).value.decimal.lo;
+                }
+                return XmlParserErrors::XmlSchemavCvcLengthValid as i32;
+            }
+        } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
+            if actual_len < (*(*facet).val).value.decimal.lo {
+                if !expected_len.is_null() {
+                    *expected_len = (*(*facet).val).value.decimal.lo;
+                }
+                return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
+            }
+        } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMaxlength {
+            if actual_len > (*(*facet).val).value.decimal.lo {
+                if !expected_len.is_null() {
+                    *expected_len = (*(*facet).val).value.decimal.lo;
+                }
+                return XmlParserErrors::XmlSchemavCvcMaxLengthValid as i32;
+            }
+        } else {
+            // NOTE: That we can pass NULL as xmlSchemaValPtr to
+            // xmlSchemaValidateFacet, since the remaining facet types
+            // are: xmlSchemaTypeType::XML_SCHEMA_FACET_PATTERN.as_ptr() as _, xmlSchemaTypeType::XML_SCHEMA_FACET_ENUMERATION.
+            return xml_schema_validate_facet(null_mut(), facet, value, null_mut());
+        }
+        0
     }
-    // TODO: Check if this will work with large numbers.
-    // (compare value.decimal.mi and value.decimal.hi as well?).
-    if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetLength {
-        if actual_len != (*(*facet).val).value.decimal.lo {
-            if !expected_len.is_null() {
-                *expected_len = (*(*facet).val).value.decimal.lo;
-            }
-            return XmlParserErrors::XmlSchemavCvcLengthValid as i32;
-        }
-    } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
-        if actual_len < (*(*facet).val).value.decimal.lo {
-            if !expected_len.is_null() {
-                *expected_len = (*(*facet).val).value.decimal.lo;
-            }
-            return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
-        }
-    } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMaxlength {
-        if actual_len > (*(*facet).val).value.decimal.lo {
-            if !expected_len.is_null() {
-                *expected_len = (*(*facet).val).value.decimal.lo;
-            }
-            return XmlParserErrors::XmlSchemavCvcMaxLengthValid as i32;
-        }
-    } else {
-        // NOTE: That we can pass NULL as xmlSchemaValPtr to
-        // xmlSchemaValidateFacet, since the remaining facet types
-        // are: xmlSchemaTypeType::XML_SCHEMA_FACET_PATTERN.as_ptr() as _, xmlSchemaTypeType::XML_SCHEMA_FACET_ENUMERATION.
-        return xml_schema_validate_facet(null_mut(), facet, value, null_mut());
-    }
-    0
 }
 
 /// Gives you the type struct for a built-in
@@ -6032,57 +6177,59 @@ pub unsafe fn xml_schema_validate_list_simple_type_facet(
 /// Returns the type if found, NULL otherwise.
 #[doc(alias = "xmlSchemaGetBuiltInType")]
 pub unsafe fn xml_schema_get_built_in_type(typ: XmlSchemaValType) -> XmlSchemaTypePtr {
-    if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
-        return null_mut();
-    }
-    match typ {
-        XmlSchemaValType::XmlSchemasAnysimpletype => XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
-        XmlSchemaValType::XmlSchemasString => XML_SCHEMA_TYPE_STRING_DEF.get(),
-        XmlSchemaValType::XmlSchemasNormstring => XML_SCHEMA_TYPE_NORM_STRING_DEF.get(),
-        XmlSchemaValType::XmlSchemasDecimal => XML_SCHEMA_TYPE_DECIMAL_DEF.get(),
-        XmlSchemaValType::XmlSchemasTime => XML_SCHEMA_TYPE_TIME_DEF.get(),
-        XmlSchemaValType::XmlSchemasGday => XML_SCHEMA_TYPE_GDAY_DEF.get(),
-        XmlSchemaValType::XmlSchemasGmonth => XML_SCHEMA_TYPE_GMONTH_DEF.get(),
-        XmlSchemaValType::XmlSchemasGmonthday => XML_SCHEMA_TYPE_GMONTH_DAY_DEF.get(),
-        XmlSchemaValType::XmlSchemasGyear => XML_SCHEMA_TYPE_GYEAR_DEF.get(),
-        XmlSchemaValType::XmlSchemasGyearmonth => XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.get(),
-        XmlSchemaValType::XmlSchemasDate => XML_SCHEMA_TYPE_DATE_DEF.get(),
-        XmlSchemaValType::XmlSchemasDatetime => XML_SCHEMA_TYPE_DATETIME_DEF.get(),
-        XmlSchemaValType::XmlSchemasDuration => XML_SCHEMA_TYPE_DURATION_DEF.get(),
-        XmlSchemaValType::XmlSchemasFloat => XML_SCHEMA_TYPE_FLOAT_DEF.get(),
-        XmlSchemaValType::XmlSchemasDouble => XML_SCHEMA_TYPE_DOUBLE_DEF.get(),
-        XmlSchemaValType::XmlSchemasBoolean => XML_SCHEMA_TYPE_BOOLEAN_DEF.get(),
-        XmlSchemaValType::XmlSchemasToken => XML_SCHEMA_TYPE_TOKEN_DEF.get(),
-        XmlSchemaValType::XmlSchemasLanguage => XML_SCHEMA_TYPE_LANGUAGE_DEF.get(),
-        XmlSchemaValType::XmlSchemasNmtoken => XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
-        XmlSchemaValType::XmlSchemasNmtokens => XML_SCHEMA_TYPE_NMTOKENS_DEF.get(),
-        XmlSchemaValType::XmlSchemasName => XML_SCHEMA_TYPE_NAME_DEF.get(),
-        XmlSchemaValType::XmlSchemasQname => XML_SCHEMA_TYPE_QNAME_DEF.get(),
-        XmlSchemaValType::XmlSchemasNcname => XML_SCHEMA_TYPE_NCNAME_DEF.get(),
-        XmlSchemaValType::XmlSchemasID => XML_SCHEMA_TYPE_ID_DEF.get(),
-        XmlSchemaValType::XmlSchemasIDREF => XML_SCHEMA_TYPE_IDREF_DEF.get(),
-        XmlSchemaValType::XmlSchemasIDREFS => XML_SCHEMA_TYPE_IDREFS_DEF.get(),
-        XmlSchemaValType::XmlSchemasEntity => XML_SCHEMA_TYPE_ENTITY_DEF.get(),
-        XmlSchemaValType::XmlSchemasEntities => XML_SCHEMA_TYPE_ENTITIES_DEF.get(),
-        XmlSchemaValType::XmlSchemasNotation => XML_SCHEMA_TYPE_NOTATION_DEF.get(),
-        XmlSchemaValType::XmlSchemasAnyURI => XML_SCHEMA_TYPE_ANY_URIDEF.get(),
-        XmlSchemaValType::XmlSchemasInteger => XML_SCHEMA_TYPE_INTEGER_DEF.get(),
-        XmlSchemaValType::XmlSchemasNPInteger => XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get(),
-        XmlSchemaValType::XmlSchemasNInteger => XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.get(),
-        XmlSchemaValType::XmlSchemasNNInteger => XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
-        XmlSchemaValType::XmlSchemasPInteger => XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.get(),
-        XmlSchemaValType::XmlSchemasInt => XML_SCHEMA_TYPE_INT_DEF.get(),
-        XmlSchemaValType::XmlSchemasUInt => XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get(),
-        XmlSchemaValType::XmlSchemasLong => XML_SCHEMA_TYPE_LONG_DEF.get(),
-        XmlSchemaValType::XmlSchemasULong => XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get(),
-        XmlSchemaValType::XmlSchemasShort => XML_SCHEMA_TYPE_SHORT_DEF.get(),
-        XmlSchemaValType::XmlSchemasUShort => XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get(),
-        XmlSchemaValType::XmlSchemasByte => XML_SCHEMA_TYPE_BYTE_DEF.get(),
-        XmlSchemaValType::XmlSchemasUByte => XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.get(),
-        XmlSchemaValType::XmlSchemasHexbinary => XML_SCHEMA_TYPE_HEX_BINARY_DEF.get(),
-        XmlSchemaValType::XmlSchemasBase64binary => XML_SCHEMA_TYPE_BASE64_BINARY_DEF.get(),
-        XmlSchemaValType::XmlSchemasAnytype => XML_SCHEMA_TYPE_ANY_TYPE_DEF.get(),
-        _ => null_mut(),
+    unsafe {
+        if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
+            return null_mut();
+        }
+        match typ {
+            XmlSchemaValType::XmlSchemasAnysimpletype => XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            XmlSchemaValType::XmlSchemasString => XML_SCHEMA_TYPE_STRING_DEF.get(),
+            XmlSchemaValType::XmlSchemasNormstring => XML_SCHEMA_TYPE_NORM_STRING_DEF.get(),
+            XmlSchemaValType::XmlSchemasDecimal => XML_SCHEMA_TYPE_DECIMAL_DEF.get(),
+            XmlSchemaValType::XmlSchemasTime => XML_SCHEMA_TYPE_TIME_DEF.get(),
+            XmlSchemaValType::XmlSchemasGday => XML_SCHEMA_TYPE_GDAY_DEF.get(),
+            XmlSchemaValType::XmlSchemasGmonth => XML_SCHEMA_TYPE_GMONTH_DEF.get(),
+            XmlSchemaValType::XmlSchemasGmonthday => XML_SCHEMA_TYPE_GMONTH_DAY_DEF.get(),
+            XmlSchemaValType::XmlSchemasGyear => XML_SCHEMA_TYPE_GYEAR_DEF.get(),
+            XmlSchemaValType::XmlSchemasGyearmonth => XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.get(),
+            XmlSchemaValType::XmlSchemasDate => XML_SCHEMA_TYPE_DATE_DEF.get(),
+            XmlSchemaValType::XmlSchemasDatetime => XML_SCHEMA_TYPE_DATETIME_DEF.get(),
+            XmlSchemaValType::XmlSchemasDuration => XML_SCHEMA_TYPE_DURATION_DEF.get(),
+            XmlSchemaValType::XmlSchemasFloat => XML_SCHEMA_TYPE_FLOAT_DEF.get(),
+            XmlSchemaValType::XmlSchemasDouble => XML_SCHEMA_TYPE_DOUBLE_DEF.get(),
+            XmlSchemaValType::XmlSchemasBoolean => XML_SCHEMA_TYPE_BOOLEAN_DEF.get(),
+            XmlSchemaValType::XmlSchemasToken => XML_SCHEMA_TYPE_TOKEN_DEF.get(),
+            XmlSchemaValType::XmlSchemasLanguage => XML_SCHEMA_TYPE_LANGUAGE_DEF.get(),
+            XmlSchemaValType::XmlSchemasNmtoken => XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
+            XmlSchemaValType::XmlSchemasNmtokens => XML_SCHEMA_TYPE_NMTOKENS_DEF.get(),
+            XmlSchemaValType::XmlSchemasName => XML_SCHEMA_TYPE_NAME_DEF.get(),
+            XmlSchemaValType::XmlSchemasQname => XML_SCHEMA_TYPE_QNAME_DEF.get(),
+            XmlSchemaValType::XmlSchemasNcname => XML_SCHEMA_TYPE_NCNAME_DEF.get(),
+            XmlSchemaValType::XmlSchemasID => XML_SCHEMA_TYPE_ID_DEF.get(),
+            XmlSchemaValType::XmlSchemasIDREF => XML_SCHEMA_TYPE_IDREF_DEF.get(),
+            XmlSchemaValType::XmlSchemasIDREFS => XML_SCHEMA_TYPE_IDREFS_DEF.get(),
+            XmlSchemaValType::XmlSchemasEntity => XML_SCHEMA_TYPE_ENTITY_DEF.get(),
+            XmlSchemaValType::XmlSchemasEntities => XML_SCHEMA_TYPE_ENTITIES_DEF.get(),
+            XmlSchemaValType::XmlSchemasNotation => XML_SCHEMA_TYPE_NOTATION_DEF.get(),
+            XmlSchemaValType::XmlSchemasAnyURI => XML_SCHEMA_TYPE_ANY_URIDEF.get(),
+            XmlSchemaValType::XmlSchemasInteger => XML_SCHEMA_TYPE_INTEGER_DEF.get(),
+            XmlSchemaValType::XmlSchemasNPInteger => XML_SCHEMA_TYPE_NON_POSITIVE_INTEGER_DEF.get(),
+            XmlSchemaValType::XmlSchemasNInteger => XML_SCHEMA_TYPE_NEGATIVE_INTEGER_DEF.get(),
+            XmlSchemaValType::XmlSchemasNNInteger => XML_SCHEMA_TYPE_NON_NEGATIVE_INTEGER_DEF.get(),
+            XmlSchemaValType::XmlSchemasPInteger => XML_SCHEMA_TYPE_POSITIVE_INTEGER_DEF.get(),
+            XmlSchemaValType::XmlSchemasInt => XML_SCHEMA_TYPE_INT_DEF.get(),
+            XmlSchemaValType::XmlSchemasUInt => XML_SCHEMA_TYPE_UNSIGNED_INT_DEF.get(),
+            XmlSchemaValType::XmlSchemasLong => XML_SCHEMA_TYPE_LONG_DEF.get(),
+            XmlSchemaValType::XmlSchemasULong => XML_SCHEMA_TYPE_UNSIGNED_LONG_DEF.get(),
+            XmlSchemaValType::XmlSchemasShort => XML_SCHEMA_TYPE_SHORT_DEF.get(),
+            XmlSchemaValType::XmlSchemasUShort => XML_SCHEMA_TYPE_UNSIGNED_SHORT_DEF.get(),
+            XmlSchemaValType::XmlSchemasByte => XML_SCHEMA_TYPE_BYTE_DEF.get(),
+            XmlSchemaValType::XmlSchemasUByte => XML_SCHEMA_TYPE_UNSIGNED_BYTE_DEF.get(),
+            XmlSchemaValType::XmlSchemasHexbinary => XML_SCHEMA_TYPE_HEX_BINARY_DEF.get(),
+            XmlSchemaValType::XmlSchemasBase64binary => XML_SCHEMA_TYPE_BASE64_BINARY_DEF.get(),
+            XmlSchemaValType::XmlSchemasAnytype => XML_SCHEMA_TYPE_ANY_TYPE_DEF.get(),
+            _ => null_mut(),
+        }
     }
 }
 
@@ -6093,83 +6240,85 @@ pub unsafe fn xml_schema_get_built_in_type(typ: XmlSchemaValType) -> XmlSchemaTy
 /// 0 otherwise and -1 in case the type is not a built-in type.
 #[doc(alias = "xmlSchemaIsBuiltInTypeFacet")]
 pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_type: i32) -> i32 {
-    if typ.is_null() {
-        return -1;
+    unsafe {
+        if typ.is_null() {
+            return -1;
+        }
+        if (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
+            return -1;
+        }
+        match XmlSchemaValType::try_from((*typ).built_in_type) {
+            Ok(XmlSchemaValType::XmlSchemasBoolean) => {
+                if facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
+                {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            }
+            Ok(XmlSchemaValType::XmlSchemasString)
+            | Ok(XmlSchemaValType::XmlSchemasNotation)
+            | Ok(XmlSchemaValType::XmlSchemasQname)
+            | Ok(XmlSchemaValType::XmlSchemasAnyURI)
+            | Ok(XmlSchemaValType::XmlSchemasBase64binary)
+            | Ok(XmlSchemaValType::XmlSchemasHexbinary) => {
+                if facet_type == XmlSchemaTypeType::XmlSchemaFacetLength as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinlength as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxlength as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetEnumeration as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
+                {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            }
+            Ok(XmlSchemaValType::XmlSchemasDecimal) => {
+                if facet_type == XmlSchemaTypeType::XmlSchemaFacetTotaldigits as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetFractiondigits as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetEnumeration as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxinclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxexclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMininclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinexclusive as i32
+                {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            }
+            Ok(XmlSchemaValType::XmlSchemasTime)
+            | Ok(XmlSchemaValType::XmlSchemasGday)
+            | Ok(XmlSchemaValType::XmlSchemasGmonth)
+            | Ok(XmlSchemaValType::XmlSchemasGmonthday)
+            | Ok(XmlSchemaValType::XmlSchemasGyear)
+            | Ok(XmlSchemaValType::XmlSchemasGyearmonth)
+            | Ok(XmlSchemaValType::XmlSchemasDate)
+            | Ok(XmlSchemaValType::XmlSchemasDatetime)
+            | Ok(XmlSchemaValType::XmlSchemasDuration)
+            | Ok(XmlSchemaValType::XmlSchemasFloat)
+            | Ok(XmlSchemaValType::XmlSchemasDouble) => {
+                if facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetEnumeration as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxinclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxexclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMininclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinexclusive as i32
+                {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            }
+            _ => {}
+        }
+        0
     }
-    if (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
-        return -1;
-    }
-    match XmlSchemaValType::try_from((*typ).built_in_type) {
-        Ok(XmlSchemaValType::XmlSchemasBoolean) => {
-            if facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
-            {
-                return 1;
-            } else {
-                return 0;
-            }
-        }
-        Ok(XmlSchemaValType::XmlSchemasString)
-        | Ok(XmlSchemaValType::XmlSchemasNotation)
-        | Ok(XmlSchemaValType::XmlSchemasQname)
-        | Ok(XmlSchemaValType::XmlSchemasAnyURI)
-        | Ok(XmlSchemaValType::XmlSchemasBase64binary)
-        | Ok(XmlSchemaValType::XmlSchemasHexbinary) => {
-            if facet_type == XmlSchemaTypeType::XmlSchemaFacetLength as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinlength as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxlength as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetEnumeration as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
-            {
-                return 1;
-            } else {
-                return 0;
-            }
-        }
-        Ok(XmlSchemaValType::XmlSchemasDecimal) => {
-            if facet_type == XmlSchemaTypeType::XmlSchemaFacetTotaldigits as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetFractiondigits as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetEnumeration as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxinclusive as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxexclusive as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetMininclusive as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinexclusive as i32
-            {
-                return 1;
-            } else {
-                return 0;
-            }
-        }
-        Ok(XmlSchemaValType::XmlSchemasTime)
-        | Ok(XmlSchemaValType::XmlSchemasGday)
-        | Ok(XmlSchemaValType::XmlSchemasGmonth)
-        | Ok(XmlSchemaValType::XmlSchemasGmonthday)
-        | Ok(XmlSchemaValType::XmlSchemasGyear)
-        | Ok(XmlSchemaValType::XmlSchemasGyearmonth)
-        | Ok(XmlSchemaValType::XmlSchemasDate)
-        | Ok(XmlSchemaValType::XmlSchemasDatetime)
-        | Ok(XmlSchemaValType::XmlSchemasDuration)
-        | Ok(XmlSchemaValType::XmlSchemasFloat)
-        | Ok(XmlSchemaValType::XmlSchemasDouble) => {
-            if facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetEnumeration as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxinclusive as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxexclusive as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetMininclusive as i32
-                || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinexclusive as i32
-            {
-                return 1;
-            } else {
-                return 0;
-            }
-        }
-        _ => {}
-    }
-    0
 }
 
 /// Removes and normalize white spaces in the string
@@ -6177,64 +6326,66 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
 /// Returns the new string or NULL if no change was required.
 #[doc(alias = "xmlSchemaCollapseString")]
 pub unsafe fn xml_schema_collapse_string(value: *const XmlChar) -> *mut XmlChar {
-    let mut start: *const XmlChar = value;
-    let mut end: *const XmlChar;
-    let f: *const XmlChar;
-    let mut g: *mut XmlChar;
-    let mut col: i32 = 0;
+    unsafe {
+        let mut start: *const XmlChar = value;
+        let mut end: *const XmlChar;
+        let f: *const XmlChar;
+        let mut g: *mut XmlChar;
+        let mut col: i32 = 0;
 
-    if value.is_null() {
-        return null_mut();
-    }
-    while *start != 0 && xml_is_blank_char(*start as u32) {
-        start = start.add(1);
-    }
-    end = start;
-    while *end != 0 {
-        if (*end == b' ' && xml_is_blank_char(*end.add(1) as u32))
-            || (*end == 0xa || *end == 0x9 || *end == 0xd)
-        {
-            col = end.offset_from(start) as _;
-            break;
-        }
-        end = end.add(1);
-    }
-    if col == 0 {
-        f = end;
-        end = end.sub(1);
-        while end > start && xml_is_blank_char(*end as u32) {
-            end = end.sub(1);
-        }
-        end = end.add(1);
-        if start == value && f == end {
+        if value.is_null() {
             return null_mut();
         }
-        return xml_strndup(start, end.offset_from(start) as _);
-    }
-    start = xml_strdup(start);
-    if start.is_null() {
-        return null_mut();
-    }
-    g = start.add(col as usize) as _;
-    end = g;
-    while *end != 0 {
-        if xml_is_blank_char(*end as u32) {
-            end = end.add(1);
-            while xml_is_blank_char(*end as u32) {
-                end = end.add(1);
+        while *start != 0 && xml_is_blank_char(*start as u32) {
+            start = start.add(1);
+        }
+        end = start;
+        while *end != 0 {
+            if (*end == b' ' && xml_is_blank_char(*end.add(1) as u32))
+                || (*end == 0xa || *end == 0x9 || *end == 0xd)
+            {
+                col = end.offset_from(start) as _;
+                break;
             }
-            if *end != 0 {
-                *g = b' ';
-                g = g.add(1);
-            }
-        } else {
-            *g = *end;
-            g = g.add(1);
             end = end.add(1);
         }
+        if col == 0 {
+            f = end;
+            end = end.sub(1);
+            while end > start && xml_is_blank_char(*end as u32) {
+                end = end.sub(1);
+            }
+            end = end.add(1);
+            if start == value && f == end {
+                return null_mut();
+            }
+            return xml_strndup(start, end.offset_from(start) as _);
+        }
+        start = xml_strdup(start);
+        if start.is_null() {
+            return null_mut();
+        }
+        g = start.add(col as usize) as _;
+        end = g;
+        while *end != 0 {
+            if xml_is_blank_char(*end as u32) {
+                end = end.add(1);
+                while xml_is_blank_char(*end as u32) {
+                    end = end.add(1);
+                }
+                if *end != 0 {
+                    *g = b' ';
+                    g = g.add(1);
+                }
+            } else {
+                *g = *end;
+                g = g.add(1);
+                end = end.add(1);
+            }
+        }
+        *g = 0;
+        start as _
     }
-    *g = 0;
-    start as _
 }
 
 /// Replaces 0xd, 0x9 and 0xa with a space.
@@ -6242,30 +6393,32 @@ pub unsafe fn xml_schema_collapse_string(value: *const XmlChar) -> *mut XmlChar 
 /// Returns the new string or NULL if no change was required.
 #[doc(alias = "xmlSchemaWhiteSpaceReplace")]
 pub unsafe fn xml_schema_white_space_replace(value: *const XmlChar) -> *mut XmlChar {
-    let mut cur: *const XmlChar = value;
-    let mut mcur: *mut XmlChar;
+    unsafe {
+        let mut cur: *const XmlChar = value;
+        let mut mcur: *mut XmlChar;
 
-    if value.is_null() {
-        return null_mut();
-    }
-
-    while *cur != 0 && (*cur != 0xd && *cur != 0x9 && *cur != 0xa) {
-        cur = cur.add(1);
-    }
-    if *cur == 0 {
-        return null_mut();
-    }
-    let ret: *mut XmlChar = xml_strdup(value);
-    // TODO FIXME: I guess gcc will bark at this.
-    mcur = ret.add(cur.offset_from(value) as usize);
-    while {
-        if *mcur == 0xd || *mcur == 0x9 || *mcur == 0xa {
-            *mcur = b' ';
+        if value.is_null() {
+            return null_mut();
         }
-        mcur = mcur.add(1);
-        *mcur != 0
-    } {}
-    ret
+
+        while *cur != 0 && (*cur != 0xd && *cur != 0x9 && *cur != 0xa) {
+            cur = cur.add(1);
+        }
+        if *cur == 0 {
+            return null_mut();
+        }
+        let ret: *mut XmlChar = xml_strdup(value);
+        // TODO FIXME: I guess gcc will bark at this.
+        mcur = ret.add(cur.offset_from(value) as usize);
+        while {
+            if *mcur == 0xd || *mcur == 0x9 || *mcur == 0xa {
+                *mcur = b' ';
+            }
+            mcur = mcur.add(1);
+            *mcur != 0
+        } {}
+        ret
+    }
 }
 
 /// Extract the value of a facet
@@ -6273,11 +6426,13 @@ pub unsafe fn xml_schema_white_space_replace(value: *const XmlChar) -> *mut XmlC
 /// Returns the value as a long
 #[doc(alias = "xmlSchemaGetFacetValueAsULong")]
 pub unsafe fn xml_schema_get_facet_value_as_ulong(facet: XmlSchemaFacetPtr) -> u64 {
-    // TODO: Check if this is a decimal.
-    if facet.is_null() || (*facet).val.is_null() {
-        return 0;
+    unsafe {
+        // TODO: Check if this is a decimal.
+        if facet.is_null() || (*facet).val.is_null() {
+            return 0;
+        }
+        (*(*facet).val).value.decimal.lo
     }
-    (*(*facet).val).value.decimal.lo
 }
 
 /// Checka a value against a "length", "minLength" and "maxLength"
@@ -6294,38 +6449,39 @@ unsafe fn xml_schema_validate_length_facet_internal(
     length: *mut u64,
     ws: XmlSchemaWhitespaceValueType,
 ) -> i32 {
-    let mut len: u32 = 0;
+    unsafe {
+        let mut len: u32 = 0;
 
-    if length.is_null() || facet.is_null() {
-        return -1;
-    }
-    *length = 0;
-    if !matches!(
-        (*facet).typ,
-        XmlSchemaTypeType::XmlSchemaFacetLength
-            | XmlSchemaTypeType::XmlSchemaFacetMaxlength
-            | XmlSchemaTypeType::XmlSchemaFacetMinlength
-    ) {
-        return -1;
-    }
+        if length.is_null() || facet.is_null() {
+            return -1;
+        }
+        *length = 0;
+        if !matches!(
+            (*facet).typ,
+            XmlSchemaTypeType::XmlSchemaFacetLength
+                | XmlSchemaTypeType::XmlSchemaFacetMaxlength
+                | XmlSchemaTypeType::XmlSchemaFacetMinlength
+        ) {
+            return -1;
+        }
 
-    // TODO: length, maxLength and minLength must be of type
-    // nonNegativeInteger only. Check if decimal is used somehow.
-    if (*facet).val.is_null()
-        || !matches!(
-            (*(*facet).val).typ,
-            XmlSchemaValType::XmlSchemasDecimal | XmlSchemaValType::XmlSchemasNNInteger
-        )
-        || (*(*facet).val).value.decimal.frac != 0
-    {
-        return -1;
-    }
-    if !val.is_null() && (*val).typ == XmlSchemaValType::XmlSchemasHexbinary {
-        len = (*val).value.hex.total;
-    } else if !val.is_null() && (*val).typ == XmlSchemaValType::XmlSchemasBase64binary {
-        len = (*val).value.base64.total;
-    } else {
-        match val_type {
+        // TODO: length, maxLength and minLength must be of type
+        // nonNegativeInteger only. Check if decimal is used somehow.
+        if (*facet).val.is_null()
+            || !matches!(
+                (*(*facet).val).typ,
+                XmlSchemaValType::XmlSchemasDecimal | XmlSchemaValType::XmlSchemasNNInteger
+            )
+            || (*(*facet).val).value.decimal.frac != 0
+        {
+            return -1;
+        }
+        if !val.is_null() && (*val).typ == XmlSchemaValType::XmlSchemasHexbinary {
+            len = (*val).value.hex.total;
+        } else if !val.is_null() && (*val).typ == XmlSchemaValType::XmlSchemasBase64binary {
+            len = (*val).value.base64.total;
+        } else {
+            match val_type {
             XmlSchemaValType::XmlSchemasString | XmlSchemaValType::XmlSchemasNormstring => {
                 if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown {
                     // This is to ensure API compatibility with the old
@@ -6369,22 +6525,23 @@ unsafe fn xml_schema_validate_length_facet_internal(
                 todo!()
             }
         }
-    }
-    *length = len as u64;
-    // TODO: Return the whole expected value, i.e. "lo", "mi" and "hi".
-    if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetLength {
-        if len as u64 != (*(*facet).val).value.decimal.lo {
-            return XmlParserErrors::XmlSchemavCvcLengthValid as i32;
         }
-    } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
-        if (len as u64) < (*(*facet).val).value.decimal.lo {
-            return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
+        *length = len as u64;
+        // TODO: Return the whole expected value, i.e. "lo", "mi" and "hi".
+        if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetLength {
+            if len as u64 != (*(*facet).val).value.decimal.lo {
+                return XmlParserErrors::XmlSchemavCvcLengthValid as i32;
+            }
+        } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
+            if (len as u64) < (*(*facet).val).value.decimal.lo {
+                return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
+            }
+        } else if len as u64 > (*(*facet).val).value.decimal.lo {
+            return XmlParserErrors::XmlSchemavCvcMaxLengthValid as i32;
         }
-    } else if len as u64 > (*(*facet).val).value.decimal.lo {
-        return XmlParserErrors::XmlSchemavCvcMaxLengthValid as i32;
-    }
 
-    0
+        0
+    }
 }
 
 /// Checka a value against a "length", "minLength" and "maxLength"
@@ -6400,17 +6557,19 @@ pub unsafe fn xml_schema_validate_length_facet(
     val: XmlSchemaValPtr,
     length: *mut u64,
 ) -> i32 {
-    if typ.is_null() {
-        return -1;
+    unsafe {
+        if typ.is_null() {
+            return -1;
+        }
+        xml_schema_validate_length_facet_internal(
+            facet,
+            (*typ).built_in_type.try_into().unwrap(),
+            value,
+            val,
+            length,
+            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
+        )
     }
-    xml_schema_validate_length_facet_internal(
-        facet,
-        (*typ).built_in_type.try_into().unwrap(),
-        value,
-        val,
-        length,
-        XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
-    )
 }
 
 /// Checka a value against a "length", "minLength" and "maxLength"
@@ -6427,7 +6586,7 @@ pub unsafe fn xml_schema_validate_length_facet_whtsp(
     length: *mut u64,
     ws: XmlSchemaWhitespaceValueType,
 ) -> i32 {
-    xml_schema_validate_length_facet_internal(facet, val_type, value, val, length, ws)
+    unsafe { xml_schema_validate_length_facet_internal(facet, val_type, value, val, length, ws) }
 }
 
 /// Check that a value conforms to the lexical space of the predefined type.
@@ -6443,17 +6602,19 @@ pub unsafe fn xml_schema_val_predef_type_node_no_norm(
     val: *mut XmlSchemaValPtr,
     node: Option<XmlGenericNodePtr>,
 ) -> i32 {
-    xml_schema_val_atomic_type(
-        typ,
-        value,
-        val,
-        node,
-        1,
-        XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
-        1,
-        0,
-        1,
-    )
+    unsafe {
+        xml_schema_val_atomic_type(
+            typ,
+            value,
+            val,
+            node,
+            1,
+            XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown,
+            1,
+            0,
+            1,
+        )
+    }
 }
 
 /// Get the canonical lexical representation of the value.
@@ -6474,509 +6635,511 @@ pub unsafe fn xml_schema_get_canon_value(
     val: XmlSchemaValPtr,
     ret_value: *mut *const XmlChar,
 ) -> i32 {
-    if ret_value.is_null() || val.is_null() {
-        return -1;
-    }
-    *ret_value = null_mut();
-    match (*val).typ {
-        XmlSchemaValType::XmlSchemasString => {
-            if (*val).value.str.is_null() {
-                *ret_value = xml_strdup(c"".as_ptr() as _);
-            } else {
-                *ret_value = xml_strdup((*val).value.str);
-            }
+    unsafe {
+        if ret_value.is_null() || val.is_null() {
+            return -1;
         }
-        XmlSchemaValType::XmlSchemasNormstring => {
-            if (*val).value.str.is_null() {
-                *ret_value = xml_strdup(c"".as_ptr() as _);
-            } else {
-                *ret_value = xml_schema_white_space_replace((*val).value.str);
+        *ret_value = null_mut();
+        match (*val).typ {
+            XmlSchemaValType::XmlSchemasString => {
+                if (*val).value.str.is_null() {
+                    *ret_value = xml_strdup(c"".as_ptr() as _);
+                } else {
+                    *ret_value = xml_strdup((*val).value.str);
+                }
+            }
+            XmlSchemaValType::XmlSchemasNormstring => {
+                if (*val).value.str.is_null() {
+                    *ret_value = xml_strdup(c"".as_ptr() as _);
+                } else {
+                    *ret_value = xml_schema_white_space_replace((*val).value.str);
+                    if (*ret_value).is_null() {
+                        *ret_value = xml_strdup((*val).value.str);
+                    }
+                }
+            }
+            XmlSchemaValType::XmlSchemasToken
+            | XmlSchemaValType::XmlSchemasLanguage
+            | XmlSchemaValType::XmlSchemasNmtoken
+            | XmlSchemaValType::XmlSchemasName
+            | XmlSchemaValType::XmlSchemasNcname
+            | XmlSchemaValType::XmlSchemasID
+            | XmlSchemaValType::XmlSchemasIDREF
+            | XmlSchemaValType::XmlSchemasEntity
+            | XmlSchemaValType::XmlSchemasNotation
+            | XmlSchemaValType::XmlSchemasAnyURI => {
+                if (*val).value.str.is_null() {
+                    return -1;
+                }
+                *ret_value = xml_schema_collapse_string((*val).value.str);
                 if (*ret_value).is_null() {
                     *ret_value = xml_strdup((*val).value.str);
                 }
             }
-        }
-        XmlSchemaValType::XmlSchemasToken
-        | XmlSchemaValType::XmlSchemasLanguage
-        | XmlSchemaValType::XmlSchemasNmtoken
-        | XmlSchemaValType::XmlSchemasName
-        | XmlSchemaValType::XmlSchemasNcname
-        | XmlSchemaValType::XmlSchemasID
-        | XmlSchemaValType::XmlSchemasIDREF
-        | XmlSchemaValType::XmlSchemasEntity
-        | XmlSchemaValType::XmlSchemasNotation
-        | XmlSchemaValType::XmlSchemasAnyURI => {
-            if (*val).value.str.is_null() {
-                return -1;
-            }
-            *ret_value = xml_schema_collapse_string((*val).value.str);
-            if (*ret_value).is_null() {
-                *ret_value = xml_strdup((*val).value.str);
-            }
-        }
-        XmlSchemaValType::XmlSchemasQname => {
-            // TODO: Unclear in XML Schema 1.0.
-            if (*val).value.qname.uri.is_null() {
-                *ret_value = xml_strdup((*val).value.qname.name);
-                return 0;
-            } else {
-                *ret_value = xml_strdup(c"{".as_ptr() as _);
-                *ret_value = xml_strcat(*ret_value as _, (*val).value.qname.uri);
-                *ret_value = xml_strcat(*ret_value as _, c"}".as_ptr() as _);
-                *ret_value = xml_strcat(*ret_value as _, (*val).value.qname.uri);
-            }
-        }
-        XmlSchemaValType::XmlSchemasDecimal => {
-            // TODO: Lookout for a more simple implementation.
-            if (*val).value.decimal.total == 1 && (*val).value.decimal.lo == 0 {
-                *ret_value = xml_strdup(c"0.0".as_ptr() as _);
-            } else {
-                let mut bufsize: i32;
-                let dec: XmlSchemaValDecimal = (*val).value.decimal;
-                let mut offs: *mut c_char;
-
-                // Add room for the decimal point as well.
-                bufsize = dec.total as i32 + 2;
-                if dec.sign != 0 {
-                    bufsize += 1;
-                }
-                // Add room for leading/trailing zero.
-                if dec.frac == 0 || dec.frac == dec.total {
-                    bufsize += 1;
-                }
-                let buf: *mut c_char = xml_malloc(bufsize as _) as _;
-                if buf.is_null() {
-                    return -1;
-                }
-                offs = buf;
-                if dec.sign != 0 {
-                    *offs = b'-' as _;
-                    offs = offs.add(1);
-                }
-                if dec.frac == dec.total {
-                    *offs = b'0' as _;
-                    offs = offs.add(1);
-                    *offs = b'.' as _;
-                    offs = offs.add(1);
-                }
-                if dec.hi != 0 {
-                    snprintf(
-                        offs,
-                        bufsize as usize - offs.offset_from(buf) as usize,
-                        c"%lu%lu%lu".as_ptr() as _,
-                        dec.hi,
-                        dec.mi,
-                        dec.lo,
-                    );
-                } else if dec.mi != 0 {
-                    snprintf(
-                        offs,
-                        bufsize as usize - offs.offset_from(buf) as usize,
-                        c"%lu%lu".as_ptr() as _,
-                        dec.mi,
-                        dec.lo,
-                    );
+            XmlSchemaValType::XmlSchemasQname => {
+                // TODO: Unclear in XML Schema 1.0.
+                if (*val).value.qname.uri.is_null() {
+                    *ret_value = xml_strdup((*val).value.qname.name);
+                    return 0;
                 } else {
-                    snprintf(
-                        offs,
-                        bufsize as usize - offs.offset_from(buf) as usize,
-                        c"%lu".as_ptr() as _,
-                        dec.lo,
-                    );
+                    *ret_value = xml_strdup(c"{".as_ptr() as _);
+                    *ret_value = xml_strcat(*ret_value as _, (*val).value.qname.uri);
+                    *ret_value = xml_strcat(*ret_value as _, c"}".as_ptr() as _);
+                    *ret_value = xml_strcat(*ret_value as _, (*val).value.qname.uri);
                 }
-
-                if dec.frac != 0 {
-                    if dec.frac != dec.total {
-                        let diff: i32 = (dec.total - dec.frac) as i32;
-                        // Insert the decimal point.
-                        memmove(
-                            offs.add(diff as usize + 1) as _,
-                            offs.add(diff as usize) as _,
-                            dec.frac as usize + 1,
-                        );
-                        *offs.add(diff as usize) = b'.' as _;
-                    } else {
-                        let mut i: u32 = 0;
-                        // Insert missing zeroes behind the decimal point.
-                        while *offs.add(i as usize) != 0 {
-                            i += 1;
-                        }
-                        if i < dec.total {
-                            memmove(
-                                offs.add(dec.total as usize - i as usize) as _,
-                                offs as _,
-                                i as usize + 1,
-                            );
-                            memset(offs as _, b'0' as _, dec.total as usize - i as usize);
-                        }
-                    }
-                } else {
-                    // Append decimal point and zero.
-                    offs = buf.add(bufsize as usize - 1);
-                    *offs = 0;
-                    offs = offs.sub(1);
-                    *offs = b'0' as _;
-                    offs = offs.sub(1);
-                    *offs = b'.' as _;
-                    // offs = offs.sub(1);
-                }
-                *ret_value = buf as _;
             }
-        }
-        XmlSchemaValType::XmlSchemasInteger
-        | XmlSchemaValType::XmlSchemasPInteger
-        | XmlSchemaValType::XmlSchemasNPInteger
-        | XmlSchemaValType::XmlSchemasNInteger
-        | XmlSchemaValType::XmlSchemasNNInteger
-        | XmlSchemaValType::XmlSchemasLong
-        | XmlSchemaValType::XmlSchemasByte
-        | XmlSchemaValType::XmlSchemasShort
-        | XmlSchemaValType::XmlSchemasInt
-        | XmlSchemaValType::XmlSchemasUInt
-        | XmlSchemaValType::XmlSchemasULong
-        | XmlSchemaValType::XmlSchemasUShort
-        | XmlSchemaValType::XmlSchemasUByte => {
-            if (*val).value.decimal.total == 1 && (*val).value.decimal.lo == 0 {
-                *ret_value = xml_strdup(c"0".as_ptr() as _);
-            } else {
-                let dec: XmlSchemaValDecimal = (*val).value.decimal;
-                let mut bufsize: i32 = dec.total as i32 + 1;
+            XmlSchemaValType::XmlSchemasDecimal => {
+                // TODO: Lookout for a more simple implementation.
+                if (*val).value.decimal.total == 1 && (*val).value.decimal.lo == 0 {
+                    *ret_value = xml_strdup(c"0.0".as_ptr() as _);
+                } else {
+                    let mut bufsize: i32;
+                    let dec: XmlSchemaValDecimal = (*val).value.decimal;
+                    let mut offs: *mut c_char;
 
-                // Add room for the decimal point as well.
-                if dec.sign != 0 {
-                    bufsize += 1;
-                }
-                *ret_value = xml_malloc(bufsize as usize) as _;
-                if (*ret_value).is_null() {
-                    return -1;
-                }
-                if dec.hi != 0 {
+                    // Add room for the decimal point as well.
+                    bufsize = dec.total as i32 + 2;
                     if dec.sign != 0 {
+                        bufsize += 1;
+                    }
+                    // Add room for leading/trailing zero.
+                    if dec.frac == 0 || dec.frac == dec.total {
+                        bufsize += 1;
+                    }
+                    let buf: *mut c_char = xml_malloc(bufsize as _) as _;
+                    if buf.is_null() {
+                        return -1;
+                    }
+                    offs = buf;
+                    if dec.sign != 0 {
+                        *offs = b'-' as _;
+                        offs = offs.add(1);
+                    }
+                    if dec.frac == dec.total {
+                        *offs = b'0' as _;
+                        offs = offs.add(1);
+                        *offs = b'.' as _;
+                        offs = offs.add(1);
+                    }
+                    if dec.hi != 0 {
                         snprintf(
-                            *ret_value as _,
-                            bufsize as _,
-                            c"-%lu%lu%lu".as_ptr() as _,
-                            dec.hi,
-                            dec.mi,
-                            dec.lo,
-                        );
-                    } else {
-                        snprintf(
-                            *ret_value as _,
-                            bufsize as _,
+                            offs,
+                            bufsize as usize - offs.offset_from(buf) as usize,
                             c"%lu%lu%lu".as_ptr() as _,
                             dec.hi,
                             dec.mi,
                             dec.lo,
                         );
-                    }
-                } else if dec.mi != 0 {
-                    if dec.sign != 0 {
+                    } else if dec.mi != 0 {
                         snprintf(
-                            *ret_value as _,
-                            bufsize as _,
-                            c"-%lu%lu".as_ptr() as _,
+                            offs,
+                            bufsize as usize - offs.offset_from(buf) as usize,
+                            c"%lu%lu".as_ptr() as _,
                             dec.mi,
                             dec.lo,
                         );
                     } else {
                         snprintf(
-                            *ret_value as _,
-                            bufsize as _,
-                            c"%lu%lu".as_ptr() as _,
-                            dec.mi,
+                            offs,
+                            bufsize as usize - offs.offset_from(buf) as usize,
+                            c"%lu".as_ptr() as _,
                             dec.lo,
                         );
                     }
-                } else if dec.sign != 0 {
-                    snprintf(*ret_value as _, bufsize as _, c"-%lu".as_ptr() as _, dec.lo);
+
+                    if dec.frac != 0 {
+                        if dec.frac != dec.total {
+                            let diff: i32 = (dec.total - dec.frac) as i32;
+                            // Insert the decimal point.
+                            memmove(
+                                offs.add(diff as usize + 1) as _,
+                                offs.add(diff as usize) as _,
+                                dec.frac as usize + 1,
+                            );
+                            *offs.add(diff as usize) = b'.' as _;
+                        } else {
+                            let mut i: u32 = 0;
+                            // Insert missing zeroes behind the decimal point.
+                            while *offs.add(i as usize) != 0 {
+                                i += 1;
+                            }
+                            if i < dec.total {
+                                memmove(
+                                    offs.add(dec.total as usize - i as usize) as _,
+                                    offs as _,
+                                    i as usize + 1,
+                                );
+                                memset(offs as _, b'0' as _, dec.total as usize - i as usize);
+                            }
+                        }
+                    } else {
+                        // Append decimal point and zero.
+                        offs = buf.add(bufsize as usize - 1);
+                        *offs = 0;
+                        offs = offs.sub(1);
+                        *offs = b'0' as _;
+                        offs = offs.sub(1);
+                        *offs = b'.' as _;
+                        // offs = offs.sub(1);
+                    }
+                    *ret_value = buf as _;
+                }
+            }
+            XmlSchemaValType::XmlSchemasInteger
+            | XmlSchemaValType::XmlSchemasPInteger
+            | XmlSchemaValType::XmlSchemasNPInteger
+            | XmlSchemaValType::XmlSchemasNInteger
+            | XmlSchemaValType::XmlSchemasNNInteger
+            | XmlSchemaValType::XmlSchemasLong
+            | XmlSchemaValType::XmlSchemasByte
+            | XmlSchemaValType::XmlSchemasShort
+            | XmlSchemaValType::XmlSchemasInt
+            | XmlSchemaValType::XmlSchemasUInt
+            | XmlSchemaValType::XmlSchemasULong
+            | XmlSchemaValType::XmlSchemasUShort
+            | XmlSchemaValType::XmlSchemasUByte => {
+                if (*val).value.decimal.total == 1 && (*val).value.decimal.lo == 0 {
+                    *ret_value = xml_strdup(c"0".as_ptr() as _);
                 } else {
-                    snprintf(*ret_value as _, bufsize as _, c"%lu".as_ptr() as _, dec.lo);
+                    let dec: XmlSchemaValDecimal = (*val).value.decimal;
+                    let mut bufsize: i32 = dec.total as i32 + 1;
+
+                    // Add room for the decimal point as well.
+                    if dec.sign != 0 {
+                        bufsize += 1;
+                    }
+                    *ret_value = xml_malloc(bufsize as usize) as _;
+                    if (*ret_value).is_null() {
+                        return -1;
+                    }
+                    if dec.hi != 0 {
+                        if dec.sign != 0 {
+                            snprintf(
+                                *ret_value as _,
+                                bufsize as _,
+                                c"-%lu%lu%lu".as_ptr() as _,
+                                dec.hi,
+                                dec.mi,
+                                dec.lo,
+                            );
+                        } else {
+                            snprintf(
+                                *ret_value as _,
+                                bufsize as _,
+                                c"%lu%lu%lu".as_ptr() as _,
+                                dec.hi,
+                                dec.mi,
+                                dec.lo,
+                            );
+                        }
+                    } else if dec.mi != 0 {
+                        if dec.sign != 0 {
+                            snprintf(
+                                *ret_value as _,
+                                bufsize as _,
+                                c"-%lu%lu".as_ptr() as _,
+                                dec.mi,
+                                dec.lo,
+                            );
+                        } else {
+                            snprintf(
+                                *ret_value as _,
+                                bufsize as _,
+                                c"%lu%lu".as_ptr() as _,
+                                dec.mi,
+                                dec.lo,
+                            );
+                        }
+                    } else if dec.sign != 0 {
+                        snprintf(*ret_value as _, bufsize as _, c"-%lu".as_ptr() as _, dec.lo);
+                    } else {
+                        snprintf(*ret_value as _, bufsize as _, c"%lu".as_ptr() as _, dec.lo);
+                    }
                 }
             }
-        }
-        XmlSchemaValType::XmlSchemasBoolean => {
-            if (*val).value.b != 0 {
-                *ret_value = xml_strdup(c"true".as_ptr() as _);
-            } else {
-                *ret_value = xml_strdup(c"false".as_ptr() as _);
+            XmlSchemaValType::XmlSchemasBoolean => {
+                if (*val).value.b != 0 {
+                    *ret_value = xml_strdup(c"true".as_ptr() as _);
+                } else {
+                    *ret_value = xml_strdup(c"false".as_ptr() as _);
+                }
             }
-        }
-        XmlSchemaValType::XmlSchemasDuration => {
-            let mut buf: [c_char; 100] = [0; 100];
-            let mut hour: u64 = 0;
-            let mut min: u64 = 0;
-            let mut sec: f64 = 0.;
-            let mut left: f64;
+            XmlSchemaValType::XmlSchemasDuration => {
+                let mut buf: [c_char; 100] = [0; 100];
+                let mut hour: u64 = 0;
+                let mut min: u64 = 0;
+                let mut sec: f64 = 0.;
+                let mut left: f64;
 
-            // TODO: Unclear in XML Schema 1.0
-            // TODO: This results in a normalized output of the value
-            // - which is NOT conformant to the spec -
-            // since the exact values of each property are not
-            // recoverable. Think about extending the structure to
-            // provide a field for every property.
-            let year: u64 = FQUOTIENT!((*val).value.dur.mon.abs(), 12) as u64;
-            let mon: u64 = (*val).value.dur.mon.unsigned_abs() - 12 * year;
+                // TODO: Unclear in XML Schema 1.0
+                // TODO: This results in a normalized output of the value
+                // - which is NOT conformant to the spec -
+                // since the exact values of each property are not
+                // recoverable. Think about extending the structure to
+                // provide a field for every property.
+                let year: u64 = FQUOTIENT!((*val).value.dur.mon.abs(), 12) as u64;
+                let mon: u64 = (*val).value.dur.mon.unsigned_abs() - 12 * year;
 
-            let day: u64 = FQUOTIENT!((*val).value.dur.sec.abs(), 86400) as u64;
-            left = (*val).value.dur.sec.abs() - (day * 86400) as f64;
-            if left > 0. {
-                hour = FQUOTIENT!(left, 3600) as u64;
-                left -= (hour * 3600) as f64;
+                let day: u64 = FQUOTIENT!((*val).value.dur.sec.abs(), 86400) as u64;
+                left = (*val).value.dur.sec.abs() - (day * 86400) as f64;
                 if left > 0. {
-                    min = FQUOTIENT!(left, 60) as u64;
-                    sec = left - (min * 60) as f64;
+                    hour = FQUOTIENT!(left, 3600) as u64;
+                    left -= (hour * 3600) as f64;
+                    if left > 0. {
+                        min = FQUOTIENT!(left, 60) as u64;
+                        sec = left - (min * 60) as f64;
+                    }
                 }
+                if (*val).value.dur.mon < 0 || (*val).value.dur.sec < 0. {
+                    snprintf(
+                        buf.as_mut_ptr() as _,
+                        100,
+                        c"P%luY%luM%luDT%luH%luM%.14gS".as_ptr() as _,
+                        year,
+                        mon,
+                        day,
+                        hour,
+                        min,
+                        sec,
+                    );
+                } else {
+                    snprintf(
+                        buf.as_mut_ptr() as _,
+                        100,
+                        c"-P%luY%luM%luDT%luH%luM%.14gS".as_ptr() as _,
+                        year,
+                        mon,
+                        day,
+                        hour,
+                        min,
+                        sec,
+                    );
+                }
+                *ret_value = xml_strdup(buf.as_ptr() as _);
             }
-            if (*val).value.dur.mon < 0 || (*val).value.dur.sec < 0. {
+            XmlSchemaValType::XmlSchemasGyear => {
+                let mut buf: [c_char; 30] = [0; 30];
+                // TODO: Unclear in XML Schema 1.0
+                // TODO: What to do with the timezone?
                 snprintf(
                     buf.as_mut_ptr() as _,
-                    100,
-                    c"P%luY%luM%luDT%luH%luM%.14gS".as_ptr() as _,
-                    year,
-                    mon,
-                    day,
-                    hour,
-                    min,
-                    sec,
-                );
-            } else {
-                snprintf(
-                    buf.as_mut_ptr() as _,
-                    100,
-                    c"-P%luY%luM%luDT%luH%luM%.14gS".as_ptr() as _,
-                    year,
-                    mon,
-                    day,
-                    hour,
-                    min,
-                    sec,
-                );
-            }
-            *ret_value = xml_strdup(buf.as_ptr() as _);
-        }
-        XmlSchemaValType::XmlSchemasGyear => {
-            let mut buf: [c_char; 30] = [0; 30];
-            // TODO: Unclear in XML Schema 1.0
-            // TODO: What to do with the timezone?
-            snprintf(
-                buf.as_mut_ptr() as _,
-                30,
-                c"%04ld".as_ptr() as _,
-                (*val).value.date.year,
-            );
-            *ret_value = xml_strdup(buf.as_ptr() as _);
-        }
-        XmlSchemaValType::XmlSchemasGmonth => {
-            // TODO: Unclear in XML Schema 1.0
-            // TODO: What to do with the timezone?
-            *ret_value = xml_malloc(6) as _;
-            if (*ret_value).is_null() {
-                return -1;
-            }
-            snprintf(
-                *ret_value as _,
-                6,
-                c"--%02u".as_ptr() as _,
-                (*val).value.date.mon,
-            );
-        }
-        XmlSchemaValType::XmlSchemasGday => {
-            // TODO: Unclear in XML Schema 1.0
-            // TODO: What to do with the timezone?
-            *ret_value = xml_malloc(6) as _;
-            if (*ret_value).is_null() {
-                return -1;
-            }
-            snprintf(
-                *ret_value as _,
-                6,
-                c"---%02u".as_ptr() as _,
-                (*val).value.date.day,
-            );
-        }
-        XmlSchemaValType::XmlSchemasGmonthday => {
-            // TODO: Unclear in XML Schema 1.0
-            // TODO: What to do with the timezone?
-            *ret_value = xml_malloc(8) as _;
-            if (*ret_value).is_null() {
-                return -1;
-            }
-            snprintf(
-                *ret_value as _,
-                8,
-                c"--%02u-%02u".as_ptr() as _,
-                (*val).value.date.mon,
-                (*val).value.date.day,
-            );
-        }
-        XmlSchemaValType::XmlSchemasGyearmonth => {
-            let mut buf: [c_char; 35] = [0; 35];
-            // TODO: Unclear in XML Schema 1.0
-            // TODO: What to do with the timezone?
-            if (*val).value.date.year < 0 {
-                snprintf(
-                    buf.as_mut_ptr() as _,
-                    35,
-                    c"-%04ld-%02u".as_ptr() as _,
-                    (*val).value.date.year.abs(),
-                    (*val).value.date.mon,
-                );
-            } else {
-                snprintf(
-                    buf.as_mut_ptr() as _,
-                    35,
-                    c"%04ld-%02u".as_ptr() as _,
+                    30,
+                    c"%04ld".as_ptr() as _,
                     (*val).value.date.year,
+                );
+                *ret_value = xml_strdup(buf.as_ptr() as _);
+            }
+            XmlSchemaValType::XmlSchemasGmonth => {
+                // TODO: Unclear in XML Schema 1.0
+                // TODO: What to do with the timezone?
+                *ret_value = xml_malloc(6) as _;
+                if (*ret_value).is_null() {
+                    return -1;
+                }
+                snprintf(
+                    *ret_value as _,
+                    6,
+                    c"--%02u".as_ptr() as _,
                     (*val).value.date.mon,
                 );
             }
-            *ret_value = xml_strdup(buf.as_ptr() as _);
-        }
-        XmlSchemaValType::XmlSchemasTime => {
-            let mut buf: [c_char; 30] = [0; 30];
-
-            if (*val).value.date.tz_flag != 0 {
-                let norm: XmlSchemaValPtr = xml_schema_date_normalize(val, 0.);
-                if norm.is_null() {
+            XmlSchemaValType::XmlSchemasGday => {
+                // TODO: Unclear in XML Schema 1.0
+                // TODO: What to do with the timezone?
+                *ret_value = xml_malloc(6) as _;
+                if (*ret_value).is_null() {
                     return -1;
                 }
-                // TODO: Check if "%.14g" is portable.
                 snprintf(
-                    buf.as_mut_ptr() as _,
-                    30,
-                    c"%02u:%02u:%02.14gZ".as_ptr() as _,
-                    (*norm).value.date.hour,
-                    (*norm).value.date.min,
-                    (*norm).value.date.sec,
-                );
-                xml_schema_free_value(norm);
-            } else {
-                snprintf(
-                    buf.as_mut_ptr() as _,
-                    30,
-                    c"%02u:%02u:%02.14g".as_ptr() as _,
-                    (*val).value.date.hour,
-                    (*val).value.date.min,
-                    (*val).value.date.sec,
+                    *ret_value as _,
+                    6,
+                    c"---%02u".as_ptr() as _,
+                    (*val).value.date.day,
                 );
             }
-            *ret_value = xml_strdup(buf.as_ptr() as _);
-        }
-        XmlSchemaValType::XmlSchemasDate => {
-            let mut buf: [c_char; 30] = [0; 30];
-
-            if (*val).value.date.tz_flag != 0 {
-                let norm: XmlSchemaValPtr = xml_schema_date_normalize(val, 0.);
-                if norm.is_null() {
+            XmlSchemaValType::XmlSchemasGmonthday => {
+                // TODO: Unclear in XML Schema 1.0
+                // TODO: What to do with the timezone?
+                *ret_value = xml_malloc(8) as _;
+                if (*ret_value).is_null() {
                     return -1;
                 }
-                // TODO: Append the canonical value of the
-                // recoverable timezone and not "Z".
                 snprintf(
-                    buf.as_mut_ptr() as _,
-                    30,
-                    c"%04ld-%02u-%02uZ".as_ptr() as _,
-                    (*norm).value.date.year,
-                    (*norm).value.date.mon,
-                    (*norm).value.date.day,
-                );
-                xml_schema_free_value(norm);
-            } else {
-                snprintf(
-                    buf.as_mut_ptr() as _,
-                    30,
-                    c"%04ld-%02u-%02u".as_ptr() as _,
-                    (*val).value.date.year,
+                    *ret_value as _,
+                    8,
+                    c"--%02u-%02u".as_ptr() as _,
                     (*val).value.date.mon,
                     (*val).value.date.day,
                 );
             }
-            *ret_value = xml_strdup(buf.as_ptr() as _) as _;
-        }
-        XmlSchemaValType::XmlSchemasDatetime => {
-            let mut buf: [c_char; 50] = [0; 50];
-
-            if (*val).value.date.tz_flag != 0 {
-                let norm: XmlSchemaValPtr = xml_schema_date_normalize(val, 0.);
-                if norm.is_null() {
-                    return -1;
+            XmlSchemaValType::XmlSchemasGyearmonth => {
+                let mut buf: [c_char; 35] = [0; 35];
+                // TODO: Unclear in XML Schema 1.0
+                // TODO: What to do with the timezone?
+                if (*val).value.date.year < 0 {
+                    snprintf(
+                        buf.as_mut_ptr() as _,
+                        35,
+                        c"-%04ld-%02u".as_ptr() as _,
+                        (*val).value.date.year.abs(),
+                        (*val).value.date.mon,
+                    );
+                } else {
+                    snprintf(
+                        buf.as_mut_ptr() as _,
+                        35,
+                        c"%04ld-%02u".as_ptr() as _,
+                        (*val).value.date.year,
+                        (*val).value.date.mon,
+                    );
                 }
-                // TODO: Check if "%.14g" is portable.
-                snprintf(
-                    buf.as_mut_ptr() as _,
-                    50,
-                    c"%04ld-%02u-%02uT%02u:%02u:%02.14gZ".as_ptr() as _,
-                    (*norm).value.date.year,
-                    (*norm).value.date.mon,
-                    (*norm).value.date.day,
-                    (*norm).value.date.hour,
-                    (*norm).value.date.min,
-                    (*norm).value.date.sec,
-                );
-                xml_schema_free_value(norm);
-            } else {
-                snprintf(
-                    buf.as_mut_ptr() as _,
-                    50,
-                    c"%04ld-%02u-%02uT%02u:%02u:%02.14g".as_ptr() as _,
-                    (*val).value.date.year,
-                    (*val).value.date.mon,
-                    (*val).value.date.day,
-                    (*val).value.date.hour,
-                    (*val).value.date.min,
-                    (*val).value.date.sec,
-                );
+                *ret_value = xml_strdup(buf.as_ptr() as _);
             }
-            *ret_value = xml_strdup(buf.as_ptr() as _) as _;
+            XmlSchemaValType::XmlSchemasTime => {
+                let mut buf: [c_char; 30] = [0; 30];
+
+                if (*val).value.date.tz_flag != 0 {
+                    let norm: XmlSchemaValPtr = xml_schema_date_normalize(val, 0.);
+                    if norm.is_null() {
+                        return -1;
+                    }
+                    // TODO: Check if "%.14g" is portable.
+                    snprintf(
+                        buf.as_mut_ptr() as _,
+                        30,
+                        c"%02u:%02u:%02.14gZ".as_ptr() as _,
+                        (*norm).value.date.hour,
+                        (*norm).value.date.min,
+                        (*norm).value.date.sec,
+                    );
+                    xml_schema_free_value(norm);
+                } else {
+                    snprintf(
+                        buf.as_mut_ptr() as _,
+                        30,
+                        c"%02u:%02u:%02.14g".as_ptr() as _,
+                        (*val).value.date.hour,
+                        (*val).value.date.min,
+                        (*val).value.date.sec,
+                    );
+                }
+                *ret_value = xml_strdup(buf.as_ptr() as _);
+            }
+            XmlSchemaValType::XmlSchemasDate => {
+                let mut buf: [c_char; 30] = [0; 30];
+
+                if (*val).value.date.tz_flag != 0 {
+                    let norm: XmlSchemaValPtr = xml_schema_date_normalize(val, 0.);
+                    if norm.is_null() {
+                        return -1;
+                    }
+                    // TODO: Append the canonical value of the
+                    // recoverable timezone and not "Z".
+                    snprintf(
+                        buf.as_mut_ptr() as _,
+                        30,
+                        c"%04ld-%02u-%02uZ".as_ptr() as _,
+                        (*norm).value.date.year,
+                        (*norm).value.date.mon,
+                        (*norm).value.date.day,
+                    );
+                    xml_schema_free_value(norm);
+                } else {
+                    snprintf(
+                        buf.as_mut_ptr() as _,
+                        30,
+                        c"%04ld-%02u-%02u".as_ptr() as _,
+                        (*val).value.date.year,
+                        (*val).value.date.mon,
+                        (*val).value.date.day,
+                    );
+                }
+                *ret_value = xml_strdup(buf.as_ptr() as _) as _;
+            }
+            XmlSchemaValType::XmlSchemasDatetime => {
+                let mut buf: [c_char; 50] = [0; 50];
+
+                if (*val).value.date.tz_flag != 0 {
+                    let norm: XmlSchemaValPtr = xml_schema_date_normalize(val, 0.);
+                    if norm.is_null() {
+                        return -1;
+                    }
+                    // TODO: Check if "%.14g" is portable.
+                    snprintf(
+                        buf.as_mut_ptr() as _,
+                        50,
+                        c"%04ld-%02u-%02uT%02u:%02u:%02.14gZ".as_ptr() as _,
+                        (*norm).value.date.year,
+                        (*norm).value.date.mon,
+                        (*norm).value.date.day,
+                        (*norm).value.date.hour,
+                        (*norm).value.date.min,
+                        (*norm).value.date.sec,
+                    );
+                    xml_schema_free_value(norm);
+                } else {
+                    snprintf(
+                        buf.as_mut_ptr() as _,
+                        50,
+                        c"%04ld-%02u-%02uT%02u:%02u:%02.14g".as_ptr() as _,
+                        (*val).value.date.year,
+                        (*val).value.date.mon,
+                        (*val).value.date.day,
+                        (*val).value.date.hour,
+                        (*val).value.date.min,
+                        (*val).value.date.sec,
+                    );
+                }
+                *ret_value = xml_strdup(buf.as_ptr() as _) as _;
+            }
+            XmlSchemaValType::XmlSchemasHexbinary => {
+                *ret_value = xml_strdup((*val).value.hex.str);
+            }
+            XmlSchemaValType::XmlSchemasBase64binary => {
+                // TODO: Is the following spec piece implemented?:
+                // SPEC: "Note: For some values the canonical form defined
+                // above does not conform to [RFC 2045], which requires breaking
+                // with linefeeds at appropriate intervals."
+                *ret_value = xml_strdup((*val).value.base64.str);
+            }
+            XmlSchemaValType::XmlSchemasFloat => {
+                let mut buf: [c_char; 30] = [0; 30];
+                // |m| < 16777216, -149 <= e <= 104.
+                // TODO: Handle, NaN, INF, -INF. The format is not
+                // yet conformant. The c type float does not cover
+                // the whole range.
+                snprintf(
+                    buf.as_mut_ptr() as _,
+                    30,
+                    c"%01.14e".as_ptr() as _,
+                    (*val).value.f as f64,
+                );
+                *ret_value = xml_strdup(buf.as_ptr() as _);
+            }
+            XmlSchemaValType::XmlSchemasDouble => {
+                let mut buf: [c_char; 40] = [0; 40];
+                // |m| < 9007199254740992, -1075 <= e <= 970
+                // TODO: Handle, NaN, INF, -INF. The format is not
+                // yet conformant. The c type float does not cover
+                // the whole range.
+                snprintf(
+                    buf.as_mut_ptr() as _,
+                    40,
+                    c"%01.14e".as_ptr() as _,
+                    (*val).value.d,
+                );
+                *ret_value = xml_strdup(buf.as_ptr() as _);
+            }
+            _ => {
+                *ret_value = xml_strdup(c"???".as_ptr() as _);
+                return 1;
+            }
         }
-        XmlSchemaValType::XmlSchemasHexbinary => {
-            *ret_value = xml_strdup((*val).value.hex.str);
+        if (*ret_value).is_null() {
+            return -1;
         }
-        XmlSchemaValType::XmlSchemasBase64binary => {
-            // TODO: Is the following spec piece implemented?:
-            // SPEC: "Note: For some values the canonical form defined
-            // above does not conform to [RFC 2045], which requires breaking
-            // with linefeeds at appropriate intervals."
-            *ret_value = xml_strdup((*val).value.base64.str);
-        }
-        XmlSchemaValType::XmlSchemasFloat => {
-            let mut buf: [c_char; 30] = [0; 30];
-            // |m| < 16777216, -149 <= e <= 104.
-            // TODO: Handle, NaN, INF, -INF. The format is not
-            // yet conformant. The c type float does not cover
-            // the whole range.
-            snprintf(
-                buf.as_mut_ptr() as _,
-                30,
-                c"%01.14e".as_ptr() as _,
-                (*val).value.f as f64,
-            );
-            *ret_value = xml_strdup(buf.as_ptr() as _);
-        }
-        XmlSchemaValType::XmlSchemasDouble => {
-            let mut buf: [c_char; 40] = [0; 40];
-            // |m| < 9007199254740992, -1075 <= e <= 970
-            // TODO: Handle, NaN, INF, -INF. The format is not
-            // yet conformant. The c type float does not cover
-            // the whole range.
-            snprintf(
-                buf.as_mut_ptr() as _,
-                40,
-                c"%01.14e".as_ptr() as _,
-                (*val).value.d,
-            );
-            *ret_value = xml_strdup(buf.as_ptr() as _);
-        }
-        _ => {
-            *ret_value = xml_strdup(c"???".as_ptr() as _);
-            return 1;
-        }
+        0
     }
-    if (*ret_value).is_null() {
-        return -1;
-    }
-    0
 }
 
 /// Get the canonical representation of the value.
@@ -6990,48 +7153,50 @@ pub unsafe fn xml_schema_get_canon_value_whtsp(
     ret_value: *mut *const XmlChar,
     ws: XmlSchemaWhitespaceValueType,
 ) -> i32 {
-    if ret_value.is_null() || val.is_null() {
-        return -1;
-    }
-    if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown
-        || ws as i32 > XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse as i32
-    {
-        return -1;
-    }
-
-    *ret_value = null_mut();
-    match (*val).typ {
-        XmlSchemaValType::XmlSchemasString => {
-            if (*val).value.str.is_null() {
-                *ret_value = xml_strdup(c"".as_ptr() as _);
-            } else if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
-                *ret_value = xml_schema_collapse_string((*val).value.str);
-            } else if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
-                *ret_value = xml_schema_white_space_replace((*val).value.str);
-            }
-            if (*ret_value).is_null() {
-                *ret_value = xml_strdup((*val).value.str);
-            }
+    unsafe {
+        if ret_value.is_null() || val.is_null() {
+            return -1;
         }
-        XmlSchemaValType::XmlSchemasNormstring => {
-            if (*val).value.str.is_null() {
-                *ret_value = xml_strdup(c"".as_ptr() as _);
-            } else {
-                if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
+        if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown
+            || ws as i32 > XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse as i32
+        {
+            return -1;
+        }
+
+        *ret_value = null_mut();
+        match (*val).typ {
+            XmlSchemaValType::XmlSchemasString => {
+                if (*val).value.str.is_null() {
+                    *ret_value = xml_strdup(c"".as_ptr() as _);
+                } else if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
                     *ret_value = xml_schema_collapse_string((*val).value.str);
-                } else {
+                } else if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
                     *ret_value = xml_schema_white_space_replace((*val).value.str);
                 }
                 if (*ret_value).is_null() {
                     *ret_value = xml_strdup((*val).value.str);
                 }
             }
+            XmlSchemaValType::XmlSchemasNormstring => {
+                if (*val).value.str.is_null() {
+                    *ret_value = xml_strdup(c"".as_ptr() as _);
+                } else {
+                    if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
+                        *ret_value = xml_schema_collapse_string((*val).value.str);
+                    } else {
+                        *ret_value = xml_schema_white_space_replace((*val).value.str);
+                    }
+                    if (*ret_value).is_null() {
+                        *ret_value = xml_strdup((*val).value.str);
+                    }
+                }
+            }
+            _ => {
+                return xml_schema_get_canon_value(val, ret_value);
+            }
         }
-        _ => {
-            return xml_schema_get_canon_value(val, ret_value);
-        }
+        0
     }
-    0
 }
 
 /// Appends a next sibling to a list of computed values.
@@ -7039,11 +7204,13 @@ pub unsafe fn xml_schema_get_canon_value_whtsp(
 /// Returns 0 if succeeded and -1 on API errors.
 #[doc(alias = "xmlSchemaValueAppend")]
 pub unsafe fn xml_schema_value_append(prev: XmlSchemaValPtr, cur: XmlSchemaValPtr) -> i32 {
-    if prev.is_null() || cur.is_null() {
-        return -1;
+    unsafe {
+        if prev.is_null() || cur.is_null() {
+            return -1;
+        }
+        (*prev).next = cur;
+        0
     }
-    (*prev).next = cur;
-    0
 }
 
 /// Accessor for the next sibling of a list of computed values.
@@ -7051,10 +7218,12 @@ pub unsafe fn xml_schema_value_append(prev: XmlSchemaValPtr, cur: XmlSchemaValPt
 /// Returns the next value or NULL if there was none, or on API errors.
 #[doc(alias = "xmlSchemaValueGetNext")]
 pub unsafe fn xml_schema_value_get_next(cur: XmlSchemaValPtr) -> XmlSchemaValPtr {
-    if cur.is_null() {
-        return null_mut();
+    unsafe {
+        if cur.is_null() {
+            return null_mut();
+        }
+        (*cur).next
     }
-    (*cur).next
 }
 
 /// Accessor for the string value of a computed value.
@@ -7062,27 +7231,29 @@ pub unsafe fn xml_schema_value_get_next(cur: XmlSchemaValPtr) -> XmlSchemaValPtr
 /// Returns the string value or NULL if there was none, or on API errors.
 #[doc(alias = "xmlSchemaValueGetAsString")]
 pub unsafe fn xml_schema_value_get_as_string(val: XmlSchemaValPtr) -> *const XmlChar {
-    if val.is_null() {
-        return null_mut();
-    }
-    match (*val).typ {
-        XmlSchemaValType::XmlSchemasString
-        | XmlSchemaValType::XmlSchemasNormstring
-        | XmlSchemaValType::XmlSchemasAnysimpletype
-        | XmlSchemaValType::XmlSchemasToken
-        | XmlSchemaValType::XmlSchemasLanguage
-        | XmlSchemaValType::XmlSchemasNmtoken
-        | XmlSchemaValType::XmlSchemasName
-        | XmlSchemaValType::XmlSchemasNcname
-        | XmlSchemaValType::XmlSchemasID
-        | XmlSchemaValType::XmlSchemasIDREF
-        | XmlSchemaValType::XmlSchemasEntity
-        | XmlSchemaValType::XmlSchemasAnyURI => {
-            return (*val).value.str;
+    unsafe {
+        if val.is_null() {
+            return null_mut();
         }
-        _ => {}
+        match (*val).typ {
+            XmlSchemaValType::XmlSchemasString
+            | XmlSchemaValType::XmlSchemasNormstring
+            | XmlSchemaValType::XmlSchemasAnysimpletype
+            | XmlSchemaValType::XmlSchemasToken
+            | XmlSchemaValType::XmlSchemasLanguage
+            | XmlSchemaValType::XmlSchemasNmtoken
+            | XmlSchemaValType::XmlSchemasName
+            | XmlSchemaValType::XmlSchemasNcname
+            | XmlSchemaValType::XmlSchemasID
+            | XmlSchemaValType::XmlSchemasIDREF
+            | XmlSchemaValType::XmlSchemasEntity
+            | XmlSchemaValType::XmlSchemasAnyURI => {
+                return (*val).value.str;
+            }
+            _ => {}
+        }
+        null_mut()
     }
-    null_mut()
 }
 
 /// Accessor for the boolean value of a computed value.
@@ -7090,10 +7261,12 @@ pub unsafe fn xml_schema_value_get_as_string(val: XmlSchemaValPtr) -> *const Xml
 /// Returns 1 if true and 0 if false, or in case of an error. Hmm.
 #[doc(alias = "xmlSchemaValueGetAsBoolean")]
 pub unsafe fn xml_schema_value_get_as_boolean(val: XmlSchemaValPtr) -> i32 {
-    if val.is_null() || (*val).typ != XmlSchemaValType::XmlSchemasBoolean {
-        return 0;
+    unsafe {
+        if val.is_null() || (*val).typ != XmlSchemaValType::XmlSchemasBoolean {
+            return 0;
+        }
+        (*val).value.b
     }
-    (*val).value.b
 }
 
 /// Allocate a new simple type value. The type can be
@@ -7108,17 +7281,19 @@ pub unsafe fn xml_schema_new_string_value(
     typ: XmlSchemaValType,
     value: *const XmlChar,
 ) -> XmlSchemaValPtr {
-    if typ != XmlSchemaValType::XmlSchemasString {
-        return null_mut();
+    unsafe {
+        if typ != XmlSchemaValType::XmlSchemasString {
+            return null_mut();
+        }
+        let val: XmlSchemaValPtr = xml_malloc(size_of::<XmlSchemaVal>()) as XmlSchemaValPtr;
+        if val.is_null() {
+            return null_mut();
+        }
+        memset(val as _, 0, size_of::<XmlSchemaVal>());
+        (*val).typ = typ;
+        (*val).value.str = value as *mut XmlChar;
+        val
     }
-    let val: XmlSchemaValPtr = xml_malloc(size_of::<XmlSchemaVal>()) as XmlSchemaValPtr;
-    if val.is_null() {
-        return null_mut();
-    }
-    memset(val as _, 0, size_of::<XmlSchemaVal>());
-    (*val).typ = typ;
-    (*val).value.str = value as *mut XmlChar;
-    val
 }
 
 /// Allocate a new NOTATION value.
@@ -7130,16 +7305,18 @@ pub unsafe fn xml_schema_new_notation_value(
     name: *const XmlChar,
     ns: *const XmlChar,
 ) -> XmlSchemaValPtr {
-    let val: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasNotation);
-    if val.is_null() {
-        return null_mut();
-    }
+    unsafe {
+        let val: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasNotation);
+        if val.is_null() {
+            return null_mut();
+        }
 
-    (*val).value.qname.name = name as _;
-    if !ns.is_null() {
-        (*val).value.qname.uri = ns as _;
+        (*val).value.qname.name = name as _;
+        if !ns.is_null() {
+            (*val).value.qname.uri = ns as _;
+        }
+        val
     }
-    val
 }
 
 /// Allocate a new QName value.
@@ -7151,14 +7328,16 @@ pub unsafe fn xml_schema_new_qname_value(
     namespace_name: *const XmlChar,
     local_name: *const XmlChar,
 ) -> XmlSchemaValPtr {
-    let val: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasQname);
-    if val.is_null() {
-        return null_mut();
-    }
+    unsafe {
+        let val: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasQname);
+        if val.is_null() {
+            return null_mut();
+        }
 
-    (*val).value.qname.name = local_name as _;
-    (*val).value.qname.uri = namespace_name as _;
-    val
+        (*val).value.qname.name = local_name as _;
+        (*val).value.qname.uri = namespace_name as _;
+        val
+    }
 }
 
 /// Compare 2 values
@@ -7171,10 +7350,21 @@ pub unsafe fn xml_schema_compare_values_whtsp(
     y: XmlSchemaValPtr,
     yws: XmlSchemaWhitespaceValueType,
 ) -> i32 {
-    if x.is_null() || y.is_null() {
-        return -2;
+    unsafe {
+        if x.is_null() || y.is_null() {
+            return -2;
+        }
+        xml_schema_compare_values_internal(
+            (*x).typ,
+            x,
+            null_mut(),
+            xws,
+            (*y).typ,
+            y,
+            null_mut(),
+            yws,
+        )
     }
-    xml_schema_compare_values_internal((*x).typ, x, null_mut(), xws, (*y).typ, y, null_mut(), yws)
 }
 
 /// Copies the precomputed value. This duplicates any string within.
@@ -7182,71 +7372,73 @@ pub unsafe fn xml_schema_compare_values_whtsp(
 /// Returns the copy or NULL if a copy for a data-type is not implemented.
 #[doc(alias = "xmlSchemaCopyValue")]
 pub unsafe fn xml_schema_copy_value(mut val: XmlSchemaValPtr) -> XmlSchemaValPtr {
-    let mut ret: XmlSchemaValPtr = null_mut();
-    let mut prev: XmlSchemaValPtr = null_mut();
-    let mut cur: XmlSchemaValPtr;
+    unsafe {
+        let mut ret: XmlSchemaValPtr = null_mut();
+        let mut prev: XmlSchemaValPtr = null_mut();
+        let mut cur: XmlSchemaValPtr;
 
-    // Copy the string values.
-    while !val.is_null() {
-        match (*val).typ {
-            XmlSchemaValType::XmlSchemasAnytype
-            | XmlSchemaValType::XmlSchemasIDREFS
-            | XmlSchemaValType::XmlSchemasEntities
-            | XmlSchemaValType::XmlSchemasNmtokens => {
-                xml_schema_free_value(ret);
-                return null_mut();
-            }
-            XmlSchemaValType::XmlSchemasAnysimpletype
-            | XmlSchemaValType::XmlSchemasString
-            | XmlSchemaValType::XmlSchemasNormstring
-            | XmlSchemaValType::XmlSchemasToken
-            | XmlSchemaValType::XmlSchemasLanguage
-            | XmlSchemaValType::XmlSchemasName
-            | XmlSchemaValType::XmlSchemasNcname
-            | XmlSchemaValType::XmlSchemasID
-            | XmlSchemaValType::XmlSchemasIDREF
-            | XmlSchemaValType::XmlSchemasEntity
-            | XmlSchemaValType::XmlSchemasNmtoken
-            | XmlSchemaValType::XmlSchemasAnyURI => {
-                cur = xml_schema_dup_val(val);
-                if !(*val).value.str.is_null() {
-                    (*cur).value.str = xml_strdup((*val).value.str);
+        // Copy the string values.
+        while !val.is_null() {
+            match (*val).typ {
+                XmlSchemaValType::XmlSchemasAnytype
+                | XmlSchemaValType::XmlSchemasIDREFS
+                | XmlSchemaValType::XmlSchemasEntities
+                | XmlSchemaValType::XmlSchemasNmtokens => {
+                    xml_schema_free_value(ret);
+                    return null_mut();
+                }
+                XmlSchemaValType::XmlSchemasAnysimpletype
+                | XmlSchemaValType::XmlSchemasString
+                | XmlSchemaValType::XmlSchemasNormstring
+                | XmlSchemaValType::XmlSchemasToken
+                | XmlSchemaValType::XmlSchemasLanguage
+                | XmlSchemaValType::XmlSchemasName
+                | XmlSchemaValType::XmlSchemasNcname
+                | XmlSchemaValType::XmlSchemasID
+                | XmlSchemaValType::XmlSchemasIDREF
+                | XmlSchemaValType::XmlSchemasEntity
+                | XmlSchemaValType::XmlSchemasNmtoken
+                | XmlSchemaValType::XmlSchemasAnyURI => {
+                    cur = xml_schema_dup_val(val);
+                    if !(*val).value.str.is_null() {
+                        (*cur).value.str = xml_strdup((*val).value.str);
+                    }
+                }
+                XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation => {
+                    cur = xml_schema_dup_val(val);
+                    if !(*val).value.qname.name.is_null() {
+                        (*cur).value.qname.name = xml_strdup((*val).value.qname.name);
+                    }
+                    if !(*val).value.qname.uri.is_null() {
+                        (*cur).value.qname.uri = xml_strdup((*val).value.qname.uri);
+                    }
+                }
+                XmlSchemaValType::XmlSchemasHexbinary => {
+                    cur = xml_schema_dup_val(val);
+                    if !(*val).value.hex.str.is_null() {
+                        (*cur).value.hex.str = xml_strdup((*val).value.hex.str);
+                    }
+                }
+                XmlSchemaValType::XmlSchemasBase64binary => {
+                    cur = xml_schema_dup_val(val);
+                    if !(*val).value.base64.str.is_null() {
+                        (*cur).value.base64.str = xml_strdup((*val).value.base64.str);
+                    }
+                }
+                _ => {
+                    cur = xml_schema_dup_val(val);
                 }
             }
-            XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation => {
-                cur = xml_schema_dup_val(val);
-                if !(*val).value.qname.name.is_null() {
-                    (*cur).value.qname.name = xml_strdup((*val).value.qname.name);
-                }
-                if !(*val).value.qname.uri.is_null() {
-                    (*cur).value.qname.uri = xml_strdup((*val).value.qname.uri);
-                }
+            if ret.is_null() {
+                ret = cur;
+            } else {
+                (*prev).next = cur;
             }
-            XmlSchemaValType::XmlSchemasHexbinary => {
-                cur = xml_schema_dup_val(val);
-                if !(*val).value.hex.str.is_null() {
-                    (*cur).value.hex.str = xml_strdup((*val).value.hex.str);
-                }
-            }
-            XmlSchemaValType::XmlSchemasBase64binary => {
-                cur = xml_schema_dup_val(val);
-                if !(*val).value.base64.str.is_null() {
-                    (*cur).value.base64.str = xml_strdup((*val).value.base64.str);
-                }
-            }
-            _ => {
-                cur = xml_schema_dup_val(val);
-            }
+            prev = cur;
+            val = (*val).next;
         }
-        if ret.is_null() {
-            ret = cur;
-        } else {
-            (*prev).next = cur;
-        }
-        prev = cur;
-        val = (*val).next;
+        ret
     }
-    ret
 }
 
 /// Accessor for the type of a value
@@ -7254,10 +7446,12 @@ pub unsafe fn xml_schema_copy_value(mut val: XmlSchemaValPtr) -> XmlSchemaValPtr
 /// Returns the XmlSchemaValType of the value
 #[doc(alias = "xmlSchemaGetValType")]
 pub unsafe fn xml_schema_get_val_type(val: XmlSchemaValPtr) -> XmlSchemaValType {
-    if val.is_null() {
-        return XmlSchemaValType::XmlSchemasUnknown;
+    unsafe {
+        if val.is_null() {
+            return XmlSchemaValType::XmlSchemasUnknown;
+        }
+        (*val).typ
     }
-    (*val).typ
 }
 
 #[cfg(test)]
@@ -7747,8 +7941,14 @@ mod tests {
                                     reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
-                                        eprint!("Leak of {} blocks found in xmlSchemaValidateFacetWhtsp", xml_mem_blocks() - mem_base);
-                                        assert!(leaks == 0, "{leaks} Leaks are found in xmlSchemaValidateFacetWhtsp()");
+                                        eprint!(
+                                            "Leak of {} blocks found in xmlSchemaValidateFacetWhtsp",
+                                            xml_mem_blocks() - mem_base
+                                        );
+                                        assert!(
+                                            leaks == 0,
+                                            "{leaks} Leaks are found in xmlSchemaValidateFacetWhtsp()"
+                                        );
                                         eprint!(" {}", n_facet);
                                         eprint!(" {}", n_fws);
                                         eprint!(" {}", n_val_type);
@@ -7850,8 +8050,14 @@ mod tests {
                                     reset_last_error();
                                     if mem_base != xml_mem_blocks() {
                                         leaks += 1;
-                                        eprint!("Leak of {} blocks found in xmlSchemaValidateLengthFacetWhtsp", xml_mem_blocks() - mem_base);
-                                        assert!(leaks == 0, "{leaks} Leaks are found in xmlSchemaValidateLengthFacetWhtsp()");
+                                        eprint!(
+                                            "Leak of {} blocks found in xmlSchemaValidateLengthFacetWhtsp",
+                                            xml_mem_blocks() - mem_base
+                                        );
+                                        assert!(
+                                            leaks == 0,
+                                            "{leaks} Leaks are found in xmlSchemaValidateLengthFacetWhtsp()"
+                                        );
                                         eprint!(" {}", n_facet);
                                         eprint!(" {}", n_val_type);
                                         eprint!(" {}", n_value);
@@ -7898,8 +8104,14 @@ mod tests {
                             reset_last_error();
                             if mem_base != xml_mem_blocks() {
                                 leaks += 1;
-                                eprint!("Leak of {} blocks found in xmlSchemaValidateListSimpleTypeFacet", xml_mem_blocks() - mem_base);
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlSchemaValidateListSimpleTypeFacet()");
+                                eprint!(
+                                    "Leak of {} blocks found in xmlSchemaValidateListSimpleTypeFacet",
+                                    xml_mem_blocks() - mem_base
+                                );
+                                assert!(
+                                    leaks == 0,
+                                    "{leaks} Leaks are found in xmlSchemaValidateListSimpleTypeFacet()"
+                                );
                                 eprint!(" {}", n_facet);
                                 eprint!(" {}", n_value);
                                 eprint!(" {}", n_actual_len);

@@ -27,17 +27,18 @@ use std::{
 };
 
 use libc::{
-    free, malloc, memcpy, memset, pthread_cond_destroy, pthread_cond_init, pthread_cond_signal,
-    pthread_cond_t, pthread_cond_wait, pthread_getspecific, pthread_key_create, pthread_key_delete,
-    pthread_key_t, pthread_mutex_destroy, pthread_mutex_init, pthread_mutex_lock, pthread_mutex_t,
-    pthread_mutex_unlock, pthread_self, pthread_setspecific, pthread_t, PTHREAD_MUTEX_INITIALIZER,
+    PTHREAD_MUTEX_INITIALIZER, free, malloc, memcpy, memset, pthread_cond_destroy,
+    pthread_cond_init, pthread_cond_signal, pthread_cond_t, pthread_cond_wait, pthread_getspecific,
+    pthread_key_create, pthread_key_delete, pthread_key_t, pthread_mutex_destroy,
+    pthread_mutex_init, pthread_mutex_lock, pthread_mutex_t, pthread_mutex_unlock, pthread_self,
+    pthread_setspecific, pthread_t,
 };
 
 use crate::libxml::globals::XmlGlobalStatePtr;
 
 use super::{globals::XmlGlobalState, parser::xml_init_parser};
 
-extern "C" {
+unsafe extern "C" {
     // Does it work ???
     fn pthread_equal(t1: pthread_t, t2: pthread_t) -> i32;
 }
@@ -77,49 +78,57 @@ static mut XML_LIBRARY_LOCK: XmlRMutexPtr = null_mut();
 /// Returns a new simple mutex pointer or NULL in case of error
 #[doc(alias = "xmlNewMutex")]
 pub unsafe extern "C" fn xml_new_mutex() -> XmlMutexPtr {
-    let tok: XmlMutexPtr = malloc(size_of::<XmlMutex>()) as _;
-    if tok.is_null() {
-        return null_mut();
+    unsafe {
+        let tok: XmlMutexPtr = malloc(size_of::<XmlMutex>()) as _;
+        if tok.is_null() {
+            return null_mut();
+        }
+        xml_init_mutex(tok);
+        tok
     }
-    xml_init_mutex(tok);
-    tok
 }
 
 /// xmlMutexLock() is used to lock a libxml2 token.
 #[doc(alias = "xmlMutexLock")]
 pub unsafe extern "C" fn xml_mutex_lock(tok: XmlMutexPtr) {
-    if tok.is_null() {
-        return;
-    }
-    /*
-     * This assumes that __libc_single_threaded won't change while the
-     * lock is held.
-     */
-    if XML_IS_THREADED {
-        pthread_mutex_lock(&mut (*tok).lock as _);
+    unsafe {
+        if tok.is_null() {
+            return;
+        }
+        /*
+         * This assumes that __libc_single_threaded won't change while the
+         * lock is held.
+         */
+        if XML_IS_THREADED {
+            pthread_mutex_lock(&mut (*tok).lock as _);
+        }
     }
 }
 
 /// xmlMutexUnlock() is used to unlock a libxml2 token.
 #[doc(alias = "xmlMutexUnlock")]
 pub unsafe extern "C" fn xml_mutex_unlock(tok: XmlMutexPtr) {
-    if tok.is_null() {
-        return;
-    }
-    if XML_IS_THREADED {
-        pthread_mutex_unlock(&mut (*tok).lock as _);
+    unsafe {
+        if tok.is_null() {
+            return;
+        }
+        if XML_IS_THREADED {
+            pthread_mutex_unlock(&mut (*tok).lock as _);
+        }
     }
 }
 
 /// Free a mutex.
 #[doc(alias = "xmlFreeMutex")]
 pub unsafe extern "C" fn xml_free_mutex(tok: XmlMutexPtr) {
-    if tok.is_null() {
-        return;
-    }
+    unsafe {
+        if tok.is_null() {
+            return;
+        }
 
-    xml_cleanup_mutex(tok);
-    free(tok as _);
+        xml_cleanup_mutex(tok);
+        free(tok as _);
+    }
 }
 
 /// xmlRNewMutex() is used to allocate a reentrant mutex for use in
@@ -130,98 +139,112 @@ pub unsafe extern "C" fn xml_free_mutex(tok: XmlMutexPtr) {
 /// Returns the new reentrant mutex pointer or NULL in case of error
 #[doc(alias = "xmlNewRMutex")]
 pub unsafe extern "C" fn xml_new_rmutex() -> XmlRMutexPtr {
-    let tok: XmlRMutexPtr = malloc(size_of::<XmlRMutex>()) as _;
-    if tok.is_null() {
-        return null_mut();
+    unsafe {
+        let tok: XmlRMutexPtr = malloc(size_of::<XmlRMutex>()) as _;
+        if tok.is_null() {
+            return null_mut();
+        }
+        if !XML_IS_NEVER_THREADED {
+            pthread_mutex_init(&mut (*tok).lock as _, null_mut());
+            (*tok).held = 0;
+            (*tok).waiters = 0;
+            pthread_cond_init(&mut (*tok).cv as _, null_mut());
+        }
+        tok
     }
-    if !XML_IS_NEVER_THREADED {
-        pthread_mutex_init(&mut (*tok).lock as _, null_mut());
-        (*tok).held = 0;
-        (*tok).waiters = 0;
-        pthread_cond_init(&mut (*tok).cv as _, null_mut());
-    }
-    tok
 }
 
 /// xmlRMutexLock() is used to lock a libxml2 token_r.
 #[doc(alias = "xmlRMutexLock")]
 pub unsafe extern "C" fn xml_rmutex_lock(tok: XmlRMutexPtr) {
-    if tok.is_null() {
-        return;
-    }
-    if !XML_IS_THREADED {
-        return;
-    }
-
-    pthread_mutex_lock(&mut (*tok).lock as _);
-    if (*tok).held != 0 {
-        if pthread_equal((*tok).tid, pthread_self()) != 0 {
-            (*tok).held += 1;
-            pthread_mutex_unlock(&mut (*tok).lock as _);
+    unsafe {
+        if tok.is_null() {
             return;
-        } else {
-            (*tok).waiters += 1;
-            while (*tok).held != 0 {
-                pthread_cond_wait(&mut (*tok).cv as _, &mut (*tok).lock as _);
-            }
-            (*tok).waiters -= 1;
         }
+        if !XML_IS_THREADED {
+            return;
+        }
+
+        pthread_mutex_lock(&mut (*tok).lock as _);
+        if (*tok).held != 0 {
+            if pthread_equal((*tok).tid, pthread_self()) != 0 {
+                (*tok).held += 1;
+                pthread_mutex_unlock(&mut (*tok).lock as _);
+                return;
+            } else {
+                (*tok).waiters += 1;
+                while (*tok).held != 0 {
+                    pthread_cond_wait(&mut (*tok).cv as _, &mut (*tok).lock as _);
+                }
+                (*tok).waiters -= 1;
+            }
+        }
+        (*tok).tid = pthread_self();
+        (*tok).held = 1;
+        pthread_mutex_unlock(&mut (*tok).lock as _);
     }
-    (*tok).tid = pthread_self();
-    (*tok).held = 1;
-    pthread_mutex_unlock(&mut (*tok).lock as _);
 }
 
 /// xmlRMutexUnlock() is used to unlock a libxml2 token_r.
 #[doc(alias = "xmlRMutexUnlock")]
 pub unsafe extern "C" fn xml_rmutex_unlock(tok: XmlRMutexPtr) {
-    if tok.is_null() {
-        return;
-    }
-    if !XML_IS_THREADED {
-        return;
-    }
-
-    pthread_mutex_lock(&mut (*tok).lock as _);
-    (*tok).held -= 1;
-    if (*tok).held == 0 {
-        if (*tok).waiters != 0 {
-            pthread_cond_signal(&mut (*tok).cv as _);
+    unsafe {
+        if tok.is_null() {
+            return;
         }
-        memset(&raw mut (*tok).tid as _, 0, size_of_val(&(*tok).tid));
+        if !XML_IS_THREADED {
+            return;
+        }
+
+        pthread_mutex_lock(&mut (*tok).lock as _);
+        (*tok).held -= 1;
+        if (*tok).held == 0 {
+            if (*tok).waiters != 0 {
+                pthread_cond_signal(&mut (*tok).cv as _);
+            }
+            memset(&raw mut (*tok).tid as _, 0, size_of_val(&(*tok).tid));
+        }
+        pthread_mutex_unlock(&mut (*tok).lock as _);
     }
-    pthread_mutex_unlock(&mut (*tok).lock as _);
 }
 
 /// xmlRFreeMutex() is used to reclaim resources associated with a reentrant mutex.
 #[doc(alias = "xmlFreeRMutex")]
 pub unsafe extern "C" fn xml_free_rmutex(tok: XmlRMutexPtr) {
-    if tok.is_null() {
-        return;
+    unsafe {
+        if tok.is_null() {
+            return;
+        }
+        if !XML_IS_NEVER_THREADED {
+            pthread_mutex_destroy(&mut (*tok).lock as _);
+            pthread_cond_destroy(&mut (*tok).cv as _);
+        }
+        free(tok as _);
     }
-    if !XML_IS_NEVER_THREADED {
-        pthread_mutex_destroy(&mut (*tok).lock as _);
-        pthread_cond_destroy(&mut (*tok).cv as _);
-    }
-    free(tok as _);
 }
 
 #[doc(alias = "xmlInitThreads")]
 #[deprecated = "Alias for xmlInitParser"]
 pub unsafe extern "C" fn xml_init_threads() {
-    xml_init_parser();
+    unsafe {
+        xml_init_parser();
+    }
 }
 
 /// xmlLockLibrary() is used to take out a re-entrant lock on the libxml2 library.
 #[doc(alias = "xmlLockLibrary")]
 pub unsafe extern "C" fn xml_lock_library() {
-    xml_rmutex_lock(XML_LIBRARY_LOCK);
+    unsafe {
+        xml_rmutex_lock(XML_LIBRARY_LOCK);
+    }
 }
 
 /// xmlUnlockLibrary() is used to release a re-entrant lock on the libxml2 library.
 #[doc(alias = "xmlUnlockLibrary")]
 pub unsafe extern "C" fn xml_unlock_library() {
-    xml_rmutex_unlock(XML_LIBRARY_LOCK);
+    unsafe {
+        xml_rmutex_unlock(XML_LIBRARY_LOCK);
+    }
 }
 
 /// xmlGetThreadId() find the current thread ID number
@@ -231,15 +254,17 @@ pub unsafe extern "C" fn xml_unlock_library() {
 /// Returns the current thread ID number
 #[doc(alias = "xmlGetThreadId")]
 pub(crate) unsafe extern "C" fn xml_get_thread_id() -> i32 {
-    let mut ret: i32 = 0;
+    unsafe {
+        let mut ret: i32 = 0;
 
-    if !XML_IS_THREADED {
-        return 0;
+        if !XML_IS_THREADED {
+            return 0;
+        }
+        let id: pthread_t = pthread_self();
+        /* horrible but preserves compat, see warning above */
+        memcpy(&raw mut ret as _, &raw const id as _, size_of_val(&ret));
+        ret
     }
-    let id: pthread_t = pthread_self();
-    /* horrible but preserves compat, see warning above */
-    memcpy(&raw mut ret as _, &raw const id as _, size_of_val(&ret));
-    ret
 }
 
 /// xmlIsMainThread() check whether the current thread is the main thread.
@@ -247,12 +272,14 @@ pub(crate) unsafe extern "C" fn xml_get_thread_id() -> i32 {
 /// Returns 1 if the current thread is the main thread, 0 otherwise
 #[doc(alias = "xmlIsMainThread")]
 pub(crate) unsafe extern "C" fn xml_is_main_thread() -> i32 {
-    xml_init_parser();
+    unsafe {
+        xml_init_parser();
 
-    if !XML_IS_THREADED {
-        return 1;
+        if !XML_IS_THREADED {
+            return 1;
+        }
+        pthread_equal(MAINTHREAD, pthread_self())
     }
-    pthread_equal(MAINTHREAD, pthread_self())
 }
 
 #[doc(alias = "xmlCleanupThreads")]
@@ -269,19 +296,21 @@ pub unsafe extern "C" fn xml_cleanup_threads() {}
 /// Returns the newly allocated xmlGlobalStatePtr or NULL in case of error
 #[doc(alias = "xmlNewGlobalState")]
 unsafe extern "C" fn xml_new_global_state() -> XmlGlobalStatePtr {
-    use crate::generic_error;
+    unsafe {
+        use crate::generic_error;
 
-    use super::globals::xml_initialize_global_state;
+        use super::globals::xml_initialize_global_state;
 
-    let gs: *mut XmlGlobalState = malloc(size_of::<XmlGlobalState>()) as _;
-    if gs.is_null() {
-        generic_error!("xmlGetGlobalState: out of memory\n");
-        return null_mut();
+        let gs: *mut XmlGlobalState = malloc(size_of::<XmlGlobalState>()) as _;
+        if gs.is_null() {
+            generic_error!("xmlGetGlobalState: out of memory\n");
+            return null_mut();
+        }
+
+        memset(gs as _, 0, size_of::<XmlGlobalState>());
+        xml_initialize_global_state(gs);
+        gs
     }
-
-    memset(gs as _, 0, size_of::<XmlGlobalState>());
-    xml_initialize_global_state(gs);
-    gs
 }
 
 /// xmlGetGlobalState() is called to retrieve the global state for a thread.
@@ -289,21 +318,23 @@ unsafe extern "C" fn xml_new_global_state() -> XmlGlobalStatePtr {
 /// Returns the thread global state or NULL in case of error
 #[doc(alias = "xmlGetGlobalState")]
 pub(crate) unsafe extern "C" fn xml_get_global_state() -> XmlGlobalStatePtr {
-    if !XML_IS_THREADED {
-        return null_mut();
-    }
-
-    let globalval: *mut XmlGlobalState = pthread_getspecific(GLOBALKEY) as *mut XmlGlobalState;
-    if globalval.is_null() {
-        let tsd: *mut XmlGlobalState = xml_new_global_state();
-        if tsd.is_null() {
+    unsafe {
+        if !XML_IS_THREADED {
             return null_mut();
         }
 
-        pthread_setspecific(GLOBALKEY, tsd as _);
-        return tsd;
+        let globalval: *mut XmlGlobalState = pthread_getspecific(GLOBALKEY) as *mut XmlGlobalState;
+        if globalval.is_null() {
+            let tsd: *mut XmlGlobalState = xml_new_global_state();
+            if tsd.is_null() {
+                return null_mut();
+            }
+
+            pthread_setspecific(GLOBALKEY, tsd as _);
+            return tsd;
+        }
+        globalval
     }
-    globalval
 }
 
 // #if defined(LIBXML_THREAD_ENABLED) && defined(_WIN32) && \
@@ -320,19 +351,23 @@ pub unsafe extern "C" fn xmlDllMain(
 /// Makes sure that the global initialization mutex is initialized and locks it.
 #[doc(alias = "xmlGlobalInitMutexLock")]
 pub(crate) unsafe extern "C" fn __xml_global_init_mutex_lock() {
-    /* Make sure the global init lock is initialized and then lock it. */
-    if !XML_IS_THREADED {
-        return;
+    unsafe {
+        /* Make sure the global init lock is initialized and then lock it. */
+        if !XML_IS_THREADED {
+            return;
+        }
+        /* The mutex is statically initialized, so we just lock it. */
+        pthread_mutex_lock(&raw mut GLOBAL_INIT_LOCK);
     }
-    /* The mutex is statically initialized, so we just lock it. */
-    pthread_mutex_lock(&raw mut GLOBAL_INIT_LOCK);
 }
 
 pub(crate) unsafe extern "C" fn __xml_global_init_mutex_unlock() {
-    if !XML_IS_THREADED {
-        return;
+    unsafe {
+        if !XML_IS_THREADED {
+            return;
+        }
+        pthread_mutex_unlock(&raw mut GLOBAL_INIT_LOCK);
     }
-    pthread_mutex_unlock(&raw mut GLOBAL_INIT_LOCK);
 }
 
 /// Makes sure that the global initialization mutex is destroyed before
@@ -344,38 +379,48 @@ pub(crate) unsafe extern "C" fn __xml_global_init_mutex_destroy() {}
 /// global state. It is is used here to reclaim memory resources.
 #[doc(alias = "xmlFreeGlobalState")]
 unsafe extern "C" fn xml_free_global_state(state: *mut c_void) {
-    let gs: *mut XmlGlobalState = state as _;
+    unsafe {
+        let gs: *mut XmlGlobalState = state as _;
 
-    /* free any memory allocated in the thread's xmlLastError */
-    (*gs).xml_last_error.reset();
-    free(state);
+        /* free any memory allocated in the thread's xmlLastError */
+        (*gs).xml_last_error.reset();
+        free(state);
+    }
 }
 
 /// Used to to initialize all the thread related data.
 #[doc(alias = "xmlInitThreadsInternal")]
 pub(crate) unsafe extern "C" fn xml_init_threads_internal() {
-    pthread_key_create(&raw mut GLOBALKEY, Some(xml_free_global_state));
-    MAINTHREAD = pthread_self();
+    unsafe {
+        pthread_key_create(&raw mut GLOBALKEY, Some(xml_free_global_state));
+        MAINTHREAD = pthread_self();
+    }
 }
 
 /// Used to to cleanup all the thread related data.
 #[doc(alias = "xmlCleanupThreadsInternal")]
 pub(crate) unsafe extern "C" fn xml_cleanup_threads_internal() {
-    pthread_key_delete(GLOBALKEY);
+    unsafe {
+        pthread_key_delete(GLOBALKEY);
+    }
 }
 
 /// Initialize a mutex.
 #[doc(alias = "xmlInitMutex")]
 pub(crate) unsafe extern "C" fn xml_init_mutex(mutex: XmlMutexPtr) {
-    if !XML_IS_NEVER_THREADED {
-        pthread_mutex_init(&mut (*mutex).lock as _, null());
+    unsafe {
+        if !XML_IS_NEVER_THREADED {
+            pthread_mutex_init(&mut (*mutex).lock as _, null());
+        }
     }
 }
 
 /// Reclaim resources associated with a mutex.
 #[doc(alias = "xmlCleanupMutex")]
 pub(crate) unsafe extern "C" fn xml_cleanup_mutex(mutex: XmlMutexPtr) {
-    if !XML_IS_NEVER_THREADED {
-        pthread_mutex_destroy(&mut (*mutex).lock as _);
+    unsafe {
+        if !XML_IS_NEVER_THREADED {
+            pthread_mutex_destroy(&mut (*mutex).lock as _);
+        }
     }
 }

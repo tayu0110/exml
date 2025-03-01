@@ -792,11 +792,7 @@ fn parse3986_dec_octet(s: &str) -> Result<&str, i32> {
     let mut t = s[..3.min(s.len())].split_terminator(|c: char| !c.is_ascii_digit());
     let t = t.next().filter(|t| !t.is_empty()).ok_or(1)?;
     let u = t.parse::<u16>().unwrap();
-    if u < 256 {
-        Ok(&s[t.len()..])
-    } else {
-        Err(1)
-    }
+    if u < 256 { Ok(&s[t.len()..]) } else { Err(1) }
 }
 
 /// Parse a segment and fills in the appropriate fields
@@ -852,7 +848,7 @@ pub fn build_uri(uri: &str, base: &str) -> Option<String> {
         r.parse_uri_reference(uri).ok()?;
         refe = Some(r);
     }
-    if refe.as_ref().map_or(false, |r| r.scheme.is_some()) {
+    if refe.as_ref().is_some_and(|r| r.scheme.is_some()) {
         // The URI is absolute don't modify.
         return Some(uri.to_owned());
     }
@@ -1081,7 +1077,7 @@ pub fn build_relative_uri<'a>(uri: &'a str, base: Option<&str>) -> Option<Cow<'a
 
     // If the scheme / server on the URI differs from the base, just return the URI
     if let Some(rscheme) = refe.scheme.as_deref() {
-        if bas.scheme.map_or(true, |scheme| scheme != rscheme)
+        if bas.scheme.is_none_or(|scheme| scheme != rscheme)
             || bas.port != refe.port
             || bas.server != refe.server
         {

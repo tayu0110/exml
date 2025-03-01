@@ -60,8 +60,8 @@ use crate::{
     libxml::{
         globals::{xml_free, xml_malloc},
         parser::xml_init_parser,
-        pattern::{xml_free_pattern_list, XmlPatternPtr},
-        xmlstring::{xml_strdup, XmlChar},
+        pattern::{XmlPatternPtr, xml_free_pattern_list},
+        xmlstring::{XmlChar, xml_strdup},
     },
     tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr},
 };
@@ -658,7 +658,7 @@ pub fn xml_xpath_cast_number_to_boolean(val: f64) -> bool {
 #[doc(alias = "xmlXPathCastStringToBoolean")]
 #[cfg(feature = "xpath")]
 pub fn xml_xpath_cast_string_to_boolean(val: Option<&str>) -> bool {
-    val.map_or(false, |v| !v.is_empty())
+    val.is_some_and(|v| !v.is_empty())
 }
 
 /// Converts a node-set to its boolean value
@@ -667,7 +667,7 @@ pub fn xml_xpath_cast_string_to_boolean(val: Option<&str>) -> bool {
 #[doc(alias = "xmlXPathCastNodeSetToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_cast_node_set_to_boolean(ns: Option<&XmlNodeSet>) -> bool {
-    ns.map_or(false, |n| !n.is_empty())
+    ns.is_some_and(|n| !n.is_empty())
 }
 
 /// Converts a boolean to its number value
@@ -676,11 +676,7 @@ pub unsafe fn xml_xpath_cast_node_set_to_boolean(ns: Option<&XmlNodeSet>) -> boo
 #[doc(alias = "xmlXPathCastBooleanToNumber")]
 #[cfg(feature = "xpath")]
 pub fn xml_xpath_cast_boolean_to_number(val: bool) -> f64 {
-    if val {
-        1.0
-    } else {
-        0.0
-    }
+    if val { 1.0 } else { 0.0 }
 }
 
 /// Converts a string to its number value
@@ -689,7 +685,7 @@ pub fn xml_xpath_cast_boolean_to_number(val: bool) -> f64 {
 #[doc(alias = "xmlXPathCastStringToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_cast_string_to_number(val: *const XmlChar) -> f64 {
-    xml_xpath_string_eval_number(val)
+    unsafe { xml_xpath_string_eval_number(val) }
 }
 
 /// Converts a node to its number value
@@ -698,16 +694,18 @@ pub unsafe fn xml_xpath_cast_string_to_number(val: *const XmlChar) -> f64 {
 #[doc(alias = "xmlXPathCastNodeToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_cast_node_to_number(node: Option<XmlGenericNodePtr>) -> f64 {
-    use std::ffi::CString;
+    unsafe {
+        use std::ffi::CString;
 
-    if node.is_none() {
-        return XML_XPATH_NAN;
+        if node.is_none() {
+            return XML_XPATH_NAN;
+        }
+        let strval = xml_xpath_cast_node_to_string(node);
+        let strval = CString::new(strval).unwrap();
+        let ret: f64 = xml_xpath_cast_string_to_number(strval.as_ptr() as *const u8);
+
+        ret
     }
-    let strval = xml_xpath_cast_node_to_string(node);
-    let strval = CString::new(strval).unwrap();
-    let ret: f64 = xml_xpath_cast_string_to_number(strval.as_ptr() as *const u8);
-
-    ret
 }
 
 /// Converts a node-set to its number value
@@ -716,14 +714,16 @@ pub unsafe fn xml_xpath_cast_node_to_number(node: Option<XmlGenericNodePtr>) -> 
 #[doc(alias = "xmlXPathCastNodeSetToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_cast_node_set_to_number(ns: Option<&mut XmlNodeSet>) -> f64 {
-    use std::ffi::CString;
+    unsafe {
+        use std::ffi::CString;
 
-    let Some(ns) = ns else {
-        return XML_XPATH_NAN;
-    };
-    let str = CString::new(xml_xpath_cast_node_set_to_string(Some(ns)).as_ref()).unwrap();
-    let ret: f64 = xml_xpath_cast_string_to_number(str.as_ptr() as *const u8);
-    ret
+        let Some(ns) = ns else {
+            return XML_XPATH_NAN;
+        };
+        let str = CString::new(xml_xpath_cast_node_set_to_string(Some(ns)).as_ref()).unwrap();
+        let ret: f64 = xml_xpath_cast_string_to_number(str.as_ptr() as *const u8);
+        ret
+    }
 }
 
 /// Converts a boolean to its string value.
@@ -732,11 +732,7 @@ pub unsafe fn xml_xpath_cast_node_set_to_number(ns: Option<&mut XmlNodeSet>) -> 
 #[doc(alias = "xmlXPathCastBooleanToString")]
 #[cfg(feature = "xpath")]
 pub fn xml_xpath_cast_boolean_to_string(val: bool) -> &'static str {
-    if val {
-        "true"
-    } else {
-        "false"
-    }
+    if val { "true" } else { "false" }
 }
 
 const DBL_DIG: usize = 15;
@@ -860,8 +856,10 @@ pub fn xml_xpath_cast_number_to_string(val: f64) -> Cow<'static, str> {
 #[doc(alias = "xmlXPathCastNodeToString")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_cast_node_to_string(node: Option<XmlGenericNodePtr>) -> String {
-    node.and_then(|node| node.get_content())
-        .unwrap_or_else(|| "".to_owned())
+    unsafe {
+        node.and_then(|node| node.get_content())
+            .unwrap_or_else(|| "".to_owned())
+    }
 }
 
 /// Converts a node-set to its string value.
@@ -870,15 +868,17 @@ pub unsafe fn xml_xpath_cast_node_to_string(node: Option<XmlGenericNodePtr>) -> 
 #[doc(alias = "xmlXPathCastNodeSetToString")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> Cow<'static, str> {
-    let Some(ns) = ns.filter(|n| !n.is_empty()) else {
-        return "".into();
-    };
+    unsafe {
+        let Some(ns) = ns.filter(|n| !n.is_empty()) else {
+            return "".into();
+        };
 
-    if ns.len() > 1 {
-        ns.sort();
+        if ns.len() > 1 {
+            ns.sort();
+        }
+
+        xml_xpath_cast_node_to_string(Some(ns.node_tab[0])).into()
     }
-
-    xml_xpath_cast_node_to_string(Some(ns.node_tab[0])).into()
 }
 
 /// Create a new xmlXPathContext
@@ -887,110 +887,121 @@ pub unsafe fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> 
 #[doc(alias = "xmlXPathNewContext")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPtr {
-    let ret: XmlXPathContextPtr = xml_malloc(size_of::<XmlXPathContext>()) as XmlXPathContextPtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), Some("creating context\n"));
-        return null_mut();
+    unsafe {
+        let ret: XmlXPathContextPtr =
+            xml_malloc(size_of::<XmlXPathContext>()) as XmlXPathContextPtr;
+        if ret.is_null() {
+            xml_xpath_err_memory(null_mut(), Some("creating context\n"));
+            return null_mut();
+        }
+        std::ptr::write(&mut *ret, XmlXPathContext::default());
+        (*ret).doc = doc;
+        (*ret).node = None;
+
+        (*ret).var_hash = None;
+
+        (*ret).nb_types = 0;
+        (*ret).max_types = 0;
+        (*ret).types = null_mut();
+
+        (*ret).func_hash = XmlHashTableRef::with_capacity(0);
+
+        (*ret).nb_axis = 0;
+        (*ret).max_axis = 0;
+        (*ret).axis = null_mut();
+
+        (*ret).ns_hash = None;
+        (*ret).user = null_mut();
+
+        (*ret).context_size = -1;
+        (*ret).proximity_position = -1;
+
+        if xml_xpath_context_set_cache(ret, 1, -1, 0) == -1 {
+            xml_xpath_free_context(ret);
+            return null_mut();
+        }
+
+        xml_xpath_register_all_functions(ret);
+
+        ret
     }
-    std::ptr::write(&mut *ret, XmlXPathContext::default());
-    (*ret).doc = doc;
-    (*ret).node = None;
-
-    (*ret).var_hash = None;
-
-    (*ret).nb_types = 0;
-    (*ret).max_types = 0;
-    (*ret).types = null_mut();
-
-    (*ret).func_hash = XmlHashTableRef::with_capacity(0);
-
-    (*ret).nb_axis = 0;
-    (*ret).max_axis = 0;
-    (*ret).axis = null_mut();
-
-    (*ret).ns_hash = None;
-    (*ret).user = null_mut();
-
-    (*ret).context_size = -1;
-    (*ret).proximity_position = -1;
-
-    if xml_xpath_context_set_cache(ret, 1, -1, 0) == -1 {
-        xml_xpath_free_context(ret);
-        return null_mut();
-    }
-
-    xml_xpath_register_all_functions(ret);
-
-    ret
 }
 
 /// Frees the xsltPointerList structure. This does not free the content of the list.
 #[doc(alias = "xsltPointerListFree")]
 unsafe fn xml_pointer_list_free(list: XmlPointerListPtr) {
-    if list.is_null() {
-        return;
+    unsafe {
+        if list.is_null() {
+            return;
+        }
+        if !(*list).items.is_null() {
+            xml_free((*list).items as _);
+        }
+        xml_free(list as _);
     }
-    if !(*list).items.is_null() {
-        xml_free((*list).items as _);
-    }
-    xml_free(list as _);
 }
 
 unsafe fn xml_xpath_cache_free_object_list(list: XmlPointerListPtr) {
-    let mut obj: XmlXPathObjectPtr;
+    unsafe {
+        let mut obj: XmlXPathObjectPtr;
 
-    if list.is_null() {
-        return;
-    }
+        if list.is_null() {
+            return;
+        }
 
-    for i in 0..(*list).number {
-        obj = *(*list).items.add(i as usize) as _;
-        // Note that it is already assured that we don't need to
-        // look out for namespace nodes in the node-set.
-        let _ = (*obj).nodesetval.take();
-        xml_free(obj as _);
+        for i in 0..(*list).number {
+            obj = *(*list).items.add(i as usize) as _;
+            // Note that it is already assured that we don't need to
+            // look out for namespace nodes in the node-set.
+            let _ = (*obj).nodesetval.take();
+            xml_free(obj as _);
+        }
+        xml_pointer_list_free(list);
     }
-    xml_pointer_list_free(list);
 }
 
 unsafe fn xml_xpath_free_cache(cache: XmlXpathContextCachePtr) {
-    if cache.is_null() {
-        return;
+    unsafe {
+        if cache.is_null() {
+            return;
+        }
+        if !(*cache).nodeset_objs.is_null() {
+            xml_xpath_cache_free_object_list((*cache).nodeset_objs);
+        }
+        if !(*cache).string_objs.is_null() {
+            xml_xpath_cache_free_object_list((*cache).string_objs);
+        }
+        if !(*cache).boolean_objs.is_null() {
+            xml_xpath_cache_free_object_list((*cache).boolean_objs);
+        }
+        if !(*cache).number_objs.is_null() {
+            xml_xpath_cache_free_object_list((*cache).number_objs);
+        }
+        if !(*cache).misc_objs.is_null() {
+            xml_xpath_cache_free_object_list((*cache).misc_objs);
+        }
+        xml_free(cache as _);
     }
-    if !(*cache).nodeset_objs.is_null() {
-        xml_xpath_cache_free_object_list((*cache).nodeset_objs);
-    }
-    if !(*cache).string_objs.is_null() {
-        xml_xpath_cache_free_object_list((*cache).string_objs);
-    }
-    if !(*cache).boolean_objs.is_null() {
-        xml_xpath_cache_free_object_list((*cache).boolean_objs);
-    }
-    if !(*cache).number_objs.is_null() {
-        xml_xpath_cache_free_object_list((*cache).number_objs);
-    }
-    if !(*cache).misc_objs.is_null() {
-        xml_xpath_cache_free_object_list((*cache).misc_objs);
-    }
-    xml_free(cache as _);
 }
 
 /// Free up an xmlXPathContext
 #[doc(alias = "xmlXPathFreeContext")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
-    if ctxt.is_null() {
-        return;
-    }
+    unsafe {
+        if ctxt.is_null() {
+            return;
+        }
 
-    if !(*ctxt).cache.is_null() {
-        xml_xpath_free_cache((*ctxt).cache as XmlXpathContextCachePtr);
+        if !(*ctxt).cache.is_null() {
+            xml_xpath_free_cache((*ctxt).cache as XmlXpathContextCachePtr);
+        }
+        xml_xpath_registered_ns_cleanup(ctxt);
+        xml_xpath_registered_funcs_cleanup(ctxt);
+        xml_xpath_registered_variables_cleanup(ctxt);
+        (*ctxt).last_error.reset();
+        xml_free(ctxt as _);
     }
-    xml_xpath_registered_ns_cleanup(ctxt);
-    xml_xpath_registered_funcs_cleanup(ctxt);
-    xml_xpath_registered_variables_cleanup(ctxt);
-    (*ctxt).last_error.reset();
-    xml_free(ctxt as _);
 }
 
 /// Create a new object cache
@@ -998,19 +1009,21 @@ pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
 /// Returns the xmlXPathCache just allocated.
 #[doc(alias = "xmlXPathNewCache")]
 unsafe fn xml_xpath_new_cache() -> XmlXpathContextCachePtr {
-    let ret: XmlXpathContextCachePtr =
-        xml_malloc(size_of::<XmlXpathContextCache>()) as XmlXpathContextCachePtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), Some("creating object cache\n"));
-        return null_mut();
+    unsafe {
+        let ret: XmlXpathContextCachePtr =
+            xml_malloc(size_of::<XmlXpathContextCache>()) as XmlXpathContextCachePtr;
+        if ret.is_null() {
+            xml_xpath_err_memory(null_mut(), Some("creating object cache\n"));
+            return null_mut();
+        }
+        memset(ret as _, 0, size_of::<XmlXpathContextCache>());
+        (*ret).max_nodeset = 100;
+        (*ret).max_string = 100;
+        (*ret).max_boolean = 100;
+        (*ret).max_number = 100;
+        (*ret).max_misc = 100;
+        ret
     }
-    memset(ret as _, 0, size_of::<XmlXpathContextCache>());
-    (*ret).max_nodeset = 100;
-    (*ret).max_string = 100;
-    (*ret).max_boolean = 100;
-    (*ret).max_number = 100;
-    (*ret).max_misc = 100;
-    ret
 }
 
 /// Creates/frees an object cache on the XPath context.
@@ -1033,32 +1046,34 @@ pub unsafe fn xml_xpath_context_set_cache(
     mut value: i32,
     options: i32,
 ) -> i32 {
-    if ctxt.is_null() {
-        return -1;
-    }
-    if active != 0 {
-        if (*ctxt).cache.is_null() {
-            (*ctxt).cache = xml_xpath_new_cache() as _;
+    unsafe {
+        if ctxt.is_null() {
+            return -1;
+        }
+        if active != 0 {
             if (*ctxt).cache.is_null() {
-                return -1;
+                (*ctxt).cache = xml_xpath_new_cache() as _;
+                if (*ctxt).cache.is_null() {
+                    return -1;
+                }
             }
-        }
-        let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
-        if options == 0 {
-            if value < 0 {
-                value = 100;
+            let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
+            if options == 0 {
+                if value < 0 {
+                    value = 100;
+                }
+                (*cache).max_nodeset = value;
+                (*cache).max_string = value;
+                (*cache).max_number = value;
+                (*cache).max_boolean = value;
+                (*cache).max_misc = value;
             }
-            (*cache).max_nodeset = value;
-            (*cache).max_string = value;
-            (*cache).max_number = value;
-            (*cache).max_boolean = value;
-            (*cache).max_misc = value;
+        } else if !(*ctxt).cache.is_null() {
+            xml_xpath_free_cache((*ctxt).cache as XmlXpathContextCachePtr);
+            (*ctxt).cache = null_mut();
         }
-    } else if !(*ctxt).cache.is_null() {
-        xml_xpath_free_cache((*ctxt).cache as XmlXpathContextCachePtr);
-        (*ctxt).cache = null_mut();
+        0
     }
-    0
 }
 
 /// Call this routine to speed up XPath computation on static documents.
@@ -1115,18 +1130,20 @@ pub unsafe fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
 #[doc(alias = "xmlXPathSetContextNode")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_set_context_node(node: XmlGenericNodePtr, ctx: XmlXPathContextPtr) -> i32 {
-    // if node.is_null() {
-    //     return -1;
-    // }
-    if ctx.is_null() {
-        return -1;
-    }
+    unsafe {
+        // if node.is_null() {
+        //     return -1;
+        // }
+        if ctx.is_null() {
+            return -1;
+        }
 
-    if node.document() == (*ctx).doc {
-        (*ctx).node = Some(node);
-        return 0;
+        if node.document() == (*ctx).doc {
+            (*ctx).node = Some(node);
+            return 0;
+        }
+        -1
     }
-    -1
 }
 
 /// Evaluate the XPath Location Path in the given context. The node 'node'
@@ -1141,13 +1158,15 @@ pub unsafe fn xml_xpath_node_eval(
     str: *const XmlChar,
     ctx: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
-    if str.is_null() {
-        return null_mut();
+    unsafe {
+        if str.is_null() {
+            return null_mut();
+        }
+        if xml_xpath_set_context_node(node, ctx) < 0 {
+            return null_mut();
+        }
+        xml_xpath_eval(str, ctx)
     }
-    if xml_xpath_set_context_node(node, ctx) < 0 {
-        return null_mut();
-    }
-    xml_xpath_eval(str, ctx)
 }
 
 macro_rules! CHECK_CTXT {
@@ -1183,36 +1202,38 @@ macro_rules! CHECK_CTXT {
 #[doc(alias = "xmlXPathEval")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_eval(str: *const XmlChar, ctx: XmlXPathContextPtr) -> XmlXPathObjectPtr {
-    use crate::generic_error;
+    unsafe {
+        use crate::generic_error;
 
-    let res: XmlXPathObjectPtr;
+        let res: XmlXPathObjectPtr;
 
-    CHECK_CTXT!(ctx);
+        CHECK_CTXT!(ctx);
 
-    xml_init_parser();
+        xml_init_parser();
 
-    let ctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(str, ctx);
-    if ctxt.is_null() {
-        return null_mut();
-    }
-    xml_xpath_eval_expr(ctxt);
-
-    if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
-        res = null_mut();
-    } else {
-        res = value_pop(ctxt);
-        if res.is_null() {
-            generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
-        } else if !(*ctxt).value_tab.is_empty() {
-            generic_error!(
-                "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
-                (*ctxt).value_tab.len() as i32
-            );
+        let ctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(str, ctx);
+        if ctxt.is_null() {
+            return null_mut();
         }
-    }
+        xml_xpath_eval_expr(ctxt);
 
-    xml_xpath_free_parser_context(ctxt);
-    res
+        if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+            res = null_mut();
+        } else {
+            res = value_pop(ctxt);
+            if res.is_null() {
+                generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
+            } else if !(*ctxt).value_tab.is_empty() {
+                generic_error!(
+                    "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
+                    (*ctxt).value_tab.len() as i32
+                );
+            }
+        }
+
+        xml_xpath_free_parser_context(ctxt);
+        res
+    }
 }
 
 /// Alias for xmlXPathEval().
@@ -1225,7 +1246,7 @@ pub unsafe fn xml_xpath_eval_expression(
     str: *const XmlChar,
     ctxt: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
-    xml_xpath_eval(str, ctxt)
+    unsafe { xml_xpath_eval(str, ctxt) }
 }
 
 /// Evaluate a predicate result for the current node.
@@ -1241,32 +1262,34 @@ pub unsafe fn xml_xpath_eval_expression(
 #[doc(alias = "xmlXPathEvalPredicate")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_eval_predicate(ctxt: XmlXPathContextPtr, res: XmlXPathObjectPtr) -> bool {
-    use crate::generic_error;
+    unsafe {
+        use crate::generic_error;
 
-    if ctxt.is_null() || res.is_null() {
-        return false;
+        if ctxt.is_null() || res.is_null() {
+            return false;
+        }
+        match (*res).typ {
+            XmlXPathObjectType::XPathBoolean => {
+                return (*res).boolval;
+            }
+            XmlXPathObjectType::XPathNumber => {
+                return (*res).floatval == (*ctxt).proximity_position as _;
+            }
+            XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
+                let Some(nodeset) = (*res).nodesetval.as_deref() else {
+                    return false;
+                };
+                return !nodeset.node_tab.is_empty();
+            }
+            XmlXPathObjectType::XPathString => {
+                return (*res).stringval.as_deref().is_some_and(|s| !s.is_empty());
+            }
+            _ => {
+                generic_error!("Internal error at {}:{}\n", file!(), line!());
+            }
+        }
+        false
     }
-    match (*res).typ {
-        XmlXPathObjectType::XPathBoolean => {
-            return (*res).boolval;
-        }
-        XmlXPathObjectType::XPathNumber => {
-            return (*res).floatval == (*ctxt).proximity_position as _;
-        }
-        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            let Some(nodeset) = (*res).nodesetval.as_deref() else {
-                return false;
-            };
-            return !nodeset.node_tab.is_empty();
-        }
-        XmlXPathObjectType::XPathString => {
-            return (*res).stringval.as_deref().map_or(false, |s| !s.is_empty());
-        }
-        _ => {
-            generic_error!("Internal error at {}:{}\n", file!(), line!());
-        }
-    }
-    false
 }
 
 /// Compile an XPath expression
@@ -1276,7 +1299,7 @@ pub unsafe fn xml_xpath_eval_predicate(ctxt: XmlXPathContextPtr, res: XmlXPathOb
 #[doc(alias = "xmlXPathCompile")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_compile(str: *const XmlChar) -> XmlXPathCompExprPtr {
-    xml_xpath_ctxt_compile(null_mut(), str)
+    unsafe { xml_xpath_ctxt_compile(null_mut(), str) }
 }
 
 /// Compile an XPath expression
@@ -1289,70 +1312,72 @@ pub unsafe fn xml_xpath_ctxt_compile(
     ctxt: XmlXPathContextPtr,
     str: *const XmlChar,
 ) -> XmlXPathCompExprPtr {
-    use std::ffi::CString;
+    unsafe {
+        use std::ffi::CString;
 
-    let mut comp: XmlXPathCompExprPtr;
-    let mut old_depth: i32 = 0;
+        let mut comp: XmlXPathCompExprPtr;
+        let mut old_depth: i32 = 0;
 
-    #[cfg(feature = "libxml_pattern")]
-    {
-        comp = xml_xpath_try_stream_compile(ctxt, str);
-        if !comp.is_null() {
-            return comp;
+        #[cfg(feature = "libxml_pattern")]
+        {
+            comp = xml_xpath_try_stream_compile(ctxt, str);
+            if !comp.is_null() {
+                return comp;
+            }
         }
-    }
 
-    xml_init_parser();
+        xml_init_parser();
 
-    let pctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(str, ctxt);
-    if pctxt.is_null() {
-        return null_mut();
-    }
-    if !ctxt.is_null() {
-        old_depth = (*ctxt).depth;
-    }
-    xml_xpath_compile_expr(pctxt, 1);
-    if !ctxt.is_null() {
-        (*ctxt).depth = old_depth;
-    }
+        let pctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(str, ctxt);
+        if pctxt.is_null() {
+            return null_mut();
+        }
+        if !ctxt.is_null() {
+            old_depth = (*ctxt).depth;
+        }
+        xml_xpath_compile_expr(pctxt, 1);
+        if !ctxt.is_null() {
+            (*ctxt).depth = old_depth;
+        }
 
-    if (*pctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+        if (*pctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+            xml_xpath_free_parser_context(pctxt);
+            return null_mut();
+        }
+
+        if *(*pctxt).cur != 0 {
+            // aleksey: in some cases this line prints *second* error message
+            // (see bug #78858) and probably this should be fixed.
+            // However, we are not sure that all error messages are printed
+            // out in other places. It's not critical so we leave it as-is for now
+            let file = CString::new(file!()).unwrap();
+            xml_xpatherror(
+                pctxt,
+                file.as_ptr(),
+                line!() as i32,
+                XmlXPathError::XPathExprError as i32,
+            );
+            comp = null_mut();
+        } else {
+            comp = (*pctxt).comp;
+            if (*comp).steps.len() > 1 && (*comp).last >= 0 {
+                if !ctxt.is_null() {
+                    old_depth = (*ctxt).depth;
+                }
+                xml_xpath_optimize_expression(pctxt, &raw mut (*comp).steps[(*comp).last as usize]);
+                if !ctxt.is_null() {
+                    (*ctxt).depth = old_depth;
+                }
+            }
+            (*pctxt).comp = null_mut();
+        }
         xml_xpath_free_parser_context(pctxt);
-        return null_mut();
-    }
 
-    if *(*pctxt).cur != 0 {
-        // aleksey: in some cases this line prints *second* error message
-        // (see bug #78858) and probably this should be fixed.
-        // However, we are not sure that all error messages are printed
-        // out in other places. It's not critical so we leave it as-is for now
-        let file = CString::new(file!()).unwrap();
-        xml_xpatherror(
-            pctxt,
-            file.as_ptr(),
-            line!() as i32,
-            XmlXPathError::XPathExprError as i32,
-        );
-        comp = null_mut();
-    } else {
-        comp = (*pctxt).comp;
-        if (*comp).steps.len() > 1 && (*comp).last >= 0 {
-            if !ctxt.is_null() {
-                old_depth = (*ctxt).depth;
-            }
-            xml_xpath_optimize_expression(pctxt, &raw mut (*comp).steps[(*comp).last as usize]);
-            if !ctxt.is_null() {
-                (*ctxt).depth = old_depth;
-            }
+        if !comp.is_null() {
+            (*comp).expr = xml_strdup(str);
         }
-        (*pctxt).comp = null_mut();
+        comp
     }
-    xml_xpath_free_parser_context(pctxt);
-
-    if !comp.is_null() {
-        (*comp).expr = xml_strdup(str);
-    }
-    comp
 }
 
 macro_rules! CHECK_CTXT_NEG {
@@ -1389,21 +1414,23 @@ unsafe fn xml_xpath_comp_parser_context(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
 ) -> XmlXPathParserContextPtr {
-    let ret: XmlXPathParserContextPtr =
-        xml_malloc(size_of::<XmlXPathParserContext>()) as XmlXPathParserContextPtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(ctxt, Some("creating evaluation context\n"));
-        return null_mut();
+    unsafe {
+        let ret: XmlXPathParserContextPtr =
+            xml_malloc(size_of::<XmlXPathParserContext>()) as XmlXPathParserContextPtr;
+        if ret.is_null() {
+            xml_xpath_err_memory(ctxt, Some("creating evaluation context\n"));
+            return null_mut();
+        }
+        std::ptr::write(&mut *ret, XmlXPathParserContext::default());
+
+        // Allocate the value stack
+        (*ret).value_tab.reserve(10);
+        (*ret).value = null_mut();
+        (*ret).context = ctxt;
+        (*ret).comp = comp;
+
+        ret
     }
-    std::ptr::write(&mut *ret, XmlXPathParserContext::default());
-
-    // Allocate the value stack
-    (*ret).value_tab.reserve(10);
-    (*ret).value = null_mut();
-    (*ret).context = ctxt;
-    (*ret).comp = comp;
-
-    ret
 }
 
 /// Evaluate the Precompiled XPath expression in the given context.
@@ -1418,47 +1445,49 @@ unsafe fn xml_xpath_compiled_eval_internal(
     res_obj_ptr: *mut XmlXPathObjectPtr,
     to_bool: i32,
 ) -> i32 {
-    let res_obj: XmlXPathObjectPtr;
+    unsafe {
+        let res_obj: XmlXPathObjectPtr;
 
-    CHECK_CTXT_NEG!(ctxt);
+        CHECK_CTXT_NEG!(ctxt);
 
-    if comp.is_null() {
-        return -1;
-    }
-    xml_init_parser();
-
-    let pctxt: XmlXPathParserContextPtr = xml_xpath_comp_parser_context(comp, ctxt);
-    if pctxt.is_null() {
-        return -1;
-    }
-    let res: i32 = xml_xpath_run_eval(pctxt, to_bool);
-
-    if (*pctxt).error != XmlXPathError::XPathExpressionOK as i32 {
-        res_obj = null_mut();
-    } else {
-        res_obj = value_pop(pctxt);
-        if res_obj.is_null() {
-            if to_bool == 0 {
-                generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
-            }
-        } else if !(*pctxt).value_tab.is_empty() {
-            generic_error!(
-                "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
-                (*pctxt).value_tab.len() as i32
-            );
+        if comp.is_null() {
+            return -1;
         }
+        xml_init_parser();
+
+        let pctxt: XmlXPathParserContextPtr = xml_xpath_comp_parser_context(comp, ctxt);
+        if pctxt.is_null() {
+            return -1;
+        }
+        let res: i32 = xml_xpath_run_eval(pctxt, to_bool);
+
+        if (*pctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+            res_obj = null_mut();
+        } else {
+            res_obj = value_pop(pctxt);
+            if res_obj.is_null() {
+                if to_bool == 0 {
+                    generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
+                }
+            } else if !(*pctxt).value_tab.is_empty() {
+                generic_error!(
+                    "xmlXPathCompiledEval: {} object(s) left on the stack.\n",
+                    (*pctxt).value_tab.len() as i32
+                );
+            }
+        }
+
+        if !res_obj_ptr.is_null() {
+            *res_obj_ptr = res_obj;
+        } else {
+            xml_xpath_release_object(ctxt, res_obj);
+        }
+
+        (*pctxt).comp = null_mut();
+        xml_xpath_free_parser_context(pctxt);
+
+        res
     }
-
-    if !res_obj_ptr.is_null() {
-        *res_obj_ptr = res_obj;
-    } else {
-        xml_xpath_release_object(ctxt, res_obj);
-    }
-
-    (*pctxt).comp = null_mut();
-    xml_xpath_free_parser_context(pctxt);
-
-    res
 }
 
 /// Evaluate the Precompiled XPath expression in the given context.
@@ -1471,10 +1500,12 @@ pub unsafe extern "C" fn xml_xpath_compiled_eval(
     comp: XmlXPathCompExprPtr,
     ctx: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
-    let mut res: XmlXPathObjectPtr = null_mut();
+    unsafe {
+        let mut res: XmlXPathObjectPtr = null_mut();
 
-    xml_xpath_compiled_eval_internal(comp, ctx, addr_of_mut!(res), 0);
-    res
+        xml_xpath_compiled_eval_internal(comp, ctx, addr_of_mut!(res), 0);
+        res
+    }
 }
 
 /// Applies the XPath boolean() function on the result of the given
@@ -1488,40 +1519,42 @@ pub unsafe fn xml_xpath_compiled_eval_to_boolean(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
 ) -> i32 {
-    xml_xpath_compiled_eval_internal(comp, ctxt, null_mut(), 1)
+    unsafe { xml_xpath_compiled_eval_internal(comp, ctxt, null_mut(), 1) }
 }
 
 /// Free up the memory allocated by @comp
 #[doc(alias = "xmlXPathFreeCompExpr")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
-    use std::ptr::drop_in_place;
+    unsafe {
+        use std::ptr::drop_in_place;
 
-    if comp.is_null() {
-        return;
-    }
-    for op in &(*comp).steps {
-        if !op.value4.is_null() {
-            if matches!(op.op, XmlXPathOp::XpathOpValue) {
-                xml_xpath_free_object(op.value4 as _);
-            } else {
-                xml_free(op.value4 as _);
+        if comp.is_null() {
+            return;
+        }
+        for op in &(*comp).steps {
+            if !op.value4.is_null() {
+                if matches!(op.op, XmlXPathOp::XpathOpValue) {
+                    xml_xpath_free_object(op.value4 as _);
+                } else {
+                    xml_free(op.value4 as _);
+                }
+            }
+            if !op.value5.is_null() {
+                xml_free(op.value5 as _);
             }
         }
-        if !op.value5.is_null() {
-            xml_free(op.value5 as _);
+        #[cfg(feature = "libxml_pattern")]
+        if !(*comp).stream.is_null() {
+            xml_free_pattern_list((*comp).stream);
         }
-    }
-    #[cfg(feature = "libxml_pattern")]
-    if !(*comp).stream.is_null() {
-        xml_free_pattern_list((*comp).stream);
-    }
-    if !(*comp).expr.is_null() {
-        xml_free((*comp).expr as _);
-    }
+        if !(*comp).expr.is_null() {
+            xml_free((*comp).expr as _);
+        }
 
-    drop_in_place(comp);
-    xml_free(comp as _);
+        drop_in_place(comp);
+        xml_free(comp as _);
+    }
 }
 
 /// Compare two nodes w.r.t document order.
@@ -1840,7 +1873,9 @@ unsafe fn xml_xpath_cmp_nodes_ext(
 #[cfg(any(feature = "xpath", feature = "schema"))]
 #[deprecated = "Alias for xmlInitParser"]
 pub unsafe fn xml_xpath_init() {
-    xml_init_parser();
+    unsafe {
+        xml_init_parser();
+    }
 }
 
 /// Returns 1 if the value is a NaN, 0 otherwise
@@ -1855,11 +1890,7 @@ pub fn xml_xpath_is_nan(val: f64) -> bool {
 #[cfg(any(feature = "xpath", feature = "schema"))]
 pub fn xml_xpath_is_inf(val: f64) -> i32 {
     if val.is_infinite() {
-        if val > 0.0 {
-            1
-        } else {
-            -1
-        }
+        if val > 0.0 { 1 } else { -1 }
     } else {
         0
     }

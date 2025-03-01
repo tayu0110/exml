@@ -30,7 +30,7 @@
 
 use std::cmp::Ordering;
 
-use super::chvalid::{xml_char_in_range, XmlChLRange, XmlChRangeGroup, XmlChSRange};
+use super::chvalid::{XmlChLRange, XmlChRangeGroup, XmlChSRange, xml_char_in_range};
 
 pub type XmlIntFunc = fn(i32) -> bool; /* just to keep one's mind untwisted */
 

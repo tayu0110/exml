@@ -43,15 +43,15 @@ use std::{
     borrow::Cow,
     collections::BTreeMap,
     fmt::Display,
-    str::{from_utf8, FromStr},
+    str::{FromStr, from_utf8},
     sync::{Mutex, RwLock},
 };
 
 use encoding_rs::{
+    Decoder, DecoderResult, EUC_JP, Encoder, EncoderResult, Encoding, ISO_2022_JP, ISO_8859_2,
+    ISO_8859_3, ISO_8859_4, ISO_8859_5, ISO_8859_6, ISO_8859_7, ISO_8859_8, ISO_8859_10,
+    ISO_8859_13, ISO_8859_14, ISO_8859_15, ISO_8859_16, SHIFT_JIS, WINDOWS_1254,
     mem::{convert_latin1_to_str, convert_utf8_to_latin1_lossy, str_latin1_up_to},
-    Decoder, DecoderResult, Encoder, EncoderResult, Encoding, EUC_JP, ISO_2022_JP, ISO_8859_10,
-    ISO_8859_13, ISO_8859_14, ISO_8859_15, ISO_8859_16, ISO_8859_2, ISO_8859_3, ISO_8859_4,
-    ISO_8859_5, ISO_8859_6, ISO_8859_7, ISO_8859_8, SHIFT_JIS, WINDOWS_1254,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

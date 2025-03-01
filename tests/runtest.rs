@@ -5,8 +5,8 @@
 use std::{
     cell::{Cell, RefCell},
     env::args,
-    ffi::{c_char, CStr, CString},
-    fs::{metadata, remove_file, File},
+    ffi::{CStr, CString, c_char},
+    fs::{File, metadata, remove_file},
     io::{self, BufRead, BufReader, Read, Write},
     os::raw::c_void,
     path::Path,
@@ -14,8 +14,8 @@ use std::{
     slice::from_raw_parts,
     str::from_utf8,
     sync::{
-        atomic::{AtomicPtr, AtomicUsize, Ordering},
         Condvar, Mutex, OnceLock,
+        atomic::{AtomicPtr, AtomicUsize, Ordering},
     },
 };
 
@@ -25,29 +25,30 @@ use exml::libxml::c14n::XmlC14NMode;
 #[cfg(feature = "schematron")]
 use exml::libxml::schematron::XmlSchematronPtr;
 use exml::{
+    SYSCONFDIR,
     error::{
-        parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel,
-        XmlParserErrors,
+        XmlError, XmlErrorDomain, XmlErrorLevel, XmlParserErrors,
+        parser_print_file_context_internal,
     },
     globals::{
-        reset_last_error, set_generic_error, set_pedantic_parser_default_value,
-        set_structured_error, GenericErrorContext,
+        GenericErrorContext, reset_last_error, set_generic_error,
+        set_pedantic_parser_default_value, set_structured_error,
     },
     io::{
-        pop_input_callbacks, register_input_callbacks, xml_no_net_external_entity_loader,
-        XmlInputCallback,
+        XmlInputCallback, pop_input_callbacks, register_input_callbacks,
+        xml_no_net_external_entity_loader,
     },
     libxml::{
         globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
         htmlparser::{
-            html_ctxt_read_file, html_free_parser_ctxt, html_new_sax_parser_ctxt, html_read_file,
-            HtmlParserCtxtPtr,
+            HtmlParserCtxtPtr, html_ctxt_read_file, html_free_parser_ctxt,
+            html_new_sax_parser_ctxt, html_read_file,
         },
         htmltree::html_doc_dump_memory,
         parser::{
-            xml_cleanup_parser, xml_ctxt_use_options, xml_init_parser, xml_parse_document,
-            xml_parse_file, xml_set_external_entity_loader, XmlParserOption, XmlSAXHandler,
-            XmlSAXLocatorPtr, XML_SAX2_MAGIC,
+            XML_SAX2_MAGIC, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, xml_cleanup_parser,
+            xml_ctxt_use_options, xml_init_parser, xml_parse_document, xml_parse_file,
+            xml_set_external_entity_loader,
         },
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
         relaxng::XmlRelaxNGPtr,
@@ -63,17 +64,16 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        xml_create_file_parser_ctxt, xml_free_parser_ctxt, xml_read_file, xml_read_memory,
-        XmlParserCtxtPtr, XmlParserInputPtr,
+        XmlParserCtxtPtr, XmlParserInputPtr, xml_create_file_parser_ctxt, xml_free_parser_ctxt,
+        xml_read_file, xml_read_memory,
     },
     relaxng::xml_relaxng_init_types,
     tree::{
-        xml_free_doc, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr,
+        XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr, xml_free_doc,
     },
-    uri::{build_uri, normalize_uri_path, XmlURI},
+    uri::{XmlURI, build_uri, normalize_uri_path},
     xpath::XmlXPathObjectPtr,
-    SYSCONFDIR,
 };
 #[cfg(feature = "catalog")]
 use libc::pthread_t;
@@ -113,17 +113,20 @@ unsafe fn test_external_entity_loader(
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
-    let ret: XmlParserInputPtr;
+    unsafe {
+        let ret: XmlParserInputPtr;
 
-    if check_test_file(url.unwrap()) {
-        ret = xml_no_net_external_entity_loader(url, id, ctxt);
-    } else {
-        let memused: i32 = xml_mem_used();
-        ret = xml_no_net_external_entity_loader(url, id, ctxt);
-        EXTRA_MEMORY_FROM_RESOLVER.set(EXTRA_MEMORY_FROM_RESOLVER.get() + xml_mem_used() - memused);
+        if check_test_file(url.unwrap()) {
+            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+        } else {
+            let memused: i32 = xml_mem_used();
+            ret = xml_no_net_external_entity_loader(url, id, ctxt);
+            EXTRA_MEMORY_FROM_RESOLVER
+                .set(EXTRA_MEMORY_FROM_RESOLVER.get() + xml_mem_used() - memused);
+        }
+
+        ret
     }
-
-    ret
 }
 
 // Trapping the error messages at the generic level to grab the equivalent of
@@ -308,19 +311,21 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 }
 
 unsafe fn initialize_libxml2() {
-    // This verifies that xmlInitParser doesn't allocate memory with xmlMalloc
-    set_xml_free(None);
-    set_xml_malloc(None);
-    set_xml_realloc(None);
-    set_xml_mem_strdup(None);
-    xml_init_parser();
-    xml_mem_setup(
-        Some(xml_mem_free),
-        Some(xml_mem_malloc),
-        Some(xml_mem_realloc),
-        Some(xml_memory_strdup),
-    );
-    xml_set_external_entity_loader(test_external_entity_loader);
+    unsafe {
+        // This verifies that xmlInitParser doesn't allocate memory with xmlMalloc
+        set_xml_free(None);
+        set_xml_malloc(None);
+        set_xml_realloc(None);
+        set_xml_mem_strdup(None);
+        xml_init_parser();
+        xml_mem_setup(
+            Some(xml_mem_free),
+            Some(xml_mem_malloc),
+            Some(xml_mem_realloc),
+            Some(xml_memory_strdup),
+        );
+        xml_set_external_entity_loader(test_external_entity_loader);
+    }
 }
 
 fn base_filename(filename: impl AsRef<Path>) -> String {
@@ -348,7 +353,7 @@ fn result_filename(filename: &str, out: Option<&str>, suffix: Option<&str>) -> S
 }
 
 fn check_test_file(filename: impl AsRef<Path>) -> bool {
-    metadata(filename.as_ref()).map_or(false, |meta| meta.is_file())
+    metadata(filename.as_ref()).is_ok_and(|meta| meta.is_file())
 }
 
 fn compare_files(
@@ -494,47 +499,51 @@ fn compare_file_mem(filename: impl AsRef<Path>, mem: &[u8]) -> i32 {
 }
 
 unsafe fn load_mem(filename: &str, mem: *mut *const c_char, size: *mut i32) -> i32 {
-    match metadata(filename) {
-        Ok(meta) => {
-            let base: *mut c_char = malloc(meta.len() as usize + 1) as _;
-            if base.is_null() {
-                return -1;
-            }
-            match File::open(filename) {
-                Ok(mut file) => {
-                    let mut siz = 0;
-                    while let Some(res) = file
-                        .read(std::slice::from_raw_parts_mut(
-                            base.add(siz) as _,
-                            meta.len() as usize - siz,
-                        ))
-                        .ok()
-                        .filter(|&res| res > 0)
-                    {
-                        siz += res;
+    unsafe {
+        match metadata(filename) {
+            Ok(meta) => {
+                let base: *mut c_char = malloc(meta.len() as usize + 1) as _;
+                if base.is_null() {
+                    return -1;
+                }
+                match File::open(filename) {
+                    Ok(mut file) => {
+                        let mut siz = 0;
+                        while let Some(res) = file
+                            .read(std::slice::from_raw_parts_mut(
+                                base.add(siz) as _,
+                                meta.len() as usize - siz,
+                            ))
+                            .ok()
+                            .filter(|&res| res > 0)
+                        {
+                            siz += res;
+                        }
+                        if siz != meta.len() as usize {
+                            free(base as _);
+                            return -1;
+                        }
+                        *base.add(siz) = 0;
+                        *mem = base;
+                        *size = siz as _;
+                        0
                     }
-                    if siz != meta.len() as usize {
+                    _ => {
                         free(base as _);
-                        return -1;
+                        -1
                     }
-                    *base.add(siz) = 0;
-                    *mem = base;
-                    *size = siz as _;
-                    0
-                }
-                _ => {
-                    free(base as _);
-                    -1
                 }
             }
+            _ => -1,
         }
-        _ => -1,
     }
 }
 
 unsafe extern "C" fn unload_mem(mem: *const c_char) -> i32 {
-    free(mem as _);
-    0
+    unsafe {
+        free(mem as _);
+        0
+    }
 }
 
 thread_local! {
@@ -1125,38 +1134,40 @@ unsafe fn htmlstart_element_debug(
     name: &str,
     atts: &[(String, Option<String>)],
 ) {
-    use exml::libxml::htmlparser::html_encode_entities;
+    unsafe {
+        use exml::libxml::htmlparser::html_encode_entities;
 
-    sax_debug!("SAX.startElement({name}");
-    for (key, value) in atts {
-        sax_debug!(", {key}");
-        if let Some(value) = value {
-            let value = CString::new(value.as_str()).unwrap();
-            let mut output: [u8; 40] = [0; 40];
-            let mut att = value.as_ptr() as *const u8;
-            let mut outlen: usize;
-            let mut attlen: usize;
-            sax_debug!("='");
-            while {
-                attlen = strlen(att as *mut c_char);
-                attlen > 0
-            } {
-                outlen = output.len() - 1;
-                html_encode_entities(
-                    output.as_mut_ptr(),
-                    addr_of_mut!(outlen) as _,
-                    att,
-                    addr_of_mut!(attlen) as _,
-                    b'\'' as _,
-                );
-                output[outlen] = 0;
-                sax_debug!("{}", CStr::from_ptr(output.as_ptr() as _).to_string_lossy());
-                att = att.add(attlen);
+        sax_debug!("SAX.startElement({name}");
+        for (key, value) in atts {
+            sax_debug!(", {key}");
+            if let Some(value) = value {
+                let value = CString::new(value.as_str()).unwrap();
+                let mut output: [u8; 40] = [0; 40];
+                let mut att = value.as_ptr() as *const u8;
+                let mut outlen: usize;
+                let mut attlen: usize;
+                sax_debug!("='");
+                while {
+                    attlen = strlen(att as *mut c_char);
+                    attlen > 0
+                } {
+                    outlen = output.len() - 1;
+                    html_encode_entities(
+                        output.as_mut_ptr(),
+                        addr_of_mut!(outlen) as _,
+                        att,
+                        addr_of_mut!(attlen) as _,
+                        b'\'' as _,
+                    );
+                    output[outlen] = 0;
+                    sax_debug!("{}", CStr::from_ptr(output.as_ptr() as _).to_string_lossy());
+                    att = att.add(attlen);
+                }
+                sax_debug!("'");
             }
-            sax_debug!("'");
         }
+        sax_debugln!(")");
     }
-    sax_debugln!(")");
 }
 
 /// receiving some chars from the parser.
@@ -1164,30 +1175,32 @@ unsafe fn htmlstart_element_debug(
 #[doc(alias = "htmlcharactersDebug")]
 #[cfg(feature = "html")]
 unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
-    use std::ffi::c_uchar;
+    unsafe {
+        use std::ffi::c_uchar;
 
-    use exml::libxml::htmlparser::html_encode_entities;
+        use exml::libxml::htmlparser::html_encode_entities;
 
-    let len = ch.len();
-    let mut output: [c_uchar; 40] = [0; 40];
-    let mut inlen: i32 = len as i32;
-    let mut outlen: usize = 30;
-    let ch = CString::new(ch).unwrap();
+        let len = ch.len();
+        let mut output: [c_uchar; 40] = [0; 40];
+        let mut inlen: i32 = len as i32;
+        let mut outlen: usize = 30;
+        let ch = CString::new(ch).unwrap();
 
-    html_encode_entities(
-        output.as_mut_ptr(),
-        addr_of_mut!(outlen) as _,
-        ch.as_ptr() as *const u8,
-        addr_of_mut!(inlen),
-        0,
-    );
-    output[outlen] = 0;
+        html_encode_entities(
+            output.as_mut_ptr(),
+            addr_of_mut!(outlen) as _,
+            ch.as_ptr() as *const u8,
+            addr_of_mut!(inlen),
+            0,
+        );
+        output[outlen] = 0;
 
-    sax_debugln!(
-        "SAX.characters({}, {})",
-        CStr::from_ptr(output.as_ptr() as _).to_string_lossy(),
-        len
-    );
+        sax_debugln!(
+            "SAX.characters({}, {})",
+            CStr::from_ptr(output.as_ptr() as _).to_string_lossy(),
+            len
+        );
+    }
 }
 
 /// receiving some cdata chars from the parser.
@@ -1195,30 +1208,32 @@ unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
 #[doc(alias = "htmlcdataDebug")]
 #[cfg(feature = "html")]
 unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
-    use std::ffi::c_uchar;
+    unsafe {
+        use std::ffi::c_uchar;
 
-    use exml::libxml::htmlparser::html_encode_entities;
+        use exml::libxml::htmlparser::html_encode_entities;
 
-    let len = ch.len();
-    let mut output: [c_uchar; 40] = [0; 40];
-    let mut inlen: i32 = len as i32;
-    let mut outlen: usize = 30;
-    let ch = CString::new(ch).unwrap();
+        let len = ch.len();
+        let mut output: [c_uchar; 40] = [0; 40];
+        let mut inlen: i32 = len as i32;
+        let mut outlen: usize = 30;
+        let ch = CString::new(ch).unwrap();
 
-    html_encode_entities(
-        output.as_mut_ptr(),
-        addr_of_mut!(outlen) as _,
-        ch.as_ptr() as *const u8,
-        addr_of_mut!(inlen),
-        0,
-    );
-    output[outlen] = 0;
+        html_encode_entities(
+            output.as_mut_ptr(),
+            addr_of_mut!(outlen) as _,
+            ch.as_ptr() as *const u8,
+            addr_of_mut!(inlen),
+            0,
+        );
+        output[outlen] = 0;
 
-    sax_debugln!(
-        "SAX.cdata({}, {})",
-        CStr::from_ptr(output.as_ptr() as _).to_string_lossy(),
-        len
-    );
+        sax_debugln!(
+            "SAX.cdata({}, {})",
+            CStr::from_ptr(output.as_ptr() as _).to_string_lossy(),
+            len
+        );
+    }
 }
 
 #[cfg(feature = "html")]
@@ -1396,85 +1411,35 @@ unsafe fn sax_parse_test(
     _err: Option<String>,
     mut options: i32,
 ) -> i32 {
-    let mut ret: i32;
+    unsafe {
+        let mut ret: i32;
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
-    let temp = result_filename(
-        filename,
-        TEMP_DIRECTORY.get().cloned().as_deref(),
-        Some(".res"),
-    );
-
-    let Ok(out) = File::options()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(temp.as_str())
-    else {
-        eprintln!("Failed to write to {temp}",);
-        return -1;
-    };
-    SAX_DEBUG.with_borrow_mut(|f| *f = Some(out));
-
-    // for SAX we really want the callbacks though the context handlers
-    set_structured_error(None, None);
-    set_generic_error(Some(test_error_handler), None);
-
-    #[cfg(feature = "html")]
-    if options & XML_PARSE_HTML != 0 {
-        let mut sax = XmlSAXHandler::default();
-        std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
-        let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(Some(Box::new(sax)), None);
-        html_ctxt_read_file(ctxt, filename, None, options);
-        html_free_parser_ctxt(ctxt);
-        ret = 0;
-    } else {
-        let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(Some(filename));
-        let mut sax = XmlSAXHandler::default();
-        std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
-        (*ctxt).sax = Some(Box::new(sax));
-        xml_ctxt_use_options(ctxt, options);
-        xml_parse_document(ctxt);
-        ret = if (*ctxt).well_formed != 0 {
-            0
-        } else {
-            (*ctxt).err_no
-        };
-        if let Some(my_doc) = (*ctxt).my_doc {
-            xml_free_doc(my_doc);
-        }
-        xml_free_parser_ctxt(ctxt);
-    }
-
-    #[cfg(not(feature = "html"))]
-    {
-        let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
-        memcpy(
-            (*ctxt).sax,
-            addr_of_mut!(EMPTY_SAXHANDLER_STRUCT),
-            sizeof(XmlSAXHandler),
+        NB_TESTS.set(NB_TESTS.get() + 1);
+        let temp = result_filename(
+            filename,
+            TEMP_DIRECTORY.get().cloned().as_deref(),
+            Some(".res"),
         );
-        xml_ctxt_use_options(ctxt, options);
-        xml_parse_document(ctxt);
-        ret = if (*ctxt).wellFormed { 0 } else { (*ctxt).errNo };
-        xml_free_doc((*ctxt).myDoc);
-        xml_free_parser_ctxt(ctxt);
-    }
 
-    if ret == XmlParserErrors::XmlWarUndeclaredEntity as i32 {
-        sax_debugln!("xmlSAXUserParseFile returned error {}", ret);
-        ret = 0;
-    }
-    'done: {
-        if ret != 0 {
-            eprintln!("Failed to parse {filename}",);
-            ret = 1;
-            break 'done;
-        }
+        let Ok(out) = File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(temp.as_str())
+        else {
+            eprintln!("Failed to write to {temp}",);
+            return -1;
+        };
+        SAX_DEBUG.with_borrow_mut(|f| *f = Some(out));
+
+        // for SAX we really want the callbacks though the context handlers
+        set_structured_error(None, None);
+        set_generic_error(Some(test_error_handler), None);
+
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
             let mut sax = XmlSAXHandler::default();
-            std::ptr::copy(&DEBUG_HTMLSAXHANDLER_STRUCT, &mut sax, 1);
+            std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
             let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(Some(Box::new(sax)), None);
             html_ctxt_read_file(ctxt, filename, None, options);
             html_free_parser_ctxt(ctxt);
@@ -1482,12 +1447,7 @@ unsafe fn sax_parse_test(
         } else {
             let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(Some(filename));
             let mut sax = XmlSAXHandler::default();
-            if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
-                std::ptr::copy(&DEBUG_SAXHANDLER_STRUCT, &mut sax, 1);
-                options -= XmlParserOption::XmlParseSAX1 as i32;
-            } else {
-                std::ptr::copy(&DEBUG_SAX2_HANDLER_STRUCT, &mut sax, 1);
-            }
+            std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
             (*ctxt).sax = Some(Box::new(sax));
             xml_ctxt_use_options(ctxt, options);
             xml_parse_document(ctxt);
@@ -1501,57 +1461,114 @@ unsafe fn sax_parse_test(
             }
             xml_free_parser_ctxt(ctxt);
         }
+
         #[cfg(not(feature = "html"))]
         {
             let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
-            if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
-                memcpy(
-                    (*ctxt).sax as _,
-                    addr_of_mut!(DEBUG_SAXHANDLER_STRUCT) as _,
-                    size_of::<XmlSAXHandler>(),
-                );
-                options -= XmlParserOption::XmlParseSAX1 as i32;
-            } else {
-                memcpy(
-                    (*ctxt).sax as _,
-                    addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT) as _,
-                    size_of::<XmlSAXHandler>(),
-                );
-            }
+            memcpy(
+                (*ctxt).sax,
+                addr_of_mut!(EMPTY_SAXHANDLER_STRUCT),
+                sizeof(XmlSAXHandler),
+            );
             xml_ctxt_use_options(ctxt, options);
             xml_parse_document(ctxt);
-            ret = if (*ctxt).well_formed != 0 {
-                0
-            } else {
-                (*ctxt).err_no
-            };
-            xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+            ret = if (*ctxt).wellFormed { 0 } else { (*ctxt).errNo };
+            xml_free_doc((*ctxt).myDoc);
             xml_free_parser_ctxt(ctxt);
         }
+
         if ret == XmlParserErrors::XmlWarUndeclaredEntity as i32 {
             sax_debugln!("xmlSAXUserParseFile returned error {}", ret);
             ret = 0;
         }
+        'done: {
+            if ret != 0 {
+                eprintln!("Failed to parse {filename}",);
+                ret = 1;
+                break 'done;
+            }
+            #[cfg(feature = "html")]
+            if options & XML_PARSE_HTML != 0 {
+                let mut sax = XmlSAXHandler::default();
+                std::ptr::copy(&DEBUG_HTMLSAXHANDLER_STRUCT, &mut sax, 1);
+                let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(Some(Box::new(sax)), None);
+                html_ctxt_read_file(ctxt, filename, None, options);
+                html_free_parser_ctxt(ctxt);
+                ret = 0;
+            } else {
+                let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(Some(filename));
+                let mut sax = XmlSAXHandler::default();
+                if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
+                    std::ptr::copy(&DEBUG_SAXHANDLER_STRUCT, &mut sax, 1);
+                    options -= XmlParserOption::XmlParseSAX1 as i32;
+                } else {
+                    std::ptr::copy(&DEBUG_SAX2_HANDLER_STRUCT, &mut sax, 1);
+                }
+                (*ctxt).sax = Some(Box::new(sax));
+                xml_ctxt_use_options(ctxt, options);
+                xml_parse_document(ctxt);
+                ret = if (*ctxt).well_formed != 0 {
+                    0
+                } else {
+                    (*ctxt).err_no
+                };
+                if let Some(my_doc) = (*ctxt).my_doc {
+                    xml_free_doc(my_doc);
+                }
+                xml_free_parser_ctxt(ctxt);
+            }
+            #[cfg(not(feature = "html"))]
+            {
+                let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
+                if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
+                    memcpy(
+                        (*ctxt).sax as _,
+                        addr_of_mut!(DEBUG_SAXHANDLER_STRUCT) as _,
+                        size_of::<XmlSAXHandler>(),
+                    );
+                    options -= XmlParserOption::XmlParseSAX1 as i32;
+                } else {
+                    memcpy(
+                        (*ctxt).sax as _,
+                        addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT) as _,
+                        size_of::<XmlSAXHandler>(),
+                    );
+                }
+                xml_ctxt_use_options(ctxt, options);
+                xml_parse_document(ctxt);
+                ret = if (*ctxt).well_formed != 0 {
+                    0
+                } else {
+                    (*ctxt).err_no
+                };
+                xml_free_doc(XmlDocPtr::from_raw((*ctxt).my_doc).unwrap().unwrap());
+                xml_free_parser_ctxt(ctxt);
+            }
+            if ret == XmlParserErrors::XmlWarUndeclaredEntity as i32 {
+                sax_debugln!("xmlSAXUserParseFile returned error {}", ret);
+                ret = 0;
+            }
 
-        if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0
-            && !sax_compare_file(temp.as_str(), result.unwrap())
-        {
-            eprintln!("Got a difference for {filename}",);
-            let mut content = String::new();
-            let mut temp = File::open(temp.as_str()).unwrap();
-            temp.read_to_string(&mut content).unwrap();
-            eprint!("{content}");
-            ret = 1;
+            if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0
+                && !sax_compare_file(temp.as_str(), result.unwrap())
+            {
+                eprintln!("Got a difference for {filename}",);
+                let mut content = String::new();
+                let mut temp = File::open(temp.as_str()).unwrap();
+                temp.read_to_string(&mut content).unwrap();
+                eprint!("{content}");
+                ret = 1;
+            }
         }
+
+        remove_file(temp).ok();
+
+        /* switch back to structured error handling */
+        set_generic_error(None, None);
+        set_structured_error(Some(test_structured_error_handler), None);
+
+        ret
     }
-
-    remove_file(temp).ok();
-
-    /* switch back to structured error handling */
-    set_generic_error(None, None);
-    set_structured_error(Some(test_structured_error_handler), None);
-
-    ret
 }
 
 /// Parse a file using the old xmlParseFile API, then serialize back
@@ -1565,46 +1582,48 @@ unsafe fn old_parse_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    let mut res: i32 = 0;
+    unsafe {
+        let mut res: i32 = 0;
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
-    // base of the test, parse with the old API
-    #[cfg(feature = "sax1")]
-    let Some(mut doc) = xml_parse_file(Some(filename)) else {
-        return 1;
-    };
-    #[cfg(not(feature = "sax1"))]
-    let Some(mut doc) = xml_read_file(filename, NULL, 0) else {
-        return 1;
-    };
-    let temp = result_filename(
-        filename,
-        TEMP_DIRECTORY.get().cloned().as_deref(),
-        Some(".res"),
-    );
-    (*doc).save_file(temp.as_str());
-    if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
-        res = 1;
+        NB_TESTS.set(NB_TESTS.get() + 1);
+        // base of the test, parse with the old API
+        #[cfg(feature = "sax1")]
+        let Some(mut doc) = xml_parse_file(Some(filename)) else {
+            return 1;
+        };
+        #[cfg(not(feature = "sax1"))]
+        let Some(mut doc) = xml_read_file(filename, NULL, 0) else {
+            return 1;
+        };
+        let temp = result_filename(
+            filename,
+            TEMP_DIRECTORY.get().cloned().as_deref(),
+            Some(".res"),
+        );
+        (*doc).save_file(temp.as_str());
+        if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
+            res = 1;
+        }
+        xml_free_doc(doc);
+
+        // Parse the saved result to make sure the round trip is okay
+        #[cfg(feature = "sax1")]
+        let Some(mut doc) = xml_parse_file(Some(&temp)) else {
+            return 1;
+        };
+        #[cfg(not(feature = "sax1"))]
+        let Some(mut doc) = xml_read_file(temp, null_mut(), 0) else {
+            return 1;
+        };
+        (*doc).save_file(temp.as_str());
+        if compare_files(temp.as_str(), result.unwrap()) != 0 {
+            res = 1;
+        }
+        xml_free_doc(doc);
+
+        remove_file(temp).ok();
+        res
     }
-    xml_free_doc(doc);
-
-    // Parse the saved result to make sure the round trip is okay
-    #[cfg(feature = "sax1")]
-    let Some(mut doc) = xml_parse_file(Some(&temp)) else {
-        return 1;
-    };
-    #[cfg(not(feature = "sax1"))]
-    let Some(mut doc) = xml_read_file(temp, null_mut(), 0) else {
-        return 1;
-    };
-    (*doc).save_file(temp.as_str());
-    if compare_files(temp.as_str(), result.unwrap()) != 0 {
-        res = 1;
-    }
-    xml_free_doc(doc);
-
-    remove_file(temp).ok();
-    res
 }
 
 /// Parse a file using the Push API, then serialize back
@@ -1619,142 +1638,145 @@ unsafe fn push_parse_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::{
-        encoding::XmlCharEncoding,
-        libxml::{
-            htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
-            parser::{xml_create_push_parser_ctxt, xml_parse_chunk},
-        },
-    };
+    unsafe {
+        use exml::{
+            encoding::XmlCharEncoding,
+            libxml::{
+                htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
+                parser::{xml_create_push_parser_ctxt, xml_parse_chunk},
+            },
+        };
 
-    let mut base: *const c_char = null();
-    let mut size: i32 = 0;
-    let mut res: i32;
-    let mut cur: i32 = 0;
-    let mut chunk_size: i32 = 4;
+        let mut base: *const c_char = null();
+        let mut size: i32 = 0;
+        let mut res: i32;
+        let mut cur: i32 = 0;
+        let mut chunk_size: i32 = 4;
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
+        NB_TESTS.set(NB_TESTS.get() + 1);
 
-    // load the document in memory and work from there.
-    if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
-        eprintln!("Failed to load {filename}",);
-        return -1;
-    }
-
-    if chunk_size > size {
-        chunk_size = size;
-    }
-
-    #[cfg(feature = "html")]
-    let ctxt = if options & XML_PARSE_HTML != 0 {
-        html_create_push_parser_ctxt(
-            None,
-            None,
-            base.add(cur as _),
-            chunk_size,
-            Some(filename),
-            XmlCharEncoding::None,
-        )
-    } else {
-        xml_create_push_parser_ctxt(None, None, base.add(cur as _), chunk_size, Some(filename))
-    };
-    #[cfg(not(feature = "html"))]
-    let ctxt = xml_create_push_parser_ctxt(None, None, base.add(cur as _), chunk_size, filename);
-    xml_ctxt_use_options(ctxt, options);
-    cur += chunk_size;
-    chunk_size = 1024;
-    'b: while {
-        if cur + chunk_size >= size {
-            #[cfg(feature = "html")]
-            if options & XML_PARSE_HTML != 0 {
-                html_parse_chunk(ctxt, base.add(cur as _), size - cur, 1);
-            } else {
-                xml_parse_chunk(ctxt, base.add(cur as _), size - cur, 1);
-            }
-            #[cfg(not(feature = "html"))]
-            {
-                xml_parse_chunk(ctxt, base.add(cur as _), size - cur, 1);
-            }
-            break 'b;
-        } else {
-            #[cfg(feature = "html")]
-            if options & XML_PARSE_HTML != 0 {
-                html_parse_chunk(ctxt, base.add(cur as _), chunk_size, 0);
-            } else {
-                xml_parse_chunk(ctxt, base.add(cur as _), chunk_size, 0);
-            }
-            #[cfg(not(feature = "html"))]
-            {
-                xml_parse_chunk(ctxt, base.add(cur as _), chunk_size, 0);
-            }
-            cur += chunk_size;
-        }
-        cur < size
-    } {}
-    let doc = (*ctxt).my_doc;
-    #[cfg(feature = "html")]
-    if options & XML_PARSE_HTML != 0 {
-        res = 1;
-    } else {
-        res = (*ctxt).well_formed;
-    }
-    #[cfg(not(feature = "html"))]
-    {
-        res = (*ctxt).wellFormed;
-    }
-    xml_free_parser_ctxt(ctxt);
-    free(base as _);
-    if res == 0 {
-        if let Some(doc) = doc {
-            xml_free_doc(doc);
-        }
-        eprintln!("Failed to parse {filename}",);
-        return -1;
-    }
-    #[cfg(feature = "html")]
-    if options & XML_PARSE_HTML != 0 {
-        html_doc_dump_memory(
-            doc.unwrap(),
-            addr_of_mut!(base) as *mut *mut XmlChar,
-            addr_of_mut!(size),
-        );
-    } else {
-        doc.unwrap()
-            .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
-    }
-    #[cfg(not(feature = "html"))]
-    {
-        xml_doc_dump_memory(
-            doc,
-            addr_of_mut!(base) as *mut *mut XmlChar,
-            addr_of_mut!(size),
-        );
-    }
-    xml_free_doc(doc.unwrap());
-    res = compare_file_mem(
-        result.as_deref().unwrap(),
-        from_raw_parts(base as _, size as usize),
-    );
-    if base.is_null() || res != 0 {
-        if !base.is_null() {
-            xml_free(base as _);
-        }
-        eprintln!("Result for {filename} failed in {}", result.unwrap());
-        return -1;
-    }
-    xml_free(base as _);
-    if let Some(err) = err {
-        let mut emsg = vec![];
-        TEST_ERRORS.with_borrow(|errors| {
-            emsg.extend_from_slice(&errors[..TEST_ERRORS_SIZE.get()]);
-        });
-        res = compare_file_mem(err, &emsg);
-        if res != 0 {
-            eprintln!("Error for {filename} failed",);
+        // load the document in memory and work from there.
+        if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
+            eprintln!("Failed to load {filename}",);
             return -1;
         }
+
+        if chunk_size > size {
+            chunk_size = size;
+        }
+
+        #[cfg(feature = "html")]
+        let ctxt = if options & XML_PARSE_HTML != 0 {
+            html_create_push_parser_ctxt(
+                None,
+                None,
+                base.add(cur as _),
+                chunk_size,
+                Some(filename),
+                XmlCharEncoding::None,
+            )
+        } else {
+            xml_create_push_parser_ctxt(None, None, base.add(cur as _), chunk_size, Some(filename))
+        };
+        #[cfg(not(feature = "html"))]
+        let ctxt =
+            xml_create_push_parser_ctxt(None, None, base.add(cur as _), chunk_size, filename);
+        xml_ctxt_use_options(ctxt, options);
+        cur += chunk_size;
+        chunk_size = 1024;
+        'b: while {
+            if cur + chunk_size >= size {
+                #[cfg(feature = "html")]
+                if options & XML_PARSE_HTML != 0 {
+                    html_parse_chunk(ctxt, base.add(cur as _), size - cur, 1);
+                } else {
+                    xml_parse_chunk(ctxt, base.add(cur as _), size - cur, 1);
+                }
+                #[cfg(not(feature = "html"))]
+                {
+                    xml_parse_chunk(ctxt, base.add(cur as _), size - cur, 1);
+                }
+                break 'b;
+            } else {
+                #[cfg(feature = "html")]
+                if options & XML_PARSE_HTML != 0 {
+                    html_parse_chunk(ctxt, base.add(cur as _), chunk_size, 0);
+                } else {
+                    xml_parse_chunk(ctxt, base.add(cur as _), chunk_size, 0);
+                }
+                #[cfg(not(feature = "html"))]
+                {
+                    xml_parse_chunk(ctxt, base.add(cur as _), chunk_size, 0);
+                }
+                cur += chunk_size;
+            }
+            cur < size
+        } {}
+        let doc = (*ctxt).my_doc;
+        #[cfg(feature = "html")]
+        if options & XML_PARSE_HTML != 0 {
+            res = 1;
+        } else {
+            res = (*ctxt).well_formed;
+        }
+        #[cfg(not(feature = "html"))]
+        {
+            res = (*ctxt).wellFormed;
+        }
+        xml_free_parser_ctxt(ctxt);
+        free(base as _);
+        if res == 0 {
+            if let Some(doc) = doc {
+                xml_free_doc(doc);
+            }
+            eprintln!("Failed to parse {filename}",);
+            return -1;
+        }
+        #[cfg(feature = "html")]
+        if options & XML_PARSE_HTML != 0 {
+            html_doc_dump_memory(
+                doc.unwrap(),
+                addr_of_mut!(base) as *mut *mut XmlChar,
+                addr_of_mut!(size),
+            );
+        } else {
+            doc.unwrap()
+                .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+        }
+        #[cfg(not(feature = "html"))]
+        {
+            xml_doc_dump_memory(
+                doc,
+                addr_of_mut!(base) as *mut *mut XmlChar,
+                addr_of_mut!(size),
+            );
+        }
+        xml_free_doc(doc.unwrap());
+        res = compare_file_mem(
+            result.as_deref().unwrap(),
+            from_raw_parts(base as _, size as usize),
+        );
+        if base.is_null() || res != 0 {
+            if !base.is_null() {
+                xml_free(base as _);
+            }
+            eprintln!("Result for {filename} failed in {}", result.unwrap());
+            return -1;
+        }
+        xml_free(base as _);
+        if let Some(err) = err {
+            let mut emsg = vec![];
+            TEST_ERRORS.with_borrow(|errors| {
+                emsg.extend_from_slice(&errors[..TEST_ERRORS_SIZE.get()]);
+            });
+            res = compare_file_mem(err, &emsg);
+            if res != 0 {
+                eprintln!("Error for {filename} failed",);
+                return -1;
+            }
+        }
+        0
     }
-    0
 }
 
 thread_local! {
@@ -1775,36 +1797,44 @@ unsafe fn internal_subset_bnd(
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) {
-    use exml::libxml::sax2::xml_sax2_internal_subset;
+    unsafe {
+        use exml::libxml::sax2::xml_sax2_internal_subset;
 
-    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-    xml_sax2_internal_subset(ctx, name, external_id, system_id);
+        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+        xml_sax2_internal_subset(ctx, name, external_id, system_id);
+    }
 }
 
 #[cfg(feature = "libxml_push")]
 unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: &str) {
-    use exml::libxml::sax2::xml_sax2_reference;
+    unsafe {
+        use exml::libxml::sax2::xml_sax2_reference;
 
-    PUSH_BOUNDARY_REF_COUNT.set(PUSH_BOUNDARY_REF_COUNT.get() + 1);
-    xml_sax2_reference(ctx, name);
+        PUSH_BOUNDARY_REF_COUNT.set(PUSH_BOUNDARY_REF_COUNT.get() + 1);
+        xml_sax2_reference(ctx, name);
+    }
 }
 
 #[cfg(feature = "libxml_push")]
 unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
-    use exml::libxml::sax2::xml_sax2_characters;
+    unsafe {
+        use exml::libxml::sax2::xml_sax2_characters;
 
-    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-    PUSH_BOUNDARY_CHARS_COUNT.set(PUSH_BOUNDARY_CHARS_COUNT.get() + 1);
-    xml_sax2_characters(ctx, ch);
+        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+        PUSH_BOUNDARY_CHARS_COUNT.set(PUSH_BOUNDARY_CHARS_COUNT.get() + 1);
+        xml_sax2_characters(ctx, ch);
+    }
 }
 
 #[cfg(feature = "libxml_push")]
 unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
-    use exml::libxml::sax2::xml_sax2_cdata_block;
+    unsafe {
+        use exml::libxml::sax2::xml_sax2_cdata_block;
 
-    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-    PUSH_BOUNDARY_CDATA_COUNT.set(PUSH_BOUNDARY_CDATA_COUNT.get() + 1);
-    xml_sax2_cdata_block(ctx, ch);
+        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+        PUSH_BOUNDARY_CDATA_COUNT.set(PUSH_BOUNDARY_CDATA_COUNT.get() + 1);
+        xml_sax2_cdata_block(ctx, ch);
+    }
 }
 
 #[cfg(feature = "libxml_push")]
@@ -1813,25 +1843,29 @@ unsafe fn processing_instruction_bnd(
     target: &str,
     data: Option<&str>,
 ) {
-    use exml::libxml::sax2::xml_sax2_processing_instruction;
+    unsafe {
+        use exml::libxml::sax2::xml_sax2_processing_instruction;
 
-    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-    xml_sax2_processing_instruction(ctx, target, data);
+        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+        xml_sax2_processing_instruction(ctx, target, data);
+    }
 }
 
 #[cfg(feature = "libxml_push")]
 unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: &str) {
-    use exml::libxml::sax2::xml_sax2_comment;
+    unsafe {
+        use exml::libxml::sax2::xml_sax2_comment;
 
-    let ctxt = {
-        let ctx = ctx.as_ref().unwrap();
-        let lock = ctx.lock();
-        *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
-    };
-    if (*ctxt).in_subset == 0 {
-        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+        let ctxt = {
+            let ctx = ctx.as_ref().unwrap();
+            let lock = ctx.lock();
+            *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
+        };
+        if (*ctxt).in_subset == 0 {
+            PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+        }
+        xml_sax2_comment(ctx, value);
     }
-    xml_sax2_comment(ctx, value);
 }
 
 #[cfg(feature = "libxml_push")]
@@ -1840,21 +1874,25 @@ unsafe fn start_element_bnd(
     xname: &str,
     atts: &[(String, Option<String>)],
 ) {
-    use exml::libxml::sax2::xml_sax2_start_element;
+    unsafe {
+        use exml::libxml::sax2::xml_sax2_start_element;
 
-    // Some elements might be created automatically.
-    if xname != "html" && xname != "body" && xname != "head" && xname != "p" {
-        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+        // Some elements might be created automatically.
+        if xname != "html" && xname != "body" && xname != "head" && xname != "p" {
+            PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+        }
+        xml_sax2_start_element(ctx, xname, atts);
     }
-    xml_sax2_start_element(ctx, xname, atts);
 }
 
 #[cfg(feature = "libxml_push")]
 unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: &str) {
-    /*pushBoundaryCount++;*/
+    unsafe {
+        /*pushBoundaryCount++;*/
 
-    use exml::libxml::sax2::xml_sax2_end_element;
-    xml_sax2_end_element(ctx, name);
+        use exml::libxml::sax2::xml_sax2_end_element;
+        xml_sax2_end_element(ctx, name);
+    }
 }
 
 #[cfg(feature = "libxml_push")]
@@ -1869,18 +1907,20 @@ unsafe fn start_element_ns_bnd(
     nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
-    use exml::libxml::sax2::xml_sax2_start_element_ns;
+    unsafe {
+        use exml::libxml::sax2::xml_sax2_start_element_ns;
 
-    PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
-    xml_sax2_start_element_ns(
-        ctx,
-        localname,
-        prefix,
-        uri,
-        namespaces,
-        nb_defaulted,
-        attributes,
-    );
+        PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
+        xml_sax2_start_element_ns(
+            ctx,
+            localname,
+            prefix,
+            uri,
+            namespaces,
+            nb_defaulted,
+            attributes,
+        );
+    }
 }
 
 #[cfg(feature = "libxml_push")]
@@ -1890,8 +1930,10 @@ unsafe fn end_element_ns_bnd(
     prefix: Option<&str>,
     uri: Option<&str>,
 ) {
-    use exml::libxml::sax2::xml_sax2_end_element_ns;
-    xml_sax2_end_element_ns(ctx, localname, prefix, uri);
+    unsafe {
+        use exml::libxml::sax2::xml_sax2_end_element_ns;
+        xml_sax2_end_element_ns(ctx, localname, prefix, uri);
+    }
 }
 
 /// Test whether the push parser detects boundaries between syntactical
@@ -1906,259 +1948,263 @@ unsafe fn push_boundary_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::{
-        encoding::XmlCharEncoding,
-        libxml::{
-            htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
-            htmltree::html_doc_dump_memory,
-            parser::{
-                xml_create_push_parser_ctxt, xml_parse_chunk, XmlParserInputState, XmlSAXHandler,
+    unsafe {
+        use exml::{
+            encoding::XmlCharEncoding,
+            libxml::{
+                htmlparser::{html_create_push_parser_ctxt, html_parse_chunk},
+                htmltree::html_doc_dump_memory,
+                parser::{
+                    XmlParserInputState, XmlSAXHandler, xml_create_push_parser_ctxt,
+                    xml_parse_chunk,
+                },
+                sax2::{xml_sax_version, xml_sax2_init_html_default_sax_handler},
             },
-            sax2::{xml_sax2_init_html_default_sax_handler, xml_sax_version},
-        },
-    };
+        };
 
-    let mut bnd_sax = XmlSAXHandler::default();
-    let mut base: *const c_char = null();
-    let mut size: i32 = 0;
-    let mut res: i32;
-    let mut num_callbacks: i32;
-    let mut cur: i32;
-    let mut avail: u64;
-    let mut old_consumed: u64 = 0;
-    let mut consumed: u64;
+        let mut bnd_sax = XmlSAXHandler::default();
+        let mut base: *const c_char = null();
+        let mut size: i32 = 0;
+        let mut res: i32;
+        let mut num_callbacks: i32;
+        let mut cur: i32;
+        let mut avail: u64;
+        let mut old_consumed: u64 = 0;
+        let mut consumed: u64;
 
-    // If the parser made progress, check that exactly one construct was
-    // processed and that the input buffer is (almost) empty.
-    // Since we use a chunk size of 1, this tests whether content is
-    // processed as early as possible.
+        // If the parser made progress, check that exactly one construct was
+        // processed and that the input buffer is (almost) empty.
+        // Since we use a chunk size of 1, this tests whether content is
+        // processed as early as possible.
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
-
-    #[cfg(feature = "html")]
-    if options & XML_PARSE_HTML != 0 {
-        xml_sax2_init_html_default_sax_handler(&mut bnd_sax);
-        bnd_sax.start_element = Some(start_element_bnd);
-        bnd_sax.end_element = Some(end_element_bnd);
-    } else {
-        xml_sax_version(&mut bnd_sax, 2);
-        bnd_sax.start_element_ns = Some(start_element_ns_bnd);
-        bnd_sax.end_element_ns = Some(end_element_ns_bnd);
-    }
-    #[cfg(not(feature = "html"))]
-    {
-        xml_sax_version(addr_of_mut!(bndSAX) as _, 2);
-        bndSAX.startElementNs = Some(start_element_ns_bnd);
-        bndSAX.endElementNs = Some(end_element_ns_bnd);
-    }
-
-    bnd_sax.internal_subset = Some(internal_subset_bnd);
-    bnd_sax.reference = Some(reference_bnd);
-    bnd_sax.characters = Some(characters_bnd);
-    bnd_sax.cdata_block = Some(cdata_block_bnd);
-    bnd_sax.processing_instruction = Some(processing_instruction_bnd);
-    bnd_sax.comment = Some(comment_bnd);
-
-    // load the document in memory and work from there.
-    if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
-        eprintln!("Failed to load {filename}",);
-        return -1;
-    }
-
-    #[cfg(feature = "html")]
-    let ctxt = if options & XML_PARSE_HTML != 0 {
-        html_create_push_parser_ctxt(
-            Some(Box::new(bnd_sax)),
-            None,
-            base,
-            1,
-            Some(filename),
-            XmlCharEncoding::None,
-        )
-    } else {
-        xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), None, base, 1, Some(filename))
-    };
-    #[cfg(not(feature = "html"))]
-    let ctxt = xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), null_mut(), base, 1, filename);
-    xml_ctxt_use_options(ctxt, options);
-    cur = 1;
-    consumed = 0;
-    num_callbacks = 0;
-    avail = 0;
-    while cur < size && num_callbacks <= 1 && avail == 0 {
-        let terminate = (cur + 1 >= size) as i32;
-        let mut is_text: i32 = 0;
-
-        if (*ctxt).instate == XmlParserInputState::XmlParserContent {
-            let first_char: i32 = if (*(*ctxt).input).end > (*(*ctxt).input).cur {
-                *(*(*ctxt).input).cur as i32
-            } else {
-                *base.add(cur as usize) as i32
-            };
-
-            if first_char != b'<' as i32
-                && (options & XML_PARSE_HTML != 0 || first_char != b'&' as i32)
-            {
-                is_text = 1;
-            }
-        }
-
-        old_consumed = (*(*ctxt).input).consumed
-            + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as u64;
-
-        PUSH_BOUNDARY_COUNT.set(0);
-        PUSH_BOUNDARY_REF_COUNT.set(0);
-        PUSH_BOUNDARY_CHARS_COUNT.set(0);
-        PUSH_BOUNDARY_CDATA_COUNT.set(0);
+        NB_TESTS.set(NB_TESTS.get() + 1);
 
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
-            html_parse_chunk(ctxt, base.add(cur as _), 1, terminate);
+            xml_sax2_init_html_default_sax_handler(&mut bnd_sax);
+            bnd_sax.start_element = Some(start_element_bnd);
+            bnd_sax.end_element = Some(end_element_bnd);
         } else {
-            xml_parse_chunk(ctxt, base.add(cur as _), 1, terminate);
+            xml_sax_version(&mut bnd_sax, 2);
+            bnd_sax.start_element_ns = Some(start_element_ns_bnd);
+            bnd_sax.end_element_ns = Some(end_element_ns_bnd);
         }
         #[cfg(not(feature = "html"))]
         {
-            xml_parse_chunk(ctxt, base.add(cur as _), 1, terminate);
-        }
-        cur += 1;
-
-        // Callback check: Check that only a single construct was parsed.
-        if PUSH_BOUNDARY_REF_COUNT.get() > 0 {
-            num_callbacks = 1;
-        } else {
-            num_callbacks = PUSH_BOUNDARY_COUNT.get();
-            if PUSH_BOUNDARY_CHARS_COUNT.get() > 1 {
-                if options & XML_PARSE_HTML != 0 {
-                    // The HTML parser can generate a mix of chars and references.
-                    num_callbacks -= PUSH_BOUNDARY_CHARS_COUNT.get() - 1;
-                } else {
-                    // Allow two chars callbacks. This can happen when
-                    // multi-byte chars are split across buffer boundaries.
-                    num_callbacks -= 1;
-                }
-            }
-            if options & XML_PARSE_HTML != 0 {
-                // Allow multiple cdata callbacks in HTML mode.
-                if PUSH_BOUNDARY_CDATA_COUNT.get() > 1 {
-                    num_callbacks -= PUSH_BOUNDARY_CDATA_COUNT.get() - 1;
-                }
-            }
+            xml_sax_version(addr_of_mut!(bndSAX) as _, 2);
+            bndSAX.startElementNs = Some(start_element_ns_bnd);
+            bndSAX.endElementNs = Some(end_element_ns_bnd);
         }
 
-        // Buffer check: If input was consumed, check that the input
-        // buffer is (almost) empty.
-        consumed = (*(*ctxt).input).consumed
-            + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as u64;
-        if (*ctxt).instate != XmlParserInputState::XmlParserDTD
-            && consumed >= 4
-            && consumed != old_consumed
-        {
-            let mut max: size_t = 0;
+        bnd_sax.internal_subset = Some(internal_subset_bnd);
+        bnd_sax.reference = Some(reference_bnd);
+        bnd_sax.characters = Some(characters_bnd);
+        bnd_sax.cdata_block = Some(cdata_block_bnd);
+        bnd_sax.processing_instruction = Some(processing_instruction_bnd);
+        bnd_sax.comment = Some(comment_bnd);
 
-            avail = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
-
-            if options & XML_PARSE_HTML != 0
-                && ((*ctxt).instate == XmlParserInputState::XmlParserEndTag)
-            {
-                // Something related to script parsing.
-                max = 3;
-            } else if is_text != 0 {
-                let c: i32 = *(*(*ctxt).input).cur as i32;
-
-                // 3 bytes for partial UTF-8
-                max = if c == b'<' as i32 || c == b'&' as i32 {
-                    1
-                } else {
-                    3
-                };
-            } else if (*ctxt).instate == XmlParserInputState::XmlParserCDATASection {
-                // 2 bytes for terminator, 3 bytes for UTF-8
-                max = 5;
-            }
-
-            if avail <= max as _ {
-                avail = 0;
-            }
-        }
-    }
-    let doc = (*ctxt).my_doc;
-    #[cfg(feature = "html")]
-    if options & XML_PARSE_HTML != 0 {
-        res = 1;
-    } else {
-        res = (*ctxt).well_formed;
-    }
-    #[cfg(not(feature = "html"))]
-    {
-        res = (*ctxt).wellFormed;
-    }
-    xml_free_parser_ctxt(ctxt);
-    free(base as _);
-    if num_callbacks > 1 {
-        if let Some(doc) = doc {
-            xml_free_doc(doc);
-        }
-        eprintln!(
-            "Failed push boundary callback test ({}@{}-{}): {filename}",
-            num_callbacks, old_consumed, consumed,
-        );
-        return -1;
-    }
-    if avail > 0 {
-        xml_free_doc(doc.unwrap());
-        eprintln!(
-            "Failed push boundary buffer test ({}@{}): {filename}",
-            avail, consumed,
-        );
-        return -1;
-    }
-    if res == 0 {
-        xml_free_doc(doc.unwrap());
-        eprintln!("Failed to parse {filename}",);
-        return -1;
-    }
-    #[cfg(feature = "html")]
-    if options & XML_PARSE_HTML != 0 {
-        html_doc_dump_memory(
-            doc.unwrap(),
-            addr_of_mut!(base) as *mut *mut XmlChar,
-            addr_of_mut!(size),
-        );
-    } else {
-        doc.unwrap()
-            .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
-    }
-    #[cfg(not(feature = "html"))]
-    {
-        xml_doc_dump_memory(
-            doc,
-            addr_of_mut!(base) as *mut *mut XmlChar,
-            addr_of_mut!(size),
-        );
-    }
-    xml_free_doc(doc.unwrap());
-    res = compare_file_mem(
-        result.as_deref().unwrap(),
-        from_raw_parts(base as _, size as usize),
-    );
-    if base.is_null() || res != 0 {
-        if !base.is_null() {
-            xml_free(base as _);
-        }
-        eprintln!("Result for {filename} failed in {}", result.unwrap());
-        return -1;
-    }
-    xml_free(base as _);
-    if let Some(err) = err {
-        res = TEST_ERRORS
-            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
-        if res != 0 {
-            eprintln!("Error for {filename} failed",);
+        // load the document in memory and work from there.
+        if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
+            eprintln!("Failed to load {filename}",);
             return -1;
         }
+
+        #[cfg(feature = "html")]
+        let ctxt = if options & XML_PARSE_HTML != 0 {
+            html_create_push_parser_ctxt(
+                Some(Box::new(bnd_sax)),
+                None,
+                base,
+                1,
+                Some(filename),
+                XmlCharEncoding::None,
+            )
+        } else {
+            xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), None, base, 1, Some(filename))
+        };
+        #[cfg(not(feature = "html"))]
+        let ctxt =
+            xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), null_mut(), base, 1, filename);
+        xml_ctxt_use_options(ctxt, options);
+        cur = 1;
+        consumed = 0;
+        num_callbacks = 0;
+        avail = 0;
+        while cur < size && num_callbacks <= 1 && avail == 0 {
+            let terminate = (cur + 1 >= size) as i32;
+            let mut is_text: i32 = 0;
+
+            if (*ctxt).instate == XmlParserInputState::XmlParserContent {
+                let first_char: i32 = if (*(*ctxt).input).end > (*(*ctxt).input).cur {
+                    *(*(*ctxt).input).cur as i32
+                } else {
+                    *base.add(cur as usize) as i32
+                };
+
+                if first_char != b'<' as i32
+                    && (options & XML_PARSE_HTML != 0 || first_char != b'&' as i32)
+                {
+                    is_text = 1;
+                }
+            }
+
+            old_consumed = (*(*ctxt).input).consumed
+                + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as u64;
+
+            PUSH_BOUNDARY_COUNT.set(0);
+            PUSH_BOUNDARY_REF_COUNT.set(0);
+            PUSH_BOUNDARY_CHARS_COUNT.set(0);
+            PUSH_BOUNDARY_CDATA_COUNT.set(0);
+
+            #[cfg(feature = "html")]
+            if options & XML_PARSE_HTML != 0 {
+                html_parse_chunk(ctxt, base.add(cur as _), 1, terminate);
+            } else {
+                xml_parse_chunk(ctxt, base.add(cur as _), 1, terminate);
+            }
+            #[cfg(not(feature = "html"))]
+            {
+                xml_parse_chunk(ctxt, base.add(cur as _), 1, terminate);
+            }
+            cur += 1;
+
+            // Callback check: Check that only a single construct was parsed.
+            if PUSH_BOUNDARY_REF_COUNT.get() > 0 {
+                num_callbacks = 1;
+            } else {
+                num_callbacks = PUSH_BOUNDARY_COUNT.get();
+                if PUSH_BOUNDARY_CHARS_COUNT.get() > 1 {
+                    if options & XML_PARSE_HTML != 0 {
+                        // The HTML parser can generate a mix of chars and references.
+                        num_callbacks -= PUSH_BOUNDARY_CHARS_COUNT.get() - 1;
+                    } else {
+                        // Allow two chars callbacks. This can happen when
+                        // multi-byte chars are split across buffer boundaries.
+                        num_callbacks -= 1;
+                    }
+                }
+                if options & XML_PARSE_HTML != 0 {
+                    // Allow multiple cdata callbacks in HTML mode.
+                    if PUSH_BOUNDARY_CDATA_COUNT.get() > 1 {
+                        num_callbacks -= PUSH_BOUNDARY_CDATA_COUNT.get() - 1;
+                    }
+                }
+            }
+
+            // Buffer check: If input was consumed, check that the input
+            // buffer is (almost) empty.
+            consumed = (*(*ctxt).input).consumed
+                + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as u64;
+            if (*ctxt).instate != XmlParserInputState::XmlParserDTD
+                && consumed >= 4
+                && consumed != old_consumed
+            {
+                let mut max: size_t = 0;
+
+                avail = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
+
+                if options & XML_PARSE_HTML != 0
+                    && ((*ctxt).instate == XmlParserInputState::XmlParserEndTag)
+                {
+                    // Something related to script parsing.
+                    max = 3;
+                } else if is_text != 0 {
+                    let c: i32 = *(*(*ctxt).input).cur as i32;
+
+                    // 3 bytes for partial UTF-8
+                    max = if c == b'<' as i32 || c == b'&' as i32 {
+                        1
+                    } else {
+                        3
+                    };
+                } else if (*ctxt).instate == XmlParserInputState::XmlParserCDATASection {
+                    // 2 bytes for terminator, 3 bytes for UTF-8
+                    max = 5;
+                }
+
+                if avail <= max as _ {
+                    avail = 0;
+                }
+            }
+        }
+        let doc = (*ctxt).my_doc;
+        #[cfg(feature = "html")]
+        if options & XML_PARSE_HTML != 0 {
+            res = 1;
+        } else {
+            res = (*ctxt).well_formed;
+        }
+        #[cfg(not(feature = "html"))]
+        {
+            res = (*ctxt).wellFormed;
+        }
+        xml_free_parser_ctxt(ctxt);
+        free(base as _);
+        if num_callbacks > 1 {
+            if let Some(doc) = doc {
+                xml_free_doc(doc);
+            }
+            eprintln!(
+                "Failed push boundary callback test ({}@{}-{}): {filename}",
+                num_callbacks, old_consumed, consumed,
+            );
+            return -1;
+        }
+        if avail > 0 {
+            xml_free_doc(doc.unwrap());
+            eprintln!(
+                "Failed push boundary buffer test ({}@{}): {filename}",
+                avail, consumed,
+            );
+            return -1;
+        }
+        if res == 0 {
+            xml_free_doc(doc.unwrap());
+            eprintln!("Failed to parse {filename}",);
+            return -1;
+        }
+        #[cfg(feature = "html")]
+        if options & XML_PARSE_HTML != 0 {
+            html_doc_dump_memory(
+                doc.unwrap(),
+                addr_of_mut!(base) as *mut *mut XmlChar,
+                addr_of_mut!(size),
+            );
+        } else {
+            doc.unwrap()
+                .dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+        }
+        #[cfg(not(feature = "html"))]
+        {
+            xml_doc_dump_memory(
+                doc,
+                addr_of_mut!(base) as *mut *mut XmlChar,
+                addr_of_mut!(size),
+            );
+        }
+        xml_free_doc(doc.unwrap());
+        res = compare_file_mem(
+            result.as_deref().unwrap(),
+            from_raw_parts(base as _, size as usize),
+        );
+        if base.is_null() || res != 0 {
+            if !base.is_null() {
+                xml_free(base as _);
+            }
+            eprintln!("Result for {filename} failed in {}", result.unwrap());
+            return -1;
+        }
+        xml_free(base as _);
+        if let Some(err) = err {
+            res = TEST_ERRORS
+                .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
+            if res != 0 {
+                eprintln!("Error for {filename} failed",);
+                return -1;
+            }
+        }
+        0
     }
-    0
 }
 
 /// Parse a file using the old xmlReadMemory API, then serialize back
@@ -2173,37 +2219,39 @@ unsafe fn mem_parse_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    let mut base: *const c_char = null();
-    let mut size: i32 = 0;
+    unsafe {
+        let mut base: *const c_char = null();
+        let mut size: i32 = 0;
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
-    // load and parse the memory
-    if load_mem(filename, &raw mut base, &raw mut size) != 0 {
-        eprintln!("Failed to load {filename}",);
-        return -1;
-    }
-
-    let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
-    let doc = xml_read_memory(buffer, Some(filename), None, 0);
-    unload_mem(base);
-    let Some(mut doc) = doc else {
-        return 1;
-    };
-    doc.dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
-    xml_free_doc(doc);
-    let res: i32 = compare_file_mem(
-        result.as_deref().unwrap(),
-        from_raw_parts(base as _, size as _),
-    );
-    if base.is_null() || res != 0 {
-        if !base.is_null() {
-            xml_free(base as _);
+        NB_TESTS.set(NB_TESTS.get() + 1);
+        // load and parse the memory
+        if load_mem(filename, &raw mut base, &raw mut size) != 0 {
+            eprintln!("Failed to load {filename}",);
+            return -1;
         }
-        eprintln!("Result for {filename} failed in {}", result.unwrap());
-        return -1;
+
+        let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
+        let doc = xml_read_memory(buffer, Some(filename), None, 0);
+        unload_mem(base);
+        let Some(mut doc) = doc else {
+            return 1;
+        };
+        doc.dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+        xml_free_doc(doc);
+        let res: i32 = compare_file_mem(
+            result.as_deref().unwrap(),
+            from_raw_parts(base as _, size as _),
+        );
+        if base.is_null() || res != 0 {
+            if !base.is_null() {
+                xml_free(base as _);
+            }
+            eprintln!("Result for {filename} failed in {}", result.unwrap());
+            return -1;
+        }
+        xml_free(base as _);
+        0
     }
-    xml_free(base as _);
-    0
 }
 
 /// Parse a file with entity resolution, then serialize back
@@ -2218,36 +2266,38 @@ unsafe fn noent_parse_test(
     _err: Option<String>,
     options: i32,
 ) -> i32 {
-    let mut res: i32 = 0;
+    unsafe {
+        let mut res: i32 = 0;
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
-    // base of the test, parse with the old API
-    let Some(mut doc) = xml_read_file(filename, None, options) else {
-        return 1;
-    };
-    let temp = result_filename(
-        filename,
-        TEMP_DIRECTORY.get().cloned().as_deref(),
-        Some(".res"),
-    );
-    doc.save_file(temp.as_str());
-    if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
-        res = 1;
+        NB_TESTS.set(NB_TESTS.get() + 1);
+        // base of the test, parse with the old API
+        let Some(mut doc) = xml_read_file(filename, None, options) else {
+            return 1;
+        };
+        let temp = result_filename(
+            filename,
+            TEMP_DIRECTORY.get().cloned().as_deref(),
+            Some(".res"),
+        );
+        doc.save_file(temp.as_str());
+        if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
+            res = 1;
+        }
+        xml_free_doc(doc);
+
+        // Parse the saved result to make sure the round trip is okay
+        let Some(mut doc) = xml_read_file(filename, None, options) else {
+            return 1;
+        };
+        doc.save_file(temp.as_str());
+        if compare_files(temp.as_str(), result.unwrap()) != 0 {
+            res = 1;
+        }
+        xml_free_doc(doc);
+
+        remove_file(temp).ok();
+        res
     }
-    xml_free_doc(doc);
-
-    // Parse the saved result to make sure the round trip is okay
-    let Some(mut doc) = xml_read_file(filename, None, options) else {
-        return 1;
-    };
-    doc.save_file(temp.as_str());
-    if compare_files(temp.as_str(), result.unwrap()) != 0 {
-        res = 1;
-    }
-    xml_free_doc(doc);
-
-    remove_file(temp).ok();
-    res
 }
 
 /// Parse a file using the xmlReadFile API and check for errors.
@@ -2260,109 +2310,115 @@ unsafe fn err_parse_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    let mut base: *const c_char = null_mut();
-    let mut size: i32 = 0;
-    let mut res: i32 = 0;
-    let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
+    unsafe {
+        let mut base: *const c_char = null_mut();
+        let mut size: i32 = 0;
+        let mut res: i32 = 0;
+        let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
-    let doc = match options {
-        #[cfg(feature = "html")]
-        options if options & XML_PARSE_HTML != 0 => html_read_file(filename, None, options),
-        #[cfg(feature = "xinclude")]
-        options if options & XmlParserOption::XmlParseXInclude as i32 != 0 => {
-            let mut doc = xml_read_file(filename, None, options);
-            if let Some(doc) = doc.take_if(|doc| xml_xinclude_process_flags(*doc, options) < 0) {
-                xml_free_doc(doc);
-            }
-            doc
-        }
-        _ => xml_read_file(filename, None, options),
-    };
-    if let Some(result) = cresult {
-        if let Some(mut doc) = doc {
+        NB_TESTS.set(NB_TESTS.get() + 1);
+        let doc = match options {
             #[cfg(feature = "html")]
-            if options & XML_PARSE_HTML != 0 {
-                html_doc_dump_memory(
-                    doc,
-                    addr_of_mut!(base) as *mut *mut XmlChar,
-                    addr_of_mut!(size),
-                );
+            options if options & XML_PARSE_HTML != 0 => html_read_file(filename, None, options),
+            #[cfg(feature = "xinclude")]
+            options if options & XmlParserOption::XmlParseXInclude as i32 != 0 => {
+                let mut doc = xml_read_file(filename, None, options);
+                if let Some(doc) = doc.take_if(|doc| xml_xinclude_process_flags(*doc, options) < 0)
+                {
+                    xml_free_doc(doc);
+                }
+                doc
+            }
+            _ => xml_read_file(filename, None, options),
+        };
+        if let Some(result) = cresult {
+            if let Some(mut doc) = doc {
+                #[cfg(feature = "html")]
+                if options & XML_PARSE_HTML != 0 {
+                    html_doc_dump_memory(
+                        doc,
+                        addr_of_mut!(base) as *mut *mut XmlChar,
+                        addr_of_mut!(size),
+                    );
+                } else {
+                    doc.dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+                }
+                #[cfg(not(feature = "html"))]
+                {
+                    xml_doc_dump_memory(
+                        doc,
+                        addr_of_mut!(base) as *mut *mut XmlChar,
+                        addr_of_mut!(size),
+                    );
+                }
             } else {
-                doc.dump_memory(addr_of_mut!(base) as *mut *mut XmlChar, addr_of_mut!(size));
+                base = c"".as_ptr();
+                size = 0;
             }
-            #[cfg(not(feature = "html"))]
-            {
-                xml_doc_dump_memory(
-                    doc,
-                    addr_of_mut!(base) as *mut *mut XmlChar,
-                    addr_of_mut!(size),
-                );
+            res = compare_file_mem(
+                CStr::from_ptr(result.as_ptr()).to_string_lossy().as_ref(),
+                from_raw_parts(base as _, size as _),
+            );
+        }
+        if let Some(doc) = doc {
+            if !base.is_null() {
+                xml_free(base as _);
             }
-        } else {
-            base = c"".as_ptr();
-            size = 0;
+            xml_free_doc(doc);
         }
-        res = compare_file_mem(
-            CStr::from_ptr(result.as_ptr()).to_string_lossy().as_ref(),
-            from_raw_parts(base as _, size as _),
-        );
-    }
-    if let Some(doc) = doc {
-        if !base.is_null() {
-            xml_free(base as _);
-        }
-        xml_free_doc(doc);
-    }
-    if res != 0 {
-        eprintln!("Result for {filename} failed in {}", result.unwrap());
-        return -1;
-    }
-    if let Some(err) = err {
-        res = TEST_ERRORS
-            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
         if res != 0 {
-            eprintln!("Error for {filename} failed",);
+            eprintln!("Result for {filename} failed in {}", result.unwrap());
             return -1;
         }
-    } else if options & XmlParserOption::XmlParseDTDValid as i32 != 0 && TEST_ERRORS_SIZE.get() != 0
-    {
-        eprintln!("Validation for {filename} failed",);
-    }
+        if let Some(err) = err {
+            res = TEST_ERRORS
+                .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
+            if res != 0 {
+                eprintln!("Error for {filename} failed",);
+                return -1;
+            }
+        } else if options & XmlParserOption::XmlParseDTDValid as i32 != 0
+            && TEST_ERRORS_SIZE.get() != 0
+        {
+            eprintln!("Validation for {filename} failed",);
+        }
 
-    0
+        0
+    }
 }
 
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
-    use exml::libxml::xmlreader::{xml_text_reader_const_name, xml_text_reader_const_value};
+    unsafe {
+        use exml::libxml::xmlreader::{xml_text_reader_const_name, xml_text_reader_const_value};
 
-    let mut name: *const XmlChar;
+        let mut name: *const XmlChar;
 
-    let typ = (*reader).node_type();
-    let empty = (*reader).is_empty_element();
+        let typ = (*reader).node_type();
+        let empty = (*reader).is_empty_element();
 
-    name = xml_text_reader_const_name(&mut *reader);
-    if name.is_null() {
-        name = c"--".as_ptr() as _;
-    }
+        name = xml_text_reader_const_name(&mut *reader);
+        if name.is_null() {
+            name = c"--".as_ptr() as _;
+        }
 
-    let value: *const XmlChar = xml_text_reader_const_value(&mut *reader);
+        let value: *const XmlChar = xml_text_reader_const_value(&mut *reader);
 
-    write!(
-        out,
-        "{} {} {} {} {}",
-        (*reader).depth(),
-        typ as i32,
-        CStr::from_ptr(name as _).to_string_lossy(),
-        empty.map_or(-1, |e| e as i32),
-        (*reader).has_value() as i32,
-    )
-    .ok();
-    if value.is_null() {
-        writeln!(out).ok();
-    } else {
-        writeln!(out, " {}", CStr::from_ptr(value as _).to_string_lossy()).ok();
+        write!(
+            out,
+            "{} {} {} {} {}",
+            (*reader).depth(),
+            typ as i32,
+            CStr::from_ptr(name as _).to_string_lossy(),
+            empty.map_or(-1, |e| e as i32),
+            (*reader).has_value() as i32,
+        )
+        .ok();
+        if value.is_null() {
+            writeln!(out).ok();
+        } else {
+            writeln!(out, " {}", CStr::from_ptr(value as _).to_string_lossy()).ok();
+        }
     }
 }
 
@@ -2375,93 +2431,95 @@ unsafe fn stream_process_test(
     rng: *const c_char,
     _options: i32,
 ) -> i32 {
-    use exml::libxml::xmlreader::xml_text_reader_relaxng_validate;
+    unsafe {
+        use exml::libxml::xmlreader::xml_text_reader_relaxng_validate;
 
-    let mut ret: i32;
-    let mut temp = None;
+        let mut ret: i32;
+        let mut temp = None;
 
-    if reader.is_null() {
-        return -1;
-    }
+        if reader.is_null() {
+            return -1;
+        }
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
-    let mut t = None;
-    if result.is_some() {
-        let tm = result_filename(
-            filename,
-            TEMP_DIRECTORY.get().cloned().as_deref(),
-            Some(".res"),
-        );
-        match File::options()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(tm.as_str())
-        {
-            Ok(file) => t = Some(file),
-            _ => {
-                eprintln!("Can't open temp file {tm}",);
-                return -1;
-            }
-        };
-        temp = Some(tm);
-    }
-    #[cfg(feature = "schema")]
-    if !rng.is_null() {
-        ret = xml_text_reader_relaxng_validate(reader, rng);
-        if ret < 0 {
-            let rng = CStr::from_ptr(rng).to_string_lossy();
-            test_error_handler(
-                None,
-                format!("Relax-NG schema {rng} failed to compile\n").as_str(),
+        NB_TESTS.set(NB_TESTS.get() + 1);
+        let mut t = None;
+        if result.is_some() {
+            let tm = result_filename(
+                filename,
+                TEMP_DIRECTORY.get().cloned().as_deref(),
+                Some(".res"),
             );
+            match File::options()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(tm.as_str())
+            {
+                Ok(file) => t = Some(file),
+                _ => {
+                    eprintln!("Can't open temp file {tm}",);
+                    return -1;
+                }
+            };
+            temp = Some(tm);
+        }
+        #[cfg(feature = "schema")]
+        if !rng.is_null() {
+            ret = xml_text_reader_relaxng_validate(reader, rng);
+            if ret < 0 {
+                let rng = CStr::from_ptr(rng).to_string_lossy();
+                test_error_handler(
+                    None,
+                    format!("Relax-NG schema {rng} failed to compile\n").as_str(),
+                );
 
+                if let Some(temp) = temp {
+                    remove_file(temp).ok();
+                }
+                return 0;
+            }
+        }
+        ret = (*reader).read();
+        while ret == 1 {
+            if let Some(t) = t.as_mut().filter(|_| rng.is_null()) {
+                process_node(t, reader);
+            }
+            ret = (*reader).read();
+        }
+        if ret != 0 {
+            test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
+        }
+        if !rng.is_null() {
+            if !(*reader).is_valid().unwrap_or(false) {
+                test_error_handler(None, format!("{filename} fails to validate\n").as_str());
+            } else {
+                test_error_handler(None, format!("{filename} validates\n").as_str());
+            }
+        }
+        if t.is_some() {
+            ret = compare_files(temp.as_deref().unwrap(), result.as_deref().unwrap());
             if let Some(temp) = temp {
                 remove_file(temp).ok();
             }
-            return 0;
+            if ret != 0 {
+                eprintln!("Result for {filename} failed in {}", result.unwrap());
+                return -1;
+            }
         }
-    }
-    ret = (*reader).read();
-    while ret == 1 {
-        if let Some(t) = t.as_mut().filter(|_| rng.is_null()) {
-            process_node(t, reader);
+        if let Some(err) = err {
+            ret = TEST_ERRORS
+                .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
+            if ret != 0 {
+                eprintln!("Error for {filename} failed");
+                TEST_ERRORS.with_borrow(|errors| {
+                    print!("{}", CStr::from_ptr(errors.as_ptr() as _).to_string_lossy());
+                });
+                return -1;
+            }
         }
-        ret = (*reader).read();
-    }
-    if ret != 0 {
-        test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
-    }
-    if !rng.is_null() {
-        if !(*reader).is_valid().unwrap_or(false) {
-            test_error_handler(None, format!("{filename} fails to validate\n").as_str());
-        } else {
-            test_error_handler(None, format!("{filename} validates\n").as_str());
-        }
-    }
-    if t.is_some() {
-        ret = compare_files(temp.as_deref().unwrap(), result.as_deref().unwrap());
-        if let Some(temp) = temp {
-            remove_file(temp).ok();
-        }
-        if ret != 0 {
-            eprintln!("Result for {filename} failed in {}", result.unwrap());
-            return -1;
-        }
-    }
-    if let Some(err) = err {
-        ret = TEST_ERRORS
-            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
-        if ret != 0 {
-            eprintln!("Error for {filename} failed");
-            TEST_ERRORS.with_borrow(|errors| {
-                print!("{}", CStr::from_ptr(errors.as_ptr() as _).to_string_lossy());
-            });
-            return -1;
-        }
-    }
 
-    0
+        0
+    }
 }
 
 /// Parse a file using the reader API and check for errors.
@@ -2475,12 +2533,14 @@ unsafe fn stream_parse_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
+    unsafe {
+        use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
 
-    let reader: XmlTextReaderPtr = xml_reader_for_file(filename, null_mut(), options);
-    let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
-    xml_free_text_reader(reader);
-    ret
+        let reader: XmlTextReaderPtr = xml_reader_for_file(filename, null_mut(), options);
+        let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
+        xml_free_text_reader(reader);
+        ret
+    }
 }
 
 /// Parse a file using the walker, i.e. a reader built from a atree.
@@ -2494,17 +2554,19 @@ unsafe fn walker_parse_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_walker};
+    unsafe {
+        use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_walker};
 
-    let Some(doc) = xml_read_file(filename, None, options) else {
-        eprintln!("Failed to parse {filename}",);
-        return -1;
-    };
-    let reader: XmlTextReaderPtr = xml_reader_walker(doc);
-    let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
-    xml_free_text_reader(reader);
-    xml_free_doc(doc);
-    ret
+        let Some(doc) = xml_read_file(filename, None, options) else {
+            eprintln!("Failed to parse {filename}",);
+            return -1;
+        };
+        let reader: XmlTextReaderPtr = xml_reader_walker(doc);
+        let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
+        xml_free_text_reader(reader);
+        xml_free_doc(doc);
+        ret
+    }
 }
 
 /// Parse a file using the reader API from memory and check for errors.
@@ -2518,23 +2580,25 @@ unsafe fn stream_mem_parse_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_memory};
+    unsafe {
+        use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_memory};
 
-    let mut base: *const c_char = null();
-    let mut size: i32 = 0;
+        let mut base: *const c_char = null();
+        let mut size: i32 = 0;
 
-    // load and parse the memory
-    if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
-        eprintln!("Failed to load {filename}",);
-        return -1;
+        // load and parse the memory
+        if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
+            eprintln!("Failed to load {filename}",);
+            return -1;
+        }
+        let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
+        let reader: XmlTextReaderPtr =
+            xml_reader_for_memory(buffer, Some(filename), null_mut(), options);
+        let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
+        free(base as _);
+        xml_free_text_reader(reader);
+        ret
     }
-    let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
-    let reader: XmlTextReaderPtr =
-        xml_reader_for_memory(buffer, Some(filename), null_mut(), options);
-    let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
-    free(base as _);
-    xml_free_text_reader(reader);
-    ret
 }
 
 thread_local! {
@@ -2549,59 +2613,61 @@ fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
-    use exml::{
-        libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
-        xpath::{
-            xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_debug_dump_object,
-            xml_xpath_eval_expression, xml_xpath_free_comp_expr, xml_xpath_free_context,
-            xml_xpath_free_object, xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContextPtr,
-            XmlXPathObjectPtr,
-        },
-    };
+    unsafe {
+        use exml::{
+            libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
+            xpath::{
+                XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr, xml_xpath_compile,
+                xml_xpath_compiled_eval, xml_xpath_debug_dump_object, xml_xpath_eval_expression,
+                xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
+                xml_xpath_new_context,
+            },
+        };
 
-    let res: XmlXPathObjectPtr;
-    let ctxt: XmlXPathContextPtr;
+        let res: XmlXPathObjectPtr;
+        let ctxt: XmlXPathContextPtr;
 
-    // Don't print generic errors to stderr.
-    set_generic_error(Some(ignore_generic_error), None);
+        // Don't print generic errors to stderr.
+        set_generic_error(Some(ignore_generic_error), None);
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
-    if cfg!(feature = "xpointer") && xptr != 0 {
-        #[cfg(feature = "xpointer")]
-        {
-            ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), None, None);
-            res = xml_xptr_eval(str as _, ctxt);
-        }
-    } else {
-        let xpath_document = XPATH_DOCUMENT.get();
-        ctxt = xml_xpath_new_context(xpath_document);
-        (*ctxt).node = xpath_document
-            .and_then(|doc| doc.get_root_element())
-            .map(|root| root.into());
-        if expr != 0 {
-            res = xml_xpath_eval_expression(str as _, ctxt);
+        NB_TESTS.set(NB_TESTS.get() + 1);
+        if cfg!(feature = "xpointer") && xptr != 0 {
+            #[cfg(feature = "xpointer")]
+            {
+                ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), None, None);
+                res = xml_xptr_eval(str as _, ctxt);
+            }
         } else {
-            /* res = xmlXPathEval(str, ctxt); */
-
-            let comp: XmlXPathCompExprPtr = xml_xpath_compile(str as _);
-            if !comp.is_null() {
-                res = xml_xpath_compiled_eval(comp, ctxt);
-                xml_xpath_free_comp_expr(comp);
+            let xpath_document = XPATH_DOCUMENT.get();
+            ctxt = xml_xpath_new_context(xpath_document);
+            (*ctxt).node = xpath_document
+                .and_then(|doc| doc.get_root_element())
+                .map(|root| root.into());
+            if expr != 0 {
+                res = xml_xpath_eval_expression(str as _, ctxt);
             } else {
-                res = null_mut();
+                /* res = xmlXPathEval(str, ctxt); */
+
+                let comp: XmlXPathCompExprPtr = xml_xpath_compile(str as _);
+                if !comp.is_null() {
+                    res = xml_xpath_compiled_eval(comp, ctxt);
+                    xml_xpath_free_comp_expr(comp);
+                } else {
+                    res = null_mut();
+                }
             }
         }
-    }
-    XPATH_OUTPUT.with_borrow_mut(|out| {
-        let out = out.as_mut().unwrap();
-        xml_xpath_debug_dump_object(out, res, 0);
-        out.flush().ok();
-    });
-    xml_xpath_free_object(res);
-    xml_xpath_free_context(ctxt);
+        XPATH_OUTPUT.with_borrow_mut(|out| {
+            let out = out.as_mut().unwrap();
+            xml_xpath_debug_dump_object(out, res, 0);
+            out.flush().ok();
+        });
+        xml_xpath_free_object(res);
+        xml_xpath_free_context(ctxt);
 
-    // Reset generic error handler.
-    set_generic_error(None, None);
+        // Reset generic error handler.
+        set_generic_error(None, None);
+    }
 }
 
 /// Parse a file containing XPath standalone expressions and evaluate them
@@ -2610,125 +2676,127 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
 #[doc(alias = "xpathExprTest")]
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, expr: i32) -> i32 {
-    use std::io::{BufRead, BufReader};
+    unsafe {
+        use std::io::{BufRead, BufReader};
 
-    use exml::generic_error;
+        use exml::generic_error;
 
-    let mut ret: i32 = 0;
+        let mut ret: i32 = 0;
 
-    let temp = result_filename(
-        filename,
-        TEMP_DIRECTORY.get().cloned().as_deref(),
-        Some(".res"),
-    );
+        let temp = result_filename(
+            filename,
+            TEMP_DIRECTORY.get().cloned().as_deref(),
+            Some(".res"),
+        );
 
-    let Ok(out) = File::options()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(temp.as_str())
-    else {
-        eprintln!("failed to open output file {temp}",);
-        return -1;
-    };
-    XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
-
-    let mut input = match File::open(filename) {
-        Ok(file) => BufReader::new(file),
-        _ => {
-            generic_error!("Cannot open {filename} for reading\n");
+        let Ok(out) = File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(temp.as_str())
+        else {
+            eprintln!("failed to open output file {temp}",);
             return -1;
-        }
-    };
+        };
+        XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
 
-    let mut expression = vec![];
-    while input
-        .read_until(b'\n', &mut expression)
-        .ok()
-        .filter(|&len| len > 0)
-        .map(|len| len as i32)
-        .is_some()
-    {
-        while expression
-            .last()
-            .filter(|&c| matches!(c, b'\n' | b'\t' | b'\r' | b' '))
+        let mut input = match File::open(filename) {
+            Ok(file) => BufReader::new(file),
+            _ => {
+                generic_error!("Cannot open {filename} for reading\n");
+                return -1;
+            }
+        };
+
+        let mut expression = vec![];
+        while input
+            .read_until(b'\n', &mut expression)
+            .ok()
+            .filter(|&len| len > 0)
+            .map(|len| len as i32)
             .is_some()
         {
-            expression.pop();
-        }
-        if !expression.is_empty() {
-            expression.push(0);
-            XPATH_OUTPUT.with_borrow_mut(|f| {
-                writeln!(
-                    f.as_mut().unwrap(),
-                    "\n========================\nExpression: {}",
-                    CStr::from_ptr(expression.as_ptr() as _).to_string_lossy(),
-                )
-                .ok()
-            });
-            test_xpath(expression.as_ptr() as _, xptr, expr);
-        }
-        expression.clear();
-    }
-
-    if let Some(result) = result {
-        ret = compare_files(temp.as_str(), result.as_str());
-        if ret != 0 {
-            // Rust `format!` does not support the similar of `%g` of C lang.
-            // Therefore, the representation of the floating point number may be different
-            // from result files of the original libxml2.
-            let mut t = BufReader::new(File::open(temp.as_str()).unwrap());
-            let mut r = BufReader::new(File::open(result.as_str()).unwrap());
-            let (mut ts, mut rs) = (String::new(), String::new());
-            let mut ok = true;
-            let mut cache = String::new();
-            while t.read_line(&mut ts).ok().filter(|&len| len > 0).is_none() {
-                if r.read_line(&mut rs).ok().filter(|&len| len > 0).is_none() {
-                    ok = false;
-                    break;
-                }
-                if ts.starts_with("Expression") {
-                    if ts != rs {
-                        ok = false;
-                        break;
-                    }
-                    cache = ts.clone();
-                } else if ts.starts_with("Object is a number") {
-                    if ts == rs {
-                        ts.clear();
-                        rs.clear();
-                        continue;
-                    }
-                    let Some((_, expr)) = cache.split_once(' ') else {
-                        ok = false;
-                        break;
-                    };
-                    let Ok(float) = expr.trim().parse::<f64>() else {
-                        ok = false;
-                        break;
-                    };
-                    let s = format!("Object is a number : {float}\n");
-                    if ts != s {
-                        ok = false;
-                        break;
-                    }
-                } else if ts != rs {
-                    ok = false;
-                    break;
-                }
-                ts.clear();
-                rs.clear();
+            while expression
+                .last()
+                .filter(|&c| matches!(c, b'\n' | b'\t' | b'\r' | b' '))
+                .is_some()
+            {
+                expression.pop();
             }
-            if ok {
-                ret = 0;
-            } else {
-                eprintln!("Result for {filename} failed in {}", result);
+            if !expression.is_empty() {
+                expression.push(0);
+                XPATH_OUTPUT.with_borrow_mut(|f| {
+                    writeln!(
+                        f.as_mut().unwrap(),
+                        "\n========================\nExpression: {}",
+                        CStr::from_ptr(expression.as_ptr() as _).to_string_lossy(),
+                    )
+                    .ok()
+                });
+                test_xpath(expression.as_ptr() as _, xptr, expr);
+            }
+            expression.clear();
+        }
+
+        if let Some(result) = result {
+            ret = compare_files(temp.as_str(), result.as_str());
+            if ret != 0 {
+                // Rust `format!` does not support the similar of `%g` of C lang.
+                // Therefore, the representation of the floating point number may be different
+                // from result files of the original libxml2.
+                let mut t = BufReader::new(File::open(temp.as_str()).unwrap());
+                let mut r = BufReader::new(File::open(result.as_str()).unwrap());
+                let (mut ts, mut rs) = (String::new(), String::new());
+                let mut ok = true;
+                let mut cache = String::new();
+                while t.read_line(&mut ts).ok().filter(|&len| len > 0).is_none() {
+                    if r.read_line(&mut rs).ok().filter(|&len| len > 0).is_none() {
+                        ok = false;
+                        break;
+                    }
+                    if ts.starts_with("Expression") {
+                        if ts != rs {
+                            ok = false;
+                            break;
+                        }
+                        cache = ts.clone();
+                    } else if ts.starts_with("Object is a number") {
+                        if ts == rs {
+                            ts.clear();
+                            rs.clear();
+                            continue;
+                        }
+                        let Some((_, expr)) = cache.split_once(' ') else {
+                            ok = false;
+                            break;
+                        };
+                        let Ok(float) = expr.trim().parse::<f64>() else {
+                            ok = false;
+                            break;
+                        };
+                        let s = format!("Object is a number : {float}\n");
+                        if ts != s {
+                            ok = false;
+                            break;
+                        }
+                    } else if ts != rs {
+                        ok = false;
+                        break;
+                    }
+                    ts.clear();
+                    rs.clear();
+                }
+                if ok {
+                    ret = 0;
+                } else {
+                    eprintln!("Result for {filename} failed in {}", result);
+                }
             }
         }
-    }
 
-    remove_file(temp).ok();
-    ret
+        remove_file(temp).ok();
+        ret
+    }
 }
 
 /// Parse a file containing XPath standalone expressions and evaluate them
@@ -2742,7 +2810,7 @@ unsafe fn xpath_expr_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    xpath_common_test(filename, result, 0, 1)
+    unsafe { xpath_common_test(filename, result, 0, 1) }
 }
 
 /// Parse a file containing XPath expressions and evaluate them against
@@ -2757,68 +2825,72 @@ unsafe fn xpath_doc_test(
     _err: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::mem::zeroed;
+    unsafe {
+        use std::mem::zeroed;
 
-    use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
+        use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
-    let mut pattern: [c_char; 500] = [0; 500];
-    let mut result: [c_char; 500] = [0; 500];
-    let mut globbuf: glob_t = unsafe { zeroed() };
-    let mut ret: i32 = 0;
-    let mut res: i32;
+        let mut pattern: [c_char; 500] = [0; 500];
+        let mut result: [c_char; 500] = [0; 500];
+        let mut globbuf: glob_t = zeroed();
+        let mut ret: i32 = 0;
+        let mut res: i32;
 
-    if let Some(xpath_document) = xml_read_file(
-        filename,
-        None,
-        options | XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
-    ) {
-        XPATH_DOCUMENT.set(xpath_document.into());
-    } else {
-        eprintln!("Failed to load {filename}",);
-        return -1;
-    }
+        if let Some(xpath_document) = xml_read_file(
+            filename,
+            None,
+            options
+                | XmlParserOption::XmlParseDTDAttr as i32
+                | XmlParserOption::XmlParseNoEnt as i32,
+        ) {
+            XPATH_DOCUMENT.set(xpath_document.into());
+        } else {
+            eprintln!("Failed to load {filename}",);
+            return -1;
+        }
 
-    let cbase = CString::new(base_filename(filename)).unwrap();
-    res = snprintf(
-        pattern.as_mut_ptr() as _,
-        499,
-        c"./test/XPath/tests/%s*".as_ptr(),
-        cbase.as_ptr(),
-    );
-    if res >= 499 {
-        pattern[499] = 0;
-    }
-    globbuf.gl_offs = 0;
-    glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-    for i in 0..globbuf.gl_pathc {
-        let cbase = CString::new(base_filename(
-            CStr::from_ptr(*globbuf.gl_pathv.add(i))
-                .to_string_lossy()
-                .as_ref(),
-        ))
-        .unwrap();
+        let cbase = CString::new(base_filename(filename)).unwrap();
         res = snprintf(
-            result.as_mut_ptr() as _,
+            pattern.as_mut_ptr() as _,
             499,
-            c"./result/XPath/tests/%s".as_ptr(),
+            c"./test/XPath/tests/%s*".as_ptr(),
             cbase.as_ptr(),
         );
         if res >= 499 {
-            result[499] = 0;
+            pattern[499] = 0;
         }
-        let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-        let result = CStr::from_ptr(result.as_ptr()).to_string_lossy();
-        res = xpath_common_test(&filename, Some(result.into_owned()), 0, 0);
-        if res != 0 {
-            ret = res;
+        globbuf.gl_offs = 0;
+        glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
+        for i in 0..globbuf.gl_pathc {
+            let cbase = CString::new(base_filename(
+                CStr::from_ptr(*globbuf.gl_pathv.add(i))
+                    .to_string_lossy()
+                    .as_ref(),
+            ))
+            .unwrap();
+            res = snprintf(
+                result.as_mut_ptr() as _,
+                499,
+                c"./result/XPath/tests/%s".as_ptr(),
+                cbase.as_ptr(),
+            );
+            if res >= 499 {
+                result[499] = 0;
+            }
+            let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+            let result = CStr::from_ptr(result.as_ptr()).to_string_lossy();
+            res = xpath_common_test(&filename, Some(result.into_owned()), 0, 0);
+            if res != 0 {
+                ret = res;
+            }
         }
-    }
-    globfree(addr_of_mut!(globbuf));
+        globfree(addr_of_mut!(globbuf));
 
-    if let Some(doc) = XPATH_DOCUMENT.get() {
-        xml_free_doc(doc);
+        if let Some(doc) = XPATH_DOCUMENT.get() {
+            xml_free_doc(doc);
+        }
+        ret
     }
-    ret
 }
 
 /// Parse a file containing XPath expressions and evaluate them against
@@ -2833,75 +2905,77 @@ unsafe fn xptr_doc_test(
     _err: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::mem::zeroed;
+    unsafe {
+        use std::mem::zeroed;
 
-    use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
+        use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
-    let mut pattern: [c_char; 500] = [0; 500];
-    let mut result: [c_char; 500] = [0; 500];
-    let mut globbuf: glob_t = unsafe { zeroed() };
-    let mut ret: i32 = 0;
-    let mut res: i32;
-    let subdir: *const c_char = if options == -1 {
-        c"xptr-xp1".as_ptr()
-    } else {
-        c"xptr".as_ptr()
-    };
+        let mut pattern: [c_char; 500] = [0; 500];
+        let mut result: [c_char; 500] = [0; 500];
+        let mut globbuf: glob_t = zeroed();
+        let mut ret: i32 = 0;
+        let mut res: i32;
+        let subdir: *const c_char = if options == -1 {
+            c"xptr-xp1".as_ptr()
+        } else {
+            c"xptr".as_ptr()
+        };
 
-    if let Some(xpath_document) = xml_read_file(
-        filename,
-        None,
-        XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
-    ) {
-        XPATH_DOCUMENT.set(xpath_document.into())
-    } else {
-        eprintln!("Failed to load {filename}",);
-        return -1;
-    }
+        if let Some(xpath_document) = xml_read_file(
+            filename,
+            None,
+            XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
+        ) {
+            XPATH_DOCUMENT.set(xpath_document.into())
+        } else {
+            eprintln!("Failed to load {filename}",);
+            return -1;
+        }
 
-    let cbase = CString::new(base_filename(filename)).unwrap();
-    res = snprintf(
-        pattern.as_mut_ptr() as _,
-        499,
-        c"./test/XPath/%s/%s*".as_ptr(),
-        subdir,
-        cbase.as_ptr(),
-    );
-    if res >= 499 {
-        pattern[499] = 0;
-    }
-    globbuf.gl_offs = 0;
-    glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-    for i in 0..globbuf.gl_pathc {
-        let cbase = CString::new(base_filename(
-            CStr::from_ptr(*globbuf.gl_pathv.add(i))
-                .to_string_lossy()
-                .as_ref(),
-        ))
-        .unwrap();
+        let cbase = CString::new(base_filename(filename)).unwrap();
         res = snprintf(
-            result.as_mut_ptr(),
+            pattern.as_mut_ptr() as _,
             499,
-            c"./result/XPath/%s/%s".as_ptr(),
+            c"./test/XPath/%s/%s*".as_ptr(),
             subdir,
             cbase.as_ptr(),
         );
         if res >= 499 {
-            result[499] = 0;
+            pattern[499] = 0;
         }
-        let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-        let result = CStr::from_ptr(result.as_ptr()).to_string_lossy();
-        res = xpath_common_test(&filename, Some(result.into_owned()), 1, 0);
-        if res != 0 {
-            ret = res;
+        globbuf.gl_offs = 0;
+        glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
+        for i in 0..globbuf.gl_pathc {
+            let cbase = CString::new(base_filename(
+                CStr::from_ptr(*globbuf.gl_pathv.add(i))
+                    .to_string_lossy()
+                    .as_ref(),
+            ))
+            .unwrap();
+            res = snprintf(
+                result.as_mut_ptr(),
+                499,
+                c"./result/XPath/%s/%s".as_ptr(),
+                subdir,
+                cbase.as_ptr(),
+            );
+            if res >= 499 {
+                result[499] = 0;
+            }
+            let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+            let result = CStr::from_ptr(result.as_ptr()).to_string_lossy();
+            res = xpath_common_test(&filename, Some(result.into_owned()), 1, 0);
+            if res != 0 {
+                ret = res;
+            }
         }
-    }
-    globfree(addr_of_mut!(globbuf));
+        globfree(addr_of_mut!(globbuf));
 
-    if let Some(doc) = XPATH_DOCUMENT.get() {
-        xml_free_doc(doc);
+        if let Some(doc) = XPATH_DOCUMENT.get() {
+            xml_free_doc(doc);
+        }
+        ret
     }
-    ret
 }
 
 /// Parse a file containing xml:id and check for errors and verify
@@ -2916,64 +2990,68 @@ unsafe fn xmlid_doc_test(
     err: Option<String>,
     options: i32,
 ) -> i32 {
-    let mut res: i32 = 0;
-    let mut ret: i32;
+    unsafe {
+        let mut res: i32 = 0;
+        let mut ret: i32;
 
-    if let Some(xpath_document) = xml_read_file(
-        filename,
-        None,
-        options | XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
-    ) {
-        XPATH_DOCUMENT.set(xpath_document.into())
-    } else {
-        eprintln!("Failed to load {filename}",);
-        return -1;
-    }
+        if let Some(xpath_document) = xml_read_file(
+            filename,
+            None,
+            options
+                | XmlParserOption::XmlParseDTDAttr as i32
+                | XmlParserOption::XmlParseNoEnt as i32,
+        ) {
+            XPATH_DOCUMENT.set(xpath_document.into())
+        } else {
+            eprintln!("Failed to load {filename}",);
+            return -1;
+        }
 
-    let temp = result_filename(
-        filename,
-        TEMP_DIRECTORY.get().cloned().as_deref(),
-        Some(".res"),
-    );
+        let temp = result_filename(
+            filename,
+            TEMP_DIRECTORY.get().cloned().as_deref(),
+            Some(".res"),
+        );
 
-    let Ok(out) = File::options()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(temp.as_str())
-    else {
-        eprintln!("failed to open output file {temp}",);
+        let Ok(out) = File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(temp.as_str())
+        else {
+            eprintln!("failed to open output file {temp}",);
+            if let Some(doc) = XPATH_DOCUMENT.get() {
+                xml_free_doc(doc);
+            }
+            return -1;
+        };
+        XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
+
+        test_xpath(c"id('bar')".as_ptr() as _, 0, 0);
+
+        if let Some(result) = result {
+            ret = compare_files(temp.as_str(), result.as_str());
+            if ret != 0 {
+                eprintln!("Result for {filename} failed in {}", result);
+                res = 1;
+            }
+        }
+
+        remove_file(temp).ok();
         if let Some(doc) = XPATH_DOCUMENT.get() {
             xml_free_doc(doc);
         }
-        return -1;
-    };
-    XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
 
-    test_xpath(c"id('bar')".as_ptr() as _, 0, 0);
-
-    if let Some(result) = result {
-        ret = compare_files(temp.as_str(), result.as_str());
-        if ret != 0 {
-            eprintln!("Result for {filename} failed in {}", result);
-            res = 1;
+        if let Some(err) = err {
+            ret = TEST_ERRORS
+                .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
+            if ret != 0 {
+                eprintln!("Error for {filename} failed",);
+                res = 1;
+            }
         }
+        res
     }
-
-    remove_file(temp).ok();
-    if let Some(doc) = XPATH_DOCUMENT.get() {
-        xml_free_doc(doc);
-    }
-
-    if let Some(err) = err {
-        ret = TEST_ERRORS
-            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
-        if ret != 0 {
-            eprintln!("Error for {filename} failed",);
-            res = 1;
-        }
-    }
-    res
 }
 
 unsafe fn handle_uri(str: &str, base: Option<&str>, o: &mut File) {
@@ -3014,72 +3092,74 @@ unsafe fn uri_common_test(
     err: Option<String>,
     base: Option<&str>,
 ) -> i32 {
-    let mut res: i32 = 0;
-    let mut ret: i32;
+    unsafe {
+        let mut res: i32 = 0;
+        let mut ret: i32;
 
-    let temp = result_filename(
-        filename,
-        TEMP_DIRECTORY.get().cloned().as_deref(),
-        Some(".res"),
-    );
-    let Ok(mut o) = File::options()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(temp.as_str())
-    else {
-        eprintln!("failed to open output file {temp}",);
-        return -1;
-    };
-    let Ok(mut f) = File::open(filename).map(BufReader::new) else {
-        eprintln!("failed to open input file {filename}");
-        remove_file(temp).ok();
-        return -1;
-    };
+        let temp = result_filename(
+            filename,
+            TEMP_DIRECTORY.get().cloned().as_deref(),
+            Some(".res"),
+        );
+        let Ok(mut o) = File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(temp.as_str())
+        else {
+            eprintln!("failed to open output file {temp}",);
+            return -1;
+        };
+        let Ok(mut f) = File::open(filename).map(BufReader::new) else {
+            eprintln!("failed to open input file {filename}");
+            remove_file(temp).ok();
+            return -1;
+        };
 
-    let mut str = vec![];
-    loop {
-        // read one line in string buffer.
-        match f.read_until(b'\n', &mut str) {
-            Ok(mut len) if len > 0 => {
-                // remove the ending spaces
-                while len > 0
-                    && (str[len - 1] == b'\n'
-                        || str[len - 1] == b'\r'
-                        || str[len - 1] == b' '
-                        || str[len - 1] == b'\t')
-                {
-                    len -= 1;
-                    str.pop();
+        let mut str = vec![];
+        loop {
+            // read one line in string buffer.
+            match f.read_until(b'\n', &mut str) {
+                Ok(mut len) if len > 0 => {
+                    // remove the ending spaces
+                    while len > 0
+                        && (str[len - 1] == b'\n'
+                            || str[len - 1] == b'\r'
+                            || str[len - 1] == b' '
+                            || str[len - 1] == b'\t')
+                    {
+                        len -= 1;
+                        str.pop();
+                    }
+                    NB_TESTS.set(NB_TESTS.get() + 1);
+                    handle_uri(from_utf8(&str).unwrap(), base, &mut o);
                 }
-                NB_TESTS.set(NB_TESTS.get() + 1);
-                handle_uri(from_utf8(&str).unwrap(), base, &mut o);
+                _ => {
+                    break;
+                }
             }
-            _ => {
-                break;
+            str.clear();
+        }
+
+        if let Some(result) = result {
+            ret = compare_files(temp.as_str(), result.as_str());
+            if ret != 0 {
+                eprintln!("Result for {filename} failed in {result}");
+                res = 1;
             }
         }
-        str.clear();
-    }
-
-    if let Some(result) = result {
-        ret = compare_files(temp.as_str(), result.as_str());
-        if ret != 0 {
-            eprintln!("Result for {filename} failed in {result}");
-            res = 1;
+        if let Some(err) = err {
+            ret = TEST_ERRORS
+                .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
+            if ret != 0 {
+                eprintln!("Error for {filename} failed",);
+                res = 1;
+            }
         }
-    }
-    if let Some(err) = err {
-        ret = TEST_ERRORS
-            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
-        if ret != 0 {
-            eprintln!("Error for {filename} failed",);
-            res = 1;
-        }
-    }
 
-    remove_file(temp).ok();
-    res
+        remove_file(temp).ok();
+        res
+    }
 }
 
 /// Parse a file containing URI and check for errors
@@ -3092,7 +3172,7 @@ unsafe fn uri_parse_test(
     err: Option<String>,
     _options: i32,
 ) -> i32 {
-    uri_common_test(filename, result, err, None)
+    unsafe { uri_common_test(filename, result, err, None) }
 }
 
 /// Parse a file containing URI, compose them against a fixed base and
@@ -3106,12 +3186,14 @@ unsafe fn uri_base_test(
     err: Option<String>,
     _options: i32,
 ) -> i32 {
-    uri_common_test(
-        filename,
-        result,
-        err,
-        Some("http://foo.com/path/to/index.html?orig#help"),
-    )
+    unsafe {
+        uri_common_test(
+            filename,
+            result,
+            err,
+            Some("http://foo.com/path/to/index.html?orig#help"),
+        )
+    }
 }
 
 const URIP_TEST_URLS: &[&str] = &[
@@ -3203,26 +3285,30 @@ unsafe fn urip_close(context: *mut c_void) -> i32 {
 /// Returns the number of bytes read or -1 in case of error
 #[doc(alias = "uripRead")]
 unsafe fn urip_read(context: *mut c_void, buffer: *mut c_char, mut len: i32) -> i32 {
-    let ptr: *const c_char = context as *const c_char;
+    unsafe {
+        let ptr: *const c_char = context as *const c_char;
 
-    if context.is_null() || buffer.is_null() || len < 0 {
-        return -1;
-    }
+        if context.is_null() || buffer.is_null() || len < 0 {
+            return -1;
+        }
 
-    if len > URIP_RLEN.get() as _ {
-        len = URIP_RLEN.get() as _;
+        if len > URIP_RLEN.get() as _ {
+            len = URIP_RLEN.get() as _;
+        }
+        memcpy(buffer as _, ptr as _, len as usize);
+        URIP_RLEN.set(URIP_RLEN.get() - len as usize);
+        len
     }
-    memcpy(buffer as _, ptr as _, len as usize);
-    URIP_RLEN.set(URIP_RLEN.get() - len as usize);
-    len
 }
 
 unsafe fn urip_check_url(url: &str) -> i32 {
-    let Some(doc) = xml_read_file(url, None, 0) else {
-        return -1;
-    };
-    xml_free_doc(doc);
-    1
+    unsafe {
+        let Some(doc) = xml_read_file(url, None, 0) else {
+            return -1;
+        };
+        xml_free_doc(doc);
+        1
+    }
 }
 
 /// Run a set of tests to check how Path and URI are handled before
@@ -3236,72 +3322,75 @@ unsafe fn uri_path_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    let mut parsed: i32;
-    let mut failures: i32 = 0;
+    unsafe {
+        let mut parsed: i32;
+        let mut failures: i32 = 0;
 
-    // register the new I/O handlers
-    struct URIPTest(*mut c_void);
-    impl Read for URIPTest {
-        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-            let res = unsafe { urip_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
-            if res < 0 {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(res as usize)
-            }
-        }
-    }
-    unsafe impl Send for URIPTest {}
-    impl Drop for URIPTest {
-        fn drop(&mut self) {
-            if !self.0.is_null() {
-                unsafe {
-                    urip_close(self.0);
+        // register the new I/O handlers
+        struct URIPTest(*mut c_void);
+        impl Read for URIPTest {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                let res =
+                    unsafe { urip_read(self.0, buf.as_mut_ptr() as *mut i8, buf.len() as i32) };
+                if res < 0 {
+                    Err(io::Error::last_os_error())
+                } else {
+                    Ok(res as usize)
                 }
             }
         }
-    }
-    impl XmlInputCallback for URIPTest {
-        fn is_match(&self, filename: &str) -> bool {
-            unsafe { urip_match(filename) != 0 }
-        }
-        fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
-            let ptr = unsafe { urip_open(filename) };
-            if ptr.is_null() {
-                Err(io::Error::other("Failed to execute urip_open"))
-            } else {
-                Ok(Box::new(Self(ptr)))
+        unsafe impl Send for URIPTest {}
+        impl Drop for URIPTest {
+            fn drop(&mut self) {
+                if !self.0.is_null() {
+                    unsafe {
+                        urip_close(self.0);
+                    }
+                }
             }
         }
-    }
-    if register_input_callbacks(URIPTest(null_mut())).is_err() {
-        eprintln!("failed to register HTTP handler");
-        return -1;
-    }
-
-    URIP_CURRENT.set(0);
-    while URIP_CURRENT.get() < URIP_TEST_URLS.len() {
-        URIP_SUCCESS.set(1);
-        parsed = urip_check_url(URIP_TEST_URLS[URIP_CURRENT.get()]);
-        if URIP_SUCCESS.get() != 1 {
-            eprintln!(
-                "failed the URL passing test for {}",
-                URIP_TEST_URLS[URIP_CURRENT.get()]
-            );
-            failures += 1;
-        } else if parsed != 1 {
-            eprintln!(
-                "failed the parsing test for {}",
-                URIP_TEST_URLS[URIP_CURRENT.get()]
-            );
-            failures += 1;
+        impl XmlInputCallback for URIPTest {
+            fn is_match(&self, filename: &str) -> bool {
+                unsafe { urip_match(filename) != 0 }
+            }
+            fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
+                let ptr = unsafe { urip_open(filename) };
+                if ptr.is_null() {
+                    Err(io::Error::other("Failed to execute urip_open"))
+                } else {
+                    Ok(Box::new(Self(ptr)))
+                }
+            }
         }
-        NB_TESTS.set(NB_TESTS.get() + 1);
-        URIP_CURRENT.set(URIP_CURRENT.get() + 1);
-    }
+        if register_input_callbacks(URIPTest(null_mut())).is_err() {
+            eprintln!("failed to register HTTP handler");
+            return -1;
+        }
 
-    pop_input_callbacks();
-    failures
+        URIP_CURRENT.set(0);
+        while URIP_CURRENT.get() < URIP_TEST_URLS.len() {
+            URIP_SUCCESS.set(1);
+            parsed = urip_check_url(URIP_TEST_URLS[URIP_CURRENT.get()]);
+            if URIP_SUCCESS.get() != 1 {
+                eprintln!(
+                    "failed the URL passing test for {}",
+                    URIP_TEST_URLS[URIP_CURRENT.get()]
+                );
+                failures += 1;
+            } else if parsed != 1 {
+                eprintln!(
+                    "failed the parsing test for {}",
+                    URIP_TEST_URLS[URIP_CURRENT.get()]
+                );
+                failures += 1;
+            }
+            NB_TESTS.set(NB_TESTS.get() + 1);
+            URIP_CURRENT.set(URIP_CURRENT.get() + 1);
+        }
+
+        pop_input_callbacks();
+        failures
+    }
 }
 
 #[cfg(feature = "schema")]
@@ -3312,77 +3401,79 @@ unsafe fn schemas_one_test(
     options: i32,
     schemas: XmlSchemaPtr,
 ) -> i32 {
-    use exml::libxml::xmlschemas::{
-        xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt, xml_schema_set_valid_errors,
-        xml_schema_validate_doc,
-    };
+    unsafe {
+        use exml::libxml::xmlschemas::{
+            xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt, xml_schema_set_valid_errors,
+            xml_schema_validate_doc,
+        };
 
-    let mut ret: i32 = 0;
+        let mut ret: i32 = 0;
 
-    let Some(doc) = xml_read_file(filename, None, options) else {
-        eprintln!(
-            "failed to parse instance {filename} for {}",
-            CStr::from_ptr(sch).to_string_lossy(),
-        );
-        return -1;
-    };
+        let Some(doc) = xml_read_file(filename, None, options) else {
+            eprintln!(
+                "failed to parse instance {filename} for {}",
+                CStr::from_ptr(sch).to_string_lossy(),
+            );
+            return -1;
+        };
 
-    let temp = result_filename(
-        CStr::from_ptr(result).to_string_lossy().as_ref(),
-        TEMP_DIRECTORY.get().cloned().as_deref(),
-        Some(".res"),
-    );
-    let Ok(mut schemas_output) = File::options()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(temp.as_str())
-    else {
-        eprintln!("failed to open output file {temp}",);
-        xml_free_doc(doc);
-        return -1;
-    };
-
-    let ctxt: XmlSchemaValidCtxtPtr = xml_schema_new_valid_ctxt(schemas);
-    xml_schema_set_valid_errors(
-        ctxt,
-        Some(test_error_handler),
-        Some(test_error_handler),
-        Some(GenericErrorContext::new(ctxt)),
-    );
-    let valid_result: i32 = xml_schema_validate_doc(ctxt, doc);
-    match valid_result.cmp(&0) {
-        std::cmp::Ordering::Equal => {
-            writeln!(schemas_output, "{filename} validates").ok();
-        }
-        std::cmp::Ordering::Greater => {
-            writeln!(schemas_output, "{filename} fails to validate").ok();
-        }
-        std::cmp::Ordering::Less => {
-            writeln!(
-                schemas_output,
-                "{filename} validation generated an internal error"
-            )
-            .ok();
-        }
-    }
-    if !result.is_null()
-        && compare_files(
-            temp.as_str(),
+        let temp = result_filename(
             CStr::from_ptr(result).to_string_lossy().as_ref(),
-        ) != 0
-    {
-        eprintln!(
-            "Result for {filename} on {} failed",
-            CStr::from_ptr(sch).to_string_lossy()
+            TEMP_DIRECTORY.get().cloned().as_deref(),
+            Some(".res"),
         );
-        ret = 1;
-    }
-    remove_file(temp).ok();
+        let Ok(mut schemas_output) = File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(temp.as_str())
+        else {
+            eprintln!("failed to open output file {temp}",);
+            xml_free_doc(doc);
+            return -1;
+        };
 
-    xml_schema_free_valid_ctxt(ctxt);
-    xml_free_doc(doc);
-    ret
+        let ctxt: XmlSchemaValidCtxtPtr = xml_schema_new_valid_ctxt(schemas);
+        xml_schema_set_valid_errors(
+            ctxt,
+            Some(test_error_handler),
+            Some(test_error_handler),
+            Some(GenericErrorContext::new(ctxt)),
+        );
+        let valid_result: i32 = xml_schema_validate_doc(ctxt, doc);
+        match valid_result.cmp(&0) {
+            std::cmp::Ordering::Equal => {
+                writeln!(schemas_output, "{filename} validates").ok();
+            }
+            std::cmp::Ordering::Greater => {
+                writeln!(schemas_output, "{filename} fails to validate").ok();
+            }
+            std::cmp::Ordering::Less => {
+                writeln!(
+                    schemas_output,
+                    "{filename} validation generated an internal error"
+                )
+                .ok();
+            }
+        }
+        if !result.is_null()
+            && compare_files(
+                temp.as_str(),
+                CStr::from_ptr(result).to_string_lossy().as_ref(),
+            ) != 0
+        {
+            eprintln!(
+                "Result for {filename} on {} failed",
+                CStr::from_ptr(sch).to_string_lossy()
+            );
+            ret = 1;
+        }
+        remove_file(temp).ok();
+
+        xml_schema_free_valid_ctxt(ctxt);
+        xml_free_doc(doc);
+        ret
+    }
 }
 
 /// Parse a file containing URI, compose them against a fixed base and
@@ -3397,140 +3488,142 @@ unsafe fn schemas_test(
     _errr: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::mem::zeroed;
+    unsafe {
+        use std::mem::zeroed;
 
-    use exml::libxml::xmlschemas::{
-        xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt, xml_schema_parse,
-        xml_schema_set_parser_errors, XmlSchemaParserCtxtPtr,
-    };
-    use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
+        use exml::libxml::xmlschemas::{
+            XmlSchemaParserCtxtPtr, xml_schema_free, xml_schema_free_parser_ctxt,
+            xml_schema_new_parser_ctxt, xml_schema_parse, xml_schema_set_parser_errors,
+        };
+        use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
-    let cfilename = CString::new(filename).unwrap();
-    let base = CString::new(base_filename(filename)).unwrap();
-    let base = base.as_ptr();
-    let mut res: i32 = 0;
-    let mut len: usize;
-    let mut ret: i32;
-    let mut pattern: [c_char; 500] = [0; 500];
-    let mut prefix: [c_char; 500] = [0; 500];
-    let mut result: [c_char; 500] = [0; 500];
-    let mut err: [c_char; 500] = [0; 500];
-    let mut globbuf: glob_t = unsafe { zeroed() };
-    let mut count: c_char;
+        let cfilename = CString::new(filename).unwrap();
+        let base = CString::new(base_filename(filename)).unwrap();
+        let base = base.as_ptr();
+        let mut res: i32 = 0;
+        let mut len: usize;
+        let mut ret: i32;
+        let mut pattern: [c_char; 500] = [0; 500];
+        let mut prefix: [c_char; 500] = [0; 500];
+        let mut result: [c_char; 500] = [0; 500];
+        let mut err: [c_char; 500] = [0; 500];
+        let mut globbuf: glob_t = zeroed();
+        let mut count: c_char;
 
-    // first compile the schemas if possible
-    let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(cfilename.as_ptr());
-    xml_schema_set_parser_errors(
-        ctxt,
-        Some(test_error_handler),
-        Some(test_error_handler),
-        Some(GenericErrorContext::new(ctxt)),
-    );
-    let schemas: XmlSchemaPtr = xml_schema_parse(ctxt);
-    xml_schema_free_parser_ctxt(ctxt);
-    let parse_errors_size = TEST_ERRORS_SIZE.get();
+        // first compile the schemas if possible
+        let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(cfilename.as_ptr());
+        xml_schema_set_parser_errors(
+            ctxt,
+            Some(test_error_handler),
+            Some(test_error_handler),
+            Some(GenericErrorContext::new(ctxt)),
+        );
+        let schemas: XmlSchemaPtr = xml_schema_parse(ctxt);
+        xml_schema_free_parser_ctxt(ctxt);
+        let parse_errors_size = TEST_ERRORS_SIZE.get();
 
-    // most of the mess is about the output filenames generated by the Makefile
-    len = strlen(base);
-    if !(5..=499).contains(&len) {
-        xml_schema_free(schemas);
-        return -1;
-    }
-    len -= 4; /* remove trailing .xsd */
-    if *base.add(len - 2) == b'_' as _ {
-        len -= 2; /* remove subtest number */
-    }
-    if *base.add(len - 2) == b'_' as _ {
-        len -= 2; /* remove subtest number */
-    }
-    memcpy(prefix.as_mut_ptr() as _, base as _, len);
-    prefix[len] = 0;
-
-    if snprintf(
-        pattern.as_mut_ptr() as _,
-        499,
-        c"./test/schemas/%s_*.xml".as_ptr(),
-        prefix.as_ptr(),
-    ) >= 499
-    {
-        pattern[499] = 0;
-    }
-
-    if *base.add(len) == b'_' as _ {
-        len += 2;
+        // most of the mess is about the output filenames generated by the Makefile
+        len = strlen(base);
+        if !(5..=499).contains(&len) {
+            xml_schema_free(schemas);
+            return -1;
+        }
+        len -= 4; /* remove trailing .xsd */
+        if *base.add(len - 2) == b'_' as _ {
+            len -= 2; /* remove subtest number */
+        }
+        if *base.add(len - 2) == b'_' as _ {
+            len -= 2; /* remove subtest number */
+        }
         memcpy(prefix.as_mut_ptr() as _, base as _, len);
         prefix[len] = 0;
-    }
 
-    globbuf.gl_offs = 0;
-    glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-    for i in 0..globbuf.gl_pathc {
-        TEST_ERRORS_SIZE.set(parse_errors_size);
-        TEST_ERRORS.with_borrow_mut(|errors| {
-            errors[parse_errors_size] = 0;
-        });
-        let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-        let base2 = CString::new(base_filename(instance.as_ref())).unwrap();
-        let base2 = base2.as_ptr();
-        len = strlen(base2);
-        if len > 6 && *base2.add(len - 6) == b'_' as _ {
-            count = *base2.add(len - 5);
-            ret = snprintf(
-                result.as_mut_ptr(),
-                499,
-                c"./result/schemas/%s_%c".as_ptr(),
-                prefix.as_ptr(),
-                count as i32,
-            );
-            if ret >= 499 {
-                result[499] = 0;
-            }
-            ret = snprintf(
-                err.as_mut_ptr(),
-                499,
-                c"./result/schemas/%s_%c.err".as_ptr(),
-                prefix.as_ptr(),
-                count as i32,
-            );
-            if ret >= 499 {
-                err[499] = 0;
-            }
-        } else {
-            eprintln!("don't know how to process {}", instance);
-            continue;
+        if snprintf(
+            pattern.as_mut_ptr() as _,
+            499,
+            c"./test/schemas/%s_*.xml".as_ptr(),
+            prefix.as_ptr(),
+        ) >= 499
+        {
+            pattern[499] = 0;
         }
-        if !schemas.is_null() {
-            NB_TESTS.set(NB_TESTS.get() + 1);
-            ret = schemas_one_test(
-                cfilename.as_ptr(),
-                &instance,
-                result.as_ptr(),
-                options,
-                schemas,
-            );
-            if ret != 0 {
-                res = ret;
-            }
+
+        if *base.add(len) == b'_' as _ {
+            len += 2;
+            memcpy(prefix.as_mut_ptr() as _, base as _, len);
+            prefix[len] = 0;
         }
-        TEST_ERRORS.with_borrow(|errors| {
-            if compare_file_mem(
-                CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
-                &errors[..TEST_ERRORS_SIZE.get()],
-            ) != 0
-            {
-                eprintln!("Error for {instance} on {filename} failed");
-                eprintln!(
-                    "{}",
-                    CStr::from_ptr(errors.as_ptr() as *const i8).to_string_lossy()
+
+        globbuf.gl_offs = 0;
+        glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
+        for i in 0..globbuf.gl_pathc {
+            TEST_ERRORS_SIZE.set(parse_errors_size);
+            TEST_ERRORS.with_borrow_mut(|errors| {
+                errors[parse_errors_size] = 0;
+            });
+            let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+            let base2 = CString::new(base_filename(instance.as_ref())).unwrap();
+            let base2 = base2.as_ptr();
+            len = strlen(base2);
+            if len > 6 && *base2.add(len - 6) == b'_' as _ {
+                count = *base2.add(len - 5);
+                ret = snprintf(
+                    result.as_mut_ptr(),
+                    499,
+                    c"./result/schemas/%s_%c".as_ptr(),
+                    prefix.as_ptr(),
+                    count as i32,
                 );
-                res = 1;
+                if ret >= 499 {
+                    result[499] = 0;
+                }
+                ret = snprintf(
+                    err.as_mut_ptr(),
+                    499,
+                    c"./result/schemas/%s_%c.err".as_ptr(),
+                    prefix.as_ptr(),
+                    count as i32,
+                );
+                if ret >= 499 {
+                    err[499] = 0;
+                }
+            } else {
+                eprintln!("don't know how to process {}", instance);
+                continue;
             }
-        });
-    }
-    globfree(addr_of_mut!(globbuf));
-    xml_schema_free(schemas);
+            if !schemas.is_null() {
+                NB_TESTS.set(NB_TESTS.get() + 1);
+                ret = schemas_one_test(
+                    cfilename.as_ptr(),
+                    &instance,
+                    result.as_ptr(),
+                    options,
+                    schemas,
+                );
+                if ret != 0 {
+                    res = ret;
+                }
+            }
+            TEST_ERRORS.with_borrow(|errors| {
+                if compare_file_mem(
+                    CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
+                    &errors[..TEST_ERRORS_SIZE.get()],
+                ) != 0
+                {
+                    eprintln!("Error for {instance} on {filename} failed");
+                    eprintln!(
+                        "{}",
+                        CStr::from_ptr(errors.as_ptr() as *const i8).to_string_lossy()
+                    );
+                    res = 1;
+                }
+            });
+        }
+        globfree(addr_of_mut!(globbuf));
+        xml_schema_free(schemas);
 
-    res
+        res
+    }
 }
 
 #[cfg(feature = "schema")]
@@ -3541,78 +3634,80 @@ unsafe fn rng_one_test(
     options: i32,
     schemas: XmlRelaxNGPtr,
 ) -> i32 {
-    use exml::{
-        libxml::relaxng::{xml_relaxng_set_valid_errors, xml_relaxng_validate_doc},
-        relaxng::{xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt},
-    };
+    unsafe {
+        use exml::{
+            libxml::relaxng::{xml_relaxng_set_valid_errors, xml_relaxng_validate_doc},
+            relaxng::{xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt},
+        };
 
-    let mut ret: i32;
+        let mut ret: i32;
 
-    let Some(doc) = xml_read_file(filename, None, options) else {
-        eprintln!(
-            "failed to parse instance {filename} for {}",
-            CStr::from_ptr(sch).to_string_lossy(),
-        );
-        return -1;
-    };
-
-    let temp = result_filename(
-        CStr::from_ptr(result).to_string_lossy().as_ref(),
-        TEMP_DIRECTORY.get().cloned().as_deref(),
-        Some(".res"),
-    );
-    let Ok(_) = File::options()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(temp.as_str())
-    else {
-        eprintln!("failed to open output file {temp}",);
-        xml_free_doc(doc);
-        return -1;
-    };
-
-    let ctxt = xml_relaxng_new_valid_ctxt(schemas);
-    xml_relaxng_set_valid_errors(
-        ctxt,
-        Some(test_error_handler),
-        Some(test_error_handler),
-        Some(GenericErrorContext::new(ctxt)),
-    );
-    ret = xml_relaxng_validate_doc(ctxt, doc);
-    match ret.cmp(&0) {
-        std::cmp::Ordering::Equal => {
-            test_error_handler(None, format!("{filename} validates\n").as_str());
-        }
-        std::cmp::Ordering::Greater => {
-            test_error_handler(None, format!("{filename} fails to validate\n").as_str());
-        }
-        std::cmp::Ordering::Less => {
-            test_error_handler(
-                None,
-                format!("{filename} validation generated an internal error\n").as_str(),
+        let Some(doc) = xml_read_file(filename, None, options) else {
+            eprintln!(
+                "failed to parse instance {filename} for {}",
+                CStr::from_ptr(sch).to_string_lossy(),
             );
-        }
-    }
+            return -1;
+        };
 
-    ret = 0;
-    if !result.is_null()
-        && compare_files(
-            temp.as_str(),
+        let temp = result_filename(
             CStr::from_ptr(result).to_string_lossy().as_ref(),
-        ) != 0
-    {
-        eprintln!(
-            "Result for {filename} on {} failed",
-            CStr::from_ptr(sch).to_string_lossy()
+            TEMP_DIRECTORY.get().cloned().as_deref(),
+            Some(".res"),
         );
-        ret = 1;
-    }
-    remove_file(temp).ok();
+        let Ok(_) = File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(temp.as_str())
+        else {
+            eprintln!("failed to open output file {temp}",);
+            xml_free_doc(doc);
+            return -1;
+        };
 
-    xml_relaxng_free_valid_ctxt(ctxt);
-    xml_free_doc(doc);
-    ret
+        let ctxt = xml_relaxng_new_valid_ctxt(schemas);
+        xml_relaxng_set_valid_errors(
+            ctxt,
+            Some(test_error_handler),
+            Some(test_error_handler),
+            Some(GenericErrorContext::new(ctxt)),
+        );
+        ret = xml_relaxng_validate_doc(ctxt, doc);
+        match ret.cmp(&0) {
+            std::cmp::Ordering::Equal => {
+                test_error_handler(None, format!("{filename} validates\n").as_str());
+            }
+            std::cmp::Ordering::Greater => {
+                test_error_handler(None, format!("{filename} fails to validate\n").as_str());
+            }
+            std::cmp::Ordering::Less => {
+                test_error_handler(
+                    None,
+                    format!("{filename} validation generated an internal error\n").as_str(),
+                );
+            }
+        }
+
+        ret = 0;
+        if !result.is_null()
+            && compare_files(
+                temp.as_str(),
+                CStr::from_ptr(result).to_string_lossy().as_ref(),
+            ) != 0
+        {
+            eprintln!(
+                "Result for {filename} on {} failed",
+                CStr::from_ptr(sch).to_string_lossy()
+            );
+            ret = 1;
+        }
+        remove_file(temp).ok();
+
+        xml_relaxng_free_valid_ctxt(ctxt);
+        xml_free_doc(doc);
+        ret
+    }
 }
 
 /// Parse an RNG schemas and then apply it to the related .xml
@@ -3626,127 +3721,129 @@ unsafe fn rng_test(
     _errr: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::mem::zeroed;
+    unsafe {
+        use std::mem::zeroed;
 
-    use exml::{
-        libxml::relaxng::{xml_relaxng_free, xml_relaxng_parse},
-        relaxng::{xml_relaxng_free_parser_ctxt, xml_relaxng_new_parser_ctxt},
-    };
-    use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
+        use exml::{
+            libxml::relaxng::{xml_relaxng_free, xml_relaxng_parse},
+            relaxng::{xml_relaxng_free_parser_ctxt, xml_relaxng_new_parser_ctxt},
+        };
+        use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
-    let cfilename = CString::new(filename).unwrap();
-    let base = CString::new(base_filename(filename)).unwrap();
-    let base = base.as_ptr();
-    let mut res: i32;
-    let mut len: usize;
-    let mut ret: i32 = 0;
-    let mut pattern: [c_char; 500] = [0; 500];
-    let mut prefix: [c_char; 500] = [0; 500];
-    let mut result: [c_char; 500] = [0; 500];
-    let mut err: [c_char; 500] = [0; 500];
-    let mut globbuf: glob_t = unsafe { zeroed() };
-    let mut count: c_char;
+        let cfilename = CString::new(filename).unwrap();
+        let base = CString::new(base_filename(filename)).unwrap();
+        let base = base.as_ptr();
+        let mut res: i32;
+        let mut len: usize;
+        let mut ret: i32 = 0;
+        let mut pattern: [c_char; 500] = [0; 500];
+        let mut prefix: [c_char; 500] = [0; 500];
+        let mut result: [c_char; 500] = [0; 500];
+        let mut err: [c_char; 500] = [0; 500];
+        let mut globbuf: glob_t = zeroed();
+        let mut count: c_char;
 
-    // first compile the schemas if possible
-    let ctxt = xml_relaxng_new_parser_ctxt(filename);
-    (*ctxt).set_parser_errors(
-        Some(test_error_handler),
-        Some(test_error_handler),
-        Some(GenericErrorContext::new(ctxt)),
-    );
-    let schemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
-    xml_relaxng_free_parser_ctxt(ctxt);
-    if schemas.is_null() {
-        test_error_handler(
-            None,
-            format!("Relax-NG schema {filename} failed to compile\n").as_str(),
+        // first compile the schemas if possible
+        let ctxt = xml_relaxng_new_parser_ctxt(filename);
+        (*ctxt).set_parser_errors(
+            Some(test_error_handler),
+            Some(test_error_handler),
+            Some(GenericErrorContext::new(ctxt)),
         );
-    }
-    let parse_errors_size = TEST_ERRORS_SIZE.get();
+        let schemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
+        xml_relaxng_free_parser_ctxt(ctxt);
+        if schemas.is_null() {
+            test_error_handler(
+                None,
+                format!("Relax-NG schema {filename} failed to compile\n").as_str(),
+            );
+        }
+        let parse_errors_size = TEST_ERRORS_SIZE.get();
 
-    // * most of the mess is about the output filenames generated by the Makefile
-    len = strlen(base);
-    if !(5..=499).contains(&len) {
+        // * most of the mess is about the output filenames generated by the Makefile
+        len = strlen(base);
+        if !(5..=499).contains(&len) {
+            xml_relaxng_free(schemas);
+            return -1;
+        }
+        len -= 4; /* remove trailing .rng */
+        memcpy(prefix.as_mut_ptr() as _, base as _, len);
+        prefix[len] = 0;
+
+        if snprintf(
+            pattern.as_mut_ptr(),
+            499,
+            c"./test/relaxng/%s_?.xml".as_ptr(),
+            prefix.as_ptr(),
+        ) >= 499
+        {
+            pattern[499] = 0;
+        }
+
+        globbuf.gl_offs = 0;
+        glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
+        for i in 0..globbuf.gl_pathc {
+            TEST_ERRORS_SIZE.set(parse_errors_size);
+            TEST_ERRORS.with_borrow_mut(|errors| errors[parse_errors_size] = 0);
+            let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+            let base2 = CString::new(base_filename(instance.as_ref())).unwrap();
+            let base2 = base2.as_ptr();
+            len = strlen(base2);
+            if len > 6 && *base2.add(len - 6) == b'_' as i8 {
+                count = *base2.add(len - 5);
+                res = snprintf(
+                    result.as_mut_ptr(),
+                    499,
+                    c"./result/relaxng/%s_%c".as_ptr(),
+                    prefix.as_ptr(),
+                    count as i32,
+                );
+                if res >= 499 {
+                    result[499] = 0;
+                }
+                res = snprintf(
+                    err.as_mut_ptr(),
+                    499,
+                    c"./result/relaxng/%s_%c.err".as_ptr(),
+                    prefix.as_ptr(),
+                    count as i32,
+                );
+                if res >= 499 {
+                    err[499] = 0;
+                }
+            } else {
+                eprintln!("don't know how to process {instance}");
+                continue;
+            }
+            if !schemas.is_null() {
+                NB_TESTS.set(NB_TESTS.get() + 1);
+                res = rng_one_test(
+                    cfilename.as_ptr(),
+                    &instance,
+                    result.as_ptr(),
+                    options,
+                    schemas,
+                );
+                if res != 0 {
+                    ret = res;
+                }
+            }
+            TEST_ERRORS.with_borrow(|errors| {
+                if compare_file_mem(
+                    CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
+                    &errors[..TEST_ERRORS_SIZE.get()],
+                ) != 0
+                {
+                    eprintln!("Error for {instance} on {filename} failed");
+                    // res = 1;
+                }
+            });
+        }
+        globfree(addr_of_mut!(globbuf));
         xml_relaxng_free(schemas);
-        return -1;
-    }
-    len -= 4; /* remove trailing .rng */
-    memcpy(prefix.as_mut_ptr() as _, base as _, len);
-    prefix[len] = 0;
 
-    if snprintf(
-        pattern.as_mut_ptr(),
-        499,
-        c"./test/relaxng/%s_?.xml".as_ptr(),
-        prefix.as_ptr(),
-    ) >= 499
-    {
-        pattern[499] = 0;
+        ret
     }
-
-    globbuf.gl_offs = 0;
-    glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-    for i in 0..globbuf.gl_pathc {
-        TEST_ERRORS_SIZE.set(parse_errors_size);
-        TEST_ERRORS.with_borrow_mut(|errors| errors[parse_errors_size] = 0);
-        let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-        let base2 = CString::new(base_filename(instance.as_ref())).unwrap();
-        let base2 = base2.as_ptr();
-        len = strlen(base2);
-        if len > 6 && *base2.add(len - 6) == b'_' as i8 {
-            count = *base2.add(len - 5);
-            res = snprintf(
-                result.as_mut_ptr(),
-                499,
-                c"./result/relaxng/%s_%c".as_ptr(),
-                prefix.as_ptr(),
-                count as i32,
-            );
-            if res >= 499 {
-                result[499] = 0;
-            }
-            res = snprintf(
-                err.as_mut_ptr(),
-                499,
-                c"./result/relaxng/%s_%c.err".as_ptr(),
-                prefix.as_ptr(),
-                count as i32,
-            );
-            if res >= 499 {
-                err[499] = 0;
-            }
-        } else {
-            eprintln!("don't know how to process {instance}");
-            continue;
-        }
-        if !schemas.is_null() {
-            NB_TESTS.set(NB_TESTS.get() + 1);
-            res = rng_one_test(
-                cfilename.as_ptr(),
-                &instance,
-                result.as_ptr(),
-                options,
-                schemas,
-            );
-            if res != 0 {
-                ret = res;
-            }
-        }
-        TEST_ERRORS.with_borrow(|errors| {
-            if compare_file_mem(
-                CStr::from_ptr(err.as_ptr()).to_string_lossy().as_ref(),
-                &errors[..TEST_ERRORS_SIZE.get()],
-            ) != 0
-            {
-                eprintln!("Error for {instance} on {filename} failed");
-                // res = 1;
-            }
-        });
-    }
-    globfree(addr_of_mut!(globbuf));
-    xml_relaxng_free(schemas);
-
-    ret
 }
 
 /// Parse a set of files with streaming, applying an RNG schemas
@@ -3760,147 +3857,149 @@ unsafe fn rng_stream_test(
     _errr: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::mem::zeroed;
+    unsafe {
+        use std::mem::zeroed;
 
-    use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
-    use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
+        use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
+        use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
-    let cfilename = CString::new(filename).unwrap();
-    let base = CString::new(base_filename(filename)).unwrap();
-    let base = base.as_ptr();
-    let mut instance: *const c_char;
-    let mut res: i32 = 0;
-    let mut len: usize;
-    let mut ret: i32;
-    let mut pattern: [c_char; 500] = [0; 500];
-    let mut prefix: [c_char; 500] = [0; 500];
-    let mut result: [c_char; 500] = [0; 500];
-    let mut err: [c_char; 500] = [0; 500];
-    let mut globbuf: glob_t = unsafe { zeroed() };
-    let mut count: c_char;
-    let mut reader: XmlTextReaderPtr;
-    let mut disable_err: i32 = 0;
+        let cfilename = CString::new(filename).unwrap();
+        let base = CString::new(base_filename(filename)).unwrap();
+        let base = base.as_ptr();
+        let mut instance: *const c_char;
+        let mut res: i32 = 0;
+        let mut len: usize;
+        let mut ret: i32;
+        let mut pattern: [c_char; 500] = [0; 500];
+        let mut prefix: [c_char; 500] = [0; 500];
+        let mut result: [c_char; 500] = [0; 500];
+        let mut err: [c_char; 500] = [0; 500];
+        let mut globbuf: glob_t = zeroed();
+        let mut count: c_char;
+        let mut reader: XmlTextReaderPtr;
+        let mut disable_err: i32 = 0;
 
-    // most of the mess is about the output filenames generated by the Makefile
-    len = strlen(base);
-    if !(5..=499).contains(&len) {
-        eprintln!("len(base) == {} !", len);
-        return -1;
-    }
-    len -= 4; /* remove trailing .rng */
-    memcpy(prefix.as_mut_ptr() as _, base as _, len);
-    prefix[len] = 0;
-
-    // strictly unifying the error messages is nearly impossible this
-    // hack is also done in the Makefile
-    if strcmp(prefix.as_ptr(), c"tutor10_1".as_ptr()) == 0
-        || strcmp(prefix.as_ptr(), c"tutor10_2".as_ptr()) == 0
-        || strcmp(prefix.as_ptr(), c"tutor3_2".as_ptr()) == 0
-        || strcmp(prefix.as_ptr(), c"307377".as_ptr()) == 0
-        || strcmp(prefix.as_ptr(), c"tutor8_2".as_ptr()) == 0
-    {
-        disable_err = 1;
-    }
-
-    if snprintf(
-        pattern.as_mut_ptr(),
-        499,
-        c"./test/relaxng/%s_?.xml".as_ptr(),
-        prefix.as_ptr(),
-    ) >= 499
-    {
-        pattern[499] = 0;
-    }
-
-    globbuf.gl_offs = 0;
-    glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
-    for i in 0..globbuf.gl_pathc {
-        TEST_ERRORS_SIZE.set(0);
-        TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
-        instance = *globbuf.gl_pathv.add(i);
-        let base2 = CString::new(base_filename(
-            CStr::from_ptr(instance).to_string_lossy().as_ref(),
-        ))
-        .unwrap();
-        let base2 = base2.as_ptr();
-        len = strlen(base2);
-        if len > 6 && *base2.add(len - 6) == b'_' as i8 {
-            count = *base2.add(len - 5);
-            ret = snprintf(
-                result.as_mut_ptr(),
-                499,
-                c"./result/relaxng/%s_%c".as_ptr(),
-                prefix.as_ptr(),
-                count as i32,
-            );
-            if ret >= 499 {
-                result[499] = 0;
-            }
-            ret = snprintf(
-                err.as_mut_ptr(),
-                499,
-                c"./result/relaxng/%s_%c.err".as_ptr(),
-                prefix.as_ptr(),
-                count as i32,
-            );
-            if ret >= 499 {
-                err[499] = 0;
-            }
-        } else {
-            eprintln!(
-                "don't know how to process {}",
-                CStr::from_ptr(instance).to_string_lossy()
-            );
-            continue;
+        // most of the mess is about the output filenames generated by the Makefile
+        len = strlen(base);
+        if !(5..=499).contains(&len) {
+            eprintln!("len(base) == {} !", len);
+            return -1;
         }
-        reader = xml_reader_for_file(
-            &CStr::from_ptr(instance).to_string_lossy(),
-            null_mut(),
-            options,
-        );
-        if reader.is_null() {
-            eprintln!(
-                "Failed to build reader for {}",
-                CStr::from_ptr(instance).to_string_lossy()
-            );
+        len -= 4; /* remove trailing .rng */
+        memcpy(prefix.as_mut_ptr() as _, base as _, len);
+        prefix[len] = 0;
+
+        // strictly unifying the error messages is nearly impossible this
+        // hack is also done in the Makefile
+        if strcmp(prefix.as_ptr(), c"tutor10_1".as_ptr()) == 0
+            || strcmp(prefix.as_ptr(), c"tutor10_2".as_ptr()) == 0
+            || strcmp(prefix.as_ptr(), c"tutor3_2".as_ptr()) == 0
+            || strcmp(prefix.as_ptr(), c"307377".as_ptr()) == 0
+            || strcmp(prefix.as_ptr(), c"tutor8_2".as_ptr()) == 0
+        {
+            disable_err = 1;
         }
-        let instance = CStr::from_ptr(instance).to_string_lossy();
-        if disable_err == 1 {
-            ret = stream_process_test(
-                &instance,
-                Some(
-                    CStr::from_ptr(result.as_ptr())
-                        .to_string_lossy()
-                        .into_owned(),
-                ),
-                None,
-                reader,
-                cfilename.as_ptr(),
+
+        if snprintf(
+            pattern.as_mut_ptr(),
+            499,
+            c"./test/relaxng/%s_?.xml".as_ptr(),
+            prefix.as_ptr(),
+        ) >= 499
+        {
+            pattern[499] = 0;
+        }
+
+        globbuf.gl_offs = 0;
+        glob(pattern.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
+        for i in 0..globbuf.gl_pathc {
+            TEST_ERRORS_SIZE.set(0);
+            TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
+            instance = *globbuf.gl_pathv.add(i);
+            let base2 = CString::new(base_filename(
+                CStr::from_ptr(instance).to_string_lossy().as_ref(),
+            ))
+            .unwrap();
+            let base2 = base2.as_ptr();
+            len = strlen(base2);
+            if len > 6 && *base2.add(len - 6) == b'_' as i8 {
+                count = *base2.add(len - 5);
+                ret = snprintf(
+                    result.as_mut_ptr(),
+                    499,
+                    c"./result/relaxng/%s_%c".as_ptr(),
+                    prefix.as_ptr(),
+                    count as i32,
+                );
+                if ret >= 499 {
+                    result[499] = 0;
+                }
+                ret = snprintf(
+                    err.as_mut_ptr(),
+                    499,
+                    c"./result/relaxng/%s_%c.err".as_ptr(),
+                    prefix.as_ptr(),
+                    count as i32,
+                );
+                if ret >= 499 {
+                    err[499] = 0;
+                }
+            } else {
+                eprintln!(
+                    "don't know how to process {}",
+                    CStr::from_ptr(instance).to_string_lossy()
+                );
+                continue;
+            }
+            reader = xml_reader_for_file(
+                &CStr::from_ptr(instance).to_string_lossy(),
+                null_mut(),
                 options,
             );
-        } else {
-            ret = stream_process_test(
-                &instance,
-                Some(
-                    CStr::from_ptr(result.as_ptr())
-                        .to_string_lossy()
-                        .into_owned(),
-                ),
-                Some(CStr::from_ptr(err.as_ptr()).to_string_lossy().into_owned()),
-                reader,
-                cfilename.as_ptr(),
-                options,
-            );
+            if reader.is_null() {
+                eprintln!(
+                    "Failed to build reader for {}",
+                    CStr::from_ptr(instance).to_string_lossy()
+                );
+            }
+            let instance = CStr::from_ptr(instance).to_string_lossy();
+            if disable_err == 1 {
+                ret = stream_process_test(
+                    &instance,
+                    Some(
+                        CStr::from_ptr(result.as_ptr())
+                            .to_string_lossy()
+                            .into_owned(),
+                    ),
+                    None,
+                    reader,
+                    cfilename.as_ptr(),
+                    options,
+                );
+            } else {
+                ret = stream_process_test(
+                    &instance,
+                    Some(
+                        CStr::from_ptr(result.as_ptr())
+                            .to_string_lossy()
+                            .into_owned(),
+                    ),
+                    Some(CStr::from_ptr(err.as_ptr()).to_string_lossy().into_owned()),
+                    reader,
+                    cfilename.as_ptr(),
+                    options,
+                );
+            }
+            xml_free_text_reader(reader);
+            if ret != 0 {
+                eprintln!("instance {instance} failed",);
+                res = ret;
+            }
         }
-        xml_free_text_reader(reader);
-        if ret != 0 {
-            eprintln!("instance {instance} failed",);
-            res = ret;
-        }
-    }
-    globfree(addr_of_mut!(globbuf));
+        globfree(addr_of_mut!(globbuf));
 
-    res
+        res
+    }
 }
 
 #[cfg(feature = "schematron")]
@@ -3910,41 +4009,43 @@ unsafe fn schematron_one_test(
     options: i32,
     schematron: XmlSchematronPtr,
 ) -> i32 {
-    use exml::libxml::schematron::{
-        xml_schematron_free_valid_ctxt, xml_schematron_new_valid_ctxt,
-        xml_schematron_set_valid_structured_errors, xml_schematron_validate_doc,
-        XmlSchematronValidOptions,
-    };
+    unsafe {
+        use exml::libxml::schematron::{
+            XmlSchematronValidOptions, xml_schematron_free_valid_ctxt,
+            xml_schematron_new_valid_ctxt, xml_schematron_set_valid_structured_errors,
+            xml_schematron_validate_doc,
+        };
 
-    let Some(doc) = xml_read_file(filename, None, options) else {
-        eprintln!("failed to parse instance {} for {}", filename, sch,);
-        return -1;
-    };
+        let Some(doc) = xml_read_file(filename, None, options) else {
+            eprintln!("failed to parse instance {} for {}", filename, sch,);
+            return -1;
+        };
 
-    let ctxt = xml_schematron_new_valid_ctxt(
-        schematron,
-        XmlSchematronValidOptions::XmlSchematronOutError as i32,
-    );
-    xml_schematron_set_valid_structured_errors(ctxt, Some(test_structured_error_handler), None);
-    let ret = xml_schematron_validate_doc(ctxt, doc);
-    match ret.cmp(&0) {
-        std::cmp::Ordering::Equal => {
-            test_error_handler(None, &format!("{} validates\n", filename));
+        let ctxt = xml_schematron_new_valid_ctxt(
+            schematron,
+            XmlSchematronValidOptions::XmlSchematronOutError as i32,
+        );
+        xml_schematron_set_valid_structured_errors(ctxt, Some(test_structured_error_handler), None);
+        let ret = xml_schematron_validate_doc(ctxt, doc);
+        match ret.cmp(&0) {
+            std::cmp::Ordering::Equal => {
+                test_error_handler(None, &format!("{} validates\n", filename));
+            }
+            std::cmp::Ordering::Greater => {
+                test_error_handler(None, &format!("{} fails to validate\n", filename));
+            }
+            std::cmp::Ordering::Less => {
+                test_error_handler(
+                    None,
+                    &format!("{} validation generated an internal error\n", filename),
+                );
+            }
         }
-        std::cmp::Ordering::Greater => {
-            test_error_handler(None, &format!("{} fails to validate\n", filename));
-        }
-        std::cmp::Ordering::Less => {
-            test_error_handler(
-                None,
-                &format!("{} validation generated an internal error\n", filename),
-            );
-        }
+
+        xml_schematron_free_valid_ctxt(ctxt);
+        xml_free_doc(doc);
+        0
     }
-
-    xml_schematron_free_valid_ctxt(ctxt);
-    xml_free_doc(doc);
-    0
 }
 
 /// Returns 0 in case of success, an error code otherwise
@@ -3955,80 +4056,82 @@ unsafe fn schematron_test(
     _errr: Option<String>,
     options: i32,
 ) -> i32 {
-    use std::mem::zeroed;
+    unsafe {
+        use std::mem::zeroed;
 
-    use exml::libxml::schematron::{
-        xml_schematron_free, xml_schematron_free_parser_ctxt, xml_schematron_new_parser_ctxt,
-        xml_schematron_parse,
-    };
-    use libc::{glob_t, GLOB_DOOFFS};
-
-    let cfilename = CString::new(filename).unwrap();
-    let base = base_filename(filename);
-    let mut ret = 0;
-    let mut globbuf: glob_t = unsafe { zeroed() };
-
-    let pctxt = xml_schematron_new_parser_ctxt(cfilename.as_ptr());
-    let schematron = xml_schematron_parse(pctxt);
-    xml_schematron_free_parser_ctxt(pctxt);
-    if schematron.is_null() {
-        test_error_handler(
-            None,
-            &format!("Schematron schema {filename} failed to compile\n",),
-        );
-    }
-    let parse_errors_size = TEST_ERRORS_SIZE.get();
-
-    // most of the mess is about the output filenames generated by the Makefile
-    let len = base.len();
-    if !(5..=499).contains(&len) {
-        xml_schematron_free(schematron);
-        return -1;
-    }
-    let prefix = base.strip_suffix(".sct").unwrap();
-    let mut pattern = format!("./test/schematron/{prefix}_?.xml");
-    pattern.truncate(500);
-    let cpattern = CString::new(pattern).unwrap();
-
-    globbuf.gl_offs = 0;
-    libc::glob(cpattern.as_ptr(), GLOB_DOOFFS, None, &raw mut globbuf);
-    for i in 0..globbuf.gl_pathc {
-        TEST_ERRORS_SIZE.set(parse_errors_size);
-        TEST_ERRORS.with_borrow_mut(|errors| {
-            errors[parse_errors_size] = 0;
-        });
-        let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
-        let base2 = base_filename(instance.as_ref());
-        let len = base2.len();
-        let err = if len > 6 && base2.as_bytes()[len - 6] == b'_' {
-            let count = base2.as_bytes()[len - 5] as char;
-            let mut err = format!("result/schematron/{prefix}_{count}.err");
-            err.truncate(500);
-            err
-        } else {
-            eprintln!("don't know how to process {}", instance);
-            continue;
+        use exml::libxml::schematron::{
+            xml_schematron_free, xml_schematron_free_parser_ctxt, xml_schematron_new_parser_ctxt,
+            xml_schematron_parse,
         };
-        if !schematron.is_null() {
-            NB_TESTS.set(NB_TESTS.get() + 1);
-            let res = schematron_one_test(filename, &instance, options, schematron);
-            if res != 0 {
-                ret = res;
-            }
-        }
-        TEST_ERRORS.with_borrow(|errors| {
-            if compare_file_mem(&err, &errors[..TEST_ERRORS_SIZE.get()]) != 0 {
-                eprintln!("Error for {} on {} failed", instance, filename);
-                let errstr = std::str::from_utf8(&errors[..TEST_ERRORS_SIZE.get()]).unwrap();
-                eprintln!("Result:\n{errstr}");
-                ret = 1;
-            }
-        });
-    }
-    libc::globfree(&raw mut globbuf);
-    xml_schematron_free(schematron);
+        use libc::{GLOB_DOOFFS, glob_t};
 
-    ret
+        let cfilename = CString::new(filename).unwrap();
+        let base = base_filename(filename);
+        let mut ret = 0;
+        let mut globbuf: glob_t = zeroed();
+
+        let pctxt = xml_schematron_new_parser_ctxt(cfilename.as_ptr());
+        let schematron = xml_schematron_parse(pctxt);
+        xml_schematron_free_parser_ctxt(pctxt);
+        if schematron.is_null() {
+            test_error_handler(
+                None,
+                &format!("Schematron schema {filename} failed to compile\n",),
+            );
+        }
+        let parse_errors_size = TEST_ERRORS_SIZE.get();
+
+        // most of the mess is about the output filenames generated by the Makefile
+        let len = base.len();
+        if !(5..=499).contains(&len) {
+            xml_schematron_free(schematron);
+            return -1;
+        }
+        let prefix = base.strip_suffix(".sct").unwrap();
+        let mut pattern = format!("./test/schematron/{prefix}_?.xml");
+        pattern.truncate(500);
+        let cpattern = CString::new(pattern).unwrap();
+
+        globbuf.gl_offs = 0;
+        libc::glob(cpattern.as_ptr(), GLOB_DOOFFS, None, &raw mut globbuf);
+        for i in 0..globbuf.gl_pathc {
+            TEST_ERRORS_SIZE.set(parse_errors_size);
+            TEST_ERRORS.with_borrow_mut(|errors| {
+                errors[parse_errors_size] = 0;
+            });
+            let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+            let base2 = base_filename(instance.as_ref());
+            let len = base2.len();
+            let err = if len > 6 && base2.as_bytes()[len - 6] == b'_' {
+                let count = base2.as_bytes()[len - 5] as char;
+                let mut err = format!("result/schematron/{prefix}_{count}.err");
+                err.truncate(500);
+                err
+            } else {
+                eprintln!("don't know how to process {}", instance);
+                continue;
+            };
+            if !schematron.is_null() {
+                NB_TESTS.set(NB_TESTS.get() + 1);
+                let res = schematron_one_test(filename, &instance, options, schematron);
+                if res != 0 {
+                    ret = res;
+                }
+            }
+            TEST_ERRORS.with_borrow(|errors| {
+                if compare_file_mem(&err, &errors[..TEST_ERRORS_SIZE.get()]) != 0 {
+                    eprintln!("Error for {} on {} failed", instance, filename);
+                    let errstr = std::str::from_utf8(&errors[..TEST_ERRORS_SIZE.get()]).unwrap();
+                    eprintln!("Result:\n{errstr}");
+                    ret = 1;
+                }
+            });
+        }
+        libc::globfree(&raw mut globbuf);
+        xml_schematron_free(schematron);
+
+        ret
+    }
 }
 
 #[cfg(all(feature = "libxml_pattern", feature = "libxml_reader"))]
@@ -4039,69 +4142,72 @@ unsafe fn pattern_node(
     patternc: XmlPatternPtr,
     mut patstream: XmlStreamCtxtPtr,
 ) {
-    use exml::libxml::{
-        pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
-        xmlreader::{
-            xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri, XmlReaderTypes,
-        },
-    };
+    unsafe {
+        use exml::libxml::{
+            pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
+            xmlreader::{
+                XmlReaderTypes, xml_text_reader_const_local_name,
+                xml_text_reader_const_namespace_uri,
+            },
+        };
 
-    let mut path = None;
-    let mut is_match: i32 = -1;
+        let mut path = None;
+        let mut is_match: i32 = -1;
 
-    let typ = (*reader).node_type();
-    let empty = (*reader).is_empty_element();
-
-    if typ == XmlReaderTypes::XmlReaderTypeElement {
-        /* do the check only on element start */
-        is_match = xml_pattern_match(patternc, (*reader).current_node().unwrap());
-
-        if is_match != 0 {
-            path = (*reader).current_node().unwrap().get_node_path();
-            writeln!(
-                out,
-                "Node {} matches pattern {}",
-                path.as_deref().unwrap(),
-                CStr::from_ptr(pattern).to_string_lossy()
-            )
-            .ok();
-        }
-    }
-    if !patstream.is_null() {
-        let mut ret: i32;
+        let typ = (*reader).node_type();
+        let empty = (*reader).is_empty_element();
 
         if typ == XmlReaderTypes::XmlReaderTypeElement {
-            ret = xml_stream_push(
-                patstream,
-                xml_text_reader_const_local_name(&mut *reader),
-                xml_text_reader_const_namespace_uri(&mut *reader),
-            );
-            if ret < 0 {
-                writeln!(out, "xmlStreamPush() failure").ok();
-                xml_free_stream_ctxt(patstream);
-                patstream = null_mut();
-            } else if ret != is_match {
-                if path.is_none() {
-                    path = (*reader).current_node().unwrap().get_node_path();
-                }
-                writeln!(out, "xmlPatternMatch and xmlStreamPush disagree").ok();
+            /* do the check only on element start */
+            is_match = xml_pattern_match(patternc, (*reader).current_node().unwrap());
+
+            if is_match != 0 {
+                path = (*reader).current_node().unwrap().get_node_path();
                 writeln!(
                     out,
-                    "  pattern {} node {}",
-                    CStr::from_ptr(pattern).to_string_lossy(),
-                    path.as_deref().unwrap()
+                    "Node {} matches pattern {}",
+                    path.as_deref().unwrap(),
+                    CStr::from_ptr(pattern).to_string_lossy()
                 )
                 .ok();
             }
         }
-        if typ == XmlReaderTypes::XmlReaderTypeEndElement
-            || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap())
-        {
-            ret = xml_stream_pop(patstream);
-            if ret < 0 {
-                writeln!(out, "xmlStreamPop() failure").ok();
-                xml_free_stream_ctxt(patstream);
-                // patstream = null_mut();
+        if !patstream.is_null() {
+            let mut ret: i32;
+
+            if typ == XmlReaderTypes::XmlReaderTypeElement {
+                ret = xml_stream_push(
+                    patstream,
+                    xml_text_reader_const_local_name(&mut *reader),
+                    xml_text_reader_const_namespace_uri(&mut *reader),
+                );
+                if ret < 0 {
+                    writeln!(out, "xmlStreamPush() failure").ok();
+                    xml_free_stream_ctxt(patstream);
+                    patstream = null_mut();
+                } else if ret != is_match {
+                    if path.is_none() {
+                        path = (*reader).current_node().unwrap().get_node_path();
+                    }
+                    writeln!(out, "xmlPatternMatch and xmlStreamPush disagree").ok();
+                    writeln!(
+                        out,
+                        "  pattern {} node {}",
+                        CStr::from_ptr(pattern).to_string_lossy(),
+                        path.as_deref().unwrap()
+                    )
+                    .ok();
+                }
+            }
+            if typ == XmlReaderTypes::XmlReaderTypeEndElement
+                || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap())
+            {
+                ret = xml_stream_pop(patstream);
+                if ret < 0 {
+                    writeln!(out, "xmlStreamPop() failure").ok();
+                    xml_free_stream_ctxt(patstream);
+                    // patstream = null_mut();
+                }
             }
         }
     }
@@ -4118,255 +4224,262 @@ unsafe fn pattern_test(
     _err: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::libxml::{
-        pattern::{
-            xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
-            xml_patterncompile, xml_stream_push,
-        },
-        xmlreader::{xml_free_text_reader, xml_reader_walker},
-    };
+    unsafe {
+        use exml::libxml::{
+            pattern::{
+                xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
+                xml_patterncompile, xml_stream_push,
+            },
+            xmlreader::{xml_free_text_reader, xml_reader_walker},
+        };
 
-    let mut patternc: XmlPatternPtr;
-    let mut patstream: XmlStreamCtxtPtr;
-    let mut xml: [c_char; 500] = [0; 500];
-    let mut result: [c_char; 500] = [0; 500];
-    let mut len: usize;
-    let mut ret: i32;
-    let mut res: i32;
-    let cfilename = CString::new(filename).unwrap();
-    let mut reader: XmlTextReaderPtr;
+        let mut patternc: XmlPatternPtr;
+        let mut patstream: XmlStreamCtxtPtr;
+        let mut xml: [c_char; 500] = [0; 500];
+        let mut result: [c_char; 500] = [0; 500];
+        let mut len: usize;
+        let mut ret: i32;
+        let mut res: i32;
+        let cfilename = CString::new(filename).unwrap();
+        let mut reader: XmlTextReaderPtr;
 
-    len = filename.len();
-    len -= 4;
-    memcpy(xml.as_mut_ptr() as _, cfilename.as_ptr() as _, len);
-    xml[len] = 0;
-    let cbase = CString::new(base_filename(
-        CStr::from_ptr(xml.as_ptr()).to_string_lossy().as_ref(),
-    ))
-    .unwrap();
-    if snprintf(
-        result.as_mut_ptr(),
-        499,
-        c"./result/pattern/%s".as_ptr(),
-        cbase.as_ptr(),
-    ) >= 499
-    {
-        result[499] = 0;
-    }
-    memcpy(xml.as_mut_ptr().add(len) as _, c".xml".as_ptr() as _, 5);
-
-    if !check_test_file(CStr::from_ptr(xml.as_ptr()).to_string_lossy().as_ref())
-        && !*UPDATE_RESULTS.get_or_init(|| false)
-    {
-        eprintln!(
-            "Missing xml file {}",
-            CStr::from_ptr(xml.as_ptr()).to_string_lossy()
-        );
-        return -1;
-    }
-    let Ok(mut f) = File::open(filename).map(BufReader::new) else {
-        eprintln!("Failed to open {filename}\n",);
-        return -1;
-    };
-    let temp = result_filename(
-        filename,
-        TEMP_DIRECTORY.get().cloned().as_deref(),
-        Some(".res"),
-    );
-    let Ok(mut o) = File::options()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(temp.as_str())
-    else {
-        eprintln!("failed to open output file {temp}",);
-        return -1;
-    };
-    let mut str = vec![];
-    loop {
-        // read one line in string buffer.
-        match f.read_until(b'\n', &mut str) {
-            Ok(mut size) if size > 0 => {
-                // remove the ending spaces
-                while size > 0
-                    && (str[size - 1] == b'\n'
-                        || str[size - 1] == b'\r'
-                        || str[size - 1] == b' '
-                        || str[size - 1] == b'\t')
-                {
-                    size -= 1;
-                    str[size] = 0;
-                }
-                let xml = CStr::from_ptr(xml.as_ptr()).to_string_lossy();
-                if let Some(doc) = xml_read_file(&xml, None, options) {
-                    let mut namespaces: [(*const u8, *const u8); 20] = [(null(), null()); 20];
-                    let root = doc.get_root_element().unwrap();
-                    let mut ns = root.ns_def;
-                    let mut j = 0;
-                    while let Some(now) = ns.filter(|_| j < 10) {
-                        namespaces[j] = (now.href, now.prefix);
-                        j += 1;
-                        ns = now.next;
-                    }
-
-                    patternc = xml_patterncompile(str.as_ptr(), 0, Some(namespaces[..=j].to_vec()));
-                    if patternc.is_null() {
-                        let str = CStr::from_ptr(str.as_ptr() as *const i8).to_string_lossy();
-                        test_error_handler(
-                            None,
-                            format!("Pattern {str} failed to compile\n").as_str(),
-                        );
-                        xml_free_doc(doc);
-                        // ret = 1;
-                        continue;
-                    }
-                    patstream = xml_pattern_get_stream_ctxt(patternc);
-                    if !patstream.is_null() {
-                        ret = xml_stream_push(patstream, null_mut(), null_mut());
-                        if ret < 0 {
-                            eprintln!("xmlStreamPush() failure");
-                            xml_free_stream_ctxt(patstream);
-                            patstream = null_mut();
-                        }
-                    }
-                    NB_TESTS.set(NB_TESTS.get() + 1);
-
-                    reader = xml_reader_walker(doc);
-                    res = (*reader).read();
-                    while res == 1 {
-                        pattern_node(&mut o, reader, str.as_ptr() as _, patternc, patstream);
-                        res = (*reader).read();
-                    }
-                    if res != 0 {
-                        writeln!(o, "{filename} : failed to parse",).ok();
-                    }
-                    xml_free_text_reader(reader);
-                    xml_free_doc(doc);
-                    xml_free_stream_ctxt(patstream);
-                    // patstream = null_mut();
-                    xml_free_pattern(patternc);
-                } else {
-                    eprintln!("Failed to parse {xml}");
-                    // ret = 1;
-                }
-            }
-            _ => {
-                break;
-            }
+        len = filename.len();
+        len -= 4;
+        memcpy(xml.as_mut_ptr() as _, cfilename.as_ptr() as _, len);
+        xml[len] = 0;
+        let cbase = CString::new(base_filename(
+            CStr::from_ptr(xml.as_ptr()).to_string_lossy().as_ref(),
+        ))
+        .unwrap();
+        if snprintf(
+            result.as_mut_ptr(),
+            499,
+            c"./result/pattern/%s".as_ptr(),
+            cbase.as_ptr(),
+        ) >= 499
+        {
+            result[499] = 0;
         }
-        str.clear();
-    }
+        memcpy(xml.as_mut_ptr().add(len) as _, c".xml".as_ptr() as _, 5);
 
-    let result = CStr::from_ptr(result.as_ptr()).to_string_lossy();
-    ret = compare_files(temp.as_str(), result.as_ref());
-    if ret != 0 {
-        eprintln!("Result for {filename} failed in {result}");
-        ret = 1;
+        if !check_test_file(CStr::from_ptr(xml.as_ptr()).to_string_lossy().as_ref())
+            && !*UPDATE_RESULTS.get_or_init(|| false)
+        {
+            eprintln!(
+                "Missing xml file {}",
+                CStr::from_ptr(xml.as_ptr()).to_string_lossy()
+            );
+            return -1;
+        }
+        let Ok(mut f) = File::open(filename).map(BufReader::new) else {
+            eprintln!("Failed to open {filename}\n",);
+            return -1;
+        };
+        let temp = result_filename(
+            filename,
+            TEMP_DIRECTORY.get().cloned().as_deref(),
+            Some(".res"),
+        );
+        let Ok(mut o) = File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(temp.as_str())
+        else {
+            eprintln!("failed to open output file {temp}",);
+            return -1;
+        };
+        let mut str = vec![];
+        loop {
+            // read one line in string buffer.
+            match f.read_until(b'\n', &mut str) {
+                Ok(mut size) if size > 0 => {
+                    // remove the ending spaces
+                    while size > 0
+                        && (str[size - 1] == b'\n'
+                            || str[size - 1] == b'\r'
+                            || str[size - 1] == b' '
+                            || str[size - 1] == b'\t')
+                    {
+                        size -= 1;
+                        str[size] = 0;
+                    }
+                    let xml = CStr::from_ptr(xml.as_ptr()).to_string_lossy();
+                    if let Some(doc) = xml_read_file(&xml, None, options) {
+                        let mut namespaces: [(*const u8, *const u8); 20] = [(null(), null()); 20];
+                        let root = doc.get_root_element().unwrap();
+                        let mut ns = root.ns_def;
+                        let mut j = 0;
+                        while let Some(now) = ns.filter(|_| j < 10) {
+                            namespaces[j] = (now.href, now.prefix);
+                            j += 1;
+                            ns = now.next;
+                        }
+
+                        patternc =
+                            xml_patterncompile(str.as_ptr(), 0, Some(namespaces[..=j].to_vec()));
+                        if patternc.is_null() {
+                            let str = CStr::from_ptr(str.as_ptr() as *const i8).to_string_lossy();
+                            test_error_handler(
+                                None,
+                                format!("Pattern {str} failed to compile\n").as_str(),
+                            );
+                            xml_free_doc(doc);
+                            // ret = 1;
+                            continue;
+                        }
+                        patstream = xml_pattern_get_stream_ctxt(patternc);
+                        if !patstream.is_null() {
+                            ret = xml_stream_push(patstream, null_mut(), null_mut());
+                            if ret < 0 {
+                                eprintln!("xmlStreamPush() failure");
+                                xml_free_stream_ctxt(patstream);
+                                patstream = null_mut();
+                            }
+                        }
+                        NB_TESTS.set(NB_TESTS.get() + 1);
+
+                        reader = xml_reader_walker(doc);
+                        res = (*reader).read();
+                        while res == 1 {
+                            pattern_node(&mut o, reader, str.as_ptr() as _, patternc, patstream);
+                            res = (*reader).read();
+                        }
+                        if res != 0 {
+                            writeln!(o, "{filename} : failed to parse",).ok();
+                        }
+                        xml_free_text_reader(reader);
+                        xml_free_doc(doc);
+                        xml_free_stream_ctxt(patstream);
+                        // patstream = null_mut();
+                        xml_free_pattern(patternc);
+                    } else {
+                        eprintln!("Failed to parse {xml}");
+                        // ret = 1;
+                    }
+                }
+                _ => {
+                    break;
+                }
+            }
+            str.clear();
+        }
+
+        let result = CStr::from_ptr(result.as_ptr()).to_string_lossy();
+        ret = compare_files(temp.as_str(), result.as_ref());
+        if ret != 0 {
+            eprintln!("Result for {filename} failed in {result}");
+            ret = 1;
+        }
+        remove_file(temp).ok();
+        ret
     }
-    remove_file(temp).ok();
-    ret
 }
 
 #[cfg(feature = "c14n")]
 unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObjectPtr {
-    use exml::{
-        globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
-        libxml::parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
-        tree::NodeCommon,
-        xpath::{
-            internals::xml_xpath_register_ns, xml_xpath_eval_expression, xml_xpath_free_context,
-            xml_xpath_new_context, XmlXPathContextPtr,
-        },
-    };
+    unsafe {
+        use exml::{
+            globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
+            libxml::parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS, XmlParserOption},
+            tree::NodeCommon,
+            xpath::{
+                XmlXPathContextPtr, internals::xml_xpath_register_ns, xml_xpath_eval_expression,
+                xml_xpath_free_context, xml_xpath_new_context,
+            },
+        };
 
-    // load XPath expr as a file
-    set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
-    set_substitute_entities_default_value(1);
+        // load XPath expr as a file
+        set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
+        set_substitute_entities_default_value(1);
 
-    let Some(doc) = xml_read_file(
-        filename,
-        None,
-        XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
-    ) else {
-        eprintln!("Error: unable to parse file \"{filename}\"");
-        return null_mut();
-    };
+        let Some(doc) = xml_read_file(
+            filename,
+            None,
+            XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
+        ) else {
+            eprintln!("Error: unable to parse file \"{filename}\"");
+            return null_mut();
+        };
 
-    // Check the document is of the right kind
-    if doc.get_root_element().is_none() {
-        eprintln!("Error: empty document for file \"{filename}\"");
-        xml_free_doc(doc);
-        return null_mut();
-    }
+        // Check the document is of the right kind
+        if doc.get_root_element().is_none() {
+            eprintln!("Error: empty document for file \"{filename}\"");
+            xml_free_doc(doc);
+            return null_mut();
+        }
 
-    let mut node = doc.children();
-    while let Some(now) = node.filter(|node| node.name().as_deref() != Some("XPath")) {
-        node = now.next();
-    }
+        let mut node = doc.children();
+        while let Some(now) = node.filter(|node| node.name().as_deref() != Some("XPath")) {
+            node = now.next();
+        }
 
-    let Some(node) = node else {
-        eprintln!("Error: XPath element expected in the file  \"{filename}\"");
-        xml_free_doc(doc);
-        return null_mut();
-    };
+        let Some(node) = node else {
+            eprintln!("Error: XPath element expected in the file  \"{filename}\"");
+            xml_free_doc(doc);
+            return null_mut();
+        };
 
-    let Some(expr) = node.get_content() else {
-        eprintln!("Error: XPath content element is NULL \"{filename}\"");
-        xml_free_doc(doc);
-        return null_mut();
-    };
+        let Some(expr) = node.get_content() else {
+            eprintln!("Error: XPath content element is NULL \"{filename}\"");
+            xml_free_doc(doc);
+            return null_mut();
+        };
 
-    let ctx: XmlXPathContextPtr = xml_xpath_new_context(Some(parent_doc));
-    if ctx.is_null() {
-        eprintln!("Error: unable to create new context");
-        xml_free_doc(doc);
-        return null_mut();
-    }
+        let ctx: XmlXPathContextPtr = xml_xpath_new_context(Some(parent_doc));
+        if ctx.is_null() {
+            eprintln!("Error: unable to create new context");
+            xml_free_doc(doc);
+            return null_mut();
+        }
 
-    // Register namespaces
-    let node = XmlNodePtr::try_from(node).unwrap();
-    let mut ns = node.ns_def;
-    while let Some(now) = ns {
-        if xml_xpath_register_ns(ctx, now.prefix, now.href) != 0 {
-            eprintln!(
-                "Error: unable to register NS with prefix=\"{}\" and href=\"{}\"",
-                CStr::from_ptr(now.prefix as _).to_string_lossy(),
-                CStr::from_ptr(now.href as _).to_string_lossy(),
-            );
+        // Register namespaces
+        let node = XmlNodePtr::try_from(node).unwrap();
+        let mut ns = node.ns_def;
+        while let Some(now) = ns {
+            if xml_xpath_register_ns(ctx, now.prefix, now.href) != 0 {
+                eprintln!(
+                    "Error: unable to register NS with prefix=\"{}\" and href=\"{}\"",
+                    CStr::from_ptr(now.prefix as _).to_string_lossy(),
+                    CStr::from_ptr(now.href as _).to_string_lossy(),
+                );
+                xml_xpath_free_context(ctx);
+                xml_free_doc(doc);
+                return null_mut();
+            }
+            ns = now.next;
+        }
+
+        // Evaluate xpath
+        let expr = CString::new(expr).unwrap();
+        let xpath: XmlXPathObjectPtr = xml_xpath_eval_expression(expr.as_ptr() as *const u8, ctx);
+        if xpath.is_null() {
+            eprintln!("Error: unable to evaluate xpath expression");
             xml_xpath_free_context(ctx);
             xml_free_doc(doc);
             return null_mut();
         }
-        ns = now.next;
-    }
 
-    // Evaluate xpath
-    let expr = CString::new(expr).unwrap();
-    let xpath: XmlXPathObjectPtr = xml_xpath_eval_expression(expr.as_ptr() as *const u8, ctx);
-    if xpath.is_null() {
-        eprintln!("Error: unable to evaluate xpath expression");
+        // print_xpath_nodes((*xpath).nodesetval);
+
         xml_xpath_free_context(ctx);
         xml_free_doc(doc);
-        return null_mut();
+        xpath
     }
-
-    // print_xpath_nodes((*xpath).nodesetval);
-
-    xml_xpath_free_context(ctx);
-    xml_free_doc(doc);
-    xpath
 }
 
 #[cfg(feature = "c14n")]
 unsafe fn parse_list(s: *mut XmlChar) -> Option<Vec<String>> {
-    if s.is_null() {
-        return None;
-    }
+    unsafe {
+        if s.is_null() {
+            return None;
+        }
 
-    let s = CStr::from_ptr(s as *const i8)
-        .to_string_lossy()
-        .into_owned();
-    Some(s.split(',').map(|s| s.to_owned()).collect())
+        let s = CStr::from_ptr(s as *const i8)
+            .to_string_lossy()
+            .into_owned();
+        Some(s.split(',').map(|s| s.to_owned()).collect())
+    }
 }
 
 #[cfg(feature = "c14n")]
@@ -4378,114 +4491,116 @@ unsafe fn c14n_run_test(
     ns_filename: *const c_char,
     result_file: *const c_char,
 ) -> i32 {
-    use exml::{
-        globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
-        libxml::{
-            c14n::xml_c14n_doc_dump_memory,
-            parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
-        },
-        xpath::xml_xpath_free_object,
-    };
+    unsafe {
+        use exml::{
+            globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
+            libxml::{
+                c14n::xml_c14n_doc_dump_memory,
+                parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS, XmlParserOption},
+            },
+            xpath::xml_xpath_free_object,
+        };
 
-    let mut xpath: XmlXPathObjectPtr = null_mut();
-    let mut ret: i32;
-    let mut inclusive_namespaces = None;
-    let mut nslist: *const c_char = null_mut();
-    let mut nssize: i32 = 0;
+        let mut xpath: XmlXPathObjectPtr = null_mut();
+        let mut ret: i32;
+        let mut inclusive_namespaces = None;
+        let mut nslist: *const c_char = null_mut();
+        let mut nssize: i32 = 0;
 
-    // build an XML tree from a the file; we need to add default
-    // attributes and resolve all character and entities references
-    set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
-    set_substitute_entities_default_value(1);
+        // build an XML tree from a the file; we need to add default
+        // attributes and resolve all character and entities references
+        set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
+        set_substitute_entities_default_value(1);
 
-    let Some(mut doc) = xml_read_file(
-        xml_filename,
-        None,
-        XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
-    ) else {
-        // let last_error = get_last_error();
-        // eprintln!("last_error: {last_error:?}");
-        eprintln!("Error: unable to parse file \"{xml_filename}\"");
-        return -1;
-    };
+        let Some(mut doc) = xml_read_file(
+            xml_filename,
+            None,
+            XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
+        ) else {
+            // let last_error = get_last_error();
+            // eprintln!("last_error: {last_error:?}");
+            eprintln!("Error: unable to parse file \"{xml_filename}\"");
+            return -1;
+        };
 
-    // Check the document is of the right kind
-    if doc.get_root_element().is_none() {
-        eprintln!("Error: empty document for file \"{xml_filename}\"");
-        xml_free_doc(doc);
-        return -1;
-    }
-
-    // load xpath file if specified
-    if let Some(xpath_filename) = xpath_filename {
-        xpath = load_xpath_expr(doc, xpath_filename);
-        if xpath.is_null() {
-            eprintln!("Error: unable to evaluate xpath expression");
+        // Check the document is of the right kind
+        if doc.get_root_element().is_none() {
+            eprintln!("Error: empty document for file \"{xml_filename}\"");
             xml_free_doc(doc);
             return -1;
         }
-    }
 
-    if !ns_filename.is_null() {
-        if load_mem(
-            CStr::from_ptr(ns_filename).to_string_lossy().as_ref(),
-            addr_of_mut!(nslist),
-            addr_of_mut!(nssize),
-        ) != 0
-        {
-            eprintln!("Error: unable to evaluate xpath expression");
-            if !xpath.is_null() {
-                xml_xpath_free_object(xpath);
+        // load xpath file if specified
+        if let Some(xpath_filename) = xpath_filename {
+            xpath = load_xpath_expr(doc, xpath_filename);
+            if xpath.is_null() {
+                eprintln!("Error: unable to evaluate xpath expression");
+                xml_free_doc(doc);
+                return -1;
             }
-            xml_free_doc(doc);
-            return -1;
         }
-        inclusive_namespaces = parse_list(nslist as *mut XmlChar);
-    }
 
-    // Canonical form
-    // fprintf(stderr,"File \"%s\" loaded: start canonization\n", xml_filename);
-    let mut result = String::new();
-    ret = xml_c14n_doc_dump_memory(
-        &mut doc,
-        if !xpath.is_null() {
-            (*xpath).nodesetval.as_deref_mut()
+        if !ns_filename.is_null() {
+            if load_mem(
+                CStr::from_ptr(ns_filename).to_string_lossy().as_ref(),
+                addr_of_mut!(nslist),
+                addr_of_mut!(nssize),
+            ) != 0
+            {
+                eprintln!("Error: unable to evaluate xpath expression");
+                if !xpath.is_null() {
+                    xml_xpath_free_object(xpath);
+                }
+                xml_free_doc(doc);
+                return -1;
+            }
+            inclusive_namespaces = parse_list(nslist as *mut XmlChar);
+        }
+
+        // Canonical form
+        // fprintf(stderr,"File \"%s\" loaded: start canonization\n", xml_filename);
+        let mut result = String::new();
+        ret = xml_c14n_doc_dump_memory(
+            &mut doc,
+            if !xpath.is_null() {
+                (*xpath).nodesetval.as_deref_mut()
+            } else {
+                None
+            },
+            mode,
+            inclusive_namespaces,
+            with_comments,
+            &mut result,
+        );
+        if ret >= 0 {
+            if compare_file_mem(
+                CStr::from_ptr(result_file).to_string_lossy().as_ref(),
+                result.as_bytes(),
+            ) != 0
+            {
+                eprintln!("Result mismatch for {xml_filename}");
+                eprintln!("RESULT:\n{result}");
+                ret = -1;
+            }
         } else {
-            None
-        },
-        mode,
-        inclusive_namespaces,
-        with_comments,
-        &mut result,
-    );
-    if ret >= 0 {
-        if compare_file_mem(
-            CStr::from_ptr(result_file).to_string_lossy().as_ref(),
-            result.as_bytes(),
-        ) != 0
-        {
-            eprintln!("Result mismatch for {xml_filename}");
-            eprintln!("RESULT:\n{result}");
+            eprintln!(
+                "Error: failed to canonicalize XML file \"{xml_filename}\" (ret={})",
+                ret,
+            );
             ret = -1;
         }
-    } else {
-        eprintln!(
-            "Error: failed to canonicalize XML file \"{xml_filename}\" (ret={})",
-            ret,
-        );
-        ret = -1;
-    }
 
-    // Cleanup
-    if !xpath.is_null() {
-        xml_xpath_free_object(xpath);
-    }
-    if !nslist.is_null() {
-        free(nslist as _);
-    }
-    xml_free_doc(doc);
+        // Cleanup
+        if !xpath.is_null() {
+            xml_xpath_free_object(xpath);
+        }
+        if !nslist.is_null() {
+            free(nslist as _);
+        }
+        xml_free_doc(doc);
 
-    ret
+        ret
+    }
 }
 
 #[cfg(feature = "c14n")]
@@ -4495,85 +4610,87 @@ unsafe fn c14n_common_test(
     mode: XmlC14NMode,
     subdir: *const c_char,
 ) -> i32 {
-    use libc::strdup;
+    unsafe {
+        use libc::strdup;
 
-    let mut buf: [c_char; 500] = [0; 500];
-    let mut prefix: [c_char; 500] = [0; 500];
-    let mut len: usize;
-    let mut xpath: *mut c_char = null_mut();
-    let mut ns: *mut c_char = null_mut();
-    let mut ret: i32 = 0;
+        let mut buf: [c_char; 500] = [0; 500];
+        let mut prefix: [c_char; 500] = [0; 500];
+        let mut len: usize;
+        let mut xpath: *mut c_char = null_mut();
+        let mut ns: *mut c_char = null_mut();
+        let mut ret: i32 = 0;
 
-    let base = CString::new(base_filename(filename)).unwrap();
-    let base = base.as_ptr();
-    len = strlen(base);
-    len -= 4;
-    memcpy(prefix.as_mut_ptr() as _, base as _, len);
-    prefix[len] = 0;
+        let base = CString::new(base_filename(filename)).unwrap();
+        let base = base.as_ptr();
+        len = strlen(base);
+        len -= 4;
+        memcpy(prefix.as_mut_ptr() as _, base as _, len);
+        prefix[len] = 0;
 
-    if snprintf(
-        buf.as_mut_ptr(),
-        499,
-        c"./result/c14n/%s/%s".as_ptr(),
-        subdir,
-        prefix.as_ptr(),
-    ) >= 499
-    {
-        buf[499] = 0;
-    }
-    let result: *mut c_char = strdup(buf.as_ptr());
-    if snprintf(
-        buf.as_mut_ptr(),
-        499,
-        c"./test/c14n/%s/%s.xpath".as_ptr(),
-        subdir,
-        prefix.as_ptr(),
-    ) >= 499
-    {
-        buf[499] = 0;
-    }
-    if check_test_file(CStr::from_ptr(buf.as_ptr()).to_string_lossy().as_ref()) {
-        xpath = strdup(buf.as_ptr());
-    }
-    if snprintf(
-        buf.as_mut_ptr(),
-        499,
-        c"./test/c14n/%s/%s.ns".as_ptr(),
-        subdir,
-        prefix.as_ptr(),
-    ) >= 499
-    {
-        buf[499] = 0;
-    }
-    if check_test_file(CStr::from_ptr(buf.as_ptr()).to_string_lossy().as_ref()) {
-        ns = strdup(buf.as_ptr());
-    }
+        if snprintf(
+            buf.as_mut_ptr(),
+            499,
+            c"./result/c14n/%s/%s".as_ptr(),
+            subdir,
+            prefix.as_ptr(),
+        ) >= 499
+        {
+            buf[499] = 0;
+        }
+        let result: *mut c_char = strdup(buf.as_ptr());
+        if snprintf(
+            buf.as_mut_ptr(),
+            499,
+            c"./test/c14n/%s/%s.xpath".as_ptr(),
+            subdir,
+            prefix.as_ptr(),
+        ) >= 499
+        {
+            buf[499] = 0;
+        }
+        if check_test_file(CStr::from_ptr(buf.as_ptr()).to_string_lossy().as_ref()) {
+            xpath = strdup(buf.as_ptr());
+        }
+        if snprintf(
+            buf.as_mut_ptr(),
+            499,
+            c"./test/c14n/%s/%s.ns".as_ptr(),
+            subdir,
+            prefix.as_ptr(),
+        ) >= 499
+        {
+            buf[499] = 0;
+        }
+        if check_test_file(CStr::from_ptr(buf.as_ptr()).to_string_lossy().as_ref()) {
+            ns = strdup(buf.as_ptr());
+        }
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
-    if c14n_run_test(
-        filename,
-        with_comments,
-        mode,
-        (!xpath.is_null())
-            .then(|| CStr::from_ptr(xpath as *const i8).to_string_lossy())
-            .as_deref(),
-        ns,
-        result,
-    ) < 0
-    {
-        ret = 1;
-    }
+        NB_TESTS.set(NB_TESTS.get() + 1);
+        if c14n_run_test(
+            filename,
+            with_comments,
+            mode,
+            (!xpath.is_null())
+                .then(|| CStr::from_ptr(xpath as *const i8).to_string_lossy())
+                .as_deref(),
+            ns,
+            result,
+        ) < 0
+        {
+            ret = 1;
+        }
 
-    if !result.is_null() {
-        free(result as _);
+        if !result.is_null() {
+            free(result as _);
+        }
+        if !xpath.is_null() {
+            free(xpath as _);
+        }
+        if !ns.is_null() {
+            free(ns as _);
+        }
+        ret
     }
-    if !xpath.is_null() {
-        free(xpath as _);
-    }
-    if !ns.is_null() {
-        free(ns as _);
-    }
-    ret
 }
 
 #[cfg(feature = "c14n")]
@@ -4583,14 +4700,16 @@ unsafe fn c14n_with_comment_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    use exml::libxml::c14n::XmlC14NMode;
+    unsafe {
+        use exml::libxml::c14n::XmlC14NMode;
 
-    c14n_common_test(
-        filename,
-        true,
-        XmlC14NMode::XmlC14N1_0,
-        c"with-comments".as_ptr(),
-    )
+        c14n_common_test(
+            filename,
+            true,
+            XmlC14NMode::XmlC14N1_0,
+            c"with-comments".as_ptr(),
+        )
+    }
 }
 
 #[cfg(feature = "c14n")]
@@ -4600,14 +4719,16 @@ unsafe fn c14n_without_comment_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    use exml::libxml::c14n::XmlC14NMode;
+    unsafe {
+        use exml::libxml::c14n::XmlC14NMode;
 
-    c14n_common_test(
-        filename,
-        false,
-        XmlC14NMode::XmlC14N1_0,
-        c"without-comments".as_ptr(),
-    )
+        c14n_common_test(
+            filename,
+            false,
+            XmlC14NMode::XmlC14N1_0,
+            c"without-comments".as_ptr(),
+        )
+    }
 }
 
 #[cfg(feature = "c14n")]
@@ -4617,14 +4738,16 @@ unsafe fn c14n_exc_without_comment_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    use exml::libxml::c14n::XmlC14NMode;
+    unsafe {
+        use exml::libxml::c14n::XmlC14NMode;
 
-    c14n_common_test(
-        filename,
-        false,
-        XmlC14NMode::XmlC14NExclusive1_0,
-        c"exc-without-comments".as_ptr(),
-    )
+        c14n_common_test(
+            filename,
+            false,
+            XmlC14NMode::XmlC14NExclusive1_0,
+            c"exc-without-comments".as_ptr(),
+        )
+    }
 }
 
 #[cfg(feature = "c14n")]
@@ -4634,14 +4757,16 @@ unsafe fn c14n11_without_comment_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    use exml::libxml::c14n::XmlC14NMode;
+    unsafe {
+        use exml::libxml::c14n::XmlC14NMode;
 
-    c14n_common_test(
-        filename,
-        false,
-        XmlC14NMode::XmlC14N1_1,
-        c"1-1-without-comments".as_ptr(),
-    )
+        c14n_common_test(
+            filename,
+            false,
+            XmlC14NMode::XmlC14N1_1,
+            c"1-1-without-comments".as_ptr(),
+        )
+    }
 }
 
 // mostly a cut and paste from testThreads.c
@@ -4658,7 +4783,7 @@ struct XmlThreadParams<'a> {
 #[cfg(feature = "catalog")]
 const CATALOG: &str = "./test/threads/complex.xml";
 #[cfg(feature = "catalog")]
-static mut THREAD_PARAMS: [XmlThreadParams; 7] = [
+static THREAD_PARAMS: Mutex<[XmlThreadParams; 7]> = Mutex::new([
     XmlThreadParams {
         filename: "./test/threads/abc.xml",
         okay: 0,
@@ -4687,9 +4812,7 @@ static mut THREAD_PARAMS: [XmlThreadParams; 7] = [
         filename: "./test/threads/invalid.xml",
         okay: 0,
     },
-];
-#[cfg(feature = "catalog")]
-static NUM_THREADS: usize = unsafe { THREAD_PARAMS.len() };
+]);
 
 #[cfg(feature = "catalog")]
 extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
@@ -4742,51 +4865,55 @@ static TID: Mutex<[pthread_t; MAX_ARGC]> = Mutex::new([0; MAX_ARGC]);
 
 #[cfg(feature = "catalog")]
 unsafe extern "C" fn test_thread() -> i32 {
-    use exml::libxml::catalog::{xml_catalog_cleanup, xml_load_catalog};
-    use libc::{pthread_create, pthread_join};
+    unsafe {
+        use exml::libxml::catalog::{xml_catalog_cleanup, xml_load_catalog};
+        use libc::{pthread_create, pthread_join};
 
-    let mut ret: i32;
-    let mut res: i32 = 0;
+        let mut ret: i32;
+        let mut res: i32 = 0;
 
-    xml_init_parser();
+        xml_init_parser();
 
-    let mut tid = TID.lock().unwrap();
-    for _ in 0..500 {
-        xml_load_catalog(CATALOG);
-        NB_TESTS.set(NB_TESTS.get() + 1);
+        let mut tid = TID.lock().unwrap();
+        let mut thread_params = THREAD_PARAMS.lock().unwrap();
+        let num_threads = thread_params.len();
+        for _ in 0..500 {
+            xml_load_catalog(CATALOG);
+            NB_TESTS.set(NB_TESTS.get() + 1);
 
-        tid[..NUM_THREADS].fill(u64::MAX);
+            tid[..num_threads].fill(u64::MAX);
 
-        for i in 0..NUM_THREADS {
-            ret = pthread_create(
-                &raw mut tid[i],
-                null(),
-                thread_specific_data,
-                addr_of_mut!(THREAD_PARAMS[i]) as _,
-            );
-            if ret != 0 {
-                eprintln!("pthread_create failed");
-                return 1;
+            for i in 0..num_threads {
+                ret = pthread_create(
+                    &raw mut tid[i],
+                    null(),
+                    thread_specific_data,
+                    &raw mut thread_params[i] as _,
+                );
+                if ret != 0 {
+                    eprintln!("pthread_create failed");
+                    return 1;
+                }
+            }
+            for &tid in tid.iter().take(num_threads) {
+                let mut result: *mut c_void = null_mut();
+                ret = pthread_join(tid, addr_of_mut!(result));
+                if ret != 0 {
+                    eprintln!("pthread_join failed");
+                    return 1;
+                }
+            }
+
+            xml_catalog_cleanup();
+            for (i, params) in thread_params.iter().take(num_threads).enumerate() {
+                if params.okay == 0 {
+                    eprintln!("Thread {} handling {} failed", i, params.filename);
+                    res = 1;
+                }
             }
         }
-        for &tid in tid.iter().take(NUM_THREADS) {
-            let mut result: *mut c_void = null_mut();
-            ret = pthread_join(tid, addr_of_mut!(result));
-            if ret != 0 {
-                eprintln!("pthread_join failed");
-                return 1;
-            }
-        }
-
-        xml_catalog_cleanup();
-        for (i, params) in THREAD_PARAMS.iter().take(NUM_THREADS).enumerate() {
-            if params.okay == 0 {
-                eprintln!("Thread {} handling {} failed", i, params.filename);
-                res = 1;
-            }
-        }
+        res
     }
-    res
 }
 
 #[cfg(feature = "catalog")]
@@ -4796,26 +4923,28 @@ unsafe fn threads_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    test_thread()
+    unsafe { test_thread() }
 }
 
 #[cfg(feature = "libxml_regexp")]
 unsafe fn test_regexp(output: &mut File, comp: XmlRegexpPtr, value: *const c_char) {
-    use exml::libxml::xmlregexp::xml_regexp_exec;
+    unsafe {
+        use exml::libxml::xmlregexp::xml_regexp_exec;
 
-    let ret: i32 = xml_regexp_exec(comp, value as _);
-    if ret == 1 {
-        writeln!(output, "{}: Ok", CStr::from_ptr(value).to_string_lossy()).ok();
-    } else if ret == 0 {
-        writeln!(output, "{}: Fail", CStr::from_ptr(value).to_string_lossy()).ok();
-    } else {
-        writeln!(
-            output,
-            "{}: Error: {}",
-            CStr::from_ptr(value).to_string_lossy(),
-            ret
-        )
-        .ok();
+        let ret: i32 = xml_regexp_exec(comp, value as _);
+        if ret == 1 {
+            writeln!(output, "{}: Ok", CStr::from_ptr(value).to_string_lossy()).ok();
+        } else if ret == 0 {
+            writeln!(output, "{}: Fail", CStr::from_ptr(value).to_string_lossy()).ok();
+        } else {
+            writeln!(
+                output,
+                "{}: Error: {}",
+                CStr::from_ptr(value).to_string_lossy(),
+                ret
+            )
+            .ok();
+        }
     }
 }
 
@@ -4826,135 +4955,139 @@ unsafe fn regexp_test(
     err: Option<String>,
     _options: i32,
 ) -> i32 {
-    use std::io::{BufRead, BufReader};
+    unsafe {
+        use std::io::{BufRead, BufReader};
 
-    use exml::{
-        generic_error,
-        libxml::xmlregexp::{xml_reg_free_regexp, xml_regexp_compile},
-    };
+        use exml::{
+            generic_error,
+            libxml::xmlregexp::{xml_reg_free_regexp, xml_regexp_compile},
+        };
 
-    let mut comp: XmlRegexpPtr = null_mut();
-    let mut ret: i32;
-    let mut res: i32 = 0;
+        let mut comp: XmlRegexpPtr = null_mut();
+        let mut ret: i32;
+        let mut res: i32 = 0;
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
+        NB_TESTS.set(NB_TESTS.get() + 1);
 
-    let mut input = match File::open(filename) {
-        Ok(file) => BufReader::new(file),
-        _ => {
-            generic_error!("Cannot open {filename} for reading\n");
-            return -1;
-        }
-    };
-    let temp = result_filename(filename, Some(""), Some(".res"));
-    let mut output = match File::options()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(temp.as_str())
-    {
-        Ok(file) => file,
-        _ => {
-            eprintln!("failed to open output file {temp}",);
-            return -1;
-        }
-    };
-    let mut expression = vec![];
-    while let Some(mut len) = input
-        .read_until(b'\n', &mut expression)
-        .ok()
-        .filter(|&len| len > 0)
-        .map(|len| len as i32)
-    {
-        len -= 1;
-        while len >= 0
-            && (expression[len as usize] == b'\n'
-                || expression[len as usize] == b'\t'
-                || expression[len as usize] == b'\r'
-                || expression[len as usize] == b' ')
+        let mut input = match File::open(filename) {
+            Ok(file) => BufReader::new(file),
+            _ => {
+                generic_error!("Cannot open {filename} for reading\n");
+                return -1;
+            }
+        };
+        let temp = result_filename(filename, Some(""), Some(".res"));
+        let mut output = match File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(temp.as_str())
+        {
+            Ok(file) => file,
+            _ => {
+                eprintln!("failed to open output file {temp}",);
+                return -1;
+            }
+        };
+        let mut expression = vec![];
+        while let Some(mut len) = input
+            .read_until(b'\n', &mut expression)
+            .ok()
+            .filter(|&len| len > 0)
+            .map(|len| len as i32)
         {
             len -= 1;
-        }
-        if len + 1 == expression.len() as i32 {
-            expression.push(0);
-        } else {
-            expression[(len + 1) as usize] = 0;
-        }
-        if len >= 0 {
-            if expression[0] == b'#' {
-                expression.clear();
-                continue;
+            while len >= 0
+                && (expression[len as usize] == b'\n'
+                    || expression[len as usize] == b'\t'
+                    || expression[len as usize] == b'\r'
+                    || expression[len as usize] == b' ')
+            {
+                len -= 1;
             }
-            if expression[0] == b'=' && expression[1] == b'>' {
-                let pattern: *mut c_char = expression.as_mut_ptr().add(2) as _;
-
-                if !comp.is_null() {
-                    xml_reg_free_regexp(comp);
-                    // comp = null_mut();
-                }
-                writeln!(
-                    output,
-                    "Regexp: {}",
-                    CStr::from_ptr(pattern).to_string_lossy()
-                )
-                .ok();
-                comp = xml_regexp_compile(pattern as _);
-                if comp.is_null() {
-                    writeln!(output, "   failed to compile").ok();
-                    break;
-                }
-            } else if comp.is_null() {
-                writeln!(
-                    output,
-                    "Regexp: {}",
-                    CStr::from_ptr(expression.as_ptr() as _).to_string_lossy()
-                )
-                .ok();
-                comp = xml_regexp_compile(expression.as_ptr());
-                if comp.is_null() {
-                    writeln!(output, "   failed to compile").ok();
-                    break;
-                }
-            } else if !comp.is_null() {
-                test_regexp(&mut output, comp, expression.as_ptr() as _);
+            if len + 1 == expression.len() as i32 {
+                expression.push(0);
+            } else {
+                expression[(len + 1) as usize] = 0;
             }
+            if len >= 0 {
+                if expression[0] == b'#' {
+                    expression.clear();
+                    continue;
+                }
+                if expression[0] == b'=' && expression[1] == b'>' {
+                    let pattern: *mut c_char = expression.as_mut_ptr().add(2) as _;
+
+                    if !comp.is_null() {
+                        xml_reg_free_regexp(comp);
+                        // comp = null_mut();
+                    }
+                    writeln!(
+                        output,
+                        "Regexp: {}",
+                        CStr::from_ptr(pattern).to_string_lossy()
+                    )
+                    .ok();
+                    comp = xml_regexp_compile(pattern as _);
+                    if comp.is_null() {
+                        writeln!(output, "   failed to compile").ok();
+                        break;
+                    }
+                } else if comp.is_null() {
+                    writeln!(
+                        output,
+                        "Regexp: {}",
+                        CStr::from_ptr(expression.as_ptr() as _).to_string_lossy()
+                    )
+                    .ok();
+                    comp = xml_regexp_compile(expression.as_ptr());
+                    if comp.is_null() {
+                        writeln!(output, "   failed to compile").ok();
+                        break;
+                    }
+                } else if !comp.is_null() {
+                    test_regexp(&mut output, comp, expression.as_ptr() as _);
+                }
+            }
+            expression.clear();
         }
-        expression.clear();
-    }
-    if !comp.is_null() {
-        xml_reg_free_regexp(comp);
-    }
+        if !comp.is_null() {
+            xml_reg_free_regexp(comp);
+        }
 
-    ret = compare_files(temp.as_str(), result.as_deref().unwrap());
-    if ret != 0 {
-        eprintln!("Result for {filename} failed in {}", result.unwrap());
-        res = 1;
-    }
-    remove_file(temp).ok();
+        ret = compare_files(temp.as_str(), result.as_deref().unwrap());
+        if ret != 0 {
+            eprintln!("Result for {filename} failed in {}", result.unwrap());
+            res = 1;
+        }
+        remove_file(temp).ok();
 
-    ret = TEST_ERRORS.with_borrow(|errors| {
-        compare_file_mem(err.as_deref().unwrap(), &errors[..TEST_ERRORS_SIZE.get()])
-    });
-    if ret != 0 {
-        eprintln!("Error for {filename} failed",);
-        res = 1;
-    }
+        ret = TEST_ERRORS.with_borrow(|errors| {
+            compare_file_mem(err.as_deref().unwrap(), &errors[..TEST_ERRORS_SIZE.get()])
+        });
+        if ret != 0 {
+            eprintln!("Error for {filename} failed",);
+            res = 1;
+        }
 
-    res
+        res
+    }
 }
 
 #[cfg(feature = "libxml_automata")]
 unsafe extern "C" fn scan_number(ptr: *mut *mut c_char) -> i32 {
-    let mut ret: i32 = 0;
-    let mut cur: *mut c_char;
+    unsafe {
+        let mut ret: i32 = 0;
+        let mut cur: *mut c_char;
 
-    cur = *ptr;
-    while *cur >= b'0' as _ && *cur <= b'9' as _ {
-        ret = ret * 10 + (*cur - b'0' as i8) as i32;
-        cur = cur.add(1);
+        cur = *ptr;
+        while *cur >= b'0' as _ && *cur <= b'9' as _ {
+            ret = ret * 10 + (*cur - b'0' as i8) as i32;
+            cur = cur.add(1);
+        }
+        *ptr = cur;
+        ret
     }
-    *ptr = cur;
-    ret
 }
 
 #[cfg(feature = "libxml_automata")]
@@ -4964,254 +5097,256 @@ unsafe fn automata_test(
     _err: Option<String>,
     _options: i32,
 ) -> i32 {
-    use std::io::{BufRead, BufReader};
+    unsafe {
+        use std::io::{BufRead, BufReader};
 
-    use exml::{
-        generic_error,
-        libxml::{
-            xmlautomata::{
-                xml_automata_compile, xml_automata_get_init_state, xml_automata_new_count_trans,
-                xml_automata_new_epsilon, xml_automata_new_state, xml_automata_new_transition,
-                xml_automata_set_final_state, xml_free_automata, xml_new_automata, XmlAutomataPtr,
-                XmlAutomataStatePtr,
+        use exml::{
+            generic_error,
+            libxml::{
+                xmlautomata::{
+                    XmlAutomataPtr, XmlAutomataStatePtr, xml_automata_compile,
+                    xml_automata_get_init_state, xml_automata_new_count_trans,
+                    xml_automata_new_epsilon, xml_automata_new_state, xml_automata_new_transition,
+                    xml_automata_set_final_state, xml_free_automata, xml_new_automata,
+                },
+                xmlregexp::{
+                    XmlRegExecCtxtPtr, xml_reg_exec_push_string, xml_reg_free_exec_ctxt,
+                    xml_reg_free_regexp, xml_reg_new_exec_ctxt,
+                },
             },
-            xmlregexp::{
-                xml_reg_exec_push_string, xml_reg_free_exec_ctxt, xml_reg_free_regexp,
-                xml_reg_new_exec_ctxt, XmlRegExecCtxtPtr,
-            },
-        },
-    };
+        };
 
-    let mut ret: i32;
-    let mut res: i32 = 0;
-    let mut am: XmlAutomataPtr;
-    let mut states: [XmlAutomataStatePtr; 1000] = [null_mut(); 1000];
-    let mut regexp: XmlRegexpPtr = null_mut();
-    let mut exec: XmlRegExecCtxtPtr = null_mut();
+        let mut ret: i32;
+        let mut res: i32 = 0;
+        let mut am: XmlAutomataPtr;
+        let mut states: [XmlAutomataStatePtr; 1000] = [null_mut(); 1000];
+        let mut regexp: XmlRegexpPtr = null_mut();
+        let mut exec: XmlRegExecCtxtPtr = null_mut();
 
-    NB_TESTS.set(NB_TESTS.get() + 1);
+        NB_TESTS.set(NB_TESTS.get() + 1);
 
-    let mut input = match File::open(filename) {
-        Ok(file) => BufReader::new(file),
-        _ => {
-            generic_error!("Cannot open {filename} for reading\n");
+        let mut input = match File::open(filename) {
+            Ok(file) => BufReader::new(file),
+            _ => {
+                generic_error!("Cannot open {filename} for reading\n");
+                return -1;
+            }
+        };
+        let temp = result_filename(filename, Some(""), Some(".res"));
+        let Ok(mut output) = File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(temp.as_str())
+        else {
+            eprintln!("failed to open output file {temp}",);
+            return -1;
+        };
+
+        am = xml_new_automata();
+        if am.is_null() {
+            generic_error!("Cannot create automata\n");
             return -1;
         }
-    };
-    let temp = result_filename(filename, Some(""), Some(".res"));
-    let Ok(mut output) = File::options()
-        .write(true)
-        .truncate(true)
-        .create(true)
-        .open(temp.as_str())
-    else {
-        eprintln!("failed to open output file {temp}",);
-        return -1;
-    };
-
-    am = xml_new_automata();
-    if am.is_null() {
-        generic_error!("Cannot create automata\n");
-        return -1;
-    }
-    states[0] = xml_automata_get_init_state(am);
-    if states[0].is_null() {
-        generic_error!("Cannot get start state\n");
-        xml_free_automata(am);
-        return -1;
-    }
-    ret = 0;
-
-    let mut expr = vec![];
-    while let Some(mut len) = input
-        .read_until(b'\n', &mut expr)
-        .ok()
-        .filter(|&len| len > 0)
-        .map(|len| len as i32)
-    {
-        if expr[0] == b'#' {
-            expr.clear();
-            continue;
+        states[0] = xml_automata_get_init_state(am);
+        if states[0].is_null() {
+            generic_error!("Cannot get start state\n");
+            xml_free_automata(am);
+            return -1;
         }
-        len -= 1;
-        while len >= 0
-            && (expr[len as usize] == b'\n'
-                || expr[len as usize] == b'\t'
-                || expr[len as usize] == b'\r'
-                || expr[len as usize] == b' ')
+        ret = 0;
+
+        let mut expr = vec![];
+        while let Some(mut len) = input
+            .read_until(b'\n', &mut expr)
+            .ok()
+            .filter(|&len| len > 0)
+            .map(|len| len as i32)
         {
+            if expr[0] == b'#' {
+                expr.clear();
+                continue;
+            }
             len -= 1;
-        }
-        if len + 1 == expr.len() as i32 {
-            expr.push(0);
-        } else {
-            expr[(len + 1) as usize] = 0;
-        }
-        if len >= 0 {
-            if !am.is_null() && expr[0] == b't' && expr[1] == b' ' {
-                let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
+            while len >= 0
+                && (expr[len as usize] == b'\n'
+                    || expr[len as usize] == b'\t'
+                    || expr[len as usize] == b'\r'
+                    || expr[len as usize] == b' ')
+            {
+                len -= 1;
+            }
+            if len + 1 == expr.len() as i32 {
+                expr.push(0);
+            } else {
+                expr[(len + 1) as usize] = 0;
+            }
+            if len >= 0 {
+                if !am.is_null() && expr[0] == b't' && expr[1] == b' ' {
+                    let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
 
-                let from: usize = scan_number(addr_of_mut!(ptr)) as _;
-                if *ptr != b' ' as i8 {
-                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
-                    generic_error!("Bad line {expr}\n");
-                    break;
-                }
-                if states[from].is_null() {
-                    states[from] = xml_automata_new_state(am);
-                }
-                ptr = ptr.add(1);
-                let to: usize = scan_number(addr_of_mut!(ptr)) as _;
-                if *ptr != b' ' as i8 {
-                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
-                    generic_error!("Bad line {expr}\n");
-                    break;
-                }
-                if states[to].is_null() {
-                    states[to] = xml_automata_new_state(am);
-                }
-                ptr = ptr.add(1);
-                xml_automata_new_transition(
-                    am,
-                    states[from],
-                    states[to],
-                    CStr::from_ptr(ptr as *const i8).to_string_lossy().as_ref(),
-                    null_mut(),
-                );
-            } else if !am.is_null() && expr[0] == b'e' && expr[1] == b' ' {
-                let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
+                    let from: usize = scan_number(addr_of_mut!(ptr)) as _;
+                    if *ptr != b' ' as i8 {
+                        let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    }
+                    if states[from].is_null() {
+                        states[from] = xml_automata_new_state(am);
+                    }
+                    ptr = ptr.add(1);
+                    let to: usize = scan_number(addr_of_mut!(ptr)) as _;
+                    if *ptr != b' ' as i8 {
+                        let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    }
+                    if states[to].is_null() {
+                        states[to] = xml_automata_new_state(am);
+                    }
+                    ptr = ptr.add(1);
+                    xml_automata_new_transition(
+                        am,
+                        states[from],
+                        states[to],
+                        CStr::from_ptr(ptr as *const i8).to_string_lossy().as_ref(),
+                        null_mut(),
+                    );
+                } else if !am.is_null() && expr[0] == b'e' && expr[1] == b' ' {
+                    let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
 
-                let from: usize = scan_number(addr_of_mut!(ptr)) as _;
-                if *ptr != b' ' as i8 {
-                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
-                    generic_error!("Bad line {expr}\n");
-                    break;
-                }
-                if states[from].is_null() {
-                    states[from] = xml_automata_new_state(am);
-                }
-                ptr = ptr.add(1);
-                let to: usize = scan_number(addr_of_mut!(ptr)) as _;
-                if states[to].is_null() {
-                    states[to] = xml_automata_new_state(am);
-                }
-                xml_automata_new_epsilon(am, states[from], states[to]);
-            } else if !am.is_null() && expr[0] == b'f' && expr[1] == b' ' {
-                let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
+                    let from: usize = scan_number(addr_of_mut!(ptr)) as _;
+                    if *ptr != b' ' as i8 {
+                        let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    }
+                    if states[from].is_null() {
+                        states[from] = xml_automata_new_state(am);
+                    }
+                    ptr = ptr.add(1);
+                    let to: usize = scan_number(addr_of_mut!(ptr)) as _;
+                    if states[to].is_null() {
+                        states[to] = xml_automata_new_state(am);
+                    }
+                    xml_automata_new_epsilon(am, states[from], states[to]);
+                } else if !am.is_null() && expr[0] == b'f' && expr[1] == b' ' {
+                    let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
 
-                let state: usize = scan_number(addr_of_mut!(ptr)) as _;
-                if states[state].is_null() {
-                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
-                    generic_error!("Bad state {state} : {expr}\n");
-                    break;
-                }
-                xml_automata_set_final_state(am, states[state]);
-            } else if !am.is_null() && expr[0] == b'c' && expr[1] == b' ' {
-                let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
+                    let state: usize = scan_number(addr_of_mut!(ptr)) as _;
+                    if states[state].is_null() {
+                        let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        generic_error!("Bad state {state} : {expr}\n");
+                        break;
+                    }
+                    xml_automata_set_final_state(am, states[state]);
+                } else if !am.is_null() && expr[0] == b'c' && expr[1] == b' ' {
+                    let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
 
-                let from: usize = scan_number(addr_of_mut!(ptr)) as _;
-                if *ptr != b' ' as i8 {
-                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
-                    generic_error!("Bad line {expr}\n");
-                    break;
-                }
-                if states[from].is_null() {
-                    states[from] = xml_automata_new_state(am);
-                }
-                ptr = ptr.add(1);
-                let to: usize = scan_number(addr_of_mut!(ptr)) as _;
-                if *ptr != b' ' as i8 {
-                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
-                    generic_error!("Bad line {expr}\n");
-                    break;
-                }
-                if states[to].is_null() {
-                    states[to] = xml_automata_new_state(am);
-                }
-                ptr = ptr.add(1);
-                let min: i32 = scan_number(addr_of_mut!(ptr));
-                if *ptr != b' ' as i8 {
-                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
-                    generic_error!("Bad line {expr}\n");
-                    break;
-                }
-                ptr = ptr.add(1);
-                let max: i32 = scan_number(addr_of_mut!(ptr));
-                if *ptr != b' ' as i8 {
-                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
-                    generic_error!("Bad line {expr}\n");
-                    break;
-                }
-                ptr = ptr.add(1);
-                xml_automata_new_count_trans(
-                    am,
-                    states[from],
-                    states[to],
-                    CStr::from_ptr(ptr as *const i8).to_string_lossy().as_ref(),
-                    min,
-                    max,
-                    null_mut(),
-                );
-            } else if !am.is_null() && expr[0] == b'-' && expr[1] == b'-' {
-                /* end of the automata */
-                regexp = xml_automata_compile(am);
-                xml_free_automata(am);
-                am = null_mut();
-                if regexp.is_null() {
-                    generic_error!("Failed to compile the automata");
-                    break;
-                }
-            } else if expr[0] == b'=' && expr[1] == b'>' {
-                if regexp.is_null() {
-                    writeln!(output, "=> failed not compiled").ok();
-                } else {
+                    let from: usize = scan_number(addr_of_mut!(ptr)) as _;
+                    if *ptr != b' ' as i8 {
+                        let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    }
+                    if states[from].is_null() {
+                        states[from] = xml_automata_new_state(am);
+                    }
+                    ptr = ptr.add(1);
+                    let to: usize = scan_number(addr_of_mut!(ptr)) as _;
+                    if *ptr != b' ' as i8 {
+                        let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    }
+                    if states[to].is_null() {
+                        states[to] = xml_automata_new_state(am);
+                    }
+                    ptr = ptr.add(1);
+                    let min: i32 = scan_number(addr_of_mut!(ptr));
+                    if *ptr != b' ' as i8 {
+                        let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    }
+                    ptr = ptr.add(1);
+                    let max: i32 = scan_number(addr_of_mut!(ptr));
+                    if *ptr != b' ' as i8 {
+                        let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                        generic_error!("Bad line {expr}\n");
+                        break;
+                    }
+                    ptr = ptr.add(1);
+                    xml_automata_new_count_trans(
+                        am,
+                        states[from],
+                        states[to],
+                        CStr::from_ptr(ptr as *const i8).to_string_lossy().as_ref(),
+                        min,
+                        max,
+                        null_mut(),
+                    );
+                } else if !am.is_null() && expr[0] == b'-' && expr[1] == b'-' {
+                    /* end of the automata */
+                    regexp = xml_automata_compile(am);
+                    xml_free_automata(am);
+                    am = null_mut();
+                    if regexp.is_null() {
+                        generic_error!("Failed to compile the automata");
+                        break;
+                    }
+                } else if expr[0] == b'=' && expr[1] == b'>' {
+                    if regexp.is_null() {
+                        writeln!(output, "=> failed not compiled").ok();
+                    } else {
+                        if exec.is_null() {
+                            exec = xml_reg_new_exec_ctxt(regexp, None, null_mut());
+                        }
+                        if ret == 0 {
+                            ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
+                        }
+                        if ret == 1 {
+                            writeln!(output, "=> Passed").ok();
+                        } else if ret == 0 || ret == -1 {
+                            writeln!(output, "=> Failed").ok();
+                        } else if ret < 0 {
+                            writeln!(output, "=> Error").ok();
+                        }
+                        xml_reg_free_exec_ctxt(exec);
+                        exec = null_mut();
+                    }
+                    ret = 0;
+                } else if !regexp.is_null() {
                     if exec.is_null() {
                         exec = xml_reg_new_exec_ctxt(regexp, None, null_mut());
                     }
-                    if ret == 0 {
-                        ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
-                    }
-                    if ret == 1 {
-                        writeln!(output, "=> Passed").ok();
-                    } else if ret == 0 || ret == -1 {
-                        writeln!(output, "=> Failed").ok();
-                    } else if ret < 0 {
-                        writeln!(output, "=> Error").ok();
-                    }
-                    xml_reg_free_exec_ctxt(exec);
-                    exec = null_mut();
+                    ret = xml_reg_exec_push_string(exec, expr.as_ptr(), null_mut());
+                } else {
+                    let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
+                    generic_error!("Unexpected line {expr}\n");
                 }
-                ret = 0;
-            } else if !regexp.is_null() {
-                if exec.is_null() {
-                    exec = xml_reg_new_exec_ctxt(regexp, None, null_mut());
-                }
-                ret = xml_reg_exec_push_string(exec, expr.as_ptr(), null_mut());
-            } else {
-                let expr = CStr::from_ptr(expr.as_ptr() as *const i8).to_string_lossy();
-                generic_error!("Unexpected line {expr}\n");
             }
+            expr.clear();
         }
-        expr.clear();
-    }
-    if !regexp.is_null() {
-        xml_reg_free_regexp(regexp);
-    }
-    if !exec.is_null() {
-        xml_reg_free_exec_ctxt(exec);
-    }
-    if !am.is_null() {
-        xml_free_automata(am);
-    }
+        if !regexp.is_null() {
+            xml_reg_free_regexp(regexp);
+        }
+        if !exec.is_null() {
+            xml_reg_free_exec_ctxt(exec);
+        }
+        if !am.is_null() {
+            xml_free_automata(am);
+        }
 
-    ret = compare_files(temp.as_str(), result.as_deref().unwrap());
-    if ret != 0 {
-        eprintln!("Result for {filename} failed in {}", result.unwrap());
-        res = 1;
-    }
-    remove_file(temp).ok();
+        ret = compare_files(temp.as_str(), result.as_deref().unwrap());
+        if ret != 0 {
+            eprintln!("Result for {filename} failed in {}", result.unwrap());
+            res = 1;
+        }
+        remove_file(temp).ok();
 
-    res
+        res
+    }
 }
 
 const TEST_DESCRIPTIONS: &[TestDesc] = &[
@@ -5405,111 +5540,115 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
 ];
 
 unsafe fn launch_tests(tst: &TestDesc) -> i32 {
-    let mut res: i32;
-    let mut err: i32 = 0;
-    let mut result;
-    let mut error;
-    let mut mem: i32;
+    unsafe {
+        let mut res: i32;
+        let mut err: i32 = 0;
+        let mut result;
+        let mut error;
+        let mut mem: i32;
 
-    // let ebcdic_handler = get_encoding_handler(XmlCharEncoding::EBCDIC);
-    // let euc_jp_handler = get_encoding_handler(XmlCharEncoding::EUCJP);
+        // let ebcdic_handler = get_encoding_handler(XmlCharEncoding::EBCDIC);
+        // let euc_jp_handler = get_encoding_handler(XmlCharEncoding::EUCJP);
 
-    if let Some(input) = tst.input {
-        for entry in glob::glob(input).expect("Failed to read glob pattern") {
-            let path = match entry {
-                Ok(path) => Path::new("./").join(path),
-                Err(e) => {
-                    println!("{e:?}");
+        if let Some(input) = tst.input {
+            for entry in glob::glob(input).expect("Failed to read glob pattern") {
+                let path = match entry {
+                    Ok(path) => Path::new("./").join(path),
+                    Err(e) => {
+                        println!("{e:?}");
+                        continue;
+                    }
+                };
+                if !check_test_file(&path) {
                     continue;
                 }
-            };
-            if !check_test_file(&path) {
-                continue;
-            }
 
-            let path = path.to_string_lossy();
-            // TODO: `icu_parse_test`s are not passed now.
-            //       This should be fixed at feature/encoding
-            // if (ebcdic_handler.is_none() && path.contains("ebcdic"))
-            //     || (euc_jp_handler.is_none() && path.contains("icu_parse_test"))
-            // {
-            //     continue;
-            // }
-            if path.contains("ebcdic") || path.contains("icu_parse_test") {
-                continue;
-            }
+                let path = path.to_string_lossy();
+                // TODO: `icu_parse_test`s are not passed now.
+                //       This should be fixed at feature/encoding
+                // if (ebcdic_handler.is_none() && path.contains("ebcdic"))
+                //     || (euc_jp_handler.is_none() && path.contains("icu_parse_test"))
+                // {
+                //     continue;
+                // }
+                if path.contains("ebcdic") || path.contains("icu_parse_test") {
+                    continue;
+                }
 
-            if let Some(suffix) = tst.suffix {
-                result = Some(result_filename(&path, tst.out, Some(suffix)));
-            } else {
-                result = None;
+                if let Some(suffix) = tst.suffix {
+                    result = Some(result_filename(&path, tst.out, Some(suffix)));
+                } else {
+                    result = None;
+                }
+                if let Some(err) = tst.err {
+                    error = Some(result_filename(&path, tst.out, Some(err)));
+                } else {
+                    error = None;
+                }
+                mem = xml_mem_used();
+                EXTRA_MEMORY_FROM_RESOLVER.set(0);
+                TEST_ERRORS_SIZE.set(0);
+                TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
+                res = (tst.func)(
+                    &path,
+                    result,
+                    error,
+                    tst.options | XmlParserOption::XmlParseCompact as i32,
+                );
+                reset_last_error();
+                if res != 0 {
+                    eprintln!("File {} generated an error", path,);
+                    NB_ERRORS.set(NB_ERRORS.get() + 1);
+                    err += 1;
+                } else if xml_mem_used() != mem
+                    && xml_mem_used() != mem
+                    && EXTRA_MEMORY_FROM_RESOLVER.get() == 0
+                {
+                    eprintln!("File {} leaked {} bytes", path, xml_mem_used() - mem,);
+                    NB_LEAKS.set(NB_LEAKS.get() + 1);
+                    err += 1;
+                }
+                TEST_ERRORS_SIZE.set(0);
             }
-            if let Some(err) = tst.err {
-                error = Some(result_filename(&path, tst.out, Some(err)));
-            } else {
-                error = None;
-            }
-            mem = xml_mem_used();
-            EXTRA_MEMORY_FROM_RESOLVER.set(0);
+        } else {
             TEST_ERRORS_SIZE.set(0);
             TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
-            res = (tst.func)(
-                &path,
-                result,
-                error,
-                tst.options | XmlParserOption::XmlParseCompact as i32,
-            );
-            reset_last_error();
+            EXTRA_MEMORY_FROM_RESOLVER.set(0);
+            res = (tst.func)("", None, None, tst.options);
             if res != 0 {
-                eprintln!("File {} generated an error", path,);
                 NB_ERRORS.set(NB_ERRORS.get() + 1);
                 err += 1;
-            } else if xml_mem_used() != mem
-                && xml_mem_used() != mem
-                && EXTRA_MEMORY_FROM_RESOLVER.get() == 0
-            {
-                eprintln!("File {} leaked {} bytes", path, xml_mem_used() - mem,);
-                NB_LEAKS.set(NB_LEAKS.get() + 1);
-                err += 1;
             }
-            TEST_ERRORS_SIZE.set(0);
         }
-    } else {
-        TEST_ERRORS_SIZE.set(0);
-        TEST_ERRORS.with_borrow_mut(|errors| errors[0] = 0);
-        EXTRA_MEMORY_FROM_RESOLVER.set(0);
-        res = (tst.func)("", None, None, tst.options);
-        if res != 0 {
-            NB_ERRORS.set(NB_ERRORS.get() + 1);
-            err += 1;
-        }
-    }
 
-    err
+        err
+    }
 }
 
 unsafe extern "C" fn runtest(i: usize) -> i32 {
-    let mut ret: i32 = 0;
+    unsafe {
+        let mut ret: i32 = 0;
 
-    let old_errors = NB_ERRORS.get();
-    let old_tests = NB_TESTS.get();
-    let old_leaks = NB_LEAKS.get();
-    println!("## {}", TEST_DESCRIPTIONS[i].desc);
-    let res: i32 = launch_tests(&TEST_DESCRIPTIONS[i]);
-    if res != 0 {
-        ret += 1;
+        let old_errors = NB_ERRORS.get();
+        let old_tests = NB_TESTS.get();
+        let old_leaks = NB_LEAKS.get();
+        println!("## {}", TEST_DESCRIPTIONS[i].desc);
+        let res: i32 = launch_tests(&TEST_DESCRIPTIONS[i]);
+        if res != 0 {
+            ret += 1;
+        }
+        if NB_ERRORS.get() == old_errors && NB_LEAKS.get() == old_leaks {
+            println!("Ran {} tests, no errors", NB_TESTS.get() - old_tests);
+        } else {
+            println!(
+                "Ran {} tests, {} errors, {} leaks",
+                NB_TESTS.get() - old_tests,
+                NB_ERRORS.get() - old_errors,
+                NB_LEAKS.get() - old_leaks,
+            );
+        }
+        ret
     }
-    if NB_ERRORS.get() == old_errors && NB_LEAKS.get() == old_leaks {
-        println!("Ran {} tests, no errors", NB_TESTS.get() - old_tests);
-    } else {
-        println!(
-            "Ran {} tests, {} errors, {} leaks",
-            NB_TESTS.get() - old_tests,
-            NB_ERRORS.get() - old_errors,
-            NB_LEAKS.get() - old_leaks,
-        );
-    }
-    ret
 }
 
 static NUM_STARTED_TESTS: AtomicUsize = AtomicUsize::new(0);

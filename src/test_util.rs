@@ -1,6 +1,6 @@
 use std::{
     cell::{Cell, RefCell},
-    ffi::{c_char, CStr},
+    ffi::{CStr, c_char},
     fs::File,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -15,7 +15,7 @@ use crate::{
     libxml::{
         globals::xml_free,
         htmlparser::{
-            html_free_parser_ctxt, HtmlElemDesc, HtmlEntityDesc, HtmlParserCtxtPtr, HtmlStatus,
+            HtmlElemDesc, HtmlEntityDesc, HtmlParserCtxtPtr, HtmlStatus, html_free_parser_ctxt,
         },
         parser::{XmlFeature, XmlParserOption},
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
@@ -23,7 +23,7 @@ use crate::{
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaValType},
         uri::XmlURIPtr,
         valid::{
-            xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt, XmlValidCtxtPtr,
+            XmlValidCtxtPtr, xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt,
         },
         xinclude::XmlXIncludeCtxtPtr,
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
@@ -35,8 +35,8 @@ use crate::{
         xmlstring::XmlChar,
     },
     parser::{
-        xml_create_memory_parser_ctxt, xml_free_input_stream, xml_free_parser_ctxt,
-        xml_new_parser_ctxt, XmlParserCtxtPtr, XmlParserInputPtr,
+        XmlParserCtxtPtr, XmlParserInputPtr, xml_create_memory_parser_ctxt, xml_free_input_stream,
+        xml_free_parser_ctxt, xml_new_parser_ctxt,
     },
     tree::{XmlAttr, XmlAttributeType, XmlDoc, XmlDtd, XmlElementContentPtr, XmlNode, XmlNs},
     xpath::{
@@ -169,16 +169,20 @@ pub(crate) fn des_xml_xpath_parser_context_ptr(_no: i32, _val: XmlXPathParserCon
 
 #[cfg(feature = "xpath")]
 pub(crate) unsafe fn desret_xml_xpath_object_ptr(val: XmlXPathObjectPtr) {
-    use crate::xpath::xml_xpath_free_object;
+    unsafe {
+        use crate::xpath::xml_xpath_free_object;
 
-    xml_xpath_free_object(val);
+        xml_xpath_free_object(val);
+    }
 }
 
 #[cfg(feature = "xpath")]
 pub(crate) unsafe fn desret_xml_node_set_ptr(val: Option<Box<crate::xpath::XmlNodeSet>>) {
-    use crate::xpath::xml_xpath_free_node_set;
+    unsafe {
+        use crate::xpath::xml_xpath_free_node_set;
 
-    xml_xpath_free_node_set(val);
+        xml_xpath_free_node_set(val);
+    }
 }
 
 #[cfg(any(feature = "xpath", feature = "schema"))]
@@ -202,31 +206,36 @@ pub(crate) fn des_double(_no: i32, _val: f64, _nr: i32) {}
 
 #[cfg(feature = "xpath")]
 pub(crate) unsafe fn gen_xml_xpath_object_ptr(no: i32, _nr: i32) -> XmlXPathObjectPtr {
-    use crate::xpath::object::{
-        xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string,
-    };
+    unsafe {
+        use crate::xpath::object::{
+            xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set,
+            xml_xpath_new_string,
+        };
 
-    if no == 0 {
-        return xml_xpath_new_string(Some("string object"));
+        if no == 0 {
+            return xml_xpath_new_string(Some("string object"));
+        }
+        if no == 1 {
+            return xml_xpath_new_float(1.1);
+        }
+        if no == 2 {
+            return xml_xpath_new_boolean(true);
+        }
+        if no == 3 {
+            return xml_xpath_new_node_set(None);
+        }
+        null_mut()
     }
-    if no == 1 {
-        return xml_xpath_new_float(1.1);
-    }
-    if no == 2 {
-        return xml_xpath_new_boolean(true);
-    }
-    if no == 3 {
-        return xml_xpath_new_node_set(None);
-    }
-    null_mut()
 }
 
 #[cfg(feature = "xpath")]
 pub(crate) unsafe fn des_xml_xpath_object_ptr(_no: i32, val: XmlXPathObjectPtr, _nr: i32) {
-    use crate::xpath::xml_xpath_free_object;
+    unsafe {
+        use crate::xpath::xml_xpath_free_object;
 
-    if !val.is_null() {
-        xml_xpath_free_object(val);
+        if !val.is_null() {
+            xml_xpath_free_object(val);
+        }
     }
 }
 
@@ -419,26 +428,30 @@ pub(crate) fn des_xml_schema_valid_ctxt_ptr(_no: i32, _val: XmlSchemaValidCtxtPt
 
 #[cfg(feature = "libxml_reader")]
 pub(crate) unsafe fn gen_xml_text_reader_ptr(no: i32, _nr: i32) -> XmlTextReaderPtr {
-    use crate::libxml::xmlreader::xml_new_text_reader_filename;
+    unsafe {
+        use crate::libxml::xmlreader::xml_new_text_reader_filename;
 
-    if no == 0 {
-        return xml_new_text_reader_filename("test/ent2");
+        if no == 0 {
+            return xml_new_text_reader_filename("test/ent2");
+        }
+        if no == 1 {
+            return xml_new_text_reader_filename("test/valid/REC-xml-19980210.xml");
+        }
+        if no == 2 {
+            return xml_new_text_reader_filename("test/valid/dtds/xhtml1-strict.dtd");
+        }
+        null_mut()
     }
-    if no == 1 {
-        return xml_new_text_reader_filename("test/valid/REC-xml-19980210.xml");
-    }
-    if no == 2 {
-        return xml_new_text_reader_filename("test/valid/dtds/xhtml1-strict.dtd");
-    }
-    null_mut()
 }
 
 #[cfg(feature = "libxml_reader")]
 pub(crate) unsafe fn des_xml_text_reader_ptr(_no: i32, val: XmlTextReaderPtr, _nr: i32) {
-    use crate::libxml::xmlreader::xml_free_text_reader;
+    unsafe {
+        use crate::libxml::xmlreader::xml_free_text_reader;
 
-    if !val.is_null() {
-        xml_free_text_reader(val);
+        if !val.is_null() {
+            xml_free_text_reader(val);
+        }
     }
 }
 
@@ -501,16 +514,20 @@ pub(crate) fn gen_xml_attribute_type(no: i32, _nr: i32) -> XmlAttributeType {
 pub(crate) fn des_xml_attribute_type(_no: i32, _val: XmlAttributeType, _nr: i32) {}
 
 pub(crate) unsafe fn gen_xml_valid_ctxt_ptr(no: i32, _nr: i32) -> XmlValidCtxtPtr {
-    #[cfg(feature = "libxml_valid")]
-    if no == 0 {
-        return xml_new_valid_ctxt();
+    unsafe {
+        #[cfg(feature = "libxml_valid")]
+        if no == 0 {
+            return xml_new_valid_ctxt();
+        }
+        null_mut()
     }
-    null_mut()
 }
 pub(crate) unsafe fn des_xml_valid_ctxt_ptr(_no: i32, val: XmlValidCtxtPtr, _nr: i32) {
-    #[cfg(feature = "libxml_valid")]
-    if !val.is_null() {
-        xml_free_valid_ctxt(val);
+    unsafe {
+        #[cfg(feature = "libxml_valid")]
+        if !val.is_null() {
+            xml_free_valid_ctxt(val);
+        }
     }
 }
 
@@ -528,9 +545,11 @@ pub(crate) fn des_xml_uriptr(_no: i32, _val: XmlURIPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
 pub(crate) unsafe fn desret_xml_schema_parser_ctxt_ptr(val: XmlSchemaParserCtxtPtr) {
-    use crate::libxml::xmlschemas::xml_schema_free_parser_ctxt;
+    unsafe {
+        use crate::libxml::xmlschemas::xml_schema_free_parser_ctxt;
 
-    xml_schema_free_parser_ctxt(val);
+        xml_schema_free_parser_ctxt(val);
+    }
 }
 
 #[cfg(feature = "schema")]
@@ -617,22 +636,28 @@ pub(crate) fn gen_xml_feature(no: i32, _nr: i32) -> Option<XmlFeature> {
 pub(crate) fn des_xml_feature(_no: i32, _val: Option<XmlFeature>, _nr: i32) {}
 
 pub(crate) unsafe fn desret_xml_parser_ctxt_ptr(val: XmlParserCtxtPtr) {
-    xml_free_parser_ctxt(val);
+    unsafe {
+        xml_free_parser_ctxt(val);
+    }
 }
 
 pub(crate) unsafe fn gen_xml_parser_ctxt_ptr(no: i32, _nr: i32) -> XmlParserCtxtPtr {
-    if no == 0 {
-        return xml_new_parser_ctxt();
+    unsafe {
+        if no == 0 {
+            return xml_new_parser_ctxt();
+        }
+        if no == 1 {
+            return xml_create_memory_parser_ctxt("<doc/>".as_bytes().to_vec());
+        }
+        null_mut()
     }
-    if no == 1 {
-        return xml_create_memory_parser_ctxt("<doc/>".as_bytes().to_vec());
-    }
-    null_mut()
 }
 
 pub(crate) unsafe fn des_xml_parser_ctxt_ptr(_no: i32, val: XmlParserCtxtPtr, _nr: i32) {
-    if !val.is_null() {
-        xml_free_parser_ctxt(val);
+    unsafe {
+        if !val.is_null() {
+            xml_free_parser_ctxt(val);
+        }
     }
 }
 
@@ -687,8 +712,10 @@ pub(crate) fn desret_xml_catalog_allow(_val: XmlCatalogAllow) {}
 pub(crate) fn desret_void_ptr(_val: *mut c_void) {}
 
 pub(crate) unsafe fn desret_xml_char_ptr(val: *mut XmlChar) {
-    if !val.is_null() {
-        xml_free(val as _);
+    unsafe {
+        if !val.is_null() {
+            xml_free(val as _);
+        }
     }
 }
 
@@ -700,7 +727,9 @@ pub(crate) fn gen_xml_node_set_ptr(_no: i32, _nr: i32) -> Option<Box<XmlNodeSet>
 pub(crate) fn des_xml_node_set_ptr(_no: i32, _val: Option<Box<XmlNodeSet>>, _nr: i32) {}
 
 pub(crate) unsafe fn desret_xml_parser_input_ptr(val: XmlParserInputPtr) {
-    xml_free_input_stream(val);
+    unsafe {
+        xml_free_input_stream(val);
+    }
 }
 
 pub(crate) unsafe fn gen_xml_char_ptr(no: i32, _nr: i32) -> *mut XmlChar {
@@ -717,13 +746,17 @@ pub(crate) fn gen_xml_element_content_ptr(_no: i32, _nr: i32) -> XmlElementConte
     null_mut()
 }
 pub(crate) unsafe fn des_xml_element_content_ptr(_no: i32, val: XmlElementContentPtr, _nr: i32) {
-    if !val.is_null() {
-        xml_free_element_content(val);
+    unsafe {
+        if !val.is_null() {
+            xml_free_element_content(val);
+        }
     }
 }
 pub(crate) unsafe fn desret_xml_element_content_ptr(val: XmlElementContentPtr) {
-    if !val.is_null() {
-        xml_free_element_content(val);
+    unsafe {
+        if !val.is_null() {
+            xml_free_element_content(val);
+        }
     }
 }
 
@@ -755,8 +788,10 @@ pub(crate) fn des_const_unsigned_char_ptr(_no: i32, _val: *const u8, _nr: i32) {
 
 #[cfg(feature = "html")]
 pub(crate) unsafe fn desret_html_parser_ctxt_ptr(val: HtmlParserCtxtPtr) {
-    if !val.is_null() {
-        html_free_parser_ctxt(val);
+    unsafe {
+        if !val.is_null() {
+            html_free_parser_ctxt(val);
+        }
     }
 }
 
@@ -778,21 +813,25 @@ pub(crate) fn gen_const_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlCha
 
 #[cfg(feature = "html")]
 pub(crate) unsafe fn gen_html_parser_ctxt_ptr(no: i32, _nr: i32) -> HtmlParserCtxtPtr {
-    use crate::libxml::htmlparser::html_create_memory_parser_ctxt;
+    unsafe {
+        use crate::libxml::htmlparser::html_create_memory_parser_ctxt;
 
-    if no == 0 {
-        return xml_new_parser_ctxt();
+        if no == 0 {
+            return xml_new_parser_ctxt();
+        }
+        if no == 1 {
+            return html_create_memory_parser_ctxt("<html/>".as_bytes().to_vec());
+        }
+        null_mut()
     }
-    if no == 1 {
-        return html_create_memory_parser_ctxt("<html/>".as_bytes().to_vec());
-    }
-    null_mut()
 }
 
 #[cfg(feature = "html")]
 pub(crate) unsafe fn des_html_parser_ctxt_ptr(_no: i32, val: HtmlParserCtxtPtr, _nr: i32) {
-    if !val.is_null() {
-        html_free_parser_ctxt(val);
+    unsafe {
+        if !val.is_null() {
+            html_free_parser_ctxt(val);
+        }
     }
 }
 
@@ -946,12 +985,12 @@ pub(crate) fn des_unsigned_int(_no: i32, _val: u32, _nr: i32) {}
 pub(crate) fn des_const_xml_char_ptr_ptr(_no: i32, _val: *mut *const XmlChar, _nr: i32) {}
 
 pub(crate) fn gen_file_ptr(_no: i32, _nr: i32) -> Option<File> {
-    return File::options()
+    File::options()
         .append(true)
         .read(true)
         .create(true)
         .open("test.out")
-        .ok();
+        .ok()
 }
 
 pub(crate) fn gen_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlChar {

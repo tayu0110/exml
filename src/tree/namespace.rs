@@ -24,17 +24,17 @@ use std::{
     ffi::CStr,
     ops::{Deref, DerefMut},
     os::raw::c_void,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
 };
 
 use crate::libxml::{
     globals::xml_free,
-    xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
+    xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
 };
 
 use super::{
-    xml_tree_err_memory, InvalidNodePointerCastError, NodeCommon, XmlDocPtr, XmlElementType,
-    XmlGenericNodePtr, XmlNodePtr, XmlNsType, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    InvalidNodePointerCastError, NodeCommon, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, XmlDocPtr,
+    XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsType, xml_tree_err_memory,
 };
 
 #[repr(C)]
@@ -54,13 +54,17 @@ pub struct XmlNs {
 
 impl XmlNs {
     pub unsafe fn prefix(&self) -> Option<Cow<'_, str>> {
-        let prefix = self.prefix;
-        (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+        unsafe {
+            let prefix = self.prefix;
+            (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+        }
     }
 
     pub unsafe fn href(&self) -> Option<Cow<'_, str>> {
-        let href = self.href;
-        (!href.is_null()).then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+        unsafe {
+            let href = self.href;
+            (!href.is_null()).then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+        }
     }
 
     /// Read the value of a node, this can be either the text carried
@@ -73,11 +77,13 @@ impl XmlNs {
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlNodeGetContent")]
     pub unsafe fn get_content(&self) -> Option<String> {
-        assert!(matches!(
-            self.element_type(),
-            XmlElementType::XmlNamespaceDecl
-        ));
-        self.href().map(|href| href.into_owned())
+        unsafe {
+            assert!(matches!(
+                self.element_type(),
+                XmlElementType::XmlNamespaceDecl
+            ));
+            self.href().map(|href| href.into_owned())
+        }
     }
 
     /// Read the value of a node `cur`, this can be either the text carried
@@ -89,13 +95,15 @@ impl XmlNs {
     /// Returns 0 in case of success and -1 in case of error.
     #[doc(alias = "xmlBufGetNodeContent")]
     pub unsafe fn get_content_to(&self, buf: &mut String) -> i32 {
-        assert!(matches!(
-            self.element_type(),
-            XmlElementType::XmlNamespaceDecl
-        ));
-        buf.push_str(self.href().unwrap().as_ref());
+        unsafe {
+            assert!(matches!(
+                self.element_type(),
+                XmlElementType::XmlNamespaceDecl
+            ));
+            buf.push_str(self.href().unwrap().as_ref());
 
-        0
+            0
+        }
     }
 }
 
@@ -176,15 +184,17 @@ impl XmlNsPtr {
     /// # Todo
     /// - Fix to the private method.
     pub unsafe fn from_raw(ptr: *mut XmlNs) -> Result<Option<Self>, InvalidNodePointerCastError> {
-        if ptr.is_null() {
-            return Ok(None);
-        }
-        match (*ptr).element_type() {
-            XmlElementType::XmlNamespaceDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
-            _ => Err(InvalidNodePointerCastError {
-                from: (*ptr).element_type(),
-                to: type_name::<Self>(),
-            }),
+        unsafe {
+            if ptr.is_null() {
+                return Ok(None);
+            }
+            match (*ptr).element_type() {
+                XmlElementType::XmlNamespaceDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+                _ => Err(InvalidNodePointerCastError {
+                    from: (*ptr).element_type(),
+                    to: type_name::<Self>(),
+                }),
+            }
         }
     }
 
@@ -198,7 +208,9 @@ impl XmlNsPtr {
     /// This method should be called only once.  
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn free(self) {
-        let _ = *Box::from_raw(self.0.as_ptr());
+        unsafe {
+            let _ = *Box::from_raw(self.0.as_ptr());
+        }
     }
 
     /// Acquire the ownership of the inner value.  
@@ -208,7 +220,7 @@ impl XmlNsPtr {
     /// This method should be called only once.  
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn into_inner(self) -> Box<XmlNs> {
-        Box::from_raw(self.0.as_ptr())
+        unsafe { Box::from_raw(self.0.as_ptr()) }
     }
 }
 
@@ -282,88 +294,92 @@ pub unsafe fn xml_new_ns(
     href: *const XmlChar,
     prefix: Option<&str>,
 ) -> Option<XmlNsPtr> {
-    if node.map_or(false, |node| {
-        node.element_type() != XmlElementType::XmlElementNode
-    }) {
-        return None;
-    }
-
-    if prefix == Some("xml") {
-        // xml namespace is predefined, no need to add it
-        if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) {
+    unsafe {
+        if node.is_some_and(|node| node.element_type() != XmlElementType::XmlElementNode) {
             return None;
         }
 
-        // Problem, this is an attempt to bind xml prefix to a wrong
-        // namespace, which breaks
-        // Namespace constraint: Reserved Prefixes and Namespace Names
-        // from XML namespace. But documents authors may not care in
-        // their context so let's proceed.
-    }
-
-    // Allocate a new Namespace and fill the fields.
-    let Some(mut cur) = XmlNsPtr::new(XmlNs {
-        typ: XML_LOCAL_NAMESPACE,
-        ..Default::default()
-    }) else {
-        xml_tree_err_memory("building namespace");
-        return None;
-    };
-
-    if !href.is_null() {
-        cur.href = xml_strdup(href);
-    }
-    if let Some(prefix) = prefix {
-        cur.prefix = xml_strndup(prefix.as_ptr(), prefix.len() as i32);
-    }
-
-    // Add it at the end to preserve parsing order ...
-    // and checks for existing use of the prefix
-    if let Some(mut node) = node {
-        if let Some(ns_def) = node.ns_def {
-            let mut prev = ns_def;
-            if (prev.prefix.is_null() && cur.prefix.is_null())
-                || xml_str_equal(prev.prefix, cur.prefix)
-            {
-                xml_free_ns(cur);
+        if prefix == Some("xml") {
+            // xml namespace is predefined, no need to add it
+            if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) {
                 return None;
             }
-            while let Some(next) = prev.next {
-                prev = next;
+
+            // Problem, this is an attempt to bind xml prefix to a wrong
+            // namespace, which breaks
+            // Namespace constraint: Reserved Prefixes and Namespace Names
+            // from XML namespace. But documents authors may not care in
+            // their context so let's proceed.
+        }
+
+        // Allocate a new Namespace and fill the fields.
+        let Some(mut cur) = XmlNsPtr::new(XmlNs {
+            typ: XML_LOCAL_NAMESPACE,
+            ..Default::default()
+        }) else {
+            xml_tree_err_memory("building namespace");
+            return None;
+        };
+
+        if !href.is_null() {
+            cur.href = xml_strdup(href);
+        }
+        if let Some(prefix) = prefix {
+            cur.prefix = xml_strndup(prefix.as_ptr(), prefix.len() as i32);
+        }
+
+        // Add it at the end to preserve parsing order ...
+        // and checks for existing use of the prefix
+        if let Some(mut node) = node {
+            if let Some(ns_def) = node.ns_def {
+                let mut prev = ns_def;
                 if (prev.prefix.is_null() && cur.prefix.is_null())
                     || xml_str_equal(prev.prefix, cur.prefix)
                 {
                     xml_free_ns(cur);
                     return None;
                 }
+                while let Some(next) = prev.next {
+                    prev = next;
+                    if (prev.prefix.is_null() && cur.prefix.is_null())
+                        || xml_str_equal(prev.prefix, cur.prefix)
+                    {
+                        xml_free_ns(cur);
+                        return None;
+                    }
+                }
+                prev.next = Some(cur);
+            } else {
+                node.ns_def = Some(cur);
             }
-            prev.next = Some(cur);
-        } else {
-            node.ns_def = Some(cur);
         }
+        Some(cur)
     }
-    Some(cur)
 }
 
 /// Free up the structures associated to a namespace
 #[doc(alias = "xmlFreeNs")]
 pub unsafe fn xml_free_ns(cur: XmlNsPtr) {
-    if !cur.href.is_null() {
-        xml_free(cur.href as _);
+    unsafe {
+        if !cur.href.is_null() {
+            xml_free(cur.href as _);
+        }
+        if !cur.prefix.is_null() {
+            xml_free(cur.prefix as _);
+        }
+        cur.free();
     }
-    if !cur.prefix.is_null() {
-        xml_free(cur.prefix as _);
-    }
-    cur.free();
 }
 
 /// Free up all the structures associated to the chained namespaces.
 #[doc(alias = "xmlFreeNsList")]
 pub unsafe fn xml_free_ns_list(cur: XmlNsPtr) {
-    let mut next = cur.next;
-    xml_free_ns(cur);
-    while let Some(now) = next {
-        next = now.next;
-        xml_free_ns(now);
+    unsafe {
+        let mut next = cur.next;
+        xml_free_ns(cur);
+        while let Some(now) = next {
+            next = now.next;
+            xml_free_ns(now);
+        }
     }
 }

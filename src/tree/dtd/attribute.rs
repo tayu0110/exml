@@ -24,7 +24,7 @@ use std::{
     ffi::CStr,
     ops::{Deref, DerefMut},
     os::raw::c_void,
-    ptr::{null_mut, NonNull},
+    ptr::{NonNull, null_mut},
 };
 
 use crate::{
@@ -152,15 +152,17 @@ impl XmlAttributePtr {
     pub(crate) unsafe fn from_raw(
         ptr: *mut XmlAttribute,
     ) -> Result<Option<Self>, InvalidNodePointerCastError> {
-        if ptr.is_null() {
-            return Ok(None);
-        }
-        match (*ptr).element_type() {
-            XmlElementType::XmlAttributeDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
-            _ => Err(InvalidNodePointerCastError {
-                from: (*ptr).element_type(),
-                to: type_name::<Self>(),
-            }),
+        unsafe {
+            if ptr.is_null() {
+                return Ok(None);
+            }
+            match (*ptr).element_type() {
+                XmlElementType::XmlAttributeDecl => Ok(Some(Self(NonNull::new_unchecked(ptr)))),
+                _ => Err(InvalidNodePointerCastError {
+                    from: (*ptr).element_type(),
+                    to: type_name::<Self>(),
+                }),
+            }
         }
     }
 
@@ -174,7 +176,9 @@ impl XmlAttributePtr {
     /// This method should be called only once.  
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn free(self) {
-        let _ = *Box::from_raw(self.0.as_ptr());
+        unsafe {
+            let _ = *Box::from_raw(self.0.as_ptr());
+        }
     }
 
     /// Acquire the ownership of the inner value.  
@@ -184,7 +188,7 @@ impl XmlAttributePtr {
     /// This method should be called only once.  
     /// If called more than twice, the behavior is undefined.
     pub(crate) unsafe fn into_inner(self) -> Box<XmlAttribute> {
-        Box::from_raw(self.0.as_ptr())
+        unsafe { Box::from_raw(self.0.as_ptr()) }
     }
 }
 
@@ -248,14 +252,16 @@ impl From<XmlAttributePtr> for *mut XmlAttribute {
 /// Deallocate the memory used by an attribute definition
 #[doc(alias = "xmlFreeAttribute")]
 pub(crate) unsafe fn xml_free_attribute(mut attr: XmlAttributePtr) {
-    attr.unlink();
-    attr.elem = None;
-    if !attr.name.is_null() {
-        xml_free(attr.name as _);
+    unsafe {
+        attr.unlink();
+        attr.elem = None;
+        if !attr.name.is_null() {
+            xml_free(attr.name as _);
+        }
+        if !attr.default_value.is_null() {
+            xml_free(attr.default_value as _);
+        }
+        attr.prefix = None;
+        attr.free();
     }
-    if !attr.default_value.is_null() {
-        xml_free(attr.default_value as _);
-    }
-    attr.prefix = None;
-    attr.free();
 }
