@@ -1220,16 +1220,8 @@ unsafe fn xml_schema_get_component_name(item: XmlSchemaBasicItemPtr) -> *const X
 pub(crate) unsafe fn xml_schema_get_component_qname(item: *mut c_void) -> String {
     unsafe {
         let namespace_name = (*(item as XmlSchemaBasicItemPtr)).target_namespace();
-        xml_schema_format_qname(
-            namespace_name.as_deref(),
-            Some(
-                CStr::from_ptr(
-                    xml_schema_get_component_name(item as XmlSchemaBasicItemPtr) as *const i8
-                )
-                .to_string_lossy()
-                .as_ref(),
-            ),
-        )
+        let local_name = (*(item as XmlSchemaBasicItemPtr)).name();
+        xml_schema_format_qname(namespace_name.as_deref(), local_name.as_deref())
     }
 }
 

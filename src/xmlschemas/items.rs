@@ -17,6 +17,8 @@ use crate::{
 };
 
 pub(crate) trait XmlSchemaItem {
+    #[doc(alias = "xmlSchemaGetComponentName")]
+    fn name(&self) -> Option<Cow<'static, str>>;
     #[doc(alias = "xmlSchemaGetComponentTargetNs")]
     fn target_namespace(&self) -> Option<Cow<'static, str>>;
 }
@@ -25,12 +27,34 @@ macro_rules! impl_xml_schema_item {
     {
         type: $t:ty
         $(, @self: $self:tt )?
-        $(, @expected: $( $expected:tt )+ )?
-        $(, @fallback: $( $fallback:tt )+ )?
+        $(, @expected: $( $expected:pat )+ )?
+        $(, @fallback_name: $( $fallback_name:pat => $fname_block:block )+ )?
+        $(, @fallback: $( $fallback:pat => $fns_block:block )+ )?
     } => {
         impl XmlSchemaItem for $t {
+            fn name(&self) -> Option<Cow<'static, str>> {
+                $(
+                    #[allow(unused_variables)]
+                    let $self = self;
+                )?
+                match self.typ {
+                    $($( $expected )+ => {
+                        let name = self.name;
+                        unsafe {
+                            (!name.is_null()).then(|| CStr::from_ptr(name as *const i8).to_string_lossy().into_owned().into())
+                        }
+                    })?
+                    $($( $fallback_name => $fname_block )+)?
+                    _ => {
+                        unreachable!("Unexpected schema item type: {:?}", self.typ);
+                    }
+                }
+            }
             fn target_namespace(&self) -> Option<Cow<'static, str>> {
-                $( let $self = self; )?
+                $(
+                    #[allow(unused_variables)]
+                    let $self = self;
+                )?
                 match self.typ {
                     $($( $expected )+ => {
                         let ns = self.target_namespace;
@@ -41,7 +65,7 @@ macro_rules! impl_xml_schema_item {
                     XmlSchemaTypeType::XmlSchemaTypeBasic => {
                         Some("http://www.w3.org/2001/XMLSchema".into())
                     }
-                    $($( $fallback )+)?
+                    $($( $fallback => $fns_block )+)?
                     _ => {
                         unreachable!("Unexpected schema item type: {:?}", self.typ);
                     }
@@ -62,6 +86,102 @@ pub struct XmlSchemaBasicItem {
 }
 
 impl XmlSchemaItem for XmlSchemaBasicItem {
+    fn name(&self) -> Option<Cow<'static, str>> {
+        let item = self as *const Self;
+        unsafe {
+            match (*item).typ {
+                XmlSchemaTypeType::XmlSchemaTypeElement => {
+                    let name = (*(item as XmlSchemaElementPtr)).name;
+                    (!name.is_null()).then(|| {
+                        CStr::from_ptr(name as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into()
+                    })
+                }
+                XmlSchemaTypeType::XmlSchemaTypeAttribute => {
+                    let name = (*(item as XmlSchemaAttributePtr)).name;
+                    (!name.is_null()).then(|| {
+                        CStr::from_ptr(name as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into()
+                    })
+                }
+                XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+                    let name = (*(item as XmlSchemaAttributeGroupPtr)).name;
+                    (!name.is_null()).then(|| {
+                        CStr::from_ptr(name as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into()
+                    })
+                }
+                XmlSchemaTypeType::XmlSchemaTypeBasic
+                | XmlSchemaTypeType::XmlSchemaTypeSimple
+                | XmlSchemaTypeType::XmlSchemaTypeComplex => {
+                    let name = (*(item as XmlSchemaTypePtr)).name;
+                    (!name.is_null()).then(|| {
+                        CStr::from_ptr(name as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into()
+                    })
+                }
+                XmlSchemaTypeType::XmlSchemaTypeGroup => {
+                    let name = (*(item as XmlSchemaModelGroupDefPtr)).name;
+                    (!name.is_null()).then(|| {
+                        CStr::from_ptr(name as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into()
+                    })
+                }
+                XmlSchemaTypeType::XmlSchemaTypeIDCKey
+                | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
+                | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
+                    let name = (*(item as XmlSchemaIDCPtr)).name;
+                    (!name.is_null()).then(|| {
+                        CStr::from_ptr(name as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into()
+                    })
+                }
+                XmlSchemaTypeType::XmlSchemaTypeAttributeUse => {
+                    let decl = (*(item as XmlSchemaAttributeUsePtr)).attr_decl;
+                    if !decl.is_null() {
+                        (*decl).name()
+                    } else {
+                        None
+                    }
+                }
+                XmlSchemaTypeType::XmlSchemaExtraQnameref => {
+                    let name = (*(item as XmlSchemaQnameRefPtr)).name;
+                    (!name.is_null()).then(|| {
+                        CStr::from_ptr(name as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into()
+                    })
+                }
+                XmlSchemaTypeType::XmlSchemaTypeNotation => {
+                    let name = (*(item as XmlSchemaNotationPtr)).name;
+                    (!name.is_null()).then(|| {
+                        CStr::from_ptr(name as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                            .into()
+                    })
+                }
+                _ => {
+                    // Other components cannot have names.
+                    None
+                }
+            }
+        }
+    }
+
     fn target_namespace(&self) -> Option<Cow<'static, str>> {
         let item = self as *const Self;
         unsafe {
@@ -174,7 +294,8 @@ pub struct XmlSchemaAnnotItem {
 
 impl_xml_schema_item! {
     type: XmlSchemaAnnotItem,
-    @fallback: _ => None,
+    @fallback_name: _ => { None },
+    @fallback: _ => { None }
 }
 
 /// The abstract base type for tree-like structured schema components.
@@ -192,7 +313,8 @@ pub struct XmlSchemaTreeItem {
 
 impl_xml_schema_item! {
     type: XmlSchemaTreeItem,
-    @fallback: _ => None,
+    @fallback_name: _ => { None },
+    @fallback: _ => { None }
 }
 
 /// The abstract base type for tree-like structured schema components.
@@ -219,6 +341,17 @@ pub struct XmlSchemaAttributeUse {
 impl_xml_schema_item! {
     type: XmlSchemaAttributeUse,
     @self: item,
+    @fallback_name:
+        XmlSchemaTypeType::XmlSchemaTypeAttributeUse => {
+            let decl = item.attr_decl;
+            if !decl.is_null() {
+                unsafe {
+                    (*decl).name()
+                }
+            } else {
+                None
+            }
+        },
     @fallback:
         XmlSchemaTypeType::XmlSchemaTypeAttributeUse => {
             let decl = item.attr_decl;
@@ -229,7 +362,7 @@ impl_xml_schema_item! {
             } else {
                 None
             }
-        },
+        }
 }
 
 /// A helper component to reflect attribute prohibitions.
@@ -247,8 +380,9 @@ pub struct XmlSchemaAttributeUseProhib {
 }
 
 impl_xml_schema_item! {
-    type: XmlSchemaAttributeUseProhib,
-    @fallback: _ => None,
+    type: XmlSchemaAttributeUseProhib
+    // @fallback_name: _ => { None },
+    // @fallback: _ => { None }
 }
 
 #[doc(alias = "xmlSchemaQNameRefPtr")]
@@ -291,7 +425,8 @@ pub struct XmlSchemaParticle {
 
 impl_xml_schema_item! {
     type: XmlSchemaParticle,
-    @fallback: _ => None,
+    @fallback_name: _ => { None },
+    @fallback: _ => { None }
 }
 
 #[doc(alias = "xmlSchemaModelGroupPtr")]
@@ -310,7 +445,8 @@ pub struct XmlSchemaModelGroup {
 
 impl_xml_schema_item! {
     type: XmlSchemaModelGroup,
-    @fallback: _ => None,
+    @fallback_name: _ => { None },
+    @fallback: _ => { None }
 }
 
 #[doc(alias = "xmlSchemaModelGroupDefPtr")]
@@ -476,7 +612,15 @@ pub struct XmlSchemaType {
 
 impl_xml_schema_item! {
     type: XmlSchemaType,
-    @expected: XmlSchemaTypeType::XmlSchemaTypeSimple | XmlSchemaTypeType::XmlSchemaTypeComplex
+    @self: item,
+    @expected: XmlSchemaTypeType::XmlSchemaTypeSimple | XmlSchemaTypeType::XmlSchemaTypeComplex,
+    @fallback_name:
+        XmlSchemaTypeType::XmlSchemaTypeBasic => {
+            let name = item.name;
+            unsafe {
+                (!name.is_null()).then(|| CStr::from_ptr(name as *const i8).to_string_lossy().into_owned().into())
+            }
+        }
 }
 
 #[doc(alias = "xmlSchemaNotationPtr")]
