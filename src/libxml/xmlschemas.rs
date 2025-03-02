@@ -157,6 +157,13 @@ use crate::{
             xml_schema_pmutual_excl_attr_err, xml_schema_pres_comp_attr_err,
             xml_schema_psimple_type_err, xml_schema_simple_type_err,
         },
+        items::{
+            XmlSchemaAnnotItemPtr, XmlSchemaAttributeUse, XmlSchemaAttributeUseProhib,
+            XmlSchemaAttributeUseProhibPtr, XmlSchemaAttributeUsePtr, XmlSchemaBasicItemPtr,
+            XmlSchemaIDC, XmlSchemaIDCPtr, XmlSchemaModelGroup, XmlSchemaModelGroupDef,
+            XmlSchemaModelGroupDefPtr, XmlSchemaModelGroupPtr, XmlSchemaParticle,
+            XmlSchemaParticlePtr, XmlSchemaQnameRef, XmlSchemaQnameRefPtr, XmlSchemaTreeItemPtr,
+        },
         wxs_is_atomic, wxs_is_list, wxs_is_union,
     },
 };
@@ -706,76 +713,7 @@ pub struct XmlSchemaInclude {
     owner_import: XmlSchemaImportPtr,
 }
 
-/// The abstract base type for schema components.
-#[doc(alias = "xmlSchemaBasicItemPtr")]
-pub type XmlSchemaBasicItemPtr = *mut XmlSchemaBasicItem;
-#[doc(alias = "xmlSchemaBasicItem")]
-#[repr(C)]
-pub struct XmlSchemaBasicItem {
-    pub(crate) typ: XmlSchemaTypeType,
-    pub(crate) dummy: *mut c_void, /* Fix alignment issues */
-}
-
-/// The abstract base type for annotated schema components.
-/// (Extends xmlSchemaBasicItem)
-#[doc(alias = "xmlSchemaAnnotItemPtr")]
-pub type XmlSchemaAnnotItemPtr = *mut XmlSchemaAnnotItem;
-#[doc(alias = "xmlSchemaAnnotItem")]
-#[repr(C)]
-pub struct XmlSchemaAnnotItem {
-    typ: XmlSchemaTypeType,
-    annot: XmlSchemaAnnotPtr,
-}
-
-/// The abstract base type for tree-like structured schema components.
-/// (Extends xmlSchemaAnnotItem)
-#[doc(alias = "xmlSchemaTreeItemPtr")]
-pub type XmlSchemaTreeItemPtr = *mut XmlSchemaTreeItem;
-#[doc(alias = "xmlSchemaTreeItem")]
-#[repr(C)]
-pub struct XmlSchemaTreeItem {
-    pub(crate) typ: XmlSchemaTypeType,
-    pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) next: XmlSchemaTreeItemPtr,
-    pub(crate) children: XmlSchemaTreeItemPtr,
-}
-
 const XML_SCHEMA_ATTR_USE_FIXED: i32 = 1 << 0;
-
-/// The abstract base type for tree-like structured schema components.
-/// (Extends xmlSchemaTreeItem)
-#[doc(alias = "xmlSchemaAttributeUsePtr")]
-pub type XmlSchemaAttributeUsePtr = *mut XmlSchemaAttributeUse;
-#[doc(alias = "xmlSchemaAttributeUse")]
-#[repr(C)]
-pub struct XmlSchemaAttributeUse {
-    typ: XmlSchemaTypeType,
-    annot: XmlSchemaAnnotPtr,
-    next: XmlSchemaAttributeUsePtr, /* The next attr. use. */
-    // The attr. decl. OR a QName-ref. to an attr. decl. OR
-    // a QName-ref. to an attribute group definition.
-    pub(crate) attr_decl: XmlSchemaAttributePtr,
-
-    flags: i32,
-    node: XmlNodePtr,
-    occurs: i32, /* required, optional */
-    def_value: *const XmlChar,
-    def_val: XmlSchemaValPtr,
-}
-
-/// A helper component to reflect attribute prohibitions.
-/// (Extends xmlSchemaBasicItem)
-#[doc(alias = "xmlSchemaAttributeUseProhibPtr")]
-pub type XmlSchemaAttributeUseProhibPtr = *mut XmlSchemaAttributeUseProhib;
-#[doc(alias = "xmlSchemaAttributeUseProhib")]
-#[repr(C)]
-pub struct XmlSchemaAttributeUseProhib {
-    typ: XmlSchemaTypeType, /* == XML_SCHEMA_EXTRA_ATTR_USE_PROHIB */
-    node: Option<XmlNodePtr>,
-    name: *const XmlChar,
-    target_namespace: *const XmlChar,
-    is_ref: i32,
-}
 
 #[doc(alias = "xmlSchemaRedefPtr")]
 pub type XmlSchemaRedefPtr = *mut XmlSchemaRedef;
@@ -864,71 +802,8 @@ pub struct XmlSchemaParserCtxt {
     attr_prohibs: XmlSchemaItemListPtr,
 }
 
-#[doc(alias = "xmlSchemaQNameRefPtr")]
-pub type XmlSchemaQnameRefPtr = *mut XmlSchemaQnameRef;
-/// A component reference item (not a schema component)
-/// (Extends xmlSchemaBasicItem)
-#[doc(alias = "xmlSchemaQNameRef")]
-#[repr(C)]
-pub struct XmlSchemaQnameRef {
-    typ: XmlSchemaTypeType,
-    item: XmlSchemaBasicItemPtr, /* The resolved referenced item. */
-    item_type: XmlSchemaTypeType,
-    name: *const XmlChar,
-    target_namespace: *const XmlChar,
-    node: Option<XmlNodePtr>,
-}
-
-#[doc(alias = "xmlSchemaParticlePtr")]
-pub type XmlSchemaParticlePtr = *mut XmlSchemaParticle;
-/// A particle component.
-/// (Extends xmlSchemaTreeItem)
-#[doc(alias = "xmlSchemaParticle")]
-#[repr(C)]
-pub struct XmlSchemaParticle {
-    pub(crate) typ: XmlSchemaTypeType,
-    pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) next: XmlSchemaTreeItemPtr, /* next particle */
-    // the "term" (e.g. a model group,
-    // a group definition, a XML_SCHEMA_EXTRA_QNAMEREF (if a reference), etc.)
-    pub(crate) children: XmlSchemaTreeItemPtr,
-    pub(crate) min_occurs: i32,
-    pub(crate) max_occurs: i32,
-    pub(crate) node: Option<XmlNodePtr>,
-}
-
-#[doc(alias = "xmlSchemaModelGroupPtr")]
-pub type XmlSchemaModelGroupPtr = *mut XmlSchemaModelGroup;
-/// A model group component.
-/// (Extends xmlSchemaTreeItem)
-#[doc(alias = "xmlSchemaModelGroup")]
-#[repr(C)]
-pub struct XmlSchemaModelGroup {
-    pub(crate) typ: XmlSchemaTypeType, /* XmlSchemaTypeSequence, XmlSchemaTypeChoice, XmlSchemaTypeAll */
-    pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) next: XmlSchemaTreeItemPtr,     /* not used */
-    pub(crate) children: XmlSchemaTreeItemPtr, /* first particle (OR "element decl" OR "wildcard") */
-    pub(crate) node: XmlNodePtr,
-}
-
 const XML_SCHEMA_MODEL_GROUP_DEF_MARKED: i32 = 1 << 0;
 const XML_SCHEMA_MODEL_GROUP_DEF_REDEFINED: i32 = 1 << 1;
-#[doc(alias = "xmlSchemaModelGroupDefPtr")]
-pub type XmlSchemaModelGroupDefPtr = *mut XmlSchemaModelGroupDef;
-/// A model group definition component.
-/// (Extends xmlSchemaTreeItem)
-#[doc(alias = "xmlSchemaModelGroupDef")]
-#[repr(C)]
-pub struct XmlSchemaModelGroupDef {
-    typ: XmlSchemaTypeType, /* XML_SCHEMA_TYPE_GROUP */
-    annot: XmlSchemaAnnotPtr,
-    next: XmlSchemaTreeItemPtr,     /* not used */
-    children: XmlSchemaTreeItemPtr, /* the "model group" */
-    name: *const XmlChar,
-    target_namespace: *const XmlChar,
-    node: XmlNodePtr,
-    flags: i32,
-}
 
 #[doc(alias = "xmlSchemaIDCSelectPtr")]
 pub type XmlSchemaIdcselectPtr = *mut XmlSchemaIdcselect;
@@ -941,25 +816,6 @@ pub struct XmlSchemaIdcselect {
     index: i32,              /* an index position if significant for IDC key-sequences */
     xpath: *const XmlChar,   /* the XPath expression */
     xpath_comp: *mut c_void, /* the compiled XPath expression */
-}
-
-#[doc(alias = "xmlSchemaIDCPtr")]
-pub type XmlSchemaIDCPtr = *mut XmlSchemaIDC;
-/// The identity-constraint definition component.
-/// (Extends xmlSchemaAnnotItem)
-#[doc(alias = "xmlSchemaIDC")]
-#[repr(C)]
-pub struct XmlSchemaIDC {
-    typ: XmlSchemaTypeType,
-    annot: XmlSchemaAnnotPtr,
-    next: XmlSchemaIDCPtr,
-    node: XmlNodePtr,
-    pub(crate) name: *const XmlChar,
-    target_namespace: *const XmlChar,
-    selector: XmlSchemaIdcselectPtr,
-    fields: XmlSchemaIdcselectPtr,
-    nb_fields: i32,
-    refe: XmlSchemaQnameRefPtr,
 }
 
 #[doc(alias = "xmlSchemaIDCAugPtr")]

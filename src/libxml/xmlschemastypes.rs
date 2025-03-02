@@ -49,9 +49,7 @@ use crate::{
         valid::{xml_add_id, xml_add_ref, xml_validate_notation_use},
         xmlregexp::{xml_reg_free_regexp, xml_regexp_compile, xml_regexp_exec},
         xmlschemas::{
-            XmlSchemaAbstractCtxtPtr, XmlSchemaBasicItemPtr, XmlSchemaModelGroup,
-            XmlSchemaModelGroupPtr, XmlSchemaParserCtxtPtr, XmlSchemaParticle,
-            XmlSchemaParticlePtr, XmlSchemaTreeItemPtr, xml_schema_facet_type_to_string,
+            XmlSchemaAbstractCtxtPtr, XmlSchemaParserCtxtPtr, xml_schema_facet_type_to_string,
             xml_schema_format_qname, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
             xml_schema_vcheck_cvc_simple_type,
         },
@@ -65,7 +63,13 @@ use crate::{
         xml_split_qname2, xml_validate_name, xml_validate_ncname, xml_validate_nmtoken,
         xml_validate_qname,
     },
-    xmlschemas::error::{xml_schema_custom_err, xml_schema_custom_err4},
+    xmlschemas::{
+        error::{xml_schema_custom_err, xml_schema_custom_err4},
+        items::{
+            XmlSchemaBasicItemPtr, XmlSchemaModelGroup, XmlSchemaModelGroupPtr, XmlSchemaParticle,
+            XmlSchemaParticlePtr, XmlSchemaTreeItemPtr,
+        },
+    },
     xpath::{XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF, xml_xpath_is_nan},
 };
 

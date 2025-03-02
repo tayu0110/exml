@@ -17,13 +17,12 @@ use crate::{
         },
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR, XmlSchemaAbstractCtxtPtr,
-            XmlSchemaAttrInfoPtr, XmlSchemaAttributeUsePtr, XmlSchemaBasicItemPtr, XmlSchemaIDCPtr,
-            XmlSchemaNodeInfoPtr, XmlSchemaPSVIIDCNodePtr, XmlSchemaParserCtxtPtr,
-            XmlSchemaValidCtxtPtr, xml_schema_facet_type_to_string, xml_schema_format_qname,
-            xml_schema_get_canon_value_whtsp_ext, xml_schema_get_component_designation,
-            xml_schema_get_component_node, xml_schema_get_component_qname,
-            xml_schema_get_component_type_str, xml_schema_get_white_space_facet_value,
-            xml_schema_item_type_to_str,
+            XmlSchemaAttrInfoPtr, XmlSchemaNodeInfoPtr, XmlSchemaPSVIIDCNodePtr,
+            XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_facet_type_to_string,
+            xml_schema_format_qname, xml_schema_get_canon_value_whtsp_ext,
+            xml_schema_get_component_designation, xml_schema_get_component_node,
+            xml_schema_get_component_qname, xml_schema_get_component_type_str,
+            xml_schema_get_white_space_facet_value, xml_schema_item_type_to_str,
         },
         xmlschemastypes::{XmlSchemaWhitespaceValueType, xml_schema_get_facet_value_as_ulong},
         xmlstring::{
@@ -34,7 +33,10 @@ use crate::{
     tree::{NodeCommon, XmlAttrPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr},
 };
 
-use super::{wxs_is_atomic, wxs_is_list, wxs_is_union};
+use super::{
+    items::{XmlSchemaAttributeUsePtr, XmlSchemaBasicItemPtr, XmlSchemaIDCPtr},
+    wxs_is_atomic, wxs_is_list, wxs_is_union,
+};
 
 macro_rules! FREE_AND_NULL {
     ($str:expr) => {

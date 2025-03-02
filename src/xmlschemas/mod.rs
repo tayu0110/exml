@@ -21,6 +21,7 @@
 // Daniel Veillard <veillard@redhat.com>
 
 pub(crate) mod error;
+pub mod items;
 
 use crate::libxml::schemas_internals::{
     XML_SCHEMAS_TYPE_VARIETY_ATOMIC, XML_SCHEMAS_TYPE_VARIETY_LIST, XML_SCHEMAS_TYPE_VARIETY_UNION,
