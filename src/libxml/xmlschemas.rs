@@ -584,14 +584,6 @@ macro_rules! HERROR {
     };
 }
 
-// macro_rules! HSTOP {
-// 	($ctx:expr) => {
-// 		if (*$ctx).stop {
-// 			goto exit;
-// 		}
-// 	}
-// }
-
 // Some flags used for various schema constraints.
 const SUBSET_RESTRICTION: i32 = 1 << 0;
 const SUBSET_EXTENSION: i32 = 1 << 1;
@@ -599,7 +591,9 @@ const SUBSET_SUBSTITUTION: i32 = 1 << 2;
 const SUBSET_LIST: i32 = 1 << 3;
 const SUBSET_UNION: i32 = 1 << 4;
 
+#[doc(alias = "xmlSchemaItemListPtr")]
 pub type XmlSchemaItemListPtr = *mut XmlSchemaItemList;
+#[doc(alias = "xmlSchemaItemList")]
 #[repr(C)]
 pub struct XmlSchemaItemList {
     pub(crate) items: *mut *mut c_void, /* used for dynamic addition of schemata */
@@ -610,7 +604,9 @@ pub struct XmlSchemaItemList {
 const XML_SCHEMA_CTXT_PARSER: i32 = 1;
 const XML_SCHEMA_CTXT_VALIDATOR: i32 = 2;
 
+#[doc(alias = "xmlSchemaAbstractCtxtPtr")]
 pub type XmlSchemaAbstractCtxtPtr = *mut XmlSchemaAbstractCtxt;
+#[doc(alias = "xmlSchemaAbstractCtxt")]
 #[repr(C)]
 pub struct XmlSchemaAbstractCtxt {
     pub(crate) typ: i32,           /* E.g. XML_SCHEMA_CTXT_VALIDATOR */
@@ -622,6 +618,7 @@ const XML_SCHEMA_SCHEMA_IMPORT: i32 = 1;
 const XML_SCHEMA_SCHEMA_INCLUDE: i32 = 2;
 const XML_SCHEMA_SCHEMA_REDEFINE: i32 = 3;
 
+#[doc(alias = "xmlSchemaSchemaRelationPtr")]
 pub type XmlSchemaSchemaRelationPtr = *mut XmlSchemaSchemaRelation;
 /// Used to create a graph of schema relationships.
 #[doc(alias = "xmlSchemaSchemaRelation")]
@@ -636,7 +633,9 @@ pub struct XmlSchemaSchemaRelation {
 const XML_SCHEMA_BUCKET_MARKED: i32 = 1 << 0;
 const XML_SCHEMA_BUCKET_COMPS_ADDED: i32 = 1 << 1;
 
+#[doc(alias = "xmlSchemaBucketPtr")]
 pub type XmlSchemaBucketPtr = *mut XmlSchemaBucket;
+#[doc(alias = "xmlSchemaBucket")]
 #[repr(C)]
 pub struct XmlSchemaBucket {
     typ: i32,
@@ -659,8 +658,9 @@ pub struct XmlSchemaBucket {
 /// Reflects a schema. Holds some information
 /// about the schema and its toplevel components. Duplicate
 /// toplevel components are not checked at this level.
-#[doc(alias = "xmlSchemaImport")]
+#[doc(alias = "xmlSchemaImportPtr")]
 pub type XmlSchemaImportPtr = *mut XmlSchemaImport;
+#[doc(alias = "xmlSchemaImport")]
 #[repr(C)]
 pub struct XmlSchemaImport {
     typ: i32, /* Main OR import OR include. */
@@ -685,7 +685,9 @@ pub struct XmlSchemaImport {
 }
 
 // Extends xmlSchemaBucket
+#[doc(alias = "xmlSchemaIncludePtr")]
 pub type XmlSchemaIncludePtr = *mut XmlSchemaInclude;
+#[doc(alias = "xmlSchemaInclude")]
 #[repr(C)]
 pub struct XmlSchemaInclude {
     typ: i32,
@@ -707,8 +709,9 @@ pub struct XmlSchemaInclude {
 }
 
 /// The abstract base type for schema components.
-#[doc(alias = "xmlSchemaBasicItem")]
+#[doc(alias = "xmlSchemaBasicItemPtr")]
 pub type XmlSchemaBasicItemPtr = *mut XmlSchemaBasicItem;
+#[doc(alias = "xmlSchemaBasicItem")]
 #[repr(C)]
 pub struct XmlSchemaBasicItem {
     pub(crate) typ: XmlSchemaTypeType,
@@ -717,8 +720,9 @@ pub struct XmlSchemaBasicItem {
 
 /// The abstract base type for annotated schema components.
 /// (Extends xmlSchemaBasicItem)
-#[doc(alias = "xmlSchemaAnnotItem")]
+#[doc(alias = "xmlSchemaAnnotItemPtr")]
 pub type XmlSchemaAnnotItemPtr = *mut XmlSchemaAnnotItem;
+#[doc(alias = "xmlSchemaAnnotItem")]
 #[repr(C)]
 pub struct XmlSchemaAnnotItem {
     typ: XmlSchemaTypeType,
@@ -727,8 +731,9 @@ pub struct XmlSchemaAnnotItem {
 
 /// The abstract base type for tree-like structured schema components.
 /// (Extends xmlSchemaAnnotItem)
-#[doc(alias = "xmlSchemaTreeItem")]
+#[doc(alias = "xmlSchemaTreeItemPtr")]
 pub type XmlSchemaTreeItemPtr = *mut XmlSchemaTreeItem;
+#[doc(alias = "xmlSchemaTreeItem")]
 #[repr(C)]
 pub struct XmlSchemaTreeItem {
     pub(crate) typ: XmlSchemaTypeType,
@@ -743,6 +748,7 @@ const XML_SCHEMA_ATTR_USE_FIXED: i32 = 1 << 0;
 /// (Extends xmlSchemaTreeItem)
 #[doc(alias = "xmlSchemaAttributeUsePtr")]
 pub type XmlSchemaAttributeUsePtr = *mut XmlSchemaAttributeUse;
+#[doc(alias = "xmlSchemaAttributeUse")]
 #[repr(C)]
 pub struct XmlSchemaAttributeUse {
     typ: XmlSchemaTypeType,
@@ -763,6 +769,7 @@ pub struct XmlSchemaAttributeUse {
 /// (Extends xmlSchemaBasicItem)
 #[doc(alias = "xmlSchemaAttributeUseProhibPtr")]
 pub type XmlSchemaAttributeUseProhibPtr = *mut XmlSchemaAttributeUseProhib;
+#[doc(alias = "xmlSchemaAttributeUseProhib")]
 #[repr(C)]
 pub struct XmlSchemaAttributeUseProhib {
     typ: XmlSchemaTypeType, /* == XML_SCHEMA_EXTRA_ATTR_USE_PROHIB */
@@ -772,6 +779,7 @@ pub struct XmlSchemaAttributeUseProhib {
     is_ref: i32,
 }
 
+#[doc(alias = "xmlSchemaRedefPtr")]
 pub type XmlSchemaRedefPtr = *mut XmlSchemaRedef;
 #[doc(alias = "xmlSchemaRedef")]
 #[repr(C)]
@@ -786,6 +794,7 @@ pub struct XmlSchemaRedef {
     target_bucket: XmlSchemaBucketPtr, /* The redefined schema. */
 }
 
+#[doc(alias = "xmlSchemaConstructionCtxtPtr")]
 pub type XmlSchemaConstructionCtxtPtr = *mut XmlSchemaConstructionCtxt;
 #[doc(alias = "xmlSchemaConstructionCtxt")]
 #[repr(C)]
@@ -807,7 +816,9 @@ const XML_SCHEMAS_PARSE_ERROR: i32 = 1;
 const SCHEMAS_PARSE_OPTIONS: i32 = XmlParserOption::XmlParseNoEnt as i32;
 
 /// A schemas validation context
+#[doc(alias = "xmlSchemaParserCtxtPtr")]
 pub type XmlSchemaParserCtxtPtr = *mut XmlSchemaParserCtxt;
+#[doc(alias = "xmlSchemaParserCtxt")]
 #[repr(C)]
 pub struct XmlSchemaParserCtxt {
     typ: i32,
@@ -855,6 +866,7 @@ pub struct XmlSchemaParserCtxt {
     attr_prohibs: XmlSchemaItemListPtr,
 }
 
+#[doc(alias = "xmlSchemaQNameRefPtr")]
 pub type XmlSchemaQnameRefPtr = *mut XmlSchemaQnameRef;
 /// A component reference item (not a schema component)
 /// (Extends xmlSchemaBasicItem)
@@ -869,6 +881,7 @@ pub struct XmlSchemaQnameRef {
     node: Option<XmlNodePtr>,
 }
 
+#[doc(alias = "xmlSchemaParticlePtr")]
 pub type XmlSchemaParticlePtr = *mut XmlSchemaParticle;
 /// A particle component.
 /// (Extends xmlSchemaTreeItem)
@@ -886,6 +899,7 @@ pub struct XmlSchemaParticle {
     pub(crate) node: Option<XmlNodePtr>,
 }
 
+#[doc(alias = "xmlSchemaModelGroupPtr")]
 pub type XmlSchemaModelGroupPtr = *mut XmlSchemaModelGroup;
 /// A model group component.
 /// (Extends xmlSchemaTreeItem)
@@ -901,6 +915,7 @@ pub struct XmlSchemaModelGroup {
 
 const XML_SCHEMA_MODEL_GROUP_DEF_MARKED: i32 = 1 << 0;
 const XML_SCHEMA_MODEL_GROUP_DEF_REDEFINED: i32 = 1 << 1;
+#[doc(alias = "xmlSchemaModelGroupDefPtr")]
 pub type XmlSchemaModelGroupDefPtr = *mut XmlSchemaModelGroupDef;
 /// A model group definition component.
 /// (Extends xmlSchemaTreeItem)
@@ -917,6 +932,7 @@ pub struct XmlSchemaModelGroupDef {
     flags: i32,
 }
 
+#[doc(alias = "xmlSchemaIDCSelectPtr")]
 pub type XmlSchemaIdcselectPtr = *mut XmlSchemaIdcselect;
 /// The identity-constraint "field" and "selector" item, holding the XPath expression.
 #[doc(alias = "xmlSchemaIDCSelect")]
@@ -929,6 +945,7 @@ pub struct XmlSchemaIdcselect {
     xpath_comp: *mut c_void, /* the compiled XPath expression */
 }
 
+#[doc(alias = "xmlSchemaIDCPtr")]
 pub type XmlSchemaIDCPtr = *mut XmlSchemaIDC;
 /// The identity-constraint definition component.
 /// (Extends xmlSchemaAnnotItem)
@@ -947,6 +964,7 @@ pub struct XmlSchemaIDC {
     refe: XmlSchemaQnameRefPtr,
 }
 
+#[doc(alias = "xmlSchemaIDCAugPtr")]
 pub type XmlSchemaIDCAugPtr = *mut XmlSchemaIDCAug;
 /// The augmented IDC information used for validation.
 #[doc(alias = "xmlSchemaIDCAug")]
@@ -958,6 +976,7 @@ pub struct XmlSchemaIDCAug {
                               tables need to be bubbled upwards */
 }
 
+#[doc(alias = "xmlSchemaPSVIIDCKeyPtr")]
 pub type XmlSchemaPSVIIDCKeyPtr = *mut XmlSchemaPSVIIDCKey;
 /// The key sequence of a node table item.
 #[doc(alias = "xmlSchemaPSVIIDCKeySequence")]
@@ -967,6 +986,7 @@ pub struct XmlSchemaPSVIIDCKey {
     val: XmlSchemaValPtr,
 }
 
+#[doc(alias = "xmlSchemaPSVIIDCNodePtr")]
 pub type XmlSchemaPSVIIDCNodePtr = *mut XmlSchemaPSVIIDCNode;
 /// The node table item of a node table.
 #[doc(alias = "xmlSchemaPSVIIDCNode")]
@@ -978,6 +998,7 @@ pub struct XmlSchemaPSVIIDCNode {
     node_qname_id: i32,
 }
 
+#[doc(alias = "xmlSchemaPSVIIDCBindingPtr")]
 pub type XmlSchemaPSVIIDCBindingPtr = *mut XmlSchemaPSVIIDCBinding;
 /// The identity-constraint binding item of the [identity-constraint table].
 #[doc(alias = "xmlSchemaPSVIIDCBinding")]
@@ -997,6 +1018,7 @@ const XPATH_STATE_OBJ_TYPE_IDC_FIELD: i32 = 2;
 const XPATH_STATE_OBJ_MATCHES: i32 = -2;
 const XPATH_STATE_OBJ_BLOCKED: i32 = -3;
 
+#[doc(alias = "xmlSchemaIDCStateObjPtr")]
 pub type XmlSchemaIDCStateObjPtr = *mut XmlSchemaIDCStateObj;
 /// The state object used to evaluate XPath expressions.
 #[doc(alias = "xmlSchemaIDCStateObj")]
@@ -1016,6 +1038,7 @@ pub struct XmlSchemaIDCStateObj {
 
 const IDC_MATCHER: i32 = 0;
 
+#[doc(alias = "xmlSchemaIDCMatcherPtr")]
 pub type XmlSchemaIDCMatcherPtr = *mut XmlSchemaIDCMatcher;
 /// Used to evaluate IDC selectors (and fields).
 #[doc(alias = "xmlSchemaIDCMatcher")]
@@ -1050,6 +1073,7 @@ const XML_SCHEMA_ELEM_INFO_ERR_BAD_CONTENT: i32 = 1 << 8;
 const XML_SCHEMA_NODE_INFO_ERR_NOT_EXPECTED: i32 = 1 << 9;
 const XML_SCHEMA_NODE_INFO_ERR_BAD_TYPE: i32 = 1 << 10;
 
+#[doc(alias = "xmlSchemaNodeInfoPtr")]
 pub type XmlSchemaNodeInfoPtr = *mut XmlSchemaNodeInfo;
 /// Holds information of an element node.
 #[doc(alias = "xmlSchemaNodeInfo")]
@@ -1109,7 +1133,9 @@ const XML_SCHEMA_ATTR_INFO_META_XSI_SCHEMA_LOC: i32 = 3;
 const XML_SCHEMA_ATTR_INFO_META_XSI_NO_NS_SCHEMA_LOC: i32 = 4;
 const XML_SCHEMA_ATTR_INFO_META_XMLNS: i32 = 5;
 
+#[doc(alias = "xmlSchemaAttrInfoPtr")]
 pub type XmlSchemaAttrInfoPtr = *mut XmlSchemaAttrInfo;
+#[doc(alias = "xmlSchemaAttrInfo")]
 #[repr(C)]
 pub struct XmlSchemaAttrInfo {
     node_type: i32,
@@ -1131,9 +1157,10 @@ pub struct XmlSchemaAttrInfo {
 }
 
 const XML_SCHEMA_VALID_CTXT_FLAG_STREAM: i32 = 1;
+#[doc(alias = "xmlSchemaValidCtxtPtr")]
+pub type XmlSchemaValidCtxtPtr = *mut XmlSchemaValidCtxt;
 /// A Schemas validation context
 #[doc(alias = "xmlSchemaValidCtxt")]
-pub type XmlSchemaValidCtxtPtr = *mut XmlSchemaValidCtxt;
 #[repr(C)]
 pub struct XmlSchemaValidCtxt {
     typ: i32,
@@ -1207,6 +1234,7 @@ pub struct XmlSchemaValidCtxt {
     loc_ctxt: *mut c_void,
 }
 
+#[doc(alias = "xmlSchemaSubstGroupPtr")]
 pub type XmlSchemaSubstGroupPtr = *mut XmlSchemaSubstGroup;
 #[doc(alias = "xmlSchemaSubstGroup")]
 #[repr(C)]
@@ -1215,6 +1243,7 @@ pub struct XmlSchemaSubstGroup {
     members: XmlSchemaItemListPtr,
 }
 
+#[doc(alias = "xmlIDCHashEntryPtr")]
 pub type XmlIDCHashEntryPtr = *mut XmlIDCHashEntry;
 /// an entry in hash tables to quickly look up keys/uniques
 #[doc(alias = "xmlIDCHashEntry")]
