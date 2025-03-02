@@ -164,7 +164,8 @@ use crate::{
             XmlSchemaModelGroupDefPtr, XmlSchemaModelGroupPtr, XmlSchemaParticle,
             XmlSchemaParticlePtr, XmlSchemaQnameRef, XmlSchemaQnameRefPtr, XmlSchemaTreeItemPtr,
         },
-        wxs_is_atomic, wxs_is_list, wxs_is_union,
+        wxs_is_any_simple_type, wxs_is_anytype, wxs_is_atomic, wxs_is_complex, wxs_is_extension,
+        wxs_is_list, wxs_is_restriction, wxs_is_simple, wxs_is_union,
     },
 };
 
@@ -376,49 +377,6 @@ macro_rules! WXS_INCBUCKET {
     };
 }
 
-// Macros for complex/simple types.
-macro_rules! WXS_IS_ANYTYPE {
-    ($i:expr) => {
-        (*$i).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
-            && (*($i as XmlSchemaTypePtr)).built_in_type
-                == XmlSchemaValType::XmlSchemasAnytype as i32
-    };
-}
-
-macro_rules! WXS_IS_COMPLEX {
-    ($i:expr) => {
-        (*$i).typ == XmlSchemaTypeType::XmlSchemaTypeComplex
-            || (*$i).built_in_type == XmlSchemaValType::XmlSchemasAnytype as i32
-    };
-}
-
-macro_rules! WXS_IS_SIMPLE {
-    ($item:expr) => {
-        (*$item).typ == XmlSchemaTypeType::XmlSchemaTypeSimple
-            || ((*$item).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
-                && (*$item).built_in_type != XmlSchemaValType::XmlSchemasAnytype as i32)
-    };
-}
-
-macro_rules! WXS_IS_ANY_SIMPLE_TYPE {
-    ($i:expr) => {
-        (*$i).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
-            && (*$i).built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
-    };
-}
-
-macro_rules! WXS_IS_RESTRICTION {
-    ($t:expr) => {
-        (*$t).flags & XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION != 0
-    };
-}
-
-macro_rules! WXS_IS_EXTENSION {
-    ($t:expr) => {
-        (*$t).flags & XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION != 0
-    };
-}
-
 macro_rules! WXS_IS_TYPE_NOT_FIXED {
     ($i:expr) => {
         (*$i).typ != XmlSchemaTypeType::XmlSchemaTypeBasic
@@ -463,13 +421,7 @@ macro_rules! WXS_TYPE_PARTICLE_TERM {
         WXS_PARTICLE_TERM!(WXS_TYPE_PARTICLE!($t))
     };
 }
-// Macros for exclusively for simple types.
 
-macro_rules! WXS_IS_UNION {
-    ($t:expr) => {
-        (*$t).flags & $crate::libxml::schemas_internals::XML_SCHEMAS_TYPE_VARIETY_UNION != 0
-    };
-}
 // Misc parser context macros.
 macro_rules! WXS_CONSTRUCTOR {
     ($ctx:expr) => {
@@ -1203,7 +1155,7 @@ pub(crate) unsafe fn xml_schema_get_component_type_str(
     unsafe {
         match (*item).typ {
             XmlSchemaTypeType::XmlSchemaTypeBasic => {
-                if WXS_IS_COMPLEX!(item as XmlSchemaTypePtr) {
+                if wxs_is_complex(item as XmlSchemaTypePtr) {
                     "complex type definition"
                 } else {
                     "simple type definition"
@@ -1924,7 +1876,7 @@ unsafe fn xml_schema_are_values_equal(mut x: XmlSchemaValPtr, mut y: XmlSchemaVa
             // We assume computed values to be normalized, so do a fast
             // string comparison for string based types.
             if (*ptx).built_in_type == XmlSchemaValType::XmlSchemasString as i32
-                || WXS_IS_ANY_SIMPLE_TYPE!(ptx)
+                || wxs_is_any_simple_type(ptx)
             {
                 if !xml_str_equal(
                     xml_schema_value_get_as_string(x),
@@ -2023,7 +1975,7 @@ unsafe fn xml_schema_validate_facets(
                 // Whitespace handling is only of importance for string-based types.
                 tmp_type = xml_schema_get_primitive_type(typ);
                 if (*tmp_type).built_in_type == XmlSchemaValType::XmlSchemasString as i32
-                    || WXS_IS_ANY_SIMPLE_TYPE!(tmp_type)
+                    || wxs_is_any_simple_type(tmp_type)
                 {
                     ws = xml_schema_get_white_space_facet_value(typ).unwrap();
                 } else {
@@ -2390,7 +2342,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
             value = c"".as_ptr() as _;
         }
         'internal_error: {
-            if WXS_IS_ANY_SIMPLE_TYPE!(typ) || wxs_is_atomic(typ) {
+            if wxs_is_any_simple_type(typ) || wxs_is_atomic(typ) {
                 let mut bi_type: XmlSchemaTypePtr; /* The built-in type. */
                 // SPEC (1.2.1) "if {variety} is `atomic` then the string must `match`
                 // a literal in the `lexical space` of {base type definition}"
@@ -12803,7 +12755,7 @@ unsafe fn xml_schema_resolve_union_member_types(
             let ns_name: *const XmlChar = (*((*link).typ as XmlSchemaQnameRefPtr)).target_namespace;
 
             member_type = xml_schema_get_type((*ctxt).schema, name, ns_name);
-            if member_type.is_null() || !WXS_IS_SIMPLE!(member_type) {
+            if member_type.is_null() || !wxs_is_simple(member_type) {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapSrcResolve,
@@ -12940,7 +12892,7 @@ unsafe fn xml_schema_resolve_type_references(
                 return;
             }
         }
-        if WXS_IS_SIMPLE!(type_def) {
+        if wxs_is_simple(type_def) {
             if wxs_is_union(type_def) {
                 // Resolve the memberTypes.
                 xml_schema_resolve_union_member_types(ctxt, type_def);
@@ -12950,7 +12902,7 @@ unsafe fn xml_schema_resolve_type_references(
                     (*type_def).subtypes =
                         xml_schema_get_type((*ctxt).schema, (*type_def).base, (*type_def).base_ns);
 
-                    if (*type_def).subtypes.is_null() || !WXS_IS_SIMPLE!((*type_def).subtypes) {
+                    if (*type_def).subtypes.is_null() || !wxs_is_simple((*type_def).subtypes) {
                         (*type_def).subtypes = null_mut();
                         xml_schema_pres_comp_attr_err(
                             ctxt,
@@ -13071,7 +13023,7 @@ unsafe fn xml_schema_resolve_attr_type_references(
         if !(*item).type_name.is_null() {
             let typ: XmlSchemaTypePtr =
                 xml_schema_get_type((*ctxt).schema, (*item).type_name, (*item).type_ns);
-            if typ.is_null() || !WXS_IS_SIMPLE!(typ) {
+            if typ.is_null() || !wxs_is_simple(typ) {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
                     XmlParserErrors::XmlSchemapSrcResolve,
@@ -14754,7 +14706,7 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
             // 1 If the <complexContent> alternative is chosen, the type definition
             // `resolved` to by the `actual value` of the base [attribute]
             // must be a complex type definition;
-            if !WXS_IS_COMPLEX!(base) {
+            if !wxs_is_complex(base) {
                 let qname = xml_schema_format_qname(
                     Some(
                         CStr::from_ptr((*base).target_namespace as *const i8)
@@ -14784,8 +14736,8 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
             // following must be true:
             // 2.1 The type definition `resolved` to by the `actual value` of the
             // base [attribute] must be one of the following:
-            if WXS_IS_SIMPLE!(base) {
-                if !WXS_IS_EXTENSION!(typ) {
+            if wxs_is_simple(base) {
+                if !wxs_is_extension(typ) {
                     let qname = xml_schema_format_qname(
                         Some(
                             CStr::from_ptr((*base).target_namespace as *const i8)
@@ -14833,7 +14785,7 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
                         return -1;
                     }
                 } else if (*base).content_type == XmlSchemaContentType::XmlSchemaContentMixed
-                    && WXS_IS_RESTRICTION!(typ)
+                    && wxs_is_restriction(typ)
                 {
                     // 2.1.2 only if the <restriction> alternative is also
                     // chosen, a complex type definition whose {content type}
@@ -14877,7 +14829,7 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
                 }
             }
             if ret > 0 {
-                if WXS_IS_RESTRICTION!(typ) {
+                if wxs_is_restriction(typ) {
                     let qname = xml_schema_format_qname(
                         Some(
                             CStr::from_ptr((*base).target_namespace as *const i8)
@@ -14970,7 +14922,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
         // wildcard, i.e. intersect multiple wildcards.
         // Move attribute prohibitions into a separate list.
         if !uses.is_null() {
-            if WXS_IS_RESTRICTION!(typ) {
+            if wxs_is_restriction(typ) {
                 // This one will transfer all attr. prohibitions
                 // into (*pctxt).attrProhibs.
                 if xml_schema_expand_attribute_group_refs(
@@ -15011,7 +14963,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
         if !base_uses.is_null() {
             let mut pro: XmlSchemaAttributeUseProhibPtr;
 
-            if WXS_IS_RESTRICTION!(typ) {
+            if wxs_is_restriction(typ) {
                 let mut tmp: XmlSchemaAttributeUsePtr;
 
                 let uses_count = if !uses.is_null() { (*uses).nb_items } else { 0 };
@@ -15073,7 +15025,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
             (*typ).attr_uses = null_mut();
         }
         // Compute the complete wildcard.
-        if WXS_IS_EXTENSION!(typ) {
+        if wxs_is_extension(typ) {
             if !(*base_type).attribute_wildcard.is_null() {
                 // (3.2.2.1) "If the `base wildcard` is non-`absent`, then
                 // the appropriate case among the following:"
@@ -15126,7 +15078,7 @@ unsafe fn xml_schema_is_derived_from_built_in_type(typ: XmlSchemaTypePtr, val_ty
         if typ.is_null() {
             return 0;
         }
-        if WXS_IS_COMPLEX!(typ) {
+        if wxs_is_complex(typ) {
             return 0;
         }
         if (*typ).typ == XmlSchemaTypeType::XmlSchemaTypeBasic {
@@ -15163,9 +15115,7 @@ unsafe fn xml_schema_check_ctprops_correct(
         // be as described in the property tableau in The Complex Type Definition
         // Schema Component ($3.4.1), modulo the impact of Missing
         // Sub-components ($5.3)."
-        if !(*typ).base_type.is_null()
-            && WXS_IS_SIMPLE!((*typ).base_type)
-            && !WXS_IS_EXTENSION!(typ)
+        if !(*typ).base_type.is_null() && wxs_is_simple((*typ).base_type) && !wxs_is_extension(typ)
         {
             // SPEC (2) "If the {base type definition} is a simple type definition,
             // the {derivation method} must be extension."
@@ -15293,7 +15243,7 @@ unsafe fn xml_schema_check_cosctextends(
 
         // SPEC (1) "If the {base type definition} is a complex type definition,
         // then all of the following must be true:"
-        if WXS_IS_COMPLEX!(base) {
+        if wxs_is_complex(base) {
             // SPEC (1.1) "The {final} of the {base type definition} must not contain extension."
             if (*base).flags & XML_SCHEMAS_TYPE_FINAL_EXTENSION != 0 {
                 xml_schema_pcustom_err(
@@ -15487,13 +15437,13 @@ unsafe fn xml_schema_check_cosstderived_ok(
         }
         // 2.2.2 D's `base type definition` is not the `ur-type definition`
         // and is validly derived from B given the subset, as defined by this constraint.
-        if !WXS_IS_ANYTYPE!((*typ).base_type)
+        if !wxs_is_anytype((*typ).base_type)
             && xml_schema_check_cosstderived_ok(actxt, (*typ).base_type, base_type, subset) == 0
         {
             return 0;
         }
         // 2.2.3 D's {variety} is list or union and B is the `simple ur-type definition`.
-        if WXS_IS_ANY_SIMPLE_TYPE!(base_type) && (wxs_is_list(typ) || wxs_is_union(typ)) {
+        if wxs_is_any_simple_type(base_type) && (wxs_is_list(typ) || wxs_is_union(typ)) {
             return 0;
         }
         // 2.2.4 B's {variety} is union and D is validly derived from a type
@@ -15953,7 +15903,7 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
             // stronger than the {base type definition}'s {attribute
             // wildcard}'s {process contents}, where strict is stronger
             // than lax is stronger than skip.
-            if !WXS_IS_ANYTYPE!(base_item)
+            if !wxs_is_anytype(base_item as XmlSchemaTypePtr)
                 && (*wild).process_contents < (*base_wild).process_contents
             {
                 let str1 = WXS_ACTION_STR!(action);
@@ -16001,7 +15951,7 @@ unsafe fn xml_schema_check_derivation_okrestriction(
         // TODO: Correct the error code; XML_SCHEMAP_DERIVATION_OK_RESTRICTION_1 is used
         // temporarily only.
         let base: XmlSchemaTypePtr = (*typ).base_type;
-        if !WXS_IS_COMPLEX!(base) {
+        if !wxs_is_complex(base) {
             xml_schema_custom_err(
                 ctxt as XmlSchemaAbstractCtxtPtr,
                 XmlParserErrors::XmlSchemapDerivationOkRestriction1,
@@ -16194,7 +16144,7 @@ unsafe fn xml_schema_check_ctcomponent(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSch
         if ret != 0 {
             return ret;
         }
-        if WXS_IS_EXTENSION!(typ) {
+        if wxs_is_extension(typ) {
             ret = xml_schema_check_cosctextends(ctxt, typ);
         } else {
             ret = xml_schema_check_derivation_okrestriction(ctxt, typ);
@@ -16238,9 +16188,9 @@ unsafe fn xml_schema_fixup_complex_type(
                 // Fixup the content type.
                 if (*typ).content_type == XmlSchemaContentType::XmlSchemaContentSimple {
                     // Corresponds to <complexType><simpleContent>...
-                    if WXS_IS_COMPLEX!(base_type)
+                    if wxs_is_complex(base_type)
                         && !(*base_type).content_type_def.is_null()
-                        && WXS_IS_RESTRICTION!(typ)
+                        && wxs_is_restriction(typ)
                     {
                         let content_base: XmlSchemaTypePtr;
 
@@ -16313,9 +16263,9 @@ unsafe fn xml_schema_fixup_complex_type(
                         res = xml_schema_fixup_simple_type_stage_two(pctxt, content);
                         HFAILURE!(res, 'exit_failure);
                         HERROR!(res, 'exit_error);
-                    } else if WXS_IS_COMPLEX!(base_type)
+                    } else if wxs_is_complex(base_type)
                         && (*base_type).content_type == XmlSchemaContentType::XmlSchemaContentMixed
-                        && WXS_IS_RESTRICTION!(typ)
+                        && wxs_is_restriction(typ)
                     {
                         // SPEC (2) If <restriction> + base is a mixed <complexType> with
                         // an emptiable particle, then a simple type definition which
@@ -16335,7 +16285,7 @@ unsafe fn xml_schema_fixup_complex_type(
                         );
                             break 'exit_failure;
                         }
-                    } else if WXS_IS_COMPLEX!(base_type) && WXS_IS_EXTENSION!(typ) {
+                    } else if wxs_is_complex(base_type) && wxs_is_extension(typ) {
                         // SPEC (3) If <extension> + base is <complexType> with
                         // <simpleType> content, "...then the {content type} of that
                         // complex type definition"
@@ -16354,7 +16304,7 @@ unsafe fn xml_schema_fixup_complex_type(
                             break 'exit_failure;
                         }
                         (*typ).content_type_def = (*base_type).content_type_def;
-                    } else if WXS_IS_SIMPLE!(base_type) && WXS_IS_EXTENSION!(typ) {
+                    } else if wxs_is_simple(base_type) && wxs_is_extension(typ) {
                         // SPEC (4) <extension> + base is <simpleType>
                         // "... then that simple type definition"
                         (*typ).content_type_def = base_type;
@@ -16441,7 +16391,7 @@ unsafe fn xml_schema_fixup_complex_type(
                         (*typ).content_type = XmlSchemaContentType::XmlSchemaContentElements;
                     }
                     // Compute the "content type".
-                    if WXS_IS_RESTRICTION!(typ) {
+                    if wxs_is_restriction(typ) {
                         // SPEC (3.1) "If <restriction>..."
                         // (3.1.1) + (3.1.2)
                         if (*typ).content_type != XmlSchemaContentType::XmlSchemaContentEmpty
@@ -16719,7 +16669,7 @@ unsafe fn xml_schema_check_st_props_correct(
             );
             return XmlParserErrors::XmlSchemapStPropsCorrect1 as i32;
         }
-        if !WXS_IS_SIMPLE!(base_type) {
+        if !wxs_is_simple(base_type) {
             let qname = xml_schema_get_component_qname(base_type as _);
             xml_schema_pcustom_err(
                 ctxt,
@@ -16732,8 +16682,8 @@ unsafe fn xml_schema_check_st_props_correct(
             return XmlParserErrors::XmlSchemapStPropsCorrect1 as i32;
         }
         if (wxs_is_list(typ) || wxs_is_union(typ))
-            && !WXS_IS_RESTRICTION!(typ)
-            && (!WXS_IS_ANY_SIMPLE_TYPE!(base_type)
+            && !wxs_is_restriction(typ)
+            && (!wxs_is_any_simple_type(base_type)
                 && (*base_type).typ != XmlSchemaTypeType::XmlSchemaTypeSimple)
         {
             let qname = xml_schema_get_component_qname(base_type as _);
@@ -16887,7 +16837,7 @@ unsafe fn xml_schema_check_cosstrestricts(
         // xmlSchemaDeriveAndValidateFacets()
         } else if wxs_is_list(typ) {
             let item_type: XmlSchemaTypePtr = (*typ).subtypes;
-            if item_type.is_null() || !WXS_IS_SIMPLE!(item_type) {
+            if item_type.is_null() || !wxs_is_simple(item_type) {
                 PERROR_INT!(
                     pctxt,
                     "xmlSchemaCheckCOSSTRestricts",
@@ -16934,7 +16884,7 @@ unsafe fn xml_schema_check_cosstrestricts(
                 }
             }
 
-            if WXS_IS_ANY_SIMPLE_TYPE!((*typ).base_type) {
+            if wxs_is_any_simple_type((*typ).base_type) {
                 let mut facet: XmlSchemaFacetPtr;
                 // This is the case if we have: <simpleType><list ..
                 // 2.3.1
@@ -17020,7 +16970,7 @@ unsafe fn xml_schema_check_cosstrestricts(
                 // the empty set, as defined in Type Derivation OK (Simple) ($3.14.6).
                 {
                     let base_item_type = (*(*typ).base_type).subtypes;
-                    if base_item_type.is_null() || !WXS_IS_SIMPLE!(base_item_type) {
+                    if base_item_type.is_null() || !wxs_is_simple(base_item_type) {
                         PERROR_INT!(
                             pctxt,
                             "xmlSchemaCheckCOSSTRestricts",
@@ -18630,8 +18580,8 @@ unsafe fn xml_schema_check_cos_ct_derived_ok(
         if equal == 0 {
             // SPEC (1) "If B and D are not the same type definition, then the
             // {derivation method} of D must not be in the subset."
-            if (set & SUBSET_EXTENSION != 0 && WXS_IS_EXTENSION!(typ))
-                || (set & SUBSET_RESTRICTION != 0 && WXS_IS_RESTRICTION!(typ))
+            if (set & SUBSET_EXTENSION != 0 && wxs_is_extension(typ))
+                || (set & SUBSET_RESTRICTION != 0 && wxs_is_restriction(typ))
             {
                 return 1;
             }
@@ -18644,11 +18594,11 @@ unsafe fn xml_schema_check_cos_ct_derived_ok(
             return 0;
         }
         // SPEC (2.3.1) "D's {base type definition} must not be the `ur-type definition`."
-        if WXS_IS_ANYTYPE!((*typ).base_type) {
+        if wxs_is_anytype((*typ).base_type) {
             return 1;
         }
 
-        if WXS_IS_COMPLEX!((*typ).base_type) {
+        if wxs_is_complex((*typ).base_type) {
             // SPEC (2.3.2.1) "If D's {base type definition} is complex, then it
             // must be validly derived from B given the subset as defined by this constraint."
             xml_schema_check_cos_ct_derived_ok(actxt, (*typ).base_type, base_type, set)
@@ -18675,7 +18625,7 @@ unsafe fn xml_schema_check_cos_derived_ok(
     set: i32,
 ) -> i32 {
     unsafe {
-        if WXS_IS_SIMPLE!(typ) {
+        if wxs_is_simple(typ) {
             xml_schema_check_cosstderived_ok(actxt, typ, base_type, set)
         } else {
             xml_schema_check_cos_ct_derived_ok(actxt, typ, base_type, set)
@@ -18704,7 +18654,7 @@ unsafe fn xml_schema_parse_check_cos_valid_default(
         // Schema Component Constraint: Element Default Valid (Immediate)
         // For a string to be a valid default with respect to a type
         // definition the appropriate case among the following must be true:
-        if WXS_IS_COMPLEX!(typ) {
+        if wxs_is_complex(typ) {
             // Complex type.
             //
             // SPEC (2.1) "its {content type} must be a simple type definition
@@ -18736,7 +18686,7 @@ unsafe fn xml_schema_parse_check_cos_valid_default(
         // 2.2.1 If the {content type} is a simple type definition, then the
         // string must be `valid` with respect to that simple type definition
         // as defined by String Valid ($3.14.4).
-        if WXS_IS_SIMPLE!(typ) {
+        if wxs_is_simple(typ) {
             ret = xml_schema_vcheck_cvc_simple_type(
                 pctxt as XmlSchemaAbstractCtxtPtr,
                 node,
@@ -18889,12 +18839,12 @@ unsafe fn xml_schema_check_elem_props_correct(
         // Note: The use of ID as a type definition for elements goes beyond
         // XML 1.0, and should be avoided if backwards compatibility is desired"
         if !(*elem_decl).value.is_null()
-            && ((WXS_IS_SIMPLE!(type_def)
+            && ((wxs_is_simple(type_def)
                 && xml_schema_is_derived_from_built_in_type(
                     type_def,
                     XmlSchemaValType::XmlSchemasID as i32,
                 ) != 0)
-                || (WXS_IS_COMPLEX!(type_def)
+                || (wxs_is_complex(type_def)
                     && WXS_HAS_SIMPLE_CONTENT!(type_def)
                     && xml_schema_is_derived_from_built_in_type(
                         (*type_def).content_type_def,
@@ -19126,13 +19076,13 @@ unsafe fn xml_schema_check_elem_subst_group(
 
                         // The set of all {derivation method}s involved in the derivation
                         while !typ.is_null() && typ != head_type && typ != (*typ).base_type {
-                            if WXS_IS_EXTENSION!(typ)
+                            if wxs_is_extension(typ)
                                 && meth_set & XML_SCHEMAS_TYPE_BLOCK_RESTRICTION == 0
                             {
                                 meth_set |= XML_SCHEMAS_TYPE_BLOCK_EXTENSION;
                             }
 
-                            if WXS_IS_RESTRICTION!(typ)
+                            if wxs_is_restriction(typ)
                                 && meth_set & XML_SCHEMAS_TYPE_BLOCK_RESTRICTION == 0
                             {
                                 meth_set |= XML_SCHEMAS_TYPE_BLOCK_RESTRICTION;
@@ -19143,7 +19093,7 @@ unsafe fn xml_schema_check_elem_subst_group(
                         // The {prohibited substitutions} of all intermediate types + the head's type.
                         typ = (*(*elem_decl).subtypes).base_type;
                         while !typ.is_null() {
-                            if WXS_IS_COMPLEX!(typ) {
+                            if wxs_is_complex(typ) {
                                 if (*typ).flags & XML_SCHEMAS_TYPE_BLOCK_EXTENSION != 0
                                     && set & XML_SCHEMAS_TYPE_BLOCK_EXTENSION == 0
                                 {
@@ -20430,7 +20380,7 @@ unsafe fn xml_schema_fixup_components(
                             // * Schema Component Constraint: Element Declarations Consistent
                             // * Apply this constraint to local types of element declarations.
                             // */
-                            // if (!WXS_ELEM_TYPEDEF!(elemDecl).is_null() && (WXS_IS_COMPLEX!(WXS_ELEM_TYPEDEF!(elemDecl))) && (WXS_TYPE_IS_LOCAL(WXS_ELEM_TYPEDEF!(elemDecl)))) {
+                            // if (!WXS_ELEM_TYPEDEF!(elemDecl).is_null() && (wxs_is_complex(WXS_ELEM_TYPEDEF!(elemDecl))) && (WXS_TYPE_IS_LOCAL(WXS_ELEM_TYPEDEF!(elemDecl)))) {
                             //     xmlSchemaCheckElementDeclConsistent(pctxt, (XmlSchemaBasicItemPtr) elemDecl, WXS_TYPE_PARTICLE!(WXS_ELEM_TYPEDEF!(elemDecl)), null_mut(), null_mut(), 0);
                             // }
                             // #endif
@@ -22589,7 +22539,7 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 XmlSchemaContentType::XmlSchemaContentSimple
                 | XmlSchemaContentType::XmlSchemaContentBasic => {
                     ACTIVATE_PARENT_ELEM!(vctxt);
-                    if WXS_IS_COMPLEX!(ptype) {
+                    if wxs_is_complex(ptype) {
                         // SPEC (cvc-complex-type) (2.2)
                         // "If the {content type} is a simple type definition, then
                         // the element information item has no element information
@@ -23390,7 +23340,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                     //   http://www.w3.org/Bugs/Public/show_bug.cgi?id=2198
                     //   ... the simple-content of complex types is also allowed.
 
-                    if WXS_IS_COMPLEX!(typ) {
+                    if wxs_is_complex(typ) {
                         if WXS_HAS_SIMPLE_CONTENT!(typ) {
                             // Sanity check for complex types with simple content.
                             simple_type = (*typ).content_type_def;
@@ -24750,7 +24700,7 @@ unsafe fn xml_schema_validate_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 }
             }
             // Validate attributes.
-            if WXS_IS_COMPLEX!((*(*vctxt).inode).type_def) {
+            if wxs_is_complex((*(*vctxt).inode).type_def) {
                 if (*vctxt).nb_attr_infos != 0 || !(*(*(*vctxt).inode).type_def).attr_uses.is_null()
                 {
                     ret = xml_schema_vattributes_complex(vctxt);
@@ -24961,7 +24911,7 @@ unsafe fn xml_schema_check_cos_valid_default(
         // Schema Component Constraint: Element Default Valid (Immediate)
         // For a string to be a valid default with respect to a type
         // definition the appropriate case among the following must be true:
-        if WXS_IS_COMPLEX!((*inode).type_def) {
+        if wxs_is_complex((*inode).type_def) {
             // Complex type.
             //
             // SPEC (2.1) "its {content type} must be a simple type definition
@@ -24993,7 +24943,7 @@ unsafe fn xml_schema_check_cos_valid_default(
         // 2.2.1 If the {content type} is a simple type definition, then the
         // string must be `valid` with respect to that simple type definition
         // as defined by String Valid ($3.14.4).
-        if WXS_IS_SIMPLE!((*inode).type_def) {
+        if wxs_is_simple((*inode).type_def) {
             ret = xml_schema_vcheck_cvc_simple_type(
                 vctxt as XmlSchemaAbstractCtxtPtr,
                 None,
@@ -25935,7 +25885,7 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 // Check character content.
                 if (*inode).decl.is_null() {
                     // Speedup if no declaration exists.
-                    if WXS_IS_SIMPLE!((*inode).type_def) {
+                    if wxs_is_simple((*inode).type_def) {
                         ret = xml_schema_vcheck_inode_data_type(
                             vctxt,
                             inode,
@@ -26008,7 +25958,7 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         // `normalized value` must be `valid` with respect to the
                         // `actual type definition` as defined by Element Locally Valid (Type)
                         // ($3.3.4).
-                        if WXS_IS_SIMPLE!((*inode).type_def) {
+                        if wxs_is_simple((*inode).type_def) {
                             ret = xml_schema_vcheck_inode_data_type(
                                 vctxt,
                                 inode,
@@ -26068,7 +26018,7 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     // 5.2.1 The element information item must be `valid` with respect
                     // to the `actual type definition` as defined by Element Locally
                     // Valid (Type) ($3.3.4).
-                    if WXS_IS_SIMPLE!((*inode).type_def) {
+                    if wxs_is_simple((*inode).type_def) {
                         // SPEC (cvc-type) (3.1)
                         // "If the type definition is a simple type definition, ..."
                         // (3.1.3) "If clause 3.2 of Element Locally Valid

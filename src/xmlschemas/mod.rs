@@ -24,8 +24,9 @@ pub(crate) mod error;
 pub mod items;
 
 use crate::libxml::schemas_internals::{
+    XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION, XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION,
     XML_SCHEMAS_TYPE_VARIETY_ATOMIC, XML_SCHEMAS_TYPE_VARIETY_LIST, XML_SCHEMAS_TYPE_VARIETY_UNION,
-    XmlSchemaType,
+    XmlSchemaType, XmlSchemaTypeType, XmlSchemaValType,
 };
 
 pub(crate) unsafe fn wxs_is_atomic(r#type: *mut XmlSchemaType) -> bool {
@@ -38,4 +39,41 @@ pub(crate) unsafe fn wxs_is_list(r#type: *mut XmlSchemaType) -> bool {
 
 pub(crate) unsafe fn wxs_is_union(r#type: *mut XmlSchemaType) -> bool {
     unsafe { (*r#type).flags & XML_SCHEMAS_TYPE_VARIETY_UNION != 0 }
+}
+
+pub(crate) unsafe fn wxs_is_restriction(r#type: *mut XmlSchemaType) -> bool {
+    unsafe { (*r#type).flags & XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION != 0 }
+}
+
+pub(crate) unsafe fn wxs_is_extension(r#type: *mut XmlSchemaType) -> bool {
+    unsafe { (*r#type).flags & XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION != 0 }
+}
+
+pub(crate) unsafe fn wxs_is_anytype(r#type: *mut XmlSchemaType) -> bool {
+    unsafe {
+        (*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
+            && (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnytype as i32
+    }
+}
+
+pub(crate) unsafe fn wxs_is_simple(r#type: *mut XmlSchemaType) -> bool {
+    unsafe {
+        (*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeSimple
+            || ((*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
+                && (*r#type).built_in_type != XmlSchemaValType::XmlSchemasAnytype as i32)
+    }
+}
+
+pub(crate) unsafe fn wxs_is_complex(r#type: *mut XmlSchemaType) -> bool {
+    unsafe {
+        (*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeComplex
+            || (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnytype as i32
+    }
+}
+
+pub(crate) unsafe fn wxs_is_any_simple_type(r#type: *mut XmlSchemaType) -> bool {
+    unsafe {
+        (*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
+            && (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
+    }
 }

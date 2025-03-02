@@ -9,6 +9,8 @@ use crate::{
     tree::XmlNodePtr,
 };
 
+pub(crate) trait XmlSchemaItem {}
+
 /// The abstract base type for schema components.
 #[doc(alias = "xmlSchemaBasicItemPtr")]
 pub type XmlSchemaBasicItemPtr = *mut XmlSchemaBasicItem;
