@@ -34,6 +34,8 @@ pub mod tree;
 pub mod uri;
 #[cfg(feature = "libxml_writer")]
 pub mod writer;
+#[cfg(feature = "schema")]
+pub mod xmlschemas;
 pub mod xpath;
 
 pub const SYSCONFDIR: &str = if let Some(sysconfdir) = option_env!("SYSCONFDIR") {

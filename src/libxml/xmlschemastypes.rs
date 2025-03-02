@@ -51,9 +51,8 @@ use crate::{
         xmlschemas::{
             XmlSchemaAbstractCtxtPtr, XmlSchemaBasicItemPtr, XmlSchemaModelGroup,
             XmlSchemaModelGroupPtr, XmlSchemaParserCtxtPtr, XmlSchemaParticle,
-            XmlSchemaParticlePtr, XmlSchemaTreeItemPtr, xml_schema_custom_err,
-            xml_schema_custom_err4, xml_schema_facet_type_to_string, xml_schema_format_qname,
-            xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+            XmlSchemaParticlePtr, XmlSchemaTreeItemPtr, xml_schema_facet_type_to_string,
+            xml_schema_format_qname, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
             xml_schema_vcheck_cvc_simple_type,
         },
         xmlstring::{
@@ -66,6 +65,7 @@ use crate::{
         xml_split_qname2, xml_validate_name, xml_validate_ncname, xml_validate_nmtoken,
         xml_validate_qname,
     },
+    xmlschemas::error::{xml_schema_custom_err, xml_schema_custom_err4},
     xpath::{XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF, xml_xpath_is_nan},
 };
 
@@ -5727,54 +5727,15 @@ pub unsafe fn xml_schema_new_facet() -> XmlSchemaFacetPtr {
     }
 }
 
-// macro_rules! VERROR {
-//     ($vctxt:expr, $err:expr, $typ:expr, $msg:expr) => {
-//         xmlSchemaCustomErr(
-//             $vctxt as XmlSchemaAbstractCtxtPtr,
-//             $err,
-//             null_mut(),
-//             $typ,
-//             $msg,
-//             null_mut(),
-//             null_mut(),
-//         );
-//     };
-// }
-
-// macro_rules! VERROR_INT {
-//     ($vctxt:expr, $func:expr, $msg:expr) => {
-//         $crate::libxml::xmlschemas::xml_schema_internal_err(
-//             $vctxt as XmlSchemaAbstractCtxtPtr,
-//             $func,
-//             $msg,
-//         );
-//     };
-// }
-
 macro_rules! PERROR_INT {
     ($pctxt:expr, $func:expr, $msg:expr) => {
-        $crate::libxml::xmlschemas::xml_schema_internal_err(
+        $crate::xmlschemas::error::xml_schema_internal_err(
             $pctxt as XmlSchemaAbstractCtxtPtr,
             $func,
             $msg,
         );
     };
 }
-// macro_rules! PERROR_INT2 {
-//     ($ctxt:expr, $func:expr, $msg:expr) => {
-//         $crate::libxml::xmlschemas::xml_schema_internal_err(
-//             $ctxt as XmlSchemaAbstractCtxtPtr,
-//             $func,
-//             $msg,
-//         );
-//     };
-// }
-
-// macro_rules! AERROR_INT {
-//     ($actxt:expr, $func:expr, $msg:expr) => {
-//         $crate::libxml::xmlschemas::xml_schema_internal_err($actxt, $func, $msg);
-//     };
-// }
 
 macro_rules! FREE_AND_NULL {
     ($str:expr) => {
