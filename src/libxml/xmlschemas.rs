@@ -90,12 +90,9 @@ use crate::{
             XML_SCHEMAS_TYPE_VARIETY_LIST, XML_SCHEMAS_TYPE_VARIETY_UNION,
             XML_SCHEMAS_TYPE_WHITESPACE_COLLAPSE, XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE,
             XML_SCHEMAS_TYPE_WHITESPACE_REPLACE, XmlSchemaAnnot, XmlSchemaAnnotPtr,
-            XmlSchemaAttribute, XmlSchemaAttributeGroup, XmlSchemaAttributeGroupPtr,
-            XmlSchemaAttributePtr, XmlSchemaContentType, XmlSchemaElement, XmlSchemaElementPtr,
-            XmlSchemaFacetLink, XmlSchemaFacetLinkPtr, XmlSchemaFacetPtr, XmlSchemaNotation,
-            XmlSchemaNotationPtr, XmlSchemaType, XmlSchemaTypeLink, XmlSchemaTypeLinkPtr,
-            XmlSchemaTypePtr, XmlSchemaTypeType, XmlSchemaValType, XmlSchemaWildcard,
-            XmlSchemaWildcardNs, XmlSchemaWildcardNsPtr, XmlSchemaWildcardPtr,
+            XmlSchemaContentType, XmlSchemaFacetLink, XmlSchemaFacetLinkPtr, XmlSchemaFacetPtr,
+            XmlSchemaTypeLink, XmlSchemaTypeLinkPtr, XmlSchemaTypeType, XmlSchemaValType,
+            XmlSchemaWildcard, XmlSchemaWildcardNs, XmlSchemaWildcardNsPtr, XmlSchemaWildcardPtr,
             xml_schema_free_annot, xml_schema_free_type, xml_schema_free_wildcard,
             xml_schema_free_wildcard_ns_set, xml_schema_item_list_free,
         },
@@ -158,11 +155,14 @@ use crate::{
             xml_schema_psimple_type_err, xml_schema_simple_type_err,
         },
         items::{
-            XmlSchemaAnnotItemPtr, XmlSchemaAttributeUse, XmlSchemaAttributeUseProhib,
-            XmlSchemaAttributeUseProhibPtr, XmlSchemaAttributeUsePtr, XmlSchemaBasicItemPtr,
-            XmlSchemaIDC, XmlSchemaIDCPtr, XmlSchemaModelGroup, XmlSchemaModelGroupDef,
-            XmlSchemaModelGroupDefPtr, XmlSchemaModelGroupPtr, XmlSchemaParticle,
-            XmlSchemaParticlePtr, XmlSchemaQnameRef, XmlSchemaQnameRefPtr, XmlSchemaTreeItemPtr,
+            XmlSchemaAnnotItemPtr, XmlSchemaAttribute, XmlSchemaAttributeGroup,
+            XmlSchemaAttributeGroupPtr, XmlSchemaAttributePtr, XmlSchemaAttributeUse,
+            XmlSchemaAttributeUseProhib, XmlSchemaAttributeUseProhibPtr, XmlSchemaAttributeUsePtr,
+            XmlSchemaBasicItemPtr, XmlSchemaElement, XmlSchemaElementPtr, XmlSchemaIDC,
+            XmlSchemaIDCPtr, XmlSchemaItem, XmlSchemaModelGroup, XmlSchemaModelGroupDef,
+            XmlSchemaModelGroupDefPtr, XmlSchemaModelGroupPtr, XmlSchemaNotation,
+            XmlSchemaNotationPtr, XmlSchemaParticle, XmlSchemaParticlePtr, XmlSchemaQnameRef,
+            XmlSchemaQnameRefPtr, XmlSchemaTreeItemPtr, XmlSchemaType, XmlSchemaTypePtr,
         },
         wxs_is_any_simple_type, wxs_is_anytype, wxs_is_atomic, wxs_is_complex, wxs_is_extension,
         wxs_is_list, wxs_is_restriction, wxs_is_simple, wxs_is_union,
@@ -1166,57 +1166,6 @@ pub(crate) unsafe fn xml_schema_get_component_type_str(
     }
 }
 
-unsafe fn xml_schema_get_component_target_ns(item: XmlSchemaBasicItemPtr) -> *const XmlChar {
-    unsafe {
-        if item.is_null() {
-            return null_mut();
-        }
-        match (*item).typ {
-            XmlSchemaTypeType::XmlSchemaTypeElement => {
-                return (*(item as XmlSchemaElementPtr)).target_namespace;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeAttribute => {
-                return (*(item as XmlSchemaAttributePtr)).target_namespace;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
-                return (*(item as XmlSchemaAttributeGroupPtr)).target_namespace;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeBasic => {
-                return c"http://www.w3.org/2001/XMLSchema".as_ptr() as _;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeSimple | XmlSchemaTypeType::XmlSchemaTypeComplex => {
-                return (*(item as XmlSchemaTypePtr)).target_namespace;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeGroup => {
-                return (*(item as XmlSchemaModelGroupDefPtr)).target_namespace;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeIDCKey
-            | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
-            | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
-                return (*(item as XmlSchemaIDCPtr)).target_namespace;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeAttributeUse => {
-                if !WXS_ATTRUSE_DECL!(item).is_null() {
-                    return xml_schema_get_component_target_ns(
-                        WXS_ATTRUSE_DECL!(item) as XmlSchemaBasicItemPtr
-                    );
-                }
-                // TODO: Will returning NULL break something?
-            }
-            XmlSchemaTypeType::XmlSchemaExtraQnameref => {
-                return (*(item as XmlSchemaQnameRefPtr)).target_namespace;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeNotation => {
-                return (*(item as XmlSchemaNotationPtr)).target_namespace;
-            }
-            _ => {
-                // Other components cannot have names.
-            }
-        }
-        null_mut()
-    }
-}
-
 unsafe fn xml_schema_get_component_name(item: XmlSchemaBasicItemPtr) -> *const XmlChar {
     unsafe {
         if item.is_null() {
@@ -1270,12 +1219,9 @@ unsafe fn xml_schema_get_component_name(item: XmlSchemaBasicItemPtr) -> *const X
 
 pub(crate) unsafe fn xml_schema_get_component_qname(item: *mut c_void) -> String {
     unsafe {
-        let namespace_name =
-            xml_schema_get_component_target_ns(item as XmlSchemaBasicItemPtr) as *const i8;
+        let namespace_name = (*(item as XmlSchemaBasicItemPtr)).target_namespace();
         xml_schema_format_qname(
-            (!namespace_name.is_null())
-                .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
-                .as_deref(),
+            namespace_name.as_deref(),
             Some(
                 CStr::from_ptr(
                     xml_schema_get_component_name(item as XmlSchemaBasicItemPtr) as *const i8

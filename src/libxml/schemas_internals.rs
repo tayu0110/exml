@@ -20,16 +20,18 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
-use std::{any::type_name, os::raw::c_void};
+use std::any::type_name;
 
-use crate::tree::XmlNodePtr;
+use crate::{
+    tree::XmlNodePtr,
+    xmlschemas::items::{XmlSchemaAttribute, XmlSchemaTypePtr},
+};
 
 use super::{
     globals::xml_free,
     xmlregexp::{XmlRegexpPtr, xml_reg_free_regexp},
     xmlschemas::XmlSchemaItemListPtr,
     xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_facet},
-    xmlstring::XmlChar,
 };
 
 #[repr(C)]
@@ -293,26 +295,6 @@ pub(crate) const XML_SCHEMAS_ATTR_INTERNAL_RESOLVED: i32 = 1 << 8;
 /// The attribute has a fixed value
 pub(crate) const XML_SCHEMAS_ATTR_FIXED: i32 = 1 << 9;
 
-/// An attribute definition.
-#[doc(alias = "xmlSchemaAttribute")]
-pub type XmlSchemaAttributePtr = *mut XmlSchemaAttribute;
-#[repr(C)]
-pub struct XmlSchemaAttribute {
-    pub(crate) typ: XmlSchemaTypeType,
-    pub(crate) next: *mut XmlSchemaAttribute, /* the next attribute (not used?) */
-    pub(crate) name: *const XmlChar,          /* the name of the declaration */
-    pub(crate) type_name: *const XmlChar,     /* the local name of the type definition */
-    pub(crate) type_ns: *const XmlChar,       /* the ns URI of the type definition */
-    pub(crate) annot: XmlSchemaAnnotPtr,
-
-    pub(crate) def_value: *const XmlChar, /* The initial value of the value constraint */
-    pub(crate) subtypes: XmlSchemaTypePtr, /* the type definition */
-    pub(crate) node: Option<XmlNodePtr>,
-    pub(crate) target_namespace: *const XmlChar,
-    pub(crate) flags: i32,
-    pub(crate) def_val: XmlSchemaValPtr, /* The compiled value constraint */
-}
-
 pub type XmlSchemaAttributeLinkPtr = *mut XmlSchemaAttributeLink;
 /// Used to build a list of attribute uses on complexType definitions.
 /// WARNING: Deprecated; not used.
@@ -332,7 +314,7 @@ pub type XmlSchemaWildcardNsPtr = *mut XmlSchemaWildcardNs;
 #[repr(C)]
 pub struct XmlSchemaWildcardNs {
     pub(crate) next: *mut XmlSchemaWildcardNs, /* the next constraint link ... */
-    pub(crate) value: *const XmlChar,          /* the value */
+    pub(crate) value: *const u8,               /* the value */
 }
 
 /// A wildcard.
@@ -361,23 +343,6 @@ pub(crate) const XML_SCHEMAS_ATTRGROUP_MARKED: i32 = 1 << 2;
 pub(crate) const XML_SCHEMAS_ATTRGROUP_REDEFINED: i32 = 1 << 3;
 /// Whether this attr. group contains attr. group references.
 pub(crate) const XML_SCHEMAS_ATTRGROUP_HAS_REFS: i32 = 1 << 4;
-
-pub type XmlSchemaAttributeGroupPtr = *mut XmlSchemaAttributeGroup;
-/// xmlSchemaAttribute and xmlSchemaAttributeGroup start of structures must be kept similar
-#[repr(C)]
-pub struct XmlSchemaAttributeGroup {
-    pub(crate) typ: XmlSchemaTypeType,        /* The kind of type */
-    pub(crate) next: *mut XmlSchemaAttribute, /* the next attribute if in a group ... */
-    pub(crate) name: *mut XmlChar,
-    pub(crate) id: *const XmlChar,
-    pub(crate) annot: XmlSchemaAnnotPtr,
-
-    pub(crate) node: Option<XmlNodePtr>,
-    pub(crate) flags: i32,
-    pub(crate) attribute_wildcard: XmlSchemaWildcardPtr,
-    pub(crate) target_namespace: *const XmlChar,
-    pub(crate) attr_uses: *mut c_void,
-}
 
 pub type XmlSchemaTypeLinkPtr = *mut XmlSchemaTypeLink;
 /// Used to build a list of types (e.g. member types of
@@ -467,35 +432,6 @@ pub(crate) const XML_SCHEMAS_TYPE_REDEFINED: i32 = 1 << 30;
 // The type redefines an other type.
 // #define XML_SCHEMAS_TYPE_REDEFINING    1 << 31
 
-pub type XmlSchemaTypePtr = *mut XmlSchemaType;
-/// Schemas type definition.
-#[doc(alias = "xmlSchemaType")]
-#[repr(C)]
-pub struct XmlSchemaType {
-    pub(crate) typ: XmlSchemaTypeType,   /* The kind of type */
-    pub(crate) next: *mut XmlSchemaType, /* the next type if in a sequence ... */
-    pub(crate) name: *const XmlChar,
-    pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) subtypes: XmlSchemaTypePtr,
-    pub(crate) node: Option<XmlNodePtr>,
-    pub(crate) flags: i32,
-    pub(crate) content_type: XmlSchemaContentType,
-    pub(crate) base: *const XmlChar,    /* Base type's local name */
-    pub(crate) base_ns: *const XmlChar, /* Base type's target namespace */
-    pub(crate) base_type: XmlSchemaTypePtr, /* The base type component */
-    pub(crate) facets: XmlSchemaFacetPtr, /* Local facets */
-    pub(crate) recurse: i32,            /* Obsolete */
-    pub(crate) attribute_wildcard: XmlSchemaWildcardPtr,
-    pub(crate) built_in_type: i32, /* Type of built-in types. */
-    pub(crate) member_types: XmlSchemaTypeLinkPtr, /* member-types if a union type. */
-    pub(crate) facet_set: XmlSchemaFacetLinkPtr, /* All facets (incl. inherited) */
-    pub(crate) content_type_def: XmlSchemaTypePtr, /* Used for the simple content of complex types.
-                                   Could we use @subtypes for this? */
-    pub(crate) cont_model: XmlRegexpPtr, /* Holds the automaton of the content model */
-    pub(crate) target_namespace: *const XmlChar,
-    pub(crate) attr_uses: *mut c_void,
-}
-
 /// The element is nillable
 pub(crate) const XML_SCHEMAS_ELEM_NILLABLE: i32 = 1 << 0;
 /// The element is global
@@ -538,37 +474,6 @@ pub(crate) const XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD: i32 = 1 << 17;
 /// This is set when the elem decl has been checked against all constraints
 pub(crate) const XML_SCHEMAS_ELEM_INTERNAL_CHECKED: i32 = 1 << 18;
 
-pub type XmlSchemaElementPtr = *mut XmlSchemaElement;
-/// An element definition.
-///
-/// xmlSchemaType, xmlSchemaFacet and xmlSchemaElement start of
-/// structures must be kept similar
-#[doc(alias = "xmlSchemaElement")]
-#[repr(C)]
-pub struct XmlSchemaElement {
-    pub(crate) typ: XmlSchemaTypeType,   /* The kind of type */
-    pub(crate) next: *mut XmlSchemaType, /* Not used? */
-    pub(crate) name: *const XmlChar,
-    pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) subtypes: XmlSchemaTypePtr, /* the type definition */
-    pub(crate) attributes: XmlSchemaAttributePtr,
-    pub(crate) node: Option<XmlNodePtr>,
-    pub(crate) flags: i32,
-    pub(crate) target_namespace: *const XmlChar,
-    pub(crate) named_type: *const XmlChar,
-    pub(crate) named_type_ns: *const XmlChar,
-    pub(crate) subst_group: *const XmlChar,
-    pub(crate) subst_group_ns: *const XmlChar,
-    pub(crate) scope: *const XmlChar,
-    pub(crate) value: *const XmlChar, /* The original value of the value constraint. */
-    pub(crate) ref_decl: *mut XmlSchemaElement, /* This will now be used for the
-                                      substitution group affiliation */
-    pub(crate) cont_model: XmlRegexpPtr, /* Obsolete for WXS, maybe used for RelaxNG */
-    pub(crate) content_type: XmlSchemaContentType,
-    pub(crate) def_val: XmlSchemaValPtr, /* The compiled value constraint. */
-    pub(crate) idcs: *mut c_void,        /* The identity-constraint defs */
-}
-
 /// Unknown facet handling
 const XML_SCHEMAS_FACET_UNKNOWN: i32 = 0;
 /// Preserve the type of the facet
@@ -583,25 +488,14 @@ pub type XmlSchemaFacetPtr = *mut XmlSchemaFacet;
 pub struct XmlSchemaFacet {
     pub(crate) typ: XmlSchemaTypeType,    /* The kind of type */
     pub(crate) next: *mut XmlSchemaFacet, /* the next type if in a sequence ... */
-    pub(crate) value: *const XmlChar,     /* The original value */
-    pub(crate) id: *const XmlChar,        /* Obsolete */
+    pub(crate) value: *const u8,          /* The original value */
+    pub(crate) id: *const u8,             /* Obsolete */
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) node: Option<XmlNodePtr>,
     pub(crate) fixed: i32, /* XML_SCHEMAS_FACET_PRESERVE, etc. */
     pub(crate) whitespace: i32,
     pub(crate) val: XmlSchemaValPtr, /* The compiled value */
     pub(crate) regexp: XmlRegexpPtr, /* The regex for patterns */
-}
-
-/// A notation definition.
-pub type XmlSchemaNotationPtr = *mut XmlSchemaNotation;
-#[repr(C)]
-pub struct XmlSchemaNotation {
-    pub(crate) typ: XmlSchemaTypeType, /* The kind of type */
-    pub(crate) name: *const XmlChar,
-    pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) identifier: *const XmlChar,
-    pub(crate) target_namespace: *const XmlChar,
 }
 
 // TODO: Actually all those flags used for the schema should sit

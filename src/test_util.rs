@@ -9,8 +9,6 @@ use std::{
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{XmlCatalogAllow, XmlCatalogPrefer};
-#[cfg(feature = "schema")]
-use crate::relaxng::XmlRelaxNGValidCtxtPtr;
 use crate::{
     libxml::{
         globals::xml_free,
@@ -20,7 +18,7 @@ use crate::{
         parser::{XmlFeature, XmlParserOption},
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
         relaxng::XmlRelaxNGPtr,
-        schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaValType},
+        schemas_internals::{XmlSchemaFacetPtr, XmlSchemaValType},
         uri::XmlURIPtr,
         valid::{
             XmlValidCtxtPtr, xml_free_element_content, xml_free_valid_ctxt, xml_new_valid_ctxt,
@@ -44,6 +42,8 @@ use crate::{
         XmlXPathParserContextPtr,
     },
 };
+#[cfg(feature = "schema")]
+use crate::{relaxng::XmlRelaxNGValidCtxtPtr, xmlschemas::items::XmlSchemaTypePtr};
 
 pub(crate) static TEST_CATALOG_LOCK: Mutex<()> = Mutex::new(());
 

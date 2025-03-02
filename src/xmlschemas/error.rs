@@ -12,8 +12,7 @@ use crate::{
         schemas_internals::{
             XML_SCHEMAS_ANY_LAX, XML_SCHEMAS_ANY_SKIP, XML_SCHEMAS_ANY_STRICT,
             XML_SCHEMAS_ATTR_GLOBAL, XML_SCHEMAS_ELEM_GLOBAL, XML_SCHEMAS_TYPE_GLOBAL,
-            XmlSchemaAttributePtr, XmlSchemaElementPtr, XmlSchemaFacetPtr, XmlSchemaTypePtr,
-            XmlSchemaTypeType, XmlSchemaWildcardPtr,
+            XmlSchemaFacetPtr, XmlSchemaTypeType, XmlSchemaWildcardPtr,
         },
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR, XmlSchemaAbstractCtxtPtr,
@@ -34,7 +33,10 @@ use crate::{
 };
 
 use super::{
-    items::{XmlSchemaAttributeUsePtr, XmlSchemaBasicItemPtr, XmlSchemaIDCPtr},
+    items::{
+        XmlSchemaAttributePtr, XmlSchemaAttributeUsePtr, XmlSchemaBasicItemPtr,
+        XmlSchemaElementPtr, XmlSchemaIDCPtr, XmlSchemaTypePtr,
+    },
     wxs_is_atomic, wxs_is_list, wxs_is_union,
 };
 

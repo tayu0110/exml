@@ -23,10 +23,12 @@
 pub(crate) mod error;
 pub mod items;
 
+use items::XmlSchemaType;
+
 use crate::libxml::schemas_internals::{
     XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION, XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION,
     XML_SCHEMAS_TYPE_VARIETY_ATOMIC, XML_SCHEMAS_TYPE_VARIETY_LIST, XML_SCHEMAS_TYPE_VARIETY_UNION,
-    XmlSchemaType, XmlSchemaTypeType, XmlSchemaValType,
+    XmlSchemaTypeType, XmlSchemaValType,
 };
 
 pub(crate) unsafe fn wxs_is_atomic(r#type: *mut XmlSchemaType) -> bool {
