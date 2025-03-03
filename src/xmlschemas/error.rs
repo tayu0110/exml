@@ -22,8 +22,7 @@ use crate::{
             xml_schema_facet_type_to_string, xml_schema_format_qname,
             xml_schema_get_canon_value_whtsp_ext, xml_schema_get_component_designation,
             xml_schema_get_component_node, xml_schema_get_component_qname,
-            xml_schema_get_component_type_str, xml_schema_get_white_space_facet_value,
-            xml_schema_item_type_to_str,
+            xml_schema_get_component_type_str, xml_schema_item_type_to_str,
         },
         xmlschemastypes::{XmlSchemaWhitespaceValueType, xml_schema_get_facet_value_as_ulong},
         xmlstring::{
@@ -41,7 +40,6 @@ use super::{
         XmlSchemaAttributePtr, XmlSchemaAttributeUsePtr, XmlSchemaBasicItemPtr,
         XmlSchemaElementPtr, XmlSchemaIDCPtr, XmlSchemaTypePtr,
     },
-    wxs_is_atomic, wxs_is_list, wxs_is_union,
 };
 
 macro_rules! FREE_AND_NULL {
@@ -190,7 +188,7 @@ unsafe fn xml_schema_format_facet_enum_set(
 
         loop {
             // Use the whitespace type of the base type.
-            ws = xml_schema_get_white_space_facet_value((*typ).base_type).unwrap();
+            ws = (*(*typ).base_type).white_space_facet_value().unwrap();
             facet = (*typ).facets;
             while !facet.is_null() {
                 if (*facet).typ != XmlSchemaTypeType::XmlSchemaFacetEnumeration {
@@ -283,11 +281,11 @@ unsafe fn xml_schema_format_item_for_report(
                 XmlSchemaTypeType::XmlSchemaTypeBasic => {
                     let typ: XmlSchemaTypePtr = item as XmlSchemaTypePtr;
 
-                    if wxs_is_atomic(typ) {
+                    if (*typ).wxs_is_atomic() {
                         res.push_str("atomic type 'xs:");
-                    } else if wxs_is_list(typ) {
+                    } else if (*typ).wxs_is_list() {
                         res.push_str("list type 'xs:");
-                    } else if wxs_is_union(typ) {
+                    } else if (*typ).wxs_is_union() {
                         res.push_str("union type 'xs:");
                     } else {
                         res.push_str("simple type 'xs:");
@@ -305,11 +303,11 @@ unsafe fn xml_schema_format_item_for_report(
                     if (*typ).flags & XML_SCHEMAS_TYPE_GLOBAL == 0 {
                         res.push_str("local ");
                     }
-                    if wxs_is_atomic(typ) {
+                    if (*typ).wxs_is_atomic() {
                         res.push_str("atomic type");
-                    } else if wxs_is_list(typ) {
+                    } else if (*typ).wxs_is_list() {
                         res.push_str("list type");
-                    } else if wxs_is_union(typ) {
+                    } else if (*typ).wxs_is_union() {
                         res.push_str("union type");
                     } else {
                         res.push_str("simple type");
@@ -1228,11 +1226,11 @@ pub(crate) unsafe fn xml_schema_simple_type_err(
             msg.push_str("the ");
         }
 
-        if wxs_is_atomic(typ) {
+        if (*typ).wxs_is_atomic() {
             msg.push_str("atomic type");
-        } else if wxs_is_list(typ) {
+        } else if (*typ).wxs_is_list() {
             msg.push_str("list type");
-        } else if wxs_is_union(typ) {
+        } else if (*typ).wxs_is_union() {
             msg.push_str("union type");
         }
 
@@ -1323,11 +1321,11 @@ pub(crate) unsafe fn xml_schema_psimple_type_err(
                     msg.push_str("the ");
                 }
 
-                if wxs_is_atomic(typ) {
+                if (*typ).wxs_is_atomic() {
                     msg.push_str("atomic type");
-                } else if wxs_is_list(typ) {
+                } else if (*typ).wxs_is_list() {
                     msg.push_str("list type");
-                } else if wxs_is_union(typ) {
+                } else if (*typ).wxs_is_union() {
                     msg.push_str("union type");
                 }
 

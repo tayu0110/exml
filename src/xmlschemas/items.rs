@@ -8,12 +8,16 @@ use crate::{
     libxml::{
         globals::xml_free,
         schemas_internals::{
+            XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION,
+            XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION, XML_SCHEMAS_TYPE_VARIETY_ATOMIC,
+            XML_SCHEMAS_TYPE_VARIETY_LIST, XML_SCHEMAS_TYPE_VARIETY_UNION,
+            XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE, XML_SCHEMAS_TYPE_WHITESPACE_REPLACE,
             XmlSchemaAnnotPtr, XmlSchemaContentType, XmlSchemaFacetLinkPtr, XmlSchemaFacetPtr,
-            XmlSchemaTypeLinkPtr, XmlSchemaTypeType, XmlSchemaWildcardPtr,
+            XmlSchemaTypeLinkPtr, XmlSchemaTypeType, XmlSchemaValType, XmlSchemaWildcardPtr,
         },
         xmlregexp::XmlRegexpPtr,
         xmlschemas::XmlSchemaIdcselectPtr,
-        xmlschemastypes::XmlSchemaValPtr,
+        xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
     },
     tree::XmlNodePtr,
 };
@@ -633,6 +637,65 @@ pub struct XmlSchemaType {
     pub(crate) cont_model: XmlRegexpPtr, /* Holds the automaton of the content model */
     pub(crate) target_namespace: *const u8,
     pub(crate) attr_uses: *mut c_void,
+}
+
+impl XmlSchemaType {
+    pub(crate) fn wxs_is_atomic(&self) -> bool {
+        self.flags & XML_SCHEMAS_TYPE_VARIETY_ATOMIC != 0
+    }
+
+    pub(crate) fn wxs_is_list(&self) -> bool {
+        self.flags & XML_SCHEMAS_TYPE_VARIETY_LIST != 0
+    }
+
+    pub(crate) fn wxs_is_union(&self) -> bool {
+        self.flags & XML_SCHEMAS_TYPE_VARIETY_UNION != 0
+    }
+
+    pub(crate) fn wxs_is_restriction(&self) -> bool {
+        self.flags & XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION != 0
+    }
+
+    pub(crate) fn wxs_is_extension(&self) -> bool {
+        self.flags & XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION != 0
+    }
+
+    #[doc(alias = "xmlSchemaGetWhiteSpaceFacetValue")]
+    pub(crate) fn white_space_facet_value(&self) -> Option<XmlSchemaWhitespaceValueType> {
+        // The normalization type can be changed only for types which are derived
+        // from xsd:string.
+        if self.typ == XmlSchemaTypeType::XmlSchemaTypeBasic {
+            // Note that we assume a whitespace of preserve for anySimpleType.
+            if self.built_in_type == XmlSchemaValType::XmlSchemasString as i32
+                || self.built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
+            {
+                Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve)
+            } else if self.built_in_type == XmlSchemaValType::XmlSchemasNormstring as i32 {
+                Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace)
+            } else {
+                // For all `atomic` datatypes other than string (and types `derived`
+                // by `restriction` from it) the value of whiteSpace is fixed to
+                // collapse
+                // Note that this includes built-in list datatypes.
+                Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse)
+            }
+        } else if self.wxs_is_list() {
+            // For list types the facet "whiteSpace" is fixed to "collapse".
+            Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse)
+        } else if self.wxs_is_union() {
+            Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown)
+        } else if self.wxs_is_atomic() {
+            if self.flags & XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE != 0 {
+                Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve)
+            } else if self.flags & XML_SCHEMAS_TYPE_WHITESPACE_REPLACE != 0 {
+                Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace)
+            } else {
+                Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse)
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl_xml_schema_item! {

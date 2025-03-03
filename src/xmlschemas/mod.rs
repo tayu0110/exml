@@ -26,31 +26,7 @@ pub mod items;
 
 use items::XmlSchemaType;
 
-use crate::libxml::schemas_internals::{
-    XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION, XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION,
-    XML_SCHEMAS_TYPE_VARIETY_ATOMIC, XML_SCHEMAS_TYPE_VARIETY_LIST, XML_SCHEMAS_TYPE_VARIETY_UNION,
-    XmlSchemaTypeType, XmlSchemaValType,
-};
-
-pub(crate) unsafe fn wxs_is_atomic(r#type: *mut XmlSchemaType) -> bool {
-    unsafe { (*r#type).flags & XML_SCHEMAS_TYPE_VARIETY_ATOMIC != 0 }
-}
-
-pub(crate) unsafe fn wxs_is_list(r#type: *mut XmlSchemaType) -> bool {
-    unsafe { (*r#type).flags & XML_SCHEMAS_TYPE_VARIETY_LIST != 0 }
-}
-
-pub(crate) unsafe fn wxs_is_union(r#type: *mut XmlSchemaType) -> bool {
-    unsafe { (*r#type).flags & XML_SCHEMAS_TYPE_VARIETY_UNION != 0 }
-}
-
-pub(crate) unsafe fn wxs_is_restriction(r#type: *mut XmlSchemaType) -> bool {
-    unsafe { (*r#type).flags & XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION != 0 }
-}
-
-pub(crate) unsafe fn wxs_is_extension(r#type: *mut XmlSchemaType) -> bool {
-    unsafe { (*r#type).flags & XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION != 0 }
-}
+use crate::libxml::schemas_internals::{XmlSchemaTypeType, XmlSchemaValType};
 
 pub(crate) unsafe fn wxs_is_anytype(r#type: *mut XmlSchemaType) -> bool {
     unsafe {

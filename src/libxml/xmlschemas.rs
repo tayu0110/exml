@@ -168,8 +168,7 @@ use crate::{
             XmlSchemaQnameRefPtr, XmlSchemaTreeItemPtr, XmlSchemaType, XmlSchemaTypePtr,
             xml_schema_free_attribute_use_prohib,
         },
-        wxs_is_any_simple_type, wxs_is_anytype, wxs_is_atomic, wxs_is_complex, wxs_is_extension,
-        wxs_is_list, wxs_is_restriction, wxs_is_simple, wxs_is_union,
+        wxs_is_any_simple_type, wxs_is_anytype, wxs_is_complex, wxs_is_simple,
     },
     xmlschemastypes::{xml_schema_collapse_string, xml_schema_white_space_replace},
 };
@@ -1112,48 +1111,9 @@ macro_rules! AERROR_INT {
     };
 }
 
-pub(crate) unsafe fn xml_schema_get_white_space_facet_value(
-    typ: XmlSchemaTypePtr,
-) -> Option<XmlSchemaWhitespaceValueType> {
-    unsafe {
-        // The normalization type can be changed only for types which are derived
-        // from xsd:string.
-        if (*typ).typ == XmlSchemaTypeType::XmlSchemaTypeBasic {
-            // Note that we assume a whitespace of preserve for anySimpleType.
-            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasString as i32
-                || (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
-            {
-                return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve);
-            } else if (*typ).built_in_type == XmlSchemaValType::XmlSchemasNormstring as i32 {
-                return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace);
-            } else {
-                // For all `atomic` datatypes other than string (and types `derived`
-                // by `restriction` from it) the value of whiteSpace is fixed to
-                // collapse
-                // Note that this includes built-in list datatypes.
-                return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse);
-            }
-        } else if wxs_is_list(typ) {
-            // For list types the facet "whiteSpace" is fixed to "collapse".
-            return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse);
-        } else if wxs_is_union(typ) {
-            return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown);
-        } else if wxs_is_atomic(typ) {
-            if (*typ).flags & XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE != 0 {
-                return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve);
-            } else if (*typ).flags & XML_SCHEMAS_TYPE_WHITESPACE_REPLACE != 0 {
-                return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace);
-            } else {
-                return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse);
-            }
-        }
-        None
-    }
-}
-
 unsafe fn xml_schema_normalize_value(typ: XmlSchemaTypePtr, value: *const XmlChar) -> *mut XmlChar {
     unsafe {
-        match xml_schema_get_white_space_facet_value(typ) {
+        match (*typ).white_space_facet_value() {
             Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse) => {
                 xml_schema_collapse_string(
                     CStr::from_ptr(value as *const i8)
@@ -1703,8 +1663,8 @@ unsafe fn xml_schema_validate_facets(
                 break 'pattern_and_enum;
             }
             'wxs_is_list: {
-                if !wxs_is_atomic(typ) {
-                    if wxs_is_list(typ) {
+                if !(*typ).wxs_is_atomic() {
+                    if (*typ).wxs_is_list() {
                         break 'wxs_is_list;
                     } else {
                         break 'pattern_and_enum;
@@ -1715,7 +1675,7 @@ unsafe fn xml_schema_validate_facets(
                 if (*tmp_type).built_in_type == XmlSchemaValType::XmlSchemasString as i32
                     || wxs_is_any_simple_type(tmp_type)
                 {
-                    ws = xml_schema_get_white_space_facet_value(typ).unwrap();
+                    ws = (*typ).white_space_facet_value().unwrap();
                 } else {
                     ws = XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse;
                 }
@@ -1802,7 +1762,7 @@ unsafe fn xml_schema_validate_facets(
             }
 
             // WXS_IS_LIST:
-            if !wxs_is_list(typ) {
+            if !(*typ).wxs_is_list() {
                 break 'pattern_and_enum;
             }
             // "length", "minLength" and "maxLength" of list types.
@@ -2080,7 +2040,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
             value = c"".as_ptr() as _;
         }
         'internal_error: {
-            if wxs_is_any_simple_type(typ) || wxs_is_atomic(typ) {
+            if wxs_is_any_simple_type(typ) || (*typ).wxs_is_atomic() {
                 let mut bi_type: XmlSchemaTypePtr; /* The built-in type. */
                 // SPEC (1.2.1) "if {variety} is `atomic` then the string must `match`
                 // a literal in the `lexical space` of {base type definition}"
@@ -2193,7 +2153,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                         );
                         break 'internal_error;
                     }
-                    if wxs_is_list(typ) {
+                    if (*typ).wxs_is_list() {
                         ret = XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_2 as i32;
                     } else {
                         ret = XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1 as i32;
@@ -2220,7 +2180,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                             );
                             break 'internal_error;
                         }
-                        if wxs_is_list(typ) {
+                        if (*typ).wxs_is_list() {
                             ret = XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_2 as i32;
                         } else {
                             ret = XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1 as i32;
@@ -2237,7 +2197,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                         1,
                     );
                 }
-            } else if wxs_is_list(typ) {
+            } else if (*typ).wxs_is_list() {
                 let mut cur: *const XmlChar;
                 let mut end: *const XmlChar;
                 let mut tmp_value: *mut XmlChar = null_mut();
@@ -2360,7 +2320,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                         1,
                     );
                 }
-            } else if wxs_is_union(typ) {
+            } else if (*typ).wxs_is_union() {
                 let mut member_link: XmlSchemaTypeLinkPtr;
                 // TODO: For all datatypes `derived` by `union`  whiteSpace does
                 // not apply directly; however, the normalization behavior of `union`
@@ -4087,7 +4047,7 @@ unsafe fn xml_schema_pval_attr_node_value(
                 return -1;
             }
             std::cmp::Ordering::Greater => {
-                if wxs_is_list(typ) {
+                if (*typ).wxs_is_list() {
                     ret = XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_2 as i32;
                 } else {
                     ret = XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1 as i32;
@@ -12422,10 +12382,10 @@ unsafe fn xml_schema_resolve_type_references(
             }
         }
         if wxs_is_simple(type_def) {
-            if wxs_is_union(type_def) {
+            if (*type_def).wxs_is_union() {
                 // Resolve the memberTypes.
                 xml_schema_resolve_union_member_types(ctxt, type_def);
-            } else if wxs_is_list(type_def) {
+            } else if (*type_def).wxs_is_list() {
                 // Resolve the itemType.
                 if (*type_def).subtypes.is_null() && !(*type_def).base.is_null() {
                     (*type_def).subtypes =
@@ -13788,7 +13748,7 @@ unsafe fn xml_schema_fixup_simple_type_stage_one(
         }
         (*typ).flags |= XML_SCHEMAS_TYPE_FIXUP_1;
 
-        if wxs_is_list(typ) {
+        if (*typ).wxs_is_list() {
             // Corresponds to <simpleType><list>...
             if (*typ).subtypes.is_null() {
                 // This one is really needed, so get out.
@@ -13799,7 +13759,7 @@ unsafe fn xml_schema_fixup_simple_type_stage_one(
                 );
                 return -1;
             }
-        } else if wxs_is_union(typ) {
+        } else if (*typ).wxs_is_union() {
             // Corresponds to <simpleType><union>...
             if (*typ).member_types.is_null() {
                 // This one is really needed, so get out.
@@ -13828,13 +13788,13 @@ unsafe fn xml_schema_fixup_simple_type_stage_one(
             // Variety
             // If the <restriction> alternative is chosen, then the
             // {variety} of the {base type definition}.
-            if wxs_is_atomic((*typ).base_type) {
+            if (*(*typ).base_type).wxs_is_atomic() {
                 (*typ).flags |= XML_SCHEMAS_TYPE_VARIETY_ATOMIC;
-            } else if wxs_is_list((*typ).base_type) {
+            } else if (*(*typ).base_type).wxs_is_list() {
                 (*typ).flags |= XML_SCHEMAS_TYPE_VARIETY_LIST;
                 // Inherit the itemType.
                 (*typ).subtypes = (*(*typ).base_type).subtypes;
-            } else if wxs_is_union((*typ).base_type) {
+            } else if (*(*typ).base_type).wxs_is_union() {
                 (*typ).flags |= XML_SCHEMAS_TYPE_VARIETY_UNION;
                 // NOTE that we won't assign the memberTypes of the base,
                 // since this will make trouble when freeing them; we will
@@ -13882,7 +13842,8 @@ unsafe fn xml_schema_check_union_type_def_circular_recur(
                     );
                     return XmlParserErrors::XmlSchemapSrcSimpleType4 as i32;
                 }
-                if wxs_is_union(member_type) && (*member_type).flags & XML_SCHEMAS_TYPE_MARKED == 0
+                if (*member_type).wxs_is_union()
+                    && (*member_type).flags & XML_SCHEMAS_TYPE_MARKED == 0
                 {
                     (*member_type).flags |= XML_SCHEMAS_TYPE_MARKED;
                     let res: i32 = xml_schema_check_union_type_def_circular_recur(
@@ -13908,7 +13869,7 @@ unsafe fn xml_schema_check_union_type_def_circular(
     typ: XmlSchemaTypePtr,
 ) -> i32 {
     unsafe {
-        if !wxs_is_union(typ) {
+        if !(*typ).wxs_is_union() {
             return 0;
         }
         xml_schema_check_union_type_def_circular_recur(pctxt, typ, (*typ).member_types)
@@ -14266,7 +14227,7 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
             // 2.1 The type definition `resolved` to by the `actual value` of the
             // base [attribute] must be one of the following:
             if wxs_is_simple(base) {
-                if !wxs_is_extension(typ) {
+                if !(*typ).wxs_is_extension() {
                     let qname = xml_schema_format_qname(
                         Some(
                             CStr::from_ptr((*base).target_namespace as *const i8)
@@ -14314,7 +14275,7 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
                         return -1;
                     }
                 } else if (*base).content_type == XmlSchemaContentType::XmlSchemaContentMixed
-                    && wxs_is_restriction(typ)
+                    && (*typ).wxs_is_restriction()
                 {
                     // 2.1.2 only if the <restriction> alternative is also
                     // chosen, a complex type definition whose {content type}
@@ -14358,7 +14319,7 @@ unsafe fn xml_schema_check_srcct(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSchemaTyp
                 }
             }
             if ret > 0 {
-                if wxs_is_restriction(typ) {
+                if (*typ).wxs_is_restriction() {
                     let qname = xml_schema_format_qname(
                         Some(
                             CStr::from_ptr((*base).target_namespace as *const i8)
@@ -14451,7 +14412,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
         // wildcard, i.e. intersect multiple wildcards.
         // Move attribute prohibitions into a separate list.
         if !uses.is_null() {
-            if wxs_is_restriction(typ) {
+            if (*typ).wxs_is_restriction() {
                 // This one will transfer all attr. prohibitions
                 // into (*pctxt).attrProhibs.
                 if xml_schema_expand_attribute_group_refs(
@@ -14492,7 +14453,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
         if !base_uses.is_null() {
             let mut pro: XmlSchemaAttributeUseProhibPtr;
 
-            if wxs_is_restriction(typ) {
+            if (*typ).wxs_is_restriction() {
                 let mut tmp: XmlSchemaAttributeUsePtr;
 
                 let uses_count = if !uses.is_null() { (*uses).nb_items } else { 0 };
@@ -14554,7 +14515,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
             (*typ).attr_uses = null_mut();
         }
         // Compute the complete wildcard.
-        if wxs_is_extension(typ) {
+        if (*typ).wxs_is_extension() {
             if !(*base_type).attribute_wildcard.is_null() {
                 // (3.2.2.1) "If the `base wildcard` is non-`absent`, then
                 // the appropriate case among the following:"
@@ -14644,7 +14605,9 @@ unsafe fn xml_schema_check_ctprops_correct(
         // be as described in the property tableau in The Complex Type Definition
         // Schema Component ($3.4.1), modulo the impact of Missing
         // Sub-components ($5.3)."
-        if !(*typ).base_type.is_null() && wxs_is_simple((*typ).base_type) && !wxs_is_extension(typ)
+        if !(*typ).base_type.is_null()
+            && wxs_is_simple((*typ).base_type)
+            && !(*typ).wxs_is_extension()
         {
             // SPEC (2) "If the {base type definition} is a simple type definition,
             // the {derivation method} must be extension."
@@ -14972,7 +14935,7 @@ unsafe fn xml_schema_check_cosstderived_ok(
             return 0;
         }
         // 2.2.3 D's {variety} is list or union and B is the `simple ur-type definition`.
-        if wxs_is_any_simple_type(base_type) && (wxs_is_list(typ) || wxs_is_union(typ)) {
+        if wxs_is_any_simple_type(base_type) && ((*typ).wxs_is_list() || (*typ).wxs_is_union()) {
             return 0;
         }
         // 2.2.4 B's {variety} is union and D is validly derived from a type
@@ -14981,7 +14944,7 @@ unsafe fn xml_schema_check_cosstderived_ok(
         //
         // NOTE: This seems not to involve built-in types, since there is no
         // built-in Union Simple Type.
-        if wxs_is_union(base_type) {
+        if (*base_type).wxs_is_union() {
             let mut cur: XmlSchemaTypeLinkPtr;
 
             cur = (*base_type).member_types;
@@ -15673,7 +15636,7 @@ unsafe fn xml_schema_check_ctcomponent(ctxt: XmlSchemaParserCtxtPtr, typ: XmlSch
         if ret != 0 {
             return ret;
         }
-        if wxs_is_extension(typ) {
+        if (*typ).wxs_is_extension() {
             ret = xml_schema_check_cosctextends(ctxt, typ);
         } else {
             ret = xml_schema_check_derivation_okrestriction(ctxt, typ);
@@ -15719,7 +15682,7 @@ unsafe fn xml_schema_fixup_complex_type(
                     // Corresponds to <complexType><simpleContent>...
                     if wxs_is_complex(base_type)
                         && !(*base_type).content_type_def.is_null()
-                        && wxs_is_restriction(typ)
+                        && (*typ).wxs_is_restriction()
                     {
                         let content_base: XmlSchemaTypePtr;
 
@@ -15794,7 +15757,7 @@ unsafe fn xml_schema_fixup_complex_type(
                         HERROR!(res, 'exit_error);
                     } else if wxs_is_complex(base_type)
                         && (*base_type).content_type == XmlSchemaContentType::XmlSchemaContentMixed
-                        && wxs_is_restriction(typ)
+                        && (*typ).wxs_is_restriction()
                     {
                         // SPEC (2) If <restriction> + base is a mixed <complexType> with
                         // an emptiable particle, then a simple type definition which
@@ -15814,7 +15777,7 @@ unsafe fn xml_schema_fixup_complex_type(
                         );
                             break 'exit_failure;
                         }
-                    } else if wxs_is_complex(base_type) && wxs_is_extension(typ) {
+                    } else if wxs_is_complex(base_type) && (*typ).wxs_is_extension() {
                         // SPEC (3) If <extension> + base is <complexType> with
                         // <simpleType> content, "...then the {content type} of that
                         // complex type definition"
@@ -15833,7 +15796,7 @@ unsafe fn xml_schema_fixup_complex_type(
                             break 'exit_failure;
                         }
                         (*typ).content_type_def = (*base_type).content_type_def;
-                    } else if wxs_is_simple(base_type) && wxs_is_extension(typ) {
+                    } else if wxs_is_simple(base_type) && (*typ).wxs_is_extension() {
                         // SPEC (4) <extension> + base is <simpleType>
                         // "... then that simple type definition"
                         (*typ).content_type_def = base_type;
@@ -15920,7 +15883,7 @@ unsafe fn xml_schema_fixup_complex_type(
                         (*typ).content_type = XmlSchemaContentType::XmlSchemaContentElements;
                     }
                     // Compute the "content type".
-                    if wxs_is_restriction(typ) {
+                    if (*typ).wxs_is_restriction() {
                         // SPEC (3.1) "If <restriction>..."
                         // (3.1.1) + (3.1.2)
                         if (*typ).content_type != XmlSchemaContentType::XmlSchemaContentEmpty
@@ -16132,7 +16095,7 @@ unsafe fn xml_schema_finish_member_type_definitions_property(
                 xml_schema_type_fixup((*link).typ, pctxt as XmlSchemaAbstractCtxtPtr);
             }
 
-            if wxs_is_union((*link).typ) {
+            if (*(*link).typ).wxs_is_union() {
                 sub_link = xml_schema_get_union_simple_type_member_types((*link).typ);
                 if !sub_link.is_null() {
                     (*link).typ = (*sub_link).typ;
@@ -16210,8 +16173,8 @@ unsafe fn xml_schema_check_st_props_correct(
             );
             return XmlParserErrors::XmlSchemapStPropsCorrect1 as i32;
         }
-        if (wxs_is_list(typ) || wxs_is_union(typ))
-            && !wxs_is_restriction(typ)
+        if ((*typ).wxs_is_list() || (*typ).wxs_is_union())
+            && !(*typ).wxs_is_restriction()
             && (!wxs_is_any_simple_type(base_type)
                 && (*base_type).typ != XmlSchemaTypeType::XmlSchemaTypeSimple)
         {
@@ -16227,7 +16190,7 @@ unsafe fn xml_schema_check_st_props_correct(
             return XmlParserErrors::XmlSchemapStPropsCorrect1 as i32;
         }
         // Variety: One of {atomic, list, union}.
-        if !wxs_is_atomic(typ) && !wxs_is_union(typ) && !wxs_is_list(typ) {
+        if !(*typ).wxs_is_atomic() && !(*typ).wxs_is_union() && !(*typ).wxs_is_list() {
             xml_schema_pcustom_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapStPropsCorrect1,
@@ -16288,11 +16251,11 @@ unsafe fn xml_schema_check_cosstrestricts(
             return -1;
         }
 
-        if wxs_is_atomic(typ) {
+        if (*typ).wxs_is_atomic() {
             let primitive: XmlSchemaTypePtr;
             // 1.1 The {base type definition} must be an atomic simple
             // type definition or a built-in primitive datatype.
-            if !wxs_is_atomic((*typ).base_type) {
+            if !(*(*typ).base_type).wxs_is_atomic() {
                 let qname = xml_schema_get_component_qname((*typ).base_type as _);
                 xml_schema_pcustom_err(
                     pctxt,
@@ -16364,7 +16327,7 @@ unsafe fn xml_schema_check_cosstrestricts(
         //
         // NOTE (1.3.2) Facet derivation constraints are currently handled in
         // xmlSchemaDeriveAndValidateFacets()
-        } else if wxs_is_list(typ) {
+        } else if (*typ).wxs_is_list() {
             let item_type: XmlSchemaTypePtr = (*typ).subtypes;
             if item_type.is_null() || !wxs_is_simple(item_type) {
                 PERROR_INT!(
@@ -16380,7 +16343,7 @@ unsafe fn xml_schema_check_cosstrestricts(
             // 2.1 The {item type definition} must have a {variety} of atomic or
             // union (in which case all the {member type definitions}
             // must be atomic).
-            if !wxs_is_atomic(item_type) && !wxs_is_union(item_type) {
+            if !(*item_type).wxs_is_atomic() && !(*item_type).wxs_is_union() {
                 let qname = xml_schema_get_component_qname(item_type as _);
                 xml_schema_pcustom_err(
                     pctxt,
@@ -16392,12 +16355,12 @@ unsafe fn xml_schema_check_cosstrestricts(
                     Some(&qname),
                 );
                 return XmlParserErrors::XmlSchemapCosStRestricts2_1 as i32;
-            } else if wxs_is_union(item_type) {
+            } else if (*item_type).wxs_is_union() {
                 let mut member: XmlSchemaTypeLinkPtr;
 
                 member = (*item_type).member_types;
                 while !member.is_null() {
-                    if !wxs_is_atomic((*member).typ) {
+                    if !(*(*member).typ).wxs_is_atomic() {
                         let qname = xml_schema_get_component_qname((*member).typ as _);
                         xml_schema_pcustom_err(
                             pctxt,
@@ -16461,7 +16424,7 @@ unsafe fn xml_schema_check_cosstrestricts(
                 // I.e. the variety of "list" is inherited.
                 // 2.3.2
                 // 2.3.2.1 The {base type definition} must have a {variety} of list.
-                if !wxs_is_list((*typ).base_type) {
+                if !(*(*typ).base_type).wxs_is_list() {
                     let qname = xml_schema_get_component_qname((*typ).base_type as _);
                     xml_schema_pcustom_err(
                         pctxt,
@@ -16571,7 +16534,7 @@ unsafe fn xml_schema_check_cosstrestricts(
                     // xmlSchemaDeriveAndValidateFacets()
                 }
             }
-        } else if wxs_is_union(typ) {
+        } else if (*typ).wxs_is_union() {
             // 3.1 The {member type definitions} must all have {variety} of atomic or list.
             let mut member: XmlSchemaTypeLinkPtr;
 
@@ -16581,7 +16544,7 @@ unsafe fn xml_schema_check_cosstrestricts(
                     xml_schema_type_fixup((*member).typ, pctxt as XmlSchemaAbstractCtxtPtr);
                 }
 
-                if !wxs_is_atomic((*member).typ) && !wxs_is_list((*member).typ) {
+                if !(*(*member).typ).wxs_is_atomic() && !(*(*member).typ).wxs_is_list() {
                     let qname = xml_schema_get_component_qname((*member).typ as _);
                     xml_schema_pcustom_err(
                         pctxt,
@@ -16635,7 +16598,7 @@ unsafe fn xml_schema_check_cosstrestricts(
             } else {
                 // 3.3.2.1 The {base type definition} must have a {variety} of union.
                 // I.e. the variety of "list" is inherited.
-                if !wxs_is_union((*typ).base_type) {
+                if !(*(*typ).base_type).wxs_is_union() {
                     let qname = xml_schema_get_component_qname((*typ).base_type as _);
                     xml_schema_pcustom_err(
                         pctxt,
@@ -16843,10 +16806,10 @@ unsafe fn xml_schema_check_facet_values(
 unsafe fn xml_schema_type_fixup_whitespace(typ: XmlSchemaTypePtr) -> i32 {
     unsafe {
         // Evaluate the whitespace-facet value.
-        if wxs_is_list(typ) {
+        if (*typ).wxs_is_list() {
             (*typ).flags |= XML_SCHEMAS_TYPE_WHITESPACE_COLLAPSE;
             return 0;
-        } else if wxs_is_union(typ) {
+        } else if (*typ).wxs_is_union() {
             return 0;
         }
 
@@ -17573,7 +17536,7 @@ unsafe fn xml_schema_type_fixup_optim_facets(typ: XmlSchemaTypePtr) {
             (*typ).flags |= XML_SCHEMAS_TYPE_HAS_FACETS;
         }
 
-        if has != 0 && need_val == 0 && wxs_is_atomic(typ) {
+        if has != 0 && need_val == 0 && (*typ).wxs_is_atomic() {
             let prim: XmlSchemaTypePtr = xml_schema_get_primitive_type(typ);
             // OPTIMIZE VAL TODO: Some facets need a computed value.
             if (*prim).built_in_type != XmlSchemaValType::XmlSchemasAnysimpletype as i32
@@ -18109,8 +18072,8 @@ unsafe fn xml_schema_check_cos_ct_derived_ok(
         if equal == 0 {
             // SPEC (1) "If B and D are not the same type definition, then the
             // {derivation method} of D must not be in the subset."
-            if (set & SUBSET_EXTENSION != 0 && wxs_is_extension(typ))
-                || (set & SUBSET_RESTRICTION != 0 && wxs_is_restriction(typ))
+            if (set & SUBSET_EXTENSION != 0 && (*typ).wxs_is_extension())
+                || (set & SUBSET_RESTRICTION != 0 && (*typ).wxs_is_restriction())
             {
                 return 1;
             }
@@ -18605,13 +18568,13 @@ unsafe fn xml_schema_check_elem_subst_group(
 
                         // The set of all {derivation method}s involved in the derivation
                         while !typ.is_null() && typ != head_type && typ != (*typ).base_type {
-                            if wxs_is_extension(typ)
+                            if (*typ).wxs_is_extension()
                                 && meth_set & XML_SCHEMAS_TYPE_BLOCK_RESTRICTION == 0
                             {
                                 meth_set |= XML_SCHEMAS_TYPE_BLOCK_EXTENSION;
                             }
 
-                            if wxs_is_restriction(typ)
+                            if (*typ).wxs_is_restriction()
                                 && meth_set & XML_SCHEMAS_TYPE_BLOCK_RESTRICTION == 0
                             {
                                 meth_set |= XML_SCHEMAS_TYPE_BLOCK_RESTRICTION;
@@ -22577,7 +22540,9 @@ unsafe fn xml_schema_format_idc_key_sequence_1(
             if for_hash == 0 {
                 res = xml_schema_get_canon_value_whtsp_ext(
                     (*(*seq.add(i as usize))).val,
-                    xml_schema_get_white_space_facet_value((*(*seq.add(i as usize))).typ).unwrap(),
+                    (*(*(*seq.add(i as usize))).typ)
+                        .white_space_facet_value()
+                        .unwrap(),
                     &raw mut value,
                 );
             } else {
