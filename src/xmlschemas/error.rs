@@ -2088,18 +2088,15 @@ pub(crate) unsafe fn xml_schema_keyref_err(
     str2: Option<&str>,
 ) {
     unsafe {
-        let namespace_name = *(*(*vctxt).node_qnames)
-            .items
-            .add((*idc_node).node_qname_id as usize + 1) as *const i8;
+        let namespace_name =
+            (*(*vctxt).node_qnames).items[(*idc_node).node_qname_id as usize + 1] as *const i8;
         let qn = xml_schema_format_qname(
             (!namespace_name.is_null())
                 .then(|| CStr::from_ptr(namespace_name).to_string_lossy())
                 .as_deref(),
             Some(
                 CStr::from_ptr(
-                    *(*(*vctxt).node_qnames)
-                        .items
-                        .add((*idc_node).node_qname_id as usize) as *const i8,
+                    (*(*vctxt).node_qnames).items[(*idc_node).node_qname_id as usize] as *const i8,
                 )
                 .to_string_lossy()
                 .as_ref(),

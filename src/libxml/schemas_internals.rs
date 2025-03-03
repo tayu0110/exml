@@ -20,7 +20,7 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
-use std::any::type_name;
+use std::{any::type_name, ptr::drop_in_place};
 
 use crate::{
     tree::XmlNodePtr,
@@ -555,9 +555,7 @@ pub(crate) unsafe fn xml_schema_item_list_free(list: XmlSchemaItemListPtr) {
         if list.is_null() {
             return;
         }
-        if !(*list).items.is_null() {
-            xml_free((*list).items as _);
-        }
+        drop_in_place(list);
         xml_free(list as _);
     }
 }

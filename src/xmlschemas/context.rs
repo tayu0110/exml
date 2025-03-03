@@ -11,7 +11,7 @@ use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::XmlParserInputBuffer,
     libxml::{
-        globals::{xml_free, xml_malloc},
+        globals::xml_free,
         schemas_internals::xml_schema_item_list_free,
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
         xmlreader::{XmlTextReaderPtr, xml_text_reader_lookup_namespace},
@@ -33,10 +33,7 @@ use crate::{
     tree::{XmlDocPtr, XmlNodePtr, xml_free_doc},
 };
 
-use super::{
-    error::{xml_schema_internal_err, xml_schema_verr_memory},
-    items::XmlSchemaTypePtr,
-};
+use super::{error::xml_schema_internal_err, items::XmlSchemaTypePtr};
 
 /// A schemas validation context
 #[doc(alias = "xmlSchemaParserCtxtPtr")]
@@ -506,20 +503,12 @@ impl Default for XmlSchemaValidCtxt {
 /// Returns the validation context or NULL in case of error
 #[doc(alias = "xmlSchemaNewValidCtxt")]
 pub unsafe fn xml_schema_new_valid_ctxt(schema: XmlSchemaPtr) -> XmlSchemaValidCtxtPtr {
-    unsafe {
-        let ret: XmlSchemaValidCtxtPtr =
-            xml_malloc(size_of::<XmlSchemaValidCtxt>()) as XmlSchemaValidCtxtPtr;
-        if ret.is_null() {
-            xml_schema_verr_memory(null_mut(), "allocating validation context", None);
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlSchemaValidCtxt::default());
-        (*ret).typ = XML_SCHEMA_CTXT_VALIDATOR;
-        (*ret).dict = xml_dict_create();
-        (*ret).node_qnames = xml_schema_item_list_create();
-        (*ret).schema = schema;
-        ret
-    }
+    let mut ret = Box::new(XmlSchemaValidCtxt::default());
+    ret.typ = XML_SCHEMA_CTXT_VALIDATOR;
+    ret.dict = xml_dict_create();
+    ret.node_qnames = unsafe { xml_schema_item_list_create() };
+    ret.schema = schema;
+    Box::leak(ret)
 }
 
 /// Free the resources associated to the schema validation context
@@ -529,6 +518,7 @@ pub unsafe fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr) {
         if ctxt.is_null() {
             return;
         }
+        assert_eq!((*ctxt).typ, XML_SCHEMA_CTXT_VALIDATOR);
         if !(*ctxt).value.is_null() {
             xml_schema_free_value((*ctxt).value);
         }
@@ -607,6 +597,7 @@ pub unsafe fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr) {
         if !(*ctxt).filename.is_null() {
             xml_free((*ctxt).filename as _);
         }
-        xml_free(ctxt as _);
+
+        let _ = Box::from_raw(ctxt);
     }
 }
