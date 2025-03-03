@@ -105,7 +105,6 @@ use crate::{
             xml_automata_new_once_trans2, xml_automata_new_state, xml_automata_new_transition2,
             xml_automata_set_final_state, xml_free_automata, xml_new_automata,
         },
-        xmlreader::xml_text_reader_lookup_namespace,
         xmlregexp::{
             XmlRegExecCtxtPtr, xml_reg_exec_err_info, xml_reg_exec_next_values,
             xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_free_exec_ctxt,
@@ -862,8 +861,8 @@ pub struct XmlSchemaNodeInfo {
                                           element */
     regex_ctxt: XmlRegExecCtxtPtr,
 
-    ns_bindings: *mut *const XmlChar, /* Namespace bindings on this element */
-    nb_ns_bindings: i32,
+    pub(crate) ns_bindings: *mut *const XmlChar, /* Namespace bindings on this element */
+    pub(crate) nb_ns_bindings: i32,
     size_ns_bindings: i32,
 
     has_keyrefs: i32,
@@ -1209,76 +1208,6 @@ pub(crate) unsafe fn xml_schema_get_component_node(
     }
 }
 
-unsafe fn xml_schema_lookup_namespace(
-    vctxt: XmlSchemaValidCtxtPtr,
-    prefix: *const XmlChar,
-) -> *const XmlChar {
-    unsafe {
-        if !(*vctxt).parser_ctxt.is_null() && (*(*vctxt).parser_ctxt).sax.is_some() {
-            let mut inode: XmlSchemaNodeInfoPtr;
-
-            for i in (0..=(*vctxt).depth).rev() {
-                if (*(*(*vctxt).elem_infos.add(i as usize))).nb_ns_bindings != 0 {
-                    inode = *(*vctxt).elem_infos.add(i as usize);
-                    for j in (0..(*inode).nb_ns_bindings * 2).step_by(2) {
-                        if (prefix.is_null() && (*(*inode).ns_bindings.add(j as usize)).is_null())
-                            || (!prefix.is_null()
-                                && xml_str_equal(prefix, *(*inode).ns_bindings.add(j as usize)))
-                        {
-                            // Note that the namespace bindings are already
-                            // in a string dict.
-                            return *(*inode).ns_bindings.add(j as usize + 1);
-                        }
-                    }
-                }
-            }
-            null_mut()
-        } else if {
-            #[cfg(feature = "libxml_reader")]
-            {
-                !(*vctxt).reader.is_null()
-            }
-            #[cfg(not(feature = "libxml_reader"))]
-            {
-                false
-            }
-        } {
-            #[cfg(feature = "libxml_reader")]
-            {
-                let ns_name: *mut XmlChar =
-                    xml_text_reader_lookup_namespace(&mut *(*vctxt).reader, prefix);
-                if !ns_name.is_null() {
-                    let ret: *const XmlChar = xml_dict_lookup((*vctxt).dict, ns_name, -1);
-                    xml_free(ns_name as _);
-                    return ret;
-                } else {
-                    return null_mut();
-                }
-            }
-        } else {
-            let Some(mut node) = (*(*vctxt).inode).node.filter(|node| node.doc.is_some()) else {
-                VERROR_INT!(
-                    vctxt,
-                    "xmlSchemaLookupNamespace",
-                    "no node or node's doc available"
-                );
-                return null_mut();
-            };
-            let doc = node.doc;
-            let ns = node.search_ns(
-                doc,
-                (!prefix.is_null())
-                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                    .as_deref(),
-            );
-            if let Some(ns) = ns {
-                return ns.href;
-            }
-            return null_mut();
-        }
-    }
-}
-
 macro_rules! WXS_FIND_GLOBAL_ITEM {
     ($schema:expr, $slot:ident, $ns_name:expr, $name:expr, $ret:expr) => {
         if xml_str_equal($ns_name, (*$schema).target_namespace) {
@@ -1355,7 +1284,11 @@ unsafe fn xml_schema_validate_notation(
                 let mut ns_name: *const XmlChar = null();
 
                 if !vctxt.is_null() {
-                    ns_name = xml_schema_lookup_namespace(vctxt, prefix);
+                    ns_name = (*vctxt).lookup_namespace(
+                        (!prefix.is_null())
+                            .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                            .as_deref(),
+                    );
                 } else if let Some(node) = node {
                     let ns = node.search_ns(
                         node.document(),
@@ -1443,7 +1376,11 @@ unsafe fn xml_schema_validate_qname(
         // OPTIMIZE TODO: Use flags for:
         //  - is there any namespace binding?
         //  - is there a default namespace?
-        let ns_name: *const XmlChar = xml_schema_lookup_namespace(vctxt, prefix);
+        let ns_name: *const XmlChar = (*vctxt).lookup_namespace(
+            (!prefix.is_null())
+                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                .as_deref(),
+        );
 
         if !prefix.is_null() {
             xml_free(prefix as _);
@@ -21571,7 +21508,11 @@ unsafe fn xml_schema_vexpand_qname(
                 xml_free(local as _);
             }
 
-            *ns_name = xml_schema_lookup_namespace(vctxt, prefix);
+            *ns_name = (*vctxt).lookup_namespace(
+                (!prefix.is_null())
+                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                    .as_deref(),
+            );
 
             if !prefix.is_null() {
                 xml_free(prefix as _);

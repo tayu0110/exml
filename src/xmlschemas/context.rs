@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    ffi::c_void,
+    ffi::{CStr, CString, c_void},
     ptr::{null, null_mut},
     rc::Rc,
 };
@@ -14,7 +14,7 @@ use crate::{
         globals::{xml_free, xml_malloc},
         schemas_internals::xml_schema_item_list_free,
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
-        xmlreader::XmlTextReaderPtr,
+        xmlreader::{XmlTextReaderPtr, xml_text_reader_lookup_namespace},
         xmlregexp::XmlRegExecCtxtPtr,
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR, XmlSchemaAttrInfoPtr,
@@ -33,7 +33,10 @@ use crate::{
     tree::{XmlDocPtr, XmlNodePtr, xml_free_doc},
 };
 
-use super::{error::xml_schema_verr_memory, items::XmlSchemaTypePtr};
+use super::{
+    error::{xml_schema_internal_err, xml_schema_verr_memory},
+    items::XmlSchemaTypePtr,
+};
 
 /// A schemas validation context
 #[doc(alias = "xmlSchemaParserCtxtPtr")]
@@ -365,9 +368,80 @@ pub struct XmlSchemaValidCtxt {
     pub(crate) create_idcnode_tables: i32,
     pub(crate) psvi_expose_idcnode_tables: i32,
 
-    /* Locator for error reporting in streaming mode */
+    // Locator for error reporting in streaming mode
     pub(crate) loc_func: Option<XmlSchemaValidityLocatorFunc>,
     pub(crate) loc_ctxt: *mut c_void,
+}
+
+impl XmlSchemaValidCtxt {
+    #[doc(alias = "xmlSchemaLookupNamespace")]
+    pub(crate) unsafe fn lookup_namespace(&self, prefix: Option<&str>) -> *const u8 {
+        unsafe {
+            match () {
+                _ if !self.parser_ctxt.is_null() && (*self.parser_ctxt).sax.is_some() => {
+                    for i in (0..=self.depth).rev() {
+                        if (*(*self.elem_infos.add(i as usize))).nb_ns_bindings != 0 {
+                            let inode: XmlSchemaNodeInfoPtr = *self.elem_infos.add(i as usize);
+                            for j in (0..(*inode).nb_ns_bindings * 2).step_by(2) {
+                                if (prefix.is_none()
+                                    && (*(*inode).ns_bindings.add(j as usize)).is_null())
+                                    || (prefix.is_some_and(|prefix| {
+                                        !(*(*inode).ns_bindings.add(j as usize)).is_null()
+                                            && prefix
+                                                == CStr::from_ptr(
+                                                    *(*inode).ns_bindings.add(j as usize)
+                                                        as *const i8,
+                                                )
+                                                .to_string_lossy()
+                                                .as_ref()
+                                    }))
+                                {
+                                    // Note that the namespace bindings are already
+                                    // in a string dict.
+                                    return *(*inode).ns_bindings.add(j as usize + 1);
+                                }
+                            }
+                        }
+                    }
+                    null_mut()
+                }
+                #[cfg(feature = "libxml_reader")]
+                _ if !self.reader.is_null() => {
+                    let prefix = prefix.map(|prefix| CString::new(prefix).unwrap());
+                    let ns_name: *mut u8 = xml_text_reader_lookup_namespace(
+                        &mut *self.reader,
+                        prefix
+                            .as_deref()
+                            .map_or(null_mut(), |prefix| prefix.as_ptr() as *const u8),
+                    );
+                    if !ns_name.is_null() {
+                        let ret: *const u8 = xml_dict_lookup(self.dict, ns_name, -1);
+                        xml_free(ns_name as _);
+                        ret
+                    } else {
+                        null_mut()
+                    }
+                }
+                _ => {
+                    let Some(mut node) = (*self.inode).node.filter(|node| node.doc.is_some())
+                    else {
+                        xml_schema_internal_err(
+                            self as *const Self as _,
+                            "xmlSchemaLookupNamespace",
+                            "no node or node's doc available",
+                        );
+                        return null_mut();
+                    };
+                    let doc = node.doc;
+                    let ns = node.search_ns(doc, prefix);
+                    if let Some(ns) = ns {
+                        return ns.href;
+                    }
+                    null_mut()
+                }
+            }
+        }
+    }
 }
 
 impl Default for XmlSchemaValidCtxt {
