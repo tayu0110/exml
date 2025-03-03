@@ -28,7 +28,7 @@ use crate::{
         xmlmodule::XmlModulePtr,
         xmlreader::{XmlTextReaderLocatorPtr, XmlTextReaderPtr},
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr, XmlRegexpPtr},
-        xmlschemas::{XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaValidCtxtPtr},
+        xmlschemas::{XmlSchemaPtr, XmlSchemaValidCtxtPtr},
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::XmlChar,
     },
@@ -43,7 +43,10 @@ use crate::{
     },
 };
 #[cfg(feature = "schema")]
-use crate::{relaxng::XmlRelaxNGValidCtxtPtr, xmlschemas::items::XmlSchemaTypePtr};
+use crate::{
+    relaxng::XmlRelaxNGValidCtxtPtr,
+    xmlschemas::{context::XmlSchemaParserCtxtPtr, items::XmlSchemaTypePtr},
+};
 
 pub(crate) static TEST_CATALOG_LOCK: Mutex<()> = Mutex::new(());
 
@@ -545,9 +548,9 @@ pub(crate) fn des_xml_uriptr(_no: i32, _val: XmlURIPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
 pub(crate) unsafe fn desret_xml_schema_parser_ctxt_ptr(val: XmlSchemaParserCtxtPtr) {
-    unsafe {
-        use crate::libxml::xmlschemas::xml_schema_free_parser_ctxt;
+    use crate::xmlschemas::context::xml_schema_free_parser_ctxt;
 
+    unsafe {
         xml_schema_free_parser_ctxt(val);
     }
 }

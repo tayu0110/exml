@@ -76,11 +76,9 @@ use exml::{
         },
         xmlreader::XmlTextReaderPtr,
         xmlschemas::{
-            XmlSchema, XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free,
-            xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt, xml_schema_new_parser_ctxt,
-            xml_schema_new_valid_ctxt, xml_schema_parse, xml_schema_set_parser_errors,
-            xml_schema_set_valid_errors, xml_schema_validate_doc, xml_schema_validate_set_filename,
-            xml_schema_validate_stream,
+            XmlSchema, XmlSchemaValidCtxtPtr, xml_schema_free, xml_schema_free_valid_ctxt,
+            xml_schema_new_valid_ctxt, xml_schema_parse, xml_schema_set_valid_errors,
+            xml_schema_validate_doc, xml_schema_validate_set_filename, xml_schema_validate_stream,
         },
         xmlstring::XmlChar,
     },
@@ -100,6 +98,9 @@ use exml::{
         XmlEntity, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNode,
         XmlNodePtr, XmlNsPtr, xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc,
         xml_free_dtd, xml_new_doc, xml_new_doc_node,
+    },
+    xmlschemas::context::{
+        XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
     },
     xpath::{XmlXPathObjectPtr, xml_xpath_order_doc_elems},
 };
@@ -717,8 +718,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                     xml_memory_dump();
                     exit(PROGRESULT.load(Ordering::Relaxed));
                 }
-                xml_schema_set_parser_errors(
-                    ctxt,
+                (*ctxt).set_errors(
                     Some(generic_error_default),
                     Some(generic_error_default),
                     None,

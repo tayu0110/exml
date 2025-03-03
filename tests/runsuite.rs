@@ -32,10 +32,9 @@ use exml::{
             xml_memory_dump, xml_memory_strdup,
         },
         xmlschemas::{
-            XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaValidCtxtPtr, xml_schema_free,
-            xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt, xml_schema_new_parser_ctxt,
-            xml_schema_new_valid_ctxt, xml_schema_parse, xml_schema_set_parser_errors,
-            xml_schema_set_valid_errors, xml_schema_validate_doc,
+            XmlSchemaPtr, XmlSchemaValidCtxtPtr, xml_schema_free, xml_schema_free_valid_ctxt,
+            xml_schema_new_valid_ctxt, xml_schema_parse, xml_schema_set_valid_errors,
+            xml_schema_validate_doc,
         },
         xmlschemastypes::xml_schema_init_types,
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
@@ -50,6 +49,9 @@ use exml::{
     },
     tree::{XmlGenericNodePtr, XmlNode, xml_free_doc},
     uri::build_uri,
+    xmlschemas::context::{
+        XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+    },
     xpath::{
         XmlXPathCompExprPtr, XmlXPathContext, XmlXPathObjectPtr, XmlXPathObjectType,
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,
@@ -1068,8 +1070,7 @@ unsafe fn xstc_test_group(
                         NB_SCHEMATAS.fetch_add(1, Ordering::Relaxed);
                         let cpath = CString::new(path.as_str()).unwrap();
                         ctxt = xml_schema_new_parser_ctxt(cpath.as_ptr());
-                        xml_schema_set_parser_errors(
-                            ctxt,
+                        (*ctxt).set_errors(
                             Some(test_error_handler),
                             Some(test_error_handler),
                             Some(GenericErrorContext::new(ctxt)),
@@ -1121,8 +1122,7 @@ unsafe fn xstc_test_group(
                         NB_SCHEMATAS.fetch_add(1, Ordering::Relaxed);
                         let cpath = CString::new(path.as_str()).unwrap();
                         ctxt = xml_schema_new_parser_ctxt(cpath.as_ptr());
-                        xml_schema_set_parser_errors(
-                            ctxt,
+                        (*ctxt).set_errors(
                             Some(test_error_handler),
                             Some(test_error_handler),
                             Some(GenericErrorContext::new(ctxt)),

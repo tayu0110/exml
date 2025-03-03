@@ -64,12 +64,11 @@ use crate::{
             xml_xinclude_set_flags, xml_xinclude_set_streaming_mode,
         },
         xmlschemas::{
-            XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaSAXPlugPtr, XmlSchemaValidCtxtPtr,
-            xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
-            xml_schema_is_valid, xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
+            XmlSchemaPtr, XmlSchemaSAXPlugPtr, XmlSchemaValidCtxtPtr, xml_schema_free,
+            xml_schema_free_valid_ctxt, xml_schema_is_valid, xml_schema_new_valid_ctxt,
             xml_schema_parse, xml_schema_sax_plug, xml_schema_sax_unplug,
-            xml_schema_set_parser_errors, xml_schema_set_valid_errors,
-            xml_schema_set_valid_structured_errors, xml_schema_validate_set_locator,
+            xml_schema_set_valid_errors, xml_schema_set_valid_structured_errors,
+            xml_schema_validate_set_locator,
         },
         xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen},
     },
@@ -4914,6 +4913,10 @@ unsafe fn xml_text_reader_schema_validate_internal(
     ctxt: XmlSchemaValidCtxtPtr,
     _options: i32,
 ) -> i32 {
+    use crate::xmlschemas::context::{
+        XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+    };
+
     unsafe {
         if reader.is_null() {
             return -1;
@@ -4957,8 +4960,7 @@ unsafe fn xml_text_reader_schema_validate_internal(
             // Parse the schema and create validation environment.
             let pctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(xsd);
             if (*reader).error_func.is_some() {
-                xml_schema_set_parser_errors(
-                    pctxt,
+                (*pctxt).set_errors(
                     Some(xml_text_reader_validity_error_relay),
                     Some(xml_text_reader_validity_warning_relay),
                     Some(ctx.clone()),

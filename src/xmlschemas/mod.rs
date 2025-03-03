@@ -20,6 +20,7 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
+pub mod context;
 pub(crate) mod error;
 pub mod items;
 

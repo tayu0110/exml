@@ -5,7 +5,9 @@ use std::{
 };
 
 use crate::{
-    error::{__xml_raise_error, XmlErrorLevel, XmlParserErrors},
+    error::{
+        __xml_raise_error, __xml_simple_oom_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors,
+    },
     globals::{GenericError, StructuredError},
     libxml::{
         globals::xml_free,
@@ -17,11 +19,11 @@ use crate::{
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR, XmlSchemaAbstractCtxtPtr,
             XmlSchemaAttrInfoPtr, XmlSchemaNodeInfoPtr, XmlSchemaPSVIIDCNodePtr,
-            XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_facet_type_to_string,
-            xml_schema_format_qname, xml_schema_get_canon_value_whtsp_ext,
-            xml_schema_get_component_designation, xml_schema_get_component_node,
-            xml_schema_get_component_qname, xml_schema_get_component_type_str,
-            xml_schema_get_white_space_facet_value, xml_schema_item_type_to_str,
+            XmlSchemaValidCtxtPtr, xml_schema_facet_type_to_string, xml_schema_format_qname,
+            xml_schema_get_canon_value_whtsp_ext, xml_schema_get_component_designation,
+            xml_schema_get_component_node, xml_schema_get_component_qname,
+            xml_schema_get_component_type_str, xml_schema_get_white_space_facet_value,
+            xml_schema_item_type_to_str,
         },
         xmlschemastypes::{XmlSchemaWhitespaceValueType, xml_schema_get_facet_value_as_ulong},
         xmlstring::{
@@ -30,6 +32,7 @@ use crate::{
         },
     },
     tree::{NodeCommon, XmlAttrPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr},
+    xmlschemas::context::XmlSchemaParserCtxtPtr,
 };
 
 use super::{
@@ -2116,5 +2119,20 @@ pub(crate) unsafe fn xml_schema_keyref_err(
             str2,
             None,
         );
+    }
+}
+
+/// Handle an out of memory condition
+#[doc(alias = "xmlSchemaPErrMemory")]
+pub(crate) unsafe fn xml_schema_perr_memory(
+    ctxt: XmlSchemaParserCtxtPtr,
+    extra: &str,
+    node: Option<XmlGenericNodePtr>,
+) {
+    unsafe {
+        if !ctxt.is_null() {
+            (*ctxt).nberrors += 1;
+        }
+        __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
     }
 }

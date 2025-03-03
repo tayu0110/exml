@@ -98,7 +98,7 @@ use crate::{
         },
         valid::xml_add_id,
         xmlautomata::{
-            XmlAutomataPtr, XmlAutomataStatePtr, xml_automata_compile, xml_automata_get_init_state,
+            XmlAutomataStatePtr, xml_automata_compile, xml_automata_get_init_state,
             xml_automata_new_all_trans, xml_automata_new_count_trans2,
             xml_automata_new_counted_trans, xml_automata_new_counter,
             xml_automata_new_counter_trans, xml_automata_new_epsilon, xml_automata_new_neg_trans,
@@ -143,16 +143,20 @@ use crate::{
     },
     uri::build_uri,
     xmlschemas::{
+        context::{
+            XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+            xml_schema_parser_ctxt_create,
+        },
         error::{
             xml_schema_complex_type_err, xml_schema_custom_err, xml_schema_custom_err4,
             xml_schema_custom_warning, xml_schema_derive_facet_err, xml_schema_facet_err,
             xml_schema_illegal_attr_err, xml_schema_internal_err2, xml_schema_keyref_err,
             xml_schema_pattr_use_err4, xml_schema_pcontent_err, xml_schema_pcustom_attr_err,
-            xml_schema_pcustom_err, xml_schema_pcustom_err_ext, xml_schema_perr, xml_schema_perr2,
-            xml_schema_pillegal_attr_err, xml_schema_pillegal_facet_atomic_err,
-            xml_schema_pillegal_facet_list_union_err, xml_schema_pmissing_attr_err,
-            xml_schema_pmutual_excl_attr_err, xml_schema_pres_comp_attr_err,
-            xml_schema_psimple_type_err, xml_schema_simple_type_err,
+            xml_schema_pcustom_err, xml_schema_pcustom_err_ext, xml_schema_perr,
+            xml_schema_perr_memory, xml_schema_perr2, xml_schema_pillegal_attr_err,
+            xml_schema_pillegal_facet_atomic_err, xml_schema_pillegal_facet_list_union_err,
+            xml_schema_pmissing_attr_err, xml_schema_pmutual_excl_attr_err,
+            xml_schema_pres_comp_attr_err, xml_schema_psimple_type_err, xml_schema_simple_type_err,
         },
         items::{
             XmlSchemaAnnotItemPtr, XmlSchemaAttribute, XmlSchemaAttributeGroup,
@@ -703,57 +707,6 @@ pub struct XmlSchemaConstructionCtxt {
 
 const XML_SCHEMAS_PARSE_ERROR: i32 = 1;
 const SCHEMAS_PARSE_OPTIONS: i32 = XmlParserOption::XmlParseNoEnt as i32;
-
-/// A schemas validation context
-#[doc(alias = "xmlSchemaParserCtxtPtr")]
-pub type XmlSchemaParserCtxtPtr = *mut XmlSchemaParserCtxt;
-#[doc(alias = "xmlSchemaParserCtxt")]
-#[repr(C)]
-pub struct XmlSchemaParserCtxt {
-    typ: i32,
-    pub(crate) err_ctxt: Option<GenericErrorContext>, /* user specific error context */
-    pub(crate) error: Option<GenericError>,           /* the callback in case of errors */
-    pub(crate) warning: Option<GenericError>,         /* the callback in case of warning */
-    pub(crate) err: i32,
-    pub(crate) nberrors: i32,
-    pub(crate) serror: Option<StructuredError>,
-
-    constructor: XmlSchemaConstructionCtxtPtr,
-    owns_constructor: i32, /* TODO: Move this to parser *flags*. */
-
-    // xmlSchemaPtr topschema;
-    // xmlHashTablePtr namespaces;
-    schema: XmlSchemaPtr, /* The main schema in use */
-    counter: i32,
-
-    url: *const XmlChar,
-    doc: Option<XmlDocPtr>,
-    preserve: i32, /* Whether the doc should be freed  */
-
-    buffer: *const c_char,
-    size: i32,
-
-    // Used to build complex element content models
-    am: XmlAutomataPtr,
-    start: XmlAutomataStatePtr,
-    end: XmlAutomataStatePtr,
-    state: XmlAutomataStatePtr,
-
-    dict: XmlDictPtr,            /* dictionary for interned string names */
-    ctxt_type: XmlSchemaTypePtr, /* The current context simple/complex type */
-    options: i32,
-    vctxt: XmlSchemaValidCtxtPtr,
-    is_s4_s: i32,
-    is_redefine: i32,
-    xsi_assemble: i32,
-    stop: i32, /* If the parser should stop; i.e. a critical error. */
-    target_namespace: *const XmlChar,
-    redefined: XmlSchemaBucketPtr, /* The schema to be redefined. */
-
-    redef: XmlSchemaRedefPtr, /* Used for redefinitions. */
-    redef_counter: i32,       /* Used for redefinitions. */
-    attr_prohibs: XmlSchemaItemListPtr,
-}
 
 const XML_SCHEMA_MODEL_GROUP_DEF_MARKED: i32 = 1 << 0;
 const XML_SCHEMA_MODEL_GROUP_DEF_REDEFINED: i32 = 1 << 1;
@@ -2694,22 +2647,7 @@ pub(crate) fn xml_schema_facet_type_to_string(typ: XmlSchemaTypeType) -> &'stati
     }
 }
 
-/// Handle an out of memory condition
-#[doc(alias = "xmlSchemaPErrMemory")]
-unsafe fn xml_schema_perr_memory(
-    ctxt: XmlSchemaParserCtxtPtr,
-    extra: &str,
-    node: Option<XmlGenericNodePtr>,
-) {
-    unsafe {
-        if !ctxt.is_null() {
-            (*ctxt).nberrors += 1;
-        }
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
-    }
-}
-
-unsafe fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
+pub(crate) unsafe fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
     unsafe {
         let ret: XmlSchemaItemListPtr = xml_malloc(size_of::<XmlSchemaItemList>()) as _;
         if ret.is_null() {
@@ -2718,186 +2656,6 @@ unsafe fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
         }
         memset(ret as _, 0, size_of::<XmlSchemaItemList>());
         ret
-    }
-}
-
-unsafe fn xml_schema_parser_ctxt_create() -> XmlSchemaParserCtxtPtr {
-    unsafe {
-        let ret: XmlSchemaParserCtxtPtr =
-            xml_malloc(size_of::<XmlSchemaParserCtxt>()) as XmlSchemaParserCtxtPtr;
-        if ret.is_null() {
-            xml_schema_perr_memory(null_mut(), "allocating schema parser context", None);
-            return null_mut();
-        }
-        memset(ret as _, 0, size_of::<XmlSchemaParserCtxt>());
-        (*ret).typ = XML_SCHEMA_CTXT_PARSER;
-        (*ret).attr_prohibs = xml_schema_item_list_create();
-        if (*ret).attr_prohibs.is_null() {
-            xml_free(ret as _);
-            return null_mut();
-        }
-        ret
-    }
-}
-
-/// Create an XML Schemas parse context for that file/resource expected
-/// to contain an XML Schemas file.
-///
-/// Returns the parser context or NULL in case of error
-#[doc(alias = "xmlSchemaNewParserCtxt")]
-pub unsafe fn xml_schema_new_parser_ctxt(url: *const c_char) -> XmlSchemaParserCtxtPtr {
-    unsafe {
-        if url.is_null() {
-            return null_mut();
-        }
-
-        let ret: XmlSchemaParserCtxtPtr = xml_schema_parser_ctxt_create();
-        if ret.is_null() {
-            return null_mut();
-        }
-        (*ret).dict = xml_dict_create();
-        (*ret).url = xml_dict_lookup((*ret).dict, url as _, -1);
-        ret
-    }
-}
-
-/// Create an XML Schemas parse context for that memory buffer expected
-/// to contain an XML Schemas file.
-///
-/// Returns the parser context or NULL in case of error
-#[doc(alias = "xmlSchemaNewMemParserCtxt")]
-pub unsafe fn xml_schema_new_mem_parser_ctxt(
-    buffer: *const c_char,
-    size: i32,
-) -> XmlSchemaParserCtxtPtr {
-    unsafe {
-        if buffer.is_null() || size <= 0 {
-            return null_mut();
-        }
-        let ret: XmlSchemaParserCtxtPtr = xml_schema_parser_ctxt_create();
-        if ret.is_null() {
-            return null_mut();
-        }
-        (*ret).buffer = buffer;
-        (*ret).size = size;
-        (*ret).dict = xml_dict_create();
-        ret
-    }
-}
-
-/// Create an XML Schemas parse context for that document.
-/// NB. The document may be modified during the parsing process.
-///
-/// Returns the parser context or NULL in case of error
-#[doc(alias = "xmlSchemaNewDocParserCtxt")]
-pub unsafe fn xml_schema_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchemaParserCtxtPtr {
-    unsafe {
-        // if doc.is_null() {
-        //     return null_mut();
-        // }
-        let ret: XmlSchemaParserCtxtPtr = xml_schema_parser_ctxt_create();
-        if ret.is_null() {
-            return null_mut();
-        }
-        (*ret).doc = Some(doc);
-        (*ret).dict = xml_dict_create();
-        // The application has responsibility for the document
-        (*ret).preserve = 1;
-
-        ret
-    }
-}
-
-/// Free the resources associated to the schema parser context
-#[doc(alias = "xmlSchemaFreeParserCtxt")]
-pub unsafe fn xml_schema_free_parser_ctxt(ctxt: XmlSchemaParserCtxtPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        if let Some(doc) = (*ctxt).doc.filter(|_| (*ctxt).preserve == 0) {
-            xml_free_doc(doc);
-        }
-        if !(*ctxt).vctxt.is_null() {
-            xml_schema_free_valid_ctxt((*ctxt).vctxt);
-        }
-        if (*ctxt).owns_constructor != 0 && !(*ctxt).constructor.is_null() {
-            xml_schema_construction_ctxt_free((*ctxt).constructor);
-            (*ctxt).constructor = null_mut();
-            (*ctxt).owns_constructor = 0;
-        }
-        if !(*ctxt).attr_prohibs.is_null() {
-            xml_schema_item_list_free((*ctxt).attr_prohibs);
-        }
-        xml_dict_free((*ctxt).dict);
-        xml_free(ctxt as _);
-    }
-}
-
-/// Set the callback functions used to handle errors for a validation context
-#[doc(alias = "xmlSchemaSetParserErrors")]
-pub unsafe fn xml_schema_set_parser_errors(
-    ctxt: XmlSchemaParserCtxtPtr,
-    err: Option<GenericError>,
-    warn: Option<GenericError>,
-    ctx: Option<GenericErrorContext>,
-) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        (*ctxt).error = err;
-        (*ctxt).warning = warn;
-        (*ctxt).err_ctxt = ctx.clone();
-        if !(*ctxt).vctxt.is_null() {
-            xml_schema_set_valid_errors((*ctxt).vctxt, err, warn, ctx);
-        }
-    }
-}
-
-/// Set the structured error callback
-#[doc(alias = "xmlSchemaSetParserStructuredErrors")]
-pub unsafe fn xml_schema_set_parser_structured_errors(
-    ctxt: XmlSchemaParserCtxtPtr,
-    serror: Option<StructuredError>,
-    ctx: Option<GenericErrorContext>,
-) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        (*ctxt).serror = serror;
-        (*ctxt).err_ctxt = ctx.clone();
-        if !(*ctxt).vctxt.is_null() {
-            xml_schema_set_valid_structured_errors((*ctxt).vctxt, serror, ctx);
-        }
-    }
-}
-
-/// Get the callback information used to handle errors for a parser context
-///
-/// Returns -1 in case of failure, 0 otherwise
-#[doc(alias = "xmlSchemaGetParserErrors")]
-pub unsafe fn xml_schema_get_parser_errors(
-    ctxt: XmlSchemaParserCtxtPtr,
-    err: *mut Option<GenericError>,
-    warn: *mut Option<GenericError>,
-    ctx: *mut Option<GenericErrorContext>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return -1;
-        }
-        if !err.is_null() {
-            *err = (*ctxt).error;
-        }
-        if !warn.is_null() {
-            *warn = (*ctxt).warning;
-        }
-        if !ctx.is_null() {
-            *ctx = (*ctxt).err_ctxt.clone();
-        }
-        0
     }
 }
 
@@ -2963,7 +2721,7 @@ unsafe fn xml_schema_redef_list_free(mut redef: XmlSchemaRedefPtr) {
     }
 }
 
-unsafe fn xml_schema_construction_ctxt_free(con: XmlSchemaConstructionCtxtPtr) {
+pub(crate) unsafe fn xml_schema_construction_ctxt_free(con: XmlSchemaConstructionCtxtPtr) {
     unsafe {
         // After the construction context has been freed, there will be
         // no schema graph available any more. Only the schema buckets
@@ -5111,17 +4869,8 @@ unsafe fn xml_schema_parse_new_doc(
         // TODO: Can we avoid that the parser knows about the main schema?
         // It would be better if he knows about the current schema bucket only.
         (*newpctxt).schema = schema;
-        xml_schema_set_parser_errors(
-            newpctxt,
-            (*pctxt).error,
-            (*pctxt).warning,
-            (*pctxt).err_ctxt.clone(),
-        );
-        xml_schema_set_parser_structured_errors(
-            newpctxt,
-            (*pctxt).serror,
-            (*pctxt).err_ctxt.clone(),
-        );
+        (*newpctxt).set_errors((*pctxt).error, (*pctxt).warning, (*pctxt).err_ctxt.clone());
+        (*newpctxt).set_structured_errors((*pctxt).serror, (*pctxt).err_ctxt.clone());
         (*newpctxt).counter = (*pctxt).counter;
 
         let res: i32 = xml_schema_parse_new_doc_with_context(newpctxt, schema, bucket);
@@ -10419,7 +10168,7 @@ unsafe fn xml_schema_parse_simple_type(
                 return null_mut();
             }
             // Skip built-in types.
-            if (*ctxt).is_s4_s != 0 {
+            if (*ctxt).is_s4s != 0 {
                 if (*ctxt).is_redefine != 0 {
                     // REDEFINE: Disallow redefinition of built-in-types.
                     // TODO: It seems that the spec does not say anything
@@ -11963,7 +11712,7 @@ unsafe fn xml_schema_parse_new_doc_with_context(
             && xml_str_equal((*bucket).target_namespace, XML_SCHEMA_NS.as_ptr() as _)
         {
             // We are parsing the schema for schemas!
-            (*pctxt).is_s4_s = 1;
+            (*pctxt).is_s4s = 1;
         }
         // Mark it as parsed, even if parsing fails.
         (*bucket).parsed += 1;
@@ -20966,7 +20715,7 @@ pub unsafe fn xml_schema_set_valid_errors(
         (*ctxt).warning = warn;
         (*ctxt).err_ctxt = ctx.clone();
         if !(*ctxt).pctxt.is_null() {
-            xml_schema_set_parser_errors((*ctxt).pctxt, err, warn, ctx);
+            (*(*ctxt).pctxt).set_errors(err, warn, ctx);
         }
     }
 }
@@ -20987,7 +20736,7 @@ pub unsafe fn xml_schema_set_valid_structured_errors(
         (*ctxt).warning = None;
         (*ctxt).err_ctxt = ctx.clone();
         if !(*ctxt).pctxt.is_null() {
-            xml_schema_set_parser_structured_errors((*ctxt).pctxt, serror, ctx);
+            (*(*ctxt).pctxt).set_structured_errors(serror, ctx);
         }
     }
 }
@@ -21478,17 +21227,12 @@ unsafe fn xml_schema_create_pctxt_on_vctxt(vctxt: XmlSchemaValidCtxtPtr) -> i32 
                 return -1;
             }
             // TODO: Pass user data.
-            xml_schema_set_parser_errors(
-                (*vctxt).pctxt,
+            (*(*vctxt).pctxt).set_errors(
                 (*vctxt).error,
                 (*vctxt).warning,
                 (*vctxt).err_ctxt.clone(),
             );
-            xml_schema_set_parser_structured_errors(
-                (*vctxt).pctxt,
-                (*vctxt).serror,
-                (*vctxt).err_ctxt.clone(),
-            );
+            (*(*vctxt).pctxt).set_structured_errors((*vctxt).serror, (*vctxt).err_ctxt.clone());
         }
         0
     }
@@ -27855,7 +27599,10 @@ pub unsafe fn xml_schema_validate_set_locator(
 
 #[cfg(test)]
 mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
+    use crate::{
+        globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*,
+        xmlschemas::context::xml_schema_new_mem_parser_ctxt,
+    };
 
     use super::*;
 

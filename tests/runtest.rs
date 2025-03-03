@@ -3488,13 +3488,14 @@ unsafe fn schemas_test(
     _errr: Option<String>,
     options: i32,
 ) -> i32 {
+    use exml::xmlschemas::context::{
+        XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+    };
+
     unsafe {
         use std::mem::zeroed;
 
-        use exml::libxml::xmlschemas::{
-            XmlSchemaParserCtxtPtr, xml_schema_free, xml_schema_free_parser_ctxt,
-            xml_schema_new_parser_ctxt, xml_schema_parse, xml_schema_set_parser_errors,
-        };
+        use exml::libxml::xmlschemas::{xml_schema_free, xml_schema_parse};
         use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
         let cfilename = CString::new(filename).unwrap();
@@ -3512,8 +3513,7 @@ unsafe fn schemas_test(
 
         // first compile the schemas if possible
         let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(cfilename.as_ptr());
-        xml_schema_set_parser_errors(
-            ctxt,
+        (*ctxt).set_errors(
             Some(test_error_handler),
             Some(test_error_handler),
             Some(GenericErrorContext::new(ctxt)),
