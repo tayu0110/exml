@@ -121,7 +121,7 @@ use crate::{
             xml_schema_validate_facet_whtsp, xml_schema_validate_length_facet_whtsp,
             xml_schema_validate_list_simple_type_facet, xml_schema_value_append,
             xml_schema_value_get_as_boolean, xml_schema_value_get_as_string,
-            xml_schema_value_get_next, xml_schema_white_space_replace,
+            xml_schema_value_get_next,
         },
         xmlstring::{
             XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
@@ -171,7 +171,7 @@ use crate::{
         wxs_is_any_simple_type, wxs_is_anytype, wxs_is_atomic, wxs_is_complex, wxs_is_extension,
         wxs_is_list, wxs_is_restriction, wxs_is_simple, wxs_is_union,
     },
-    xmlschemastypes::xml_schema_collapse_string,
+    xmlschemastypes::{xml_schema_collapse_string, xml_schema_white_space_replace},
 };
 
 /// This error codes are obsolete; not used any more.
@@ -1165,7 +1165,14 @@ unsafe fn xml_schema_normalize_value(typ: XmlSchemaTypePtr, value: *const XmlCha
                 })
             }
             Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace) => {
-                xml_schema_white_space_replace(value)
+                xml_schema_white_space_replace(
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                )
+                .map_or(null_mut(), |res| {
+                    xml_strndup(res.as_ptr(), res.len() as i32)
+                })
             }
             _ => null_mut(),
         }
@@ -1493,7 +1500,14 @@ unsafe fn xml_schema_get_canon_value_whtsp_ext_1(
                                 xml_strndup(res.as_ptr(), res.len() as i32)
                             });
                         } else if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
-                            value2 = xml_schema_white_space_replace(value);
+                            value2 = xml_schema_white_space_replace(
+                                CStr::from_ptr(value as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            )
+                            .map_or(null_mut(), |res| {
+                                xml_strndup(res.as_ptr(), res.len() as i32)
+                            });
                         }
                         if !value2.is_null() {
                             value = value2;

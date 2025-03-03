@@ -51,3 +51,14 @@ pub fn xml_schema_collapse_string(value: &str) -> Option<Cow<'_, str>> {
         });
     Some(Cow::Owned(res))
 }
+
+/// Replaces 0xd, 0x9 and 0xa with a space.
+///
+/// Returns the new string or NULL if no change was required.
+#[doc(alias = "xmlSchemaWhiteSpaceReplace")]
+pub fn xml_schema_white_space_replace(value: &str) -> Option<String> {
+    if !value.contains(['\x0D', '\x09', '\x0A']) {
+        return None;
+    }
+    Some(value.replace(['\x0D', '\x09', '\x0A'], " "))
+}
