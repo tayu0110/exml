@@ -36,7 +36,7 @@ macro_rules! impl_xml_schema_item {
         $(, @self: $self:tt )?
         $(, @expected: $( $expected:pat )+ )?
         $(, @fallback_name: $( $fallback_name:pat => $fname_block:block )+ )?
-        $(, @fallback: $( $fallback:pat => $fns_block:block )+ )?
+        $(, @fallback_ns: $( $fallback_ns:pat => $fns_block:block )+ )?
     } => {
         impl XmlSchemaItem for $t {
             fn name(&self) -> Option<Cow<'static, str>> {
@@ -72,7 +72,7 @@ macro_rules! impl_xml_schema_item {
                     XmlSchemaTypeType::XmlSchemaTypeBasic => {
                         Some("http://www.w3.org/2001/XMLSchema".into())
                     }
-                    $($( $fallback => $fns_block )+)?
+                    $($( $fallback_ns => $fns_block )+)?
                     _ => {
                         unreachable!("Unexpected schema item type: {:?}", self.typ);
                     }
@@ -302,7 +302,7 @@ pub struct XmlSchemaAnnotItem {
 impl_xml_schema_item! {
     type: XmlSchemaAnnotItem,
     @fallback_name: _ => { None },
-    @fallback: _ => { None }
+    @fallback_ns: _ => { None }
 }
 
 /// The abstract base type for tree-like structured schema components.
@@ -321,7 +321,7 @@ pub struct XmlSchemaTreeItem {
 impl_xml_schema_item! {
     type: XmlSchemaTreeItem,
     @fallback_name: _ => { None },
-    @fallback: _ => { None }
+    @fallback_ns: _ => { None }
 }
 
 /// The abstract base type for tree-like structured schema components.
@@ -359,7 +359,7 @@ impl_xml_schema_item! {
                 None
             }
         },
-    @fallback:
+    @fallback_ns:
         XmlSchemaTypeType::XmlSchemaTypeAttributeUse => {
             let decl = item.attr_decl;
             if !decl.is_null() {
@@ -401,7 +401,7 @@ impl Default for XmlSchemaAttributeUseProhib {
 impl_xml_schema_item! {
     type: XmlSchemaAttributeUseProhib
     // @fallback_name: _ => { None },
-    // @fallback: _ => { None }
+    // @fallback_ns: _ => { None }
 }
 
 /// Deallocates an attribute use structure.
@@ -456,7 +456,7 @@ pub struct XmlSchemaParticle {
 impl_xml_schema_item! {
     type: XmlSchemaParticle,
     @fallback_name: _ => { None },
-    @fallback: _ => { None }
+    @fallback_ns: _ => { None }
 }
 
 #[doc(alias = "xmlSchemaModelGroupPtr")]
@@ -476,7 +476,7 @@ pub struct XmlSchemaModelGroup {
 impl_xml_schema_item! {
     type: XmlSchemaModelGroup,
     @fallback_name: _ => { None },
-    @fallback: _ => { None }
+    @fallback_ns: _ => { None }
 }
 
 #[doc(alias = "xmlSchemaModelGroupDefPtr")]

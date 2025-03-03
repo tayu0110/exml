@@ -22505,18 +22505,17 @@ unsafe fn xml_schema_get_canon_value_hash(
 
 unsafe fn xml_schema_format_idc_key_sequence_1(
     vctxt: XmlSchemaValidCtxtPtr,
-    buf: *mut *mut XmlChar,
     seq: *mut XmlSchemaPSVIIDCKeyPtr,
     count: i32,
     for_hash: i32,
-) -> *const XmlChar {
+) -> String {
     unsafe {
         let mut res: i32;
         let mut value: *mut XmlChar = null_mut();
 
-        *buf = xml_strdup(c"[".as_ptr() as _);
+        let mut buf = "[".to_owned();
         for i in 0..count {
-            *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+            buf.push('\'');
             if for_hash == 0 {
                 res = xml_schema_get_canon_value_whtsp_ext(
                     (*(*seq.add(i as usize))).val,
@@ -22530,47 +22529,48 @@ unsafe fn xml_schema_format_idc_key_sequence_1(
                     xml_schema_get_canon_value_hash((*(*seq.add(i as usize))).val, &raw mut value);
             }
             if res == 0 {
-                *buf = xml_strcat(*buf, value);
+                buf.push_str(
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             } else {
                 VERROR_INT!(
                     vctxt,
                     "xmlSchemaFormatIDCKeySequence",
                     "failed to compute a canonical value"
                 );
-                *buf = xml_strcat(*buf, c"???".as_ptr() as _);
+                buf.push_str("???");
             }
             if i < count - 1 {
-                *buf = xml_strcat(*buf, c"', ".as_ptr() as _);
+                buf.push_str("', ");
             } else {
-                *buf = xml_strcat(*buf, c"'".as_ptr() as _);
+                buf.push('\'');
             }
             if !value.is_null() {
                 xml_free(value as _);
                 value = null_mut();
             }
         }
-        *buf = xml_strcat(*buf, c"]".as_ptr() as _);
-
-        *buf
+        buf.push(']');
+        buf
     }
 }
 
 unsafe fn xml_schema_hash_key_sequence(
     vctxt: XmlSchemaValidCtxtPtr,
-    buf: *mut *mut XmlChar,
     seq: *mut XmlSchemaPSVIIDCKeyPtr,
     count: i32,
-) -> *const XmlChar {
-    unsafe { xml_schema_format_idc_key_sequence_1(vctxt, buf, seq, count, 1) }
+) -> String {
+    unsafe { xml_schema_format_idc_key_sequence_1(vctxt, seq, count, 1) }
 }
 
 unsafe fn xml_schema_format_idc_key_sequence(
     vctxt: XmlSchemaValidCtxtPtr,
-    buf: *mut *mut XmlChar,
     seq: *mut XmlSchemaPSVIIDCKeyPtr,
     count: i32,
-) -> *const XmlChar {
-    unsafe { xml_schema_format_idc_key_sequence_1(vctxt, buf, seq, count, 0) }
+) -> String {
+    unsafe { xml_schema_format_idc_key_sequence_1(vctxt, seq, count, 0) }
 }
 
 /// The validation context is used to store IDC node table items.
@@ -22965,15 +22965,14 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                                 if (*matcher).htab.is_null() {
                                     e = null_mut();
                                 } else {
-                                    let mut value: *mut XmlChar = null_mut();
-                                    xml_schema_hash_key_sequence(
-                                        vctxt,
-                                        &raw mut value,
-                                        *key_seq,
-                                        nb_keys,
-                                    );
-                                    e = xml_hash_lookup((*matcher).htab, value) as _;
-                                    FREE_AND_NULL!(value);
+                                    let value = CString::new(xml_schema_hash_key_sequence(
+                                        vctxt, *key_seq, nb_keys,
+                                    ))
+                                    .unwrap();
+                                    e = xml_hash_lookup(
+                                        (*matcher).htab,
+                                        value.as_ptr() as *const u8,
+                                    ) as _;
                                 }
 
                                 // Compare the key-sequences, key by key.
@@ -23000,15 +22999,9 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                                     e = (*e).next;
                                 }
                                 if !e.is_null() {
-                                    let mut str: *mut XmlChar = null_mut();
-                                    let seq = CStr::from_ptr(xml_schema_format_idc_key_sequence(
-                                        vctxt,
-                                        &raw mut str,
-                                        *key_seq,
-                                        nb_keys,
-                                    )
-                                        as *const i8)
-                                    .to_string_lossy();
+                                    let seq = xml_schema_format_idc_key_sequence(
+                                        vctxt, *key_seq, nb_keys,
+                                    );
                                     let desig = xml_schema_get_idc_designation(idc);
                                     // TODO: Try to report the key-sequence.
                                     xml_schema_custom_err(
@@ -23020,7 +23013,6 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                                         Some(&seq),
                                         Some(&desig),
                                     );
-                                    FREE_AND_NULL!(str);
                                     break 'selector_leave;
                                 }
                             }
@@ -23070,9 +23062,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                             (*nt_item).node_line = (*(*vctxt).inode).node_line;
                             (*nt_item).keys = *key_seq;
                             *key_seq = null_mut();
-                            // #if 0
-                            //     if (xmlSchemaIDCAppendNodeTableItem(bind, ntItem) == -1) {
-                            // #endif}
+
                             if xml_schema_item_list_add(targets, nt_item as _) == -1 {
                                 if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
                                     // Free the item, since keyref items won't be
@@ -23083,30 +23073,32 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                                 return -1;
                             }
                             if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
-                                let mut value: *mut XmlChar = null_mut();
-
                                 if (*matcher).htab.is_null() {
                                     (*matcher).htab = xml_hash_create(4);
                                 }
-                                xml_schema_hash_key_sequence(
+                                let value = CString::new(xml_schema_hash_key_sequence(
                                     vctxt,
-                                    &raw mut value,
                                     (*nt_item).keys,
                                     nb_keys,
-                                );
+                                ))
+                                .unwrap();
                                 let e: XmlIDCHashEntryPtr =
                                     xml_malloc(size_of::<XmlIDCHashEntry>()) as _;
                                 (*e).index = (*targets).nb_items - 1;
                                 let r: XmlIDCHashEntryPtr =
-                                    xml_hash_lookup((*matcher).htab, value) as _;
+                                    xml_hash_lookup((*matcher).htab, value.as_ptr() as *const u8)
+                                        as _;
                                 if !r.is_null() {
                                     (*e).next = (*r).next;
                                     (*r).next = e;
                                 } else {
                                     (*e).next = null_mut();
-                                    xml_hash_add_entry((*matcher).htab, value, e as _);
+                                    xml_hash_add_entry(
+                                        (*matcher).htab,
+                                        value.as_ptr() as *const u8,
+                                        e as _,
+                                    );
                                 }
-                                FREE_AND_NULL!(value);
                             }
 
                             break 'selector_leave;
@@ -24681,33 +24673,33 @@ unsafe fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtPtr) -> i32 
                 if !bind.is_null() {
                     table = xml_hash_create((*bind).nb_nodes * 2);
                     for j in 0..(*bind).nb_nodes {
-                        let mut value: *mut XmlChar = null_mut();
-
                         keys = (*(*(*bind).node_table.add(j as usize))).keys;
-                        xml_schema_hash_key_sequence(vctxt, &raw mut value, keys, nb_fields);
+                        let value =
+                            CString::new(xml_schema_hash_key_sequence(vctxt, keys, nb_fields))
+                                .unwrap();
                         let e: XmlIDCHashEntryPtr = xml_malloc(size_of::<XmlIDCHashEntry>()) as _;
                         (*e).index = j;
-                        let r: XmlIDCHashEntryPtr = xml_hash_lookup(table, value) as _;
+                        let r: XmlIDCHashEntryPtr =
+                            xml_hash_lookup(table, value.as_ptr() as *const u8) as _;
                         if !r.is_null() {
                             (*e).next = (*r).next;
                             (*r).next = e;
                         } else {
                             (*e).next = null_mut();
-                            xml_hash_add_entry(table, value, e as _);
+                            xml_hash_add_entry(table, value.as_ptr() as *const u8, e as _);
                         }
-                        FREE_AND_NULL!(value);
                     }
                 }
                 for i in 0..(*(*matcher).targets).nb_items {
                     res = 0;
                     ref_node = *(*(*matcher).targets).items.add(i as usize) as _;
                     if !bind.is_null() {
-                        let mut value: *mut XmlChar = null_mut();
                         let mut e: XmlIDCHashEntryPtr;
                         ref_keys = (*ref_node).keys;
-                        xml_schema_hash_key_sequence(vctxt, &raw mut value, ref_keys, nb_fields);
-                        e = xml_hash_lookup(table, value) as _;
-                        FREE_AND_NULL!(value);
+                        let value =
+                            CString::new(xml_schema_hash_key_sequence(vctxt, ref_keys, nb_fields))
+                                .unwrap();
+                        e = xml_hash_lookup(table, value.as_ptr() as *const u8) as _;
                         res = 0;
                         while !e.is_null() {
                             keys = (*(*(*bind).node_table.add((*e).index as usize))).keys;
@@ -24747,15 +24739,11 @@ unsafe fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtPtr) -> i32 
                                 }
                                 if res == 1 {
                                     // Match in duplicates found.
-                                    let mut str: *mut XmlChar = null_mut();
-                                    let seq = CStr::from_ptr(xml_schema_format_idc_key_sequence(
+                                    let seq = xml_schema_format_idc_key_sequence(
                                         vctxt,
-                                        &raw mut str,
                                         (*ref_node).keys,
                                         nb_fields,
-                                    )
-                                        as *const i8)
-                                    .to_string_lossy();
+                                    );
                                     let qname =
                                         xml_schema_get_component_qname((*(*matcher).aidc).def as _);
 
@@ -24768,7 +24756,6 @@ unsafe fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtPtr) -> i32 
                                         Some(&seq),
                                         Some(&qname),
                                     );
-                                    FREE_AND_NULL!(str);
                                     break;
                                 }
                             }
@@ -24776,14 +24763,8 @@ unsafe fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtPtr) -> i32 
                     }
 
                     if res == 0 {
-                        let mut str: *mut XmlChar = null_mut();
-                        let seq = CStr::from_ptr(xml_schema_format_idc_key_sequence(
-                            vctxt,
-                            &raw mut str,
-                            (*ref_node).keys,
-                            nb_fields,
-                        ) as *const i8)
-                        .to_string_lossy();
+                        let seq =
+                            xml_schema_format_idc_key_sequence(vctxt, (*ref_node).keys, nb_fields);
                         let qname = xml_schema_get_component_qname((*(*matcher).aidc).def as _);
 
                         xml_schema_keyref_err(
@@ -24796,7 +24777,6 @@ unsafe fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtPtr) -> i32 
                             Some(&seq),
                             Some(&qname),
                         );
-                        FREE_AND_NULL!(str);
                     }
                 }
                 if !table.is_null() {
