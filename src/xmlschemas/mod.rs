@@ -53,6 +53,6 @@ pub(crate) unsafe fn wxs_is_complex(r#type: *mut XmlSchemaType) -> bool {
 pub(crate) unsafe fn wxs_is_any_simple_type(r#type: *mut XmlSchemaType) -> bool {
     unsafe {
         (*r#type).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
-            && (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
+            && (*r#type).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
     }
 }

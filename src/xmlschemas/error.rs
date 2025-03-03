@@ -373,7 +373,7 @@ unsafe fn xml_schema_format_item_for_report(
                     );
                     res.push('\'');
                 }
-                XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+                XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                     res.push_str(xml_schema_get_component_designation(item as _).as_str());
                 }
                 XmlSchemaTypeType::XmlSchemaTypeElement => {
@@ -421,18 +421,18 @@ unsafe fn xml_schema_format_item_for_report(
                     res.push_str(s);
                     res.push_str(" wildcard");
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMininclusive
-                | XmlSchemaTypeType::XmlSchemaFacetMinexclusive
-                | XmlSchemaTypeType::XmlSchemaFacetMaxinclusive
-                | XmlSchemaTypeType::XmlSchemaFacetMaxexclusive
-                | XmlSchemaTypeType::XmlSchemaFacetTotaldigits
-                | XmlSchemaTypeType::XmlSchemaFacetFractiondigits
+                XmlSchemaTypeType::XmlSchemaFacetMinInclusive
+                | XmlSchemaTypeType::XmlSchemaFacetMinExclusive
+                | XmlSchemaTypeType::XmlSchemaFacetMaxInclusive
+                | XmlSchemaTypeType::XmlSchemaFacetMaxExclusive
+                | XmlSchemaTypeType::XmlSchemaFacetTotalDigits
+                | XmlSchemaTypeType::XmlSchemaFacetFractionDigits
                 | XmlSchemaTypeType::XmlSchemaFacetPattern
                 | XmlSchemaTypeType::XmlSchemaFacetEnumeration
                 | XmlSchemaTypeType::XmlSchemaFacetWhitespace
                 | XmlSchemaTypeType::XmlSchemaFacetLength
-                | XmlSchemaTypeType::XmlSchemaFacetMaxlength
-                | XmlSchemaTypeType::XmlSchemaFacetMinlength => {
+                | XmlSchemaTypeType::XmlSchemaFacetMaxLength
+                | XmlSchemaTypeType::XmlSchemaFacetMinLength => {
                     res.push_str("facet '");
                     let s = xml_schema_facet_type_to_string((*item).typ);
                     res.push_str(s);
@@ -1035,8 +1035,8 @@ pub(crate) unsafe fn xml_schema_facet_err(
             if matches!(
                 facet_type,
                 XmlSchemaTypeType::XmlSchemaFacetLength
-                    | XmlSchemaTypeType::XmlSchemaFacetMinlength
-                    | XmlSchemaTypeType::XmlSchemaFacetMaxlength
+                    | XmlSchemaTypeType::XmlSchemaFacetMinLength
+                    | XmlSchemaTypeType::XmlSchemaFacetMaxLength
             ) {
                 let len = xml_schema_get_facet_value_as_ulong(facet).to_string();
                 let act_len = length.to_string();
@@ -1054,11 +1054,11 @@ pub(crate) unsafe fn xml_schema_facet_err(
                     msg.push_str(
                         format!("this differs from the allowed length of '{len}'.\n").as_str(),
                     );
-                } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxlength {
+                } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxLength {
                     msg.push_str(
                         format!("this exceeds the allowed maximum length of '{len}'.\n").as_str(),
                     );
-                } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMinlength {
+                } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMinLength {
                     msg.push_str(
                         format!("this underruns the allowed minimum length of '{len}'.\n").as_str(),
                     );
@@ -1101,7 +1101,7 @@ pub(crate) unsafe fn xml_schema_facet_err(
                     Some(value),
                     Some(&facet_value),
                 );
-            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMininclusive {
+            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMinInclusive {
                 let facet_value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
                 msg.push_str(
                 format!("The value '{value}' is less than the minimum value allowed ('{facet_value}').\n")
@@ -1115,7 +1115,7 @@ pub(crate) unsafe fn xml_schema_facet_err(
                     Some(value),
                     Some(&facet_value),
                 );
-            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxinclusive {
+            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxInclusive {
                 let facet_value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
                 msg.push_str(
                 format!("The value '{value}' is greater than the maximum value allowed ('{facet_value}').\n")
@@ -1129,7 +1129,7 @@ pub(crate) unsafe fn xml_schema_facet_err(
                     Some(value),
                     Some(&facet_value),
                 );
-            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMinexclusive {
+            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMinExclusive {
                 let facet_value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
                 msg.push_str(
                     format!("The value '{value}' must be greater than '{facet_value}'.\n").as_str(),
@@ -1142,7 +1142,7 @@ pub(crate) unsafe fn xml_schema_facet_err(
                     Some(value),
                     Some(&facet_value),
                 );
-            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxexclusive {
+            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxExclusive {
                 let facet_value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
                 msg.push_str(
                     format!("The value '{value}' must be less than '{facet_value}'.\n").as_str(),
@@ -1155,7 +1155,7 @@ pub(crate) unsafe fn xml_schema_facet_err(
                     Some(value),
                     Some(&facet_value),
                 );
-            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
+            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetTotalDigits {
                 let facet_value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
                 msg.push_str(
                     format!(
@@ -1171,7 +1171,7 @@ pub(crate) unsafe fn xml_schema_facet_err(
                     Some(value),
                     Some(&facet_value),
                 );
-            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetFractiondigits {
+            } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetFractionDigits {
                 let facet_value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
                 msg.push_str(
                 format!(

@@ -352,17 +352,17 @@ unsafe fn xml_relaxng_schema_facet_check(
         }
 
         if facetname == "minInclusive" {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMininclusive;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinInclusive;
         } else if facetname == "minExclusive" {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinexclusive;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinExclusive;
         } else if facetname == "maxInclusive" {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxinclusive;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxInclusive;
         } else if facetname == "maxExclusive" {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxexclusive;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxExclusive;
         } else if facetname == "totalDigits" {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetTotaldigits;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetTotalDigits;
         } else if facetname == "fractionDigits" {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetFractiondigits;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetFractionDigits;
         } else if facetname == "pattern" {
             (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetPattern;
         } else if facetname == "enumeration" {
@@ -372,9 +372,9 @@ unsafe fn xml_relaxng_schema_facet_check(
         } else if facetname == "length" {
             (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetLength;
         } else if facetname == "maxLength" {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxlength;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxLength;
         } else if facetname == "minLength" {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinlength;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinLength;
         } else {
             xml_schema_free_facet(facet);
             return -1;

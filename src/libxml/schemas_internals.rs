@@ -39,14 +39,14 @@ use super::{
 pub enum XmlSchemaValType {
     XmlSchemasUnknown = 0,
     XmlSchemasString = 1,
-    XmlSchemasNormstring = 2,
+    XmlSchemasNormString = 2,
     XmlSchemasDecimal = 3,
     XmlSchemasTime = 4,
-    XmlSchemasGday = 5,
-    XmlSchemasGmonth = 6,
-    XmlSchemasGmonthday = 7,
-    XmlSchemasGyear = 8,
-    XmlSchemasGyearmonth = 9,
+    XmlSchemasGDay = 5,
+    XmlSchemasGMonth = 6,
+    XmlSchemasGMonthDay = 7,
+    XmlSchemasGYear = 8,
+    XmlSchemasGYearMonth = 9,
     XmlSchemasDate = 10,
     XmlSchemasDatetime = 11,
     XmlSchemasDuration = 12,
@@ -58,8 +58,8 @@ pub enum XmlSchemaValType {
     XmlSchemasNmtoken = 18,
     XmlSchemasNmtokens = 19,
     XmlSchemasName = 20,
-    XmlSchemasQname = 21,
-    XmlSchemasNcname = 22,
+    XmlSchemasQName = 21,
+    XmlSchemasNCName = 22,
     XmlSchemasID = 23,
     XmlSchemasIDREF = 24,
     XmlSchemasIDREFS = 25,
@@ -83,7 +83,7 @@ pub enum XmlSchemaValType {
     XmlSchemasHexbinary = 43,
     XmlSchemasBase64binary = 44,
     XmlSchemasAnytype = 45,
-    XmlSchemasAnysimpletype = 46,
+    XmlSchemasAnySimpletype = 46,
 }
 
 impl PartialEq<i32> for XmlSchemaValType {
@@ -99,22 +99,22 @@ impl TryFrom<i32> for XmlSchemaValType {
             Ok(Self::XmlSchemasUnknown)
         } else if value == Self::XmlSchemasString as i32 {
             Ok(Self::XmlSchemasString)
-        } else if value == Self::XmlSchemasNormstring as i32 {
-            Ok(Self::XmlSchemasNormstring)
+        } else if value == Self::XmlSchemasNormString as i32 {
+            Ok(Self::XmlSchemasNormString)
         } else if value == Self::XmlSchemasDecimal as i32 {
             Ok(Self::XmlSchemasDecimal)
         } else if value == Self::XmlSchemasTime as i32 {
             Ok(Self::XmlSchemasTime)
-        } else if value == Self::XmlSchemasGday as i32 {
-            Ok(Self::XmlSchemasGday)
-        } else if value == Self::XmlSchemasGmonth as i32 {
-            Ok(Self::XmlSchemasGmonth)
-        } else if value == Self::XmlSchemasGmonthday as i32 {
-            Ok(Self::XmlSchemasGmonthday)
-        } else if value == Self::XmlSchemasGyear as i32 {
-            Ok(Self::XmlSchemasGyear)
-        } else if value == Self::XmlSchemasGyearmonth as i32 {
-            Ok(Self::XmlSchemasGyearmonth)
+        } else if value == Self::XmlSchemasGDay as i32 {
+            Ok(Self::XmlSchemasGDay)
+        } else if value == Self::XmlSchemasGMonth as i32 {
+            Ok(Self::XmlSchemasGMonth)
+        } else if value == Self::XmlSchemasGMonthDay as i32 {
+            Ok(Self::XmlSchemasGMonthDay)
+        } else if value == Self::XmlSchemasGYear as i32 {
+            Ok(Self::XmlSchemasGYear)
+        } else if value == Self::XmlSchemasGYearMonth as i32 {
+            Ok(Self::XmlSchemasGYearMonth)
         } else if value == Self::XmlSchemasDate as i32 {
             Ok(Self::XmlSchemasDate)
         } else if value == Self::XmlSchemasDatetime as i32 {
@@ -137,10 +137,10 @@ impl TryFrom<i32> for XmlSchemaValType {
             Ok(Self::XmlSchemasNmtokens)
         } else if value == Self::XmlSchemasName as i32 {
             Ok(Self::XmlSchemasName)
-        } else if value == Self::XmlSchemasQname as i32 {
-            Ok(Self::XmlSchemasQname)
-        } else if value == Self::XmlSchemasNcname as i32 {
-            Ok(Self::XmlSchemasNcname)
+        } else if value == Self::XmlSchemasQName as i32 {
+            Ok(Self::XmlSchemasQName)
+        } else if value == Self::XmlSchemasNCName as i32 {
+            Ok(Self::XmlSchemasNCName)
         } else if value == Self::XmlSchemasID as i32 {
             Ok(Self::XmlSchemasID)
         } else if value == Self::XmlSchemasIDREF as i32 {
@@ -187,8 +187,8 @@ impl TryFrom<i32> for XmlSchemaValType {
             Ok(Self::XmlSchemasBase64binary)
         } else if value == Self::XmlSchemasAnytype as i32 {
             Ok(Self::XmlSchemasAnytype)
-        } else if value == Self::XmlSchemasAnysimpletype as i32 {
-            Ok(Self::XmlSchemasAnysimpletype)
+        } else if value == Self::XmlSchemasAnySimpletype as i32 {
+            Ok(Self::XmlSchemasAnySimpletype)
         } else {
             Err(anyhow::anyhow!(
                 "Invalid convert from value '{value}' to {}",
@@ -198,7 +198,8 @@ impl TryFrom<i32> for XmlSchemaValType {
     }
 }
 
-// XML Schemas defines multiple type of types.
+/// XML Schemas defines multiple type of types.
+#[doc(alias = "xmlSchemaTypeType")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlSchemaTypeType {
@@ -217,7 +218,7 @@ pub enum XmlSchemaTypeType {
     XmlSchemaTypeExtension,
     XmlSchemaTypeElement,
     XmlSchemaTypeAttribute,
-    XmlSchemaTypeAttributegroup,
+    XmlSchemaTypeAttributeGroup,
     XmlSchemaTypeGroup,
     XmlSchemaTypeNotation,
     XmlSchemaTypeList,
@@ -228,19 +229,19 @@ pub enum XmlSchemaTypeType {
     XmlSchemaTypeIDCKeyref,
     XmlSchemaTypeParticle = 25,
     XmlSchemaTypeAttributeUse,
-    XmlSchemaFacetMininclusive = 1000,
-    XmlSchemaFacetMinexclusive,
-    XmlSchemaFacetMaxinclusive,
-    XmlSchemaFacetMaxexclusive,
-    XmlSchemaFacetTotaldigits,
-    XmlSchemaFacetFractiondigits,
+    XmlSchemaFacetMinInclusive = 1000,
+    XmlSchemaFacetMinExclusive,
+    XmlSchemaFacetMaxInclusive,
+    XmlSchemaFacetMaxExclusive,
+    XmlSchemaFacetTotalDigits,
+    XmlSchemaFacetFractionDigits,
     XmlSchemaFacetPattern,
     XmlSchemaFacetEnumeration,
     XmlSchemaFacetWhitespace,
     XmlSchemaFacetLength,
-    XmlSchemaFacetMaxlength,
-    XmlSchemaFacetMinlength,
-    XmlSchemaExtraQnameref = 2000,
+    XmlSchemaFacetMaxLength,
+    XmlSchemaFacetMinLength,
+    XmlSchemaExtraQNameRef = 2000,
     XmlSchemaExtraAttrUseProhib,
 }
 

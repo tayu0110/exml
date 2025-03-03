@@ -20,6 +20,7 @@ use crate::{
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
     },
     tree::XmlNodePtr,
+    xmlschemastypes::{xml_schema_collapse_string, xml_schema_white_space_replace},
 };
 
 pub(crate) trait XmlSchemaItem {
@@ -114,7 +115,7 @@ impl XmlSchemaItem for XmlSchemaBasicItem {
                             .into()
                     })
                 }
-                XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+                XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                     let name = (*(item as XmlSchemaAttributeGroupPtr)).name;
                     (!name.is_null()).then(|| {
                         CStr::from_ptr(name as *const i8)
@@ -162,7 +163,7 @@ impl XmlSchemaItem for XmlSchemaBasicItem {
                         None
                     }
                 }
-                XmlSchemaTypeType::XmlSchemaExtraQnameref => {
+                XmlSchemaTypeType::XmlSchemaExtraQNameRef => {
                     let name = (*(item as XmlSchemaQnameRefPtr)).name;
                     (!name.is_null()).then(|| {
                         CStr::from_ptr(name as *const i8)
@@ -210,7 +211,7 @@ impl XmlSchemaItem for XmlSchemaBasicItem {
                             .into()
                     })
                 }
-                XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+                XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                     let ns = (*(item as XmlSchemaAttributeGroupPtr)).target_namespace;
                     (!ns.is_null()).then(|| {
                         CStr::from_ptr(ns as *const i8)
@@ -260,7 +261,7 @@ impl XmlSchemaItem for XmlSchemaBasicItem {
                     // TODO: Will returning NULL break something?
                     None
                 }
-                XmlSchemaTypeType::XmlSchemaExtraQnameref => {
+                XmlSchemaTypeType::XmlSchemaExtraQNameRef => {
                     let ns = (*(item as XmlSchemaQnameRefPtr)).target_namespace;
                     (!ns.is_null()).then(|| {
                         CStr::from_ptr(ns as *const i8)
@@ -431,7 +432,7 @@ pub struct XmlSchemaQnameRef {
 
 impl_xml_schema_item! {
     type: XmlSchemaQnameRef,
-    @expected: XmlSchemaTypeType::XmlSchemaExtraQnameref
+    @expected: XmlSchemaTypeType::XmlSchemaExtraQNameRef
 }
 
 #[doc(alias = "xmlSchemaParticlePtr")]
@@ -607,7 +608,7 @@ pub struct XmlSchemaAttributeGroup {
 
 impl_xml_schema_item! {
     type: XmlSchemaAttributeGroup,
-    @expected: XmlSchemaTypeType::XmlSchemaTypeAttributegroup
+    @expected: XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
 }
 
 pub type XmlSchemaTypePtr = *mut XmlSchemaType;
@@ -667,10 +668,10 @@ impl XmlSchemaType {
         if self.typ == XmlSchemaTypeType::XmlSchemaTypeBasic {
             // Note that we assume a whitespace of preserve for anySimpleType.
             if self.built_in_type == XmlSchemaValType::XmlSchemasString as i32
-                || self.built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
+                || self.built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
             {
                 Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve)
-            } else if self.built_in_type == XmlSchemaValType::XmlSchemasNormstring as i32 {
+            } else if self.built_in_type == XmlSchemaValType::XmlSchemasNormString as i32 {
                 Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace)
             } else {
                 // For all `atomic` datatypes other than string (and types `derived`
@@ -694,6 +695,19 @@ impl XmlSchemaType {
             }
         } else {
             None
+        }
+    }
+
+    #[doc(alias = "xmlSchemaNormalizeValue")]
+    pub(crate) fn normalize_value<'a>(&self, value: &'a str) -> Option<Cow<'a, str>> {
+        match self.white_space_facet_value() {
+            Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse) => {
+                xml_schema_collapse_string(value)
+            }
+            Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace) => {
+                xml_schema_white_space_replace(value).map(Cow::Owned)
+            }
+            _ => None,
         }
     }
 }

@@ -998,7 +998,7 @@ pub(crate) fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> &'static st
         XmlSchemaTypeType::XmlSchemaTypeAttributeUse => "attribute use",
         XmlSchemaTypeType::XmlSchemaTypeAttribute => "attribute declaration",
         XmlSchemaTypeType::XmlSchemaTypeGroup => "model group definition",
-        XmlSchemaTypeType::XmlSchemaTypeAttributegroup => "attribute group definition",
+        XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => "attribute group definition",
         XmlSchemaTypeType::XmlSchemaTypeNotation => "notation declaration",
         XmlSchemaTypeType::XmlSchemaTypeSequence => "model group (sequence)",
         XmlSchemaTypeType::XmlSchemaTypeChoice => "model group (choice)",
@@ -1017,7 +1017,7 @@ pub(crate) fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> &'static st
             // return ("IDC (keyref)");
         }
         XmlSchemaTypeType::XmlSchemaTypeAny => "wildcard (any)",
-        XmlSchemaTypeType::XmlSchemaExtraQnameref => "[helper component] QName reference",
+        XmlSchemaTypeType::XmlSchemaExtraQNameRef => "[helper component] QName reference",
         XmlSchemaTypeType::XmlSchemaExtraAttrUseProhib => {
             "[helper component] attribute use prohibition"
         }
@@ -1111,34 +1111,6 @@ macro_rules! AERROR_INT {
     };
 }
 
-unsafe fn xml_schema_normalize_value(typ: XmlSchemaTypePtr, value: *const XmlChar) -> *mut XmlChar {
-    unsafe {
-        match (*typ).white_space_facet_value() {
-            Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse) => {
-                xml_schema_collapse_string(
-                    CStr::from_ptr(value as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                )
-                .map_or(null_mut(), |res| {
-                    xml_strndup(res.as_ptr(), res.len() as i32)
-                })
-            }
-            Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace) => {
-                xml_schema_white_space_replace(
-                    CStr::from_ptr(value as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                )
-                .map_or(null_mut(), |res| {
-                    xml_strndup(res.as_ptr(), res.len() as i32)
-                })
-            }
-            _ => null_mut(),
-        }
-    }
-}
-
 /// Returns node associated with the schema component.
 /// NOTE that such a node need not be available; plus, a component's
 /// node need not to reflect the component directly, since there is no
@@ -1164,13 +1136,13 @@ pub(crate) unsafe fn xml_schema_get_component_node(
             XmlSchemaTypeType::XmlSchemaTypeGroup => {
                 Some((*(item as XmlSchemaModelGroupDefPtr)).node)
             }
-            XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+            XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                 (*(item as XmlSchemaAttributeGroupPtr)).node
             }
             XmlSchemaTypeType::XmlSchemaTypeIDCUnique
             | XmlSchemaTypeType::XmlSchemaTypeIDCKey
             | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => Some((*(item as XmlSchemaIDCPtr)).node),
-            XmlSchemaTypeType::XmlSchemaExtraQnameref => (*(item as XmlSchemaQnameRefPtr)).node,
+            XmlSchemaTypeType::XmlSchemaExtraQNameRef => (*(item as XmlSchemaQnameRefPtr)).node,
             // TODO: What to do with NOTATIONs?
             // XmlSchemaTypeType::XML_SCHEMA_TYPE_NOTATION:
             //     return ((*(item as xmlSchemaNotationPtr)).node);
@@ -1373,7 +1345,7 @@ unsafe fn xml_schema_validate_qname(
                 vctxt as XmlSchemaAbstractCtxtPtr,
                 XmlParserErrors::try_from(ret).unwrap(),
                 None,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname) as _,
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName) as _,
                 format!(
                     "The QName value '{value}' has no corresponding namespace declaration in scope"
                 )
@@ -1407,7 +1379,7 @@ unsafe fn xml_schema_get_primitive_type(mut typ: XmlSchemaTypePtr) -> XmlSchemaT
         while !typ.is_null() {
             // Note that anySimpleType is actually not a primitive type
             // but we need that here.
-            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
+            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
                 || (*typ).flags & XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE != 0
             {
                 return typ;
@@ -1446,8 +1418,8 @@ unsafe fn xml_schema_get_canon_value_whtsp_ext_1(
             val_type = xml_schema_get_val_type(val);
             match val_type {
                 XmlSchemaValType::XmlSchemasString
-                | XmlSchemaValType::XmlSchemasNormstring
-                | XmlSchemaValType::XmlSchemasAnysimpletype => {
+                | XmlSchemaValType::XmlSchemasNormString
+                | XmlSchemaValType::XmlSchemasAnySimpletype => {
                     value = xml_schema_value_get_as_string(val);
                     if !value.is_null() {
                         if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
@@ -1699,8 +1671,8 @@ unsafe fn xml_schema_validate_facets(
                                 break 'to_continue;
                             }
                             XmlSchemaTypeType::XmlSchemaFacetLength
-                            | XmlSchemaTypeType::XmlSchemaFacetMinlength
-                            | XmlSchemaTypeType::XmlSchemaFacetMaxlength => {
+                            | XmlSchemaTypeType::XmlSchemaFacetMinLength
+                            | XmlSchemaTypeType::XmlSchemaFacetMaxLength => {
                                 ret = xml_schema_validate_length_facet_whtsp(
                                     (*facet_link).facet,
                                     val_type,
@@ -1772,8 +1744,8 @@ unsafe fn xml_schema_validate_facets(
                 'to_continue: {
                     match (*(*facet_link).facet).typ {
                         XmlSchemaTypeType::XmlSchemaFacetLength
-                        | XmlSchemaTypeType::XmlSchemaFacetMinlength
-                        | XmlSchemaTypeType::XmlSchemaFacetMaxlength => {
+                        | XmlSchemaTypeType::XmlSchemaFacetMinLength
+                        | XmlSchemaTypeType::XmlSchemaFacetMaxLength => {
                             ret = xml_schema_validate_list_simple_type_facet(
                                 (*facet_link).facet,
                                 value,
@@ -1985,7 +1957,15 @@ macro_rules! NORMALIZE {
                     & $crate::libxml::schemas_internals::XML_SCHEMAS_TYPE_NORMVALUENEEDED
                     != 0)
         {
-            $norm_value = xml_schema_normalize_value($atype, $value);
+            $norm_value = (*$atype)
+                .normalize_value(
+                    CStr::from_ptr($value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                )
+                .map_or(null_mut(), |res| {
+                    xml_strndup(res.as_ptr(), res.len() as i32)
+                });
             if !$norm_value.is_null() {
                 $value = $norm_value;
             }
@@ -2081,7 +2061,7 @@ pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
                                 val_needed,
                             );
                         }
-                        Ok(XmlSchemaValType::XmlSchemasQname) => {
+                        Ok(XmlSchemaValType::XmlSchemasQName) => {
                             ret = xml_schema_validate_qname(
                                 actxt as XmlSchemaValidCtxtPtr,
                                 value,
@@ -2489,17 +2469,17 @@ pub(crate) fn xml_schema_format_qname(
 pub(crate) fn xml_schema_facet_type_to_string(typ: XmlSchemaTypeType) -> &'static str {
     match typ {
         XmlSchemaTypeType::XmlSchemaFacetPattern => "pattern",
-        XmlSchemaTypeType::XmlSchemaFacetMaxexclusive => "maxExclusive",
-        XmlSchemaTypeType::XmlSchemaFacetMaxinclusive => "maxInclusive",
-        XmlSchemaTypeType::XmlSchemaFacetMinexclusive => "minExclusive",
-        XmlSchemaTypeType::XmlSchemaFacetMininclusive => "minInclusive",
+        XmlSchemaTypeType::XmlSchemaFacetMaxExclusive => "maxExclusive",
+        XmlSchemaTypeType::XmlSchemaFacetMaxInclusive => "maxInclusive",
+        XmlSchemaTypeType::XmlSchemaFacetMinExclusive => "minExclusive",
+        XmlSchemaTypeType::XmlSchemaFacetMinInclusive => "minInclusive",
         XmlSchemaTypeType::XmlSchemaFacetWhitespace => "whiteSpace",
         XmlSchemaTypeType::XmlSchemaFacetEnumeration => "enumeration",
         XmlSchemaTypeType::XmlSchemaFacetLength => "length",
-        XmlSchemaTypeType::XmlSchemaFacetMaxlength => "maxLength",
-        XmlSchemaTypeType::XmlSchemaFacetMinlength => "minLength",
-        XmlSchemaTypeType::XmlSchemaFacetTotaldigits => "totalDigits",
-        XmlSchemaTypeType::XmlSchemaFacetFractiondigits => "fractionDigits",
+        XmlSchemaTypeType::XmlSchemaFacetMaxLength => "maxLength",
+        XmlSchemaTypeType::XmlSchemaFacetMinLength => "minLength",
+        XmlSchemaTypeType::XmlSchemaFacetTotalDigits => "totalDigits",
+        XmlSchemaTypeType::XmlSchemaFacetFractionDigits => "fractionDigits",
         _ => "Internal Error",
     }
 }
@@ -3077,7 +3057,7 @@ unsafe fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) {
                     | XmlSchemaTypeType::XmlSchemaTypeAll => {
                         xml_schema_free_model_group(item as XmlSchemaModelGroupPtr);
                     }
-                    XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+                    XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                         xml_schema_free_attribute_group(item as XmlSchemaAttributeGroupPtr);
                     }
                     XmlSchemaTypeType::XmlSchemaTypeGroup => {
@@ -3095,7 +3075,7 @@ unsafe fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) {
                     XmlSchemaTypeType::XmlSchemaTypeNotation => {
                         xml_schema_free_notation(item as XmlSchemaNotationPtr);
                     }
-                    XmlSchemaTypeType::XmlSchemaExtraQnameref => {
+                    XmlSchemaTypeType::XmlSchemaExtraQNameRef => {
                         xml_schema_free_qname_ref(item as XmlSchemaQnameRefPtr);
                     }
                     _ => {
@@ -4020,8 +4000,8 @@ unsafe fn xml_schema_pval_attr_node_value(
             return -1;
         }
         match XmlSchemaValType::try_from((*typ).built_in_type) {
-            Ok(XmlSchemaValType::XmlSchemasNcname)
-            | Ok(XmlSchemaValType::XmlSchemasQname)
+            Ok(XmlSchemaValType::XmlSchemasNCName)
+            | Ok(XmlSchemaValType::XmlSchemasQName)
             | Ok(XmlSchemaValType::XmlSchemasAnyURI)
             | Ok(XmlSchemaValType::XmlSchemasToken)
             | Ok(XmlSchemaValType::XmlSchemasLanguage) => {
@@ -4997,7 +4977,7 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
                     XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
                     owner_item,
                     attr.into(),
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname),
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName),
                     None,
                     Some(&v),
                     None,
@@ -5040,7 +5020,7 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
             owner_item,
             attr.into(),
-            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname),
+            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName),
             None,
             Some(&value),
             Some(format!("The value '{value}' of simple type 'xs:QName' has no corresponding namespace declaration in scope").as_str()),
@@ -5146,7 +5126,7 @@ unsafe fn xml_schema_add_annotation(
                 let item: XmlSchemaAnnotItemPtr = ann_item as XmlSchemaAnnotItemPtr;
                 ADD_ANNOTATION!(item, annot);
             }
-            XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+            XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                 let item: XmlSchemaAttributeGroupPtr = ann_item as XmlSchemaAttributeGroupPtr;
                 ADD_ANNOTATION!(item, annot);
             }
@@ -5154,18 +5134,18 @@ unsafe fn xml_schema_add_annotation(
                 let item: XmlSchemaNotationPtr = ann_item as XmlSchemaNotationPtr;
                 ADD_ANNOTATION!(item, annot);
             }
-            XmlSchemaTypeType::XmlSchemaFacetMininclusive
-            | XmlSchemaTypeType::XmlSchemaFacetMinexclusive
-            | XmlSchemaTypeType::XmlSchemaFacetMaxinclusive
-            | XmlSchemaTypeType::XmlSchemaFacetMaxexclusive
-            | XmlSchemaTypeType::XmlSchemaFacetTotaldigits
-            | XmlSchemaTypeType::XmlSchemaFacetFractiondigits
+            XmlSchemaTypeType::XmlSchemaFacetMinInclusive
+            | XmlSchemaTypeType::XmlSchemaFacetMinExclusive
+            | XmlSchemaTypeType::XmlSchemaFacetMaxInclusive
+            | XmlSchemaTypeType::XmlSchemaFacetMaxExclusive
+            | XmlSchemaTypeType::XmlSchemaFacetTotalDigits
+            | XmlSchemaTypeType::XmlSchemaFacetFractionDigits
             | XmlSchemaTypeType::XmlSchemaFacetPattern
             | XmlSchemaTypeType::XmlSchemaFacetEnumeration
             | XmlSchemaTypeType::XmlSchemaFacetWhitespace
             | XmlSchemaTypeType::XmlSchemaFacetLength
-            | XmlSchemaTypeType::XmlSchemaFacetMaxlength
-            | XmlSchemaTypeType::XmlSchemaFacetMinlength => {
+            | XmlSchemaTypeType::XmlSchemaFacetMaxLength
+            | XmlSchemaTypeType::XmlSchemaFacetMinLength => {
                 let item: XmlSchemaFacetPtr = ann_item as _;
                 ADD_ANNOTATION!(item, annot);
             }
@@ -5594,7 +5574,7 @@ unsafe fn xml_schema_new_qname_ref(
             return null_mut();
         }
         (*ret).node = None;
-        (*ret).typ = XmlSchemaTypeType::XmlSchemaExtraQnameref;
+        (*ret).typ = XmlSchemaTypeType::XmlSchemaExtraQNameRef;
         (*ret).name = ref_name;
         (*ret).target_namespace = ref_ns;
         (*ret).item = null_mut();
@@ -6145,7 +6125,7 @@ unsafe fn xml_schema_parse_local_attribute(
                 pctxt,
                 null_mut(),
                 attr,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
                 &raw mut name,
             ) != 0
             {
@@ -6159,7 +6139,7 @@ unsafe fn xml_schema_parse_local_attribute(
                     XmlParserErrors::XmlSchemapNoXmlns,
                     null_mut(),
                     attr.into(),
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
                     None,
                     None,
                     Some("The value of the attribute must not match 'xmlns'"),
@@ -6249,7 +6229,7 @@ unsafe fn xml_schema_parse_local_attribute(
                 );
             }
             // Check for pointlessness of attribute prohibitions.
-            if parent_type == XmlSchemaTypeType::XmlSchemaTypeAttributegroup as i32 {
+            if parent_type == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup as i32 {
                 xml_schema_custom_warning(
                     pctxt as XmlSchemaAbstractCtxtPtr,
                     XmlParserErrors::XmlSchemapWarnAttrPointlessProh,
@@ -6499,7 +6479,7 @@ unsafe fn xml_schema_parse_attribute_group_ref(
         // Handle attribute group redefinitions.
         if (*pctxt).is_redefine != 0
             && !(*pctxt).redef.is_null()
-            && (*(*(*pctxt).redef).item).typ == XmlSchemaTypeType::XmlSchemaTypeAttributegroup
+            && (*(*(*pctxt).redef).item).typ == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
             && refe == (*(*pctxt).redef).ref_name
             && ref_ns == (*(*pctxt).redef).ref_target_ns
         {
@@ -6534,7 +6514,7 @@ unsafe fn xml_schema_parse_attribute_group_ref(
             // handled by the normal component resolution mechanism?
             ret = xml_schema_new_qname_ref(
                 pctxt,
-                XmlSchemaTypeType::XmlSchemaTypeAttributegroup,
+                XmlSchemaTypeType::XmlSchemaTypeAttributeGroup,
                 refe,
                 ref_ns,
             );
@@ -6549,7 +6529,7 @@ unsafe fn xml_schema_parse_attribute_group_ref(
             // definition.
             ret = xml_schema_new_qname_ref(
                 pctxt,
-                XmlSchemaTypeType::XmlSchemaTypeAttributegroup,
+                XmlSchemaTypeType::XmlSchemaTypeAttributeGroup,
                 refe,
                 ref_ns,
             );
@@ -7366,7 +7346,7 @@ unsafe fn xml_schema_parse_complex_type(
                 ctxt,
                 null_mut(),
                 attr,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
                 &raw mut name,
             ) != 0
             {
@@ -8027,7 +8007,7 @@ unsafe fn xml_schema_parse_idc(
             ctxt,
             null_mut(),
             attr,
-            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
             &raw mut name,
         ) != 0
         {
@@ -8353,7 +8333,7 @@ unsafe fn xml_schema_parse_element(
                 null_mut(),
                 // Is this `unwrap` OK ???
                 name_attr.unwrap(),
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
                 &raw mut name,
             ) != 0
             {
@@ -9189,17 +9169,17 @@ unsafe fn xml_schema_parse_facet(
             return null_mut();
         }
         if is_schema(Some(node), "minInclusive") {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMininclusive;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinInclusive;
         } else if is_schema(Some(node), "minExclusive") {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinexclusive;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinExclusive;
         } else if is_schema(Some(node), "maxInclusive") {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxinclusive;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxInclusive;
         } else if is_schema(Some(node), "maxExclusive") {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxexclusive;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxExclusive;
         } else if is_schema(Some(node), "totalDigits") {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetTotaldigits;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetTotalDigits;
         } else if is_schema(Some(node), "fractionDigits") {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetFractiondigits;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetFractionDigits;
         } else if is_schema(Some(node), "pattern") {
             (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetPattern;
         } else if is_schema(Some(node), "enumeration") {
@@ -9209,9 +9189,9 @@ unsafe fn xml_schema_parse_facet(
         } else if is_schema(Some(node), "length") {
             (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetLength;
         } else if is_schema(Some(node), "maxLength") {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxlength;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxLength;
         } else if is_schema(Some(node), "minLength") {
-            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinlength;
+            (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinLength;
         } else {
             let name = node.name().unwrap();
             xml_schema_perr2(
@@ -9673,7 +9653,7 @@ unsafe fn xml_schema_parse_list(
         (*typ).flags |= XML_SCHEMAS_TYPE_VARIETY_LIST;
         // SPEC (Base type) (2) "If the <list> or <union> alternative is chosen,
         // then the `simple ur-type definition`."
-        (*typ).base_type = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnysimpletype);
+        (*typ).base_type = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnySimpletype);
         // Check for illegal attributes.
         let mut attr = node.properties;
         while let Some(cur_attr) = attr {
@@ -9808,7 +9788,7 @@ unsafe fn xml_schema_parse_union(
         (*typ).flags |= XML_SCHEMAS_TYPE_VARIETY_UNION;
         // SPEC (Base type) (2) "If the <list> or <union> alternative is chosen,
         // then the `simple ur-type definition`."
-        (*typ).base_type = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnysimpletype);
+        (*typ).base_type = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnySimpletype);
         // Check for illegal attributes.
         let mut attr = node.properties;
         while let Some(cur_attr) = attr {
@@ -10025,7 +10005,7 @@ unsafe fn xml_schema_parse_simple_type(
                 ctxt,
                 null_mut(),
                 attr,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
                 &raw mut attr_value,
             ) != 0
             {
@@ -10362,7 +10342,7 @@ unsafe fn xml_schema_parse_model_group_definition(
             ctxt,
             null_mut(),
             attr,
-            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
             &raw mut name,
         ) != 0
         {
@@ -10489,7 +10469,7 @@ unsafe fn xml_schema_add_attribute_group_definition(
             return null_mut();
         }
         memset(ret as _, 0, size_of::<XmlSchemaAttributeGroup>());
-        (*ret).typ = XmlSchemaTypeType::XmlSchemaTypeAttributegroup;
+        (*ret).typ = XmlSchemaTypeType::XmlSchemaTypeAttributeGroup;
         (*ret).name = name as _;
         (*ret).target_namespace = ns_name;
         (*ret).node = node.into();
@@ -10545,7 +10525,7 @@ unsafe fn xml_schema_parse_attribute_group_definition(
             pctxt,
             null_mut(),
             attr,
-            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
             &raw mut name,
         ) != 0
         {
@@ -10602,7 +10582,7 @@ unsafe fn xml_schema_parse_attribute_group_definition(
             schema,
             &mut child,
             &raw mut (*ret).attr_uses as *mut XmlSchemaItemListPtr,
-            XmlSchemaTypeType::XmlSchemaTypeAttributegroup as _,
+            XmlSchemaTypeType::XmlSchemaTypeAttributeGroup as _,
             &raw mut has_refs,
         ) == -1
         {
@@ -11141,7 +11121,7 @@ unsafe fn xml_schema_parse_global_attribute(
             pctxt,
             null_mut(),
             attr,
-            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+            xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
             &raw mut attr_value,
         ) != 0
         {
@@ -11155,7 +11135,7 @@ unsafe fn xml_schema_parse_global_attribute(
                 XmlParserErrors::XmlSchemapNoXmlns,
                 null_mut(),
                 attr.into(),
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNcname),
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
                 None,
                 None,
                 Some("The value of the attribute must not match 'xmlns'"),
@@ -11663,7 +11643,7 @@ unsafe fn xml_schema_find_redef_comp_in_graph(
                                 return ret;
                             }
                         }
-                        XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+                        XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                             if WXS_COMP_NAME!(ret, XmlSchemaAttributeGroupPtr) == name as _
                                 && WXS_COMP_TNS!(ret, XmlSchemaAttributeGroupPtr) == ns_name
                             {
@@ -11820,7 +11800,7 @@ unsafe fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> i
                         (*redef).target = prev;
                     }
                 }
-                XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+                XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                     if (*(prev as XmlSchemaAttributeGroupPtr)).flags
                         & XML_SCHEMAS_ATTRGROUP_REDEFINED
                         != 0
@@ -11967,7 +11947,7 @@ unsafe fn xml_schema_add_components(
                     name = (*(item as XmlSchemaModelGroupDefPtr)).name;
                     WXS_GET_GLOBAL_HASH!(bucket, group_decl, table);
                 }
-                XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+                XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                     if WXS_REDEFINED_ATTR_GROUP!(item) {
                         continue;
                     }
@@ -12424,7 +12404,7 @@ unsafe fn xml_schema_resolve_type_references(
         else if !(*type_def).subtypes.is_null()
             && (*(*type_def).subtypes).typ == XmlSchemaTypeType::XmlSchemaTypeParticle
             && !WXS_TYPE_PARTICLE_TERM!(type_def).is_null()
-            && (*WXS_TYPE_PARTICLE_TERM!(type_def)).typ == XmlSchemaTypeType::XmlSchemaExtraQnameref
+            && (*WXS_TYPE_PARTICLE_TERM!(type_def)).typ == XmlSchemaTypeType::XmlSchemaExtraQNameRef
         {
             let refe: XmlSchemaQnameRefPtr =
                 WXS_TYPE_PARTICLE_TERM!(type_def) as XmlSchemaQnameRefPtr;
@@ -12535,7 +12515,7 @@ unsafe fn xml_schema_resolve_attr_type_references(
         } else {
             // The type defaults to the xs:anySimpleType.
             (*item).subtypes =
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnysimpletype);
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnySimpletype);
         }
         0
     }
@@ -12576,7 +12556,7 @@ unsafe fn xml_schema_resolve_attr_use_references(
             return -1;
         }
         if (*ause).attr_decl.is_null()
-            || (*(*ause).attr_decl).typ != XmlSchemaTypeType::XmlSchemaExtraQnameref
+            || (*(*ause).attr_decl).typ != XmlSchemaTypeType::XmlSchemaExtraQNameRef
         {
             return 0;
         }
@@ -12697,7 +12677,7 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
             'next_particle: {
                 if WXS_PARTICLE_TERM!(particle).is_null()
                     || (*WXS_PARTICLE_TERM!(particle)).typ
-                        != XmlSchemaTypeType::XmlSchemaExtraQnameref
+                        != XmlSchemaTypeType::XmlSchemaExtraQNameRef
                 {
                     break 'next_particle;
                 }
@@ -13105,8 +13085,8 @@ unsafe fn xml_schema_check_attr_group_circular_recur(
         // references the context attribute group.
         for i in 0..(*list).nb_items {
             refe = *(*list).items.add(i as usize) as _;
-            if (*refe).typ == XmlSchemaTypeType::XmlSchemaExtraQnameref
-                && (*refe).item_type == XmlSchemaTypeType::XmlSchemaTypeAttributegroup
+            if (*refe).typ == XmlSchemaTypeType::XmlSchemaExtraQNameRef
+                && (*refe).item_type == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
                 && !(*refe).item.is_null()
             {
                 gr = (*refe).item as XmlSchemaAttributeGroupPtr;
@@ -13564,9 +13544,9 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                     xml_schema_item_list_add_size(prohibs, 2, using as _);
                     break 'to_continue;
                 }
-                if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraQnameref
+                if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraQNameRef
                     && (*(using as XmlSchemaQnameRefPtr)).item_type
-                        == XmlSchemaTypeType::XmlSchemaTypeAttributegroup
+                        == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
                 {
                     if (*(using as XmlSchemaQnameRefPtr)).item.is_null() {
                         return -1;
@@ -14575,7 +14555,7 @@ unsafe fn xml_schema_is_derived_from_built_in_type(typ: XmlSchemaTypePtr, val_ty
             if (*typ).built_in_type == val_type {
                 return 1;
             }
-            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
+            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
                 || (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnytype as i32
             {
                 return 0;
@@ -16504,8 +16484,8 @@ unsafe fn xml_schema_check_cosstrestricts(
                     while {
                         match (*facet).typ {
                         XmlSchemaTypeType::XmlSchemaFacetLength
-                        | XmlSchemaTypeType::XmlSchemaFacetMinlength
-                        | XmlSchemaTypeType::XmlSchemaFacetMaxlength
+                        | XmlSchemaTypeType::XmlSchemaFacetMinLength
+                        | XmlSchemaTypeType::XmlSchemaFacetMaxLength
                         | XmlSchemaTypeType::XmlSchemaFacetWhitespace
                         // TODO: 2.5.1.2 List datatypes
                         // The value of `whiteSpace` is fixed to the value collapse.
@@ -16560,7 +16540,7 @@ unsafe fn xml_schema_check_cosstrestricts(
                 member = (*member).next;
             }
             // 3.3.1 If the {base type definition} is the `simple ur-type definition`
-            if (*(*typ).base_type).built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
+            if (*(*typ).base_type).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
             {
                 // 3.3.1.1 All of the {member type definitions} must have a
                 // {final} which does not contain union.
@@ -16848,10 +16828,10 @@ unsafe fn xml_schema_type_fixup_whitespace(typ: XmlSchemaTypePtr) -> i32 {
                 && (*anc).built_in_type != XmlSchemaValType::XmlSchemasAnytype as i32
             {
                 if (*anc).typ == XmlSchemaTypeType::XmlSchemaTypeBasic {
-                    if (*anc).built_in_type == XmlSchemaValType::XmlSchemasNormstring as i32 {
+                    if (*anc).built_in_type == XmlSchemaValType::XmlSchemasNormString as i32 {
                         (*typ).flags |= XML_SCHEMAS_TYPE_WHITESPACE_REPLACE;
                     } else if (*anc).built_in_type == XmlSchemaValType::XmlSchemasString as i32
-                        || (*anc).built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
+                        || (*anc).built_in_type == XmlSchemaValType::XmlSchemasAnySimpletype as i32
                     {
                         (*typ).flags |= XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE;
                     } else {
@@ -16982,28 +16962,28 @@ unsafe fn xml_schema_derive_and_validate_facets(
                 XmlSchemaTypeType::XmlSchemaFacetLength => {
                     flength = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMinlength => {
+                XmlSchemaTypeType::XmlSchemaFacetMinLength => {
                     fminlen = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMininclusive => {
+                XmlSchemaTypeType::XmlSchemaFacetMinInclusive => {
                     fmininc = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMinexclusive => {
+                XmlSchemaTypeType::XmlSchemaFacetMinExclusive => {
                     fminexc = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMaxlength => {
+                XmlSchemaTypeType::XmlSchemaFacetMaxLength => {
                     fmaxlen = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMaxinclusive => {
+                XmlSchemaTypeType::XmlSchemaFacetMaxInclusive => {
                     fmaxinc = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMaxexclusive => {
+                XmlSchemaTypeType::XmlSchemaFacetMaxExclusive => {
                     fmaxexc = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetTotaldigits => {
+                XmlSchemaTypeType::XmlSchemaFacetTotalDigits => {
                     ftotdig = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetFractiondigits => {
+                XmlSchemaTypeType::XmlSchemaFacetFractionDigits => {
                     ffracdig = facet;
                 }
                 _ => {}
@@ -17017,28 +16997,28 @@ unsafe fn xml_schema_derive_and_validate_facets(
                 XmlSchemaTypeType::XmlSchemaFacetLength => {
                     bflength = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMinlength => {
+                XmlSchemaTypeType::XmlSchemaFacetMinLength => {
                     bfminlen = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMininclusive => {
+                XmlSchemaTypeType::XmlSchemaFacetMinInclusive => {
                     bfmininc = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMinexclusive => {
+                XmlSchemaTypeType::XmlSchemaFacetMinExclusive => {
                     bfminexc = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMaxlength => {
+                XmlSchemaTypeType::XmlSchemaFacetMaxLength => {
                     bfmaxlen = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMaxinclusive => {
+                XmlSchemaTypeType::XmlSchemaFacetMaxInclusive => {
                     bfmaxinc = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetMaxexclusive => {
+                XmlSchemaTypeType::XmlSchemaFacetMaxExclusive => {
                     bfmaxexc = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetTotaldigits => {
+                XmlSchemaTypeType::XmlSchemaFacetTotalDigits => {
                     bftotdig = facet;
                 }
-                XmlSchemaTypeType::XmlSchemaFacetFractiondigits => {
+                XmlSchemaTypeType::XmlSchemaFacetFractionDigits => {
                     bffracdig = facet;
                 }
                 _ => {}
@@ -17539,7 +17519,7 @@ unsafe fn xml_schema_type_fixup_optim_facets(typ: XmlSchemaTypePtr) {
         if has != 0 && need_val == 0 && (*typ).wxs_is_atomic() {
             let prim: XmlSchemaTypePtr = xml_schema_get_primitive_type(typ);
             // OPTIMIZE VAL TODO: Some facets need a computed value.
-            if (*prim).built_in_type != XmlSchemaValType::XmlSchemasAnysimpletype as i32
+            if (*prim).built_in_type != XmlSchemaValType::XmlSchemasAnySimpletype as i32
                 && (*prim).built_in_type != XmlSchemaValType::XmlSchemasString as i32
             {
                 (*typ).flags |= XML_SCHEMAS_TYPE_FACETSNEEDVALUE;
@@ -17980,7 +17960,7 @@ unsafe fn xml_schema_check_src_redefine_second(pctxt: XmlSchemaParserCtxtPtr) ->
                         // group definition in I, as defined in Particle Valid
                         // (Restriction) ($3.9.6)."
                     }
-                    XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+                    XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                         // SPEC src-redefine:
                         // (7.2.2) "The {attribute uses} and {attribute wildcard} of
                         // the attribute group definition which corresponds to it
@@ -19598,9 +19578,9 @@ unsafe fn xml_schema_fixup_components(
                                 );
                                 FIXHFAILURE!(pctxt, 'exit_failure);
                             }
-                            XmlSchemaTypeType::XmlSchemaExtraQnameref => {
+                            XmlSchemaTypeType::XmlSchemaExtraQNameRef => {
                                 if (*(item as XmlSchemaQnameRefPtr)).item_type
-                                    == XmlSchemaTypeType::XmlSchemaTypeAttributegroup
+                                    == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
                                 {
                                     xml_schema_resolve_attr_group_references(
                                         item as XmlSchemaQnameRefPtr,
@@ -19671,7 +19651,7 @@ unsafe fn xml_schema_fixup_components(
                                     break 'exit_error;
                                 }
                             }
-                            XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
+                            XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                                 xml_schema_check_attr_group_circular(
                                     item as XmlSchemaAttributeGroupPtr,
                                     pctxt,
@@ -19712,7 +19692,7 @@ unsafe fn xml_schema_fixup_components(
                     // Expand attribute group references of attribute group definitions.
                     for i in 0..nb_items {
                         item = *items.add(i as usize);
-                        if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeAttributegroup
+                        if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
                             && !WXS_ATTR_GROUP_EXPANDED!(item)
                             && WXS_ATTR_GROUP_HAS_REFS!(item)
                         {
@@ -19808,7 +19788,7 @@ unsafe fn xml_schema_fixup_components(
                     // Apply constraints for attribute group definitions.
                     for i in 0..nb_items {
                         item = *items.add(i as usize);
-                        if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeAttributegroup
+                        if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
                             && !(*(item as XmlSchemaAttributeGroupPtr)).attr_uses.is_null()
                             && (*((*(item as XmlSchemaAttributeGroupPtr)).attr_uses
                                 as XmlSchemaItemListPtr))
@@ -20157,7 +20137,7 @@ unsafe fn xml_schema_attr_uses_dump<'a>(
                 prohib = using as XmlSchemaAttributeUseProhibPtr;
                 name = (*prohib).name;
                 tns = (*prohib).target_namespace;
-            } else if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraQnameref {
+            } else if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraQNameRef {
                 write!(output, "  [reference] ");
                 refe = using as XmlSchemaQnameRefPtr;
                 name = (*refe).name;
@@ -21496,7 +21476,7 @@ unsafe fn xml_schema_vexpand_qname(
                 XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1,
                 None,
                 &value,
-                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname),
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName),
                 1,
             );
             return 1;
@@ -21528,7 +21508,7 @@ unsafe fn xml_schema_vexpand_qname(
                     vctxt as XmlSchemaAbstractCtxtPtr,
                     XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1,
                     None,
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname)
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName)
                         as XmlSchemaBasicItemPtr,
                     format!("The QName value '{value}' has no corresponding namespace declaration in scope").as_str(),
                     Some(&value),
@@ -21606,7 +21586,7 @@ unsafe fn xml_schema_process_xsi_type(
                     vctxt as XmlSchemaAbstractCtxtPtr,
                     XmlParserErrors::XmlSchemavCvcElt4_2,
                     None,
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQname) as XmlSchemaBasicItemPtr,
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName) as XmlSchemaBasicItemPtr,
                     format!("The QName value '{qname}' of the xsi:type attribute does not resolve to a type definition").as_str(),
                     Some(&qname),
                     None
@@ -23546,8 +23526,15 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
 
                             value = (*iattr).value;
                             // Normalize the value.
-                            let norm_value =
-                                xml_schema_normalize_value((*iattr).type_def, (*iattr).value);
+                            let norm_value = (*(*iattr).type_def)
+                                .normalize_value(
+                                    CStr::from_ptr((*iattr).value as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                )
+                                .map_or(null_mut(), |res| {
+                                    xml_strndup(res.as_ptr(), res.len() as i32)
+                                });
                             if !norm_value.is_null() {
                                 value = norm_value;
                             }
@@ -25361,10 +25348,15 @@ unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     if (*vctxt).options & XmlSchemaValidOption::XmlSchemaValVcICreate as i32 != 0 {
                         if let Some(mut node) = (*inode).node {
                             // VAL TODO: Normalize the value.
-                            let norm_value = xml_schema_normalize_value(
-                                (*inode).type_def,
-                                (*(*inode).decl).value,
-                            );
+                            let norm_value = (*(*inode).type_def)
+                                .normalize_value(
+                                    CStr::from_ptr((*(*inode).decl).value as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                )
+                                .map_or(null_mut(), |res| {
+                                    xml_strndup(res.as_ptr(), res.len() as i32)
+                                });
                             let text_child = if !norm_value.is_null() {
                                 let text_child = xml_new_doc_text(node.doc, norm_value);
                                 xml_free(norm_value as _);

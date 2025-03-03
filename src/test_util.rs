@@ -297,7 +297,7 @@ pub(crate) fn des_unsigned_long_ptr(_no: i32, _val: *mut u64, _nr: i32) {}
 #[cfg(feature = "schema")]
 pub(crate) fn gen_xml_schema_val_type(no: i32, _nr: i32) -> XmlSchemaValType {
     if no == 1 {
-        return XmlSchemaValType::XmlSchemasAnysimpletype;
+        return XmlSchemaValType::XmlSchemasAnySimpletype;
     }
     if no == 2 {
         return XmlSchemaValType::XmlSchemasAnytype;

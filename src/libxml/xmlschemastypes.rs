@@ -456,7 +456,7 @@ unsafe fn xml_schema_new_min_length_facet(value: i32) -> XmlSchemaFacetPtr {
         if ret.is_null() {
             return null_mut();
         }
-        (*ret).typ = XmlSchemaTypeType::XmlSchemaFacetMinlength;
+        (*ret).typ = XmlSchemaTypeType::XmlSchemaFacetMinLength;
         (*ret).val = xml_schema_new_value(XmlSchemaValType::XmlSchemasNNInteger);
         if (*ret).val.is_null() {
             xml_free(ret as _);
@@ -493,11 +493,11 @@ unsafe fn xml_schema_init_basic_type(
             | XmlSchemaValType::XmlSchemasDate
             | XmlSchemaValType::XmlSchemasDatetime
             | XmlSchemaValType::XmlSchemasTime
-            | XmlSchemaValType::XmlSchemasGyear
-            | XmlSchemaValType::XmlSchemasGyearmonth
-            | XmlSchemaValType::XmlSchemasGmonth
-            | XmlSchemaValType::XmlSchemasGmonthday
-            | XmlSchemaValType::XmlSchemasGday
+            | XmlSchemaValType::XmlSchemasGYear
+            | XmlSchemaValType::XmlSchemasGYearMonth
+            | XmlSchemaValType::XmlSchemasGMonth
+            | XmlSchemaValType::XmlSchemasGMonthDay
+            | XmlSchemaValType::XmlSchemasGDay
             | XmlSchemaValType::XmlSchemasDuration
             | XmlSchemaValType::XmlSchemasFloat
             | XmlSchemaValType::XmlSchemasDouble
@@ -505,7 +505,7 @@ unsafe fn xml_schema_init_basic_type(
             | XmlSchemaValType::XmlSchemasAnyURI
             | XmlSchemaValType::XmlSchemasHexbinary
             | XmlSchemaValType::XmlSchemasBase64binary
-            | XmlSchemaValType::XmlSchemasQname
+            | XmlSchemaValType::XmlSchemasQName
             | XmlSchemaValType::XmlSchemasNotation => {
                 (*ret).flags |= XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE;
             }
@@ -513,7 +513,7 @@ unsafe fn xml_schema_init_basic_type(
         }
         // Set variety.
         match typ {
-            XmlSchemaValType::XmlSchemasAnytype | XmlSchemaValType::XmlSchemasAnysimpletype => {}
+            XmlSchemaValType::XmlSchemasAnytype | XmlSchemaValType::XmlSchemasAnySimpletype => {}
             XmlSchemaValType::XmlSchemasIDREFS
             | XmlSchemaValType::XmlSchemasNmtokens
             | XmlSchemaValType::XmlSchemasEntities => {
@@ -636,7 +636,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             }
             XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.set(xml_schema_init_basic_type(
                 c"anySimpleType".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasAnysimpletype,
+                XmlSchemaValType::XmlSchemasAnySimpletype,
                 XML_SCHEMA_TYPE_ANY_TYPE_DEF.get(),
             ));
             if XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get().is_null() {
@@ -685,7 +685,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             }
             XML_SCHEMA_TYPE_GYEAR_DEF.set(xml_schema_init_basic_type(
                 c"gYear".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasGyear,
+                XmlSchemaValType::XmlSchemasGYear,
                 XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
             ));
             if XML_SCHEMA_TYPE_GYEAR_DEF.get().is_null() {
@@ -693,7 +693,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             }
             XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.set(xml_schema_init_basic_type(
                 c"gYearMonth".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasGyearmonth,
+                XmlSchemaValType::XmlSchemasGYearMonth,
                 XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
             ));
             if XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.get().is_null() {
@@ -701,7 +701,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             }
             XML_SCHEMA_TYPE_GMONTH_DEF.set(xml_schema_init_basic_type(
                 c"gMonth".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasGmonth,
+                XmlSchemaValType::XmlSchemasGMonth,
                 XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
             ));
             if XML_SCHEMA_TYPE_GMONTH_DEF.get().is_null() {
@@ -709,7 +709,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             }
             XML_SCHEMA_TYPE_GMONTH_DAY_DEF.set(xml_schema_init_basic_type(
                 c"gMonthDay".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasGmonthday,
+                XmlSchemaValType::XmlSchemasGMonthDay,
                 XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
             ));
             if XML_SCHEMA_TYPE_GMONTH_DAY_DEF.get().is_null() {
@@ -717,7 +717,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             }
             XML_SCHEMA_TYPE_GDAY_DEF.set(xml_schema_init_basic_type(
                 c"gDay".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasGday,
+                XmlSchemaValType::XmlSchemasGDay,
                 XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
             ));
             if XML_SCHEMA_TYPE_GDAY_DEF.get().is_null() {
@@ -789,7 +789,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             }
             XML_SCHEMA_TYPE_QNAME_DEF.set(xml_schema_init_basic_type(
                 c"QName".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasQname,
+                XmlSchemaValType::XmlSchemasQName,
                 XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
             ));
             if XML_SCHEMA_TYPE_QNAME_DEF.get().is_null() {
@@ -903,7 +903,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             }
             XML_SCHEMA_TYPE_NORM_STRING_DEF.set(xml_schema_init_basic_type(
                 c"normalizedString".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasNormstring,
+                XmlSchemaValType::XmlSchemasNormString,
                 XML_SCHEMA_TYPE_STRING_DEF.get(),
             ));
             if XML_SCHEMA_TYPE_NORM_STRING_DEF.get().is_null() {
@@ -943,7 +943,7 @@ pub unsafe fn xml_schema_init_types() -> i32 {
             }
             XML_SCHEMA_TYPE_NCNAME_DEF.set(xml_schema_init_basic_type(
                 c"NCName".as_ptr() as _,
-                XmlSchemaValType::XmlSchemasNcname,
+                XmlSchemaValType::XmlSchemasNCName,
                 XML_SCHEMA_TYPE_NAME_DEF.get(),
             ));
             if XML_SCHEMA_TYPE_NCNAME_DEF.get().is_null() {
@@ -1481,7 +1481,7 @@ unsafe fn xml_schema_validate_dates(
 
                 // is it an xs:gDay?
                 if *cur == b'-' {
-                    if typ == XmlSchemaValType::XmlSchemasGmonth {
+                    if typ == XmlSchemaValType::XmlSchemasGMonth {
                         break 'error;
                     }
                     cur = cur.add(1);
@@ -1490,7 +1490,7 @@ unsafe fn xml_schema_validate_dates(
                         break 'error;
                     }
 
-                    RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGday);
+                    RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGDay);
 
                     break 'error;
                 }
@@ -1525,7 +1525,7 @@ unsafe fn xml_schema_validate_dates(
                                 dt,
                                 typ,
                                 val,
-                                XmlSchemaValType::XmlSchemasGmonthday
+                                XmlSchemaValType::XmlSchemasGMonthDay
                             );
 
                             break 'error;
@@ -1537,7 +1537,7 @@ unsafe fn xml_schema_validate_dates(
                     cur = rewnd;
                 }
 
-                RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGmonth);
+                RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGMonth);
 
                 break 'error;
             }
@@ -1561,7 +1561,7 @@ unsafe fn xml_schema_validate_dates(
             }
 
             // is it an xs:gYear?
-            RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGyear);
+            RETURN_TYPE_IF_VALID!(cur, ret, dt, typ, val, XmlSchemaValType::XmlSchemasGYear);
 
             if *cur != b'-' {
                 break 'error;
@@ -1580,7 +1580,7 @@ unsafe fn xml_schema_validate_dates(
                 dt,
                 typ,
                 val,
-                XmlSchemaValType::XmlSchemasGyearmonth
+                XmlSchemaValType::XmlSchemasGYearMonth
             );
 
             if *cur != b'-' {
@@ -2090,9 +2090,9 @@ unsafe fn xml_schema_val_atomic_type(
             && !value.is_null()
             && ((*typ).built_in_type != XmlSchemaValType::XmlSchemasString as i32
                 && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnytype as i32
-                && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnysimpletype as i32)
+                && (*typ).built_in_type != XmlSchemaValType::XmlSchemasAnySimpletype as i32)
         {
-            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasNormstring as i32 {
+            if (*typ).built_in_type == XmlSchemaValType::XmlSchemasNormString as i32 {
                 norm = xml_schema_white_space_replace(
                     CStr::from_ptr(value as *const i8)
                         .to_string_lossy()
@@ -2123,10 +2123,10 @@ unsafe fn xml_schema_val_atomic_type(
                                     break 'error;
                                 }
                                 XmlSchemaValType::XmlSchemasAnytype
-                                | XmlSchemaValType::XmlSchemasAnysimpletype => {
+                                | XmlSchemaValType::XmlSchemasAnySimpletype => {
                                     if create_string_value != 0 && !val.is_null() {
                                         v = xml_schema_new_value(
-                                            XmlSchemaValType::XmlSchemasAnysimpletype,
+                                            XmlSchemaValType::XmlSchemasAnySimpletype,
                                         );
                                         if !v.is_null() {
                                             (*v).value.str = xml_strdup(value as _) as _;
@@ -2189,7 +2189,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     }
                                     break 'return0;
                                 }
-                                XmlSchemaValType::XmlSchemasNormstring => {
+                                XmlSchemaValType::XmlSchemasNormString => {
                                     if norm_on_the_fly != 0 {
                                         if apply_norm != 0 {
                                             if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
@@ -2215,7 +2215,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     }
                                     if !val.is_null() {
                                         v = xml_schema_new_value(
-                                            XmlSchemaValType::XmlSchemasNormstring,
+                                            XmlSchemaValType::XmlSchemasNormString,
                                         );
                                         if !v.is_null() {
                                             (*v).value.str = xml_strdup(value);
@@ -2364,11 +2364,11 @@ unsafe fn xml_schema_val_atomic_type(
                                     break 'return0;
                                 }
                                 XmlSchemaValType::XmlSchemasTime
-                                | XmlSchemaValType::XmlSchemasGday
-                                | XmlSchemaValType::XmlSchemasGmonth
-                                | XmlSchemaValType::XmlSchemasGmonthday
-                                | XmlSchemaValType::XmlSchemasGyear
-                                | XmlSchemaValType::XmlSchemasGyearmonth
+                                | XmlSchemaValType::XmlSchemasGDay
+                                | XmlSchemaValType::XmlSchemasGMonth
+                                | XmlSchemaValType::XmlSchemasGMonthDay
+                                | XmlSchemaValType::XmlSchemasGYear
+                                | XmlSchemaValType::XmlSchemasGYearMonth
                                 | XmlSchemaValType::XmlSchemasDate
                                 | XmlSchemaValType::XmlSchemasDatetime => {
                                     ret = xml_schema_validate_dates(
@@ -2784,7 +2784,7 @@ unsafe fn xml_schema_val_atomic_type(
                                     }
                                     break 'done;
                                 }
-                                XmlSchemaValType::XmlSchemasQname => {
+                                XmlSchemaValType::XmlSchemasQName => {
                                     let mut uri: *const XmlChar = null();
                                     let mut local: *mut XmlChar = null_mut();
 
@@ -2820,7 +2820,7 @@ unsafe fn xml_schema_val_atomic_type(
                                         }
                                     }
                                     if !val.is_null() {
-                                        v = xml_schema_new_value(XmlSchemaValType::XmlSchemasQname);
+                                        v = xml_schema_new_value(XmlSchemaValType::XmlSchemasQName);
                                         if v.is_null() {
                                             if !local.is_null() {
                                                 xml_free(local as _);
@@ -2841,11 +2841,11 @@ unsafe fn xml_schema_val_atomic_type(
                                     }
                                     break 'done;
                                 }
-                                XmlSchemaValType::XmlSchemasNcname => {
+                                XmlSchemaValType::XmlSchemasNCName => {
                                     ret = xml_validate_ncname(value, 1);
                                     if ret == 0 && !val.is_null() {
                                         v = xml_schema_new_value(
-                                            XmlSchemaValType::XmlSchemasNcname,
+                                            XmlSchemaValType::XmlSchemasNCName,
                                         );
                                         if !v.is_null() {
                                             (*v).value.str = xml_strdup(value);
@@ -4184,8 +4184,8 @@ unsafe fn _xml_schema_date_add(dt: XmlSchemaValPtr, dur: XmlSchemaValPtr) -> Xml
             } else if (*ret).typ != XmlSchemaValType::XmlSchemasDate {
                 if (*r).mon != 1 && (*r).day != 1 {
                     (*ret).typ = XmlSchemaValType::XmlSchemasDate;
-                } else if (*ret).typ != XmlSchemaValType::XmlSchemasGyearmonth && (*r).mon != 1 {
-                    (*ret).typ = XmlSchemaValType::XmlSchemasGyearmonth;
+                } else if (*ret).typ != XmlSchemaValType::XmlSchemasGYearMonth && (*r).mon != 1 {
+                    (*ret).typ = XmlSchemaValType::XmlSchemasGYearMonth;
                 }
             }
         }
@@ -4482,11 +4482,11 @@ unsafe fn xml_schema_compare_dates(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i3
         let xmask = match (*x).typ {
             XmlSchemaValType::XmlSchemasDatetime => 0xf,
             XmlSchemaValType::XmlSchemasDate => 0x7,
-            XmlSchemaValType::XmlSchemasGyear => 0x1,
-            XmlSchemaValType::XmlSchemasGmonth => 0x2,
-            XmlSchemaValType::XmlSchemasGday => 0x3,
-            XmlSchemaValType::XmlSchemasGyearmonth => 0x3,
-            XmlSchemaValType::XmlSchemasGmonthday => 0x6,
+            XmlSchemaValType::XmlSchemasGYear => 0x1,
+            XmlSchemaValType::XmlSchemasGMonth => 0x2,
+            XmlSchemaValType::XmlSchemasGDay => 0x3,
+            XmlSchemaValType::XmlSchemasGYearMonth => 0x3,
+            XmlSchemaValType::XmlSchemasGMonthDay => 0x6,
             XmlSchemaValType::XmlSchemasTime => 0x8,
             _ => 0,
         };
@@ -4494,11 +4494,11 @@ unsafe fn xml_schema_compare_dates(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i3
         let ymask = match (*y).typ {
             XmlSchemaValType::XmlSchemasDatetime => 0xf,
             XmlSchemaValType::XmlSchemasDate => 0x7,
-            XmlSchemaValType::XmlSchemasGyear => 0x1,
-            XmlSchemaValType::XmlSchemasGmonth => 0x2,
-            XmlSchemaValType::XmlSchemasGday => 0x3,
-            XmlSchemaValType::XmlSchemasGyearmonth => 0x3,
-            XmlSchemaValType::XmlSchemasGmonthday => 0x6,
+            XmlSchemaValType::XmlSchemasGYear => 0x1,
+            XmlSchemaValType::XmlSchemasGMonth => 0x2,
+            XmlSchemaValType::XmlSchemasGDay => 0x3,
+            XmlSchemaValType::XmlSchemasGYearMonth => 0x3,
+            XmlSchemaValType::XmlSchemasGMonthDay => 0x6,
             XmlSchemaValType::XmlSchemasTime => 0x8,
             _ => 0,
         };
@@ -5073,11 +5073,11 @@ unsafe fn xml_schema_compare_values_internal(
                 return -2;
             }
             XmlSchemaValType::XmlSchemasTime
-            | XmlSchemaValType::XmlSchemasGday
-            | XmlSchemaValType::XmlSchemasGmonth
-            | XmlSchemaValType::XmlSchemasGmonthday
-            | XmlSchemaValType::XmlSchemasGyear
-            | XmlSchemaValType::XmlSchemasGyearmonth
+            | XmlSchemaValType::XmlSchemasGDay
+            | XmlSchemaValType::XmlSchemasGMonth
+            | XmlSchemaValType::XmlSchemasGMonthDay
+            | XmlSchemaValType::XmlSchemasGYear
+            | XmlSchemaValType::XmlSchemasGYearMonth
             | XmlSchemaValType::XmlSchemasDate
             | XmlSchemaValType::XmlSchemasDatetime => {
                 if x.is_null() || y.is_null() {
@@ -5087,12 +5087,12 @@ unsafe fn xml_schema_compare_values_internal(
                     ytype,
                     XmlSchemaValType::XmlSchemasDatetime
                         | XmlSchemaValType::XmlSchemasTime
-                        | XmlSchemaValType::XmlSchemasGday
-                        | XmlSchemaValType::XmlSchemasGmonth
-                        | XmlSchemaValType::XmlSchemasGmonthday
-                        | XmlSchemaValType::XmlSchemasGyear
+                        | XmlSchemaValType::XmlSchemasGDay
+                        | XmlSchemaValType::XmlSchemasGMonth
+                        | XmlSchemaValType::XmlSchemasGMonthDay
+                        | XmlSchemaValType::XmlSchemasGYear
                         | XmlSchemaValType::XmlSchemasDate
-                        | XmlSchemaValType::XmlSchemasGyearmonth
+                        | XmlSchemaValType::XmlSchemasGYearMonth
                 ) {
                     return xml_schema_compare_dates(x, y);
                 }
@@ -5100,14 +5100,14 @@ unsafe fn xml_schema_compare_values_internal(
             }
             // Note that we will support comparison of string types against
             // anySimpleType as well.
-            XmlSchemaValType::XmlSchemasAnysimpletype
+            XmlSchemaValType::XmlSchemasAnySimpletype
             | XmlSchemaValType::XmlSchemasString
-            | XmlSchemaValType::XmlSchemasNormstring
+            | XmlSchemaValType::XmlSchemasNormString
             | XmlSchemaValType::XmlSchemasToken
             | XmlSchemaValType::XmlSchemasLanguage
             | XmlSchemaValType::XmlSchemasNmtoken
             | XmlSchemaValType::XmlSchemasName
-            | XmlSchemaValType::XmlSchemasNcname
+            | XmlSchemaValType::XmlSchemasNCName
             | XmlSchemaValType::XmlSchemasID
             | XmlSchemaValType::XmlSchemasIDREF
             | XmlSchemaValType::XmlSchemasEntity
@@ -5115,7 +5115,7 @@ unsafe fn xml_schema_compare_values_internal(
                 let xv = if x.is_null() { xvalue } else { (*x).value.str };
                 let yv = if y.is_null() { yvalue } else { (*y).value.str };
                 // TODO: Compare those against QName.
-                if ytype == XmlSchemaValType::XmlSchemasQname {
+                if ytype == XmlSchemaValType::XmlSchemasQName {
                     // todo!();
                     if y.is_null() {
                         return -2;
@@ -5124,14 +5124,14 @@ unsafe fn xml_schema_compare_values_internal(
                 }
                 if matches!(
                     ytype,
-                    XmlSchemaValType::XmlSchemasAnysimpletype
+                    XmlSchemaValType::XmlSchemasAnySimpletype
                         | XmlSchemaValType::XmlSchemasString
-                        | XmlSchemaValType::XmlSchemasNormstring
+                        | XmlSchemaValType::XmlSchemasNormString
                         | XmlSchemaValType::XmlSchemasToken
                         | XmlSchemaValType::XmlSchemasLanguage
                         | XmlSchemaValType::XmlSchemasNmtoken
                         | XmlSchemaValType::XmlSchemasName
-                        | XmlSchemaValType::XmlSchemasNcname
+                        | XmlSchemaValType::XmlSchemasNCName
                         | XmlSchemaValType::XmlSchemasID
                         | XmlSchemaValType::XmlSchemasIDREF
                         | XmlSchemaValType::XmlSchemasEntity
@@ -5176,13 +5176,13 @@ unsafe fn xml_schema_compare_values_internal(
                 }
                 return -2;
             }
-            XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation => {
+            XmlSchemaValType::XmlSchemasQName | XmlSchemaValType::XmlSchemasNotation => {
                 if x.is_null() || y.is_null() {
                     return -2;
                 }
                 if matches!(
                     ytype,
-                    XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation
+                    XmlSchemaValType::XmlSchemasQName | XmlSchemaValType::XmlSchemasNotation
                 ) {
                     if xml_str_equal((*x).value.qname.name, (*y).value.qname.name)
                         && xml_str_equal((*x).value.qname.uri, (*y).value.qname.uri)
@@ -5392,10 +5392,10 @@ unsafe fn xml_schema_validate_facet_internal(
                 if !val.is_null()
                     && !(*val).value.str.is_null()
                     && (((*val).typ as i32 >= XmlSchemaValType::XmlSchemasString as i32
-                        && (*val).typ as i32 <= XmlSchemaValType::XmlSchemasNormstring as i32)
+                        && (*val).typ as i32 <= XmlSchemaValType::XmlSchemasNormString as i32)
                         || ((*val).typ as i32 >= XmlSchemaValType::XmlSchemasToken as i32
                             && (*val).typ as i32 <= XmlSchemaValType::XmlSchemasEntities as i32
-                            && (*val).typ as i32 != XmlSchemaValType::XmlSchemasQname as i32))
+                            && (*val).typ as i32 != XmlSchemaValType::XmlSchemasQName as i32))
                 {
                     value = (*val).value.str;
                 }
@@ -5408,7 +5408,7 @@ unsafe fn xml_schema_validate_facet_internal(
                 }
                 return ret;
             }
-            XmlSchemaTypeType::XmlSchemaFacetMaxexclusive => {
+            XmlSchemaTypeType::XmlSchemaFacetMaxExclusive => {
                 ret = xml_schema_compare_values(val, (*facet).val);
                 if ret == -2 {
                     return -1;
@@ -5418,7 +5418,7 @@ unsafe fn xml_schema_validate_facet_internal(
                 }
                 return XmlParserErrors::XmlSchemavCvcMaxExclusiveValid as i32;
             }
-            XmlSchemaTypeType::XmlSchemaFacetMaxinclusive => {
+            XmlSchemaTypeType::XmlSchemaFacetMaxInclusive => {
                 ret = xml_schema_compare_values(val, (*facet).val);
                 if ret == -2 {
                     return -1;
@@ -5428,7 +5428,7 @@ unsafe fn xml_schema_validate_facet_internal(
                 }
                 return XmlParserErrors::XmlSchemavCvcMaxInclusiveValid as i32;
             }
-            XmlSchemaTypeType::XmlSchemaFacetMinexclusive => {
+            XmlSchemaTypeType::XmlSchemaFacetMinExclusive => {
                 ret = xml_schema_compare_values(val, (*facet).val);
                 if ret == -2 {
                     return -1;
@@ -5438,7 +5438,7 @@ unsafe fn xml_schema_validate_facet_internal(
                 }
                 return XmlParserErrors::XmlSchemavCvcMinExclusiveValid as i32;
             }
-            XmlSchemaTypeType::XmlSchemaFacetMininclusive => {
+            XmlSchemaTypeType::XmlSchemaFacetMinInclusive => {
                 ret = xml_schema_compare_values(val, (*facet).val);
                 if ret == -2 {
                     return -1;
@@ -5484,14 +5484,14 @@ unsafe fn xml_schema_validate_facet_internal(
                 return XmlParserErrors::XmlSchemavCvcEnumerationValid as i32;
             }
             ty @ XmlSchemaTypeType::XmlSchemaFacetLength
-            | ty @ XmlSchemaTypeType::XmlSchemaFacetMaxlength
-            | ty @ XmlSchemaTypeType::XmlSchemaFacetMinlength => {
+            | ty @ XmlSchemaTypeType::XmlSchemaFacetMaxLength
+            | ty @ XmlSchemaTypeType::XmlSchemaFacetMinLength => {
                 if matches!(ty, XmlSchemaTypeType::XmlSchemaFacetLength) {
                     // SPEC (1.3) "if {primitive type definition} is QName or NOTATION,
                     // then any {value} is facet-valid."
                     if matches!(
                         val_type,
-                        XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation
+                        XmlSchemaValType::XmlSchemasQName | XmlSchemaValType::XmlSchemasNotation
                     ) {
                         return 0;
                     }
@@ -5501,7 +5501,7 @@ unsafe fn xml_schema_validate_facet_internal(
 
                 if matches!(
                     val_type,
-                    XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation
+                    XmlSchemaValType::XmlSchemasQName | XmlSchemaValType::XmlSchemasNotation
                 ) {
                     return 0;
                 }
@@ -5523,7 +5523,7 @@ unsafe fn xml_schema_validate_facet_internal(
                 } else {
                     match val_type {
                         XmlSchemaValType::XmlSchemasString
-                        | XmlSchemaValType::XmlSchemasNormstring => {
+                        | XmlSchemaValType::XmlSchemasNormString => {
                             if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown {
                                 // This is to ensure API compatibility with the old
                                 // xmlSchemaValidateFacet(). Anyway, this was and
@@ -5548,7 +5548,7 @@ unsafe fn xml_schema_validate_facet_internal(
                         | XmlSchemaValType::XmlSchemasLanguage
                         | XmlSchemaValType::XmlSchemasNmtoken
                         | XmlSchemaValType::XmlSchemasName
-                        | XmlSchemaValType::XmlSchemasNcname
+                        | XmlSchemaValType::XmlSchemasNCName
                         | XmlSchemaValType::XmlSchemasID
                         | XmlSchemaValType::XmlSchemasAnyURI => {
                             if !value.is_null() {
@@ -5564,7 +5564,7 @@ unsafe fn xml_schema_validate_facet_internal(
                     if len as u64 != (*(*facet).val).value.decimal.lo {
                         return XmlParserErrors::XmlSchemavCvcLengthValid as i32;
                     }
-                } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
+                } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinLength {
                     if (len as u64) < (*(*facet).val).value.decimal.lo {
                         return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
                     }
@@ -5572,8 +5572,8 @@ unsafe fn xml_schema_validate_facet_internal(
                     return XmlParserErrors::XmlSchemavCvcMaxLengthValid as i32;
                 }
             }
-            XmlSchemaTypeType::XmlSchemaFacetTotaldigits
-            | XmlSchemaTypeType::XmlSchemaFacetFractiondigits => {
+            XmlSchemaTypeType::XmlSchemaFacetTotalDigits
+            | XmlSchemaTypeType::XmlSchemaFacetFractionDigits => {
                 if (*facet).val.is_null()
                     || !matches!(
                         (*(*facet).val).typ,
@@ -5605,11 +5605,11 @@ unsafe fn xml_schema_validate_facet_internal(
                 {
                     return -1;
                 }
-                if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
+                if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetTotalDigits {
                     if (*val).value.decimal.total as u64 > (*(*facet).val).value.decimal.lo {
                         return XmlParserErrors::XmlSchemavCvcTotalDigitsValid as i32;
                     }
-                } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetFractiondigits
+                } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetFractionDigits
                     && (*val).value.decimal.frac as u64 > (*(*facet).val).value.decimal.lo
                 {
                     return XmlParserErrors::XmlSchemavCvcFractionDigitsValid as i32;
@@ -5689,25 +5689,25 @@ pub unsafe fn xml_schema_free_value(mut value: XmlSchemaValPtr) {
         while !value.is_null() {
             match (*value).typ {
                 XmlSchemaValType::XmlSchemasString
-                | XmlSchemaValType::XmlSchemasNormstring
+                | XmlSchemaValType::XmlSchemasNormString
                 | XmlSchemaValType::XmlSchemasToken
                 | XmlSchemaValType::XmlSchemasLanguage
                 | XmlSchemaValType::XmlSchemasNmtoken
                 | XmlSchemaValType::XmlSchemasNmtokens
                 | XmlSchemaValType::XmlSchemasName
-                | XmlSchemaValType::XmlSchemasNcname
+                | XmlSchemaValType::XmlSchemasNCName
                 | XmlSchemaValType::XmlSchemasID
                 | XmlSchemaValType::XmlSchemasIDREF
                 | XmlSchemaValType::XmlSchemasIDREFS
                 | XmlSchemaValType::XmlSchemasEntity
                 | XmlSchemaValType::XmlSchemasEntities
                 | XmlSchemaValType::XmlSchemasAnyURI
-                | XmlSchemaValType::XmlSchemasAnysimpletype => {
+                | XmlSchemaValType::XmlSchemasAnySimpletype => {
                     if !(*value).value.str.is_null() {
                         xml_free((*value).value.str as _);
                     }
                 }
-                XmlSchemaValType::XmlSchemasNotation | XmlSchemaValType::XmlSchemasQname => {
+                XmlSchemaValType::XmlSchemasNotation | XmlSchemaValType::XmlSchemasQName => {
                     if !(*value).value.qname.uri.is_null() {
                         xml_free((*value).value.qname.uri as _);
                     }
@@ -5794,10 +5794,10 @@ pub unsafe fn xml_schema_check_facet(
         let ctxt_given = if pctxt.is_null() { 0 } else { 1 };
 
         match (*facet).typ {
-            XmlSchemaTypeType::XmlSchemaFacetMininclusive
-            | XmlSchemaTypeType::XmlSchemaFacetMinexclusive
-            | XmlSchemaTypeType::XmlSchemaFacetMaxinclusive
-            | XmlSchemaTypeType::XmlSchemaFacetMaxexclusive
+            XmlSchemaTypeType::XmlSchemaFacetMinInclusive
+            | XmlSchemaTypeType::XmlSchemaFacetMinExclusive
+            | XmlSchemaTypeType::XmlSchemaFacetMaxInclusive
+            | XmlSchemaTypeType::XmlSchemaFacetMaxExclusive
             | XmlSchemaTypeType::XmlSchemaFacetEnumeration => {
                 // Okay we need to validate the value at that point.
                 let base: XmlSchemaTypePtr;
@@ -5932,12 +5932,12 @@ pub unsafe fn xml_schema_check_facet(
                     }
                 }
             }
-            XmlSchemaTypeType::XmlSchemaFacetTotaldigits
-            | XmlSchemaTypeType::XmlSchemaFacetFractiondigits
+            XmlSchemaTypeType::XmlSchemaFacetTotalDigits
+            | XmlSchemaTypeType::XmlSchemaFacetFractionDigits
             | XmlSchemaTypeType::XmlSchemaFacetLength
-            | XmlSchemaTypeType::XmlSchemaFacetMaxlength
-            | XmlSchemaTypeType::XmlSchemaFacetMinlength => {
-                if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
+            | XmlSchemaTypeType::XmlSchemaFacetMaxLength
+            | XmlSchemaTypeType::XmlSchemaFacetMinLength => {
+                if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetTotalDigits {
                     ret = xml_schema_validate_predefined_type(
                         xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasPInteger),
                         (*facet).value,
@@ -5968,7 +5968,7 @@ pub unsafe fn xml_schema_check_facet(
                         let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
                         let facet_type = xml_schema_facet_type_to_string((*facet).typ);
                         let typename =
-                            if (*facet).typ != XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
+                            if (*facet).typ != XmlSchemaTypeType::XmlSchemaFacetTotalDigits {
                                 "nonNegativeInteger"
                             } else {
                                 "positiveInteger"
@@ -6063,7 +6063,7 @@ pub unsafe fn xml_schema_compare_values(x: XmlSchemaValPtr, y: XmlSchemaValPtr) 
         }
         let xws = if (*x).typ == XmlSchemaValType::XmlSchemasString {
             XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve
-        } else if (*x).typ == XmlSchemaValType::XmlSchemasNormstring {
+        } else if (*x).typ == XmlSchemaValType::XmlSchemasNormString {
             XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace
         } else {
             XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
@@ -6071,7 +6071,7 @@ pub unsafe fn xml_schema_compare_values(x: XmlSchemaValPtr, y: XmlSchemaValPtr) 
 
         let yws = if (*y).typ == XmlSchemaValType::XmlSchemasString {
             XmlSchemaWhitespaceValueType::XmlSchemaWhitespacePreserve
-        } else if (*y).typ == XmlSchemaValType::XmlSchemasNormstring {
+        } else if (*y).typ == XmlSchemaValType::XmlSchemasNormString {
             XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace
         } else {
             XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
@@ -6135,14 +6135,14 @@ pub unsafe fn xml_schema_validate_list_simple_type_facet(
                 }
                 return XmlParserErrors::XmlSchemavCvcLengthValid as i32;
             }
-        } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
+        } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinLength {
             if actual_len < (*(*facet).val).value.decimal.lo {
                 if !expected_len.is_null() {
                     *expected_len = (*(*facet).val).value.decimal.lo;
                 }
                 return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
             }
-        } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMaxlength {
+        } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMaxLength {
             if actual_len > (*(*facet).val).value.decimal.lo {
                 if !expected_len.is_null() {
                     *expected_len = (*(*facet).val).value.decimal.lo;
@@ -6170,16 +6170,16 @@ pub unsafe fn xml_schema_get_built_in_type(typ: XmlSchemaValType) -> XmlSchemaTy
             return null_mut();
         }
         match typ {
-            XmlSchemaValType::XmlSchemasAnysimpletype => XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
+            XmlSchemaValType::XmlSchemasAnySimpletype => XML_SCHEMA_TYPE_ANY_SIMPLE_TYPE_DEF.get(),
             XmlSchemaValType::XmlSchemasString => XML_SCHEMA_TYPE_STRING_DEF.get(),
-            XmlSchemaValType::XmlSchemasNormstring => XML_SCHEMA_TYPE_NORM_STRING_DEF.get(),
+            XmlSchemaValType::XmlSchemasNormString => XML_SCHEMA_TYPE_NORM_STRING_DEF.get(),
             XmlSchemaValType::XmlSchemasDecimal => XML_SCHEMA_TYPE_DECIMAL_DEF.get(),
             XmlSchemaValType::XmlSchemasTime => XML_SCHEMA_TYPE_TIME_DEF.get(),
-            XmlSchemaValType::XmlSchemasGday => XML_SCHEMA_TYPE_GDAY_DEF.get(),
-            XmlSchemaValType::XmlSchemasGmonth => XML_SCHEMA_TYPE_GMONTH_DEF.get(),
-            XmlSchemaValType::XmlSchemasGmonthday => XML_SCHEMA_TYPE_GMONTH_DAY_DEF.get(),
-            XmlSchemaValType::XmlSchemasGyear => XML_SCHEMA_TYPE_GYEAR_DEF.get(),
-            XmlSchemaValType::XmlSchemasGyearmonth => XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.get(),
+            XmlSchemaValType::XmlSchemasGDay => XML_SCHEMA_TYPE_GDAY_DEF.get(),
+            XmlSchemaValType::XmlSchemasGMonth => XML_SCHEMA_TYPE_GMONTH_DEF.get(),
+            XmlSchemaValType::XmlSchemasGMonthDay => XML_SCHEMA_TYPE_GMONTH_DAY_DEF.get(),
+            XmlSchemaValType::XmlSchemasGYear => XML_SCHEMA_TYPE_GYEAR_DEF.get(),
+            XmlSchemaValType::XmlSchemasGYearMonth => XML_SCHEMA_TYPE_GYEAR_MONTH_DEF.get(),
             XmlSchemaValType::XmlSchemasDate => XML_SCHEMA_TYPE_DATE_DEF.get(),
             XmlSchemaValType::XmlSchemasDatetime => XML_SCHEMA_TYPE_DATETIME_DEF.get(),
             XmlSchemaValType::XmlSchemasDuration => XML_SCHEMA_TYPE_DURATION_DEF.get(),
@@ -6191,8 +6191,8 @@ pub unsafe fn xml_schema_get_built_in_type(typ: XmlSchemaValType) -> XmlSchemaTy
             XmlSchemaValType::XmlSchemasNmtoken => XML_SCHEMA_TYPE_NMTOKEN_DEF.get(),
             XmlSchemaValType::XmlSchemasNmtokens => XML_SCHEMA_TYPE_NMTOKENS_DEF.get(),
             XmlSchemaValType::XmlSchemasName => XML_SCHEMA_TYPE_NAME_DEF.get(),
-            XmlSchemaValType::XmlSchemasQname => XML_SCHEMA_TYPE_QNAME_DEF.get(),
-            XmlSchemaValType::XmlSchemasNcname => XML_SCHEMA_TYPE_NCNAME_DEF.get(),
+            XmlSchemaValType::XmlSchemasQName => XML_SCHEMA_TYPE_QNAME_DEF.get(),
+            XmlSchemaValType::XmlSchemasNCName => XML_SCHEMA_TYPE_NCNAME_DEF.get(),
             XmlSchemaValType::XmlSchemasID => XML_SCHEMA_TYPE_ID_DEF.get(),
             XmlSchemaValType::XmlSchemasIDREF => XML_SCHEMA_TYPE_IDREF_DEF.get(),
             XmlSchemaValType::XmlSchemasIDREFS => XML_SCHEMA_TYPE_IDREFS_DEF.get(),
@@ -6247,13 +6247,13 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
             }
             Ok(XmlSchemaValType::XmlSchemasString)
             | Ok(XmlSchemaValType::XmlSchemasNotation)
-            | Ok(XmlSchemaValType::XmlSchemasQname)
+            | Ok(XmlSchemaValType::XmlSchemasQName)
             | Ok(XmlSchemaValType::XmlSchemasAnyURI)
             | Ok(XmlSchemaValType::XmlSchemasBase64binary)
             | Ok(XmlSchemaValType::XmlSchemasHexbinary) => {
                 if facet_type == XmlSchemaTypeType::XmlSchemaFacetLength as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinlength as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxlength as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinLength as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxLength as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetEnumeration as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
@@ -6264,15 +6264,15 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
                 }
             }
             Ok(XmlSchemaValType::XmlSchemasDecimal) => {
-                if facet_type == XmlSchemaTypeType::XmlSchemaFacetTotaldigits as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetFractiondigits as i32
+                if facet_type == XmlSchemaTypeType::XmlSchemaFacetTotalDigits as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetFractionDigits as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetEnumeration as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxinclusive as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxexclusive as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMininclusive as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinexclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxInclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxExclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinInclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinExclusive as i32
                 {
                     return 1;
                 } else {
@@ -6280,11 +6280,11 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
                 }
             }
             Ok(XmlSchemaValType::XmlSchemasTime)
-            | Ok(XmlSchemaValType::XmlSchemasGday)
-            | Ok(XmlSchemaValType::XmlSchemasGmonth)
-            | Ok(XmlSchemaValType::XmlSchemasGmonthday)
-            | Ok(XmlSchemaValType::XmlSchemasGyear)
-            | Ok(XmlSchemaValType::XmlSchemasGyearmonth)
+            | Ok(XmlSchemaValType::XmlSchemasGDay)
+            | Ok(XmlSchemaValType::XmlSchemasGMonth)
+            | Ok(XmlSchemaValType::XmlSchemasGMonthDay)
+            | Ok(XmlSchemaValType::XmlSchemasGYear)
+            | Ok(XmlSchemaValType::XmlSchemasGYearMonth)
             | Ok(XmlSchemaValType::XmlSchemasDate)
             | Ok(XmlSchemaValType::XmlSchemasDatetime)
             | Ok(XmlSchemaValType::XmlSchemasDuration)
@@ -6293,10 +6293,10 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
                 if facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetEnumeration as i32
                     || facet_type == XmlSchemaTypeType::XmlSchemaFacetWhitespace as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxinclusive as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxexclusive as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMininclusive as i32
-                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinexclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxInclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxExclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinInclusive as i32
+                    || facet_type == XmlSchemaTypeType::XmlSchemaFacetMinExclusive as i32
                 {
                     return 1;
                 } else {
@@ -6347,8 +6347,8 @@ unsafe fn xml_schema_validate_length_facet_internal(
         if !matches!(
             (*facet).typ,
             XmlSchemaTypeType::XmlSchemaFacetLength
-                | XmlSchemaTypeType::XmlSchemaFacetMaxlength
-                | XmlSchemaTypeType::XmlSchemaFacetMinlength
+                | XmlSchemaTypeType::XmlSchemaFacetMaxLength
+                | XmlSchemaTypeType::XmlSchemaFacetMinLength
         ) {
             return -1;
         }
@@ -6370,7 +6370,7 @@ unsafe fn xml_schema_validate_length_facet_internal(
             len = (*val).value.base64.total;
         } else {
             match val_type {
-            XmlSchemaValType::XmlSchemasString | XmlSchemaValType::XmlSchemasNormstring => {
+            XmlSchemaValType::XmlSchemasString | XmlSchemaValType::XmlSchemasNormString => {
                 if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown {
                     // This is to ensure API compatibility with the old
                     // xmlSchemaValidateLengthFacet(). Anyway, this was and
@@ -6395,7 +6395,7 @@ unsafe fn xml_schema_validate_length_facet_internal(
             | XmlSchemaValType::XmlSchemasLanguage
             | XmlSchemaValType::XmlSchemasNmtoken
             | XmlSchemaValType::XmlSchemasName
-            | XmlSchemaValType::XmlSchemasNcname
+            | XmlSchemaValType::XmlSchemasNCName
             | XmlSchemaValType::XmlSchemasID
             // FIXME: What exactly to do with anyURI?
             | XmlSchemaValType::XmlSchemasAnyURI => {
@@ -6403,7 +6403,7 @@ unsafe fn xml_schema_validate_length_facet_internal(
                     len = xml_schema_norm_len(value) as _;
                 }
             }
-            XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation => {
+            XmlSchemaValType::XmlSchemasQName | XmlSchemaValType::XmlSchemasNotation => {
                 // For QName and NOTATION, those facets are
                 // deprecated and should be ignored.
                 return 0;
@@ -6420,7 +6420,7 @@ unsafe fn xml_schema_validate_length_facet_internal(
             if len as u64 != (*(*facet).val).value.decimal.lo {
                 return XmlParserErrors::XmlSchemavCvcLengthValid as i32;
             }
-        } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinlength {
+        } else if (*facet).typ == XmlSchemaTypeType::XmlSchemaFacetMinLength {
             if (len as u64) < (*(*facet).val).value.decimal.lo {
                 return XmlParserErrors::XmlSchemavCvcMinLengthValid as i32;
             }
@@ -6536,7 +6536,7 @@ pub unsafe fn xml_schema_get_canon_value(
                     *ret_value = xml_strdup((*val).value.str);
                 }
             }
-            XmlSchemaValType::XmlSchemasNormstring => {
+            XmlSchemaValType::XmlSchemasNormString => {
                 if (*val).value.str.is_null() {
                     *ret_value = xml_strdup(c"".as_ptr() as _);
                 } else {
@@ -6557,7 +6557,7 @@ pub unsafe fn xml_schema_get_canon_value(
             | XmlSchemaValType::XmlSchemasLanguage
             | XmlSchemaValType::XmlSchemasNmtoken
             | XmlSchemaValType::XmlSchemasName
-            | XmlSchemaValType::XmlSchemasNcname
+            | XmlSchemaValType::XmlSchemasNCName
             | XmlSchemaValType::XmlSchemasID
             | XmlSchemaValType::XmlSchemasIDREF
             | XmlSchemaValType::XmlSchemasEntity
@@ -6577,7 +6577,7 @@ pub unsafe fn xml_schema_get_canon_value(
                     *ret_value = xml_strdup((*val).value.str);
                 }
             }
-            XmlSchemaValType::XmlSchemasQname => {
+            XmlSchemaValType::XmlSchemasQName => {
                 // TODO: Unclear in XML Schema 1.0.
                 if (*val).value.qname.uri.is_null() {
                     *ret_value = xml_strdup((*val).value.qname.name);
@@ -6818,7 +6818,7 @@ pub unsafe fn xml_schema_get_canon_value(
                 }
                 *ret_value = xml_strdup(buf.as_ptr() as _);
             }
-            XmlSchemaValType::XmlSchemasGyear => {
+            XmlSchemaValType::XmlSchemasGYear => {
                 let mut buf: [c_char; 30] = [0; 30];
                 // TODO: Unclear in XML Schema 1.0
                 // TODO: What to do with the timezone?
@@ -6830,7 +6830,7 @@ pub unsafe fn xml_schema_get_canon_value(
                 );
                 *ret_value = xml_strdup(buf.as_ptr() as _);
             }
-            XmlSchemaValType::XmlSchemasGmonth => {
+            XmlSchemaValType::XmlSchemasGMonth => {
                 // TODO: Unclear in XML Schema 1.0
                 // TODO: What to do with the timezone?
                 *ret_value = xml_malloc(6) as _;
@@ -6844,7 +6844,7 @@ pub unsafe fn xml_schema_get_canon_value(
                     (*val).value.date.mon,
                 );
             }
-            XmlSchemaValType::XmlSchemasGday => {
+            XmlSchemaValType::XmlSchemasGDay => {
                 // TODO: Unclear in XML Schema 1.0
                 // TODO: What to do with the timezone?
                 *ret_value = xml_malloc(6) as _;
@@ -6858,7 +6858,7 @@ pub unsafe fn xml_schema_get_canon_value(
                     (*val).value.date.day,
                 );
             }
-            XmlSchemaValType::XmlSchemasGmonthday => {
+            XmlSchemaValType::XmlSchemasGMonthDay => {
                 // TODO: Unclear in XML Schema 1.0
                 // TODO: What to do with the timezone?
                 *ret_value = xml_malloc(8) as _;
@@ -6873,7 +6873,7 @@ pub unsafe fn xml_schema_get_canon_value(
                     (*val).value.date.day,
                 );
             }
-            XmlSchemaValType::XmlSchemasGyearmonth => {
+            XmlSchemaValType::XmlSchemasGYearMonth => {
                 let mut buf: [c_char; 35] = [0; 35];
                 // TODO: Unclear in XML Schema 1.0
                 // TODO: What to do with the timezone?
@@ -7091,7 +7091,7 @@ pub unsafe fn xml_schema_get_canon_value_whtsp(
                     *ret_value = xml_strdup((*val).value.str);
                 }
             }
-            XmlSchemaValType::XmlSchemasNormstring => {
+            XmlSchemaValType::XmlSchemasNormString => {
                 if (*val).value.str.is_null() {
                     *ret_value = xml_strdup(c"".as_ptr() as _);
                 } else {
@@ -7164,13 +7164,13 @@ pub unsafe fn xml_schema_value_get_as_string(val: XmlSchemaValPtr) -> *const Xml
         }
         match (*val).typ {
             XmlSchemaValType::XmlSchemasString
-            | XmlSchemaValType::XmlSchemasNormstring
-            | XmlSchemaValType::XmlSchemasAnysimpletype
+            | XmlSchemaValType::XmlSchemasNormString
+            | XmlSchemaValType::XmlSchemasAnySimpletype
             | XmlSchemaValType::XmlSchemasToken
             | XmlSchemaValType::XmlSchemasLanguage
             | XmlSchemaValType::XmlSchemasNmtoken
             | XmlSchemaValType::XmlSchemasName
-            | XmlSchemaValType::XmlSchemasNcname
+            | XmlSchemaValType::XmlSchemasNCName
             | XmlSchemaValType::XmlSchemasID
             | XmlSchemaValType::XmlSchemasIDREF
             | XmlSchemaValType::XmlSchemasEntity
@@ -7256,7 +7256,7 @@ pub unsafe fn xml_schema_new_qname_value(
     local_name: *const XmlChar,
 ) -> XmlSchemaValPtr {
     unsafe {
-        let val: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasQname);
+        let val: XmlSchemaValPtr = xml_schema_new_value(XmlSchemaValType::XmlSchemasQName);
         if val.is_null() {
             return null_mut();
         }
@@ -7314,13 +7314,13 @@ pub unsafe fn xml_schema_copy_value(mut val: XmlSchemaValPtr) -> XmlSchemaValPtr
                     xml_schema_free_value(ret);
                     return null_mut();
                 }
-                XmlSchemaValType::XmlSchemasAnysimpletype
+                XmlSchemaValType::XmlSchemasAnySimpletype
                 | XmlSchemaValType::XmlSchemasString
-                | XmlSchemaValType::XmlSchemasNormstring
+                | XmlSchemaValType::XmlSchemasNormString
                 | XmlSchemaValType::XmlSchemasToken
                 | XmlSchemaValType::XmlSchemasLanguage
                 | XmlSchemaValType::XmlSchemasName
-                | XmlSchemaValType::XmlSchemasNcname
+                | XmlSchemaValType::XmlSchemasNCName
                 | XmlSchemaValType::XmlSchemasID
                 | XmlSchemaValType::XmlSchemasIDREF
                 | XmlSchemaValType::XmlSchemasEntity
@@ -7331,7 +7331,7 @@ pub unsafe fn xml_schema_copy_value(mut val: XmlSchemaValPtr) -> XmlSchemaValPtr
                         (*cur).value.str = xml_strdup((*val).value.str);
                     }
                 }
-                XmlSchemaValType::XmlSchemasQname | XmlSchemaValType::XmlSchemasNotation => {
+                XmlSchemaValType::XmlSchemasQName | XmlSchemaValType::XmlSchemasNotation => {
                     cur = xml_schema_dup_val(val);
                     if !(*val).value.qname.name.is_null() {
                         (*cur).value.qname.name = xml_strdup((*val).value.qname.name);
