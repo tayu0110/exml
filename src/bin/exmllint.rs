@@ -76,8 +76,7 @@ use exml::{
         },
         xmlreader::XmlTextReaderPtr,
         xmlschemas::{
-            XmlSchema, XmlSchemaValidCtxtPtr, xml_schema_free, xml_schema_free_valid_ctxt,
-            xml_schema_new_valid_ctxt, xml_schema_parse, xml_schema_set_valid_errors,
+            XmlSchema, xml_schema_free, xml_schema_parse, xml_schema_set_valid_errors,
             xml_schema_validate_doc, xml_schema_validate_set_filename, xml_schema_validate_stream,
         },
         xmlstring::XmlChar,
@@ -100,7 +99,8 @@ use exml::{
         xml_free_dtd, xml_new_doc, xml_new_doc_node,
     },
     xmlschemas::context::{
-        XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+        XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free_parser_ctxt,
+        xml_schema_free_valid_ctxt, xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
     },
     xpath::{XmlXPathObjectPtr, xml_xpath_order_doc_elems},
 };

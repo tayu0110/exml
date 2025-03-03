@@ -64,8 +64,7 @@ use crate::{
             xml_xinclude_set_flags, xml_xinclude_set_streaming_mode,
         },
         xmlschemas::{
-            XmlSchemaPtr, XmlSchemaSAXPlugPtr, XmlSchemaValidCtxtPtr, xml_schema_free,
-            xml_schema_free_valid_ctxt, xml_schema_is_valid, xml_schema_new_valid_ctxt,
+            XmlSchemaPtr, XmlSchemaSAXPlugPtr, xml_schema_free, xml_schema_is_valid,
             xml_schema_parse, xml_schema_sax_plug, xml_schema_sax_unplug,
             xml_schema_set_valid_errors, xml_schema_set_valid_structured_errors,
             xml_schema_validate_set_locator,
@@ -78,6 +77,7 @@ use crate::{
         xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
         xml_free_ns_list, xml_new_doc_text,
     },
+    xmlschemas::context::XmlSchemaValidCtxtPtr,
 };
 
 /// How severe an error callback is when the per-reader error callback API is used.
@@ -3196,6 +3196,8 @@ pub unsafe fn xml_new_text_reader_filename(uri: &str) -> XmlTextReaderPtr {
 #[doc(alias = "xmlFreeTextReader")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
+    use crate::xmlschemas::context::xml_schema_free_valid_ctxt;
+
     unsafe {
         use std::ptr::drop_in_place;
 
@@ -4914,7 +4916,8 @@ unsafe fn xml_text_reader_schema_validate_internal(
     _options: i32,
 ) -> i32 {
     use crate::xmlschemas::context::{
-        XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+        XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
+        xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
     };
 
     unsafe {
@@ -5070,6 +5073,8 @@ pub unsafe fn xml_text_reader_schema_validate_ctxt(
 #[doc(alias = "xmlTextReaderSetSchema")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSchemaPtr) -> i32 {
+    use crate::xmlschemas::context::{xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt};
+
     unsafe {
         if reader.is_null() {
             return -1;

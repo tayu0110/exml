@@ -1,23 +1,39 @@
-use std::ptr::{null, null_mut};
+use std::{
+    cell::RefCell,
+    ffi::c_void,
+    ptr::{null, null_mut},
+    rc::Rc,
+};
 
 use crate::{
     dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_lookup},
+    encoding::XmlCharEncoding,
     globals::{GenericError, GenericErrorContext, StructuredError},
+    io::XmlParserInputBuffer,
     libxml::{
+        globals::{xml_free, xml_malloc},
         schemas_internals::xml_schema_item_list_free,
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
+        xmlreader::XmlTextReaderPtr,
+        xmlregexp::XmlRegExecCtxtPtr,
         xmlschemas::{
-            XML_SCHEMA_CTXT_PARSER, XmlSchemaBucketPtr, XmlSchemaConstructionCtxtPtr,
-            XmlSchemaItemListPtr, XmlSchemaPtr, XmlSchemaRedefPtr, XmlSchemaValidCtxtPtr,
-            xml_schema_construction_ctxt_free, xml_schema_free_valid_ctxt,
+            XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR, XmlSchemaAttrInfoPtr,
+            XmlSchemaBucketPtr, XmlSchemaConstructionCtxtPtr, XmlSchemaIDCAugPtr,
+            XmlSchemaIDCMatcherPtr, XmlSchemaIDCStateObjPtr, XmlSchemaItemListPtr,
+            XmlSchemaNodeInfoPtr, XmlSchemaPSVIIDCKeyPtr, XmlSchemaPSVIIDCNodePtr, XmlSchemaPtr,
+            XmlSchemaRedefPtr, XmlSchemaValidityLocatorFunc, xml_schema_clear_attr_infos,
+            xml_schema_clear_elem_info, xml_schema_construction_ctxt_free,
+            xml_schema_free_idc_state_obj_list, xml_schema_idc_free_key,
             xml_schema_item_list_create, xml_schema_set_valid_errors,
             xml_schema_set_valid_structured_errors,
         },
+        xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_value},
     },
-    tree::{XmlDocPtr, xml_free_doc},
+    parser::XmlParserCtxtPtr,
+    tree::{XmlDocPtr, XmlNodePtr, xml_free_doc},
 };
 
-use super::items::XmlSchemaTypePtr;
+use super::{error::xml_schema_verr_memory, items::XmlSchemaTypePtr};
 
 /// A schemas validation context
 #[doc(alias = "xmlSchemaParserCtxtPtr")]
@@ -274,5 +290,249 @@ pub unsafe fn xml_schema_free_parser_ctxt(ctxt: XmlSchemaParserCtxtPtr) {
         }
         xml_dict_free((*ctxt).dict);
         let _ = Box::from_raw(ctxt);
+    }
+}
+
+#[doc(alias = "xmlSchemaValidCtxtPtr")]
+pub type XmlSchemaValidCtxtPtr = *mut XmlSchemaValidCtxt;
+/// A Schemas validation context
+#[doc(alias = "xmlSchemaValidCtxt")]
+#[repr(C)]
+pub struct XmlSchemaValidCtxt {
+    typ: i32,
+    pub(crate) err_ctxt: Option<GenericErrorContext>, /* user specific data block */
+    pub(crate) error: Option<GenericError>,           /* the callback in case of errors */
+    pub(crate) warning: Option<GenericError>,         /* the callback in case of warning */
+    pub(crate) serror: Option<StructuredError>,
+
+    pub(crate) schema: XmlSchemaPtr, /* The schema in use */
+    pub(crate) doc: Option<XmlDocPtr>,
+    pub(crate) input: Option<Rc<RefCell<XmlParserInputBuffer>>>,
+    pub(crate) enc: XmlCharEncoding,
+    // sax: XmlSAXHandlerPtr,
+    pub(crate) parser_ctxt: XmlParserCtxtPtr,
+    user_data: *mut c_void, /* TODO: What is this for? */
+    pub(crate) filename: *mut i8,
+
+    pub(crate) err: i32,
+    pub(crate) nberrors: i32,
+
+    pub(crate) node: Option<XmlNodePtr>,
+    cur: Option<XmlNodePtr>,
+    /* typ: XmlSchemaTypePtr, */
+    regexp: XmlRegExecCtxtPtr,
+    pub(crate) value: XmlSchemaValPtr,
+
+    value_ws: i32,
+    pub(crate) options: i32,
+    pub(crate) validation_root: Option<XmlNodePtr>,
+    pub(crate) pctxt: XmlSchemaParserCtxtPtr,
+    pub(crate) xsi_assemble: i32,
+
+    pub(crate) depth: i32,
+    pub(crate) elem_infos: *mut XmlSchemaNodeInfoPtr, /* array of element information */
+    pub(crate) size_elem_infos: i32,
+    pub(crate) inode: XmlSchemaNodeInfoPtr, /* the current element information */
+
+    pub(crate) aidcs: XmlSchemaIDCAugPtr, /* a list of augmented IDC information */
+
+    pub(crate) xpath_states: XmlSchemaIDCStateObjPtr, /* first active state object. */
+    pub(crate) xpath_state_pool: XmlSchemaIDCStateObjPtr, /* first stored state object. */
+    pub(crate) idc_matcher_cache: XmlSchemaIDCMatcherPtr, /* Cache for IDC matcher objects. */
+
+    pub(crate) idc_nodes: *mut XmlSchemaPSVIIDCNodePtr, /* list of all IDC node-table entries*/
+    pub(crate) nb_idc_nodes: i32,
+    pub(crate) size_idc_nodes: i32,
+
+    pub(crate) idc_keys: *mut XmlSchemaPSVIIDCKeyPtr, /* list of all IDC node-table entries */
+    pub(crate) nb_idc_keys: i32,
+    pub(crate) size_idc_keys: i32,
+
+    pub(crate) flags: i32,
+
+    pub(crate) dict: XmlDictPtr,
+
+    #[cfg(feature = "libxml_reader")]
+    pub(crate) reader: XmlTextReaderPtr,
+
+    pub(crate) attr_infos: *mut XmlSchemaAttrInfoPtr,
+    pub(crate) nb_attr_infos: i32,
+    pub(crate) size_attr_infos: i32,
+
+    pub(crate) skip_depth: i32,
+    pub(crate) node_qnames: XmlSchemaItemListPtr,
+    pub(crate) has_keyrefs: i32,
+    pub(crate) create_idcnode_tables: i32,
+    pub(crate) psvi_expose_idcnode_tables: i32,
+
+    /* Locator for error reporting in streaming mode */
+    pub(crate) loc_func: Option<XmlSchemaValidityLocatorFunc>,
+    pub(crate) loc_ctxt: *mut c_void,
+}
+
+impl Default for XmlSchemaValidCtxt {
+    fn default() -> Self {
+        Self {
+            typ: XML_SCHEMA_CTXT_VALIDATOR,
+            err_ctxt: None,
+            error: None,
+            warning: None,
+            serror: None,
+            schema: null_mut(),
+            doc: None,
+            input: None,
+            enc: XmlCharEncoding::None,
+            parser_ctxt: null_mut(),
+            user_data: null_mut(),
+            filename: null_mut(),
+            err: 0,
+            nberrors: 0,
+            node: None,
+            cur: None,
+            regexp: null_mut(),
+            value: null_mut(),
+            value_ws: 0,
+            options: 0,
+            validation_root: None,
+            pctxt: null_mut(),
+            xsi_assemble: 0,
+            depth: 0,
+            elem_infos: null_mut(),
+            size_elem_infos: 0,
+            inode: null_mut(),
+            aidcs: null_mut(),
+            xpath_states: null_mut(),
+            xpath_state_pool: null_mut(),
+            idc_matcher_cache: null_mut(),
+            idc_nodes: null_mut(),
+            nb_idc_nodes: 0,
+            size_idc_nodes: 0,
+            idc_keys: null_mut(),
+            nb_idc_keys: 0,
+            size_idc_keys: 0,
+            flags: 0,
+            dict: null_mut(),
+            reader: null_mut(),
+            attr_infos: null_mut(),
+            nb_attr_infos: 0,
+            size_attr_infos: 0,
+            skip_depth: 0,
+            node_qnames: null_mut(),
+            has_keyrefs: 0,
+            create_idcnode_tables: 0,
+            psvi_expose_idcnode_tables: 0,
+            loc_func: None,
+            loc_ctxt: null_mut(),
+        }
+    }
+}
+
+/// Create an XML Schemas validation context based on the given schema.
+///
+/// Returns the validation context or NULL in case of error
+#[doc(alias = "xmlSchemaNewValidCtxt")]
+pub unsafe fn xml_schema_new_valid_ctxt(schema: XmlSchemaPtr) -> XmlSchemaValidCtxtPtr {
+    unsafe {
+        let ret: XmlSchemaValidCtxtPtr =
+            xml_malloc(size_of::<XmlSchemaValidCtxt>()) as XmlSchemaValidCtxtPtr;
+        if ret.is_null() {
+            xml_schema_verr_memory(null_mut(), "allocating validation context", None);
+            return null_mut();
+        }
+        std::ptr::write(&mut *ret, XmlSchemaValidCtxt::default());
+        (*ret).typ = XML_SCHEMA_CTXT_VALIDATOR;
+        (*ret).dict = xml_dict_create();
+        (*ret).node_qnames = xml_schema_item_list_create();
+        (*ret).schema = schema;
+        ret
+    }
+}
+
+/// Free the resources associated to the schema validation context
+#[doc(alias = "xmlSchemaFreeValidCtxt")]
+pub unsafe fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr) {
+    unsafe {
+        if ctxt.is_null() {
+            return;
+        }
+        if !(*ctxt).value.is_null() {
+            xml_schema_free_value((*ctxt).value);
+        }
+        if !(*ctxt).pctxt.is_null() {
+            xml_schema_free_parser_ctxt((*ctxt).pctxt);
+        }
+        if !(*ctxt).idc_nodes.is_null() {
+            let mut item: XmlSchemaPSVIIDCNodePtr;
+
+            for i in 0..(*ctxt).nb_idc_nodes {
+                item = *(*ctxt).idc_nodes.add(i as usize) as _;
+                xml_free((*item).keys as _);
+                xml_free(item as _);
+            }
+            xml_free((*ctxt).idc_nodes as _);
+        }
+        if !(*ctxt).idc_keys.is_null() {
+            for i in 0..(*ctxt).nb_idc_keys {
+                xml_schema_idc_free_key(*(*ctxt).idc_keys.add(i as usize));
+            }
+            xml_free((*ctxt).idc_keys as _);
+        }
+
+        if !(*ctxt).xpath_states.is_null() {
+            xml_schema_free_idc_state_obj_list((*ctxt).xpath_states);
+            (*ctxt).xpath_states = null_mut();
+        }
+        if !(*ctxt).xpath_state_pool.is_null() {
+            xml_schema_free_idc_state_obj_list((*ctxt).xpath_state_pool);
+            (*ctxt).xpath_state_pool = null_mut();
+        }
+
+        // Augmented IDC information.
+        if !(*ctxt).aidcs.is_null() {
+            let mut cur: XmlSchemaIDCAugPtr = (*ctxt).aidcs;
+            let mut next: XmlSchemaIDCAugPtr;
+            while {
+                next = (*cur).next;
+                xml_free(cur as _);
+                cur = next;
+                !cur.is_null()
+            } {}
+        }
+        if !(*ctxt).attr_infos.is_null() {
+            let mut attr: XmlSchemaAttrInfoPtr;
+
+            // Just a paranoid call to the cleanup.
+            if (*ctxt).nb_attr_infos != 0 {
+                xml_schema_clear_attr_infos(ctxt);
+            }
+            for i in 0..(*ctxt).size_attr_infos {
+                attr = *(*ctxt).attr_infos.add(i as usize);
+                xml_free(attr as _);
+            }
+            xml_free((*ctxt).attr_infos as _);
+        }
+        if !(*ctxt).elem_infos.is_null() {
+            let mut ei: XmlSchemaNodeInfoPtr;
+
+            for i in 0..(*ctxt).size_elem_infos {
+                ei = *(*ctxt).elem_infos.add(i as usize);
+                if ei.is_null() {
+                    break;
+                }
+                xml_schema_clear_elem_info(ctxt, ei);
+                xml_free(ei as _);
+            }
+            xml_free((*ctxt).elem_infos as _);
+        }
+        if !(*ctxt).node_qnames.is_null() {
+            xml_schema_item_list_free((*ctxt).node_qnames);
+        }
+        if !(*ctxt).dict.is_null() {
+            xml_dict_free((*ctxt).dict);
+        }
+        if !(*ctxt).filename.is_null() {
+            xml_free((*ctxt).filename as _);
+        }
+        xml_free(ctxt as _);
     }
 }

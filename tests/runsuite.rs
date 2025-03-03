@@ -32,8 +32,7 @@ use exml::{
             xml_memory_dump, xml_memory_strdup,
         },
         xmlschemas::{
-            XmlSchemaPtr, XmlSchemaValidCtxtPtr, xml_schema_free, xml_schema_free_valid_ctxt,
-            xml_schema_new_valid_ctxt, xml_schema_parse, xml_schema_set_valid_errors,
+            XmlSchemaPtr, xml_schema_free, xml_schema_parse, xml_schema_set_valid_errors,
             xml_schema_validate_doc,
         },
         xmlschemastypes::xml_schema_init_types,
@@ -50,7 +49,8 @@ use exml::{
     tree::{XmlGenericNodePtr, XmlNode, xml_free_doc},
     uri::build_uri,
     xmlschemas::context::{
-        XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+        XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free_parser_ctxt,
+        xml_schema_free_valid_ctxt, xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
     },
     xpath::{
         XmlXPathCompExprPtr, XmlXPathContext, XmlXPathObjectPtr, XmlXPathObjectType,

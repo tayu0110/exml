@@ -24,6 +24,8 @@ use const_format::concatcp;
 use exml::libxml::c14n::XmlC14NMode;
 #[cfg(feature = "schematron")]
 use exml::libxml::schematron::XmlSchematronPtr;
+#[cfg(feature = "schema")]
+use exml::libxml::xmlschemas::XmlSchemaPtr;
 use exml::{
     SYSCONFDIR,
     error::{
@@ -59,7 +61,6 @@ use exml::{
         },
         xmlreader::XmlTextReaderPtr,
         xmlregexp::XmlRegexpPtr,
-        xmlschemas::{XmlSchemaPtr, XmlSchemaValidCtxtPtr},
         xmlschemastypes::xml_schema_init_types,
         xmlstring::XmlChar,
     },
@@ -3401,11 +3402,12 @@ unsafe fn schemas_one_test(
     options: i32,
     schemas: XmlSchemaPtr,
 ) -> i32 {
+    use exml::xmlschemas::context::{
+        XmlSchemaValidCtxtPtr, xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt,
+    };
+
     unsafe {
-        use exml::libxml::xmlschemas::{
-            xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt, xml_schema_set_valid_errors,
-            xml_schema_validate_doc,
-        };
+        use exml::libxml::xmlschemas::{xml_schema_set_valid_errors, xml_schema_validate_doc};
 
         let mut ret: i32 = 0;
 
@@ -3488,8 +3490,11 @@ unsafe fn schemas_test(
     _errr: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::xmlschemas::context::{
-        XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+    use exml::{
+        libxml::xmlschemas::XmlSchemaPtr,
+        xmlschemas::context::{
+            XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
+        },
     };
 
     unsafe {

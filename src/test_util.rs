@@ -28,7 +28,7 @@ use crate::{
         xmlmodule::XmlModulePtr,
         xmlreader::{XmlTextReaderLocatorPtr, XmlTextReaderPtr},
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr, XmlRegexpPtr},
-        xmlschemas::{XmlSchemaPtr, XmlSchemaValidCtxtPtr},
+        xmlschemas::XmlSchemaPtr,
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::XmlChar,
     },
@@ -45,7 +45,10 @@ use crate::{
 #[cfg(feature = "schema")]
 use crate::{
     relaxng::XmlRelaxNGValidCtxtPtr,
-    xmlschemas::{context::XmlSchemaParserCtxtPtr, items::XmlSchemaTypePtr},
+    xmlschemas::{
+        context::{XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr},
+        items::XmlSchemaTypePtr,
+    },
 };
 
 pub(crate) static TEST_CATALOG_LOCK: Mutex<()> = Mutex::new(());

@@ -105,7 +105,7 @@ use crate::{
             xml_automata_new_once_trans2, xml_automata_new_state, xml_automata_new_transition2,
             xml_automata_set_final_state, xml_free_automata, xml_new_automata,
         },
-        xmlreader::{XmlTextReaderPtr, xml_text_reader_lookup_namespace},
+        xmlreader::xml_text_reader_lookup_namespace,
         xmlregexp::{
             XmlRegExecCtxtPtr, xml_reg_exec_err_info, xml_reg_exec_next_values,
             xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_free_exec_ctxt,
@@ -144,8 +144,8 @@ use crate::{
     uri::build_uri,
     xmlschemas::{
         context::{
-            XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
-            xml_schema_parser_ctxt_create,
+            XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free_parser_ctxt,
+            xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt, xml_schema_parser_ctxt_create,
         },
         error::{
             xml_schema_complex_type_err, xml_schema_custom_err, xml_schema_custom_err4,
@@ -157,6 +157,7 @@ use crate::{
             xml_schema_pillegal_facet_atomic_err, xml_schema_pillegal_facet_list_union_err,
             xml_schema_pmissing_attr_err, xml_schema_pmutual_excl_attr_err,
             xml_schema_pres_comp_attr_err, xml_schema_psimple_type_err, xml_schema_simple_type_err,
+            xml_schema_verr_memory,
         },
         items::{
             XmlSchemaAnnotItemPtr, XmlSchemaAttribute, XmlSchemaAttributeGroup,
@@ -730,10 +731,10 @@ pub type XmlSchemaIDCAugPtr = *mut XmlSchemaIDCAug;
 #[doc(alias = "xmlSchemaIDCAug")]
 #[repr(C)]
 pub struct XmlSchemaIDCAug {
-    next: XmlSchemaIDCAugPtr, /* next in a list */
-    def: XmlSchemaIDCPtr,     /* the IDC definition */
-    keyref_depth: i32,        /* the lowest tree level to which IDC
-                              tables need to be bubbled upwards */
+    pub(crate) next: XmlSchemaIDCAugPtr, /* next in a list */
+    def: XmlSchemaIDCPtr,                /* the IDC definition */
+    keyref_depth: i32,                   /* the lowest tree level to which IDC
+                                         tables need to be bubbled upwards */
 }
 
 #[doc(alias = "xmlSchemaPSVIIDCKeyPtr")]
@@ -753,7 +754,7 @@ pub type XmlSchemaPSVIIDCNodePtr = *mut XmlSchemaPSVIIDCNode;
 #[repr(C)]
 pub struct XmlSchemaPSVIIDCNode {
     node: Option<XmlNodePtr>,
-    keys: *mut XmlSchemaPSVIIDCKeyPtr,
+    pub(crate) keys: *mut XmlSchemaPSVIIDCKeyPtr,
     pub(crate) node_line: i32,
     pub(crate) node_qname_id: i32,
 }
@@ -917,82 +918,6 @@ pub struct XmlSchemaAttrInfo {
 }
 
 const XML_SCHEMA_VALID_CTXT_FLAG_STREAM: i32 = 1;
-#[doc(alias = "xmlSchemaValidCtxtPtr")]
-pub type XmlSchemaValidCtxtPtr = *mut XmlSchemaValidCtxt;
-/// A Schemas validation context
-#[doc(alias = "xmlSchemaValidCtxt")]
-#[repr(C)]
-pub struct XmlSchemaValidCtxt {
-    typ: i32,
-    pub(crate) err_ctxt: Option<GenericErrorContext>, /* user specific data block */
-    pub(crate) error: Option<GenericError>,           /* the callback in case of errors */
-    pub(crate) warning: Option<GenericError>,         /* the callback in case of warning */
-    pub(crate) serror: Option<StructuredError>,
-
-    schema: XmlSchemaPtr, /* The schema in use */
-    pub(crate) doc: Option<XmlDocPtr>,
-    input: Option<Rc<RefCell<XmlParserInputBuffer>>>,
-    enc: XmlCharEncoding,
-    // sax: XmlSAXHandlerPtr,
-    pub(crate) parser_ctxt: XmlParserCtxtPtr,
-    user_data: *mut c_void, /* TODO: What is this for? */
-    pub(crate) filename: *mut c_char,
-
-    pub(crate) err: i32,
-    pub(crate) nberrors: i32,
-
-    node: Option<XmlNodePtr>,
-    cur: Option<XmlNodePtr>,
-    /* typ: XmlSchemaTypePtr, */
-    regexp: XmlRegExecCtxtPtr,
-    value: XmlSchemaValPtr,
-
-    value_ws: i32,
-    options: i32,
-    validation_root: Option<XmlNodePtr>,
-    pctxt: XmlSchemaParserCtxtPtr,
-    xsi_assemble: i32,
-
-    pub(crate) depth: i32,
-    pub(crate) elem_infos: *mut XmlSchemaNodeInfoPtr, /* array of element information */
-    size_elem_infos: i32,
-    pub(crate) inode: XmlSchemaNodeInfoPtr, /* the current element information */
-
-    aidcs: XmlSchemaIDCAugPtr, /* a list of augmented IDC information */
-
-    xpath_states: XmlSchemaIDCStateObjPtr, /* first active state object. */
-    xpath_state_pool: XmlSchemaIDCStateObjPtr, /* first stored state object. */
-    idc_matcher_cache: XmlSchemaIDCMatcherPtr, /* Cache for IDC matcher objects. */
-
-    idc_nodes: *mut XmlSchemaPSVIIDCNodePtr, /* list of all IDC node-table entries*/
-    nb_idc_nodes: i32,
-    size_idc_nodes: i32,
-
-    idc_keys: *mut XmlSchemaPSVIIDCKeyPtr, /* list of all IDC node-table entries */
-    nb_idc_keys: i32,
-    size_idc_keys: i32,
-
-    flags: i32,
-
-    dict: XmlDictPtr,
-
-    #[cfg(feature = "libxml_reader")]
-    reader: XmlTextReaderPtr,
-
-    attr_infos: *mut XmlSchemaAttrInfoPtr,
-    nb_attr_infos: i32,
-    size_attr_infos: i32,
-
-    skip_depth: i32,
-    pub(crate) node_qnames: XmlSchemaItemListPtr,
-    has_keyrefs: i32,
-    create_idcnode_tables: i32,
-    psvi_expose_idcnode_tables: i32,
-
-    /* Locator for error reporting in streaming mode */
-    pub(crate) loc_func: Option<XmlSchemaValidityLocatorFunc>,
-    pub(crate) loc_ctxt: *mut c_void,
-}
 
 #[doc(alias = "xmlSchemaSubstGroupPtr")]
 pub type XmlSchemaSubstGroupPtr = *mut XmlSchemaSubstGroup;
@@ -20819,46 +20744,9 @@ pub unsafe fn xml_schema_valid_ctxt_get_options(ctxt: XmlSchemaValidCtxtPtr) -> 
     unsafe { if ctxt.is_null() { -1 } else { (*ctxt).options } }
 }
 
-/// Handle an out of memory condition
-#[doc(alias = "xmlSchemaVTypeErrMemory")]
-unsafe fn xml_schema_verr_memory(
-    ctxt: XmlSchemaValidCtxtPtr,
-    extra: &str,
-    node: Option<XmlGenericNodePtr>,
-) {
-    unsafe {
-        if !ctxt.is_null() {
-            (*ctxt).nberrors += 1;
-            (*ctxt).err = XmlParserErrors::XmlSchemavInternal as i32;
-        }
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasv, node, Some(extra));
-    }
-}
-
-/// Create an XML Schemas validation context based on the given schema.
-///
-/// Returns the validation context or NULL in case of error
-#[doc(alias = "xmlSchemaNewValidCtxt")]
-pub unsafe fn xml_schema_new_valid_ctxt(schema: XmlSchemaPtr) -> XmlSchemaValidCtxtPtr {
-    unsafe {
-        let ret: XmlSchemaValidCtxtPtr =
-            xml_malloc(size_of::<XmlSchemaValidCtxt>()) as XmlSchemaValidCtxtPtr;
-        if ret.is_null() {
-            xml_schema_verr_memory(null_mut(), "allocating validation context", None);
-            return null_mut();
-        }
-        memset(ret as _, 0, size_of::<XmlSchemaValidCtxt>());
-        (*ret).typ = XML_SCHEMA_CTXT_VALIDATOR;
-        (*ret).dict = xml_dict_create();
-        (*ret).node_qnames = xml_schema_item_list_create();
-        (*ret).schema = schema;
-        ret
-    }
-}
-
 /// Frees an IDC key together with its compiled value.
 #[doc(alias = "xmlSchemaIDCFreeKey")]
-unsafe fn xml_schema_idc_free_key(key: XmlSchemaPSVIIDCKeyPtr) {
+pub(crate) unsafe fn xml_schema_idc_free_key(key: XmlSchemaPSVIIDCKeyPtr) {
     unsafe {
         if !(*key).val.is_null() {
             xml_schema_free_value((*key).val);
@@ -20867,7 +20755,7 @@ unsafe fn xml_schema_idc_free_key(key: XmlSchemaPSVIIDCKeyPtr) {
     }
 }
 
-unsafe fn xml_schema_free_idc_state_obj_list(mut sto: XmlSchemaIDCStateObjPtr) {
+pub(crate) unsafe fn xml_schema_free_idc_state_obj_list(mut sto: XmlSchemaIDCStateObjPtr) {
     unsafe {
         let mut next: XmlSchemaIDCStateObjPtr;
         while !sto.is_null() {
@@ -20885,7 +20773,7 @@ unsafe fn xml_schema_free_idc_state_obj_list(mut sto: XmlSchemaIDCStateObjPtr) {
 }
 
 // Cleanup currently used attribute infos.
-unsafe fn xml_schema_clear_attr_infos(vctxt: XmlSchemaValidCtxtPtr) {
+pub(crate) unsafe fn xml_schema_clear_attr_infos(vctxt: XmlSchemaValidCtxtPtr) {
     unsafe {
         let mut attr: XmlSchemaAttrInfoPtr;
 
@@ -21010,7 +20898,10 @@ unsafe fn xml_schema_idcfree_idc_table(mut bind: XmlSchemaPSVIIDCBindingPtr) {
 }
 
 #[doc(alias = "xmlSchemaClearElemInfo")]
-unsafe fn xml_schema_clear_elem_info(vctxt: XmlSchemaValidCtxtPtr, ielem: XmlSchemaNodeInfoPtr) {
+pub(crate) unsafe fn xml_schema_clear_elem_info(
+    vctxt: XmlSchemaValidCtxtPtr,
+    ielem: XmlSchemaNodeInfoPtr,
+) {
     unsafe {
         (*ielem).has_keyrefs = 0;
         (*ielem).applied_xpath = 0;
@@ -21055,95 +20946,6 @@ unsafe fn xml_schema_clear_elem_info(vctxt: XmlSchemaValidCtxtPtr, ielem: XmlSch
             (*ielem).nb_ns_bindings = 0;
             (*ielem).size_ns_bindings = 0;
         }
-    }
-}
-
-/// Free the resources associated to the schema validation context
-#[doc(alias = "xmlSchemaFreeValidCtxt")]
-pub unsafe fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        if !(*ctxt).value.is_null() {
-            xml_schema_free_value((*ctxt).value);
-        }
-        if !(*ctxt).pctxt.is_null() {
-            xml_schema_free_parser_ctxt((*ctxt).pctxt);
-        }
-        if !(*ctxt).idc_nodes.is_null() {
-            let mut item: XmlSchemaPSVIIDCNodePtr;
-
-            for i in 0..(*ctxt).nb_idc_nodes {
-                item = *(*ctxt).idc_nodes.add(i as usize) as _;
-                xml_free((*item).keys as _);
-                xml_free(item as _);
-            }
-            xml_free((*ctxt).idc_nodes as _);
-        }
-        if !(*ctxt).idc_keys.is_null() {
-            for i in 0..(*ctxt).nb_idc_keys {
-                xml_schema_idc_free_key(*(*ctxt).idc_keys.add(i as usize));
-            }
-            xml_free((*ctxt).idc_keys as _);
-        }
-
-        if !(*ctxt).xpath_states.is_null() {
-            xml_schema_free_idc_state_obj_list((*ctxt).xpath_states);
-            (*ctxt).xpath_states = null_mut();
-        }
-        if !(*ctxt).xpath_state_pool.is_null() {
-            xml_schema_free_idc_state_obj_list((*ctxt).xpath_state_pool);
-            (*ctxt).xpath_state_pool = null_mut();
-        }
-
-        // Augmented IDC information.
-        if !(*ctxt).aidcs.is_null() {
-            let mut cur: XmlSchemaIDCAugPtr = (*ctxt).aidcs;
-            let mut next: XmlSchemaIDCAugPtr;
-            while {
-                next = (*cur).next;
-                xml_free(cur as _);
-                cur = next;
-                !cur.is_null()
-            } {}
-        }
-        if !(*ctxt).attr_infos.is_null() {
-            let mut attr: XmlSchemaAttrInfoPtr;
-
-            // Just a paranoid call to the cleanup.
-            if (*ctxt).nb_attr_infos != 0 {
-                xml_schema_clear_attr_infos(ctxt);
-            }
-            for i in 0..(*ctxt).size_attr_infos {
-                attr = *(*ctxt).attr_infos.add(i as usize);
-                xml_free(attr as _);
-            }
-            xml_free((*ctxt).attr_infos as _);
-        }
-        if !(*ctxt).elem_infos.is_null() {
-            let mut ei: XmlSchemaNodeInfoPtr;
-
-            for i in 0..(*ctxt).size_elem_infos {
-                ei = *(*ctxt).elem_infos.add(i as usize);
-                if ei.is_null() {
-                    break;
-                }
-                xml_schema_clear_elem_info(ctxt, ei);
-                xml_free(ei as _);
-            }
-            xml_free((*ctxt).elem_infos as _);
-        }
-        if !(*ctxt).node_qnames.is_null() {
-            xml_schema_item_list_free((*ctxt).node_qnames);
-        }
-        if !(*ctxt).dict.is_null() {
-            xml_dict_free((*ctxt).dict);
-        }
-        if !(*ctxt).filename.is_null() {
-            xml_free((*ctxt).filename as _);
-        }
-        xml_free(ctxt as _);
     }
 }
 

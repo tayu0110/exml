@@ -19,7 +19,7 @@ use crate::{
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR, XmlSchemaAbstractCtxtPtr,
             XmlSchemaAttrInfoPtr, XmlSchemaNodeInfoPtr, XmlSchemaPSVIIDCNodePtr,
-            XmlSchemaValidCtxtPtr, xml_schema_facet_type_to_string, xml_schema_format_qname,
+            xml_schema_facet_type_to_string, xml_schema_format_qname,
             xml_schema_get_canon_value_whtsp_ext, xml_schema_get_component_designation,
             xml_schema_get_component_node, xml_schema_get_component_qname,
             xml_schema_get_component_type_str, xml_schema_get_white_space_facet_value,
@@ -36,6 +36,7 @@ use crate::{
 };
 
 use super::{
+    context::XmlSchemaValidCtxtPtr,
     items::{
         XmlSchemaAttributePtr, XmlSchemaAttributeUsePtr, XmlSchemaBasicItemPtr,
         XmlSchemaElementPtr, XmlSchemaIDCPtr, XmlSchemaTypePtr,
@@ -2134,5 +2135,21 @@ pub(crate) unsafe fn xml_schema_perr_memory(
             (*ctxt).nberrors += 1;
         }
         __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
+    }
+}
+
+/// Handle an out of memory condition
+#[doc(alias = "xmlSchemaVTypeErrMemory")]
+pub(crate) unsafe fn xml_schema_verr_memory(
+    ctxt: XmlSchemaValidCtxtPtr,
+    extra: &str,
+    node: Option<XmlGenericNodePtr>,
+) {
+    unsafe {
+        if !ctxt.is_null() {
+            (*ctxt).nberrors += 1;
+            (*ctxt).err = XmlParserErrors::XmlSchemavInternal as i32;
+        }
+        __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasv, node, Some(extra));
     }
 }
