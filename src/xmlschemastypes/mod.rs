@@ -1,0 +1,53 @@
+//! Provide methods and data structures for XML Schemas types.  
+//! This module is based on `libxml/xmlschemastypes.h`, `xmlschemas.c`, `xmlschemastypes.c` and so on in `libxml2-v2.11.8`.
+//!
+//! Please refer to original libxml2 documents also.
+
+// Copyright of the original code is the following.
+// --------
+// Summary: implementation of XML Schema Datatypes
+// Description: module providing the XML Schema Datatypes implementation
+//              both definition and validity checking
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
+// schemastypes.c : implementation of the XML Schema Datatypes definition and validity checking
+//
+// See Copyright for the status of this software.
+//
+// Daniel Veillard <veillard@redhat.com>
+
+use std::{borrow::Cow, iter::once};
+
+use crate::libxml::chvalid::xml_is_blank_char;
+
+/// Removes and normalize white spaces in the string
+///
+/// Returns the new string or `None` if no change was required.
+#[doc(alias = "xmlSchemaCollapseString")]
+pub fn xml_schema_collapse_string(value: &str) -> Option<Cow<'_, str>> {
+    let start = value.trim_start_matches(|c| xml_is_blank_char(c as u32));
+    let Some(col) = start
+        .chars()
+        .zip(start.chars().skip(1).chain(once('\0')))
+        .position(|(f, s)| {
+            (f == ' ' && xml_is_blank_char(s as u32)) || f == '\x0A' || f == '\x09' || f == '\x0D'
+        })
+    else {
+        let res = start.trim_end_matches(|c| xml_is_blank_char(c as u32));
+        return (res.len() != value.len()).then_some(Cow::Borrowed(res));
+    };
+    let mut buf = String::with_capacity(start.len());
+    buf.push_str(&start[..col]);
+    let res = start[col..]
+        .split(|c| xml_is_blank_char(c as u32))
+        .filter(|s| !s.is_empty())
+        .fold(buf, |mut buf, s| {
+            buf.push(' ');
+            buf.push_str(s);
+            buf
+        });
+    Some(Cow::Owned(res))
+}

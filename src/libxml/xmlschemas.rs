@@ -112,17 +112,16 @@ use crate::{
         },
         xmlschemastypes::{
             XmlSchemaValPtr, XmlSchemaWhitespaceValueType, xml_schema_check_facet,
-            xml_schema_collapse_string, xml_schema_compare_values, xml_schema_compare_values_whtsp,
-            xml_schema_copy_value, xml_schema_free_facet, xml_schema_free_value,
-            xml_schema_get_built_in_type, xml_schema_get_canon_value,
-            xml_schema_get_predefined_type, xml_schema_get_val_type, xml_schema_init_types,
-            xml_schema_is_built_in_type_facet, xml_schema_new_facet, xml_schema_new_notation_value,
-            xml_schema_new_qname_value, xml_schema_val_predef_type_node,
-            xml_schema_val_predef_type_node_no_norm, xml_schema_validate_facet_whtsp,
-            xml_schema_validate_length_facet_whtsp, xml_schema_validate_list_simple_type_facet,
-            xml_schema_value_append, xml_schema_value_get_as_boolean,
-            xml_schema_value_get_as_string, xml_schema_value_get_next,
-            xml_schema_white_space_replace,
+            xml_schema_compare_values, xml_schema_compare_values_whtsp, xml_schema_copy_value,
+            xml_schema_free_facet, xml_schema_free_value, xml_schema_get_built_in_type,
+            xml_schema_get_canon_value, xml_schema_get_predefined_type, xml_schema_get_val_type,
+            xml_schema_init_types, xml_schema_is_built_in_type_facet, xml_schema_new_facet,
+            xml_schema_new_notation_value, xml_schema_new_qname_value,
+            xml_schema_val_predef_type_node, xml_schema_val_predef_type_node_no_norm,
+            xml_schema_validate_facet_whtsp, xml_schema_validate_length_facet_whtsp,
+            xml_schema_validate_list_simple_type_facet, xml_schema_value_append,
+            xml_schema_value_get_as_boolean, xml_schema_value_get_as_string,
+            xml_schema_value_get_next, xml_schema_white_space_replace,
         },
         xmlstring::{
             XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
@@ -172,6 +171,7 @@ use crate::{
         wxs_is_any_simple_type, wxs_is_anytype, wxs_is_atomic, wxs_is_complex, wxs_is_extension,
         wxs_is_list, wxs_is_restriction, wxs_is_simple, wxs_is_union,
     },
+    xmlschemastypes::xml_schema_collapse_string,
 };
 
 /// This error codes are obsolete; not used any more.
@@ -1155,7 +1155,14 @@ unsafe fn xml_schema_normalize_value(typ: XmlSchemaTypePtr, value: *const XmlCha
     unsafe {
         match xml_schema_get_white_space_facet_value(typ) {
             Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse) => {
-                xml_schema_collapse_string(value)
+                xml_schema_collapse_string(
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                )
+                .map_or(null_mut(), |res| {
+                    xml_strndup(res.as_ptr(), res.len() as i32)
+                })
             }
             Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace) => {
                 xml_schema_white_space_replace(value)
@@ -1364,7 +1371,14 @@ unsafe fn xml_schema_validate_qname(
         }
         // NOTE: xmlSplitQName2 will always return a duplicated strings.
         // TODO: Export and use xmlSchemaStrip instead
-        let stripped: *mut XmlChar = xml_schema_collapse_string(value);
+        let stripped: *mut XmlChar = xml_schema_collapse_string(
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        )
+        .map_or(null_mut(), |res| {
+            xml_strndup(res.as_ptr(), res.len() as i32)
+        });
         local = xml_split_qname2(
             if !stripped.is_null() { stripped } else { value },
             &raw mut prefix,
@@ -1470,7 +1484,14 @@ unsafe fn xml_schema_get_canon_value_whtsp_ext_1(
                     value = xml_schema_value_get_as_string(val);
                     if !value.is_null() {
                         if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
-                            value2 = xml_schema_collapse_string(value);
+                            value2 = xml_schema_collapse_string(
+                                CStr::from_ptr(value as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            )
+                            .map_or(null_mut(), |res| {
+                                xml_strndup(res.as_ptr(), res.len() as i32)
+                            });
                         } else if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
                             value2 = xml_schema_white_space_replace(value);
                         }
@@ -3892,7 +3913,14 @@ unsafe fn xml_schema_pval_attr_node_id(
                 // NOTE: the IDness might have already be declared in the DTD
                 if !matches!(attr.atype, Some(XmlAttributeType::XmlAttributeID)) {
                     // TODO: Use xmlSchemaStrip here; it's not exported at this moment.
-                    let strip: *mut XmlChar = xml_schema_collapse_string(value);
+                    let strip: *mut XmlChar = xml_schema_collapse_string(
+                        CStr::from_ptr(value as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    )
+                    .map_or(null_mut(), |res| {
+                        xml_strndup(res.as_ptr(), res.len() as i32)
+                    });
                     if !strip.is_null() {
                         xml_free(value as _);
                         value = strip;

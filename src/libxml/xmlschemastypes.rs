@@ -71,6 +71,7 @@ use crate::{
             XmlSchemaParticlePtr, XmlSchemaTreeItemPtr, XmlSchemaType, XmlSchemaTypePtr,
         },
     },
+    xmlschemastypes::xml_schema_collapse_string,
     xpath::{XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF, xml_xpath_is_nan},
 };
 
@@ -2093,8 +2094,12 @@ unsafe fn xml_schema_val_atomic_type(
         {
             if (*typ).built_in_type == XmlSchemaValType::XmlSchemasNormstring as i32 {
                 norm = xml_schema_white_space_replace(value);
-            } else {
-                norm = xml_schema_collapse_string(value);
+            } else if let Some(res) = xml_schema_collapse_string(
+                CStr::from_ptr(value as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ) {
+                norm = xml_strndup(res.as_ptr(), res.len() as i32);
             }
             if !norm.is_null() {
                 value = norm;
@@ -2129,44 +2134,38 @@ unsafe fn xml_schema_val_atomic_type(
                                     if norm_on_the_fly == 0 {
                                         let mut cur: *const XmlChar = value;
 
-                                        if ws
-                                        == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace
-                                    {
-                                        while *cur != 0 {
-                                            if *cur == 0xd || *cur == 0xa || *cur == 0x9 {
-                                                break 'return1;
-                                            } else {
-                                                cur = cur.add(1);
-                                            }
-                                        }
-                                    } else if ws
-                                        == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
-                                    {
-                                        while *cur != 0 {
-                                            if *cur == 0xd || *cur == 0xa || *cur == 0x9 {
-                                                break 'return1;
-                                            } else if IS_WSP_SPACE_CH!(*cur) {
-                                                cur = cur.add(1);
-                                                if IS_WSP_SPACE_CH!(*cur) {
+                                        if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
+                                            while *cur != 0 {
+                                                if *cur == 0xd || *cur == 0xa || *cur == 0x9 {
                                                     break 'return1;
+                                                } else {
+                                                    cur = cur.add(1);
                                                 }
-                                            } else {
-                                                cur = cur.add(1);
+                                            }
+                                        } else if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
+                                            while *cur != 0 {
+                                                if *cur == 0xd || *cur == 0xa || *cur == 0x9 {
+                                                    break 'return1;
+                                                } else if IS_WSP_SPACE_CH!(*cur) {
+                                                    cur = cur.add(1);
+                                                    if IS_WSP_SPACE_CH!(*cur) {
+                                                        break 'return1;
+                                                    }
+                                                } else {
+                                                    cur = cur.add(1);
+                                                }
                                             }
                                         }
-                                    }
                                     }
                                     if create_string_value != 0 && !val.is_null() {
                                         if apply_norm != 0 {
-                                            if ws
-                                        == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
-                                    {
-                                        norm = xml_schema_collapse_string(value);
-                                    } else if ws
-                                        == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace
-                                    {
-                                        norm = xml_schema_white_space_replace(value);
-                                    }
+                                            if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
+                                                if let Some(res) = xml_schema_collapse_string(CStr::from_ptr(value as *const i8).to_string_lossy().as_ref()) {
+                                                    norm = xml_strndup(res.as_ptr(), res.len() as i32);
+                                                }
+                                            } else if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
+                                                norm = xml_schema_white_space_replace(value);
+                                            }
                                             if !norm.is_null() {
                                                 value = norm;
                                             }
@@ -2186,13 +2185,13 @@ unsafe fn xml_schema_val_atomic_type(
                                 XmlSchemaValType::XmlSchemasNormstring => {
                                     if norm_on_the_fly != 0 {
                                         if apply_norm != 0 {
-                                            if ws
-                                        == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse
-                                    {
-                                        norm = xml_schema_collapse_string(value);
-                                    } else {
-                                        norm = xml_schema_white_space_replace(value);
-                                    }
+                                            if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
+                                                if let Some(res) = xml_schema_collapse_string(CStr::from_ptr(value as *const i8).to_string_lossy().as_ref()) {
+                                                    norm = xml_strndup(res.as_ptr(), res.len() as i32);
+                                                }
+                                            } else {
+                                                norm = xml_schema_white_space_replace(value);
+                                            }
                                             if !norm.is_null() {
                                                 value = norm;
                                             }
@@ -2695,7 +2694,13 @@ unsafe fn xml_schema_val_atomic_type(
                                 }
                                 XmlSchemaValType::XmlSchemasLanguage => {
                                     if norm.is_null() && norm_on_the_fly != 0 {
-                                        norm = xml_schema_collapse_string(value);
+                                        if let Some(res) = xml_schema_collapse_string(
+                                            CStr::from_ptr(value as *const i8)
+                                                .to_string_lossy()
+                                                .as_ref(),
+                                        ) {
+                                            norm = xml_strndup(res.as_ptr(), res.len() as i32);
+                                        }
                                         if !norm.is_null() {
                                             value = norm;
                                         }
@@ -3111,7 +3116,13 @@ unsafe fn xml_schema_val_atomic_type(
                                     if *value != 0 {
                                         let mut cur: *mut XmlChar;
                                         if norm.is_null() && norm_on_the_fly != 0 {
-                                            norm = xml_schema_collapse_string(value);
+                                            if let Some(res) = xml_schema_collapse_string(
+                                                CStr::from_ptr(value as *const i8)
+                                                    .to_string_lossy()
+                                                    .as_ref(),
+                                            ) {
+                                                norm = xml_strndup(res.as_ptr(), res.len() as i32);
+                                            }
                                             if !norm.is_null() {
                                                 value = norm;
                                             }
@@ -6291,73 +6302,6 @@ pub unsafe fn xml_schema_is_built_in_type_facet(typ: XmlSchemaTypePtr, facet_typ
     }
 }
 
-/// Removes and normalize white spaces in the string
-///
-/// Returns the new string or NULL if no change was required.
-#[doc(alias = "xmlSchemaCollapseString")]
-pub unsafe fn xml_schema_collapse_string(value: *const XmlChar) -> *mut XmlChar {
-    unsafe {
-        let mut start: *const XmlChar = value;
-        let mut end: *const XmlChar;
-        let f: *const XmlChar;
-        let mut g: *mut XmlChar;
-        let mut col: i32 = 0;
-
-        if value.is_null() {
-            return null_mut();
-        }
-        while *start != 0 && xml_is_blank_char(*start as u32) {
-            start = start.add(1);
-        }
-        end = start;
-        while *end != 0 {
-            if (*end == b' ' && xml_is_blank_char(*end.add(1) as u32))
-                || (*end == 0xa || *end == 0x9 || *end == 0xd)
-            {
-                col = end.offset_from(start) as _;
-                break;
-            }
-            end = end.add(1);
-        }
-        if col == 0 {
-            f = end;
-            end = end.sub(1);
-            while end > start && xml_is_blank_char(*end as u32) {
-                end = end.sub(1);
-            }
-            end = end.add(1);
-            if start == value && f == end {
-                return null_mut();
-            }
-            return xml_strndup(start, end.offset_from(start) as _);
-        }
-        start = xml_strdup(start);
-        if start.is_null() {
-            return null_mut();
-        }
-        g = start.add(col as usize) as _;
-        end = g;
-        while *end != 0 {
-            if xml_is_blank_char(*end as u32) {
-                end = end.add(1);
-                while xml_is_blank_char(*end as u32) {
-                    end = end.add(1);
-                }
-                if *end != 0 {
-                    *g = b' ';
-                    g = g.add(1);
-                }
-            } else {
-                *g = *end;
-                g = g.add(1);
-                end = end.add(1);
-            }
-        }
-        *g = 0;
-        start as _
-    }
-}
-
 /// Replaces 0xd, 0x9 and 0xa with a space.
 ///
 /// Returns the new string or NULL if no change was required.
@@ -6641,7 +6585,13 @@ pub unsafe fn xml_schema_get_canon_value(
                 if (*val).value.str.is_null() {
                     return -1;
                 }
-                *ret_value = xml_schema_collapse_string((*val).value.str);
+                if let Some(res) = xml_schema_collapse_string(
+                    CStr::from_ptr((*val).value.str as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                ) {
+                    *ret_value = xml_strndup(res.as_ptr(), res.len() as i32);
+                }
                 if (*ret_value).is_null() {
                     *ret_value = xml_strdup((*val).value.str);
                 }
@@ -7139,7 +7089,13 @@ pub unsafe fn xml_schema_get_canon_value_whtsp(
                 if (*val).value.str.is_null() {
                     *ret_value = xml_strdup(c"".as_ptr() as _);
                 } else if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
-                    *ret_value = xml_schema_collapse_string((*val).value.str);
+                    if let Some(res) = xml_schema_collapse_string(
+                        CStr::from_ptr((*val).value.str as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ) {
+                        *ret_value = xml_strndup(res.as_ptr(), res.len() as i32);
+                    }
                 } else if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace {
                     *ret_value = xml_schema_white_space_replace((*val).value.str);
                 }
@@ -7152,7 +7108,13 @@ pub unsafe fn xml_schema_get_canon_value_whtsp(
                     *ret_value = xml_strdup(c"".as_ptr() as _);
                 } else {
                     if ws == XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse {
-                        *ret_value = xml_schema_collapse_string((*val).value.str);
+                        if let Some(res) = xml_schema_collapse_string(
+                            CStr::from_ptr((*val).value.str as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ) {
+                            *ret_value = xml_strndup(res.as_ptr(), res.len() as i32);
+                        }
                     } else {
                         *ret_value = xml_schema_white_space_replace((*val).value.str);
                     }
@@ -7481,36 +7443,6 @@ mod tests {
         unsafe {
             xml_schema_cleanup_types();
             reset_last_error();
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_collapse_string() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let value = gen_const_xml_char_ptr(n_value, 0);
-
-                let ret_val = xml_schema_collapse_string(value as *const XmlChar);
-                desret_xml_char_ptr(ret_val);
-                des_const_xml_char_ptr(n_value, value, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSchemaCollapseString",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlSchemaCollapseString()"
-                    );
-                    eprintln!(" {}", n_value);
-                }
-            }
         }
     }
 
