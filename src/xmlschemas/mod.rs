@@ -22,6 +22,7 @@
 
 pub mod context;
 pub(crate) mod error;
+pub(crate) mod item_list;
 pub mod items;
 
 use items::XmlSchemaType;

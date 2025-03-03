@@ -12,28 +12,31 @@ use crate::{
     io::XmlParserInputBuffer,
     libxml::{
         globals::xml_free,
-        schemas_internals::xml_schema_item_list_free,
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
         xmlreader::{XmlTextReaderPtr, xml_text_reader_lookup_namespace},
         xmlregexp::XmlRegExecCtxtPtr,
         xmlschemas::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR, XmlSchemaAttrInfoPtr,
             XmlSchemaBucketPtr, XmlSchemaConstructionCtxtPtr, XmlSchemaIDCAugPtr,
-            XmlSchemaIDCMatcherPtr, XmlSchemaIDCStateObjPtr, XmlSchemaItemListPtr,
-            XmlSchemaNodeInfoPtr, XmlSchemaPSVIIDCKeyPtr, XmlSchemaPSVIIDCNodePtr, XmlSchemaPtr,
-            XmlSchemaRedefPtr, XmlSchemaValidityLocatorFunc, xml_schema_clear_attr_infos,
-            xml_schema_clear_elem_info, xml_schema_construction_ctxt_free,
-            xml_schema_free_idc_state_obj_list, xml_schema_idc_free_key,
-            xml_schema_item_list_create, xml_schema_set_valid_errors,
+            XmlSchemaIDCMatcherPtr, XmlSchemaIDCStateObjPtr, XmlSchemaNodeInfoPtr,
+            XmlSchemaPSVIIDCKeyPtr, XmlSchemaPSVIIDCNodePtr, XmlSchemaPtr, XmlSchemaRedefPtr,
+            XmlSchemaValidityLocatorFunc, xml_schema_clear_attr_infos, xml_schema_clear_elem_info,
+            xml_schema_construction_ctxt_free, xml_schema_free_idc_state_obj_list,
+            xml_schema_idc_free_key, xml_schema_set_valid_errors,
             xml_schema_set_valid_structured_errors,
         },
         xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_value},
     },
     parser::XmlParserCtxtPtr,
     tree::{XmlDocPtr, XmlNodePtr, xml_free_doc},
+    xmlschemas::item_list::xml_schema_item_list_free,
 };
 
-use super::{error::xml_schema_internal_err, items::XmlSchemaTypePtr};
+use super::{
+    error::xml_schema_internal_err,
+    item_list::{XmlSchemaItemListPtr, xml_schema_item_list_create},
+    items::XmlSchemaTypePtr,
+};
 
 /// A schemas validation context
 #[doc(alias = "xmlSchemaParserCtxtPtr")]
@@ -186,11 +189,9 @@ impl Default for XmlSchemaParserCtxt {
 
 pub(crate) unsafe fn xml_schema_parser_ctxt_create() -> XmlSchemaParserCtxtPtr {
     let mut ret = Box::new(XmlSchemaParserCtxt::default());
-    unsafe {
-        ret.attr_prohibs = xml_schema_item_list_create();
-        if ret.attr_prohibs.is_null() {
-            return null_mut();
-        }
+    ret.attr_prohibs = xml_schema_item_list_create();
+    if ret.attr_prohibs.is_null() {
+        return null_mut();
     }
     Box::leak(ret)
 }
@@ -502,11 +503,11 @@ impl Default for XmlSchemaValidCtxt {
 ///
 /// Returns the validation context or NULL in case of error
 #[doc(alias = "xmlSchemaNewValidCtxt")]
-pub unsafe fn xml_schema_new_valid_ctxt(schema: XmlSchemaPtr) -> XmlSchemaValidCtxtPtr {
+pub fn xml_schema_new_valid_ctxt(schema: XmlSchemaPtr) -> XmlSchemaValidCtxtPtr {
     let mut ret = Box::new(XmlSchemaValidCtxt::default());
     ret.typ = XML_SCHEMA_CTXT_VALIDATOR;
     ret.dict = xml_dict_create();
-    ret.node_qnames = unsafe { xml_schema_item_list_create() };
+    ret.node_qnames = xml_schema_item_list_create();
     ret.schema = schema;
     Box::leak(ret)
 }

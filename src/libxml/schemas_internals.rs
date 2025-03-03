@@ -20,17 +20,19 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
-use std::{any::type_name, ptr::drop_in_place};
+use std::any::type_name;
 
 use crate::{
     tree::XmlNodePtr,
-    xmlschemas::items::{XmlSchemaAttribute, XmlSchemaTypePtr},
+    xmlschemas::{
+        item_list::{XmlSchemaItemListPtr, xml_schema_item_list_free},
+        items::{XmlSchemaAttribute, XmlSchemaTypePtr},
+    },
 };
 
 use super::{
     globals::xml_free,
     xmlregexp::{XmlRegexpPtr, xml_reg_free_regexp},
-    xmlschemas::XmlSchemaItemListPtr,
     xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_facet},
 };
 
@@ -545,18 +547,6 @@ pub(crate) unsafe fn xml_schema_free_annot(mut annot: XmlSchemaAnnotPtr) {
                 !annot.is_null()
             } {}
         }
-    }
-}
-
-/// Deallocate a annotation structure
-#[doc(alias = "xmlSchemaItemListFree")]
-pub(crate) unsafe fn xml_schema_item_list_free(list: XmlSchemaItemListPtr) {
-    unsafe {
-        if list.is_null() {
-            return;
-        }
-        drop_in_place(list);
-        xml_free(list as _);
     }
 }
 

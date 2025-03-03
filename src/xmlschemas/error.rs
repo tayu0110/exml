@@ -6,7 +6,8 @@ use std::{
 
 use crate::{
     error::{
-        __xml_raise_error, __xml_simple_oom_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors,
+        __xml_raise_error, __xml_simple_error, __xml_simple_oom_error, XmlErrorDomain,
+        XmlErrorLevel, XmlParserErrors,
     },
     globals::{GenericError, StructuredError},
     libxml::{
@@ -2146,5 +2147,22 @@ pub(crate) unsafe fn xml_schema_verr_memory(
             (*ctxt).err = XmlParserErrors::XmlSchemavInternal as i32;
         }
         __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasv, node, Some(extra));
+    }
+}
+
+pub(super) unsafe fn xml_schema_psimple_err(msg: &str) {
+    unsafe {
+        __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, None, Some(msg));
+    }
+}
+
+pub(crate) unsafe fn xml_schema_psimple_internal_err(node: Option<XmlGenericNodePtr>, msg: &str) {
+    unsafe {
+        __xml_simple_error!(
+            XmlErrorDomain::XmlFromSchemasp,
+            XmlParserErrors::XmlSchemapInternal,
+            node,
+            msg
+        );
     }
 }

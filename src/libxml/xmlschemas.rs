@@ -36,7 +36,7 @@ use libc::{memset, snprintf, strchr};
 
 use crate::{
     encoding::XmlCharEncoding,
-    error::{__xml_simple_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
+    error::{XmlErrorDomain, XmlParserErrors},
     generic_error,
     globals::{GLOBAL_STATE, GenericError, GenericErrorContext, StructuredError},
     io::XmlParserInputBuffer,
@@ -94,7 +94,7 @@ use crate::{
             XmlSchemaTypeLink, XmlSchemaTypeLinkPtr, XmlSchemaTypeType, XmlSchemaValType,
             XmlSchemaWildcard, XmlSchemaWildcardNs, XmlSchemaWildcardNsPtr, XmlSchemaWildcardPtr,
             xml_schema_free_annot, xml_schema_free_type, xml_schema_free_wildcard,
-            xml_schema_free_wildcard_ns_set, xml_schema_item_list_free,
+            xml_schema_free_wildcard_ns_set,
         },
         valid::xml_add_id,
         xmlautomata::{
@@ -154,9 +154,10 @@ use crate::{
             xml_schema_perr_memory, xml_schema_perr2, xml_schema_pillegal_attr_err,
             xml_schema_pillegal_facet_atomic_err, xml_schema_pillegal_facet_list_union_err,
             xml_schema_pmissing_attr_err, xml_schema_pmutual_excl_attr_err,
-            xml_schema_pres_comp_attr_err, xml_schema_psimple_type_err, xml_schema_simple_type_err,
-            xml_schema_verr_memory,
+            xml_schema_pres_comp_attr_err, xml_schema_psimple_internal_err,
+            xml_schema_psimple_type_err, xml_schema_simple_type_err, xml_schema_verr_memory,
         },
+        item_list::{XmlSchemaItemListPtr, xml_schema_item_list_create, xml_schema_item_list_free},
         items::{
             XmlSchemaAnnotItemPtr, XmlSchemaAttribute, XmlSchemaAttributeGroup,
             XmlSchemaAttributeGroupPtr, XmlSchemaAttributePtr, XmlSchemaAttributeUse,
@@ -552,15 +553,6 @@ const SUBSET_SUBSTITUTION: i32 = 1 << 2;
 const SUBSET_LIST: i32 = 1 << 3;
 const SUBSET_UNION: i32 = 1 << 4;
 
-#[doc(alias = "xmlSchemaItemListPtr")]
-pub type XmlSchemaItemListPtr = *mut XmlSchemaItemList;
-#[doc(alias = "xmlSchemaItemList")]
-#[repr(C)]
-#[derive(Debug, Default)]
-pub struct XmlSchemaItemList {
-    pub(crate) items: Vec<*mut c_void>, /* used for dynamic addition of schemata */
-}
-
 pub(crate) const XML_SCHEMA_CTXT_PARSER: i32 = 1;
 pub(crate) const XML_SCHEMA_CTXT_VALIDATOR: i32 = 2;
 
@@ -946,20 +938,9 @@ pub struct XmlIDCHashEntry {
     index: i32,               /* index into associated item list */
 }
 
-unsafe fn xml_schema_item_list_add_size(
-    list: XmlSchemaItemListPtr,
-    _initial_size: i32,
-    item: *mut c_void,
-) -> i32 {
-    unsafe {
-        (*list).items.push(item);
-        0
-    }
-}
-
 unsafe fn xml_schema_add_item_size(
     list: *mut XmlSchemaItemListPtr,
-    initial_size: i32,
+    _initial_size: i32,
     item: *mut c_void,
 ) -> i32 {
     unsafe {
@@ -969,7 +950,7 @@ unsafe fn xml_schema_add_item_size(
                 return -1;
             }
         }
-        xml_schema_item_list_add_size(*list, initial_size, item)
+        (**list).push(item)
     }
 }
 
@@ -2470,18 +2451,6 @@ pub(crate) fn xml_schema_facet_type_to_string(typ: XmlSchemaTypeType) -> &'stati
     }
 }
 
-pub(crate) unsafe fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
-    unsafe {
-        let ret: XmlSchemaItemListPtr = xml_malloc(size_of::<XmlSchemaItemList>()) as _;
-        if ret.is_null() {
-            xml_schema_perr_memory(null_mut(), "allocating an item list structure", None);
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, Default::default());
-        ret
-    }
-}
-
 /// Check if any error was detected during validation.
 ///
 /// Returns 1 if valid so far, 0 if errors were detected, and -1 in case of internal error.
@@ -2967,17 +2936,6 @@ unsafe fn xml_schema_free_qname_ref(item: XmlSchemaQnameRefPtr) {
     }
 }
 
-unsafe fn xml_schema_psimple_internal_err(node: Option<XmlGenericNodePtr>, msg: &str) {
-    unsafe {
-        __xml_simple_error!(
-            XmlErrorDomain::XmlFromSchemasp,
-            XmlParserErrors::XmlSchemapInternal,
-            node,
-            msg
-        );
-    }
-}
-
 unsafe fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) {
     unsafe {
         if list.is_null() || (*list).items.is_empty() {
@@ -3110,13 +3068,6 @@ unsafe fn xml_schema_get_prop(
     }
 }
 
-unsafe fn xml_schema_item_list_add(list: XmlSchemaItemListPtr, item: *mut c_void) -> i32 {
-    unsafe {
-        (*list).items.push(item);
-        0
-    }
-}
-
 unsafe fn xml_schema_bucket_create(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: i32,
@@ -3242,14 +3193,14 @@ unsafe fn xml_schema_bucket_create(
                     return null_mut();
                 }
             }
-            if xml_schema_item_list_add((*main_schema).includes as _, ret as _) < 0 {
+            if (*((*main_schema).includes as XmlSchemaItemListPtr)).push(ret as _) < 0 {
                 xml_schema_bucket_free(ret);
                 return null_mut();
             }
         }
         // Add to list of all buckets; this is used for lookup
         // during schema construction time only.
-        if xml_schema_item_list_add((*WXS_CONSTRUCTOR!(pctxt)).buckets, ret as _) == -1 {
+        if (*(*WXS_CONSTRUCTOR!(pctxt)).buckets).push(ret as _) == -1 {
             return null_mut();
         }
         ret
@@ -6527,7 +6478,7 @@ unsafe fn xml_schema_parse_local_attributes(
                         return -1;
                     }
                 }
-                if xml_schema_item_list_add_size(*list, 2, item) == -1 {
+                if (**list).push(item) == -1 {
                     return -1;
                 }
             }
@@ -13153,24 +13104,6 @@ unsafe fn xml_schema_model_group_to_model_group_def_fixup(
     }
 }
 
-unsafe fn xml_schema_psimple_err(msg: &str) {
-    unsafe {
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, None, Some(msg));
-    }
-}
-
-unsafe fn xml_schema_item_list_remove(list: XmlSchemaItemListPtr, idx: usize) -> i32 {
-    unsafe {
-        if idx >= (*list).items.len() {
-            xml_schema_psimple_err("Internal error: xmlSchemaItemListRemove, index error.\n");
-            return -1;
-        }
-
-        (*list).items.remove(idx);
-        0
-    }
-}
-
 /// Clones the namespace constraints of source and assigns them to dest.
 /// Returns -1 on internal error, 0 otherwise.
 #[doc(alias = "xmlSchemaCloneWildcardNsConstraints")]
@@ -13396,19 +13329,6 @@ unsafe fn xml_schema_intersect_wildcards(
     }
 }
 
-unsafe fn xml_schema_item_list_insert(
-    list: XmlSchemaItemListPtr,
-    item: *mut c_void,
-    idx: usize,
-) -> i32 {
-    unsafe {
-        // Just append if the index is greater/equal than the item count.
-        let idx = idx.min((*list).items.len());
-        (*list).items.insert(idx, item);
-        0
-    }
-}
-
 /// Substitutes contained attribute group references
 /// for their attribute uses. Wildcards are intersected.
 /// Attribute use prohibitions are removed from the list
@@ -13445,13 +13365,13 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                     return -1;
                 }
                 // Remove from attribute uses.
-                if xml_schema_item_list_remove(list, i) == -1 {
+                if (*list).remove(i) == -1 {
                     return -1;
                 }
                 // Note that duplicate prohibitions were already
                 // handled at parsing time.
                 // Add to list of prohibitions.
-                xml_schema_item_list_add_size(prohibs, 2, using as _);
+                (*prohibs).push(using as _);
                 continue 'main;
             }
             if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraQNameRef
@@ -13518,7 +13438,7 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                 // contain any attribute uses.
                 sublist = (*gr).attr_uses as XmlSchemaItemListPtr;
                 if sublist.is_null() || (*sublist).items.is_empty() {
-                    if xml_schema_item_list_remove(list, i) == -1 {
+                    if (*list).remove(i) == -1 {
                         return -1;
                     }
                     continue 'main;
@@ -13528,7 +13448,7 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                 if (*sublist).items.len() != 1 {
                     for j in 1..(*sublist).items.len() {
                         i += 1;
-                        if xml_schema_item_list_insert(list, (*sublist).items[j], i) == -1 {
+                        if (*list).insert((*sublist).items[j], i) == -1 {
                             return -1;
                         }
                     }
@@ -13577,7 +13497,7 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                             None
                         );
                         // Remove the prohibition.
-                        if xml_schema_item_list_remove(prohibs, i) == -1 {
+                        if (*prohibs).remove(i) == -1 {
                             return -1;
                         }
                         break;
@@ -14385,7 +14305,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
                         }
                         uses = (*typ).attr_uses as _;
                     }
-                    xml_schema_item_list_add_size(uses, 2, using as _);
+                    (*uses).push(using as _);
                 }
             } else {
                 // Extension.
@@ -14402,11 +14322,8 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
                         }
                         uses = (*typ).attr_uses as _;
                     }
-                    xml_schema_item_list_add_size(
-                        uses,
-                        (*base_uses).items.len() as i32,
-                        using as _,
-                    );
+
+                    (*uses).push(using as _);
                 }
             }
         }
@@ -14572,7 +14489,7 @@ unsafe fn xml_schema_check_ctprops_correct(
                                 None,
                             );
                             // Remove the duplicate.
-                            if xml_schema_item_list_remove(uses, i) == -1 {
+                            if (*uses).remove(i) == -1 {
                                 // goto exit_failure;
                                 return -1;
                             }
@@ -14604,7 +14521,7 @@ unsafe fn xml_schema_check_ctprops_correct(
                             None
                         );
 
-                        if xml_schema_item_list_remove(uses, i) == -1 {
+                        if (*uses).remove(i) == -1 {
                             // goto exit_failure;
                             return -1;
                         }
@@ -17827,7 +17744,7 @@ unsafe fn xml_schema_check_agprops_correct(
                                 None,
                             );
                             // Remove the duplicate.
-                            if xml_schema_item_list_remove(uses, i) == -1 {
+                            if (*uses).remove(i) == -1 {
                                 return -1;
                             }
                             // goto next_use;
@@ -17858,7 +17775,7 @@ unsafe fn xml_schema_check_agprops_correct(
                             Some(&str1),
                             None
                         );
-                        if xml_schema_item_list_remove(uses, i) == -1 {
+                        if (*uses).remove(i) == -1 {
                             return -1;
                         }
                     }
@@ -18424,7 +18341,7 @@ unsafe fn xml_schema_add_element_substitution_member(
         if subst_group.is_null() {
             return -1;
         }
-        if xml_schema_item_list_add((*subst_group).members, member as _) == -1 {
+        if (*(*subst_group).members).push(member as _) == -1 {
             return -1;
         }
         0
@@ -22643,8 +22560,8 @@ unsafe fn xml_schema_vadd_node_qname(
         }
         /* Add new entry. */
         let i: i32 = (*(*vctxt).node_qnames).items.len() as i32;
-        xml_schema_item_list_add((*vctxt).node_qnames, lname as _);
-        xml_schema_item_list_add((*vctxt).node_qnames, nsname as _);
+        (*(*vctxt).node_qnames).push(lname as _);
+        (*(*vctxt).node_qnames).push(nsname as _);
         i
     }
 }
@@ -23069,7 +22986,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                             (*nt_item).keys = *key_seq;
                             *key_seq = null_mut();
 
-                            if xml_schema_item_list_add(targets, nt_item as _) == -1 {
+                            if (*targets).push(nt_item as _) == -1 {
                                 if (*idc).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref {
                                     // Free the item, since keyref items won't be
                                     // put on a global list.
@@ -24560,11 +24477,7 @@ unsafe fn xml_schema_idc_fill_node_tables(
                                             return -1;
                                         }
                                     }
-                                    if xml_schema_item_list_add(
-                                        (*bind).dupls,
-                                        (*bind).node_table[j] as _,
-                                    ) == -1
-                                    {
+                                    if (*(*bind).dupls).push((*bind).node_table[j] as _) == -1 {
                                         // goto internal_error;
                                         return -1;
                                     }
@@ -24935,7 +24848,7 @@ unsafe fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxtPtr) -> i32
                                         return -1;
                                     }
                                 }
-                                xml_schema_item_list_add((*par_bind).dupls, par_node as _);
+                                (*(*par_bind).dupls).push(par_node as _);
                             } else {
                                 // Add the node-table entry (node and key-sequence) of
                                 // the child node to the node table of the parent node.
@@ -25673,13 +25586,6 @@ unsafe fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     }
 }
 
-unsafe fn xml_schema_item_list_clear(list: XmlSchemaItemListPtr) {
-    unsafe {
-        (*list).items.clear();
-        (*list).items.shrink_to_fit();
-    }
-}
-
 /// Frees a list of IDC matchers.
 #[doc(alias = "xmlSchemaIDCFreeMatcherList")]
 unsafe fn xml_schema_idc_free_matcher_list(mut matcher: XmlSchemaIDCMatcherPtr) {
@@ -25802,7 +25708,7 @@ unsafe fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
                 xml_schema_clear_elem_info(vctxt, ei);
             }
         }
-        xml_schema_item_list_clear((*vctxt).node_qnames);
+        (*(*vctxt).node_qnames).clear();
         // Recreate the dict.
         xml_dict_free((*vctxt).dict);
         // TODO: Is is save to recreate it? Do we have a scenario
