@@ -163,6 +163,7 @@ use crate::{
             XmlSchemaModelGroupDefPtr, XmlSchemaModelGroupPtr, XmlSchemaNotation,
             XmlSchemaNotationPtr, XmlSchemaParticle, XmlSchemaParticlePtr, XmlSchemaQnameRef,
             XmlSchemaQnameRefPtr, XmlSchemaTreeItemPtr, XmlSchemaType, XmlSchemaTypePtr,
+            xml_schema_free_attribute_use_prohib,
         },
         wxs_is_any_simple_type, wxs_is_anytype, wxs_is_atomic, wxs_is_complex, wxs_is_extension,
         wxs_is_list, wxs_is_restriction, wxs_is_simple, wxs_is_union,
@@ -1163,57 +1164,6 @@ pub(crate) unsafe fn xml_schema_get_component_type_str(
             }
             _ => xml_schema_item_type_to_str((*item).typ),
         }
-    }
-}
-
-unsafe fn xml_schema_get_component_name(item: XmlSchemaBasicItemPtr) -> *const XmlChar {
-    unsafe {
-        if item.is_null() {
-            return null_mut();
-        }
-        match (*item).typ {
-            XmlSchemaTypeType::XmlSchemaTypeElement => {
-                return (*(item as XmlSchemaElementPtr)).name;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeAttribute => {
-                return (*(item as XmlSchemaAttributePtr)).name;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeAttributegroup => {
-                return (*(item as XmlSchemaAttributeGroupPtr)).name;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeBasic
-            | XmlSchemaTypeType::XmlSchemaTypeSimple
-            | XmlSchemaTypeType::XmlSchemaTypeComplex => {
-                return (*(item as XmlSchemaTypePtr)).name;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeGroup => {
-                return (*(item as XmlSchemaModelGroupDefPtr)).name;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeIDCKey
-            | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
-            | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
-                return (*(item as XmlSchemaIDCPtr)).name;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeAttributeUse => {
-                if !WXS_ATTRUSE_DECL!(item).is_null() {
-                    return xml_schema_get_component_name(
-                        WXS_ATTRUSE_DECL!(item) as XmlSchemaBasicItemPtr
-                    );
-                } else {
-                    return null_mut();
-                }
-            }
-            XmlSchemaTypeType::XmlSchemaExtraQnameref => {
-                return (*(item as XmlSchemaQnameRefPtr)).name;
-            }
-            XmlSchemaTypeType::XmlSchemaTypeNotation => {
-                return (*(item as XmlSchemaNotationPtr)).name;
-            }
-            _ => {
-                // Other components cannot have names.
-            }
-        }
-        null_mut()
     }
 }
 
@@ -3358,17 +3308,6 @@ unsafe fn xml_schema_free_element(elem: XmlSchemaElementPtr) {
             xml_schema_free_value((*elem).def_val);
         }
         xml_free(elem as _);
-    }
-}
-
-/// Deallocates an attribute use structure.
-#[doc(alias = "xmlSchemaFreeAttributeUseProhib")]
-unsafe fn xml_schema_free_attribute_use_prohib(prohib: XmlSchemaAttributeUseProhibPtr) {
-    unsafe {
-        if prohib.is_null() {
-            return;
-        }
-        xml_free(prohib as _);
     }
 }
 
@@ -6729,7 +6668,7 @@ unsafe fn xml_schema_parse_local_attribute(
             // Check for duplicate attribute prohibitions.
             if !uses.is_null() {
                 for i in 0..(*uses).nb_items {
-                    using = *(*uses).items.add(i as usize) as _;
+                    let using = *(*uses).items.add(i as usize) as XmlSchemaBasicItemPtr;
                     if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraAttrUseProhib
                         && tmp_name == (*(using as XmlSchemaAttributeUseProhibPtr)).name
                         && tmp_ns == (*(using as XmlSchemaAttributeUseProhibPtr)).target_namespace
@@ -6774,68 +6713,31 @@ unsafe fn xml_schema_parse_local_attribute(
                 WXS_ADD_PENDING!(pctxt, prohib);
             }
             return prohib as XmlSchemaBasicItemPtr;
-        } else {
-            if is_schema(child, "annotation") {
-                // TODO: Should this go into the attr decl?
-                (*using).annot = xml_schema_parse_annotation(pctxt, child.unwrap(), 1);
-                child = child
-                    .unwrap()
-                    .next
-                    .map(|node| XmlNodePtr::try_from(node).unwrap());
-            }
-            if is_ref != 0 {
-                if let Some(child) = child {
-                    if is_schema(Some(child), "simpleType") {
-                        // 3.2.3 : 3.2
-                        // If ref is present, then all of <simpleType>,
-                        // form and type must be absent.
-                        xml_schema_pcontent_err(
-                            pctxt,
-                            XmlParserErrors::XmlSchemapSrcAttribute3_2,
-                            null_mut(),
-                            node,
-                            Some(child.into()),
-                            None,
-                            Some("(annotation?)"),
-                        );
-                    } else {
-                        xml_schema_pcontent_err(
-                            pctxt,
-                            XmlParserErrors::XmlSchemapS4sElemNotAllowed,
-                            null_mut(),
-                            node,
-                            Some(child.into()),
-                            None,
-                            Some("(annotation?)"),
-                        );
-                    }
-                }
-            } else {
-                if is_schema(child, "simpleType") {
-                    if !(*WXS_ATTRUSE_DECL!(using)).type_name.is_null() {
-                        // 3.2.3 : 4
-                        // type and <simpleType> must not both be present.
-                        xml_schema_pcontent_err(
-                            pctxt,
-                            XmlParserErrors::XmlSchemapSrcAttribute4,
-                            null_mut(),
-                            node,
-                            child.map(|child| child.into()),
-                            Some(
-                                "The attribute 'type' and the <simpleType> child are mutually exclusive",
-                            ),
-                            None,
-                        );
-                    } else {
-                        WXS_ATTRUSE_TYPEDEF!(using) =
-                            xml_schema_parse_simple_type(pctxt, schema, child.unwrap(), 0);
-                    }
-                    child = child
-                        .unwrap()
-                        .next
-                        .map(|node| XmlNodePtr::try_from(node).unwrap());
-                }
-                if let Some(child) = child {
+        }
+        if is_schema(child, "annotation") {
+            // TODO: Should this go into the attr decl?
+            (*using).annot = xml_schema_parse_annotation(pctxt, child.unwrap(), 1);
+            child = child
+                .unwrap()
+                .next
+                .map(|node| XmlNodePtr::try_from(node).unwrap());
+        }
+        if is_ref != 0 {
+            if let Some(child) = child {
+                if is_schema(Some(child), "simpleType") {
+                    // 3.2.3 : 3.2
+                    // If ref is present, then all of <simpleType>,
+                    // form and type must be absent.
+                    xml_schema_pcontent_err(
+                        pctxt,
+                        XmlParserErrors::XmlSchemapSrcAttribute3_2,
+                        null_mut(),
+                        node,
+                        Some(child.into()),
+                        None,
+                        Some("(annotation?)"),
+                    );
+                } else {
                     xml_schema_pcontent_err(
                         pctxt,
                         XmlParserErrors::XmlSchemapS4sElemNotAllowed,
@@ -6843,9 +6745,45 @@ unsafe fn xml_schema_parse_local_attribute(
                         node,
                         Some(child.into()),
                         None,
-                        Some("(annotation?, simpleType?)"),
+                        Some("(annotation?)"),
                     );
                 }
+            }
+        } else {
+            if is_schema(child, "simpleType") {
+                if !(*WXS_ATTRUSE_DECL!(using)).type_name.is_null() {
+                    // 3.2.3 : 4
+                    // type and <simpleType> must not both be present.
+                    xml_schema_pcontent_err(
+                        pctxt,
+                        XmlParserErrors::XmlSchemapSrcAttribute4,
+                        null_mut(),
+                        node,
+                        child.map(|child| child.into()),
+                        Some(
+                            "The attribute 'type' and the <simpleType> child are mutually exclusive",
+                        ),
+                        None,
+                    );
+                } else {
+                    WXS_ATTRUSE_TYPEDEF!(using) =
+                        xml_schema_parse_simple_type(pctxt, schema, child.unwrap(), 0);
+                }
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            if let Some(child) = child {
+                xml_schema_pcontent_err(
+                    pctxt,
+                    XmlParserErrors::XmlSchemapS4sElemNotAllowed,
+                    null_mut(),
+                    node,
+                    Some(child.into()),
+                    None,
+                    Some("(annotation?, simpleType?)"),
+                );
             }
         }
         using as XmlSchemaBasicItemPtr

@@ -1,10 +1,12 @@
 use std::{
     borrow::Cow,
     ffi::{CStr, c_void},
+    ptr::null,
 };
 
 use crate::{
     libxml::{
+        globals::xml_free,
         schemas_internals::{
             XmlSchemaAnnotPtr, XmlSchemaContentType, XmlSchemaFacetLinkPtr, XmlSchemaFacetPtr,
             XmlSchemaTypeLinkPtr, XmlSchemaTypeType, XmlSchemaWildcardPtr,
@@ -379,10 +381,33 @@ pub struct XmlSchemaAttributeUseProhib {
     is_ref: i32,
 }
 
+impl Default for XmlSchemaAttributeUseProhib {
+    fn default() -> Self {
+        Self {
+            typ: XmlSchemaTypeType::XmlSchemaExtraAttrUseProhib,
+            node: None,
+            name: null(),
+            target_namespace: null(),
+            is_ref: 0,
+        }
+    }
+}
+
 impl_xml_schema_item! {
     type: XmlSchemaAttributeUseProhib
     // @fallback_name: _ => { None },
     // @fallback: _ => { None }
+}
+
+/// Deallocates an attribute use structure.
+#[doc(alias = "xmlSchemaFreeAttributeUseProhib")]
+pub(crate) unsafe fn xml_schema_free_attribute_use_prohib(prohib: XmlSchemaAttributeUseProhibPtr) {
+    unsafe {
+        if prohib.is_null() {
+            return;
+        }
+        xml_free(prohib as _);
+    }
 }
 
 #[doc(alias = "xmlSchemaQNameRefPtr")]
