@@ -134,8 +134,8 @@ use crate::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType,
         XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
         XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, validate_ncname,
-        xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
-        xml_split_qname2, xml_split_qname3, xml_validate_qname,
+        validate_qname, xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop,
+        xml_new_prop, xml_split_qname2, xml_split_qname3,
     },
     uri::build_uri,
     xmlschemas::{
@@ -1175,7 +1175,7 @@ unsafe fn xml_schema_validate_notation(
     val_needed: i32,
 ) -> i32 {
     unsafe {
-        let mut ret: i32;
+        let mut ret = 0;
 
         if !vctxt.is_null() && (*vctxt).schema.is_null() {
             VERROR_INT!(
@@ -1185,67 +1185,68 @@ unsafe fn xml_schema_validate_notation(
             );
             return -1;
         }
-        ret = xml_validate_qname(value, 1);
-        if ret != 0 {
-            return ret;
-        }
+        if validate_qname::<true>(
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        )
+        .is_err()
         {
-            let mut prefix: *mut XmlChar = null_mut();
-            let local_name: *mut XmlChar = xml_split_qname2(value, &raw mut prefix);
-            if !prefix.is_null() {
-                let mut ns_name: *const XmlChar = null();
+            return 1;
+        }
+        let mut prefix: *mut XmlChar = null_mut();
+        let local_name: *mut XmlChar = xml_split_qname2(value, &raw mut prefix);
+        if !prefix.is_null() {
+            let mut ns_name: *const XmlChar = null();
 
-                if !vctxt.is_null() {
-                    ns_name = (*vctxt).lookup_namespace(
-                        (!prefix.is_null())
-                            .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                            .as_deref(),
-                    );
-                } else if let Some(node) = node {
-                    let ns = node.search_ns(
-                        node.document(),
-                        (!prefix.is_null())
-                            .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                            .as_deref(),
-                    );
-                    if let Some(ns) = ns {
-                        ns_name = ns.href;
-                    }
-                } else {
-                    xml_free(prefix as _);
-                    xml_free(local_name as _);
-                    return 1;
+            if !vctxt.is_null() {
+                ns_name = (*vctxt).lookup_namespace(
+                    (!prefix.is_null())
+                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                        .as_deref(),
+                );
+            } else if let Some(node) = node {
+                let ns = node.search_ns(
+                    node.document(),
+                    (!prefix.is_null())
+                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                        .as_deref(),
+                );
+                if let Some(ns) = ns {
+                    ns_name = ns.href;
                 }
-                if ns_name.is_null() {
-                    xml_free(prefix as _);
-                    xml_free(local_name as _);
-                    return 1;
-                }
-                if !xml_schema_get_notation(schema, local_name, ns_name).is_null() {
-                    if val_needed != 0 && !val.is_null() {
-                        *val = xml_schema_new_notation_value(
-                            xml_strdup(local_name),
-                            xml_strdup(ns_name),
-                        );
-                        if (*val).is_null() {
-                            ret = -1;
-                        }
-                    }
-                } else {
-                    ret = 1;
-                }
+            } else {
                 xml_free(prefix as _);
                 xml_free(local_name as _);
-            } else if !xml_schema_get_notation(schema, value, null_mut()).is_null() {
+                return 1;
+            }
+            if ns_name.is_null() {
+                xml_free(prefix as _);
+                xml_free(local_name as _);
+                return 1;
+            }
+            if !xml_schema_get_notation(schema, local_name, ns_name).is_null() {
                 if val_needed != 0 && !val.is_null() {
-                    *val = xml_schema_new_notation_value(xml_strdup(value), null_mut());
+                    *val =
+                        xml_schema_new_notation_value(xml_strdup(local_name), xml_strdup(ns_name));
                     if (*val).is_null() {
                         ret = -1;
                     }
                 }
             } else {
-                return 1;
+                ret = 1;
             }
+            xml_free(prefix as _);
+            xml_free(local_name as _);
+        } else if !xml_schema_get_notation(schema, value, null_mut()).is_null() {
+            if val_needed != 0 && !val.is_null() {
+                *val = xml_schema_new_notation_value(xml_strdup(value), null_mut());
+                if (*val).is_null() {
+                    ret = -1;
+                }
+            }
+        } else {
+            return 1;
         }
         ret
     }
@@ -1258,12 +1259,17 @@ unsafe fn xml_schema_validate_qname(
     val_needed: i32,
 ) -> i32 {
     unsafe {
-        let mut ret: i32;
+        let mut ret = 0;
         let mut local: *mut XmlChar;
         let mut prefix: *mut XmlChar = null_mut();
 
-        ret = xml_validate_qname(value, 1);
-        if ret != 0 {
+        if validate_qname::<true>(
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        )
+        .is_err()
+        {
             if ret == -1 {
                 VERROR_INT!(
                     vctxt,
@@ -4808,29 +4814,28 @@ unsafe fn xml_schema_pval_attr_node_qname_value(
 
         *uri = null_mut();
         *local = null_mut();
-        let ret: i32 = xml_validate_qname(value, 1);
-        match ret.cmp(&0) {
-            std::cmp::Ordering::Greater => {
-                let v = CStr::from_ptr(value as *const i8).to_string_lossy();
-                xml_schema_psimple_type_err(
-                    ctxt,
-                    XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
-                    owner_item,
-                    attr.into(),
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName),
-                    None,
-                    Some(&v),
-                    None,
-                    None,
-                    None,
-                );
-                *local = value;
-                return (*ctxt).err;
-            }
-            std::cmp::Ordering::Less => {
-                return -1;
-            }
-            std::cmp::Ordering::Equal => {}
+        if validate_qname::<true>(
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        )
+        .is_err()
+        {
+            let v = CStr::from_ptr(value as *const i8).to_string_lossy();
+            xml_schema_psimple_type_err(
+                ctxt,
+                XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
+                owner_item,
+                attr.into(),
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName),
+                None,
+                Some(&v),
+                None,
+                None,
+                None,
+            );
+            *local = value;
+            return (*ctxt).err;
         }
 
         if strchr(value as *mut c_char, b':' as _).is_null() {
@@ -20903,11 +20908,13 @@ unsafe fn xml_schema_vexpand_qname(
         *ns_name = null_mut();
         *local_name = null_mut();
 
-        let ret: i32 = xml_validate_qname(value, 1);
-        if ret == -1 {
-            return -1;
-        }
-        if ret > 0 {
+        if validate_qname::<true>(
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        )
+        .is_err()
+        {
             let value = CStr::from_ptr(value as *const i8).to_string_lossy();
             xml_schema_simple_type_err(
                 vctxt as XmlSchemaAbstractCtxtPtr,
@@ -20919,41 +20926,39 @@ unsafe fn xml_schema_vexpand_qname(
             );
             return 1;
         }
-        {
-            let mut prefix: *mut XmlChar = null_mut();
+        let mut prefix: *mut XmlChar = null_mut();
 
-            // NOTE: xmlSplitQName2 will return a duplicated string.
-            let local: *mut XmlChar = xml_split_qname2(value, &raw mut prefix);
-            if local.is_null() {
-                *local_name = xml_dict_lookup((*vctxt).dict, value, -1);
-            } else {
-                *local_name = xml_dict_lookup((*vctxt).dict, local, -1);
-                xml_free(local as _);
-            }
+        // NOTE: xmlSplitQName2 will return a duplicated string.
+        let local: *mut XmlChar = xml_split_qname2(value, &raw mut prefix);
+        if local.is_null() {
+            *local_name = xml_dict_lookup((*vctxt).dict, value, -1);
+        } else {
+            *local_name = xml_dict_lookup((*vctxt).dict, local, -1);
+            xml_free(local as _);
+        }
 
-            *ns_name = (*vctxt).lookup_namespace(
-                (!prefix.is_null())
-                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                    .as_deref(),
+        *ns_name = (*vctxt).lookup_namespace(
+            (!prefix.is_null())
+                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                .as_deref(),
+        );
+
+        if !prefix.is_null() {
+            xml_free(prefix as _);
+            // A namespace must be found if the prefix is NOT NULL.
+            if (*ns_name).is_null() {
+                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
+                xml_schema_custom_err(
+                vctxt as XmlSchemaAbstractCtxtPtr,
+                XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1,
+                None,
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName)
+                    as XmlSchemaBasicItemPtr,
+                format!("The QName value '{value}' has no corresponding namespace declaration in scope").as_str(),
+                Some(&value),
+                None,
             );
-
-            if !prefix.is_null() {
-                xml_free(prefix as _);
-                // A namespace must be found if the prefix is NOT NULL.
-                if (*ns_name).is_null() {
-                    let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                    xml_schema_custom_err(
-                    vctxt as XmlSchemaAbstractCtxtPtr,
-                    XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1,
-                    None,
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasQName)
-                        as XmlSchemaBasicItemPtr,
-                    format!("The QName value '{value}' has no corresponding namespace declaration in scope").as_str(),
-                    Some(&value),
-                    None,
-                );
-                    return 2;
-                }
+                return 2;
             }
         }
         0

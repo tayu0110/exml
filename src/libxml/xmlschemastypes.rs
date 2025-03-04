@@ -58,8 +58,8 @@ use crate::{
     },
     tree::{
         XmlAttrPtr, XmlAttributeType, XmlEntityType, XmlGenericNodePtr, validate_ncname,
-        xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_nmtoken,
-        xml_validate_qname,
+        validate_qname, xml_get_doc_entity, xml_split_qname2, xml_validate_name,
+        xml_validate_nmtoken,
     },
     xmlschemas::{
         context::{
@@ -2788,7 +2788,12 @@ unsafe fn xml_schema_val_atomic_type(
                                     let mut uri: *const XmlChar = null();
                                     let mut local: *mut XmlChar = null_mut();
 
-                                    ret = xml_validate_qname(value, 1);
+                                    ret = validate_qname::<true>(
+                                        CStr::from_ptr(value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    )
+                                    .is_err() as i32;
                                     if ret != 0 {
                                         break 'done;
                                     }
@@ -3066,7 +3071,12 @@ unsafe fn xml_schema_val_atomic_type(
                                     let mut uri: *mut XmlChar = null_mut();
                                     let mut local: *mut XmlChar = null_mut();
 
-                                    ret = xml_validate_qname(value, 1);
+                                    ret = validate_qname::<true>(
+                                        CStr::from_ptr(value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    )
+                                    .is_err() as i32;
                                     if let Some(node) = node.filter(|_| ret == 0) {
                                         let mut prefix: *mut XmlChar = null_mut();
 
