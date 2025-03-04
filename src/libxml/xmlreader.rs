@@ -4915,6 +4915,8 @@ unsafe fn xml_text_reader_schema_validate_internal(
     ctxt: XmlSchemaValidCtxtPtr,
     _options: i32,
 ) -> i32 {
+    use std::ffi::CStr;
+
     use crate::xmlschemas::context::{
         XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
         xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
@@ -4961,7 +4963,8 @@ unsafe fn xml_text_reader_schema_validate_internal(
         let ctx = GenericErrorContext::new(reader);
         if !xsd.is_null() {
             // Parse the schema and create validation environment.
-            let pctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(xsd);
+            let pctxt: XmlSchemaParserCtxtPtr =
+                xml_schema_new_parser_ctxt(CStr::from_ptr(xsd).to_string_lossy().as_ref());
             if (*reader).error_func.is_some() {
                 (*pctxt).set_errors(
                     Some(xml_text_reader_validity_error_relay),

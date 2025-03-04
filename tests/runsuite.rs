@@ -1069,7 +1069,7 @@ unsafe fn xstc_test_group(
                     if xml_str_equal(validity, c"valid".as_ptr() as _) {
                         NB_SCHEMATAS.fetch_add(1, Ordering::Relaxed);
                         let cpath = CString::new(path.as_str()).unwrap();
-                        ctxt = xml_schema_new_parser_ctxt(cpath.as_ptr());
+                        ctxt = xml_schema_new_parser_ctxt(&path);
                         (*ctxt).set_errors(
                             Some(test_error_handler),
                             Some(test_error_handler),
@@ -1120,8 +1120,7 @@ unsafe fn xstc_test_group(
                         }
                     } else if xml_str_equal(validity, c"invalid".as_ptr() as _) {
                         NB_SCHEMATAS.fetch_add(1, Ordering::Relaxed);
-                        let cpath = CString::new(path.as_str()).unwrap();
-                        ctxt = xml_schema_new_parser_ctxt(cpath.as_ptr());
+                        ctxt = xml_schema_new_parser_ctxt(&path);
                         (*ctxt).set_errors(
                             Some(test_error_handler),
                             Some(test_error_handler),

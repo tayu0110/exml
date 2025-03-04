@@ -141,7 +141,8 @@ use crate::{
     xmlschemas::{
         context::{
             XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free_parser_ctxt,
-            xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt, xml_schema_parser_ctxt_create,
+            xml_schema_new_parser_ctxt, xml_schema_new_parser_ctxt_use_dict,
+            xml_schema_new_valid_ctxt,
         },
         error::{
             xml_schema_complex_type_err, xml_schema_custom_err, xml_schema_custom_err4,
@@ -4549,29 +4550,6 @@ unsafe fn xml_schema_build_absolute_uri(
     }
 }
 
-/// Create an XML Schemas parse context for that file/resource expected
-/// to contain an XML Schemas file.
-///
-/// Returns the parser context or NULL in case of error
-#[doc(alias = "xmlSchemaNewParserCtxtUseDict")]
-unsafe fn xml_schema_new_parser_ctxt_use_dict(
-    url: *const c_char,
-    dict: XmlDictPtr,
-) -> XmlSchemaParserCtxtPtr {
-    unsafe {
-        let ret: XmlSchemaParserCtxtPtr = xml_schema_parser_ctxt_create();
-        if ret.is_null() {
-            return null_mut();
-        }
-        (*ret).dict = dict;
-        xml_dict_reference(dict);
-        if !url.is_null() {
-            (*ret).url = xml_dict_lookup(dict, url as _, -1);
-        }
-        ret
-    }
-}
-
 unsafe fn xml_schema_parse_new_doc(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -4598,8 +4576,12 @@ unsafe fn xml_schema_parse_new_doc(
             return -1;
         }
         // Create and init the temporary parser context.
-        let newpctxt: XmlSchemaParserCtxtPtr =
-            xml_schema_new_parser_ctxt_use_dict((*bucket).schema_location as _, (*pctxt).dict);
+        let newpctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt_use_dict(
+            (!(*bucket).schema_location.is_null())
+                .then(|| CStr::from_ptr((*bucket).schema_location as *const i8).to_string_lossy())
+                .as_deref(),
+            (*pctxt).dict,
+        );
         if newpctxt.is_null() {
             return -1;
         }
@@ -4724,7 +4706,11 @@ unsafe fn xml_schema_parse_include_or_redefine_attrs(
             return (*pctxt).err;
         }
         // Report self-inclusion and self-redefinition.
-        if xml_str_equal(*schema_location, (*pctxt).url) {
+        if (!(*schema_location).is_null())
+            .then(|| CStr::from_ptr(*schema_location as *const i8).to_string_lossy())
+            .as_deref()
+            == (*pctxt).url.as_deref()
+        {
             let schema_location = CStr::from_ptr(*schema_location as *const i8).to_string_lossy();
             if typ == XML_SCHEMA_SCHEMA_REDEFINE {
                 xml_schema_pcustom_err(
@@ -19864,11 +19850,13 @@ pub unsafe fn xml_schema_parse(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
                 (*ctxt).owns_constructor = 1;
             }
             (*(*ctxt).constructor).main_schema = main_schema;
+            let url = (*ctxt).url.as_deref().map(|url| CString::new(url).unwrap());
             // Locate and add the schema document.
             res = xml_schema_add_schema_doc(
                 ctxt,
                 XML_SCHEMA_SCHEMA_MAIN,
-                (*ctxt).url,
+                url.as_deref()
+                    .map_or(null_mut(), |url| url.as_ptr() as *const u8),
                 (*ctxt).doc,
                 (*ctxt).buffer,
                 (*ctxt).size,
@@ -19886,8 +19874,7 @@ pub unsafe fn xml_schema_parse(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
                 }
                 if bucket.is_null() {
                     // TODO: Error code, actually we failed to *locate* the schema.
-                    if !(*ctxt).url.is_null() {
-                        let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
+                    if let Some(url) = (*ctxt).url.as_deref() {
                         xml_schema_custom_err(
                             ctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapFailedLoad,
@@ -19895,7 +19882,7 @@ pub unsafe fn xml_schema_parse(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
                             null_mut(),
                             format!("Failed to locate the main schema resource at '{url}'")
                                 .as_str(),
-                            Some(&url),
+                            Some(url),
                             None,
                         );
                     } else {
@@ -20417,12 +20404,10 @@ unsafe fn xml_schema_create_pctxt_on_vctxt(vctxt: XmlSchemaValidCtxtPtr) -> i32 
     unsafe {
         if (*vctxt).pctxt.is_null() {
             if !(*vctxt).schema.is_null() {
-                (*vctxt).pctxt = xml_schema_new_parser_ctxt_use_dict(
-                    c"*".as_ptr() as _,
-                    (*(*vctxt).schema).dict,
-                );
+                (*vctxt).pctxt =
+                    xml_schema_new_parser_ctxt_use_dict(Some("*"), (*(*vctxt).schema).dict);
             } else {
-                (*vctxt).pctxt = xml_schema_new_parser_ctxt(c"*".as_ptr() as _);
+                (*vctxt).pctxt = xml_schema_new_parser_ctxt("*");
             }
             if (*vctxt).pctxt.is_null() {
                 VERROR_INT!(
@@ -26778,36 +26763,6 @@ mod tests {
                         eprint!(" {}", n_buffer);
                         eprintln!(" {}", n_size);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_new_parser_ctxt() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_url in 0..GEN_NB_CONST_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let url = gen_const_char_ptr(n_url, 0);
-
-                let ret_val = xml_schema_new_parser_ctxt(url);
-                desret_xml_schema_parser_ctxt_ptr(ret_val);
-                des_const_char_ptr(n_url, url, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSchemaNewParserCtxt",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlSchemaNewParserCtxt()"
-                    );
-                    eprintln!(" {}", n_url);
                 }
             }
         }

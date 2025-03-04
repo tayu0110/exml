@@ -704,13 +704,12 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
             }
         }
     } else if cmd_args.schema.is_some() && not_stream {
-        if let Some(s) = cmd_args.schema.as_deref() {
+        if let Some(schema) = cmd_args.schema.as_deref() {
             unsafe {
                 if cmd_args.timing {
                     start_timer();
                 }
-                let schema = CString::new(s).unwrap();
-                let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(schema.as_ptr());
+                let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(schema);
                 if ctxt.is_null() {
                     PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;
@@ -725,7 +724,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                 );
                 let wxschemas = xml_schema_parse(ctxt);
                 if wxschemas.is_null() {
-                    generic_error!("WXS schema {s} failed to compile\n");
+                    generic_error!("WXS schema {schema} failed to compile\n");
                     PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
                 }
                 WXSCHEMAS.store(wxschemas, Ordering::Relaxed);

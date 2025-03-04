@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_lookup},
+    dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference},
     encoding::XmlCharEncoding,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::XmlParserInputBuffer,
@@ -60,7 +60,7 @@ pub struct XmlSchemaParserCtxt {
     pub(crate) schema: XmlSchemaPtr, /* The main schema in use */
     pub(crate) counter: i32,
 
-    pub(crate) url: *const u8,
+    pub(crate) url: Option<String>,
     pub(crate) doc: Option<XmlDocPtr>,
     pub(crate) preserve: i32, /* Whether the doc should be freed  */
 
@@ -161,7 +161,7 @@ impl Default for XmlSchemaParserCtxt {
             owns_constructor: 0,
             schema: null_mut(),
             counter: 0,
-            url: null(),
+            url: None,
             doc: None,
             preserve: 0,
             buffer: null(),
@@ -201,18 +201,37 @@ pub(crate) unsafe fn xml_schema_parser_ctxt_create() -> XmlSchemaParserCtxtPtr {
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchemaNewParserCtxt")]
-pub unsafe fn xml_schema_new_parser_ctxt(url: *const i8) -> XmlSchemaParserCtxtPtr {
+pub unsafe fn xml_schema_new_parser_ctxt(url: &str) -> XmlSchemaParserCtxtPtr {
     unsafe {
-        if url.is_null() {
-            return null_mut();
-        }
-
         let ret: XmlSchemaParserCtxtPtr = xml_schema_parser_ctxt_create();
         if ret.is_null() {
             return null_mut();
         }
         (*ret).dict = xml_dict_create();
-        (*ret).url = xml_dict_lookup((*ret).dict, url as _, -1);
+        (*ret).url = Some(url.to_owned());
+        ret
+    }
+}
+
+/// Create an XML Schemas parse context for that file/resource expected
+/// to contain an XML Schemas file.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlSchemaNewParserCtxtUseDict")]
+pub(crate) unsafe fn xml_schema_new_parser_ctxt_use_dict(
+    url: Option<&str>,
+    dict: XmlDictPtr,
+) -> XmlSchemaParserCtxtPtr {
+    unsafe {
+        let ret: XmlSchemaParserCtxtPtr = xml_schema_parser_ctxt_create();
+        if ret.is_null() {
+            return null_mut();
+        }
+        (*ret).dict = dict;
+        xml_dict_reference(dict);
+        if let Some(url) = url {
+            (*ret).url = Some(url.to_owned());
+        }
         ret
     }
 }

@@ -5834,7 +5834,7 @@ pub unsafe fn xml_schema_check_facet(
 
                 if ctxt_given == 0 {
                     // A context is needed if called from RelaxNG.
-                    pctxt = xml_schema_new_parser_ctxt(c"*".as_ptr() as _);
+                    pctxt = xml_schema_new_parser_ctxt("*");
                     if pctxt.is_null() {
                         return -1;
                     }

@@ -3517,7 +3517,7 @@ unsafe fn schemas_test(
         let mut count: c_char;
 
         // first compile the schemas if possible
-        let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(cfilename.as_ptr());
+        let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(filename);
         (*ctxt).set_errors(
             Some(test_error_handler),
             Some(test_error_handler),
