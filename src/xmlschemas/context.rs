@@ -90,6 +90,14 @@ pub struct XmlSchemaParserCtxt {
 }
 
 impl XmlSchemaParserCtxt {
+    /// Read a attribute value and internalize the string
+    ///
+    /// Returns the string or NULL if not present.
+    #[doc(alias = "xmlSchemaGetProp")]
+    pub(crate) unsafe fn get_prop(&self, node: XmlNodePtr, name: &str) -> Option<String> {
+        unsafe { node.get_no_ns_prop(name) }
+    }
+
     /// Get the callback information used to handle errors for a parser context
     ///
     /// Returns -1 in case of failure, 0 otherwise

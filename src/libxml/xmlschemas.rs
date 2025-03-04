@@ -3048,25 +3048,6 @@ unsafe fn xml_schema_bucket_free(bucket: XmlSchemaBucketPtr) {
     }
 }
 
-/// Read a attribute value and internalize the string
-///
-/// Returns the string or NULL if not present.
-#[doc(alias = "xmlSchemaGetProp")]
-unsafe fn xml_schema_get_prop(
-    ctxt: XmlSchemaParserCtxtPtr,
-    node: XmlNodePtr,
-    name: &str,
-) -> *const XmlChar {
-    unsafe {
-        let Some(val) = node.get_no_ns_prop(name) else {
-            return null_mut();
-        };
-        let val = CString::new(val).unwrap();
-        let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, val.as_ptr() as *const u8, -1);
-        ret
-    }
-}
-
 unsafe fn xml_schema_bucket_create(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: i32,
@@ -3622,7 +3603,11 @@ unsafe fn xml_schema_add_schema_doc(
                         }
                         // Note that we don't apply a type check for the
                         // target_namespace value here.
-                        target_namespace = xml_schema_get_prop(pctxt, doc_elem, "targetNamespace");
+                        target_namespace = (*pctxt)
+                            .get_prop(doc_elem, "targetNamespace")
+                            .map_or(null_mut(), |prop| {
+                                xml_dict_lookup((*pctxt).dict, prop.as_ptr(), prop.len() as i32)
+                            });
                     }
 
                     // after_doc_loading:
@@ -6547,15 +6532,15 @@ unsafe fn xml_schema_parse_wildcard_ns(
         let mut tmp: XmlSchemaWildcardNsPtr;
         let mut last_ns: XmlSchemaWildcardNsPtr = null_mut();
 
-        let pc: *const XmlChar = xml_schema_get_prop(ctxt, node, "processContents");
-        if pc.is_null() || xml_str_equal(pc, c"strict".as_ptr() as _) {
+        let pc = (*ctxt).get_prop(node, "processContents");
+        if pc.is_none() || pc.as_deref() == Some("strict") {
             (*wildc).process_contents = XML_SCHEMAS_ANY_STRICT;
-        } else if xml_str_equal(pc, c"skip".as_ptr() as _) {
+        } else if pc.as_deref() == Some("skip") {
             (*wildc).process_contents = XML_SCHEMAS_ANY_SKIP;
-        } else if xml_str_equal(pc, c"lax".as_ptr() as _) {
+        } else if pc.as_deref() == Some("lax") {
             (*wildc).process_contents = XML_SCHEMAS_ANY_LAX;
         } else {
-            let pc = CStr::from_ptr(pc as *const i8).to_string_lossy();
+            let pc = pc.unwrap();
             xml_schema_psimple_type_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
@@ -7565,23 +7550,21 @@ unsafe fn xml_get_boolean_prop(
     mut def: i32,
 ) -> i32 {
     unsafe {
-        let val: *const XmlChar = xml_schema_get_prop(ctxt, node, name);
-        if val.is_null() {
+        let Some(val) = (*ctxt).get_prop(node, name) else {
             return def;
-        }
+        };
         // 3.2.2.1 Lexical representation
         // An instance of a datatype that is defined as `boolean`
         // can have the following legal literals {true, false, 1, 0}.
-        if xml_str_equal(val, c"true".as_ptr() as _) {
+        if val == "true" {
             def = 1;
-        } else if xml_str_equal(val, c"false".as_ptr() as _) {
+        } else if val == "false" {
             def = 0;
-        } else if xml_str_equal(val, c"1".as_ptr() as _) {
+        } else if val == "1" {
             def = 1;
-        } else if xml_str_equal(val, c"0".as_ptr() as _) {
+        } else if val == "0" {
             def = 0;
         } else {
-            let val = CStr::from_ptr(val as *const i8).to_string_lossy();
             xml_schema_psimple_type_err(
                 ctxt,
                 XmlParserErrors::XmlSchemapInvalidBoolean,
@@ -8407,7 +8390,11 @@ unsafe fn xml_schema_parse_element(
                 );
                 xml_schema_check_reference(ctxt, schema, node, Some(attr), (*decl).named_type_ns);
             }
-            (*decl).value = xml_schema_get_prop(ctxt, node, "default");
+            (*decl).value = (*ctxt)
+                .get_prop(node, "default")
+                .map_or(null_mut(), |prop| {
+                    xml_dict_lookup((*ctxt).dict, prop.as_ptr(), prop.len() as i32)
+                });
             if let Some(attr) = xml_schema_get_prop_node(node, "fixed") {
                 fixed = xml_schema_get_node_content(ctxt, Some(attr.into()));
                 if !(*decl).value.is_null() {
@@ -9036,8 +9023,7 @@ unsafe fn xml_schema_parse_facet(
             return null_mut();
         }
         (*facet).node = node.into();
-        let value: *const XmlChar = xml_schema_get_prop(ctxt, node, "value");
-        if value.is_null() {
+        let Some(value) = (*ctxt).get_prop(node, "value") else {
             let name = node.name().unwrap();
             xml_schema_perr2(
                 ctxt,
@@ -9050,7 +9036,7 @@ unsafe fn xml_schema_parse_facet(
             );
             xml_schema_free_facet(facet);
             return null_mut();
-        }
+        };
         if is_schema(Some(node), "minInclusive") {
             (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinInclusive;
         } else if is_schema(Some(node), "minExclusive") {
@@ -9090,12 +9076,12 @@ unsafe fn xml_schema_parse_facet(
             return null_mut();
         }
         xml_schema_pval_attr_id(ctxt, node, "id");
-        (*facet).value = value;
+        (*facet).value = xml_dict_lookup((*ctxt).dict, value.as_ptr(), value.len() as i32);
         if (*facet).typ != XmlSchemaTypeType::XmlSchemaFacetPattern
             && (*facet).typ != XmlSchemaTypeType::XmlSchemaFacetEnumeration
         {
-            let fixed: *const XmlChar = xml_schema_get_prop(ctxt, node, "fixed");
-            if !fixed.is_null() && xml_str_equal(fixed, c"true".as_ptr() as _) {
+            let fixed = (*ctxt).get_prop(node, "fixed");
+            if fixed.as_deref() == Some("true") {
                 (*facet).fixed = 1;
             }
         }
@@ -10017,9 +10003,12 @@ unsafe fn xml_schema_parse_simple_type(
             }
             // Attribute "final".
             if let Some(attr) = xml_schema_get_prop_node(node, "final") {
-                attr_value = xml_schema_get_prop(ctxt, node, "final");
+                let attr_value = (*ctxt).get_prop(node, "final");
+                let cattr_value = attr_value.as_deref().map(|s| CString::new(s).unwrap());
                 if xml_schema_pval_attr_block_final(
-                    attr_value,
+                    cattr_value
+                        .as_deref()
+                        .map_or(null_mut(), |s| s.as_ptr() as *const u8),
                     &raw mut (*typ).flags,
                     -1,
                     -1,
@@ -10029,7 +10018,7 @@ unsafe fn xml_schema_parse_simple_type(
                     XML_SCHEMAS_TYPE_FINAL_UNION,
                 ) != 0
                 {
-                    let attr_value = CStr::from_ptr(attr_value as *const i8).to_string_lossy();
+                    let attr_value = attr_value.unwrap();
                     xml_schema_psimple_type_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
@@ -11099,7 +11088,9 @@ unsafe fn xml_schema_parse_global_attribute(
 
         xml_schema_pval_attr_id(pctxt, node, "id");
         // Attribute "fixed".
-        (*ret).def_value = xml_schema_get_prop(pctxt, node, "fixed");
+        (*ret).def_value = (*pctxt).get_prop(node, "fixed").map_or(null_mut(), |prop| {
+            xml_dict_lookup((*pctxt).dict, prop.as_ptr(), prop.len() as i32)
+        });
         if !(*ret).def_value.is_null() {
             (*ret).flags |= XML_SCHEMAS_ATTR_FIXED;
         }
@@ -11214,8 +11205,7 @@ unsafe fn xml_schema_parse_notation(
         if ctxt.is_null() || schema.is_null() {
             return null_mut();
         }
-        let name: *const XmlChar = xml_schema_get_prop(ctxt, node, "name");
-        if name.is_null() {
+        let Some(name) = (*ctxt).get_prop(node, "name") else {
             xml_schema_perr2(
                 ctxt,
                 Some(node.into()),
@@ -11226,9 +11216,15 @@ unsafe fn xml_schema_parse_notation(
                 None,
             );
             return null_mut();
-        }
-        let ret: XmlSchemaNotationPtr =
-            xml_schema_add_notation(ctxt, schema, name, (*ctxt).target_namespace, node);
+        };
+        let name = CString::new(name).unwrap();
+        let ret: XmlSchemaNotationPtr = xml_schema_add_notation(
+            ctxt,
+            schema,
+            name.as_ptr() as *const u8,
+            (*ctxt).target_namespace,
+            node,
+        );
         if ret.is_null() {
             return null_mut();
         }
