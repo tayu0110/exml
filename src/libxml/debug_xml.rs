@@ -36,8 +36,8 @@ use crate::{
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc,
         XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntity,
-        XmlEntityPtr, XmlEntityType, XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr,
-        xml_free_node_list, xml_get_doc_entity, xml_validate_name,
+        XmlEntityPtr, XmlEntityType, XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr, validate_name,
+        xml_free_node_list, xml_get_doc_entity,
     },
 };
 
@@ -197,7 +197,7 @@ impl XmlDebugCtxt<'_> {
                 };
                 let cname = CString::new(name).unwrap();
                 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-                if xml_validate_name(cname.as_ptr() as *const u8, 0) != 0 {
+                if validate_name::<false>(name).is_err() {
                     xml_debug_err!(
                         self,
                         XmlParserErrors::XmlCheckNotNCName,

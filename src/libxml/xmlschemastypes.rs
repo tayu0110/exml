@@ -57,8 +57,8 @@ use crate::{
         },
     },
     tree::{
-        XmlAttrPtr, XmlAttributeType, XmlEntityType, XmlGenericNodePtr, validate_ncname,
-        validate_qname, xml_get_doc_entity, xml_split_qname2, xml_validate_name,
+        XmlAttrPtr, XmlAttributeType, XmlEntityType, XmlGenericNodePtr, validate_name,
+        validate_ncname, validate_qname, xml_get_doc_entity, xml_split_qname2,
         xml_validate_nmtoken,
     },
     xmlschemas::{
@@ -2761,7 +2761,12 @@ unsafe fn xml_schema_val_atomic_type(
                                     break 'done;
                                 }
                                 XmlSchemaValType::XmlSchemasName => {
-                                    ret = xml_validate_name(value, 1);
+                                    ret = validate_name::<true>(
+                                        CStr::from_ptr(value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    )
+                                    .is_err() as i32;
                                     if ret == 0 && !val.is_null() && !value.is_null() {
                                         v = xml_schema_new_value(XmlSchemaValType::XmlSchemasName);
                                         if !v.is_null() {
