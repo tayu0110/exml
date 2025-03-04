@@ -164,7 +164,7 @@ impl XmlSchemaItem for XmlSchemaBasicItem {
                     }
                 }
                 XmlSchemaTypeType::XmlSchemaExtraQNameRef => {
-                    let name = (*(item as XmlSchemaQnameRefPtr)).name;
+                    let name = (*(item as XmlSchemaQNameRefPtr)).name;
                     (!name.is_null()).then(|| {
                         CStr::from_ptr(name as *const i8)
                             .to_string_lossy()
@@ -262,7 +262,7 @@ impl XmlSchemaItem for XmlSchemaBasicItem {
                     None
                 }
                 XmlSchemaTypeType::XmlSchemaExtraQNameRef => {
-                    let ns = (*(item as XmlSchemaQnameRefPtr)).target_namespace;
+                    let ns = (*(item as XmlSchemaQNameRefPtr)).target_namespace;
                     (!ns.is_null()).then(|| {
                         CStr::from_ptr(ns as *const i8)
                             .to_string_lossy()
@@ -416,12 +416,12 @@ pub(crate) unsafe fn xml_schema_free_attribute_use_prohib(prohib: XmlSchemaAttri
 }
 
 #[doc(alias = "xmlSchemaQNameRefPtr")]
-pub type XmlSchemaQnameRefPtr = *mut XmlSchemaQnameRef;
+pub type XmlSchemaQNameRefPtr = *mut XmlSchemaQNameRef;
 /// A component reference item (not a schema component)
 /// (Extends xmlSchemaBasicItem)
 #[doc(alias = "xmlSchemaQNameRef")]
 #[repr(C)]
-pub struct XmlSchemaQnameRef {
+pub struct XmlSchemaQNameRef {
     pub(crate) typ: XmlSchemaTypeType,
     pub(crate) item: XmlSchemaBasicItemPtr, /* The resolved referenced item. */
     pub(crate) item_type: XmlSchemaTypeType,
@@ -431,7 +431,7 @@ pub struct XmlSchemaQnameRef {
 }
 
 impl_xml_schema_item! {
-    type: XmlSchemaQnameRef,
+    type: XmlSchemaQNameRef,
     @expected: XmlSchemaTypeType::XmlSchemaExtraQNameRef
 }
 
@@ -517,7 +517,7 @@ pub struct XmlSchemaIDC {
     pub(crate) selector: XmlSchemaIdcselectPtr,
     pub(crate) fields: XmlSchemaIdcselectPtr,
     pub(crate) nb_fields: i32,
-    pub(crate) refe: XmlSchemaQnameRefPtr,
+    pub(crate) refe: XmlSchemaQNameRefPtr,
 }
 
 impl_xml_schema_item! {

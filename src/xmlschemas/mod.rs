@@ -21,6 +21,8 @@
 // Daniel Veillard <veillard@redhat.com>
 
 pub mod context;
+#[cfg(feature = "libxml_output")]
+pub mod dump;
 pub(crate) mod error;
 pub(crate) mod item_list;
 pub mod items;

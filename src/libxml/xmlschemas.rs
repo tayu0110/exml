@@ -19,8 +19,6 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
-#[cfg(feature = "libxml_output")]
-use std::io::Write;
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -69,17 +67,17 @@ use crate::{
             XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION, XML_SCHEMAS_ELEM_ABSTRACT,
             XML_SCHEMAS_ELEM_BLOCK_EXTENSION, XML_SCHEMAS_ELEM_BLOCK_RESTRICTION,
             XML_SCHEMAS_ELEM_BLOCK_SUBSTITUTION, XML_SCHEMAS_ELEM_CIRCULAR,
-            XML_SCHEMAS_ELEM_DEFAULT, XML_SCHEMAS_ELEM_FINAL_EXTENSION,
-            XML_SCHEMAS_ELEM_FINAL_RESTRICTION, XML_SCHEMAS_ELEM_FIXED, XML_SCHEMAS_ELEM_GLOBAL,
-            XML_SCHEMAS_ELEM_INTERNAL_CHECKED, XML_SCHEMAS_ELEM_INTERNAL_RESOLVED,
-            XML_SCHEMAS_ELEM_NILLABLE, XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD,
-            XML_SCHEMAS_ELEM_TOPLEVEL, XML_SCHEMAS_FACET_COLLAPSE, XML_SCHEMAS_FACET_PRESERVE,
-            XML_SCHEMAS_FACET_REPLACE, XML_SCHEMAS_FINAL_DEFAULT_EXTENSION,
-            XML_SCHEMAS_FINAL_DEFAULT_LIST, XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION,
-            XML_SCHEMAS_FINAL_DEFAULT_UNION, XML_SCHEMAS_INCLUDING_CONVERT_NS,
-            XML_SCHEMAS_QUALIF_ATTR, XML_SCHEMAS_QUALIF_ELEM, XML_SCHEMAS_TYPE_ABSTRACT,
-            XML_SCHEMAS_TYPE_BLOCK_EXTENSION, XML_SCHEMAS_TYPE_BLOCK_RESTRICTION,
-            XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE, XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION,
+            XML_SCHEMAS_ELEM_FINAL_EXTENSION, XML_SCHEMAS_ELEM_FINAL_RESTRICTION,
+            XML_SCHEMAS_ELEM_FIXED, XML_SCHEMAS_ELEM_GLOBAL, XML_SCHEMAS_ELEM_INTERNAL_CHECKED,
+            XML_SCHEMAS_ELEM_INTERNAL_RESOLVED, XML_SCHEMAS_ELEM_NILLABLE,
+            XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD, XML_SCHEMAS_ELEM_TOPLEVEL,
+            XML_SCHEMAS_FACET_COLLAPSE, XML_SCHEMAS_FACET_PRESERVE, XML_SCHEMAS_FACET_REPLACE,
+            XML_SCHEMAS_FINAL_DEFAULT_EXTENSION, XML_SCHEMAS_FINAL_DEFAULT_LIST,
+            XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION, XML_SCHEMAS_FINAL_DEFAULT_UNION,
+            XML_SCHEMAS_INCLUDING_CONVERT_NS, XML_SCHEMAS_QUALIF_ATTR, XML_SCHEMAS_QUALIF_ELEM,
+            XML_SCHEMAS_TYPE_ABSTRACT, XML_SCHEMAS_TYPE_BLOCK_EXTENSION,
+            XML_SCHEMAS_TYPE_BLOCK_RESTRICTION, XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE,
+            XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION,
             XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION, XML_SCHEMAS_TYPE_FACETSNEEDVALUE,
             XML_SCHEMAS_TYPE_FINAL_EXTENSION, XML_SCHEMAS_TYPE_FINAL_LIST,
             XML_SCHEMAS_TYPE_FINAL_RESTRICTION, XML_SCHEMAS_TYPE_FINAL_UNION,
@@ -165,8 +163,8 @@ use crate::{
             XmlSchemaBasicItemPtr, XmlSchemaElement, XmlSchemaElementPtr, XmlSchemaIDC,
             XmlSchemaIDCPtr, XmlSchemaItem, XmlSchemaModelGroup, XmlSchemaModelGroupDef,
             XmlSchemaModelGroupDefPtr, XmlSchemaModelGroupPtr, XmlSchemaNotation,
-            XmlSchemaNotationPtr, XmlSchemaParticle, XmlSchemaParticlePtr, XmlSchemaQnameRef,
-            XmlSchemaQnameRefPtr, XmlSchemaTreeItemPtr, XmlSchemaType, XmlSchemaTypePtr,
+            XmlSchemaNotationPtr, XmlSchemaParticle, XmlSchemaParticlePtr, XmlSchemaQNameRef,
+            XmlSchemaQNameRefPtr, XmlSchemaTreeItemPtr, XmlSchemaType, XmlSchemaTypePtr,
             xml_schema_free_attribute_use_prohib,
         },
         wxs_is_any_simple_type, wxs_is_anytype, wxs_is_complex, wxs_is_simple,
@@ -1109,7 +1107,7 @@ pub(crate) unsafe fn xml_schema_get_component_node(
             XmlSchemaTypeType::XmlSchemaTypeIDCUnique
             | XmlSchemaTypeType::XmlSchemaTypeIDCKey
             | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => Some((*(item as XmlSchemaIDCPtr)).node),
-            XmlSchemaTypeType::XmlSchemaExtraQNameRef => (*(item as XmlSchemaQnameRefPtr)).node,
+            XmlSchemaTypeType::XmlSchemaExtraQNameRef => (*(item as XmlSchemaQNameRefPtr)).node,
             // TODO: What to do with NOTATIONs?
             // XmlSchemaTypeType::XML_SCHEMA_TYPE_NOTATION:
             //     return ((*(item as xmlSchemaNotationPtr)).node);
@@ -2930,7 +2928,7 @@ unsafe fn xml_schema_free_notation(nota: XmlSchemaNotationPtr) {
 
 /// Deallocatea a QName reference structure.
 #[doc(alias = "xmlSchemaFreeQNameRef")]
-unsafe fn xml_schema_free_qname_ref(item: XmlSchemaQnameRefPtr) {
+unsafe fn xml_schema_free_qname_ref(item: XmlSchemaQNameRefPtr) {
     unsafe {
         xml_free(item as _);
     }
@@ -2997,7 +2995,7 @@ unsafe fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) {
                     xml_schema_free_notation(item as XmlSchemaNotationPtr);
                 }
                 XmlSchemaTypeType::XmlSchemaExtraQNameRef => {
-                    xml_schema_free_qname_ref(item as XmlSchemaQnameRefPtr);
+                    xml_schema_free_qname_ref(item as XmlSchemaQNameRefPtr);
                 }
                 _ => {
                     let name = xml_schema_get_component_type_str(item as _);
@@ -5459,11 +5457,11 @@ unsafe fn xml_schema_new_qname_ref(
     ref_type: XmlSchemaTypeType,
     ref_name: *const XmlChar,
     ref_ns: *const XmlChar,
-) -> XmlSchemaQnameRefPtr {
+) -> XmlSchemaQNameRefPtr {
     unsafe {
-        let mut ret: XmlSchemaQnameRefPtr;
+        let mut ret: XmlSchemaQNameRefPtr;
 
-        ret = xml_malloc(size_of::<XmlSchemaQnameRef>()) as XmlSchemaQnameRefPtr;
+        ret = xml_malloc(size_of::<XmlSchemaQNameRef>()) as XmlSchemaQNameRefPtr;
         if ret.is_null() {
             xml_schema_perr_memory(pctxt, "allocating QName reference item", None);
             return null_mut();
@@ -6080,7 +6078,7 @@ unsafe fn xml_schema_parse_local_attribute(
             WXS_ADD_PENDING!(pctxt, using);
             (*using).occurs = occurs;
             // Create a QName reference to the attribute declaration.
-            let refe: XmlSchemaQnameRefPtr = xml_schema_new_qname_ref(
+            let refe: XmlSchemaQNameRefPtr = xml_schema_new_qname_ref(
                 pctxt,
                 XmlSchemaTypeType::XmlSchemaTypeAttribute,
                 tmp_name,
@@ -6292,9 +6290,9 @@ unsafe fn xml_schema_parse_attribute_group_ref(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-) -> XmlSchemaQnameRefPtr {
+) -> XmlSchemaQNameRefPtr {
     unsafe {
-        let ret: XmlSchemaQnameRefPtr;
+        let ret: XmlSchemaQNameRefPtr;
         let mut ref_ns: *const XmlChar = null();
         let mut refe: *const XmlChar = null();
 
@@ -8200,7 +8198,7 @@ unsafe fn xml_schema_parse_element(
                         break 'return_null;
                     }
                     // Create the reference item and attach it to the particle.
-                    let refer: XmlSchemaQnameRefPtr = xml_schema_new_qname_ref(
+                    let refer: XmlSchemaQNameRefPtr = xml_schema_new_qname_ref(
                         ctxt,
                         XmlSchemaTypeType::XmlSchemaTypeElement,
                         refe,
@@ -8569,11 +8567,11 @@ unsafe fn xml_schema_parse_element(
 }
 
 unsafe fn xml_schema_get_qname_ref_name(refe: *mut c_void) -> *const XmlChar {
-    unsafe { (*(refe as XmlSchemaQnameRefPtr)).name }
+    unsafe { (*(refe as XmlSchemaQNameRefPtr)).name }
 }
 
 unsafe fn xml_schema_get_qname_ref_target_ns(refe: *mut c_void) -> *const XmlChar {
-    unsafe { (*(refe as XmlSchemaQnameRefPtr)).target_namespace }
+    unsafe { (*(refe as XmlSchemaQNameRefPtr)).target_namespace }
 }
 
 /// Parsea a XML schema <any> element. A particle and wildcard
@@ -9722,7 +9720,7 @@ unsafe fn xml_schema_parse_union(
             let mut ns_name: *mut XmlChar = null_mut();
             let mut link: XmlSchemaTypeLinkPtr;
             let mut last_link: XmlSchemaTypeLinkPtr = null_mut();
-            let mut refe: XmlSchemaQnameRefPtr;
+            let mut refe: XmlSchemaQNameRefPtr;
 
             cur = xml_schema_get_node_content(ctxt, Some(attr.into()));
             if cur.is_null() {
@@ -11714,7 +11712,7 @@ unsafe fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> i
                             // QName-reference component.
                             // This is the easy case, since we will just
                             // expand the redefined group.
-                            (*((*redef).reference as XmlSchemaQnameRefPtr)).item = prev;
+                            (*((*redef).reference as XmlSchemaQNameRefPtr)).item = prev;
                             (*redef).target = null_mut();
                         } else {
                             // This is the complicated case: we need
@@ -12120,8 +12118,8 @@ unsafe fn xml_schema_resolve_union_member_types(
         link = (*typ).member_types;
         last_link = null_mut();
         while !link.is_null() {
-            let name: *const XmlChar = (*((*link).typ as XmlSchemaQnameRefPtr)).name;
-            let ns_name: *const XmlChar = (*((*link).typ as XmlSchemaQnameRefPtr)).target_namespace;
+            let name: *const XmlChar = (*((*link).typ as XmlSchemaQNameRefPtr)).name;
+            let ns_name: *const XmlChar = (*((*link).typ as XmlSchemaQNameRefPtr)).target_namespace;
 
             member_type = xml_schema_get_type((*ctxt).schema, name, ns_name);
             if member_type.is_null() || !wxs_is_simple(member_type) {
@@ -12306,8 +12304,8 @@ unsafe fn xml_schema_resolve_type_references(
             && !WXS_TYPE_PARTICLE_TERM!(type_def).is_null()
             && (*WXS_TYPE_PARTICLE_TERM!(type_def)).typ == XmlSchemaTypeType::XmlSchemaExtraQNameRef
         {
-            let refe: XmlSchemaQnameRefPtr =
-                WXS_TYPE_PARTICLE_TERM!(type_def) as XmlSchemaQnameRefPtr;
+            let refe: XmlSchemaQNameRefPtr =
+                WXS_TYPE_PARTICLE_TERM!(type_def) as XmlSchemaQNameRefPtr;
 
             // URGENT TODO: Test this.
             WXS_TYPE_PARTICLE_TERM!(type_def) = null_mut();
@@ -12461,7 +12459,7 @@ unsafe fn xml_schema_resolve_attr_use_references(
             return 0;
         }
         {
-            let refe: XmlSchemaQnameRefPtr = (*ause).attr_decl as XmlSchemaQnameRefPtr;
+            let refe: XmlSchemaQNameRefPtr = (*ause).attr_decl as XmlSchemaQNameRefPtr;
 
             // TODO: Evaluate, what errors could occur if the declaration is not found.
             (*ause).attr_decl = xml_schema_get_attribute_decl(
@@ -12526,7 +12524,7 @@ unsafe fn xml_schema_get_attribute_group(
 /// Resolves references to attribute group definitions.
 #[doc(alias = "xmlSchemaResolveAttrGroupReferences")]
 unsafe fn xml_schema_resolve_attr_group_references(
-    refe: XmlSchemaQnameRefPtr,
+    refe: XmlSchemaQNameRefPtr,
     ctxt: XmlSchemaParserCtxtPtr,
 ) -> i32 {
     unsafe {
@@ -12569,7 +12567,7 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
 ) {
     unsafe {
         let mut particle: XmlSchemaParticlePtr = WXS_MODELGROUP_PARTICLE!(mg);
-        let mut refe: XmlSchemaQnameRefPtr;
+        let mut refe: XmlSchemaQNameRefPtr;
         let mut ref_item: XmlSchemaBasicItemPtr;
 
         // URGENT TODO: Test this.
@@ -12581,7 +12579,7 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
                 {
                     break 'next_particle;
                 }
-                refe = WXS_PARTICLE_TERM!(particle) as XmlSchemaQnameRefPtr;
+                refe = WXS_PARTICLE_TERM!(particle) as XmlSchemaQNameRefPtr;
                 // Resolve the reference.
                 // NULL the {term} by default.
                 (*particle).children = null_mut();
@@ -12976,16 +12974,16 @@ unsafe fn xml_schema_check_group_def_circular(
 unsafe fn xml_schema_check_attr_group_circular_recur(
     ctxt_gr: XmlSchemaAttributeGroupPtr,
     list: XmlSchemaItemListPtr,
-) -> XmlSchemaQnameRefPtr {
+) -> XmlSchemaQNameRefPtr {
     unsafe {
         let mut gr: XmlSchemaAttributeGroupPtr;
-        let mut circ: XmlSchemaQnameRefPtr;
+        let mut circ: XmlSchemaQNameRefPtr;
         // We will search for an attribute group reference which
         // references the context attribute group.
         for refe in (*list)
             .items
             .iter()
-            .map(|&refe| refe as XmlSchemaQnameRefPtr)
+            .map(|&refe| refe as XmlSchemaQNameRefPtr)
         {
             if (*refe).typ == XmlSchemaTypeType::XmlSchemaExtraQNameRef
                 && (*refe).item_type == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
@@ -13040,7 +13038,7 @@ unsafe fn xml_schema_check_attr_group_circular(
         {
             return 0;
         } else {
-            let circ: XmlSchemaQnameRefPtr = xml_schema_check_attr_group_circular_recur(
+            let circ: XmlSchemaQNameRefPtr = xml_schema_check_attr_group_circular_recur(
                 attr_gr,
                 (*attr_gr).attr_uses as XmlSchemaItemListPtr,
             );
@@ -13375,13 +13373,13 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                 continue 'main;
             }
             if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraQNameRef
-                && (*(using as XmlSchemaQnameRefPtr)).item_type
+                && (*(using as XmlSchemaQNameRefPtr)).item_type
                     == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
             {
-                if (*(using as XmlSchemaQnameRefPtr)).item.is_null() {
+                if (*(using as XmlSchemaQNameRefPtr)).item.is_null() {
                     return -1;
                 }
-                gr = (*(using as XmlSchemaQnameRefPtr)).item as XmlSchemaAttributeGroupPtr;
+                gr = (*(using as XmlSchemaQNameRefPtr)).item as XmlSchemaAttributeGroupPtr;
                 // Expand the referenced attr. group.
                 // TODO: remove this, this is done in a previous step, so
                 // already done here.
@@ -19453,11 +19451,11 @@ unsafe fn xml_schema_fixup_components(
                                 FIXHFAILURE!(pctxt, 'exit_failure);
                             }
                             XmlSchemaTypeType::XmlSchemaExtraQNameRef => {
-                                if (*(item as XmlSchemaQnameRefPtr)).item_type
+                                if (*(item as XmlSchemaQNameRefPtr)).item_type
                                     == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
                                 {
                                     xml_schema_resolve_attr_group_references(
-                                        item as XmlSchemaQnameRefPtr,
+                                        item as XmlSchemaQNameRefPtr,
                                         pctxt,
                                     );
                                 }
@@ -20030,443 +20028,6 @@ pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
 
         xml_dict_free((*schema).dict);
         xml_free(schema as _);
-    }
-}
-
-/// Dumps a list of attribute use components.
-#[doc(alias = "xmlSchemaAttrUsesDump")]
-#[cfg(feature = "libxml_output")]
-unsafe fn xml_schema_attr_uses_dump<'a>(
-    uses: XmlSchemaItemListPtr,
-    output: &mut (impl Write + 'a),
-) {
-    unsafe {
-        let mut prohib: XmlSchemaAttributeUseProhibPtr;
-        let mut refe: XmlSchemaQnameRefPtr;
-        let mut name: *const XmlChar;
-        let mut tns: *const XmlChar;
-
-        if uses.is_null() || (*uses).items.is_empty() {
-            return;
-        }
-
-        writeln!(output, "  attributes:");
-        for using in (*uses)
-            .items
-            .iter()
-            .map(|&using| using as XmlSchemaAttributeUsePtr)
-        {
-            if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraAttrUseProhib {
-                write!(output, "  [prohibition] ");
-                prohib = using as XmlSchemaAttributeUseProhibPtr;
-                name = (*prohib).name;
-                tns = (*prohib).target_namespace;
-            } else if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraQNameRef {
-                write!(output, "  [reference] ");
-                refe = using as XmlSchemaQnameRefPtr;
-                name = (*refe).name;
-                tns = (*refe).target_namespace;
-            } else {
-                write!(output, "  [use] ");
-                name = WXS_ATTRUSE_DECL_NAME!(using);
-                tns = WXS_ATTRUSE_DECL_TNS!(using);
-            }
-            writeln!(
-                output,
-                "'{}'",
-                xml_schema_format_qname(
-                    Some(CStr::from_ptr(tns as *const i8).to_string_lossy().as_ref()),
-                    Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref())
-                )
-            );
-        }
-    }
-}
-
-/// Dump the annotation
-#[doc(alias = "xmlSchemaAnnotDump")]
-#[cfg(feature = "libxml_output")]
-unsafe fn xml_schema_annot_dump<'a>(output: &mut (impl Write + 'a), annot: XmlSchemaAnnotPtr) {
-    unsafe {
-        if annot.is_null() {
-            return;
-        }
-
-        if let Some(content) = (*annot).content.get_content() {
-            writeln!(output, "  Annot: {content}");
-        } else {
-            writeln!(output, "  Annot: empty");
-        }
-    }
-}
-
-/// Dump a SchemaType structure
-#[doc(alias = "xmlSchemaContentModelDump")]
-#[cfg(feature = "libxml_output")]
-unsafe fn xml_schema_content_model_dump<'a>(
-    particle: XmlSchemaParticlePtr,
-    output: &mut (impl Write + 'a),
-    depth: i32,
-) {
-    unsafe {
-        if particle.is_null() {
-            return;
-        }
-        let shift = "  ".repeat(depth.clamp(0, 25) as usize);
-        write!(output, "{}", shift);
-        if (*particle).children.is_null() {
-            writeln!(output, "MISSING particle term");
-            return;
-        }
-        let term: XmlSchemaTreeItemPtr = (*particle).children;
-        if term.is_null() {
-            write!(output, "(NULL)");
-        } else {
-            match (*term).typ {
-                XmlSchemaTypeType::XmlSchemaTypeElement => {
-                    write!(
-                        output,
-                        "ELEM '{}'",
-                        xml_schema_format_qname(
-                            Some(
-                                CStr::from_ptr(
-                                    (*(term as XmlSchemaElementPtr)).target_namespace as *const i8
-                                )
-                                .to_string_lossy()
-                                .as_ref()
-                            ),
-                            Some(
-                                CStr::from_ptr((*(term as XmlSchemaElementPtr)).name as *const i8)
-                                    .to_string_lossy()
-                                    .as_ref()
-                            ),
-                        )
-                    );
-                }
-                XmlSchemaTypeType::XmlSchemaTypeSequence => {
-                    write!(output, "SEQUENCE");
-                }
-                XmlSchemaTypeType::XmlSchemaTypeChoice => {
-                    write!(output, "CHOICE");
-                }
-                XmlSchemaTypeType::XmlSchemaTypeAll => {
-                    write!(output, "ALL");
-                }
-                XmlSchemaTypeType::XmlSchemaTypeAny => {
-                    write!(output, "ANY");
-                }
-                _ => {
-                    writeln!(output, "UNKNOWN");
-                    return;
-                }
-            }
-        }
-        if (*particle).min_occurs != 1 {
-            write!(output, " min: {}", (*particle).min_occurs);
-        }
-        if (*particle).max_occurs >= UNBOUNDED as i32 {
-            write!(output, " max: unbounded");
-        } else if (*particle).max_occurs != 1 {
-            write!(output, " max: {}", (*particle).max_occurs);
-        }
-        writeln!(output);
-        if !term.is_null()
-            && matches!(
-                (*term).typ,
-                XmlSchemaTypeType::XmlSchemaTypeSequence
-                    | XmlSchemaTypeType::XmlSchemaTypeChoice
-                    | XmlSchemaTypeType::XmlSchemaTypeAll
-            )
-            && !(*term).children.is_null()
-        {
-            xml_schema_content_model_dump(
-                (*term).children as XmlSchemaParticlePtr,
-                output,
-                depth + 1,
-            );
-        }
-        if !(*particle).next.is_null() {
-            xml_schema_content_model_dump((*particle).next as XmlSchemaParticlePtr, output, depth);
-        }
-    }
-}
-
-/// Dump a SchemaType structure
-#[doc(alias = "xmlSchemaTypeDump")]
-#[cfg(feature = "libxml_output")]
-unsafe fn xml_schema_type_dump<'a>(typ: XmlSchemaTypePtr, output: &mut (impl Write + 'a)) {
-    unsafe {
-        if typ.is_null() {
-            writeln!(output, "Type: NULL");
-            return;
-        }
-        write!(output, "Type: ");
-        if !(*typ).name.is_null() {
-            write!(
-                output,
-                "'{}' ",
-                CStr::from_ptr((*typ).name as *const i8).to_string_lossy()
-            );
-        } else {
-            write!(output, "(no name) ");
-        }
-        if !(*typ).target_namespace.is_null() {
-            write!(
-                output,
-                "ns '{}' ",
-                CStr::from_ptr((*typ).target_namespace as *const i8).to_string_lossy()
-            );
-        }
-        match (*typ).typ {
-            XmlSchemaTypeType::XmlSchemaTypeBasic => {
-                write!(output, "[basic] ");
-            }
-            XmlSchemaTypeType::XmlSchemaTypeSimple => {
-                write!(output, "[simple] ");
-            }
-            XmlSchemaTypeType::XmlSchemaTypeComplex => {
-                write!(output, "[complex] ");
-            }
-            XmlSchemaTypeType::XmlSchemaTypeSequence => {
-                write!(output, "[sequence] ");
-            }
-            XmlSchemaTypeType::XmlSchemaTypeChoice => {
-                write!(output, "[choice] ");
-            }
-            XmlSchemaTypeType::XmlSchemaTypeAll => {
-                write!(output, "[all] ");
-            }
-            XmlSchemaTypeType::XmlSchemaTypeUr => {
-                write!(output, "[ur] ");
-            }
-            XmlSchemaTypeType::XmlSchemaTypeRestriction => {
-                write!(output, "[restriction] ");
-            }
-            XmlSchemaTypeType::XmlSchemaTypeExtension => {
-                write!(output, "[extension] ");
-            }
-            _ => {
-                write!(output, "[unknown type {}] ", (*typ).typ as i32);
-            }
-        }
-        write!(output, "content: ");
-        match (*typ).content_type {
-            XmlSchemaContentType::XmlSchemaContentUnknown => {
-                write!(output, "[unknown] ");
-            }
-            XmlSchemaContentType::XmlSchemaContentEmpty => {
-                write!(output, "[empty] ");
-            }
-            XmlSchemaContentType::XmlSchemaContentElements => {
-                write!(output, "[element] ");
-            }
-            XmlSchemaContentType::XmlSchemaContentMixed => {
-                write!(output, "[mixed] ");
-            }
-            XmlSchemaContentType::XmlSchemaContentMixedOrElements => { /* not used. */ }
-            XmlSchemaContentType::XmlSchemaContentBasic => {
-                write!(output, "[basic] ");
-            }
-            XmlSchemaContentType::XmlSchemaContentSimple => {
-                write!(output, "[simple] ");
-            }
-            XmlSchemaContentType::XmlSchemaContentAny => {
-                write!(output, "[any] ");
-            }
-        }
-        writeln!(output);
-        if !(*typ).base.is_null() {
-            write!(
-                output,
-                "  base type: '{}'",
-                CStr::from_ptr((*typ).base as *const i8).to_string_lossy()
-            );
-            if !(*typ).base_ns.is_null() {
-                writeln!(
-                    output,
-                    " ns '{}'",
-                    CStr::from_ptr((*typ).base_ns as *const i8).to_string_lossy()
-                );
-            } else {
-                writeln!(output);
-            }
-        }
-        if !(*typ).attr_uses.is_null() {
-            xml_schema_attr_uses_dump((*typ).attr_uses as _, output);
-        }
-        if !(*typ).annot.is_null() {
-            xml_schema_annot_dump(output, (*typ).annot);
-        }
-        // #ifdef DUMP_CONTENT_MODEL
-        if (*typ).typ == XmlSchemaTypeType::XmlSchemaTypeComplex && !(*typ).subtypes.is_null() {
-            xml_schema_content_model_dump((*typ).subtypes as XmlSchemaParticlePtr, output, 1);
-        }
-        // #endif
-    }
-}
-
-#[cfg(feature = "libxml_output")]
-extern "C" fn xml_schema_type_dump_entry<'a>(typ: *mut c_void, output: &mut (impl Write + 'a)) {
-    unsafe {
-        xml_schema_type_dump(typ as XmlSchemaTypePtr, output);
-    }
-}
-
-/// Dump the element
-#[doc(alias = "xmlSchemaElementDump")]
-#[cfg(feature = "libxml_output")]
-extern "C" fn xml_schema_element_dump<'a>(
-    payload: *mut c_void,
-    output: &mut (impl Write + 'a),
-    namespace: *const XmlChar,
-) {
-    let elem: XmlSchemaElementPtr = payload as XmlSchemaElementPtr;
-    if elem.is_null() {
-        return;
-    }
-
-    unsafe {
-        write!(output, "Element");
-        if (*elem).flags & XML_SCHEMAS_ELEM_GLOBAL != 0 {
-            write!(output, " (global)");
-        }
-        write!(
-            output,
-            ": '{}' ",
-            CStr::from_ptr((*elem).name as *const i8).to_string_lossy()
-        );
-        if !namespace.is_null() {
-            write!(
-                output,
-                "ns '{}'",
-                CStr::from_ptr(namespace as *const i8).to_string_lossy()
-            );
-        }
-        writeln!(output);
-        // Misc other properties.
-        if (*elem).flags & XML_SCHEMAS_ELEM_NILLABLE != 0
-            || (*elem).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0
-            || (*elem).flags & XML_SCHEMAS_ELEM_FIXED != 0
-            || (*elem).flags & XML_SCHEMAS_ELEM_DEFAULT != 0
-        {
-            write!(output, "  props: ");
-            if (*elem).flags & XML_SCHEMAS_ELEM_FIXED != 0 {
-                write!(output, "[fixed] ");
-            }
-            if (*elem).flags & XML_SCHEMAS_ELEM_DEFAULT != 0 {
-                write!(output, "[default] ");
-            }
-            if (*elem).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0 {
-                write!(output, "[abstract] ");
-            }
-            if (*elem).flags & XML_SCHEMAS_ELEM_NILLABLE != 0 {
-                write!(output, "[nillable] ");
-            }
-            writeln!(output);
-        }
-        // Default/fixed value.
-        if !(*elem).value.is_null() {
-            writeln!(
-                output,
-                "  value: '{}'",
-                CStr::from_ptr((*elem).value as *const i8).to_string_lossy()
-            );
-        }
-        // Type.
-        if !(*elem).named_type.is_null() {
-            write!(
-                output,
-                "  type: '{}' ",
-                CStr::from_ptr((*elem).named_type as *const i8).to_string_lossy()
-            );
-            if !(*elem).named_type_ns.is_null() {
-                writeln!(
-                    output,
-                    "ns '{}'",
-                    CStr::from_ptr((*elem).named_type_ns as *const i8).to_string_lossy()
-                );
-            } else {
-                writeln!(output);
-            }
-        } else if !(*elem).subtypes.is_null() {
-            // Dump local types.
-            xml_schema_type_dump((*elem).subtypes, output);
-        }
-        // Substitution group.
-        if !(*elem).subst_group.is_null() {
-            write!(
-                output,
-                "  substitutionGroup: '{}' ",
-                CStr::from_ptr((*elem).subst_group as *const i8).to_string_lossy()
-            );
-            if !(*elem).subst_group_ns.is_null() {
-                writeln!(
-                    output,
-                    "ns '{}'",
-                    CStr::from_ptr((*elem).subst_group_ns as *const i8).to_string_lossy()
-                );
-            } else {
-                writeln!(output);
-            }
-        }
-    }
-}
-
-/// Dump a Schema structure.
-#[doc(alias = "xmlSchemaDump")]
-#[cfg(feature = "libxml_output")]
-pub unsafe fn xml_schema_dump<'a>(output: &mut (impl Write + 'a), schema: XmlSchemaPtr) {
-    unsafe {
-        use crate::hash::XmlHashTableRef;
-
-        if schema.is_null() {
-            writeln!(output, "Schemas: NULL");
-            return;
-        }
-        write!(output, "Schemas: ");
-        if !(*schema).name.is_null() {
-            write!(
-                output,
-                "{}, ",
-                CStr::from_ptr((*schema).name as *const i8).to_string_lossy()
-            );
-        } else {
-            write!(output, "no name, ");
-        }
-        if !(*schema).target_namespace.is_null() {
-            write!(
-                output,
-                "{}",
-                CStr::from_ptr((*schema).target_namespace as *const i8).to_string_lossy()
-            );
-        } else {
-            write!(output, "no target namespace");
-        }
-        writeln!(output);
-        if !(*schema).annot.is_null() {
-            xml_schema_annot_dump(output, (*schema).annot);
-        }
-        if let Some(type_decl) = XmlHashTableRef::from_raw((*schema).type_decl) {
-            type_decl.scan(|data, _, _, _| {
-                if !data.0.is_null() {
-                    xml_schema_type_dump_entry(data.0, output);
-                }
-            });
-        }
-        if let Some(elem_decl) = XmlHashTableRef::from_raw((*schema).elem_decl) {
-            elem_decl.scan(|data, _, namespace, _| {
-                if !data.0.is_null() {
-                    let namespace = namespace.map(|n| CString::new(n.as_ref()).unwrap());
-                    xml_schema_element_dump(
-                        data.0,
-                        output,
-                        namespace
-                            .as_deref()
-                            .map_or(null(), |ns| ns.as_ptr() as *const u8),
-                    );
-                }
-            });
-        }
     }
 }
 
@@ -27118,8 +26679,10 @@ pub unsafe fn xml_schema_validate_set_locator(
 #[cfg(test)]
 mod tests {
     use crate::{
-        globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*,
-        xmlschemas::context::xml_schema_new_mem_parser_ctxt,
+        globals::reset_last_error,
+        libxml::xmlmemory::xml_mem_blocks,
+        test_util::*,
+        xmlschemas::{context::xml_schema_new_mem_parser_ctxt, dump::xml_schema_dump},
     };
 
     use super::*;
