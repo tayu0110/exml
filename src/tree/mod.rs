@@ -405,89 +405,57 @@ macro_rules! CUR_SCHAR {
     feature = "sax1",
     feature = "libxml_writer",
 ))]
-pub unsafe fn xml_validate_ncname(value: *const XmlChar, space: i32) -> i32 {
-    unsafe {
-        use crate::libxml::{
-            chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-            parser_internals::xml_is_letter,
-        };
+pub fn validate_ncname<const ALLOW_SPACE: bool>(value: &str) -> Result<(), &'static str> {
+    use crate::libxml::{
+        chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        parser_internals::xml_is_letter,
+    };
 
-        let mut cur: *const XmlChar = value;
-        let mut c: i32;
-        let mut l: i32 = 0;
+    let mut cur = value;
 
-        if value.is_null() {
-            return -1;
+    // First quick algorithm for ASCII range
+    if ALLOW_SPACE {
+        cur = cur.trim_start_matches(|c| xml_is_blank_char(c as u32));
+    }
+    if cur.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_') {
+        cur = cur[1..].trim_start_matches(|c: char| {
+            c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.'
+        });
+        if ALLOW_SPACE {
+            cur = cur.trim_start_matches(|c| xml_is_blank_char(c as u32));
         }
 
-        // First quick algorithm for ASCII range
-        if space != 0 {
-            while xml_is_blank_char(*cur as u32) {
-                cur = cur.add(1);
-            }
+        if cur.is_empty() {
+            return Ok(());
         }
-        if (*cur >= b'a' && *cur <= b'z') || (*cur >= b'A' && *cur <= b'Z') || *cur == b'_' {
-            cur = cur.add(1);
+    }
 
-            while (*cur >= b'a' && *cur <= b'z')
-                || (*cur >= b'A' && *cur <= b'Z')
-                || (*cur >= b'0' && *cur <= b'9')
-                || *cur == b'_'
-                || *cur == b'-'
-                || *cur == b'.'
-            {
-                cur = cur.add(1);
-            }
-            if space != 0 {
-                while xml_is_blank_char(*cur as u32) {
-                    cur = cur.add(1);
-                }
-            }
-            if *cur == 0 {
-                return 0;
-            }
-        }
-        // else {
-        //     goto try_complex;
-        // }
-
-        // try_complex:
-        // Second check for chars outside the ASCII range
-        cur = value;
-        c = CUR_SCHAR!(cur, l);
-        if space != 0 {
-            while xml_is_blank_char(c as u32) {
-                cur = cur.add(l as usize);
-                c = CUR_SCHAR!(cur, l);
-            }
-        }
-        if !xml_is_letter(c as u32) && c != b'_' as i32 {
-            return 1;
-        }
-        cur = cur.add(l as usize);
-        c = CUR_SCHAR!(cur, l);
-        while xml_is_letter(c as u32)
+    // try_complex:
+    // Second check for chars outside the ASCII range
+    let mut cur = value;
+    if ALLOW_SPACE {
+        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+    }
+    let Some(mut cur) = cur.strip_prefix(|c: char| xml_is_letter(c as u32) || c == '_') else {
+        return Err("Invalid NCName");
+    };
+    cur = cur.trim_start_matches(|c: char| {
+        xml_is_letter(c as u32)
             || xml_is_digit(c as u32)
-            || c == b'.' as i32
-            || c == b'-' as i32
-            || c == b'_' as i32
+            || c == '.'
+            || c == '-'
+            || c == '_'
             || xml_is_combining(c as u32)
             || xml_is_extender(c as u32)
-        {
-            cur = cur.add(l as usize);
-            c = CUR_SCHAR!(cur, l);
-        }
-        if space != 0 {
-            while xml_is_blank_char(c as u32) {
-                cur = cur.add(l as usize);
-                c = CUR_SCHAR!(cur, l);
-            }
-        }
-        if c != 0 {
-            return 1;
-        }
+    });
+    if ALLOW_SPACE {
+        cur = cur.trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+    }
 
-        0
+    if cur.is_empty() {
+        Ok(())
+    } else {
+        Err("Invalid NCName")
     }
 }
 
@@ -2886,45 +2854,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlSplitQName3()");
                         eprint!(" {}", n_name);
                         eprintln!(" {}", n_len);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_ncname() {
-        #[cfg(any(
-            feature = "libxml_tree",
-            feature = "xpath",
-            feature = "schema",
-            feature = "libxml_debug"
-        ))]
-        unsafe {
-            let mut leaks = 0;
-            #[cfg(feature = "libxml_tree")]
-            {
-                for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_space in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let value = gen_const_xml_char_ptr(n_value, 0);
-                        let space = gen_int(n_space, 1);
-
-                        let ret_val = xml_validate_ncname(value as *const XmlChar, space);
-                        desret_int(ret_val);
-                        des_const_xml_char_ptr(n_value, value, 0);
-                        des_int(n_space, space, 1);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidateNCName",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlValidateNCName()");
-                            eprint!(" {}", n_value);
-                            eprintln!(" {}", n_space);
-                        }
                     }
                 }
             }

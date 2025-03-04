@@ -57,8 +57,8 @@ use crate::{
         },
     },
     tree::{
-        XmlAttrPtr, XmlAttributeType, XmlEntityType, XmlGenericNodePtr, xml_get_doc_entity,
-        xml_split_qname2, xml_validate_name, xml_validate_ncname, xml_validate_nmtoken,
+        XmlAttrPtr, XmlAttributeType, XmlEntityType, XmlGenericNodePtr, validate_ncname,
+        xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_nmtoken,
         xml_validate_qname,
     },
     xmlschemas::{
@@ -2842,7 +2842,12 @@ unsafe fn xml_schema_val_atomic_type(
                                     break 'done;
                                 }
                                 XmlSchemaValType::XmlSchemasNCName => {
-                                    ret = xml_validate_ncname(value, 1);
+                                    ret = validate_ncname::<true>(
+                                        CStr::from_ptr(value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    )
+                                    .is_err() as i32;
                                     if ret == 0 && !val.is_null() {
                                         v = xml_schema_new_value(
                                             XmlSchemaValType::XmlSchemasNCName,
@@ -2857,7 +2862,12 @@ unsafe fn xml_schema_val_atomic_type(
                                     break 'done;
                                 }
                                 XmlSchemaValType::XmlSchemasID => {
-                                    ret = xml_validate_ncname(value, 1);
+                                    ret = validate_ncname::<true>(
+                                        CStr::from_ptr(value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    )
+                                    .is_err() as i32;
                                     if ret == 0 && !val.is_null() {
                                         v = xml_schema_new_value(XmlSchemaValType::XmlSchemasID);
                                         if !v.is_null() {
@@ -2910,7 +2920,12 @@ unsafe fn xml_schema_val_atomic_type(
                                     break 'done;
                                 }
                                 XmlSchemaValType::XmlSchemasIDREF => {
-                                    ret = xml_validate_ncname(value, 1);
+                                    ret = validate_ncname::<true>(
+                                        CStr::from_ptr(value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    )
+                                    .is_err() as i32;
                                     if ret == 0 && !val.is_null() {
                                         v = xml_schema_new_value(XmlSchemaValType::XmlSchemasIDREF);
                                         if v.is_null() {
@@ -2973,7 +2988,12 @@ unsafe fn xml_schema_val_atomic_type(
                                 XmlSchemaValType::XmlSchemasEntity => {
                                     let strip: *mut XmlChar;
 
-                                    ret = xml_validate_ncname(value, 1);
+                                    ret = validate_ncname::<true>(
+                                        CStr::from_ptr(value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    )
+                                    .is_err() as i32;
                                     if let Some(node) =
                                         node.filter(|node| node.document().is_some())
                                     {

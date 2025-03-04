@@ -133,9 +133,9 @@ use crate::{
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlAttributeDefault, XmlAttributeType,
         XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, xml_free_doc, xml_free_node,
-        xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop, xml_split_qname2,
-        xml_split_qname3, xml_validate_ncname, xml_validate_qname,
+        XmlEntityType, XmlEnumeration, XmlGenericNodePtr, XmlNodePtr, validate_ncname,
+        xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
+        xml_split_qname2, xml_split_qname3, xml_validate_qname,
     },
     uri::build_uri,
     xmlschemas::{
@@ -3730,46 +3730,26 @@ unsafe fn xml_schema_pval_attr_node_id(
     ctxt: XmlSchemaParserCtxtPtr,
     attr: Option<XmlAttrPtr>,
 ) -> i32 {
-    unsafe {
-        let mut ret: i32;
-
-        let Some(mut attr) = attr else {
-            return 0;
-        };
-        let value =
-            xml_schema_get_node_content_no_dict(attr.into()).map(|c| CString::new(c).unwrap());
-        let mut value = value
-            .as_ref()
-            .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *mut u8));
-        ret = xml_validate_ncname(value, 1);
-        match ret.cmp(&0) {
-            std::cmp::Ordering::Equal => {
-                // NOTE: the IDness might have already be declared in the DTD
-                if !matches!(attr.atype, Some(XmlAttributeType::XmlAttributeID)) {
-                    // TODO: Use xmlSchemaStrip here; it's not exported at this moment.
-                    let strip: *mut XmlChar = xml_schema_collapse_string(
-                        CStr::from_ptr(value as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    )
-                    .map_or(null_mut(), |res| {
-                        xml_strndup(res.as_ptr(), res.len() as i32)
-                    });
-                    if !strip.is_null() {
-                        xml_free(value as _);
-                        value = strip;
-                    }
-                    let res = xml_add_id(
-                        null_mut(),
-                        attr.doc.unwrap(),
-                        CStr::from_ptr(value as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                        attr,
-                    );
-                    if res.is_none() {
-                        ret = XmlParserErrors::XmlSchemapS4sAttrInvalidValue as i32;
-                        let value = CStr::from_ptr(value as *const i8).to_string_lossy();
+    let Some(mut attr) = attr else {
+        return 0;
+    };
+    let Some(value) = (unsafe { xml_schema_get_node_content_no_dict(attr.into()).map(Cow::Owned) })
+    else {
+        return -1;
+    };
+    let ret = validate_ncname::<true>(&value);
+    match ret {
+        Ok(_) => {
+            // NOTE: the IDness might have already be declared in the DTD
+            if !matches!(attr.atype, Some(XmlAttributeType::XmlAttributeID)) {
+                // TODO: Use xmlSchemaStrip here; it's not exported at this moment.
+                let res = if let Some(strip) = xml_schema_collapse_string(&value) {
+                    unsafe { xml_add_id(null_mut(), attr.doc.unwrap(), &strip, attr) }
+                } else {
+                    unsafe { xml_add_id(null_mut(), attr.doc.unwrap(), &value, attr) }
+                };
+                if res.is_none() {
+                    unsafe {
                         xml_schema_psimple_type_err(
                             ctxt,
                             XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
@@ -3785,39 +3765,34 @@ unsafe fn xml_schema_pval_attr_node_id(
                             Some(&value),
                             None,
                         );
-                    } else {
-                        attr.atype = Some(XmlAttributeType::XmlAttributeID);
                     }
+                    return XmlParserErrors::XmlSchemapS4sAttrInvalidValue as i32;
+                } else {
+                    attr.atype = Some(XmlAttributeType::XmlAttributeID);
                 }
             }
-            std::cmp::Ordering::Greater => {
-                ret = XmlParserErrors::XmlSchemapS4sAttrInvalidValue as i32;
-                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
-                xml_schema_psimple_type_err(
-                    ctxt,
-                    XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
-                    null_mut(),
-                    attr.into(),
-                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasID),
-                    None,
-                    None,
-                    Some(
-                        format!(
-                            "The value '{value}' of simple type 'xs:ID' is not a valid 'xs:NCName'"
-                        )
-                        .as_str(),
-                    ),
-                    Some(&value),
-                    None,
-                );
-            }
-            std::cmp::Ordering::Less => {}
+            0
         }
-        if !value.is_null() {
-            xml_free(value as _);
-        }
-
-        ret
+        Err(_) => unsafe {
+            xml_schema_psimple_type_err(
+                ctxt,
+                XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
+                null_mut(),
+                attr.into(),
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasID),
+                None,
+                None,
+                Some(
+                    format!(
+                        "The value '{value}' of simple type 'xs:ID' is not a valid 'xs:NCName'"
+                    )
+                    .as_str(),
+                ),
+                Some(&value),
+                None,
+            );
+            XmlParserErrors::XmlSchemapS4sAttrInvalidValue as i32
+        },
     }
 }
 

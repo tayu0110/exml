@@ -68,8 +68,8 @@ use crate::{
     },
     tree::{
         NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNode, XmlNodePtr,
-        XmlNs, XmlNsPtr, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
-        xml_new_doc_text, xml_validate_ncname,
+        XmlNs, XmlNsPtr, validate_ncname, xml_free_doc, xml_free_node, xml_new_child,
+        xml_new_doc_node, xml_new_doc_text,
     },
     uri::{XmlURI, build_uri, escape_url_except},
 };
@@ -2414,7 +2414,7 @@ unsafe fn xml_relaxng_parse_name_class(
             if let Some(val) = (*node).get_content() {
                 let val = normalize_external_space(&val);
                 let cval = xml_strndup(val.as_ptr(), val.len() as i32);
-                if xml_validate_ncname(cval, 0) != 0 {
+                if validate_ncname::<false>(val).is_err() {
                     if let Some(parent) = (*node).parent() {
                         xml_rng_perr!(
                             ctxt,
@@ -2644,7 +2644,7 @@ unsafe fn xml_relaxng_parse_data(
         };
         let typ = normalize_external_space(&typ);
         let ctyp = xml_strndup(typ.as_ptr(), typ.len() as i32);
-        if xml_validate_ncname(ctyp, 0) != 0 {
+        if validate_ncname::<false>(typ).is_err() {
             xml_rng_perr!(
                 ctxt,
                 Some(node.into()),
@@ -2956,7 +2956,7 @@ unsafe fn xml_relaxng_parse_value(
         if let Some(typ) = (*node).get_prop("type") {
             let typ = normalize_external_space(&typ);
             let ctyp = xml_strndup(typ.as_ptr(), typ.len() as i32);
-            if xml_validate_ncname(ctyp, 0) != 0 {
+            if validate_ncname::<false>(typ).is_err() {
                 xml_rng_perr!(
                     ctxt,
                     Some(node.into()),
@@ -3513,7 +3513,13 @@ unsafe fn xml_relaxng_parse_pattern(
                     XmlParserErrors::XmlRngpRefNoName,
                     "ref has no name\n"
                 );
-            } else if xml_validate_ncname((*def).name, 0) != 0 {
+            } else if validate_ncname::<false>(
+                CStr::from_ptr((*def).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            )
+            .is_err()
+            {
                 let name = CStr::from_ptr((*def).name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
@@ -3673,7 +3679,13 @@ unsafe fn xml_relaxng_parse_pattern(
                     XmlParserErrors::XmlRngpParentRefNoName,
                     "parentRef has no name\n"
                 );
-            } else if xml_validate_ncname((*def).name, 0) != 0 {
+            } else if validate_ncname::<false>(
+                CStr::from_ptr((*def).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            )
+            .is_err()
+            {
                 let name = CStr::from_ptr((*def).name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
@@ -4047,7 +4059,7 @@ unsafe fn xml_relaxng_parse_define(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNodeP
         if let Some(name) = node.get_prop("name") {
             let name = normalize_external_space(&name);
             let cname = xml_strndup(name.as_ptr(), name.len() as i32);
-            if xml_validate_ncname(cname, 0) != 0 {
+            if validate_ncname::<false>(name).is_err() {
                 xml_rng_perr!(
                     ctxt,
                     Some(node.into()),

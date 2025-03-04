@@ -48,12 +48,12 @@ use crate::{
     tree::{
         __XML_REGISTER_CALLBACKS, NodeCommon, XmlAttr, XmlAttributeDefault, XmlAttributeType,
         XmlDocProperties, XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, xml_add_doc_entity,
-        xml_add_dtd_entity, xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node,
-        xml_get_doc_entity, xml_get_parameter_entity, xml_get_predefined_entity,
-        xml_new_cdata_block, xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
-        xml_new_doc_pi, xml_new_doc_text, xml_new_dtd, xml_new_ns, xml_new_ns_prop,
-        xml_new_reference, xml_text_concat, xml_validate_ncname,
+        XmlEntityType, XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, validate_ncname,
+        xml_add_doc_entity, xml_add_dtd_entity, xml_build_qname, xml_create_int_subset,
+        xml_free_dtd, xml_free_node, xml_get_doc_entity, xml_get_parameter_entity,
+        xml_get_predefined_entity, xml_new_cdata_block, xml_new_char_ref, xml_new_doc,
+        xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
+        xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -1732,7 +1732,13 @@ unsafe fn xml_sax2_attribute_internal(
                         // Add the xml:id value
                         //
                         // Open issue: normalization of the value.
-                        if xml_validate_ncname(content, 1) != 0 {
+                        if validate_ncname::<true>(
+                            CStr::from_ptr(content as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        )
+                        .is_err()
+                        {
                             let content = CStr::from_ptr(content as *const i8).to_string_lossy();
                             xml_err_valid!(
                                 ctxt,
@@ -2635,7 +2641,13 @@ unsafe fn xml_sax2_attribute_ns(
                         #[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
                         {
                             #[cfg(feature = "libxml_valid")]
-                            if xml_validate_ncname(content, 1) != 0 {
+                            if validate_ncname::<true>(
+                                CStr::from_ptr(content as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            )
+                            .is_err()
+                            {
                                 let content =
                                     CStr::from_ptr(content as *const i8).to_string_lossy();
                                 xml_err_valid!(
