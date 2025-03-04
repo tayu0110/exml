@@ -13339,7 +13339,7 @@ unsafe fn xml_schema_expand_attribute_group_refs(
     item: XmlSchemaBasicItemPtr,
     complete_wild: *mut XmlSchemaWildcardPtr,
     list: XmlSchemaItemListPtr<*mut c_void>,
-    prohibs: XmlSchemaItemListPtr<*mut c_void>,
+    prohibs: XmlSchemaItemListPtr<XmlSchemaAttributeUseProhibPtr>,
 ) -> i32 {
     unsafe {
         let mut gr: XmlSchemaAttributeGroupPtr;
@@ -13458,12 +13458,7 @@ unsafe fn xml_schema_expand_attribute_group_refs(
         }
         // Handle pointless prohibitions of declared attributes.
         if !prohibs.is_null() && !(*prohibs).items.is_empty() && !(*list).items.is_empty() {
-            for prohib in (*prohibs)
-                .items
-                .iter()
-                .rev()
-                .map(|&prohib| prohib as XmlSchemaAttributeUseProhibPtr)
-            {
+            for &prohib in (*prohibs).items.iter().rev() {
                 for using in (*list)
                     .items
                     .iter()
@@ -14198,7 +14193,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
 ) -> i32 {
     unsafe {
         let mut uses: XmlSchemaItemListPtr<*mut c_void>;
-        let mut prohibs: XmlSchemaItemListPtr<*mut c_void> = null_mut();
+        let mut prohibs: XmlSchemaItemListPtr<XmlSchemaAttributeUseProhibPtr> = null_mut();
 
         if (*typ).base_type.is_null() {
             PERROR_INT!(pctxt, "xmlSchemaFixupTypeAttributeUses", "no base type");
@@ -14271,11 +14266,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
                 {
                     if !prohibs.is_null() {
                         // Filter out prohibited uses.
-                        for pro in (*prohibs)
-                            .items
-                            .iter()
-                            .map(|&pro| pro as XmlSchemaAttributeUseProhibPtr)
-                        {
+                        for &pro in &(*prohibs).items {
                             if WXS_ATTRUSE_DECL_NAME!(using) == (*pro).name
                                 && WXS_ATTRUSE_DECL_TNS!(using) == (*pro).target_namespace
                             {

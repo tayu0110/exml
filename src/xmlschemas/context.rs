@@ -35,7 +35,7 @@ use crate::{
 use super::{
     error::xml_schema_internal_err,
     item_list::{XmlSchemaItemListPtr, xml_schema_item_list_create},
-    items::XmlSchemaTypePtr,
+    items::{XmlSchemaAttributeUseProhibPtr, XmlSchemaTypePtr},
 };
 
 /// A schemas validation context
@@ -86,7 +86,7 @@ pub struct XmlSchemaParserCtxt {
 
     pub(crate) redef: XmlSchemaRedefPtr, /* Used for redefinitions. */
     pub(crate) redef_counter: i32,       /* Used for redefinitions. */
-    pub(crate) attr_prohibs: XmlSchemaItemListPtr<*mut c_void>,
+    pub(crate) attr_prohibs: XmlSchemaItemListPtr<XmlSchemaAttributeUseProhibPtr>,
 }
 
 impl XmlSchemaParserCtxt {
