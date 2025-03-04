@@ -20,7 +20,7 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
-use std::any::type_name;
+use std::{any::type_name, ffi::c_void};
 
 use crate::{
     tree::XmlNodePtr,
@@ -586,7 +586,7 @@ pub unsafe fn xml_schema_free_type(typ: XmlSchemaTypePtr) {
             }
         }
         if !(*typ).attr_uses.is_null() {
-            xml_schema_item_list_free((*typ).attr_uses as XmlSchemaItemListPtr);
+            xml_schema_item_list_free((*typ).attr_uses as XmlSchemaItemListPtr<*mut c_void>);
         }
         if !(*typ).member_types.is_null() {
             xml_schema_free_type_link_list((*typ).member_types);

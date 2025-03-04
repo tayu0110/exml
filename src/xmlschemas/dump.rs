@@ -29,7 +29,7 @@ const UNBOUNDED: usize = 1 << 30;
 /// Dumps a list of attribute use components.
 #[doc(alias = "xmlSchemaAttrUsesDump")]
 unsafe fn xml_schema_attr_uses_dump<'a>(
-    uses: XmlSchemaItemListPtr,
+    uses: XmlSchemaItemListPtr<*mut c_void>,
     output: &mut (impl Write + 'a),
 ) {
     unsafe {

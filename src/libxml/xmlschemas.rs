@@ -599,8 +599,8 @@ pub struct XmlSchemaBucket {
     parsed: i32,
     imported: i32,
     preserve_doc: i32,
-    globals: XmlSchemaItemListPtr, /* Global components. */
-    locals: XmlSchemaItemListPtr,  /* Local components. */
+    globals: XmlSchemaItemListPtr<*mut c_void>, /* Global components. */
+    locals: XmlSchemaItemListPtr<*mut c_void>,  /* Local components. */
 }
 
 /// Extends xmlSchemaBucket
@@ -628,8 +628,8 @@ pub struct XmlSchemaImport {
     parsed: i32,
     imported: i32,
     preserve_doc: i32,
-    globals: XmlSchemaItemListPtr,
-    locals: XmlSchemaItemListPtr,
+    globals: XmlSchemaItemListPtr<*mut c_void>,
+    locals: XmlSchemaItemListPtr<*mut c_void>,
     // The imported schema.
     schema: XmlSchemaPtr,
 }
@@ -651,8 +651,8 @@ pub struct XmlSchemaInclude {
     parsed: i32,
     imported: i32,
     preserve_doc: i32,
-    globals: XmlSchemaItemListPtr, /* Global components. */
-    locals: XmlSchemaItemListPtr,  /* Local components. */
+    globals: XmlSchemaItemListPtr<*mut c_void>, /* Global components. */
+    locals: XmlSchemaItemListPtr<*mut c_void>,  /* Local components. */
 
     // The owning main or import schema bucket.
     owner_import: XmlSchemaImportPtr,
@@ -683,10 +683,10 @@ pub struct XmlSchemaConstructionCtxt {
     main_schema: XmlSchemaPtr,       /* The main schema. */
     main_bucket: XmlSchemaBucketPtr, /* The main schema bucket */
     dict: XmlDictPtr,
-    buckets: XmlSchemaItemListPtr, /* List of schema buckets. */
+    buckets: XmlSchemaItemListPtr<*mut c_void>, /* List of schema buckets. */
     // xmlSchemaItemListPtr relations; /* List of schema relations. */
     bucket: XmlSchemaBucketPtr, /* The current schema bucket */
-    pending: XmlSchemaItemListPtr, /* All Components of all schemas that
+    pending: XmlSchemaItemListPtr<*mut c_void>, /* All Components of all schemas that
                                 need to be fixed. */
     subst_groups: XmlHashTablePtr,
     redefs: XmlSchemaRedefPtr,
@@ -757,7 +757,7 @@ pub struct XmlSchemaPSVIIDCBinding {
     node_table: Vec<XmlSchemaPSVIIDCNodePtr>, /* array of key-sequences */
     // nb_nodes: i32,                    /* number of entries in the node table */
     // size_nodes: i32,                  /* size of the node table */
-    dupls: XmlSchemaItemListPtr,
+    dupls: XmlSchemaItemListPtr<*mut c_void>,
 }
 
 impl Default for XmlSchemaPSVIIDCBinding {
@@ -812,8 +812,8 @@ pub struct XmlSchemaIDCMatcher {
     key_seqs: *mut *mut XmlSchemaPSVIIDCKeyPtr, /* the key-sequences of the target
                                                 elements */
     size_key_seqs: i32,
-    targets: XmlSchemaItemListPtr, /* list of target-node
-                                   (xmlSchemaPSVIIDCNodePtr) entries */
+    targets: XmlSchemaItemListPtr<*mut c_void>, /* list of target-node
+                                                (xmlSchemaPSVIIDCNodePtr) entries */
     htab: XmlHashTablePtr,
 }
 
@@ -923,7 +923,7 @@ pub type XmlSchemaSubstGroupPtr = *mut XmlSchemaSubstGroup;
 #[repr(C)]
 pub struct XmlSchemaSubstGroup {
     head: XmlSchemaElementPtr,
-    members: XmlSchemaItemListPtr,
+    members: XmlSchemaItemListPtr<*mut c_void>,
 }
 
 #[doc(alias = "xmlIDCHashEntryPtr")]
@@ -937,13 +937,13 @@ pub struct XmlIDCHashEntry {
 }
 
 unsafe fn xml_schema_add_item_size(
-    list: *mut XmlSchemaItemListPtr,
+    list: *mut XmlSchemaItemListPtr<*mut c_void>,
     _initial_size: i32,
     item: *mut c_void,
 ) -> i32 {
     unsafe {
         if (*list).is_null() {
-            *list = xml_schema_item_list_create();
+            *list = xml_schema_item_list_create::<*mut c_void>();
             if (*list).is_null() {
                 return -1;
             }
@@ -2546,13 +2546,13 @@ unsafe fn xml_schema_construction_ctxt_create(dict: XmlDictPtr) -> XmlSchemaCons
         }
         memset(ret as _, 0, size_of::<XmlSchemaConstructionCtxt>());
 
-        (*ret).buckets = xml_schema_item_list_create();
+        (*ret).buckets = xml_schema_item_list_create::<*mut c_void>();
         if (*ret).buckets.is_null() {
             xml_schema_perr_memory(null_mut(), "allocating list of schema buckets", None);
             xml_free(ret as _);
             return null_mut();
         }
-        (*ret).pending = xml_schema_item_list_create();
+        (*ret).pending = xml_schema_item_list_create::<*mut c_void>();
         if (*ret).pending.is_null() {
             xml_schema_perr_memory(
                 null_mut(),
@@ -2577,7 +2577,7 @@ unsafe fn xml_schema_get_schema_bucket(
     schema_location: *const XmlChar,
 ) -> XmlSchemaBucketPtr {
     unsafe {
-        let list: XmlSchemaItemListPtr = (*(*pctxt).constructor).buckets;
+        let list: XmlSchemaItemListPtr<*mut c_void> = (*(*pctxt).constructor).buckets;
         for cur in (*list).items.iter().map(|&cur| cur as XmlSchemaBucketPtr) {
             // Pointer comparison!
             if (*cur).schema_location == schema_location {
@@ -2631,7 +2631,7 @@ unsafe fn xml_schema_get_schema_bucket_by_tns(
     imported: i32,
 ) -> XmlSchemaBucketPtr {
     unsafe {
-        let list: XmlSchemaItemListPtr = (*(*pctxt).constructor).buckets;
+        let list: XmlSchemaItemListPtr<*mut c_void> = (*(*pctxt).constructor).buckets;
         for cur in (*list).items.iter().map(|&cur| cur as XmlSchemaBucketPtr) {
             if !IS_BAD_SCHEMA_DOC!(cur)
                 && (*cur).orig_target_namespace == target_namespace
@@ -2651,7 +2651,7 @@ unsafe fn xml_schema_get_chameleon_schema_bucket(
     target_namespace: *const XmlChar,
 ) -> XmlSchemaBucketPtr {
     unsafe {
-        let list: XmlSchemaItemListPtr = (*(*pctxt).constructor).buckets;
+        let list: XmlSchemaItemListPtr<*mut c_void> = (*(*pctxt).constructor).buckets;
         for cur in (*list).items.iter().map(|&cur| cur as XmlSchemaBucketPtr) {
             // Pointer comparison!
             if (*cur).orig_target_namespace.is_null()
@@ -2860,7 +2860,7 @@ unsafe fn xml_schema_free_attribute_group(attr_gr: XmlSchemaAttributeGroupPtr) {
             xml_schema_free_annot((*attr_gr).annot);
         }
         if !(*attr_gr).attr_uses.is_null() {
-            xml_schema_item_list_free((*attr_gr).attr_uses as XmlSchemaItemListPtr);
+            xml_schema_item_list_free((*attr_gr).attr_uses as XmlSchemaItemListPtr<*mut c_void>);
         }
         xml_free(attr_gr as _);
     }
@@ -2934,7 +2934,7 @@ unsafe fn xml_schema_free_qname_ref(item: XmlSchemaQNameRefPtr) {
     }
 }
 
-unsafe fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) {
+unsafe fn xml_schema_component_list_free(list: XmlSchemaItemListPtr<*mut c_void>) {
     unsafe {
         if list.is_null() || (*list).items.is_empty() {
             return;
@@ -3095,12 +3095,12 @@ unsafe fn xml_schema_bucket_create(
         memset(ret as _, 0, size);
         (*ret).target_namespace = target_namespace;
         (*ret).typ = typ;
-        (*ret).globals = xml_schema_item_list_create();
+        (*ret).globals = xml_schema_item_list_create::<*mut c_void>();
         if (*ret).globals.is_null() {
             xml_schema_bucket_free(ret);
             return null_mut();
         }
-        (*ret).locals = xml_schema_item_list_create();
+        (*ret).locals = xml_schema_item_list_create::<*mut c_void>();
         if (*ret).locals.is_null() {
             xml_schema_bucket_free(ret);
             return null_mut();
@@ -3185,13 +3185,14 @@ unsafe fn xml_schema_bucket_create(
 
             // Includes got into the "includes" slot of the *main* schema.
             if (*main_schema).includes.is_null() {
-                (*main_schema).includes = xml_schema_item_list_create() as _;
+                (*main_schema).includes = xml_schema_item_list_create::<*mut c_void>() as _;
                 if (*main_schema).includes.is_null() {
                     xml_schema_bucket_free(ret);
                     return null_mut();
                 }
             }
-            if (*((*main_schema).includes as XmlSchemaItemListPtr)).push(ret as _) < 0 {
+            if (*((*main_schema).includes as XmlSchemaItemListPtr<*mut c_void>)).push(ret as _) < 0
+            {
                 xml_schema_bucket_free(ret);
                 return null_mut();
             }
@@ -5787,7 +5788,7 @@ unsafe fn xml_schema_parse_local_attribute(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
-    uses: XmlSchemaItemListPtr,
+    uses: XmlSchemaItemListPtr<*mut c_void>,
     parent_type: i32,
 ) -> XmlSchemaBasicItemPtr {
     unsafe {
@@ -6446,7 +6447,7 @@ unsafe fn xml_schema_parse_local_attributes(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     child: &mut Option<XmlNodePtr>,
-    list: *mut XmlSchemaItemListPtr,
+    list: *mut XmlSchemaItemListPtr<*mut c_void>,
     parent_type: i32,
     has_refs: *mut i32,
 ) -> i32 {
@@ -6471,7 +6472,7 @@ unsafe fn xml_schema_parse_local_attributes(
             if !item.is_null() {
                 if (*list).is_null() {
                     // TODO: Customize grow factor.
-                    *list = xml_schema_item_list_create();
+                    *list = xml_schema_item_list_create::<*mut c_void>();
                     if (*list).is_null() {
                         return -1;
                     }
@@ -6906,7 +6907,7 @@ unsafe fn xml_schema_parse_extension(
                 ctxt,
                 schema,
                 &mut child,
-                &raw mut (*typ).attr_uses as *mut XmlSchemaItemListPtr,
+                &raw mut (*typ).attr_uses as *mut XmlSchemaItemListPtr<*mut c_void>,
                 XmlSchemaTypeType::XmlSchemaTypeExtension as i32,
                 null_mut(),
             ) == -1
@@ -7521,7 +7522,7 @@ unsafe fn xml_schema_parse_complex_type(
                 ctxt,
                 schema,
                 &mut child,
-                &raw mut (*typ).attr_uses as *mut XmlSchemaItemListPtr,
+                &raw mut (*typ).attr_uses as *mut XmlSchemaItemListPtr<*mut c_void>,
                 XmlSchemaTypeType::XmlSchemaTypeRestriction as i32,
                 null_mut(),
             ) == -1
@@ -9468,7 +9469,7 @@ unsafe fn xml_schema_parse_restriction(
                 ctxt,
                 schema,
                 &mut child,
-                &raw mut (*typ).attr_uses as *mut XmlSchemaItemListPtr,
+                &raw mut (*typ).attr_uses as *mut XmlSchemaItemListPtr<*mut c_void>,
                 XmlSchemaTypeType::XmlSchemaTypeRestriction as i32,
                 null_mut(),
             ) == -1
@@ -10477,7 +10478,7 @@ unsafe fn xml_schema_parse_attribute_group_definition(
             pctxt,
             schema,
             &mut child,
-            &raw mut (*ret).attr_uses as *mut XmlSchemaItemListPtr,
+            &raw mut (*ret).attr_uses as *mut XmlSchemaItemListPtr<*mut c_void>,
             XmlSchemaTypeType::XmlSchemaTypeAttributeGroup as _,
             &raw mut has_refs,
         ) == -1
@@ -12973,7 +12974,7 @@ unsafe fn xml_schema_check_group_def_circular(
 #[doc(alias = "xmlSchemaCheckAttrGroupCircularRecur")]
 unsafe fn xml_schema_check_attr_group_circular_recur(
     ctxt_gr: XmlSchemaAttributeGroupPtr,
-    list: XmlSchemaItemListPtr,
+    list: XmlSchemaItemListPtr<*mut c_void>,
 ) -> XmlSchemaQNameRefPtr {
     unsafe {
         let mut gr: XmlSchemaAttributeGroupPtr;
@@ -13002,7 +13003,7 @@ unsafe fn xml_schema_check_attr_group_circular_recur(
                     (*gr).flags |= XML_SCHEMAS_ATTRGROUP_MARKED;
                     circ = xml_schema_check_attr_group_circular_recur(
                         ctxt_gr,
-                        (*gr).attr_uses as XmlSchemaItemListPtr,
+                        (*gr).attr_uses as XmlSchemaItemListPtr<*mut c_void>,
                     );
                     (*gr).flags ^= XML_SCHEMAS_ATTRGROUP_MARKED;
                     if !circ.is_null() {
@@ -13040,7 +13041,7 @@ unsafe fn xml_schema_check_attr_group_circular(
         } else {
             let circ: XmlSchemaQNameRefPtr = xml_schema_check_attr_group_circular_recur(
                 attr_gr,
-                (*attr_gr).attr_uses as XmlSchemaItemListPtr,
+                (*attr_gr).attr_uses as XmlSchemaItemListPtr<*mut c_void>,
             );
             if !circ.is_null() {
                 let q1 = xml_schema_get_component_qname(attr_gr as _);
@@ -13337,12 +13338,12 @@ unsafe fn xml_schema_expand_attribute_group_refs(
     pctxt: XmlSchemaParserCtxtPtr,
     item: XmlSchemaBasicItemPtr,
     complete_wild: *mut XmlSchemaWildcardPtr,
-    list: XmlSchemaItemListPtr,
-    prohibs: XmlSchemaItemListPtr,
+    list: XmlSchemaItemListPtr<*mut c_void>,
+    prohibs: XmlSchemaItemListPtr<*mut c_void>,
 ) -> i32 {
     unsafe {
         let mut gr: XmlSchemaAttributeGroupPtr;
-        let mut sublist: XmlSchemaItemListPtr;
+        let mut sublist: XmlSchemaItemListPtr<*mut c_void>;
         let mut created: i32 = (!(*complete_wild).is_null()) as i32;
 
         if !prohibs.is_null() {
@@ -13434,7 +13435,7 @@ unsafe fn xml_schema_expand_attribute_group_refs(
                 }
                 // Just remove the reference if the referenced group does not
                 // contain any attribute uses.
-                sublist = (*gr).attr_uses as XmlSchemaItemListPtr;
+                sublist = (*gr).attr_uses as XmlSchemaItemListPtr<*mut c_void>;
                 if sublist.is_null() || (*sublist).items.is_empty() {
                     if (*list).remove(i) == -1 {
                         return -1;
@@ -14196,8 +14197,8 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
     typ: XmlSchemaTypePtr,
 ) -> i32 {
     unsafe {
-        let mut uses: XmlSchemaItemListPtr;
-        let mut prohibs: XmlSchemaItemListPtr = null_mut();
+        let mut uses: XmlSchemaItemListPtr<*mut c_void>;
+        let mut prohibs: XmlSchemaItemListPtr<*mut c_void> = null_mut();
 
         if (*typ).base_type.is_null() {
             PERROR_INT!(pctxt, "xmlSchemaFixupTypeAttributeUses", "no base type");
@@ -14211,7 +14212,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
         }
 
         uses = (*typ).attr_uses as _;
-        let base_uses: XmlSchemaItemListPtr = (*base_type).attr_uses as _;
+        let base_uses: XmlSchemaItemListPtr<*mut c_void> = (*base_type).attr_uses as _;
         // Expand attribute group references. And build the 'complete'
         // wildcard, i.e. intersect multiple wildcards.
         // Move attribute prohibitions into a separate list.
@@ -14296,7 +14297,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
                         }
                     }
                     if uses.is_null() {
-                        (*typ).attr_uses = xml_schema_item_list_create() as _;
+                        (*typ).attr_uses = xml_schema_item_list_create::<*mut c_void>() as _;
                         if (*typ).attr_uses.is_null() {
                             // goto exit_failure;
                             return -1;
@@ -14313,7 +14314,7 @@ unsafe fn xml_schema_fixup_type_attribute_uses(
                     .map(|&using| using as XmlSchemaAttributeUsePtr)
                 {
                     if uses.is_null() {
-                        (*typ).attr_uses = xml_schema_item_list_create() as _;
+                        (*typ).attr_uses = xml_schema_item_list_create::<*mut c_void>() as _;
                         if (*typ).attr_uses.is_null() {
                             // goto exit_failure;
                             return -1;
@@ -14448,9 +14449,13 @@ unsafe fn xml_schema_check_ctprops_correct(
         //   - attribute group references need to be expanded already
         //   - simple types need to be typefixed already
         if !(*typ).attr_uses.is_null()
-            && (*((*typ).attr_uses as XmlSchemaItemListPtr)).items.len() > 1
+            && (*((*typ).attr_uses as XmlSchemaItemListPtr<*mut c_void>))
+                .items
+                .len()
+                > 1
         {
-            let uses: XmlSchemaItemListPtr = (*typ).attr_uses as XmlSchemaItemListPtr;
+            let uses: XmlSchemaItemListPtr<*mut c_void> =
+                (*typ).attr_uses as XmlSchemaItemListPtr<*mut c_void>;
             let mut has_id: i32 = 0;
 
             'next_use: for (i, using) in (*uses)
@@ -14944,8 +14949,8 @@ unsafe fn xml_schema_check_derivation_okrestriction2to4(
     action: i32,
     item: XmlSchemaBasicItemPtr,
     base_item: XmlSchemaBasicItemPtr,
-    uses: XmlSchemaItemListPtr,
-    base_uses: XmlSchemaItemListPtr,
+    uses: XmlSchemaItemListPtr<*mut c_void>,
+    base_uses: XmlSchemaItemListPtr<*mut c_void>,
     wild: XmlSchemaWildcardPtr,
     base_wild: XmlSchemaWildcardPtr,
 ) -> i32 {
@@ -17700,12 +17705,13 @@ unsafe fn xml_schema_check_agprops_correct(
         // Missing Sub-components ($5.3);"
 
         if !(*attr_gr).attr_uses.is_null()
-            && (*((*attr_gr).attr_uses as XmlSchemaItemListPtr))
+            && (*((*attr_gr).attr_uses as XmlSchemaItemListPtr<*mut c_void>))
                 .items
                 .len()
                 > 1
         {
-            let uses: XmlSchemaItemListPtr = (*attr_gr).attr_uses as XmlSchemaItemListPtr;
+            let uses: XmlSchemaItemListPtr<*mut c_void> =
+                (*attr_gr).attr_uses as XmlSchemaItemListPtr<*mut c_void>;
             let mut has_id: i32 = 0;
 
             'next_use: for (i, using) in (*uses)
@@ -18291,7 +18297,7 @@ unsafe fn xml_schema_subst_group_add(
         memset(ret as _, 0, size_of::<XmlSchemaSubstGroup>());
         (*ret).head = head;
         // Create list of members.
-        (*ret).members = xml_schema_item_list_create();
+        (*ret).members = xml_schema_item_list_create::<*mut c_void>();
         if (*ret).members.is_null() {
             xml_schema_subst_group_free(ret);
             return null_mut();
@@ -19699,7 +19705,7 @@ unsafe fn xml_schema_fixup_components(
                         if (*item).typ == XmlSchemaTypeType::XmlSchemaTypeAttributeGroup
                             && !(*(item as XmlSchemaAttributeGroupPtr)).attr_uses.is_null()
                             && (*((*(item as XmlSchemaAttributeGroupPtr)).attr_uses
-                                as XmlSchemaItemListPtr))
+                                as XmlSchemaItemListPtr<*mut c_void>))
                                 .items
                                 .len()
                                 > 1
@@ -20015,7 +20021,8 @@ pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
             );
         }
         if !(*schema).includes.is_null() {
-            let list: XmlSchemaItemListPtr = (*schema).includes as XmlSchemaItemListPtr;
+            let list: XmlSchemaItemListPtr<*mut c_void> =
+                (*schema).includes as XmlSchemaItemListPtr<*mut c_void>;
             for &item in &(*list).items {
                 xml_schema_bucket_free(item as XmlSchemaBucketPtr);
             }
@@ -21964,10 +21971,10 @@ unsafe fn xml_schema_idc_store_key(
 unsafe fn xml_schema_idc_acquire_target_list(
     _vctxt: XmlSchemaValidCtxtPtr,
     matcher: XmlSchemaIDCMatcherPtr,
-) -> XmlSchemaItemListPtr {
+) -> XmlSchemaItemListPtr<*mut c_void> {
     unsafe {
         if (*matcher).targets.is_null() {
-            (*matcher).targets = xml_schema_item_list_create();
+            (*matcher).targets = xml_schema_item_list_create::<*mut c_void>();
         }
         (*matcher).targets
     }
@@ -22378,7 +22385,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
                     let mut key_seq: *mut *mut XmlSchemaPSVIIDCKeyPtr = null_mut();
                     // let bind: xmlSchemaPSVIIDCBindingPtr;
                     let nt_item: XmlSchemaPSVIIDCNodePtr;
-                    let targets: XmlSchemaItemListPtr;
+                    let targets: XmlSchemaItemListPtr<*mut c_void>;
 
                     // Here we have the following scenario:
                     // An IDC 'selector' state object resolved to a target node,
@@ -22705,7 +22712,8 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
         // noNamespaceSchemaLocation, the appropriate case among the following
         // must be true:
         //
-        let attr_use_list: XmlSchemaItemListPtr = (*typ).attr_uses as XmlSchemaItemListPtr;
+        let attr_use_list: XmlSchemaItemListPtr<*mut c_void> =
+            (*typ).attr_uses as XmlSchemaItemListPtr<*mut c_void>;
         // @nbAttrs is the number of attributes present in the instance.
         let nb_attrs: i32 = (*vctxt).nb_attr_infos;
         let nb_uses = if !attr_use_list.is_null() {
@@ -24032,7 +24040,8 @@ unsafe fn xml_schema_idc_fill_node_tables(
                                     }
                                     // Add the duplicate to the list of duplicates.
                                     if (*bind).dupls.is_null() {
-                                        (*bind).dupls = xml_schema_item_list_create();
+                                        (*bind).dupls =
+                                            xml_schema_item_list_create::<*mut c_void>();
                                         if (*bind).dupls.is_null() {
                                             // goto internal_error;
                                             return -1;
@@ -24403,7 +24412,8 @@ unsafe fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxtPtr) -> i32
                                 old_num -= 1;
                                 par_nodes.swap_remove(j);
                                 if (*par_bind).dupls.is_null() {
-                                    (*par_bind).dupls = xml_schema_item_list_create();
+                                    (*par_bind).dupls =
+                                        xml_schema_item_list_create::<*mut c_void>();
                                     if (*par_bind).dupls.is_null() {
                                         // goto internal_error;
                                         return -1;

@@ -86,7 +86,7 @@ pub struct XmlSchemaParserCtxt {
 
     pub(crate) redef: XmlSchemaRedefPtr, /* Used for redefinitions. */
     pub(crate) redef_counter: i32,       /* Used for redefinitions. */
-    pub(crate) attr_prohibs: XmlSchemaItemListPtr,
+    pub(crate) attr_prohibs: XmlSchemaItemListPtr<*mut c_void>,
 }
 
 impl XmlSchemaParserCtxt {
@@ -361,7 +361,7 @@ pub struct XmlSchemaValidCtxt {
     pub(crate) size_attr_infos: i32,
 
     pub(crate) skip_depth: i32,
-    pub(crate) node_qnames: XmlSchemaItemListPtr,
+    pub(crate) node_qnames: XmlSchemaItemListPtr<*mut c_void>,
     pub(crate) has_keyrefs: i32,
     pub(crate) create_idcnode_tables: i32,
     pub(crate) psvi_expose_idcnode_tables: i32,

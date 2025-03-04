@@ -1,25 +1,22 @@
-use std::ffi::c_void;
-
 use super::error::xml_schema_psimple_err;
 
 #[doc(alias = "xmlSchemaItemListPtr")]
-pub type XmlSchemaItemListPtr = *mut XmlSchemaItemList;
+pub type XmlSchemaItemListPtr<T> = *mut XmlSchemaItemList<T>;
 #[doc(alias = "xmlSchemaItemList")]
 #[repr(C)]
-#[derive(Debug, Default)]
-pub struct XmlSchemaItemList {
-    pub(crate) items: Vec<*mut c_void>, /* used for dynamic addition of schemata */
+pub struct XmlSchemaItemList<T> {
+    pub(crate) items: Vec<T>, /* used for dynamic addition of schemata */
 }
 
-impl XmlSchemaItemList {
+impl<T> XmlSchemaItemList<T> {
     #[doc(alias = "xmlSchemaItemListAddSize", alias = "xmlSchemaItemListAdd")]
-    pub(crate) fn push(&mut self, item: *mut c_void) -> i32 {
+    pub(crate) fn push(&mut self, item: T) -> i32 {
         self.items.push(item);
         0
     }
 
     #[doc(alias = "xmlSchemaItemListInsert")]
-    pub(crate) fn insert(&mut self, item: *mut c_void, idx: usize) -> i32 {
+    pub(crate) fn insert(&mut self, item: T, idx: usize) -> i32 {
         // Just append if the index is greater/equal than the item count.
         let idx = idx.min(self.items.len());
         self.items.insert(idx, item);
@@ -45,13 +42,19 @@ impl XmlSchemaItemList {
     }
 }
 
-pub(crate) fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
-    Box::leak(Box::new(XmlSchemaItemList::default()))
+impl<T> Default for XmlSchemaItemList<T> {
+    fn default() -> Self {
+        Self { items: vec![] }
+    }
+}
+
+pub(crate) fn xml_schema_item_list_create<T>() -> XmlSchemaItemListPtr<T> {
+    Box::leak(Box::new(XmlSchemaItemList::<T>::default()))
 }
 
 /// Deallocate a annotation structure
 #[doc(alias = "xmlSchemaItemListFree")]
-pub(crate) unsafe fn xml_schema_item_list_free(list: XmlSchemaItemListPtr) {
+pub(crate) unsafe fn xml_schema_item_list_free<T>(list: XmlSchemaItemListPtr<T>) {
     unsafe {
         if list.is_null() {
             return;
