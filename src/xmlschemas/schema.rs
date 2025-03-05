@@ -40,7 +40,7 @@ pub type XmlSchemaPtr = *mut XmlSchema;
 #[doc(alias = "xmlSchema")]
 #[repr(C)]
 pub struct XmlSchema {
-    pub(crate) name: *const u8,                             /* schema name */
+    pub(crate) name: Option<Cow<'static, str>>, /* schema name */
     pub(crate) target_namespace: Option<Cow<'static, str>>, /* the target namespace */
     pub(crate) version: *const u8,
     pub(crate) id: *const u8, /* Obsolete */
@@ -359,7 +359,7 @@ impl XmlSchema {
 impl Default for XmlSchema {
     fn default() -> Self {
         Self {
-            name: null(),
+            name: None,
             target_namespace: None,
             version: null(),
             id: null(),

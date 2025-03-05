@@ -1,5 +1,5 @@
 use std::{
-    ffi::{CStr, CString, c_void},
+    ffi::{CStr, c_void},
     io::Write,
 };
 
@@ -294,20 +294,13 @@ unsafe fn xml_schema_type_dump<'a>(typ: XmlSchemaTypePtr, output: &mut (impl Wri
     }
 }
 
-extern "C" fn xml_schema_type_dump_entry<'a>(typ: *mut c_void, output: &mut (impl Write + 'a)) {
-    unsafe {
-        xml_schema_type_dump(typ as XmlSchemaTypePtr, output);
-    }
-}
-
 /// Dump the element
 #[doc(alias = "xmlSchemaElementDump")]
-extern "C" fn xml_schema_element_dump<'a>(
-    payload: *mut c_void,
+unsafe fn xml_schema_element_dump<'a>(
+    elem: XmlSchemaElementPtr,
     output: &mut (impl Write + 'a),
-    namespace: *const u8,
+    namespace: &str,
 ) {
-    let elem: XmlSchemaElementPtr = payload as XmlSchemaElementPtr;
     if elem.is_null() {
         return;
     }
@@ -322,13 +315,7 @@ extern "C" fn xml_schema_element_dump<'a>(
             ": '{}' ",
             CStr::from_ptr((*elem).name as *const i8).to_string_lossy()
         );
-        if !namespace.is_null() {
-            write!(
-                output,
-                "ns '{}'",
-                CStr::from_ptr(namespace as *const i8).to_string_lossy()
-            );
-        }
+        write!(output, "ns '{}'", namespace);
         writeln!(output);
         // Misc other properties.
         if (*elem).flags & XML_SCHEMAS_ELEM_NILLABLE != 0
@@ -408,12 +395,8 @@ pub unsafe fn xml_schema_dump<'a>(output: &mut (impl Write + 'a), schema: XmlSch
             return;
         }
         write!(output, "Schemas: ");
-        if !(*schema).name.is_null() {
-            write!(
-                output,
-                "{}, ",
-                CStr::from_ptr((*schema).name as *const i8).to_string_lossy()
-            );
+        if let Some(name) = (*schema).name.as_deref() {
+            write!(output, "{name}, ");
         } else {
             write!(output, "no name, ");
         }
@@ -428,13 +411,12 @@ pub unsafe fn xml_schema_dump<'a>(output: &mut (impl Write + 'a), schema: XmlSch
         }
         for &data in (*schema).type_decl.values() {
             if !data.is_null() {
-                xml_schema_type_dump_entry(data as _, output);
+                xml_schema_type_dump(data, output);
             }
         }
-        for (namespace, &data) in &(*schema).elem_decl {
-            if !data.is_null() {
-                let namespace = CString::new(namespace.as_str()).unwrap();
-                xml_schema_element_dump(data as _, output, namespace.as_ptr() as *const u8);
+        for (namespace, &element) in &(*schema).elem_decl {
+            if !element.is_null() {
+                xml_schema_element_dump(element, output, namespace.as_str());
             }
         }
     }
