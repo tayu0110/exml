@@ -11733,7 +11733,19 @@ unsafe fn xml_schema_add_components(
                         continue;
                     }
                     name = (*(item as XmlSchemaAttributeGroupPtr)).name;
-                    WXS_GET_GLOBAL_HASH!(bucket, attrgrp_decl, table);
+                    let table = if WXS_IS_BUCKET_IMPMAIN!((*bucket).typ) {
+                        &mut (*(*WXS_IMPBUCKET!(bucket)).schema).attrgrp_decl
+                    } else {
+                        &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).attrgrp_decl
+                    };
+                    err = table
+                        .insert(
+                            CStr::from_ptr(name as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                            item as _,
+                        )
+                        .is_some() as i32;
                 }
                 XmlSchemaTypeType::XmlSchemaTypeIDCKey
                 | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
@@ -12279,8 +12291,12 @@ unsafe fn xml_schema_resolve_attr_group_references(
         if !(*refe).item.is_null() {
             return 0;
         }
-        let group: XmlSchemaAttributeGroupPtr =
-            (*(*ctxt).schema).get_attribute_group((*refe).name, (*refe).target_namespace);
+        let group: XmlSchemaAttributeGroupPtr = (*(*ctxt).schema).get_attribute_group(
+            CStr::from_ptr((*refe).name as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+            (*refe).target_namespace,
+        );
         if group.is_null() {
             xml_schema_pres_comp_attr_err(
                 ctxt,

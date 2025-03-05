@@ -51,7 +51,7 @@ pub struct XmlSchema {
 
     pub(crate) type_decl: HashMap<String, XmlSchemaTypePtr>,
     pub(crate) attr_decl: HashMap<String, XmlSchemaAttributePtr>,
-    pub(crate) attrgrp_decl: XmlHashTablePtr,
+    pub(crate) attrgrp_decl: HashMap<String, XmlSchemaAttributeGroupPtr>,
     pub(crate) elem_decl: HashMap<String, XmlSchemaElementPtr>,
     pub(crate) nota_decl: XmlHashTablePtr,
 
@@ -259,18 +259,14 @@ impl XmlSchema {
     #[doc(alias = "xmlSchemaGetAttributeGroup")]
     pub(crate) unsafe fn get_attribute_group(
         &self,
-        name: *const u8,
+        name: &str,
         ns_name: *const u8,
     ) -> XmlSchemaAttributeGroupPtr {
         unsafe {
             let mut ret: XmlSchemaAttributeGroupPtr = null_mut();
 
-            if name.is_null() {
-                return null_mut();
-            }
             if xml_str_equal(ns_name, self.target_namespace) {
-                ret = xml_hash_lookup(self.attrgrp_decl, name) as _;
-                if !ret.is_null() {
+                if let Some(&ret) = self.attrgrp_decl.get(name) {
                     return ret;
                 }
             }
@@ -284,7 +280,11 @@ impl XmlSchema {
                 if import.is_null() {
                     return ret;
                 }
-                ret = xml_hash_lookup((*(*import).schema).attrgrp_decl, name) as _;
+                ret = (*(*import).schema)
+                    .attrgrp_decl
+                    .get(name)
+                    .copied()
+                    .unwrap_or(null_mut());
             };
             // TODO:
             // if (!ret.is_null() && ((*ret).redef != null_mut())) {
@@ -382,7 +382,7 @@ impl Default for XmlSchema {
             flags: 0,
             type_decl: HashMap::new(),
             attr_decl: HashMap::new(),
-            attrgrp_decl: null_mut(),
+            attrgrp_decl: HashMap::new(),
             elem_decl: HashMap::new(),
             nota_decl: null_mut(),
             schemas_imports: null_mut(),
@@ -427,9 +427,6 @@ pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
         // schema components anymore; this will now be done by the schema buckets.
         if !(*schema).nota_decl.is_null() {
             xml_hash_free((*schema).nota_decl, None);
-        }
-        if !(*schema).attrgrp_decl.is_null() {
-            xml_hash_free((*schema).attrgrp_decl, None);
         }
 
         extern "C" fn xml_schema_bucket_free_entry(bucket: *mut c_void, _name: *const u8) {
