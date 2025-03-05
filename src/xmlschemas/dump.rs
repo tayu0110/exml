@@ -1,7 +1,6 @@
 use std::{
     ffi::{CStr, CString, c_void},
     io::Write,
-    ptr::null,
 };
 
 use crate::{
@@ -404,8 +403,6 @@ extern "C" fn xml_schema_element_dump<'a>(
 #[doc(alias = "xmlSchemaDump")]
 pub unsafe fn xml_schema_dump<'a>(output: &mut (impl Write + 'a), schema: XmlSchemaPtr) {
     unsafe {
-        use crate::hash::XmlHashTableRef;
-
         if schema.is_null() {
             writeln!(output, "Schemas: NULL");
             return;
@@ -438,19 +435,11 @@ pub unsafe fn xml_schema_dump<'a>(output: &mut (impl Write + 'a), schema: XmlSch
                 xml_schema_type_dump_entry(data as _, output);
             }
         }
-        if let Some(elem_decl) = XmlHashTableRef::from_raw((*schema).elem_decl) {
-            elem_decl.scan(|data, _, namespace, _| {
-                if !data.0.is_null() {
-                    let namespace = namespace.map(|n| CString::new(n.as_ref()).unwrap());
-                    xml_schema_element_dump(
-                        data.0,
-                        output,
-                        namespace
-                            .as_deref()
-                            .map_or(null(), |ns| ns.as_ptr() as *const u8),
-                    );
-                }
-            });
+        for (namespace, &data) in &(*schema).elem_decl {
+            if !data.is_null() {
+                let namespace = CString::new(namespace.as_str()).unwrap();
+                xml_schema_element_dump(data as _, output, namespace.as_ptr() as *const u8);
+            }
         }
     }
 }

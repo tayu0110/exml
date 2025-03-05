@@ -11679,7 +11679,19 @@ unsafe fn xml_schema_add_components(
                 }
                 XmlSchemaTypeType::XmlSchemaTypeElement => {
                     name = (*(item as XmlSchemaElementPtr)).name;
-                    WXS_GET_GLOBAL_HASH!(bucket, elem_decl, table);
+                    let table = if WXS_IS_BUCKET_IMPMAIN!((*bucket).typ) {
+                        &mut (*(*WXS_IMPBUCKET!(bucket)).schema).elem_decl
+                    } else {
+                        &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).elem_decl
+                    };
+                    err = table
+                        .insert(
+                            CStr::from_ptr(name as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                            item as _,
+                        )
+                        .is_some() as i32;
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAttribute => {
                     name = (*(item as XmlSchemaAttributePtr)).name;
@@ -11690,7 +11702,19 @@ unsafe fn xml_schema_add_components(
                         continue;
                     }
                     name = (*(item as XmlSchemaModelGroupDefPtr)).name;
-                    WXS_GET_GLOBAL_HASH!(bucket, group_decl, table);
+                    let table = if WXS_IS_BUCKET_IMPMAIN!((*bucket).typ) {
+                        &mut (*(*WXS_IMPBUCKET!(bucket)).schema).group_decl
+                    } else {
+                        &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).group_decl
+                    };
+                    err = table
+                        .insert(
+                            CStr::from_ptr(name as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                            item as _,
+                        )
+                        .is_some() as i32;
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                     if WXS_REDEFINED_ATTR_GROUP!(item) {
@@ -11829,8 +11853,12 @@ unsafe fn xml_schema_resolve_element_references(
         }
         if !(*elem_decl).subst_group.is_null() {
             // FIXME TODO: Do we need a new field in _xmlSchemaElement for substitutionGroup?
-            let subst_head: XmlSchemaElementPtr =
-                (*(*ctxt).schema).get_elem((*elem_decl).subst_group, (*elem_decl).subst_group_ns);
+            let subst_head: XmlSchemaElementPtr = (*(*ctxt).schema).get_elem(
+                CStr::from_ptr((*elem_decl).subst_group as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (*elem_decl).subst_group_ns,
+            );
             if subst_head.is_null() {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -12067,7 +12095,9 @@ unsafe fn xml_schema_resolve_type_references(
             // Resolve the MG definition reference.
             let group_def: XmlSchemaModelGroupDefPtr = (*(*ctxt).schema).get_named_component(
                 (*refe).item_type,
-                (*refe).name,
+                CStr::from_ptr((*refe).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 (*refe).target_namespace,
             ) as XmlSchemaModelGroupDefPtr;
             if group_def.is_null() {
@@ -12288,7 +12318,9 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
 
                 ref_item = (*(*ctxt).schema).get_named_component(
                     (*refe).item_type,
-                    (*refe).name,
+                    CStr::from_ptr((*refe).name as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
                     (*refe).target_namespace,
                 );
                 if ref_item.is_null() {
@@ -20812,8 +20844,12 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 // Workaround for "anyType": we have currently no content model
                 // assigned for "anyType", so handle it explicitly.
                 // "anyType" has an unbounded, lax "any" wildcard.
-                (*(*vctxt).inode).decl = (*(*vctxt).schema)
-                    .get_elem((*(*vctxt).inode).local_name, (*(*vctxt).inode).ns_name);
+                (*(*vctxt).inode).decl = (*(*vctxt).schema).get_elem(
+                    CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    (*(*vctxt).inode).ns_name,
+                );
 
                 if (*(*vctxt).inode).decl.is_null() {
                     // Process "xsi:type".
@@ -21021,8 +21057,12 @@ unsafe fn xml_schema_validate_elem_wildcard(vctxt: XmlSchemaValidCtxtPtr, skip: 
             return 0;
         }
         {
-            let decl: XmlSchemaElementPtr = (*(*vctxt).schema)
-                .get_elem((*(*vctxt).inode).local_name, (*(*vctxt).inode).ns_name);
+            let decl: XmlSchemaElementPtr = (*(*vctxt).schema).get_elem(
+                CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (*(*vctxt).inode).ns_name,
+            );
             if !decl.is_null() {
                 (*(*vctxt).inode).decl = decl;
                 return 0;
@@ -23004,8 +23044,12 @@ unsafe fn xml_schema_validate_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 }
             } else {
                 // Get the declaration of the validation root.
-                (*(*vctxt).inode).decl = (*(*vctxt).schema)
-                    .get_elem((*(*vctxt).inode).local_name, (*(*vctxt).inode).ns_name);
+                (*(*vctxt).inode).decl = (*(*vctxt).schema).get_elem(
+                    CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    (*(*vctxt).inode).ns_name,
+                );
                 if (*(*vctxt).inode).decl.is_null() {
                     ret = XmlParserErrors::XmlSchemavCvcElt1 as i32;
                     VERROR!(

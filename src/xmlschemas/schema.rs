@@ -52,13 +52,13 @@ pub struct XmlSchema {
     pub(crate) type_decl: HashMap<String, XmlSchemaTypePtr>,
     pub(crate) attr_decl: XmlHashTablePtr,
     pub(crate) attrgrp_decl: XmlHashTablePtr,
-    pub(crate) elem_decl: XmlHashTablePtr,
+    pub(crate) elem_decl: HashMap<String, XmlSchemaElementPtr>,
     pub(crate) nota_decl: XmlHashTablePtr,
 
     pub(crate) schemas_imports: XmlHashTablePtr,
 
     pub(crate) _private: *mut c_void, /* unused by the library for users or bindings */
-    pub(crate) group_decl: XmlHashTablePtr,
+    pub(crate) group_decl: HashMap<String, XmlSchemaModelGroupDefPtr>,
     pub(crate) dict: XmlDictPtr,
     pub(crate) includes: *mut c_void, /* the includes, this is opaque for now */
     pub(crate) preserve: i32,         /* whether to free the document */
@@ -117,6 +117,7 @@ impl XmlSchema {
         }
     }
 
+    #[doc(alias = "xmlSchemaGetIDC")]
     pub(crate) unsafe fn get_idc(&self, name: &str, ns_name: *const u8) -> XmlSchemaIDCPtr {
         unsafe {
             let mut ret: XmlSchemaIDCPtr = null_mut();
@@ -146,20 +147,12 @@ impl XmlSchema {
     ///
     /// Returns the element declaration or NULL if not found.
     #[doc(alias = "xmlSchemaGetElem")]
-    pub(crate) unsafe fn get_elem(
-        &self,
-        name: *const u8,
-        ns_name: *const u8,
-    ) -> XmlSchemaElementPtr {
+    pub(crate) unsafe fn get_elem(&self, name: &str, ns_name: *const u8) -> XmlSchemaElementPtr {
         unsafe {
             let mut ret: XmlSchemaElementPtr = null_mut();
 
-            if name.is_null() {
-                return null_mut();
-            }
             if xml_str_equal(ns_name, self.target_namespace) {
-                ret = xml_hash_lookup(self.elem_decl, name) as _;
-                if !ret.is_null() {
+                if let Some(&ret) = self.elem_decl.get(name) {
                     return ret;
                 }
             }
@@ -173,7 +166,11 @@ impl XmlSchema {
                 if import.is_null() {
                     return ret;
                 }
-                ret = xml_hash_lookup((*(*import).schema).elem_decl, name) as _;
+                ret = (*(*import).schema)
+                    .elem_decl
+                    .get(name)
+                    .copied()
+                    .unwrap_or(null_mut());
             };
 
             ret
@@ -224,18 +221,14 @@ impl XmlSchema {
     #[doc(alias = "xmlSchemaGetGroup")]
     pub(crate) unsafe fn get_group(
         &self,
-        name: *const u8,
+        name: &str,
         ns_name: *const u8,
     ) -> XmlSchemaModelGroupDefPtr {
         unsafe {
             let mut ret: XmlSchemaModelGroupDefPtr = null_mut();
 
-            if name.is_null() {
-                return null_mut();
-            }
             if xml_str_equal(ns_name, self.target_namespace) {
-                ret = xml_hash_lookup(self.group_decl, name) as _;
-                if !ret.is_null() {
+                if let Some(&ret) = self.group_decl.get(name) {
                     return ret;
                 }
             }
@@ -249,7 +242,11 @@ impl XmlSchema {
                 if import.is_null() {
                     return ret;
                 }
-                ret = xml_hash_lookup((*(*import).schema).group_decl, name) as _;
+                ret = (*(*import).schema)
+                    .group_decl
+                    .get(name)
+                    .copied()
+                    .unwrap_or(null_mut());
             };
 
             ret
@@ -340,7 +337,7 @@ impl XmlSchema {
     pub(crate) unsafe fn get_named_component(
         &self,
         item_type: XmlSchemaTypeType,
-        name: *const u8,
+        name: &str,
         target_ns: *const u8,
     ) -> XmlSchemaBasicItemPtr {
         unsafe {
@@ -386,11 +383,11 @@ impl Default for XmlSchema {
             type_decl: HashMap::new(),
             attr_decl: null_mut(),
             attrgrp_decl: null_mut(),
-            elem_decl: null_mut(),
+            elem_decl: HashMap::new(),
             nota_decl: null_mut(),
             schemas_imports: null_mut(),
             _private: null_mut(),
-            group_decl: null_mut(),
+            group_decl: HashMap::new(),
             dict: null_mut(),
             includes: null_mut(),
             preserve: 0,
@@ -436,12 +433,6 @@ pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
         }
         if !(*schema).attrgrp_decl.is_null() {
             xml_hash_free((*schema).attrgrp_decl, None);
-        }
-        if !(*schema).elem_decl.is_null() {
-            xml_hash_free((*schema).elem_decl, None);
-        }
-        if !(*schema).group_decl.is_null() {
-            xml_hash_free((*schema).group_decl, None);
         }
 
         extern "C" fn xml_schema_bucket_free_entry(bucket: *mut c_void, _name: *const u8) {
