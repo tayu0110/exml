@@ -433,12 +433,10 @@ pub unsafe fn xml_schema_dump<'a>(output: &mut (impl Write + 'a), schema: XmlSch
         if !(*schema).annot.is_null() {
             xml_schema_annot_dump(output, (*schema).annot);
         }
-        if let Some(type_decl) = XmlHashTableRef::from_raw((*schema).type_decl) {
-            type_decl.scan(|data, _, _, _| {
-                if !data.0.is_null() {
-                    xml_schema_type_dump_entry(data.0, output);
-                }
-            });
+        for &data in (*schema).type_decl.values() {
+            if !data.is_null() {
+                xml_schema_type_dump_entry(data as _, output);
+            }
         }
         if let Some(elem_decl) = XmlHashTableRef::from_raw((*schema).elem_decl) {
             elem_decl.scan(|data, _, namespace, _| {

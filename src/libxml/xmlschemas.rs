@@ -11628,7 +11628,7 @@ unsafe fn xml_schema_add_components(
     bucket: XmlSchemaBucketPtr,
 ) -> i32 {
     unsafe {
-        let mut err: i32;
+        let mut err = 0;
         let mut table: *mut XmlHashTablePtr;
         let mut name: *const XmlChar;
 
@@ -11655,6 +11655,7 @@ unsafe fn xml_schema_add_components(
             .iter()
             .map(|&item| item as XmlSchemaBasicItemPtr)
         {
+            table = null_mut();
             match (*item).typ {
                 XmlSchemaTypeType::XmlSchemaTypeComplex
                 | XmlSchemaTypeType::XmlSchemaTypeSimple => {
@@ -11662,7 +11663,19 @@ unsafe fn xml_schema_add_components(
                         continue;
                     }
                     name = (*(item as XmlSchemaTypePtr)).name;
-                    WXS_GET_GLOBAL_HASH!(bucket, type_decl, table);
+                    let table = if WXS_IS_BUCKET_IMPMAIN!((*bucket).typ) {
+                        &mut (*(*WXS_IMPBUCKET!(bucket)).schema).type_decl
+                    } else {
+                        &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).type_decl
+                    };
+                    err = table
+                        .insert(
+                            CStr::from_ptr(name as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                            item as _,
+                        )
+                        .is_some() as i32;
                 }
                 XmlSchemaTypeType::XmlSchemaTypeElement => {
                     name = (*(item as XmlSchemaElementPtr)).name;
@@ -11705,18 +11718,20 @@ unsafe fn xml_schema_add_components(
                     continue;
                 }
             }
-            if (*table).is_null() {
-                *table = xml_hash_create(10);
+            if !table.is_null() {
                 if (*table).is_null() {
-                    PERROR_INT!(
-                        pctxt,
-                        "xmlSchemaAddComponents",
-                        "failed to create a component hash table"
-                    );
-                    return -1;
+                    *table = xml_hash_create(10);
+                    if (*table).is_null() {
+                        PERROR_INT!(
+                            pctxt,
+                            "xmlSchemaAddComponents",
+                            "failed to create a component hash table"
+                        );
+                        return -1;
+                    }
                 }
+                err = xml_hash_add_entry(*table, name, item as _);
             }
-            err = xml_hash_add_entry(*table, name, item as _);
             if err != 0 {
                 let typename = xml_schema_get_component_type_str(item as _);
                 let qname = xml_schema_get_component_qname(item as _);
@@ -11769,8 +11784,12 @@ unsafe fn xml_schema_resolve_element_references(
         if (*elem_decl).subtypes.is_null() && !(*elem_decl).named_type.is_null() {
             // (type definition) ... otherwise the type definition `resolved`
             // to by the `actual value` of the type [attribute] ...
-            let typ: XmlSchemaTypePtr =
-                (*(*ctxt).schema).get_type((*elem_decl).named_type, (*elem_decl).named_type_ns);
+            let typ: XmlSchemaTypePtr = (*(*ctxt).schema).get_type(
+                CStr::from_ptr((*elem_decl).named_type as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (*elem_decl).named_type_ns,
+            );
             if typ.is_null() {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -11884,7 +11903,10 @@ unsafe fn xml_schema_resolve_union_member_types(
             let name: *const XmlChar = (*((*link).typ as XmlSchemaQNameRefPtr)).name;
             let ns_name: *const XmlChar = (*((*link).typ as XmlSchemaQNameRefPtr)).target_namespace;
 
-            member_type = (*(*ctxt).schema).get_type(name, ns_name);
+            member_type = (*(*ctxt).schema).get_type(
+                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                ns_name,
+            );
             if member_type.is_null() || !wxs_is_simple(member_type) {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -11951,8 +11973,12 @@ unsafe fn xml_schema_resolve_type_references(
 
         // Resolve the base type.
         if (*type_def).base_type.is_null() {
-            (*type_def).base_type =
-                (*(*ctxt).schema).get_type((*type_def).base, (*type_def).base_ns);
+            (*type_def).base_type = (*(*ctxt).schema).get_type(
+                CStr::from_ptr((*type_def).base as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (*type_def).base_ns,
+            );
             if (*type_def).base_type.is_null() {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -11979,8 +12005,12 @@ unsafe fn xml_schema_resolve_type_references(
             } else if (*type_def).wxs_is_list() {
                 // Resolve the itemType.
                 if (*type_def).subtypes.is_null() && !(*type_def).base.is_null() {
-                    (*type_def).subtypes =
-                        (*(*ctxt).schema).get_type((*type_def).base, (*type_def).base_ns);
+                    (*type_def).subtypes = (*(*ctxt).schema).get_type(
+                        CStr::from_ptr((*type_def).base as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        (*type_def).base_ns,
+                    );
 
                     if (*type_def).subtypes.is_null() || !wxs_is_simple((*type_def).subtypes) {
                         (*type_def).subtypes = null_mut();
@@ -12100,8 +12130,12 @@ unsafe fn xml_schema_resolve_attr_type_references(
             return 0;
         }
         if !(*item).type_name.is_null() {
-            let typ: XmlSchemaTypePtr =
-                (*(*ctxt).schema).get_type((*item).type_name, (*item).type_ns);
+            let typ: XmlSchemaTypePtr = (*(*ctxt).schema).get_type(
+                CStr::from_ptr((*item).type_name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (*item).type_ns,
+            );
             if typ.is_null() || !wxs_is_simple(typ) {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -20612,7 +20646,12 @@ unsafe fn xml_schema_process_xsi_type(
             }
             // (cvc-elt) (3.3.4) : (4.2)
             // (cvc-assess-elt) (1.2.1.2.3)
-            *local_type = (*(*vctxt).schema).get_type(local, ns_name);
+            *local_type = (*(*vctxt).schema).get_type(
+                CStr::from_ptr(local as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                ns_name,
+            );
             if (*local_type).is_null() {
                 let qname = xml_schema_format_qname(
                     Some(

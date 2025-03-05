@@ -1,6 +1,7 @@
 use std::{
+    collections::HashMap,
     ffi::{CStr, c_void},
-    ptr::{drop_in_place, null, null_mut},
+    ptr::{null, null_mut},
 };
 
 use crate::{
@@ -48,7 +49,7 @@ pub struct XmlSchema {
     pub(crate) annot: XmlSchemaAnnotPtr,
     pub(crate) flags: i32,
 
-    pub(crate) type_decl: XmlHashTablePtr,
+    pub(crate) type_decl: HashMap<String, XmlSchemaTypePtr>,
     pub(crate) attr_decl: XmlHashTablePtr,
     pub(crate) attrgrp_decl: XmlHashTablePtr,
     pub(crate) elem_decl: XmlHashTablePtr,
@@ -71,17 +72,14 @@ impl XmlSchema {
     ///
     /// Returns the group definition or NULL if not found.
     #[doc(alias = "xmlSchemaGetType")]
-    pub(crate) unsafe fn get_type(&self, name: *const u8, ns_name: *const u8) -> XmlSchemaTypePtr {
+    pub(crate) unsafe fn get_type(&self, name: &str, ns_name: *const u8) -> XmlSchemaTypePtr {
         unsafe {
             let mut ret: XmlSchemaTypePtr = null_mut();
 
-            if name.is_null() {
-                return null_mut();
-            }
             // First try the built-in types.
             if !ns_name.is_null() && xml_str_equal(ns_name, XML_SCHEMA_NS.as_ptr() as _) {
                 ret = xml_schema_get_predefined_type(
-                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                    name,
                     CStr::from_ptr(ns_name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -95,8 +93,7 @@ impl XmlSchema {
                 // TODO: Can we optimize this?
             }
             if xml_str_equal(ns_name, self.target_namespace) {
-                ret = xml_hash_lookup(self.type_decl, name) as _;
-                if !ret.is_null() {
+                if let Some(&ret) = self.type_decl.get(name) {
                     return ret;
                 }
             }
@@ -110,7 +107,10 @@ impl XmlSchema {
                 if import.is_null() {
                     return ret;
                 }
-                ret = xml_hash_lookup((*(*import).schema).type_decl, name) as _;
+                ret = *(*(*import).schema)
+                    .type_decl
+                    .get(name)
+                    .unwrap_or(&null_mut());
             };
 
             ret
@@ -387,7 +387,7 @@ impl Default for XmlSchema {
             doc: None,
             annot: null_mut(),
             flags: 0,
-            type_decl: null_mut(),
+            type_decl: HashMap::new(),
             attr_decl: null_mut(),
             attrgrp_decl: null_mut(),
             elem_decl: null_mut(),
@@ -444,9 +444,6 @@ pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
         if !(*schema).elem_decl.is_null() {
             xml_hash_free((*schema).elem_decl, None);
         }
-        if !(*schema).type_decl.is_null() {
-            xml_hash_free((*schema).type_decl, None);
-        }
         if !(*schema).group_decl.is_null() {
             xml_hash_free((*schema).group_decl, None);
         }
@@ -480,7 +477,6 @@ pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
         // Never free the doc here, since this will be done by the buckets.
 
         xml_dict_free((*schema).dict);
-        drop_in_place(schema);
         let _ = Box::from_raw(schema);
     }
 }
