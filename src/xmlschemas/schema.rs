@@ -63,7 +63,7 @@ pub struct XmlSchema {
     pub(crate) includes: *mut c_void, /* the includes, this is opaque for now */
     pub(crate) preserve: i32,         /* whether to free the document */
     pub(crate) counter: i32,          /* used to give anonymous components unique names */
-    pub(crate) idc_def: XmlHashTablePtr, /* All identity-constraint defs. */
+    pub(crate) idc_def: HashMap<String, XmlSchemaIDCPtr>, /* All identity-constraint defs. */
     pub(crate) volatiles: *mut c_void, /* Obsolete */
 }
 
@@ -117,16 +117,12 @@ impl XmlSchema {
         }
     }
 
-    pub(crate) unsafe fn get_idc(&self, name: *const u8, ns_name: *const u8) -> XmlSchemaIDCPtr {
+    pub(crate) unsafe fn get_idc(&self, name: &str, ns_name: *const u8) -> XmlSchemaIDCPtr {
         unsafe {
             let mut ret: XmlSchemaIDCPtr = null_mut();
 
-            if name.is_null() {
-                return null_mut();
-            }
             if xml_str_equal(ns_name, self.target_namespace) {
-                ret = xml_hash_lookup(self.idc_def, name) as _;
-                if !ret.is_null() {
+                if let Some(&ret) = self.idc_def.get(name) {
                     return ret;
                 }
             }
@@ -140,7 +136,7 @@ impl XmlSchema {
                 if import.is_null() {
                     return ret;
                 }
-                ret = xml_hash_lookup((*(*import).schema).idc_def, name) as _;
+                ret = *(*(*import).schema).idc_def.get(name).unwrap_or(&null_mut());
             };
             ret
         }
@@ -399,7 +395,7 @@ impl Default for XmlSchema {
             includes: null_mut(),
             preserve: 0,
             counter: 0,
-            idc_def: null_mut(),
+            idc_def: HashMap::new(),
             volatiles: null_mut(),
         }
     }
@@ -446,9 +442,6 @@ pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
         }
         if !(*schema).group_decl.is_null() {
             xml_hash_free((*schema).group_decl, None);
-        }
-        if !(*schema).idc_def.is_null() {
-            xml_hash_free((*schema).idc_def, None);
         }
 
         extern "C" fn xml_schema_bucket_free_entry(bucket: *mut c_void, _name: *const u8) {

@@ -11703,7 +11703,19 @@ unsafe fn xml_schema_add_components(
                 | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
                 | XmlSchemaTypeType::XmlSchemaTypeIDCKeyref => {
                     name = (*(item as XmlSchemaIDCPtr)).name;
-                    WXS_GET_GLOBAL_HASH!(bucket, idc_def, table);
+                    let table = if WXS_IS_BUCKET_IMPMAIN!((*bucket).typ) {
+                        &mut (*(*WXS_IMPBUCKET!(bucket)).schema).idc_def
+                    } else {
+                        &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).idc_def
+                    };
+                    err = table
+                        .insert(
+                            CStr::from_ptr(name as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                            item as _,
+                        )
+                        .is_some() as i32;
                 }
                 XmlSchemaTypeType::XmlSchemaTypeNotation => {
                     name = (*(item as XmlSchemaNotationPtr)).name;
@@ -12362,9 +12374,12 @@ unsafe fn xml_schema_resolve_idckey_references(
             return 0;
         }
         if !(*(*idc).refe).name.is_null() {
-            (*(*idc).refe).item = (*(*pctxt).schema)
-                .get_idc((*(*idc).refe).name, (*(*idc).refe).target_namespace)
-                as XmlSchemaBasicItemPtr;
+            (*(*idc).refe).item = (*(*pctxt).schema).get_idc(
+                CStr::from_ptr((*(*idc).refe).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (*(*idc).refe).target_namespace,
+            ) as XmlSchemaBasicItemPtr;
             if (*(*idc).refe).item.is_null() {
                 // TODO: It is actually not an error to fail to resolve
                 // at this stage. BUT we need to be that strict!
@@ -19952,46 +19967,6 @@ pub(crate) unsafe fn xml_schema_clear_elem_info(
     }
 }
 
-/// Creates an augmented IDC definition item.
-///
-/// Returns the item, or NULL on internal errors.
-#[doc(alias = "xmlSchemaAugmentIDC")]
-extern "C" fn xml_schema_augment_idc(
-    payload: *mut c_void,
-    data: *mut c_void,
-    _name: *const XmlChar,
-) {
-    let idc_def: XmlSchemaIDCPtr = payload as XmlSchemaIDCPtr;
-    let vctxt: XmlSchemaValidCtxtPtr = data as XmlSchemaValidCtxtPtr;
-
-    unsafe {
-        let aidc: XmlSchemaIDCAugPtr =
-            xml_malloc(size_of::<XmlSchemaIDCAug>()) as XmlSchemaIDCAugPtr;
-        if aidc.is_null() {
-            xml_schema_verr_memory(
-                vctxt,
-                "xmlSchemaAugmentIDC: allocating an augmented IDC definition",
-                None,
-            );
-            return;
-        }
-        (*aidc).keyref_depth = -1;
-        (*aidc).def = idc_def;
-        (*aidc).next = null_mut();
-        if (*vctxt).aidcs.is_null() {
-            (*vctxt).aidcs = aidc;
-        } else {
-            (*aidc).next = (*vctxt).aidcs;
-            (*vctxt).aidcs = aidc;
-        }
-        // Save if we have keyrefs at all.
-        if (*vctxt).has_keyrefs == 0 && (*idc_def).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
-        {
-            (*vctxt).has_keyrefs = 1;
-        }
-    }
-}
-
 /// Creates an augmented IDC definition for the imported schema.
 #[doc(alias = "xmlSchemaAugmentImportedIDC")]
 extern "C" fn xml_schema_augment_imported_idc(
@@ -20002,12 +19977,32 @@ extern "C" fn xml_schema_augment_imported_idc(
     let imported: XmlSchemaImportPtr = payload as XmlSchemaImportPtr;
     let vctxt: XmlSchemaValidCtxtPtr = data as XmlSchemaValidCtxtPtr;
     unsafe {
-        if !(*(*imported).schema).idc_def.is_null() {
-            xml_hash_scan(
-                (*(*imported).schema).idc_def,
-                Some(xml_schema_augment_idc),
-                vctxt as _,
-            );
+        for &idc_def in (*(*imported).schema).idc_def.values() {
+            let aidc: XmlSchemaIDCAugPtr =
+                xml_malloc(size_of::<XmlSchemaIDCAug>()) as XmlSchemaIDCAugPtr;
+            if aidc.is_null() {
+                xml_schema_verr_memory(
+                    vctxt,
+                    "xmlSchemaAugmentIDC: allocating an augmented IDC definition",
+                    None,
+                );
+                continue;
+            }
+            (*aidc).keyref_depth = -1;
+            (*aidc).def = idc_def;
+            (*aidc).next = null_mut();
+            if (*vctxt).aidcs.is_null() {
+                (*vctxt).aidcs = aidc;
+            } else {
+                (*aidc).next = (*vctxt).aidcs;
+                (*vctxt).aidcs = aidc;
+            }
+            // Save if we have keyrefs at all.
+            if (*vctxt).has_keyrefs == 0
+                && (*idc_def).typ == XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
+            {
+                (*vctxt).has_keyrefs = 1;
+            }
         }
     }
 }
