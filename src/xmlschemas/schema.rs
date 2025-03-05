@@ -53,7 +53,7 @@ pub struct XmlSchema {
     pub(crate) attr_decl: HashMap<String, XmlSchemaAttributePtr>,
     pub(crate) attrgrp_decl: HashMap<String, XmlSchemaAttributeGroupPtr>,
     pub(crate) elem_decl: HashMap<String, XmlSchemaElementPtr>,
-    pub(crate) nota_decl: XmlHashTablePtr,
+    pub(crate) nota_decl: HashMap<String, XmlSchemaNotationPtr>,
 
     pub(crate) schemas_imports: XmlHashTablePtr,
 
@@ -299,18 +299,14 @@ impl XmlSchema {
     #[doc(alias = "xmlSchemaGetNotation")]
     pub(crate) unsafe fn get_notation(
         &self,
-        name: *const u8,
+        name: &str,
         ns_name: *const u8,
     ) -> XmlSchemaNotationPtr {
         unsafe {
             let mut ret: XmlSchemaNotationPtr = null_mut();
 
-            if name.is_null() {
-                return null_mut();
-            }
             if xml_str_equal(ns_name, self.target_namespace) {
-                ret = xml_hash_lookup(self.nota_decl, name) as _;
-                if !ret.is_null() {
+                if let Some(&ret) = self.nota_decl.get(name) {
                     return ret;
                 }
             }
@@ -324,7 +320,11 @@ impl XmlSchema {
                 if import.is_null() {
                     return ret;
                 }
-                ret = xml_hash_lookup((*(*import).schema).nota_decl, name) as _;
+                ret = (*(*import).schema)
+                    .nota_decl
+                    .get(name)
+                    .copied()
+                    .unwrap_or(null_mut());
             };
             ret
         }
@@ -384,7 +384,7 @@ impl Default for XmlSchema {
             attr_decl: HashMap::new(),
             attrgrp_decl: HashMap::new(),
             elem_decl: HashMap::new(),
-            nota_decl: null_mut(),
+            nota_decl: HashMap::new(),
             schemas_imports: null_mut(),
             _private: null_mut(),
             group_decl: HashMap::new(),
@@ -422,11 +422,6 @@ pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
         if !(*schema).volatiles.is_null() {
             // TODO
             todo!()
-        }
-        // Note that those slots are not responsible for freeing
-        // schema components anymore; this will now be done by the schema buckets.
-        if !(*schema).nota_decl.is_null() {
-            xml_hash_free((*schema).nota_decl, None);
         }
 
         extern "C" fn xml_schema_bucket_free_entry(bucket: *mut c_void, _name: *const u8) {

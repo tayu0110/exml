@@ -1150,7 +1150,15 @@ unsafe fn xml_schema_validate_notation(
                 xml_free(local_name as _);
                 return 1;
             }
-            if !(*schema).get_notation(local_name, ns_name).is_null() {
+            if !(*schema)
+                .get_notation(
+                    CStr::from_ptr(local_name as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    ns_name,
+                )
+                .is_null()
+            {
                 if val_needed != 0 && !val.is_null() {
                     *val =
                         xml_schema_new_notation_value(xml_strdup(local_name), xml_strdup(ns_name));
@@ -1163,7 +1171,15 @@ unsafe fn xml_schema_validate_notation(
             }
             xml_free(prefix as _);
             xml_free(local_name as _);
-        } else if !(*schema).get_notation(value, null_mut()).is_null() {
+        } else if !(*schema)
+            .get_notation(
+                CStr::from_ptr(value as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                null_mut(),
+            )
+            .is_null()
+        {
             if val_needed != 0 && !val.is_null() {
                 *val = xml_schema_new_notation_value(xml_strdup(value), null_mut());
                 if (*val).is_null() {
@@ -11597,16 +11613,6 @@ unsafe fn xml_schema_check_srcredefine_first(pctxt: XmlSchemaParserCtxtPtr) -> i
     }
 }
 
-macro_rules! WXS_GET_GLOBAL_HASH {
-    ($c:expr, $slot:ident, $table:expr) => {
-        if WXS_IS_BUCKET_IMPMAIN!((*$c).typ) {
-            $table = &raw mut (*(*WXS_IMPBUCKET!($c)).schema).$slot;
-        } else {
-            $table = &raw mut (*(*(*WXS_INCBUCKET!($c)).owner_import).schema).$slot;
-        }
-    };
-}
-
 macro_rules! WXS_REDEFINED_TYPE {
     ($item:expr) => {
         (*($item as XmlSchemaTypePtr)).flags & XML_SCHEMAS_TYPE_REDEFINED != 0
@@ -11628,8 +11634,6 @@ unsafe fn xml_schema_add_components(
     bucket: XmlSchemaBucketPtr,
 ) -> i32 {
     unsafe {
-        let mut err = 0;
-        let mut table: *mut XmlHashTablePtr;
         let mut name: *const XmlChar;
 
         // Add global components to the schema's hash tables.
@@ -11655,8 +11659,7 @@ unsafe fn xml_schema_add_components(
             .iter()
             .map(|&item| item as XmlSchemaBasicItemPtr)
         {
-            table = null_mut();
-            match (*item).typ {
+            let duplicate = match (*item).typ {
                 XmlSchemaTypeType::XmlSchemaTypeComplex
                 | XmlSchemaTypeType::XmlSchemaTypeSimple => {
                     if WXS_REDEFINED_TYPE!(item) {
@@ -11668,14 +11671,14 @@ unsafe fn xml_schema_add_components(
                     } else {
                         &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).type_decl
                     };
-                    err = table
+                    table
                         .insert(
                             CStr::from_ptr(name as *const i8)
                                 .to_string_lossy()
                                 .into_owned(),
                             item as _,
                         )
-                        .is_some() as i32;
+                        .is_some()
                 }
                 XmlSchemaTypeType::XmlSchemaTypeElement => {
                     name = (*(item as XmlSchemaElementPtr)).name;
@@ -11684,14 +11687,14 @@ unsafe fn xml_schema_add_components(
                     } else {
                         &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).elem_decl
                     };
-                    err = table
+                    table
                         .insert(
                             CStr::from_ptr(name as *const i8)
                                 .to_string_lossy()
                                 .into_owned(),
                             item as _,
                         )
-                        .is_some() as i32;
+                        .is_some()
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAttribute => {
                     name = (*(item as XmlSchemaAttributePtr)).name;
@@ -11700,14 +11703,14 @@ unsafe fn xml_schema_add_components(
                     } else {
                         &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).attr_decl
                     };
-                    err = table
+                    table
                         .insert(
                             CStr::from_ptr(name as *const i8)
                                 .to_string_lossy()
                                 .into_owned(),
                             item as _,
                         )
-                        .is_some() as i32;
+                        .is_some()
                 }
                 XmlSchemaTypeType::XmlSchemaTypeGroup => {
                     if WXS_REDEFINED_MODEL_GROUP_DEF!(item) {
@@ -11719,14 +11722,14 @@ unsafe fn xml_schema_add_components(
                     } else {
                         &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).group_decl
                     };
-                    err = table
+                    table
                         .insert(
                             CStr::from_ptr(name as *const i8)
                                 .to_string_lossy()
                                 .into_owned(),
                             item as _,
                         )
-                        .is_some() as i32;
+                        .is_some()
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAttributeGroup => {
                     if WXS_REDEFINED_ATTR_GROUP!(item) {
@@ -11738,14 +11741,14 @@ unsafe fn xml_schema_add_components(
                     } else {
                         &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).attrgrp_decl
                     };
-                    err = table
+                    table
                         .insert(
                             CStr::from_ptr(name as *const i8)
                                 .to_string_lossy()
                                 .into_owned(),
                             item as _,
                         )
-                        .is_some() as i32;
+                        .is_some()
                 }
                 XmlSchemaTypeType::XmlSchemaTypeIDCKey
                 | XmlSchemaTypeType::XmlSchemaTypeIDCUnique
@@ -11756,18 +11759,30 @@ unsafe fn xml_schema_add_components(
                     } else {
                         &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).idc_def
                     };
-                    err = table
+                    table
                         .insert(
                             CStr::from_ptr(name as *const i8)
                                 .to_string_lossy()
                                 .into_owned(),
                             item as _,
                         )
-                        .is_some() as i32;
+                        .is_some()
                 }
                 XmlSchemaTypeType::XmlSchemaTypeNotation => {
                     name = (*(item as XmlSchemaNotationPtr)).name;
-                    WXS_GET_GLOBAL_HASH!(bucket, nota_decl, table);
+                    let table = if WXS_IS_BUCKET_IMPMAIN!((*bucket).typ) {
+                        &mut (*(*WXS_IMPBUCKET!(bucket)).schema).nota_decl
+                    } else {
+                        &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).nota_decl
+                    };
+                    table
+                        .insert(
+                            CStr::from_ptr(name as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                            item as _,
+                        )
+                        .is_some()
                 }
                 _ => {
                     PERROR_INT!(
@@ -11777,22 +11792,8 @@ unsafe fn xml_schema_add_components(
                     );
                     continue;
                 }
-            }
-            if !table.is_null() {
-                if (*table).is_null() {
-                    *table = xml_hash_create(10);
-                    if (*table).is_null() {
-                        PERROR_INT!(
-                            pctxt,
-                            "xmlSchemaAddComponents",
-                            "failed to create a component hash table"
-                        );
-                        return -1;
-                    }
-                }
-                err = xml_hash_add_entry(*table, name, item as _);
-            }
-            if err != 0 {
+            };
+            if duplicate {
                 let typename = xml_schema_get_component_type_str(item as _);
                 let qname = xml_schema_get_component_qname(item as _);
                 xml_schema_custom_err(
