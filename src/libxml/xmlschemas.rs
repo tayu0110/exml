@@ -11695,7 +11695,19 @@ unsafe fn xml_schema_add_components(
                 }
                 XmlSchemaTypeType::XmlSchemaTypeAttribute => {
                     name = (*(item as XmlSchemaAttributePtr)).name;
-                    WXS_GET_GLOBAL_HASH!(bucket, attr_decl, table);
+                    let table = if WXS_IS_BUCKET_IMPMAIN!((*bucket).typ) {
+                        &mut (*(*WXS_IMPBUCKET!(bucket)).schema).attr_decl
+                    } else {
+                        &mut (*(*(*WXS_INCBUCKET!(bucket)).owner_import).schema).attr_decl
+                    };
+                    err = table
+                        .insert(
+                            CStr::from_ptr(name as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                            item as _,
+                        )
+                        .is_some() as i32;
                 }
                 XmlSchemaTypeType::XmlSchemaTypeGroup => {
                     if WXS_REDEFINED_MODEL_GROUP_DEF!(item) {
@@ -12226,8 +12238,12 @@ unsafe fn xml_schema_resolve_attr_use_references(
             let refe: XmlSchemaQNameRefPtr = (*ause).attr_decl as XmlSchemaQNameRefPtr;
 
             // TODO: Evaluate, what errors could occur if the declaration is not found.
-            (*ause).attr_decl =
-                (*(*ctxt).schema).get_attribute_decl((*refe).name, (*refe).target_namespace);
+            (*ause).attr_decl = (*(*ctxt).schema).get_attribute_decl(
+                CStr::from_ptr((*refe).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (*refe).target_namespace,
+            );
             if (*ause).attr_decl.is_null() {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -12487,7 +12503,12 @@ unsafe fn xml_schema_resolve_attr_use_prohib_references(
 ) -> i32 {
     unsafe {
         if (*(*pctxt).schema)
-            .get_attribute_decl((*prohib).name, (*prohib).target_namespace)
+            .get_attribute_decl(
+                CStr::from_ptr((*prohib).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (*prohib).target_namespace,
+            )
             .is_null()
         {
             xml_schema_pres_comp_attr_err(
@@ -22476,8 +22497,12 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         continue;
                     }
                     // Find an attribute declaration.
-                    (*iattr).decl = (*(*vctxt).schema)
-                        .get_attribute_decl((*iattr).local_name, (*iattr).ns_name);
+                    (*iattr).decl = (*(*vctxt).schema).get_attribute_decl(
+                        CStr::from_ptr((*iattr).local_name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        (*iattr).ns_name,
+                    );
                     if !(*iattr).decl.is_null() {
                         (*iattr).state = XML_SCHEMAS_ATTR_ASSESSED;
                         // SPEC (cvc-complex-type)

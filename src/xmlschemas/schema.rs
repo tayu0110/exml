@@ -50,7 +50,7 @@ pub struct XmlSchema {
     pub(crate) flags: i32,
 
     pub(crate) type_decl: HashMap<String, XmlSchemaTypePtr>,
-    pub(crate) attr_decl: XmlHashTablePtr,
+    pub(crate) attr_decl: HashMap<String, XmlSchemaAttributePtr>,
     pub(crate) attrgrp_decl: XmlHashTablePtr,
     pub(crate) elem_decl: HashMap<String, XmlSchemaElementPtr>,
     pub(crate) nota_decl: XmlHashTablePtr,
@@ -183,18 +183,14 @@ impl XmlSchema {
     #[doc(alias = "xmlSchemaGetAttributeDecl")]
     pub(crate) unsafe fn get_attribute_decl(
         &self,
-        name: *const u8,
+        name: &str,
         ns_name: *const u8,
     ) -> XmlSchemaAttributePtr {
         unsafe {
             let mut ret: XmlSchemaAttributePtr = null_mut();
 
-            if name.is_null() {
-                return null_mut();
-            }
             if xml_str_equal(ns_name, self.target_namespace) {
-                ret = xml_hash_lookup(self.attr_decl, name) as _;
-                if !ret.is_null() {
+                if let Some(&ret) = self.attr_decl.get(name) {
                     return ret;
                 }
             }
@@ -208,7 +204,11 @@ impl XmlSchema {
                 if import.is_null() {
                     return ret;
                 }
-                ret = xml_hash_lookup((*(*import).schema).attr_decl, name) as _;
+                ret = (*(*import).schema)
+                    .attr_decl
+                    .get(name)
+                    .copied()
+                    .unwrap_or(null_mut());
             };
 
             ret
@@ -381,7 +381,7 @@ impl Default for XmlSchema {
             annot: null_mut(),
             flags: 0,
             type_decl: HashMap::new(),
-            attr_decl: null_mut(),
+            attr_decl: HashMap::new(),
             attrgrp_decl: null_mut(),
             elem_decl: HashMap::new(),
             nota_decl: null_mut(),
@@ -427,9 +427,6 @@ pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
         // schema components anymore; this will now be done by the schema buckets.
         if !(*schema).nota_decl.is_null() {
             xml_hash_free((*schema).nota_decl, None);
-        }
-        if !(*schema).attr_decl.is_null() {
-            xml_hash_free((*schema).attr_decl, None);
         }
         if !(*schema).attrgrp_decl.is_null() {
             xml_hash_free((*schema).attrgrp_decl, None);
