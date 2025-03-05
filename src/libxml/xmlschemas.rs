@@ -30,7 +30,7 @@ use std::{
     slice::from_raw_parts,
 };
 
-use libc::{memset, snprintf, strchr};
+use libc::{memset, strchr};
 
 use crate::{
     encoding::XmlCharEncoding,
@@ -22594,17 +22594,11 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 );
                                 if ns.is_none() {
                                     let mut counter: i32 = 0;
-                                    let mut prefix = String::new();
+                                    let mut prefix;
 
                                     // Create a namespace declaration on the validation
                                     // root node if no namespace declaration is in scope.
                                     while {
-                                        snprintf(
-                                            prefix.as_mut_ptr() as _,
-                                            12,
-                                            c"p%d".as_ptr() as _,
-                                            counter,
-                                        );
                                         prefix = format!("p{counter}");
                                         counter += 1;
                                         let doc = def_attr_owner_elem.doc;
@@ -22738,7 +22732,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 break 'eval_idcs;
                             }
                             (*iattr).vc_value = (*(*iattr).using).def_value;
-                            // if (xmlSchemaCompareValuesWhtsp((*attr).val, (xmlSchemaWhitespaceValueType) ws, (*attr).(*use).defVal, (xmlSchemaWhitespaceValueType) ws) != 0) {
+                            // // if (xmlSchemaCompareValuesWhtsp((*attr).val, (xmlSchemaWhitespaceValueType) ws, (*attr).(*use).defVal, (xmlSchemaWhitespaceValueType) ws) != 0) {
                             if xml_schema_are_values_equal((*iattr).val, (*(*iattr).using).def_val)
                                 == 0
                             {
@@ -22751,7 +22745,7 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                                 break 'eval_idcs;
                             }
                             (*iattr).vc_value = (*(*iattr).decl).def_value;
-                            // if (xmlSchemaCompareValuesWhtsp((*attr).val, (xmlSchemaWhitespaceValueType) ws, (*attrDecl).defVal, (xmlSchemaWhitespaceValueType) ws) != 0) {
+                            // // if (xmlSchemaCompareValuesWhtsp((*attr).val, (xmlSchemaWhitespaceValueType) ws, (*attrDecl).defVal, (xmlSchemaWhitespaceValueType) ws) != 0) {
                             if xml_schema_are_values_equal((*iattr).val, (*(*iattr).decl).def_val)
                                 == 0
                             {

@@ -1,15 +1,12 @@
 use std::{
     ffi::{CStr, c_void},
-    ptr::null_mut,
+    ptr::{drop_in_place, null, null_mut},
 };
-
-use libc::memset;
 
 use crate::{
     dict::{XmlDictPtr, xml_dict_free, xml_dict_reference},
     hash::{XmlHashTablePtr, xml_hash_free, xml_hash_lookup, xml_hash_size},
     libxml::{
-        globals::{xml_free, xml_malloc},
         schemas_internals::{
             XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION, XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION,
             XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION, XML_SCHEMAS_FINAL_DEFAULT_EXTENSION,
@@ -30,7 +27,6 @@ use crate::{
 
 use super::{
     context::XmlSchemaParserCtxt,
-    error::xml_schema_perr_memory,
     items::{
         XmlSchemaAttributeGroupPtr, XmlSchemaAttributePtr, XmlSchemaBasicItemPtr,
         XmlSchemaElementPtr, XmlSchemaIDCPtr, XmlSchemaModelGroupDefPtr, XmlSchemaNotationPtr,
@@ -381,24 +377,44 @@ impl XmlSchema {
     }
 }
 
+impl Default for XmlSchema {
+    fn default() -> Self {
+        Self {
+            name: null(),
+            target_namespace: null(),
+            version: null(),
+            id: null(),
+            doc: None,
+            annot: null_mut(),
+            flags: 0,
+            type_decl: null_mut(),
+            attr_decl: null_mut(),
+            attrgrp_decl: null_mut(),
+            elem_decl: null_mut(),
+            nota_decl: null_mut(),
+            schemas_imports: null_mut(),
+            _private: null_mut(),
+            group_decl: null_mut(),
+            dict: null_mut(),
+            includes: null_mut(),
+            preserve: 0,
+            counter: 0,
+            idc_def: null_mut(),
+            volatiles: null_mut(),
+        }
+    }
+}
+
 impl XmlSchemaParserCtxt {
     /// Allocate a new Schema structure.
     ///
     /// Returns the newly allocated structure or NULL in case or error
     #[doc(alias = "xmlSchemaNewSchema")]
-    pub(crate) unsafe fn new_schema(&mut self) -> XmlSchemaPtr {
-        unsafe {
-            let ret: XmlSchemaPtr = xml_malloc(size_of::<XmlSchema>()) as _;
-            if ret.is_null() {
-                xml_schema_perr_memory(self, "allocating schema", None);
-                return null_mut();
-            }
-            memset(ret as _, 0, size_of::<XmlSchema>());
-            (*ret).dict = self.dict;
-            xml_dict_reference((*ret).dict);
-
-            ret
-        }
+    pub(crate) fn new_schema(&mut self) -> XmlSchemaPtr {
+        let mut ret = Box::new(XmlSchema::default());
+        ret.dict = self.dict;
+        xml_dict_reference(ret.dict);
+        Box::leak(ret)
     }
 }
 
@@ -464,6 +480,7 @@ pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
         // Never free the doc here, since this will be done by the buckets.
 
         xml_dict_free((*schema).dict);
-        xml_free(schema as _);
+        drop_in_place(schema);
+        let _ = Box::from_raw(schema);
     }
 }
