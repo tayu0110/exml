@@ -26,6 +26,7 @@ pub mod dump;
 pub(crate) mod error;
 pub(crate) mod item_list;
 pub mod items;
+pub mod schema;
 
 use items::XmlSchemaType;
 

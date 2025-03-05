@@ -168,6 +168,7 @@ use crate::{
             XmlSchemaQNameRefPtr, XmlSchemaTreeItemPtr, XmlSchemaType, XmlSchemaTypePtr,
             xml_schema_free_attribute_use_prohib,
         },
+        schema::{XmlSchemaPtr, xml_schema_free},
         wxs_is_any_simple_type, wxs_is_anytype, wxs_is_complex, wxs_is_simple,
     },
     xmlschemastypes::{xml_schema_collapse_string, xml_schema_white_space_replace},
@@ -223,37 +224,6 @@ pub enum XmlSchemaValidOption {
     // xsi:noNamespaceSchemaLocation
 }
 
-pub type XmlSchemaPtr = *mut XmlSchema;
-/// A Schemas definition
-#[doc(alias = "xmlSchema")]
-#[repr(C)]
-pub struct XmlSchema {
-    pub(crate) name: *const XmlChar,             /* schema name */
-    pub(crate) target_namespace: *const XmlChar, /* the target namespace */
-    pub(crate) version: *const XmlChar,
-    pub(crate) id: *const XmlChar, /* Obsolete */
-    pub(crate) doc: Option<XmlDocPtr>,
-    pub(crate) annot: XmlSchemaAnnotPtr,
-    pub(crate) flags: i32,
-
-    pub(crate) type_decl: XmlHashTablePtr,
-    pub(crate) attr_decl: XmlHashTablePtr,
-    pub(crate) attrgrp_decl: XmlHashTablePtr,
-    pub(crate) elem_decl: XmlHashTablePtr,
-    pub(crate) nota_decl: XmlHashTablePtr,
-
-    pub(crate) schemas_imports: XmlHashTablePtr,
-
-    pub(crate) _private: *mut c_void, /* unused by the library for users or bindings */
-    pub(crate) group_decl: XmlHashTablePtr,
-    pub(crate) dict: XmlDictPtr,
-    pub(crate) includes: *mut c_void, /* the includes, this is opaque for now */
-    pub(crate) preserve: i32,         /* whether to free the document */
-    pub(crate) counter: i32,          /* used to give anonymous components unique names */
-    pub(crate) idc_def: XmlHashTablePtr, /* All identity-constraint defs. */
-    pub(crate) volatiles: *mut c_void, /* Obsolete */
-}
-
 /// Signature of an error callback from an XSD validation
 #[doc(alias = "xmlSchemaValidityErrorFunc")]
 pub type XmlSchemaValidityErrorFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
@@ -273,10 +243,10 @@ pub type XmlSchemaValidityLocatorFunc =
 
 const UNBOUNDED: usize = 1 << 30;
 
-const XML_SCHEMAS_NO_NAMESPACE: &CStr = c"##";
+pub(crate) const XML_SCHEMAS_NO_NAMESPACE: &CStr = c"##";
 
 // The XML Schemas namespaces
-const XML_SCHEMA_NS: &CStr = c"http://www.w3.org/2001/XMLSchema";
+pub(crate) const XML_SCHEMA_NS: &CStr = c"http://www.w3.org/2001/XMLSchema";
 
 const XML_SCHEMA_INSTANCE_NS: &CStr = c"http://www.w3.org/2001/XMLSchema-instance";
 
@@ -632,7 +602,7 @@ pub struct XmlSchemaImport {
     globals: XmlSchemaItemListPtr<*mut c_void>,
     locals: XmlSchemaItemListPtr<*mut c_void>,
     // The imported schema.
-    schema: XmlSchemaPtr,
+    pub(crate) schema: XmlSchemaPtr,
 }
 
 // Extends xmlSchemaBucket
@@ -1120,51 +1090,6 @@ pub(crate) unsafe fn xml_schema_get_component_node(
     }
 }
 
-macro_rules! WXS_FIND_GLOBAL_ITEM {
-    ($schema:expr, $slot:ident, $ns_name:expr, $name:expr, $ret:expr) => {
-        if xml_str_equal($ns_name, (*$schema).target_namespace) {
-            $ret = $crate::libxml::hash::xml_hash_lookup((*$schema).$slot, $name) as _;
-            if !$ret.is_null() {
-                return $ret;
-            }
-        }
-        if $crate::libxml::hash::xml_hash_size((*$schema).schemas_imports) > 1 {
-            let import: XmlSchemaImportPtr;
-            if $ns_name.is_null() {
-                import = $crate::libxml::hash::xml_hash_lookup(
-                    (*$schema).schemas_imports,
-                    XML_SCHEMAS_NO_NAMESPACE.as_ptr() as _,
-                ) as _;
-            } else {
-                import = $crate::libxml::hash::xml_hash_lookup((*$schema).schemas_imports, $ns_name)
-                    as _;
-            }
-            if import.is_null() {
-                return $ret;
-            }
-            $ret = $crate::libxml::hash::xml_hash_lookup((*(*import).schema).$slot, $name) as _;
-        }
-    };
-}
-
-unsafe fn xml_schema_get_notation(
-    schema: XmlSchemaPtr,
-    name: *const XmlChar,
-    ns_name: *const XmlChar,
-) -> XmlSchemaNotationPtr {
-    unsafe {
-        let mut ret: XmlSchemaNotationPtr = null_mut();
-
-        if name.is_null() || schema.is_null() {
-            return null_mut();
-        }
-        if !schema.is_null() {
-            WXS_FIND_GLOBAL_ITEM!(schema, nota_decl, ns_name, name, ret);
-        }
-        ret
-    }
-}
-
 // This one works on the schema of the validation context.
 unsafe fn xml_schema_validate_notation(
     vctxt: XmlSchemaValidCtxtPtr,
@@ -1225,7 +1150,7 @@ unsafe fn xml_schema_validate_notation(
                 xml_free(local_name as _);
                 return 1;
             }
-            if !xml_schema_get_notation(schema, local_name, ns_name).is_null() {
+            if !(*schema).get_notation(local_name, ns_name).is_null() {
                 if val_needed != 0 && !val.is_null() {
                     *val =
                         xml_schema_new_notation_value(xml_strdup(local_name), xml_strdup(ns_name));
@@ -1238,7 +1163,7 @@ unsafe fn xml_schema_validate_notation(
             }
             xml_free(prefix as _);
             xml_free(local_name as _);
-        } else if !xml_schema_get_notation(schema, value, null_mut()).is_null() {
+        } else if !(*schema).get_notation(value, null_mut()).is_null() {
             if val_needed != 0 && !val.is_null() {
                 *val = xml_schema_new_notation_value(xml_strdup(value), null_mut());
                 if (*val).is_null() {
@@ -2469,25 +2394,6 @@ pub unsafe fn xml_schema_is_valid(ctxt: XmlSchemaValidCtxtPtr) -> i32 {
     }
 }
 
-/// Allocate a new Schema structure.
-///
-/// Returns the newly allocated structure or NULL in case or error
-#[doc(alias = "xmlSchemaNewSchema")]
-unsafe fn xml_schema_new_schema(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
-    unsafe {
-        let ret: XmlSchemaPtr = xml_malloc(size_of::<XmlSchema>()) as _;
-        if ret.is_null() {
-            xml_schema_perr_memory(ctxt, "allocating schema", None);
-            return null_mut();
-        }
-        memset(ret as _, 0, size_of::<XmlSchema>());
-        (*ret).dict = (*ctxt).dict;
-        xml_dict_reference((*ret).dict);
-
-        ret
-    }
-}
-
 unsafe fn xml_schema_subst_group_free(group: XmlSchemaSubstGroupPtr) {
     unsafe {
         if group.is_null() {
@@ -3020,7 +2926,7 @@ unsafe fn xml_schema_component_list_free(list: XmlSchemaItemListPtr<*mut c_void>
     }
 }
 
-unsafe fn xml_schema_bucket_free(bucket: XmlSchemaBucketPtr) {
+pub(crate) unsafe fn xml_schema_bucket_free(bucket: XmlSchemaBucketPtr) {
     unsafe {
         if bucket.is_null() {
             return;
@@ -3125,7 +3031,7 @@ unsafe fn xml_schema_bucket_create(
             return null_mut();
         } else if typ == XML_SCHEMA_SCHEMA_IMPORT {
             // Create a schema for imports and assign the target_namespace.
-            (*WXS_IMPBUCKET!(ret)).schema = xml_schema_new_schema(pctxt);
+            (*WXS_IMPBUCKET!(ret)).schema = (*pctxt).new_schema();
             if (*WXS_IMPBUCKET!(ret)).schema.is_null() {
                 xml_schema_bucket_free(ret);
                 return null_mut();
@@ -3670,41 +3576,6 @@ unsafe fn xml_schema_add_schema_doc(
             }
         }
         -1
-    }
-}
-
-unsafe fn xml_schema_clear_schema_defaults(schema: XmlSchemaPtr) {
-    unsafe {
-        if (*schema).flags & XML_SCHEMAS_QUALIF_ELEM != 0 {
-            (*schema).flags ^= XML_SCHEMAS_QUALIF_ELEM;
-        }
-
-        if (*schema).flags & XML_SCHEMAS_QUALIF_ATTR != 0 {
-            (*schema).flags ^= XML_SCHEMAS_QUALIF_ATTR;
-        }
-
-        if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_EXTENSION != 0 {
-            (*schema).flags ^= XML_SCHEMAS_FINAL_DEFAULT_EXTENSION;
-        }
-        if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION != 0 {
-            (*schema).flags ^= XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION;
-        }
-        if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_LIST != 0 {
-            (*schema).flags ^= XML_SCHEMAS_FINAL_DEFAULT_LIST;
-        }
-        if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_UNION != 0 {
-            (*schema).flags ^= XML_SCHEMAS_FINAL_DEFAULT_UNION;
-        }
-
-        if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION != 0 {
-            (*schema).flags ^= XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION;
-        }
-        if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION != 0 {
-            (*schema).flags ^= XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION;
-        }
-        if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION != 0 {
-            (*schema).flags ^= XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION;
-        }
     }
 }
 
@@ -11403,7 +11274,7 @@ unsafe fn xml_schema_parse_new_doc_with_context(
         let old_flags: i32 = (*schema).flags;
         let old_doc = (*schema).doc;
         if (*schema).flags != 0 {
-            xml_schema_clear_schema_defaults(schema);
+            (*schema).clear_flags();
         }
         (*schema).doc = (*bucket).doc;
         (*pctxt).schema = schema;
@@ -11878,71 +11749,6 @@ unsafe fn xml_schema_add_components(
     }
 }
 
-/// Lookup a type in the schemas or the predefined types
-///
-/// Returns the group definition or NULL if not found.
-#[doc(alias = "xmlSchemaGetType")]
-unsafe fn xml_schema_get_type(
-    schema: XmlSchemaPtr,
-    name: *const XmlChar,
-    ns_name: *const XmlChar,
-) -> XmlSchemaTypePtr {
-    unsafe {
-        let mut ret: XmlSchemaTypePtr = null_mut();
-
-        if name.is_null() {
-            return null_mut();
-        }
-        // First try the built-in types.
-        if !ns_name.is_null() && xml_str_equal(ns_name, XML_SCHEMA_NS.as_ptr() as _) {
-            ret = xml_schema_get_predefined_type(
-                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                CStr::from_ptr(ns_name as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            );
-            if !ret.is_null() {
-                // goto exit;
-                return ret;
-            }
-            // Note that we try the parsed schemas as well here
-            // since one might have parsed the S4S, which contain more
-            // than the built-in types.
-            // TODO: Can we optimize this?
-        }
-        if !schema.is_null() {
-            WXS_FIND_GLOBAL_ITEM!(schema, type_decl, ns_name, name, ret);
-        }
-        // exit:
-
-        ret
-    }
-}
-
-/// Lookup a global element declaration in the schema.
-///
-/// Returns the element declaration or NULL if not found.
-#[doc(alias = "xmlSchemaGetElem")]
-unsafe fn xml_schema_get_elem(
-    schema: XmlSchemaPtr,
-    name: *const XmlChar,
-    ns_name: *const XmlChar,
-) -> XmlSchemaElementPtr {
-    unsafe {
-        let mut ret: XmlSchemaElementPtr = null_mut();
-
-        if name.is_null() || schema.is_null() {
-            return null_mut();
-        }
-        if !schema.is_null() {
-            WXS_FIND_GLOBAL_ITEM!(schema, elem_decl, ns_name, name, ret);
-        }
-        // exit:
-
-        ret
-    }
-}
-
 /// Resolves the references of an element declaration or particle,
 /// which has an element declaration as it's term.
 #[doc(alias = "xmlSchemaResolveElementReferences")]
@@ -11963,11 +11769,8 @@ unsafe fn xml_schema_resolve_element_references(
         if (*elem_decl).subtypes.is_null() && !(*elem_decl).named_type.is_null() {
             // (type definition) ... otherwise the type definition `resolved`
             // to by the `actual value` of the type [attribute] ...
-            let typ: XmlSchemaTypePtr = xml_schema_get_type(
-                (*ctxt).schema,
-                (*elem_decl).named_type,
-                (*elem_decl).named_type_ns,
-            );
+            let typ: XmlSchemaTypePtr =
+                (*(*ctxt).schema).get_type((*elem_decl).named_type, (*elem_decl).named_type_ns);
             if typ.is_null() {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -11995,11 +11798,8 @@ unsafe fn xml_schema_resolve_element_references(
         }
         if !(*elem_decl).subst_group.is_null() {
             // FIXME TODO: Do we need a new field in _xmlSchemaElement for substitutionGroup?
-            let subst_head: XmlSchemaElementPtr = xml_schema_get_elem(
-                (*ctxt).schema,
-                (*elem_decl).subst_group,
-                (*elem_decl).subst_group_ns,
-            );
+            let subst_head: XmlSchemaElementPtr =
+                (*(*ctxt).schema).get_elem((*elem_decl).subst_group, (*elem_decl).subst_group_ns);
             if subst_head.is_null() {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -12084,7 +11884,7 @@ unsafe fn xml_schema_resolve_union_member_types(
             let name: *const XmlChar = (*((*link).typ as XmlSchemaQNameRefPtr)).name;
             let ns_name: *const XmlChar = (*((*link).typ as XmlSchemaQNameRefPtr)).target_namespace;
 
-            member_type = xml_schema_get_type((*ctxt).schema, name, ns_name);
+            member_type = (*(*ctxt).schema).get_type(name, ns_name);
             if member_type.is_null() || !wxs_is_simple(member_type) {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -12138,56 +11938,6 @@ unsafe fn xml_schema_resolve_union_member_types(
     }
 }
 
-/// Lookup a group in the schema or imported schemas
-///
-/// Returns the group definition or NULL if not found.
-#[doc(alias = "xmlSchemaGetGroup")]
-unsafe fn xml_schema_get_group(
-    schema: XmlSchemaPtr,
-    name: *const XmlChar,
-    ns_name: *const XmlChar,
-) -> XmlSchemaModelGroupDefPtr {
-    unsafe {
-        let mut ret: XmlSchemaModelGroupDefPtr = null_mut();
-
-        if name.is_null() || schema.is_null() {
-            return null_mut();
-        }
-        if !schema.is_null() {
-            WXS_FIND_GLOBAL_ITEM!(schema, group_decl, ns_name, name, ret);
-        }
-        // exit:
-
-        ret
-    }
-}
-
-/// Lookup a group in the schema or imported schemas
-///
-/// Returns the group definition or NULL if not found.
-#[doc(alias = "xmlSchemaGetNamedComponent")]
-unsafe fn xml_schema_get_named_component(
-    schema: XmlSchemaPtr,
-    item_type: XmlSchemaTypeType,
-    name: *const XmlChar,
-    target_ns: *const XmlChar,
-) -> XmlSchemaBasicItemPtr {
-    unsafe {
-        match item_type {
-            XmlSchemaTypeType::XmlSchemaTypeGroup => {
-                xml_schema_get_group(schema, name, target_ns) as XmlSchemaBasicItemPtr
-            }
-            XmlSchemaTypeType::XmlSchemaTypeElement => {
-                xml_schema_get_elem(schema, name, target_ns) as XmlSchemaBasicItemPtr
-            }
-            _ => {
-                // TODO
-                null_mut()
-            }
-        }
-    }
-}
-
 /// Resolves type definition references
 #[doc(alias = "xmlSchemaResolveTypeReferences")]
 unsafe fn xml_schema_resolve_type_references(
@@ -12202,7 +11952,7 @@ unsafe fn xml_schema_resolve_type_references(
         // Resolve the base type.
         if (*type_def).base_type.is_null() {
             (*type_def).base_type =
-                xml_schema_get_type((*ctxt).schema, (*type_def).base, (*type_def).base_ns);
+                (*(*ctxt).schema).get_type((*type_def).base, (*type_def).base_ns);
             if (*type_def).base_type.is_null() {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -12230,7 +11980,7 @@ unsafe fn xml_schema_resolve_type_references(
                 // Resolve the itemType.
                 if (*type_def).subtypes.is_null() && !(*type_def).base.is_null() {
                     (*type_def).subtypes =
-                        xml_schema_get_type((*ctxt).schema, (*type_def).base, (*type_def).base_ns);
+                        (*(*ctxt).schema).get_type((*type_def).base, (*type_def).base_ns);
 
                     if (*type_def).subtypes.is_null() || !wxs_is_simple((*type_def).subtypes) {
                         (*type_def).subtypes = null_mut();
@@ -12273,8 +12023,7 @@ unsafe fn xml_schema_resolve_type_references(
             // URGENT TODO: Test this.
             WXS_TYPE_PARTICLE_TERM!(type_def) = null_mut();
             // Resolve the MG definition reference.
-            let group_def: XmlSchemaModelGroupDefPtr = xml_schema_get_named_component(
-                (*ctxt).schema,
+            let group_def: XmlSchemaModelGroupDefPtr = (*(*ctxt).schema).get_named_component(
                 (*refe).item_type,
                 (*refe).name,
                 (*refe).target_namespace,
@@ -12352,7 +12101,7 @@ unsafe fn xml_schema_resolve_attr_type_references(
         }
         if !(*item).type_name.is_null() {
             let typ: XmlSchemaTypePtr =
-                xml_schema_get_type((*ctxt).schema, (*item).type_name, (*item).type_ns);
+                (*(*ctxt).schema).get_type((*item).type_name, (*item).type_ns);
             if typ.is_null() || !wxs_is_simple(typ) {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -12382,30 +12131,6 @@ unsafe fn xml_schema_resolve_attr_type_references(
     }
 }
 
-/// Lookup a an attribute in the schema or imported schemas
-///
-/// Returns the attribute declaration or NULL if not found.
-#[doc(alias = "xmlSchemaGetAttributeDecl")]
-unsafe fn xml_schema_get_attribute_decl(
-    schema: XmlSchemaPtr,
-    name: *const XmlChar,
-    ns_name: *const XmlChar,
-) -> XmlSchemaAttributePtr {
-    unsafe {
-        let mut ret: XmlSchemaAttributePtr = null_mut();
-
-        if name.is_null() || schema.is_null() {
-            return null_mut();
-        }
-        if !schema.is_null() {
-            WXS_FIND_GLOBAL_ITEM!(schema, attr_decl, ns_name, name, ret);
-        }
-        // exit:
-
-        ret
-    }
-}
-
 /// Resolves the referenced attribute declaration.
 #[doc(alias = "xmlSchemaResolveAttrUseReferences")]
 unsafe fn xml_schema_resolve_attr_use_references(
@@ -12425,11 +12150,8 @@ unsafe fn xml_schema_resolve_attr_use_references(
             let refe: XmlSchemaQNameRefPtr = (*ause).attr_decl as XmlSchemaQNameRefPtr;
 
             // TODO: Evaluate, what errors could occur if the declaration is not found.
-            (*ause).attr_decl = xml_schema_get_attribute_decl(
-                (*ctxt).schema,
-                (*refe).name,
-                (*refe).target_namespace,
-            );
+            (*ause).attr_decl =
+                (*(*ctxt).schema).get_attribute_decl((*refe).name, (*refe).target_namespace);
             if (*ause).attr_decl.is_null() {
                 xml_schema_pres_comp_attr_err(
                     ctxt,
@@ -12455,35 +12177,6 @@ unsafe fn xml_schema_resolve_attr_use_references(
     }
 }
 
-/// Lookup a an attribute group in the schema or imported schemas
-///
-/// Returns the attribute group definition or NULL if not found.
-#[doc(alias = "xmlSchemaGetAttributeGroup")]
-unsafe fn xml_schema_get_attribute_group(
-    schema: XmlSchemaPtr,
-    name: *const XmlChar,
-    ns_name: *const XmlChar,
-) -> XmlSchemaAttributeGroupPtr {
-    unsafe {
-        let mut ret: XmlSchemaAttributeGroupPtr = null_mut();
-
-        if name.is_null() || schema.is_null() {
-            return null_mut();
-        }
-        if !schema.is_null() {
-            WXS_FIND_GLOBAL_ITEM!(schema, attrgrp_decl, ns_name, name, ret);
-        }
-        // exit:
-        // TODO:
-        // if (!ret.is_null() && ((*ret).redef != null_mut())) {
-        //     // Return the last redefinition.
-        //     ret = (*ret).redef;
-        // }
-
-        ret
-    }
-}
-
 /// Resolves references to attribute group definitions.
 #[doc(alias = "xmlSchemaResolveAttrGroupReferences")]
 unsafe fn xml_schema_resolve_attr_group_references(
@@ -12495,7 +12188,7 @@ unsafe fn xml_schema_resolve_attr_group_references(
             return 0;
         }
         let group: XmlSchemaAttributeGroupPtr =
-            xml_schema_get_attribute_group((*ctxt).schema, (*refe).name, (*refe).target_namespace);
+            (*(*ctxt).schema).get_attribute_group((*refe).name, (*refe).target_namespace);
         if group.is_null() {
             xml_schema_pres_comp_attr_err(
                 ctxt,
@@ -12547,8 +12240,7 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
                 // NULL the {term} by default.
                 (*particle).children = null_mut();
 
-                ref_item = xml_schema_get_named_component(
-                    (*ctxt).schema,
+                ref_item = (*(*ctxt).schema).get_named_component(
                     (*refe).item_type,
                     (*refe).name,
                     (*refe).target_namespace,
@@ -12623,25 +12315,6 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
     }
 }
 
-unsafe fn xml_schema_get_idc(
-    schema: XmlSchemaPtr,
-    name: *const XmlChar,
-    ns_name: *const XmlChar,
-) -> XmlSchemaIDCPtr {
-    unsafe {
-        let mut ret: XmlSchemaIDCPtr = null_mut();
-
-        if name.is_null() || schema.is_null() {
-            return null_mut();
-        }
-        if !schema.is_null() {
-            WXS_FIND_GLOBAL_ITEM!(schema, idc_def, ns_name, name, ret);
-        }
-        // exit:
-        ret
-    }
-}
-
 /// Resolve keyRef references to key/unique IDCs.
 /// Schema Component Constraint:
 ///   Identity-constraint Definition Properties Correct (c-props-correct)
@@ -12655,11 +12328,9 @@ unsafe fn xml_schema_resolve_idckey_references(
             return 0;
         }
         if !(*(*idc).refe).name.is_null() {
-            (*(*idc).refe).item = xml_schema_get_idc(
-                (*pctxt).schema,
-                (*(*idc).refe).name,
-                (*(*idc).refe).target_namespace,
-            ) as XmlSchemaBasicItemPtr;
+            (*(*idc).refe).item = (*(*pctxt).schema)
+                .get_idc((*(*idc).refe).name, (*(*idc).refe).target_namespace)
+                as XmlSchemaBasicItemPtr;
             if (*(*idc).refe).item.is_null() {
                 // TODO: It is actually not an error to fail to resolve
                 // at this stage. BUT we need to be that strict!
@@ -12734,12 +12405,9 @@ unsafe fn xml_schema_resolve_attr_use_prohib_references(
     pctxt: XmlSchemaParserCtxtPtr,
 ) -> i32 {
     unsafe {
-        if xml_schema_get_attribute_decl(
-            (*pctxt).schema,
-            (*prohib).name,
-            (*prohib).target_namespace,
-        )
-        .is_null()
+        if (*(*pctxt).schema)
+            .get_attribute_decl((*prohib).name, (*prohib).target_namespace)
+            .is_null()
         {
             xml_schema_pres_comp_attr_err(
                 pctxt,
@@ -19812,7 +19480,7 @@ pub unsafe fn xml_schema_parse(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
 
         // Create the *main* schema.
         'exit_failure: {
-            main_schema = xml_schema_new_schema(ctxt);
+            main_schema = (*ctxt).new_schema();
             if main_schema.is_null() {
                 break 'exit_failure;
             }
@@ -19923,72 +19591,6 @@ pub unsafe fn xml_schema_parse(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
         PERROR_INT2!(ctxt, "xmlSchemaParse", "An internal error occurred");
         (*ctxt).schema = null_mut();
         null_mut()
-    }
-}
-
-extern "C" fn xml_schema_bucket_free_entry(bucket: *mut c_void, _name: *const XmlChar) {
-    unsafe {
-        xml_schema_bucket_free(bucket as XmlSchemaBucketPtr);
-    }
-}
-
-/// Deallocate a Schema structure.
-#[doc(alias = "xmlSchemaFree")]
-pub unsafe fn xml_schema_free(schema: XmlSchemaPtr) {
-    unsafe {
-        if schema.is_null() {
-            return;
-        }
-        // @volatiles is not used anymore :-/
-        if !(*schema).volatiles.is_null() {
-            // TODO
-            todo!()
-        }
-        // Note that those slots are not responsible for freeing
-        // schema components anymore; this will now be done by the schema buckets.
-        if !(*schema).nota_decl.is_null() {
-            xml_hash_free((*schema).nota_decl, None);
-        }
-        if !(*schema).attr_decl.is_null() {
-            xml_hash_free((*schema).attr_decl, None);
-        }
-        if !(*schema).attrgrp_decl.is_null() {
-            xml_hash_free((*schema).attrgrp_decl, None);
-        }
-        if !(*schema).elem_decl.is_null() {
-            xml_hash_free((*schema).elem_decl, None);
-        }
-        if !(*schema).type_decl.is_null() {
-            xml_hash_free((*schema).type_decl, None);
-        }
-        if !(*schema).group_decl.is_null() {
-            xml_hash_free((*schema).group_decl, None);
-        }
-        if !(*schema).idc_def.is_null() {
-            xml_hash_free((*schema).idc_def, None);
-        }
-
-        if !(*schema).schemas_imports.is_null() {
-            xml_hash_free(
-                (*schema).schemas_imports,
-                Some(xml_schema_bucket_free_entry),
-            );
-        }
-        if !(*schema).includes.is_null() {
-            let list: XmlSchemaItemListPtr<*mut c_void> =
-                (*schema).includes as XmlSchemaItemListPtr<*mut c_void>;
-            for &item in &(*list).items {
-                xml_schema_bucket_free(item as XmlSchemaBucketPtr);
-            }
-            xml_schema_item_list_free(list);
-        }
-        if !(*schema).annot.is_null() {
-            xml_schema_free_annot((*schema).annot);
-        }
-        // Never free the doc here, since this will be done by the buckets.
-
-        xml_dict_free((*schema).dict);
-        xml_free(schema as _);
     }
 }
 
@@ -20431,7 +20033,7 @@ unsafe fn xml_schema_pre_run(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
             let pctxt: XmlSchemaParserCtxtPtr = (*vctxt).pctxt;
             (*pctxt).xsi_assemble = 1;
             // Create the schema.
-            (*vctxt).schema = xml_schema_new_schema(pctxt);
+            (*vctxt).schema = (*pctxt).new_schema();
             if (*vctxt).schema.is_null() {
                 return -1;
             }
@@ -21010,7 +20612,7 @@ unsafe fn xml_schema_process_xsi_type(
             }
             // (cvc-elt) (3.3.4) : (4.2)
             // (cvc-assess-elt) (1.2.1.2.3)
-            *local_type = xml_schema_get_type((*vctxt).schema, local, ns_name);
+            *local_type = (*(*vctxt).schema).get_type(local, ns_name);
             if (*local_type).is_null() {
                 let qname = xml_schema_format_qname(
                     Some(
@@ -21176,11 +20778,8 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 // Workaround for "anyType": we have currently no content model
                 // assigned for "anyType", so handle it explicitly.
                 // "anyType" has an unbounded, lax "any" wildcard.
-                (*(*vctxt).inode).decl = xml_schema_get_elem(
-                    (*vctxt).schema,
-                    (*(*vctxt).inode).local_name,
-                    (*(*vctxt).inode).ns_name,
-                );
+                (*(*vctxt).inode).decl = (*(*vctxt).schema)
+                    .get_elem((*(*vctxt).inode).local_name, (*(*vctxt).inode).ns_name);
 
                 if (*(*vctxt).inode).decl.is_null() {
                     // Process "xsi:type".
@@ -21388,11 +20987,8 @@ unsafe fn xml_schema_validate_elem_wildcard(vctxt: XmlSchemaValidCtxtPtr, skip: 
             return 0;
         }
         {
-            let decl: XmlSchemaElementPtr = xml_schema_get_elem(
-                (*vctxt).schema,
-                (*(*vctxt).inode).local_name,
-                (*(*vctxt).inode).ns_name,
-            );
+            let decl: XmlSchemaElementPtr = (*(*vctxt).schema)
+                .get_elem((*(*vctxt).inode).local_name, (*(*vctxt).inode).ns_name);
             if !decl.is_null() {
                 (*(*vctxt).inode).decl = decl;
                 return 0;
@@ -22806,11 +22402,8 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         continue;
                     }
                     // Find an attribute declaration.
-                    (*iattr).decl = xml_schema_get_attribute_decl(
-                        (*vctxt).schema,
-                        (*iattr).local_name,
-                        (*iattr).ns_name,
-                    );
+                    (*iattr).decl = (*(*vctxt).schema)
+                        .get_attribute_decl((*iattr).local_name, (*iattr).ns_name);
                     if !(*iattr).decl.is_null() {
                         (*iattr).state = XML_SCHEMAS_ATTR_ASSESSED;
                         // SPEC (cvc-complex-type)
@@ -23383,11 +22976,8 @@ unsafe fn xml_schema_validate_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 }
             } else {
                 // Get the declaration of the validation root.
-                (*(*vctxt).inode).decl = xml_schema_get_elem(
-                    (*vctxt).schema,
-                    (*(*vctxt).inode).local_name,
-                    (*(*vctxt).inode).ns_name,
-                );
+                (*(*vctxt).inode).decl = (*(*vctxt).schema)
+                    .get_elem((*(*vctxt).inode).local_name, (*(*vctxt).inode).ns_name);
                 if (*(*vctxt).inode).decl.is_null() {
                     ret = XmlParserErrors::XmlSchemavCvcElt1 as i32;
                     VERROR!(

@@ -29,6 +29,8 @@ use std::{
 use clap::Parser;
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
+#[cfg(feature = "schema")]
+use exml::xmlschemas::schema::XmlSchema;
 use exml::{
     encoding::{XmlCharEncoding, add_encoding_alias},
     error::generic_error_default,
@@ -76,8 +78,8 @@ use exml::{
         },
         xmlreader::XmlTextReaderPtr,
         xmlschemas::{
-            XmlSchema, xml_schema_free, xml_schema_parse, xml_schema_set_valid_errors,
-            xml_schema_validate_doc, xml_schema_validate_set_filename, xml_schema_validate_stream,
+            xml_schema_parse, xml_schema_set_valid_errors, xml_schema_validate_doc,
+            xml_schema_validate_set_filename, xml_schema_validate_stream,
         },
         xmlstring::XmlChar,
     },
@@ -98,9 +100,12 @@ use exml::{
         XmlNodePtr, XmlNsPtr, xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc,
         xml_free_dtd, xml_new_doc, xml_new_doc_node,
     },
-    xmlschemas::context::{
-        XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free_parser_ctxt,
-        xml_schema_free_valid_ctxt, xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
+    xmlschemas::{
+        context::{
+            XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free_parser_ctxt,
+            xml_schema_free_valid_ctxt, xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
+        },
+        schema::xml_schema_free,
     },
     xpath::{XmlXPathObjectPtr, xml_xpath_order_doc_elems},
 };

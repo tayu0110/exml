@@ -11,7 +11,7 @@ use crate::{
             XML_SCHEMAS_ELEM_GLOBAL, XML_SCHEMAS_ELEM_NILLABLE, XmlSchemaAnnotPtr,
             XmlSchemaContentType, XmlSchemaTypeType,
         },
-        xmlschemas::{XmlSchemaPtr, xml_schema_format_qname},
+        xmlschemas::xml_schema_format_qname,
     },
     xmlschemas::items::{
         XmlSchemaAttributeUseProhibPtr, XmlSchemaAttributeUsePtr, XmlSchemaElementPtr,
@@ -22,6 +22,7 @@ use crate::{
 use super::{
     item_list::XmlSchemaItemListPtr,
     items::{XmlSchemaParticlePtr, XmlSchemaTypePtr},
+    schema::XmlSchemaPtr,
 };
 
 const UNBOUNDED: usize = 1 << 30;

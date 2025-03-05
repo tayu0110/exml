@@ -19,7 +19,7 @@ use crate::{
             XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR, XmlSchemaAttrInfoPtr,
             XmlSchemaBucketPtr, XmlSchemaConstructionCtxtPtr, XmlSchemaIDCAugPtr,
             XmlSchemaIDCMatcherPtr, XmlSchemaIDCStateObjPtr, XmlSchemaNodeInfoPtr,
-            XmlSchemaPSVIIDCKeyPtr, XmlSchemaPSVIIDCNodePtr, XmlSchemaPtr, XmlSchemaRedefPtr,
+            XmlSchemaPSVIIDCKeyPtr, XmlSchemaPSVIIDCNodePtr, XmlSchemaRedefPtr,
             XmlSchemaValidityLocatorFunc, xml_schema_clear_attr_infos, xml_schema_clear_elem_info,
             xml_schema_construction_ctxt_free, xml_schema_free_idc_state_obj_list,
             xml_schema_idc_free_key, xml_schema_set_valid_errors,
@@ -36,6 +36,7 @@ use super::{
     error::xml_schema_internal_err,
     item_list::{XmlSchemaItemListPtr, xml_schema_item_list_create},
     items::{XmlSchemaAttributeUseProhibPtr, XmlSchemaTypePtr},
+    schema::XmlSchemaPtr,
 };
 
 /// A schemas validation context

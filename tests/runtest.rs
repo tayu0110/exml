@@ -25,7 +25,7 @@ use exml::libxml::c14n::XmlC14NMode;
 #[cfg(feature = "schematron")]
 use exml::libxml::schematron::XmlSchematronPtr;
 #[cfg(feature = "schema")]
-use exml::libxml::xmlschemas::XmlSchemaPtr;
+use exml::xmlschemas::schema::XmlSchemaPtr;
 use exml::{
     SYSCONFDIR,
     error::{
@@ -3490,17 +3490,17 @@ unsafe fn schemas_test(
     _errr: Option<String>,
     options: i32,
 ) -> i32 {
-    use exml::{
-        libxml::xmlschemas::XmlSchemaPtr,
-        xmlschemas::context::{
+    use exml::xmlschemas::{
+        context::{
             XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_new_parser_ctxt,
         },
+        schema::xml_schema_free,
     };
 
     unsafe {
         use std::mem::zeroed;
 
-        use exml::libxml::xmlschemas::{xml_schema_free, xml_schema_parse};
+        use exml::libxml::xmlschemas::xml_schema_parse;
         use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
         let cfilename = CString::new(filename).unwrap();

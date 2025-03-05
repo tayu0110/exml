@@ -36,6 +36,8 @@ use std::{
 use crate::relaxng::{XmlRelaxNGValidCtxtPtr, xml_relaxng_new_parser_ctxt};
 #[cfg(feature = "libxml_reader")]
 use crate::tree::{XmlAttrPtr, XmlDocPtr};
+#[cfg(feature = "schema")]
+use crate::xmlschemas::schema::XmlSchemaPtr;
 use crate::{
     error::{
         XmlError, parser_error, parser_validity_error, parser_validity_warning, parser_warning,
@@ -64,10 +66,9 @@ use crate::{
             xml_xinclude_set_flags, xml_xinclude_set_streaming_mode,
         },
         xmlschemas::{
-            XmlSchemaPtr, XmlSchemaSAXPlugPtr, xml_schema_free, xml_schema_is_valid,
-            xml_schema_parse, xml_schema_sax_plug, xml_schema_sax_unplug,
-            xml_schema_set_valid_errors, xml_schema_set_valid_structured_errors,
-            xml_schema_validate_set_locator,
+            XmlSchemaSAXPlugPtr, xml_schema_is_valid, xml_schema_parse, xml_schema_sax_plug,
+            xml_schema_sax_unplug, xml_schema_set_valid_errors,
+            xml_schema_set_valid_structured_errors, xml_schema_validate_set_locator,
         },
         xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen},
     },
@@ -3196,7 +3197,7 @@ pub unsafe fn xml_new_text_reader_filename(uri: &str) -> XmlTextReaderPtr {
 #[doc(alias = "xmlFreeTextReader")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
-    use crate::xmlschemas::context::xml_schema_free_valid_ctxt;
+    use crate::xmlschemas::{context::xml_schema_free_valid_ctxt, schema::xml_schema_free};
 
     unsafe {
         use std::ptr::drop_in_place;
@@ -4917,9 +4918,12 @@ unsafe fn xml_text_reader_schema_validate_internal(
 ) -> i32 {
     use std::ffi::CStr;
 
-    use crate::xmlschemas::context::{
-        XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
-        xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
+    use crate::xmlschemas::{
+        context::{
+            XmlSchemaParserCtxtPtr, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
+            xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
+        },
+        schema::xml_schema_free,
     };
 
     unsafe {
@@ -5076,7 +5080,10 @@ pub unsafe fn xml_text_reader_schema_validate_ctxt(
 #[doc(alias = "xmlTextReaderSetSchema")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSchemaPtr) -> i32 {
-    use crate::xmlschemas::context::{xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt};
+    use crate::xmlschemas::{
+        context::{xml_schema_free_valid_ctxt, xml_schema_new_valid_ctxt},
+        schema::xml_schema_free,
+    };
 
     unsafe {
         if reader.is_null() {

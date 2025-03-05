@@ -31,10 +31,7 @@ use exml::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,
         },
-        xmlschemas::{
-            XmlSchemaPtr, xml_schema_free, xml_schema_parse, xml_schema_set_valid_errors,
-            xml_schema_validate_doc,
-        },
+        xmlschemas::{xml_schema_parse, xml_schema_set_valid_errors, xml_schema_validate_doc},
         xmlschemastypes::xml_schema_init_types,
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
     },
@@ -48,9 +45,12 @@ use exml::{
     },
     tree::{XmlGenericNodePtr, XmlNode, xml_free_doc},
     uri::build_uri,
-    xmlschemas::context::{
-        XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free_parser_ctxt,
-        xml_schema_free_valid_ctxt, xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
+    xmlschemas::{
+        context::{
+            XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr, xml_schema_free_parser_ctxt,
+            xml_schema_free_valid_ctxt, xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt,
+        },
+        schema::{XmlSchemaPtr, xml_schema_free},
     },
     xpath::{
         XmlXPathCompExprPtr, XmlXPathContext, XmlXPathObjectPtr, XmlXPathObjectType,

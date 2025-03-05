@@ -28,7 +28,6 @@ use crate::{
         xmlmodule::XmlModulePtr,
         xmlreader::{XmlTextReaderLocatorPtr, XmlTextReaderPtr},
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr, XmlRegexpPtr},
-        xmlschemas::XmlSchemaPtr,
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::XmlChar,
     },
@@ -48,6 +47,7 @@ use crate::{
     xmlschemas::{
         context::{XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr},
         items::XmlSchemaTypePtr,
+        schema::XmlSchemaPtr,
     },
 };
 
