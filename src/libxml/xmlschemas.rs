@@ -44,7 +44,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
             XmlHashTablePtr, xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create,
-            xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_scan,
+            xml_hash_free, xml_hash_lookup, xml_hash_lookup2,
         },
         parser::{
             XML_SAX2_MAGIC, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr,
@@ -243,7 +243,7 @@ pub type XmlSchemaValidityLocatorFunc =
 
 const UNBOUNDED: usize = 1 << 30;
 
-pub(crate) const XML_SCHEMAS_NO_NAMESPACE: &CStr = c"##";
+pub(crate) const XML_SCHEMAS_NO_NAMESPACE: &str = "##";
 
 // The XML Schemas namespaces
 pub(crate) const XML_SCHEMA_NS: &CStr = c"http://www.w3.org/2001/XMLSchema";
@@ -1155,7 +1155,9 @@ unsafe fn xml_schema_validate_notation(
                     CStr::from_ptr(local_name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                    ns_name,
+                    (!ns_name.is_null())
+                        .then(|| CStr::from_ptr(ns_name as *const i8).to_string_lossy())
+                        .as_deref(),
                 )
                 .is_null()
             {
@@ -1176,7 +1178,7 @@ unsafe fn xml_schema_validate_notation(
                 CStr::from_ptr(value as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                null_mut(),
+                None,
             )
             .is_null()
         {
@@ -3036,7 +3038,12 @@ unsafe fn xml_schema_bucket_create(
             (*WXS_CONSTRUCTOR!(pctxt)).main_bucket = ret;
             (*WXS_IMPBUCKET!(ret)).schema = main_schema;
             // Ensure that the main schema gets a target_namespace.
-            (*main_schema).target_namespace = target_namespace;
+            (*main_schema).target_namespace = (!target_namespace.is_null()).then(|| {
+                CStr::from_ptr(target_namespace as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+                    .into()
+            });
         } else if typ == XML_SCHEMA_SCHEMA_MAIN {
             PERROR_INT!(
                 pctxt,
@@ -3052,29 +3059,32 @@ unsafe fn xml_schema_bucket_create(
                 xml_schema_bucket_free(ret);
                 return null_mut();
             }
-            (*(*WXS_IMPBUCKET!(ret)).schema).target_namespace = target_namespace;
+            (*(*WXS_IMPBUCKET!(ret)).schema).target_namespace =
+                (!target_namespace.is_null()).then(|| {
+                    CStr::from_ptr(target_namespace as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                        .into()
+                });
         }
         if WXS_IS_BUCKET_IMPMAIN!(typ) {
-            // Imports go into the "schemas_imports" slot of the main *schema*.
-            // Note that we create an import entry for the main schema as well; i.e.,
-            // even if there's only one schema, we'll get an import.
-            if (*main_schema).schemas_imports.is_null() {
-                (*main_schema).schemas_imports = xml_hash_create(5);
-                if (*main_schema).schemas_imports.is_null() {
-                    xml_schema_bucket_free(ret);
-                    return null_mut();
-                }
-            }
-            let res = if target_namespace.is_null() {
-                xml_hash_add_entry(
-                    (*main_schema).schemas_imports,
-                    XML_SCHEMAS_NO_NAMESPACE.as_ptr() as _,
-                    ret as _,
-                )
+            let duplicate = if target_namespace.is_null() {
+                (*main_schema)
+                    .schemas_imports
+                    .insert(XML_SCHEMAS_NO_NAMESPACE.to_owned(), ret as _)
+                    .is_some()
             } else {
-                xml_hash_add_entry((*main_schema).schemas_imports, target_namespace, ret as _)
+                (*main_schema)
+                    .schemas_imports
+                    .insert(
+                        CStr::from_ptr(target_namespace as *const i8)
+                            .to_string_lossy()
+                            .into_owned(),
+                        ret as _,
+                    )
+                    .is_some()
             };
-            if res != 0 {
+            if duplicate {
                 PERROR_INT!(
                     pctxt,
                     "xmlSchemaBucketCreate",
@@ -11849,7 +11859,11 @@ unsafe fn xml_schema_resolve_element_references(
                 CStr::from_ptr((*elem_decl).named_type as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (*elem_decl).named_type_ns,
+                (!(*elem_decl).named_type_ns.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*elem_decl).named_type_ns as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
             );
             if typ.is_null() {
                 xml_schema_pres_comp_attr_err(
@@ -11882,7 +11896,11 @@ unsafe fn xml_schema_resolve_element_references(
                 CStr::from_ptr((*elem_decl).subst_group as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (*elem_decl).subst_group_ns,
+                (!(*elem_decl).subst_group_ns.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*elem_decl).subst_group_ns as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
             );
             if subst_head.is_null() {
                 xml_schema_pres_comp_attr_err(
@@ -11970,7 +11988,9 @@ unsafe fn xml_schema_resolve_union_member_types(
 
             member_type = (*(*ctxt).schema).get_type(
                 CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                ns_name,
+                (!ns_name.is_null())
+                    .then(|| CStr::from_ptr(ns_name as *const i8).to_string_lossy())
+                    .as_deref(),
             );
             if member_type.is_null() || !wxs_is_simple(member_type) {
                 xml_schema_pres_comp_attr_err(
@@ -12042,7 +12062,9 @@ unsafe fn xml_schema_resolve_type_references(
                 CStr::from_ptr((*type_def).base as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (*type_def).base_ns,
+                (!(*type_def).base_ns.is_null())
+                    .then(|| CStr::from_ptr((*type_def).base_ns as *const i8).to_string_lossy())
+                    .as_deref(),
             );
             if (*type_def).base_type.is_null() {
                 xml_schema_pres_comp_attr_err(
@@ -12074,7 +12096,11 @@ unsafe fn xml_schema_resolve_type_references(
                         CStr::from_ptr((*type_def).base as *const i8)
                             .to_string_lossy()
                             .as_ref(),
-                        (*type_def).base_ns,
+                        (!(*type_def).base_ns.is_null())
+                            .then(|| {
+                                CStr::from_ptr((*type_def).base_ns as *const i8).to_string_lossy()
+                            })
+                            .as_deref(),
                     );
 
                     if (*type_def).subtypes.is_null() || !wxs_is_simple((*type_def).subtypes) {
@@ -12123,7 +12149,11 @@ unsafe fn xml_schema_resolve_type_references(
                 CStr::from_ptr((*refe).name as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (*refe).target_namespace,
+                (!(*refe).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*refe).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
             ) as XmlSchemaModelGroupDefPtr;
             if group_def.is_null() {
                 xml_schema_pres_comp_attr_err(
@@ -12201,7 +12231,9 @@ unsafe fn xml_schema_resolve_attr_type_references(
                 CStr::from_ptr((*item).type_name as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (*item).type_ns,
+                (!(*item).type_ns.is_null())
+                    .then(|| CStr::from_ptr((*item).type_ns as *const i8).to_string_lossy())
+                    .as_deref(),
             );
             if typ.is_null() || !wxs_is_simple(typ) {
                 xml_schema_pres_comp_attr_err(
@@ -12255,7 +12287,11 @@ unsafe fn xml_schema_resolve_attr_use_references(
                 CStr::from_ptr((*refe).name as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (*refe).target_namespace,
+                (!(*refe).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*refe).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
             );
             if (*ause).attr_decl.is_null() {
                 xml_schema_pres_comp_attr_err(
@@ -12296,7 +12332,9 @@ unsafe fn xml_schema_resolve_attr_group_references(
             CStr::from_ptr((*refe).name as *const i8)
                 .to_string_lossy()
                 .as_ref(),
-            (*refe).target_namespace,
+            (!(*refe).target_namespace.is_null())
+                .then(|| CStr::from_ptr((*refe).target_namespace as *const i8).to_string_lossy())
+                .as_deref(),
         );
         if group.is_null() {
             xml_schema_pres_comp_attr_err(
@@ -12354,7 +12392,11 @@ unsafe fn xml_schema_resolve_model_group_particle_references(
                     CStr::from_ptr((*refe).name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                    (*refe).target_namespace,
+                    (!(*refe).target_namespace.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*refe).target_namespace as *const i8).to_string_lossy()
+                        })
+                        .as_deref(),
                 );
                 if ref_item.is_null() {
                     xml_schema_pres_comp_attr_err(
@@ -12443,7 +12485,12 @@ unsafe fn xml_schema_resolve_idckey_references(
                 CStr::from_ptr((*(*idc).refe).name as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (*(*idc).refe).target_namespace,
+                (!(*(*idc).refe).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*(*idc).refe).target_namespace as *const i8)
+                            .to_string_lossy()
+                    })
+                    .as_deref(),
             ) as XmlSchemaBasicItemPtr;
             if (*(*idc).refe).item.is_null() {
                 // TODO: It is actually not an error to fail to resolve
@@ -12524,7 +12571,11 @@ unsafe fn xml_schema_resolve_attr_use_prohib_references(
                 CStr::from_ptr((*prohib).name as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (*prohib).target_namespace,
+                (!(*prohib).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*prohib).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
             )
             .is_null()
         {
@@ -20039,13 +20090,10 @@ pub(crate) unsafe fn xml_schema_clear_elem_info(
 
 /// Creates an augmented IDC definition for the imported schema.
 #[doc(alias = "xmlSchemaAugmentImportedIDC")]
-extern "C" fn xml_schema_augment_imported_idc(
-    payload: *mut c_void,
-    data: *mut c_void,
-    _name: *const XmlChar,
+unsafe fn xml_schema_augment_imported_idc(
+    imported: XmlSchemaImportPtr,
+    vctxt: XmlSchemaValidCtxtPtr,
 ) {
-    let imported: XmlSchemaImportPtr = payload as XmlSchemaImportPtr;
-    let vctxt: XmlSchemaValidCtxtPtr = data as XmlSchemaValidCtxtPtr;
     unsafe {
         for &idc_def in (*(*imported).schema).idc_def.values() {
             let aidc: XmlSchemaIDCAugPtr =
@@ -20147,11 +20195,11 @@ unsafe fn xml_schema_pre_run(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
         }
         // Augment the IDC definitions for the main schema and all imported ones
         // NOTE: main schema if the first in the imported list
-        xml_hash_scan(
-            (*(*vctxt).schema).schemas_imports,
-            Some(xml_schema_augment_imported_idc),
-            vctxt as _,
-        );
+        for &imported in (*(*vctxt).schema).schemas_imports.values() {
+            if !imported.is_null() {
+                xml_schema_augment_imported_idc(imported, vctxt);
+            }
+        }
 
         0
     }
@@ -20715,7 +20763,9 @@ unsafe fn xml_schema_process_xsi_type(
                 CStr::from_ptr(local as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                ns_name,
+                (!ns_name.is_null())
+                    .then(|| CStr::from_ptr(ns_name as *const i8).to_string_lossy())
+                    .as_deref(),
             );
             if (*local_type).is_null() {
                 let qname = xml_schema_format_qname(
@@ -20886,7 +20936,11 @@ unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                    (*(*vctxt).inode).ns_name,
+                    (!(*(*vctxt).inode).ns_name.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*(*vctxt).inode).ns_name as *const i8).to_string_lossy()
+                        })
+                        .as_deref(),
                 );
 
                 if (*(*vctxt).inode).decl.is_null() {
@@ -21099,7 +21153,11 @@ unsafe fn xml_schema_validate_elem_wildcard(vctxt: XmlSchemaValidCtxtPtr, skip: 
                 CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (*(*vctxt).inode).ns_name,
+                (!(*(*vctxt).inode).ns_name.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*(*vctxt).inode).ns_name as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
             );
             if !decl.is_null() {
                 (*(*vctxt).inode).decl = decl;
@@ -22518,7 +22576,11 @@ unsafe fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         CStr::from_ptr((*iattr).local_name as *const i8)
                             .to_string_lossy()
                             .as_ref(),
-                        (*iattr).ns_name,
+                        (!(*iattr).ns_name.is_null())
+                            .then(|| {
+                                CStr::from_ptr((*iattr).ns_name as *const i8).to_string_lossy()
+                            })
+                            .as_deref(),
                     );
                     if !(*iattr).decl.is_null() {
                         (*iattr).state = XML_SCHEMAS_ATTR_ASSESSED;
@@ -23050,11 +23112,11 @@ unsafe fn xml_schema_validate_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
             }
             // Augment the IDC definitions for the main schema and all imported ones
             // NOTE: main schema is the first in the imported list
-            xml_hash_scan(
-                (*(*vctxt).schema).schemas_imports,
-                Some(xml_schema_augment_imported_idc),
-                vctxt as _,
-            );
+            for &imported in (*(*vctxt).schema).schemas_imports.values() {
+                if !imported.is_null() {
+                    xml_schema_augment_imported_idc(imported, vctxt);
+                }
+            }
         }
         'goto_exit: {
             if (*vctxt).depth > 0 {
@@ -23090,7 +23152,11 @@ unsafe fn xml_schema_validate_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                    (*(*vctxt).inode).ns_name,
+                    (!(*(*vctxt).inode).ns_name.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*(*vctxt).inode).ns_name as *const i8).to_string_lossy()
+                        })
+                        .as_deref(),
                 );
                 if (*(*vctxt).inode).decl.is_null() {
                     ret = XmlParserErrors::XmlSchemavCvcElt1 as i32;

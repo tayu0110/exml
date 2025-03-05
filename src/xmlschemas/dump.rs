@@ -417,12 +417,8 @@ pub unsafe fn xml_schema_dump<'a>(output: &mut (impl Write + 'a), schema: XmlSch
         } else {
             write!(output, "no name, ");
         }
-        if !(*schema).target_namespace.is_null() {
-            write!(
-                output,
-                "{}",
-                CStr::from_ptr((*schema).target_namespace as *const i8).to_string_lossy()
-            );
+        if let Some(target_namespace) = (*schema).target_namespace.as_deref() {
+            write!(output, "{}", target_namespace);
         } else {
             write!(output, "no target namespace");
         }
