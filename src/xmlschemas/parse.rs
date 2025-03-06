@@ -1,9 +1,7 @@
-use std::{
-    ffi::{CStr, CString},
-    ptr::null_mut,
-};
+use std::{ffi::CString, ptr::null_mut};
 
 use crate::{
+    dict::xml_dict_lookup,
     error::XmlParserErrors,
     libxml::{
         schemas_internals::{
@@ -256,7 +254,6 @@ impl XmlSchemaParserCtxt {
     #[doc(alias = "xmlSchemaParseSchemaElement")]
     unsafe fn parse_schema_element(&mut self, schema: XmlSchemaPtr, node: XmlNodePtr) -> i32 {
         unsafe {
-            let mut val: *const u8;
             let mut res: i32;
             let old_errs: i32 = self.nberrors;
 
@@ -296,9 +293,10 @@ impl XmlSchemaParserCtxt {
                         }
                     }
                     if let Some(attr) = xml_schema_get_prop_node(node, "elementFormDefault") {
-                        val = self.get_node_content(Some(attr.into()));
+                        let val = self.get_node_content(Some(attr.into()));
+                        let cval = xml_dict_lookup(self.dict, val.as_ptr(), val.len() as i32);
                         res = xml_schema_pval_attr_form_default(
-                            val,
+                            cval,
                             &raw mut (*schema).flags,
                             XML_SCHEMAS_QUALIF_ELEM,
                         );
@@ -306,7 +304,6 @@ impl XmlSchemaParserCtxt {
                             break 'exit_failure;
                         };
                         if res != 0 {
-                            let val = CStr::from_ptr(val as *const i8).to_string_lossy();
                             xml_schema_psimple_type_err(
                                 self,
                                 XmlParserErrors::XmlSchemapElemFormDefaultValue,
@@ -322,9 +319,10 @@ impl XmlSchemaParserCtxt {
                         }
                     }
                     if let Some(attr) = xml_schema_get_prop_node(node, "attributeFormDefault") {
-                        val = self.get_node_content(Some(attr.into()));
+                        let val = self.get_node_content(Some(attr.into()));
+                        let cval = xml_dict_lookup(self.dict, val.as_ptr(), val.len() as i32);
                         res = xml_schema_pval_attr_form_default(
-                            val,
+                            cval,
                             &raw mut (*schema).flags,
                             XML_SCHEMAS_QUALIF_ATTR,
                         );
@@ -332,7 +330,6 @@ impl XmlSchemaParserCtxt {
                             break 'exit_failure;
                         };
                         if res != 0 {
-                            let val = CStr::from_ptr(val as *const i8).to_string_lossy();
                             xml_schema_psimple_type_err(
                                 self,
                                 XmlParserErrors::XmlSchemapAttrFormDefaultValue,
@@ -348,9 +345,10 @@ impl XmlSchemaParserCtxt {
                         }
                     }
                     if let Some(attr) = xml_schema_get_prop_node(node, "finalDefault") {
-                        val = self.get_node_content(Some(attr.into()));
+                        let val = self.get_node_content(Some(attr.into()));
+                        let cval = xml_dict_lookup(self.dict, val.as_ptr(), val.len() as i32);
                         res = xml_schema_pval_attr_block_final(
-                            val,
+                            cval,
                             &raw mut (*schema).flags,
                             -1,
                             XML_SCHEMAS_FINAL_DEFAULT_EXTENSION,
@@ -363,7 +361,6 @@ impl XmlSchemaParserCtxt {
                             break 'exit_failure;
                         };
                         if res != 0 {
-                            let val = CStr::from_ptr(val as *const i8).to_string_lossy();
                             xml_schema_psimple_type_err(
                                 self,
                                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
@@ -379,9 +376,10 @@ impl XmlSchemaParserCtxt {
                         }
                     }
                     if let Some(attr) = xml_schema_get_prop_node(node, "blockDefault") {
-                        val = self.get_node_content(Some(attr.into()));
+                        let val = self.get_node_content(Some(attr.into()));
+                        let cval = xml_dict_lookup(self.dict, val.as_ptr(), val.len() as i32);
                         res = xml_schema_pval_attr_block_final(
-                            val,
+                            cval,
                             &raw mut (*schema).flags,
                             -1,
                             XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION,
@@ -394,7 +392,6 @@ impl XmlSchemaParserCtxt {
                             break 'exit_failure;
                         };
                         if res != 0 {
-                            let val = CStr::from_ptr(val as *const i8).to_string_lossy();
                             xml_schema_psimple_type_err(
                                 self,
                                 XmlParserErrors::XmlSchemapS4sAttrInvalidValue,

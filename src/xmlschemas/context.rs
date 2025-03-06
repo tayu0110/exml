@@ -33,7 +33,7 @@ use crate::{
 };
 
 use super::{
-    error::{xml_schema_internal_err, xml_schema_perr_memory},
+    error::xml_schema_internal_err,
     item_list::{XmlSchemaItemListPtr, xml_schema_item_list_create},
     items::{XmlSchemaAttributeUseProhibPtr, XmlSchemaTypePtr},
     schema::XmlSchemaPtr,
@@ -92,16 +92,8 @@ pub struct XmlSchemaParserCtxt {
 
 impl XmlSchemaParserCtxt {
     #[doc(alias = "xmlSchemaGetNodeContent")]
-    pub(crate) unsafe fn get_node_content(&self, node: Option<XmlGenericNodePtr>) -> *const u8 {
-        unsafe {
-            let val = node.and_then(|node| node.get_content()).unwrap_or_default();
-            let val = CString::new(val).unwrap();
-            let ret: *const u8 = xml_dict_lookup(self.dict, val.as_ptr() as *const u8, -1);
-            if ret.is_null() {
-                xml_schema_perr_memory(self as *const Self as _, "getting node content", node);
-            }
-            ret
-        }
+    pub(crate) unsafe fn get_node_content(&self, node: Option<XmlGenericNodePtr>) -> String {
+        unsafe { node.and_then(|node| node.get_content()).unwrap_or_default() }
     }
 
     /// Read a attribute value and internalize the string
