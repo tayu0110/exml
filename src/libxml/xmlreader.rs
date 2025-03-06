@@ -66,9 +66,9 @@ use crate::{
             xml_xinclude_set_flags, xml_xinclude_set_streaming_mode,
         },
         xmlschemas::{
-            XmlSchemaSAXPlugPtr, xml_schema_is_valid, xml_schema_parse, xml_schema_sax_plug,
-            xml_schema_sax_unplug, xml_schema_set_valid_errors,
-            xml_schema_set_valid_structured_errors, xml_schema_validate_set_locator,
+            XmlSchemaSAXPlugPtr, xml_schema_is_valid, xml_schema_sax_plug, xml_schema_sax_unplug,
+            xml_schema_set_valid_errors, xml_schema_set_valid_structured_errors,
+            xml_schema_validate_set_locator,
         },
         xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen},
     },
@@ -4976,7 +4976,7 @@ unsafe fn xml_text_reader_schema_validate_internal(
                     Some(ctx.clone()),
                 );
             }
-            (*reader).xsd_schemas = xml_schema_parse(pctxt);
+            (*reader).xsd_schemas = (*pctxt).parse();
             xml_schema_free_parser_ctxt(pctxt);
             if (*reader).xsd_schemas.is_null() {
                 return -1;

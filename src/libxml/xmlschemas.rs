@@ -113,13 +113,12 @@ use crate::{
             xml_schema_compare_values, xml_schema_compare_values_whtsp, xml_schema_copy_value,
             xml_schema_free_facet, xml_schema_free_value, xml_schema_get_built_in_type,
             xml_schema_get_canon_value, xml_schema_get_predefined_type, xml_schema_get_val_type,
-            xml_schema_init_types, xml_schema_is_built_in_type_facet, xml_schema_new_facet,
-            xml_schema_new_notation_value, xml_schema_new_qname_value,
-            xml_schema_val_predef_type_node, xml_schema_val_predef_type_node_no_norm,
-            xml_schema_validate_facet_whtsp, xml_schema_validate_length_facet_whtsp,
-            xml_schema_validate_list_simple_type_facet, xml_schema_value_append,
-            xml_schema_value_get_as_boolean, xml_schema_value_get_as_string,
-            xml_schema_value_get_next,
+            xml_schema_is_built_in_type_facet, xml_schema_new_facet, xml_schema_new_notation_value,
+            xml_schema_new_qname_value, xml_schema_val_predef_type_node,
+            xml_schema_val_predef_type_node_no_norm, xml_schema_validate_facet_whtsp,
+            xml_schema_validate_length_facet_whtsp, xml_schema_validate_list_simple_type_facet,
+            xml_schema_value_append, xml_schema_value_get_as_boolean,
+            xml_schema_value_get_as_string, xml_schema_value_get_next,
         },
         xmlstring::{
             XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
@@ -156,6 +155,7 @@ use crate::{
             xml_schema_pres_comp_attr_err, xml_schema_psimple_internal_err,
             xml_schema_psimple_type_err, xml_schema_simple_type_err, xml_schema_verr_memory,
         },
+        is_schema,
         item_list::{XmlSchemaItemListPtr, xml_schema_item_list_create, xml_schema_item_list_free},
         items::{
             XmlSchemaAnnotItemPtr, XmlSchemaAttribute, XmlSchemaAttributeGroup,
@@ -453,15 +453,6 @@ macro_rules! WXS_ILIST_IS_EMPTY {
 }
 // Misc macros.
 
-unsafe fn is_schema(node: Option<XmlNodePtr>, r#type: &str) -> bool {
-    node.is_some_and(|node| {
-        node.name().as_deref() == Some(r#type)
-            && node.ns.is_some_and(|ns| unsafe {
-                ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap())
-            })
-    })
-}
-
 macro_rules! FREE_AND_NULL {
     ($str:expr) => {
         if !$str.is_null() {
@@ -534,7 +525,7 @@ pub struct XmlSchemaAbstractCtxt {
     pub(crate) dummy: *mut c_void, /* Fix alignment issues */
 }
 
-const XML_SCHEMA_SCHEMA_MAIN: i32 = 0;
+pub(crate) const XML_SCHEMA_SCHEMA_MAIN: i32 = 0;
 const XML_SCHEMA_SCHEMA_IMPORT: i32 = 1;
 const XML_SCHEMA_SCHEMA_INCLUDE: i32 = 2;
 const XML_SCHEMA_SCHEMA_REDEFINE: i32 = 3;
@@ -563,11 +554,11 @@ pub struct XmlSchemaBucket {
     flags: i32,
     schema_location: *const XmlChar,
     orig_target_namespace: *const XmlChar,
-    target_namespace: *const XmlChar,
-    doc: Option<XmlDocPtr>,
+    pub(crate) target_namespace: *const XmlChar,
+    pub(crate) doc: Option<XmlDocPtr>,
     relations: XmlSchemaSchemaRelationPtr,
     located: i32,
-    parsed: i32,
+    pub(crate) parsed: i32,
     imported: i32,
     preserve_doc: i32,
     globals: XmlSchemaItemListPtr<*mut c_void>, /* Global components. */
@@ -651,14 +642,14 @@ pub type XmlSchemaConstructionCtxtPtr = *mut XmlSchemaConstructionCtxt;
 #[doc(alias = "xmlSchemaConstructionCtxt")]
 #[repr(C)]
 pub struct XmlSchemaConstructionCtxt {
-    main_schema: XmlSchemaPtr,       /* The main schema. */
-    main_bucket: XmlSchemaBucketPtr, /* The main schema bucket */
+    pub(crate) main_schema: XmlSchemaPtr, /* The main schema. */
+    pub(crate) main_bucket: XmlSchemaBucketPtr, /* The main schema bucket */
     dict: XmlDictPtr,
     buckets: XmlSchemaItemListPtr<*mut c_void>, /* List of schema buckets. */
     // xmlSchemaItemListPtr relations; /* List of schema relations. */
-    bucket: XmlSchemaBucketPtr, /* The current schema bucket */
+    pub(crate) bucket: XmlSchemaBucketPtr, /* The current schema bucket */
     pending: XmlSchemaItemListPtr<*mut c_void>, /* All Components of all schemas that
-                                need to be fixed. */
+                                           need to be fixed. */
     subst_groups: XmlHashTablePtr,
     redefs: XmlSchemaRedefPtr,
     last_redef: XmlSchemaRedefPtr,
@@ -2467,7 +2458,9 @@ pub(crate) unsafe fn xml_schema_construction_ctxt_free(con: XmlSchemaConstructio
     }
 }
 
-unsafe fn xml_schema_construction_ctxt_create(dict: XmlDictPtr) -> XmlSchemaConstructionCtxtPtr {
+pub(crate) unsafe fn xml_schema_construction_ctxt_create(
+    dict: XmlDictPtr,
+) -> XmlSchemaConstructionCtxtPtr {
     unsafe {
         let ret: XmlSchemaConstructionCtxtPtr =
             xml_malloc(size_of::<XmlSchemaConstructionCtxt>()) as XmlSchemaConstructionCtxtPtr;
@@ -3132,7 +3125,7 @@ unsafe fn xml_schema_bucket_create(
 /// -1 in case of an internal or API error.
 #[doc(alias = "xmlSchemaAddSchemaDoc")]
 #[allow(clippy::too_many_arguments)]
-unsafe fn xml_schema_add_schema_doc(
+pub(crate) unsafe fn xml_schema_add_schema_doc(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: i32, /* import or include or redefine */
     mut schema_location: *const XmlChar,
@@ -3609,7 +3602,7 @@ unsafe fn xml_schema_add_schema_doc(
 ///
 /// Returns the attribute or NULL if not present.
 #[doc(alias = "xmlSchemaGetPropNode")]
-unsafe fn xml_schema_get_prop_node(node: XmlNodePtr, name: &str) -> Option<XmlAttrPtr> {
+pub(crate) unsafe fn xml_schema_get_prop_node(node: XmlNodePtr, name: &str) -> Option<XmlAttrPtr> {
     let mut prop = node.properties;
     while let Some(now) = prop {
         if now.ns.is_none() && now.name().as_deref() == Some(name) {
@@ -3699,7 +3692,7 @@ unsafe fn xml_schema_pval_attr_node_id(
     }
 }
 
-unsafe fn xml_schema_pval_attr_id(
+pub(crate) unsafe fn xml_schema_pval_attr_id(
     ctxt: XmlSchemaParserCtxtPtr,
     owner_elem: XmlNodePtr,
     name: &str,
@@ -3709,21 +3702,6 @@ unsafe fn xml_schema_pval_attr_id(
             return 0;
         };
         xml_schema_pval_attr_node_id(ctxt, Some(attr))
-    }
-}
-
-unsafe fn xml_schema_get_node_content(
-    ctxt: XmlSchemaParserCtxtPtr,
-    node: Option<XmlGenericNodePtr>,
-) -> *const XmlChar {
-    unsafe {
-        let val = node.and_then(|node| node.get_content()).unwrap_or_default();
-        let val = CString::new(val).unwrap();
-        let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, val.as_ptr() as *const u8, -1);
-        if ret.is_null() {
-            xml_schema_perr_memory(ctxt, "getting node content", node);
-        }
-        ret
     }
 }
 
@@ -3817,7 +3795,7 @@ unsafe fn xml_schema_pval_attr_node_value(
 /// Returns 0 if the value is valid, a positive error code
 /// number otherwise and -1 in case of an internal or API error.
 #[doc(alias = "xmlSchemaPValAttrNode")]
-unsafe fn xml_schema_pval_attr_node(
+pub(crate) unsafe fn xml_schema_pval_attr_node(
     ctxt: XmlSchemaParserCtxtPtr,
     owner_item: XmlSchemaBasicItemPtr,
     attr: XmlAttrPtr,
@@ -3829,7 +3807,7 @@ unsafe fn xml_schema_pval_attr_node(
             return -1;
         }
 
-        let val: *const XmlChar = xml_schema_get_node_content(ctxt, Some(attr.into()));
+        let val: *const XmlChar = (*ctxt).get_node_content(Some(attr.into()));
         if !value.is_null() {
             *value = val;
         }
@@ -3840,7 +3818,7 @@ unsafe fn xml_schema_pval_attr_node(
 
 /// Returns 0 if the value is valid, 1 otherwise.
 #[doc(alias = "xmlSchemaPValAttrFormDefault")]
-unsafe fn xml_schema_pval_attr_form_default(
+pub(crate) unsafe fn xml_schema_pval_attr_form_default(
     value: *const XmlChar,
     flags: *mut i32,
     flag_qualified: i32,
@@ -3864,7 +3842,7 @@ unsafe fn xml_schema_pval_attr_form_default(
 /// Returns 0 if the value is valid, 1 otherwise.
 #[doc(alias = "xmlSchemaPValAttrBlockFinal")]
 #[allow(clippy::too_many_arguments)]
-unsafe fn xml_schema_pval_attr_block_final(
+pub(crate) unsafe fn xml_schema_pval_attr_block_final(
     value: *const XmlChar,
     flags: *mut i32,
     flag_all: i32,
@@ -3979,166 +3957,6 @@ unsafe fn xml_schema_pval_attr_block_final(
     }
 }
 
-unsafe fn xml_schema_parse_schema_element(
-    ctxt: XmlSchemaParserCtxtPtr,
-    schema: XmlSchemaPtr,
-    node: XmlNodePtr,
-) -> i32 {
-    unsafe {
-        let mut val: *const XmlChar;
-        let mut res: i32;
-        let old_errs: i32 = (*ctxt).nberrors;
-
-        // Those flags should be moved to the parser context flags,
-        // since they are not visible at the component level. I.e.
-        // they are used if processing schema *documents* only.
-        'exit_failure: {
-            res = xml_schema_pval_attr_id(ctxt, node, "id");
-            HFAILURE!(res, 'exit_failure);
-
-            // Since the version is of type xs:token, we won't bother to check it.
-            // REMOVED:
-            // attr = xmlSchemaGetPropNode(node, c"version".as_ptr() as _);
-            // if !attr.is_null() {
-            //     res = xmlSchemaPValAttrNode(ctxt, null_mut(), NULL, attr, xmlSchemaGetBuiltInType(XML_SCHEMAS_TOKEN), &val);
-            //     if res == -1 {
-            //         goto exit_failure;
-            //     }
-            // }
-            'exit: {
-                if let Some(attr) = xml_schema_get_prop_node(node, "targetNamespace") {
-                    res = xml_schema_pval_attr_node(
-                        ctxt,
-                        null_mut(),
-                        attr,
-                        xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnyURI),
-                        null_mut(),
-                    );
-                    HFAILURE!(res, 'exit_failure);
-                    if res != 0 {
-                        (*ctxt).stop = XmlParserErrors::XmlSchemapS4sAttrInvalidValue as i32;
-                        break 'exit;
-                    }
-                }
-                if let Some(attr) = xml_schema_get_prop_node(node, "elementFormDefault") {
-                    val = xml_schema_get_node_content(ctxt, Some(attr.into()));
-                    res = xml_schema_pval_attr_form_default(
-                        val,
-                        &raw mut (*schema).flags,
-                        XML_SCHEMAS_QUALIF_ELEM,
-                    );
-                    HFAILURE!(res, 'exit_failure);
-                    if res != 0 {
-                        let val = CStr::from_ptr(val as *const i8).to_string_lossy();
-                        xml_schema_psimple_type_err(
-                            ctxt,
-                            XmlParserErrors::XmlSchemapElemFormDefaultValue,
-                            null_mut(),
-                            attr.into(),
-                            null_mut(),
-                            Some("(qualified | unqualified)"),
-                            Some(&val),
-                            None,
-                            None,
-                            None,
-                        );
-                    }
-                }
-                if let Some(attr) = xml_schema_get_prop_node(node, "attributeFormDefault") {
-                    val = xml_schema_get_node_content(ctxt, Some(attr.into()));
-                    res = xml_schema_pval_attr_form_default(
-                        val,
-                        &raw mut (*schema).flags,
-                        XML_SCHEMAS_QUALIF_ATTR,
-                    );
-                    HFAILURE!(res, 'exit_failure);
-                    if res != 0 {
-                        let val = CStr::from_ptr(val as *const i8).to_string_lossy();
-                        xml_schema_psimple_type_err(
-                            ctxt,
-                            XmlParserErrors::XmlSchemapAttrFormDefaultValue,
-                            null_mut(),
-                            attr.into(),
-                            null_mut(),
-                            Some("(qualified | unqualified)"),
-                            Some(&val),
-                            None,
-                            None,
-                            None,
-                        );
-                    }
-                }
-                if let Some(attr) = xml_schema_get_prop_node(node, "finalDefault") {
-                    val = xml_schema_get_node_content(ctxt, Some(attr.into()));
-                    res = xml_schema_pval_attr_block_final(
-                        val,
-                        &raw mut (*schema).flags,
-                        -1,
-                        XML_SCHEMAS_FINAL_DEFAULT_EXTENSION,
-                        XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION,
-                        -1,
-                        XML_SCHEMAS_FINAL_DEFAULT_LIST,
-                        XML_SCHEMAS_FINAL_DEFAULT_UNION,
-                    );
-                    HFAILURE!(res, 'exit_failure);
-                    if res != 0 {
-                        let val = CStr::from_ptr(val as *const i8).to_string_lossy();
-                        xml_schema_psimple_type_err(
-                            ctxt,
-                            XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
-                            null_mut(),
-                            attr.into(),
-                            null_mut(),
-                            Some("(#all | List of (extension | restriction | list | union))"),
-                            Some(&val),
-                            None,
-                            None,
-                            None,
-                        );
-                    }
-                }
-                if let Some(attr) = xml_schema_get_prop_node(node, "blockDefault") {
-                    val = xml_schema_get_node_content(ctxt, Some(attr.into()));
-                    res = xml_schema_pval_attr_block_final(
-                        val,
-                        &raw mut (*schema).flags,
-                        -1,
-                        XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION,
-                        XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION,
-                        XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION,
-                        -1,
-                        -1,
-                    );
-                    HFAILURE!(res, 'exit_failure);
-                    if res != 0 {
-                        let val = CStr::from_ptr(val as *const i8).to_string_lossy();
-                        xml_schema_psimple_type_err(
-                            ctxt,
-                            XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
-                            null_mut(),
-                            attr.into(),
-                            null_mut(),
-                            Some("(#all | List of (extension | restriction | substitution))"),
-                            Some(&val),
-                            None,
-                            None,
-                            None,
-                        );
-                    }
-                }
-            }
-
-            // exit:
-            if old_errs != (*ctxt).nberrors {
-                res = (*ctxt).err;
-            }
-            return res;
-        }
-        // exit_failure:
-        -1
-    }
-}
-
 /// Allocate a new annotation structure.
 ///
 /// Returns the newly allocated structure or NULL in case or error
@@ -4239,7 +4057,7 @@ unsafe fn xml_schema_get_prop_node_ns(
 ///
 /// Returns -1 in case of error, 0 if the declaration is improper and 1 in case of success.
 #[doc(alias = "xmlSchemaParseAnnotation")]
-unsafe fn xml_schema_parse_annotation(
+pub(crate) unsafe fn xml_schema_parse_annotation(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
     needed: i32,
@@ -4456,7 +4274,7 @@ unsafe fn xml_schema_parse_new_doc(
         (*newpctxt).set_structured_errors((*pctxt).serror, (*pctxt).err_ctxt.clone());
         (*newpctxt).counter = (*pctxt).counter;
 
-        let res: i32 = xml_schema_parse_new_doc_with_context(newpctxt, schema, bucket);
+        let res: i32 = (*newpctxt).parse_new_doc_with_context(schema, bucket);
 
         // Channel back errors and cleanup the temporary parser context.
         if res != 0 {
@@ -4792,7 +4610,7 @@ unsafe fn xml_schema_pval_attr_node_qname(
     local: *mut *const XmlChar,
 ) -> i32 {
     unsafe {
-        let value: *const XmlChar = xml_schema_get_node_content(ctxt, Some(attr.into()));
+        let value: *const XmlChar = (*ctxt).get_node_content(Some(attr.into()));
         xml_schema_pval_attr_node_qname_value(ctxt, schema, owner_item, attr, value, uri, local)
     }
 }
@@ -4983,7 +4801,7 @@ unsafe fn xml_get_min_occurs(
         let Some(attr) = xml_schema_get_prop_node(node, "minOccurs") else {
             return def;
         };
-        let val: *const XmlChar = xml_schema_get_node_content(ctxt, Some(attr.into()));
+        let val: *const XmlChar = (*ctxt).get_node_content(Some(attr.into()));
         if val.is_null() {
             return def;
         }
@@ -5066,7 +4884,7 @@ unsafe fn xml_get_max_occurs(
         let Some(attr) = xml_schema_get_prop_node(node, "maxOccurs") else {
             return def;
         };
-        let val: *const XmlChar = xml_schema_get_node_content(ctxt, Some(attr.into()));
+        let val: *const XmlChar = (*ctxt).get_node_content(Some(attr.into()));
         if val.is_null() {
             return def;
         }
@@ -5713,7 +5531,7 @@ unsafe fn xml_schema_parse_local_attribute(
                     } else if xml_str_equal(cur_attr.name, c"form".as_ptr() as _) {
                         // Evaluate the target namespace
                         has_form = 1;
-                        attr_value = xml_schema_get_node_content(pctxt, Some(cur_attr.into()));
+                        attr_value = (*pctxt).get_node_content(Some(cur_attr.into()));
                         if xml_str_equal(attr_value, c"qualified".as_ptr() as _) {
                             ns = (*pctxt).target_namespace;
                         } else if !xml_str_equal(attr_value, c"unqualified".as_ptr() as _) {
@@ -5735,7 +5553,7 @@ unsafe fn xml_schema_parse_local_attribute(
                         break 'attr_next;
                     }
                     if xml_str_equal(cur_attr.name, c"use".as_ptr() as _) {
-                        attr_value = xml_schema_get_node_content(pctxt, Some(cur_attr.into()));
+                        attr_value = (*pctxt).get_node_content(Some(cur_attr.into()));
                         // TODO: Maybe we need to normalize the value beforehand.
                         if xml_str_equal(attr_value, c"optional".as_ptr() as _) {
                             occurs = XML_SCHEMAS_ATTR_USE_OPTIONAL;
@@ -5773,7 +5591,7 @@ unsafe fn xml_schema_parse_local_attribute(
                                 c"fixed".as_ptr() as _,
                             );
                         } else {
-                            def_value = xml_schema_get_node_content(pctxt, Some(cur_attr.into()));
+                            def_value = (*pctxt).get_node_content(Some(cur_attr.into()));
                             def_value_type = WXS_ATTR_DEF_VAL_DEFAULT;
                         }
                         break 'attr_next;
@@ -5790,7 +5608,7 @@ unsafe fn xml_schema_parse_local_attribute(
                                 c"fixed".as_ptr() as _,
                             );
                         } else {
-                            def_value = xml_schema_get_node_content(pctxt, Some(cur_attr.into()));
+                            def_value = (*pctxt).get_node_content(Some(cur_attr.into()));
                             def_value_type = WXS_ATTR_DEF_VAL_FIXED;
                         }
                         break 'attr_next;
@@ -6435,7 +6253,7 @@ unsafe fn xml_schema_parse_wildcard_ns(
         }
         // Build the namespace constraints.
         let attr = xml_schema_get_prop_node(node, "namespace");
-        let ns: *const XmlChar = xml_schema_get_node_content(ctxt, attr.map(|attr| attr.into()));
+        let ns: *const XmlChar = (*ctxt).get_node_content(attr.map(|attr| attr.into()));
         if ns.is_null() {
             return -1;
         }
@@ -7052,7 +6870,7 @@ unsafe fn xml_schema_parse_complex_content(
 ///
 /// Returns the type definition or NULL in case of error
 #[doc(alias = "xmlSchemaParseComplexType")]
-unsafe fn xml_schema_parse_complex_type(
+pub(crate) unsafe fn xml_schema_parse_complex_type(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -7172,7 +6990,7 @@ unsafe fn xml_schema_parse_complex_type(
                     }
                 } else if xml_str_equal(cur_attr.name, c"final".as_ptr() as _) {
                     // Attribute "final".
-                    attr_value = xml_schema_get_node_content(ctxt, Some(cur_attr.into()));
+                    attr_value = (*ctxt).get_node_content(Some(cur_attr.into()));
                     if xml_schema_pval_attr_block_final(
                         attr_value,
                         &raw mut (*typ).flags,
@@ -7202,7 +7020,7 @@ unsafe fn xml_schema_parse_complex_type(
                     }
                 } else if xml_str_equal(cur_attr.name, c"block".as_ptr() as _) {
                     // Attribute "block".
-                    attr_value = xml_schema_get_node_content(ctxt, Some(cur_attr.into()));
+                    attr_value = (*ctxt).get_node_content(Some(cur_attr.into()));
                     if xml_schema_pval_attr_block_final(
                         attr_value,
                         &raw mut (*typ).flags,
@@ -7639,7 +7457,7 @@ unsafe fn xml_schema_parse_idcselector_and_field(
         memset(item as _, 0, size_of::<XmlSchemaIdcselect>());
         // Attribute "xpath" (mandatory).
         if let Some(attr) = xml_schema_get_prop_node(node, "xpath") {
-            (*item).xpath = xml_schema_get_node_content(ctxt, Some(attr.into()));
+            (*item).xpath = (*ctxt).get_node_content(Some(attr.into()));
             // URGENT TODO: "field"s have an other syntax than "selector"s.
 
             if xml_schema_check_cselector_xpath(ctxt, idc, item, Some(attr), is_field) == -1 {
@@ -7886,7 +7704,7 @@ unsafe fn xml_schema_parse_idc(
 /// Returns the element declaration or a particle; NULL in case
 /// of an error or if the particle has minOccurs==maxOccurs==0.
 #[doc(alias = "xmlSchemaParseElement")]
-unsafe fn xml_schema_parse_element(
+pub(crate) unsafe fn xml_schema_parse_element(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -8086,7 +7904,7 @@ unsafe fn xml_schema_parse_element(
             if top_level != 0 {
                 ns = (*ctxt).target_namespace;
             } else if let Some(attr) = xml_schema_get_prop_node(node, "form") {
-                attr_value = xml_schema_get_node_content(ctxt, Some(attr.into()));
+                attr_value = (*ctxt).get_node_content(Some(attr.into()));
                 if xml_str_equal(attr_value, c"qualified".as_ptr() as _) {
                     ns = (*ctxt).target_namespace;
                 } else if !xml_str_equal(attr_value, c"unqualified".as_ptr() as _) {
@@ -8177,7 +7995,7 @@ unsafe fn xml_schema_parse_element(
                 }
                 // Attribute "final".
                 if let Some(attr) = xml_schema_get_prop_node(node, "final") {
-                    attr_value = xml_schema_get_node_content(ctxt, Some(attr.into()));
+                    attr_value = (*ctxt).get_node_content(Some(attr.into()));
                     if xml_schema_pval_attr_block_final(
                         attr_value,
                         &raw mut (*decl).flags,
@@ -8214,7 +8032,7 @@ unsafe fn xml_schema_parse_element(
             }
             // Attribute "block".
             if let Some(attr) = xml_schema_get_prop_node(node, "block") {
-                attr_value = xml_schema_get_node_content(ctxt, Some(attr.into()));
+                attr_value = (*ctxt).get_node_content(Some(attr.into()));
                 if xml_schema_pval_attr_block_final(
                     attr_value,
                     &raw mut (*decl).flags,
@@ -8273,7 +8091,7 @@ unsafe fn xml_schema_parse_element(
                     xml_dict_lookup((*ctxt).dict, prop.as_ptr(), prop.len() as i32)
                 });
             if let Some(attr) = xml_schema_get_prop_node(node, "fixed") {
-                fixed = xml_schema_get_node_content(ctxt, Some(attr.into()));
+                fixed = (*ctxt).get_node_content(Some(attr.into()));
                 if !(*decl).value.is_null() {
                     // 3.3.3 : 1
                     // default and fixed must not both be present.
@@ -9572,7 +9390,7 @@ unsafe fn xml_schema_parse_union(
             let mut last_link: XmlSchemaTypeLinkPtr = null_mut();
             let mut refe: XmlSchemaQNameRefPtr;
 
-            cur = xml_schema_get_node_content(ctxt, Some(attr.into()));
+            cur = (*ctxt).get_node_content(Some(attr.into()));
             if cur.is_null() {
                 return -1;
             }
@@ -9720,7 +9538,7 @@ unsafe fn xml_schema_parse_union(
 /// Returns -1 in case of error, 0 if the declaration is improper and
 /// 1 in case of success.
 #[doc(alias = "xmlSchemaParseSimpleType")]
-unsafe fn xml_schema_parse_simple_type(
+pub(crate) unsafe fn xml_schema_parse_simple_type(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -10064,7 +9882,7 @@ unsafe fn xml_schema_add_model_group_definition(
 ///
 /// Returns -1 in case of error, 0 if the declaration is improper and 1 in case of success.
 #[doc(alias = "xmlSchemaParseModelGroupDefinition")]
-unsafe fn xml_schema_parse_model_group_definition(
+pub(crate) unsafe fn xml_schema_parse_model_group_definition(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -10245,7 +10063,7 @@ unsafe fn xml_schema_add_attribute_group_definition(
 ///
 /// Returns the attribute group definition or NULL in case of error.
 #[doc(alias = "xmlSchemaParseAttributeGroupDefinition")]
-unsafe fn xml_schema_parse_attribute_group_definition(
+pub(crate) unsafe fn xml_schema_parse_attribute_group_definition(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -10606,7 +10424,7 @@ unsafe fn xml_schema_parse_include_or_redefine(
 /// Returns 0 in case of success, a positive error code if
 /// not valid and -1 in case of an internal error.
 #[doc(alias = "xmlSchemaParseImport")]
-unsafe fn xml_schema_parse_import(
+pub(crate) unsafe fn xml_schema_parse_import(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -10808,7 +10626,7 @@ unsafe fn xml_schema_parse_import(
     }
 }
 
-unsafe fn xml_schema_parse_include(
+pub(crate) unsafe fn xml_schema_parse_include(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -10823,7 +10641,7 @@ unsafe fn xml_schema_parse_include(
     }
 }
 
-unsafe fn xml_schema_parse_redefine(
+pub(crate) unsafe fn xml_schema_parse_redefine(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -10838,7 +10656,7 @@ unsafe fn xml_schema_parse_redefine(
     }
 }
 
-unsafe fn xml_schema_parse_global_attribute(
+pub(crate) unsafe fn xml_schema_parse_global_attribute(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -10985,7 +10803,7 @@ unsafe fn xml_schema_parse_global_attribute(
                     c"fixed".as_ptr() as _,
                 );
             } else {
-                (*ret).def_value = xml_schema_get_node_content(pctxt, Some(attr.into()));
+                (*ret).def_value = (*pctxt).get_node_content(Some(attr.into()));
             }
         }
         // And now for the children...
@@ -11073,7 +10891,7 @@ unsafe fn xml_schema_add_notation(
 ///
 /// Returns the new structure or NULL in case of error
 #[doc(alias = "xmlSchemaParseNotation")]
-unsafe fn xml_schema_parse_notation(
+pub(crate) unsafe fn xml_schema_parse_notation(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -11127,226 +10945,6 @@ unsafe fn xml_schema_parse_notation(
             );
         }
 
-        ret
-    }
-}
-
-/// Returns the internal XML Schema structure built from the resource or NULL in case of error
-#[doc(alias = "xmlSchemaParseSchemaTopLevel")]
-unsafe fn xml_schema_parse_schema_top_level(
-    ctxt: XmlSchemaParserCtxtPtr,
-    schema: XmlSchemaPtr,
-    nodes: XmlNodePtr,
-) -> i32 {
-    unsafe {
-        let mut annot: XmlSchemaAnnotPtr;
-        let mut res: i32 = 0;
-        let mut tmp_old_errs: i32;
-
-        if ctxt.is_null() || schema.is_null() {
-            return -1;
-        }
-
-        let old_errs: i32 = (*ctxt).nberrors;
-        let mut child = Some(nodes);
-        'exit_failure: {
-            'exit: {
-                while is_schema(child, "include")
-                    || is_schema(child, "import")
-                    || is_schema(child, "redefine")
-                    || is_schema(child, "annotation")
-                {
-                    if is_schema(child, "annotation") {
-                        annot = xml_schema_parse_annotation(ctxt, child.unwrap(), 1);
-                        if (*schema).annot.is_null() {
-                            (*schema).annot = annot;
-                        } else {
-                            xml_schema_free_annot(annot);
-                        }
-                    } else if is_schema(child, "import") {
-                        tmp_old_errs = (*ctxt).nberrors;
-                        res = xml_schema_parse_import(ctxt, schema, child.unwrap());
-                        HFAILURE!(res, 'exit_failure);
-                        if (*ctxt).stop != 0 {
-                            break 'exit;
-                        }
-                        if tmp_old_errs != (*ctxt).nberrors {
-                            break 'exit;
-                        }
-                    } else if is_schema(child, "include") {
-                        tmp_old_errs = (*ctxt).nberrors;
-                        res = xml_schema_parse_include(ctxt, schema, child.unwrap());
-                        HFAILURE!(res, 'exit_failure);
-                        if (*ctxt).stop != 0 {
-                            break 'exit;
-                        }
-                        if tmp_old_errs != (*ctxt).nberrors {
-                            break 'exit;
-                        }
-                    } else if is_schema(child, "redefine") {
-                        tmp_old_errs = (*ctxt).nberrors;
-                        res = xml_schema_parse_redefine(ctxt, schema, child.unwrap());
-                        HFAILURE!(res, 'exit_failure);
-                        if (*ctxt).stop != 0 {
-                            break 'exit;
-                        }
-                        if tmp_old_errs != (*ctxt).nberrors {
-                            break 'exit;
-                        }
-                    }
-                    child = child
-                        .unwrap()
-                        .next
-                        .map(|node| XmlNodePtr::try_from(node).unwrap());
-                }
-                // URGENT TODO: Change the functions to return i32 results.
-                // We need especially to catch internal errors.
-                while let Some(cur_node) = child {
-                    if is_schema(child, "complexType") {
-                        xml_schema_parse_complex_type(ctxt, schema, cur_node, 1);
-                        child = cur_node
-                            .next
-                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                    } else if is_schema(child, "simpleType") {
-                        xml_schema_parse_simple_type(ctxt, schema, cur_node, 1);
-                        child = cur_node
-                            .next
-                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                    } else if is_schema(child, "element") {
-                        xml_schema_parse_element(ctxt, schema, cur_node, null_mut(), 1);
-                        child = cur_node
-                            .next
-                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                    } else if is_schema(child, "attribute") {
-                        xml_schema_parse_global_attribute(ctxt, schema, cur_node);
-                        child = cur_node
-                            .next
-                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                    } else if is_schema(child, "attributeGroup") {
-                        xml_schema_parse_attribute_group_definition(ctxt, schema, cur_node);
-                        child = cur_node
-                            .next
-                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                    } else if is_schema(child, "group") {
-                        xml_schema_parse_model_group_definition(ctxt, schema, cur_node);
-                        child = cur_node
-                            .next
-                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                    } else if is_schema(child, "notation") {
-                        xml_schema_parse_notation(ctxt, schema, cur_node);
-                        child = cur_node
-                            .next
-                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                    } else {
-                        xml_schema_pcontent_err(
-                            ctxt,
-                            XmlParserErrors::XmlSchemapS4sElemNotAllowed,
-                            null_mut(),
-                            cur_node
-                                .parent
-                                .map(|p| XmlNodePtr::try_from(p).unwrap())
-                                .unwrap(),
-                            Some(cur_node.into()),
-                            None,
-                            Some(
-                                "((include | import | redefine | annotation)*, (((simpleType | complexType | group | attributeGroup) | element | attribute | notation), annotation*)*)",
-                            ),
-                        );
-                        child = cur_node
-                            .next
-                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                    }
-                    while is_schema(child, "annotation") {
-                        // TODO: We should add all annotations.
-                        annot = xml_schema_parse_annotation(ctxt, child.unwrap(), 1);
-                        if (*schema).annot.is_null() {
-                            (*schema).annot = annot;
-                        } else {
-                            xml_schema_free_annot(annot);
-                        }
-                        child = child
-                            .unwrap()
-                            .next
-                            .map(|node| XmlNodePtr::try_from(node).unwrap());
-                    }
-                }
-            }
-            // exit:
-            (*ctxt).ctxt_type = null_mut();
-            if old_errs != (*ctxt).nberrors {
-                res = (*ctxt).err;
-            }
-            return res;
-        }
-        // exit_failure:
-        -1
-    }
-}
-
-unsafe fn xml_schema_parse_new_doc_with_context(
-    pctxt: XmlSchemaParserCtxtPtr,
-    schema: XmlSchemaPtr,
-    bucket: XmlSchemaBucketPtr,
-) -> i32 {
-    unsafe {
-        let mut ret: i32;
-        let old_errs: i32;
-        let oldbucket: XmlSchemaBucketPtr = (*(*pctxt).constructor).bucket;
-
-        // Save old values; reset the *main* schema.
-        // URGENT TODO: This is not good; move the per-document information
-        // to the parser. Get rid of passing the main schema to the
-        // parsing functions.
-        let old_flags: i32 = (*schema).flags;
-        let old_doc = (*schema).doc;
-        if (*schema).flags != 0 {
-            (*schema).clear_flags();
-        }
-        (*schema).doc = (*bucket).doc;
-        (*pctxt).schema = schema;
-        // Keep the current target namespace on the parser *not* on the main schema.
-        (*pctxt).target_namespace = (*bucket).target_namespace;
-        (*WXS_CONSTRUCTOR!(pctxt)).bucket = bucket;
-
-        if !(*bucket).target_namespace.is_null()
-            && xml_str_equal((*bucket).target_namespace, XML_SCHEMA_NS.as_ptr() as _)
-        {
-            // We are parsing the schema for schemas!
-            (*pctxt).is_s4s = 1;
-        }
-        // Mark it as parsed, even if parsing fails.
-        (*bucket).parsed += 1;
-        // Compile the schema doc.
-        let node = (*bucket)
-            .doc
-            .and_then(|doc| doc.get_root_element())
-            .unwrap();
-        ret = xml_schema_parse_schema_element(pctxt, schema, node);
-        if ret == 0 {
-            // An empty schema; just get out.
-            if let Some(children) = node
-                .children
-                .map(|children| XmlNodePtr::try_from(children).unwrap())
-            {
-                old_errs = (*pctxt).nberrors;
-                ret = xml_schema_parse_schema_top_level(pctxt, schema, children);
-                if ret == 0 {
-                    // TODO: Not nice, but I'm not 100% sure we will get always an error
-                    // as a result of the above functions; so better rely on (*pctxt).err
-                    // as well.
-                    if ret == 0 && old_errs != (*pctxt).nberrors {
-                        ret = (*pctxt).err;
-                        // goto exit;
-                    }
-                }
-            }
-        }
-
-        // exit:
-        (*WXS_CONSTRUCTOR!(pctxt)).bucket = oldbucket;
-        // Restore schema values.
-        (*schema).doc = old_doc;
-        (*schema).flags = old_flags;
         ret
     }
 }
@@ -19147,7 +18745,7 @@ macro_rules! FIXHFAILURE {
     };
 }
 
-unsafe fn xml_schema_fixup_components(
+pub(crate) unsafe fn xml_schema_fixup_components(
     pctxt: XmlSchemaParserCtxtPtr,
     root_bucket: XmlSchemaBucketPtr,
 ) -> i32 {
@@ -19618,149 +19216,6 @@ unsafe fn xml_schema_fixup_components(
             (*con).redefs = null_mut();
         }
         ret
-    }
-}
-
-/// parse a schema definition resource and build an internal
-/// XML Schema structure which can be used to validate instances.
-///
-/// Returns the internal XML Schema structure built from the resource or NULL in case of error
-#[doc(alias = "xmlSchemaParse")]
-pub unsafe fn xml_schema_parse(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
-    unsafe {
-        let mut main_schema: XmlSchemaPtr;
-        let mut bucket: XmlSchemaBucketPtr = null_mut();
-        let res: i32;
-
-        // This one is used if the schema to be parsed was specified via
-        // the API; i.e. not automatically by the validated instance document.
-
-        if xml_schema_init_types() < 0 {
-            return null_mut();
-        }
-
-        if ctxt.is_null() {
-            return null_mut();
-        }
-
-        // TODO: Init the context. Is this all we need?
-        (*ctxt).nberrors = 0;
-        (*ctxt).err = 0;
-        (*ctxt).counter = 0;
-
-        // Create the *main* schema.
-        'exit_failure: {
-            main_schema = (*ctxt).new_schema();
-            if main_schema.is_null() {
-                break 'exit_failure;
-            }
-            // Create the schema constructor.
-            if (*ctxt).constructor.is_null() {
-                (*ctxt).constructor = xml_schema_construction_ctxt_create((*ctxt).dict);
-                if (*ctxt).constructor.is_null() {
-                    break 'exit_failure;
-                }
-                // Take ownership of the constructor to be able to free it.
-                (*ctxt).owns_constructor = 1;
-            }
-            (*(*ctxt).constructor).main_schema = main_schema;
-            let url = (*ctxt).url.as_deref().map(|url| CString::new(url).unwrap());
-            // Locate and add the schema document.
-            res = xml_schema_add_schema_doc(
-                ctxt,
-                XML_SCHEMA_SCHEMA_MAIN,
-                url.as_deref()
-                    .map_or(null_mut(), |url| url.as_ptr() as *const u8),
-                (*ctxt).doc,
-                (*ctxt).buffer,
-                (*ctxt).size,
-                None,
-                null_mut(),
-                null_mut(),
-                &raw mut bucket,
-            );
-            if res == -1 {
-                break 'exit_failure;
-            }
-            'exit: {
-                if res != 0 {
-                    break 'exit;
-                }
-                if bucket.is_null() {
-                    // TODO: Error code, actually we failed to *locate* the schema.
-                    if let Some(url) = (*ctxt).url.as_deref() {
-                        xml_schema_custom_err(
-                            ctxt as XmlSchemaAbstractCtxtPtr,
-                            XmlParserErrors::XmlSchemapFailedLoad,
-                            None,
-                            null_mut(),
-                            format!("Failed to locate the main schema resource at '{url}'")
-                                .as_str(),
-                            Some(url),
-                            None,
-                        );
-                    } else {
-                        xml_schema_custom_err(
-                            ctxt as XmlSchemaAbstractCtxtPtr,
-                            XmlParserErrors::XmlSchemapFailedLoad,
-                            None,
-                            null_mut(),
-                            "Failed to locate themain schema resource",
-                            None,
-                            None,
-                        );
-                    }
-                    break 'exit;
-                }
-                // Then do the parsing for good.
-                if xml_schema_parse_new_doc_with_context(ctxt, main_schema, bucket) == -1 {
-                    break 'exit_failure;
-                }
-                if (*ctxt).nberrors != 0 {
-                    break 'exit;
-                }
-
-                (*main_schema).doc = (*bucket).doc;
-                (*main_schema).preserve = (*ctxt).preserve;
-
-                (*ctxt).schema = main_schema;
-
-                if xml_schema_fixup_components(ctxt, (*WXS_CONSTRUCTOR!(ctxt)).main_bucket) == -1 {
-                    break 'exit_failure;
-                }
-            }
-
-            // TODO: This is not nice, since we cannot distinguish from the
-            // result if there was an internal error or not.
-            // exit:
-            if (*ctxt).nberrors != 0 {
-                if !main_schema.is_null() {
-                    xml_schema_free(main_schema);
-                    main_schema = null_mut();
-                }
-                if !(*ctxt).constructor.is_null() {
-                    xml_schema_construction_ctxt_free((*ctxt).constructor);
-                    (*ctxt).constructor = null_mut();
-                    (*ctxt).owns_constructor = 0;
-                }
-            }
-            (*ctxt).schema = null_mut();
-            return main_schema;
-        }
-        // exit_failure:
-        // Quite verbose, but should catch internal errors, which were not communicated.
-        if !main_schema.is_null() {
-            xml_schema_free(main_schema);
-            // main_schema = null_mut();
-        }
-        if !(*ctxt).constructor.is_null() {
-            xml_schema_construction_ctxt_free((*ctxt).constructor);
-            (*ctxt).constructor = null_mut();
-            (*ctxt).owns_constructor = 0;
-        }
-        PERROR_INT2!(ctxt, "xmlSchemaParse", "An internal error occurred");
-        (*ctxt).schema = null_mut();
-        null_mut()
     }
 }
 
@@ -20510,7 +19965,7 @@ unsafe fn xml_schema_assemble_by_location(
         (*pctxt).err = 0;
         (*pctxt).doc = (*bucket).doc;
 
-        ret = xml_schema_parse_new_doc_with_context(pctxt, schema, bucket);
+        ret = (*pctxt).parse_new_doc_with_context(schema, bucket);
         if ret == -1 {
             (*pctxt).doc = None;
             return -1;

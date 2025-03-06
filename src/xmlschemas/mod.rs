@@ -26,11 +26,27 @@ pub mod dump;
 pub(crate) mod error;
 pub(crate) mod item_list;
 pub mod items;
+pub mod parse;
 pub mod schema;
 
 use items::XmlSchemaType;
 
-use crate::libxml::schemas_internals::{XmlSchemaTypeType, XmlSchemaValType};
+use crate::{
+    libxml::{
+        schemas_internals::{XmlSchemaTypeType, XmlSchemaValType},
+        xmlschemas::XML_SCHEMA_NS,
+    },
+    tree::{NodeCommon, XmlNodePtr},
+};
+
+pub(crate) unsafe fn is_schema(node: Option<XmlNodePtr>, r#type: &str) -> bool {
+    node.is_some_and(|node| {
+        node.name().as_deref() == Some(r#type)
+            && node.ns.is_some_and(|ns| unsafe {
+                ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap())
+            })
+    })
+}
 
 pub(crate) unsafe fn wxs_is_anytype(r#type: *mut XmlSchemaType) -> bool {
     unsafe {

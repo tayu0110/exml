@@ -3500,7 +3500,6 @@ unsafe fn schemas_test(
     unsafe {
         use std::mem::zeroed;
 
-        use exml::libxml::xmlschemas::xml_schema_parse;
         use libc::{GLOB_DOOFFS, glob, glob_t, globfree};
 
         let cfilename = CString::new(filename).unwrap();
@@ -3523,7 +3522,7 @@ unsafe fn schemas_test(
             Some(test_error_handler),
             Some(GenericErrorContext::new(ctxt)),
         );
-        let schemas: XmlSchemaPtr = xml_schema_parse(ctxt);
+        let schemas: XmlSchemaPtr = (*ctxt).parse();
         xml_schema_free_parser_ctxt(ctxt);
         let parse_errors_size = TEST_ERRORS_SIZE.get();
 

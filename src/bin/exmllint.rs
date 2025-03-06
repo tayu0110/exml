@@ -78,8 +78,8 @@ use exml::{
         },
         xmlreader::XmlTextReaderPtr,
         xmlschemas::{
-            xml_schema_parse, xml_schema_set_valid_errors, xml_schema_validate_doc,
-            xml_schema_validate_set_filename, xml_schema_validate_stream,
+            xml_schema_set_valid_errors, xml_schema_validate_doc, xml_schema_validate_set_filename,
+            xml_schema_validate_stream,
         },
         xmlstring::XmlChar,
     },
@@ -727,7 +727,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                     Some(generic_error_default),
                     None,
                 );
-                let wxschemas = xml_schema_parse(ctxt);
+                let wxschemas = (*ctxt).parse();
                 if wxschemas.is_null() {
                     generic_error!("WXS schema {schema} failed to compile\n");
                     PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);

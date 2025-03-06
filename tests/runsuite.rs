@@ -31,7 +31,7 @@ use exml::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,
         },
-        xmlschemas::{xml_schema_parse, xml_schema_set_valid_errors, xml_schema_validate_doc},
+        xmlschemas::{xml_schema_set_valid_errors, xml_schema_validate_doc},
         xmlschemastypes::xml_schema_init_types,
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
     },
@@ -1075,7 +1075,7 @@ unsafe fn xstc_test_group(
                             Some(test_error_handler),
                             Some(GenericErrorContext::new(ctxt)),
                         );
-                        schemas = xml_schema_parse(ctxt);
+                        schemas = (*ctxt).parse();
                         xml_schema_free_parser_ctxt(ctxt);
                         if schemas.is_null() {
                             test_log!(logfile, "valid schemas {} failed to parse\n", path);
@@ -1126,7 +1126,7 @@ unsafe fn xstc_test_group(
                             Some(test_error_handler),
                             Some(GenericErrorContext::new(ctxt)),
                         );
-                        schemas = xml_schema_parse(ctxt);
+                        schemas = (*ctxt).parse();
                         xml_schema_free_parser_ctxt(ctxt);
                         if !schemas.is_null() {
                             test_log!(logfile, "Failed to detect error in schemas {}\n", path);
