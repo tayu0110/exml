@@ -39,6 +39,8 @@ use crate::{
     tree::{NodeCommon, XmlNodePtr},
 };
 
+const UNBOUNDED: usize = 1 << 30;
+
 pub(crate) unsafe fn is_schema(node: Option<XmlNodePtr>, r#type: &str) -> bool {
     node.is_some_and(|node| {
         node.name().as_deref() == Some(r#type)

@@ -1,5 +1,5 @@
 use std::{
-    ffi::{CStr, CString},
+    ffi::{CStr, CString, c_void},
     ptr::{null, null_mut},
 };
 
@@ -8,34 +8,61 @@ use crate::{
     error::XmlParserErrors,
     libxml::{
         schemas_internals::{
+            XML_SCHEMAS_ATTR_FIXED, XML_SCHEMAS_ATTR_GLOBAL, XML_SCHEMAS_ATTRGROUP_HAS_REFS,
             XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION, XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION,
-            XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION, XML_SCHEMAS_FINAL_DEFAULT_EXTENSION,
-            XML_SCHEMAS_FINAL_DEFAULT_LIST, XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION,
-            XML_SCHEMAS_FINAL_DEFAULT_UNION, XML_SCHEMAS_INCLUDING_CONVERT_NS,
-            XML_SCHEMAS_QUALIF_ATTR, XML_SCHEMAS_QUALIF_ELEM, XmlSchemaAnnotPtr, XmlSchemaValType,
-            xml_schema_free_annot,
+            XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION, XML_SCHEMAS_ELEM_ABSTRACT,
+            XML_SCHEMAS_ELEM_BLOCK_EXTENSION, XML_SCHEMAS_ELEM_BLOCK_RESTRICTION,
+            XML_SCHEMAS_ELEM_BLOCK_SUBSTITUTION, XML_SCHEMAS_ELEM_FINAL_EXTENSION,
+            XML_SCHEMAS_ELEM_FINAL_RESTRICTION, XML_SCHEMAS_ELEM_FIXED, XML_SCHEMAS_ELEM_GLOBAL,
+            XML_SCHEMAS_ELEM_NILLABLE, XML_SCHEMAS_ELEM_TOPLEVEL,
+            XML_SCHEMAS_FINAL_DEFAULT_EXTENSION, XML_SCHEMAS_FINAL_DEFAULT_LIST,
+            XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION, XML_SCHEMAS_FINAL_DEFAULT_UNION,
+            XML_SCHEMAS_INCLUDING_CONVERT_NS, XML_SCHEMAS_QUALIF_ATTR, XML_SCHEMAS_QUALIF_ELEM,
+            XML_SCHEMAS_TYPE_ABSTRACT, XML_SCHEMAS_TYPE_BLOCK_EXTENSION,
+            XML_SCHEMAS_TYPE_BLOCK_RESTRICTION, XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION,
+            XML_SCHEMAS_TYPE_FINAL_EXTENSION, XML_SCHEMAS_TYPE_FINAL_LIST,
+            XML_SCHEMAS_TYPE_FINAL_RESTRICTION, XML_SCHEMAS_TYPE_FINAL_UNION,
+            XML_SCHEMAS_TYPE_GLOBAL, XML_SCHEMAS_TYPE_MIXED, XmlSchemaAnnotPtr,
+            XmlSchemaContentType, XmlSchemaTypeType, XmlSchemaValType, xml_schema_free_annot,
         },
         xmlschemas::{
-            XML_SCHEMA_NS, XML_SCHEMA_SCHEMA_IMPORT, XML_SCHEMA_SCHEMA_INCLUDE,
-            XML_SCHEMA_SCHEMA_MAIN, XML_SCHEMA_SCHEMA_REDEFINE, XmlSchemaAbstractCtxtPtr,
-            XmlSchemaBucketPtr, can_parse_schema, xml_schema_add_schema_doc,
-            xml_schema_build_absolute_uri, xml_schema_construction_ctxt_create,
-            xml_schema_construction_ctxt_free, xml_schema_fixup_components,
-            xml_schema_get_prop_node, xml_schema_get_prop_node_ns, xml_schema_new_annot,
-            xml_schema_parse_attribute_group_definition, xml_schema_parse_complex_type,
-            xml_schema_parse_element, xml_schema_parse_global_attribute,
-            xml_schema_parse_model_group_definition, xml_schema_parse_new_doc,
-            xml_schema_parse_notation, xml_schema_parse_simple_type, xml_schema_pval_attr,
-            xml_schema_pval_attr_block_final, xml_schema_pval_attr_form_default,
-            xml_schema_pval_attr_id, xml_schema_pval_attr_node,
+            XML_SCHEMA_INSTANCE_NS, XML_SCHEMA_NS, XML_SCHEMA_SCHEMA_IMPORT,
+            XML_SCHEMA_SCHEMA_INCLUDE, XML_SCHEMA_SCHEMA_MAIN, XML_SCHEMA_SCHEMA_REDEFINE,
+            XmlSchemaAbstractCtxtPtr, XmlSchemaBucketPtr, can_parse_schema, xml_get_boolean_prop,
+            xml_get_max_occurs, xml_get_min_occurs, xml_schema_add_attribute,
+            xml_schema_add_attribute_group_definition, xml_schema_add_element,
+            xml_schema_add_item_size, xml_schema_add_model_group_definition,
+            xml_schema_add_notation, xml_schema_add_particle, xml_schema_add_schema_doc,
+            xml_schema_add_type, xml_schema_build_absolute_uri, xml_schema_check_reference,
+            xml_schema_construction_ctxt_create, xml_schema_construction_ctxt_free,
+            xml_schema_fixup_components, xml_schema_get_prop_node, xml_schema_get_prop_node_ns,
+            xml_schema_new_annot, xml_schema_new_qname_ref, xml_schema_parse_any_attribute,
+            xml_schema_parse_complex_content, xml_schema_parse_idc, xml_schema_parse_list,
+            xml_schema_parse_local_attributes, xml_schema_parse_model_group,
+            xml_schema_parse_model_group_def_ref, xml_schema_parse_new_doc,
+            xml_schema_parse_restriction, xml_schema_parse_simple_content, xml_schema_parse_union,
+            xml_schema_pcheck_particle_correct_2, xml_schema_pget_bool_node_value,
+            xml_schema_pval_attr, xml_schema_pval_attr_block_final,
+            xml_schema_pval_attr_form_default, xml_schema_pval_attr_id, xml_schema_pval_attr_node,
+            xml_schema_pval_attr_node_qname, xml_schema_pval_attr_qname,
         },
-        xmlschemastypes::{xml_schema_get_built_in_type, xml_schema_init_types},
+        xmlschemastypes::{
+            xml_schema_get_built_in_type, xml_schema_get_predefined_type, xml_schema_init_types,
+        },
         xmlstring::xml_str_equal,
     },
     tree::{NodeCommon, XML_XML_NAMESPACE, XmlNodePtr},
     uri::build_uri,
     xmlschemas::{
-        error::{xml_schema_custom_err, xml_schema_internal_err, xml_schema_psimple_type_err},
+        UNBOUNDED,
+        error::{
+            xml_schema_custom_err, xml_schema_internal_err, xml_schema_pcustom_attr_err,
+            xml_schema_pmutual_excl_attr_err, xml_schema_psimple_type_err,
+        },
+        items::{
+            XmlSchemaElementPtr, XmlSchemaIDCPtr, XmlSchemaParticlePtr, XmlSchemaQNameRefPtr,
+            XmlSchemaTreeItemPtr,
+        },
         schema::xml_schema_free,
     },
 };
@@ -44,9 +71,15 @@ use super::{
     context::XmlSchemaParserCtxt,
     error::{
         xml_schema_custom_warning, xml_schema_pcontent_err, xml_schema_pcustom_err,
-        xml_schema_pcustom_err_ext, xml_schema_pillegal_attr_err, xml_schema_pmissing_attr_err,
+        xml_schema_pcustom_err_ext, xml_schema_perr2, xml_schema_pillegal_attr_err,
+        xml_schema_pmissing_attr_err,
     },
     is_schema,
+    item_list::XmlSchemaItemListPtr,
+    items::{
+        XmlSchemaAttributeGroupPtr, XmlSchemaAttributePtr, XmlSchemaBasicItemPtr,
+        XmlSchemaModelGroupDefPtr, XmlSchemaNotationPtr, XmlSchemaTypePtr,
+    },
     schema::XmlSchemaPtr,
 };
 
@@ -283,7 +316,7 @@ impl XmlSchemaParserCtxt {
                 // REMOVED:
                 // attr = xmlSchemaGetPropNode(node, c"version".as_ptr() as _);
                 // if !attr.is_null() {
-                //     res = xmlSchemaPValAttrNode(ctxt, null_mut(), NULL, attr, xmlSchemaGetBuiltInType(XML_SCHEMAS_TOKEN), &val);
+                //     res = xmlSchemaPValAttrNode(self, null_mut(), NULL, attr, xmlSchemaGetBuiltInType(XML_SCHEMAS_TOKEN), &val);
                 //     if res == -1 {
                 //         goto exit_failure;
                 //     }
@@ -505,37 +538,37 @@ impl XmlSchemaParserCtxt {
                 // We need especially to catch internal errors.
                 while let Some(cur_node) = child {
                     if is_schema(child, "complexType") {
-                        xml_schema_parse_complex_type(self, schema, cur_node, 1);
+                        self.parse_complex_type(schema, cur_node, 1);
                         child = cur_node
                             .next
                             .map(|node| XmlNodePtr::try_from(node).unwrap());
                     } else if is_schema(child, "simpleType") {
-                        xml_schema_parse_simple_type(self, schema, cur_node, 1);
+                        self.parse_simple_type(schema, cur_node, 1);
                         child = cur_node
                             .next
                             .map(|node| XmlNodePtr::try_from(node).unwrap());
                     } else if is_schema(child, "element") {
-                        xml_schema_parse_element(self, schema, cur_node, null_mut(), 1);
+                        self.parse_element(schema, cur_node, null_mut(), 1);
                         child = cur_node
                             .next
                             .map(|node| XmlNodePtr::try_from(node).unwrap());
                     } else if is_schema(child, "attribute") {
-                        xml_schema_parse_global_attribute(self, schema, cur_node);
+                        self.parse_global_attribute(schema, cur_node);
                         child = cur_node
                             .next
                             .map(|node| XmlNodePtr::try_from(node).unwrap());
                     } else if is_schema(child, "attributeGroup") {
-                        xml_schema_parse_attribute_group_definition(self, schema, cur_node);
+                        self.parse_attribute_group_definition(schema, cur_node);
                         child = cur_node
                             .next
                             .map(|node| XmlNodePtr::try_from(node).unwrap());
                     } else if is_schema(child, "group") {
-                        xml_schema_parse_model_group_definition(self, schema, cur_node);
+                        self.parse_model_group_definition(schema, cur_node);
                         child = cur_node
                             .next
                             .map(|node| XmlNodePtr::try_from(node).unwrap());
                     } else if is_schema(child, "notation") {
-                        xml_schema_parse_notation(self, schema, cur_node);
+                        self.parse_notation(schema, cur_node);
                         child = cur_node
                             .next
                             .map(|node| XmlNodePtr::try_from(node).unwrap());
@@ -1115,16 +1148,16 @@ impl XmlSchemaParserCtxt {
                     if is_schema(child, "annotation") {
                         // TODO: discard or not?
                     } else if is_schema(child, "simpleType") {
-                        xml_schema_parse_simple_type(self, schema, child.unwrap(), 1);
+                        self.parse_simple_type(schema, child.unwrap(), 1);
                     } else if is_schema(child, "complexType") {
-                        xml_schema_parse_complex_type(self, schema, child.unwrap(), 1);
+                        self.parse_complex_type(schema, child.unwrap(), 1);
                     // hasRedefinitions = 1;
                     } else if is_schema(child, "group") {
                         // hasRedefinitions = 1;
-                        xml_schema_parse_model_group_definition(self, schema, child.unwrap());
+                        self.parse_model_group_definition(schema, child.unwrap());
                     } else if is_schema(child, "attributeGroup") {
                         // hasRedefinitions = 1;
-                        xml_schema_parse_attribute_group_definition(self, schema, child.unwrap());
+                        self.parse_attribute_group_definition(schema, child.unwrap());
                     }
                     child = child
                         .unwrap()
@@ -1318,5 +1351,1735 @@ impl XmlSchemaParserCtxt {
     #[doc(alias = "xmlSchemaParseRedefine")]
     unsafe fn parse_redefine(&mut self, schema: XmlSchemaPtr, node: XmlNodePtr) -> i32 {
         unsafe { self.parse_include_or_redefine(schema, node, XML_SCHEMA_SCHEMA_REDEFINE) }
+    }
+
+    /// Parse a XML schema Complex Type definition
+    /// *WARNING* this interface is highly subject to change
+    ///
+    /// Returns the type definition or NULL in case of error
+    #[doc(alias = "xmlSchemaParseComplexType")]
+    pub(crate) unsafe fn parse_complex_type(
+        &mut self,
+        schema: XmlSchemaPtr,
+        node: XmlNodePtr,
+        top_level: i32,
+    ) -> XmlSchemaTypePtr {
+        unsafe {
+            let typ: XmlSchemaTypePtr;
+            let mut name: *const u8 = null();
+            // #ifdef ENABLE_NAMED_LOCALS
+            //     let buf: [c_char; 40];
+            // #endif
+            let mut is_final: i32 = 0;
+            let mut block: i32 = 0;
+            let mut has_restriction_or_extension: i32 = 0;
+
+            if schema.is_null() {
+                return null_mut();
+            }
+
+            let ctxt_type: XmlSchemaTypePtr = self.ctxt_type;
+
+            if top_level != 0 {
+                let Some(attr) = xml_schema_get_prop_node(node, "name") else {
+                    xml_schema_pmissing_attr_err(
+                        self,
+                        XmlParserErrors::XmlSchemapS4sAttrMissing,
+                        null_mut(),
+                        Some(node.into()),
+                        Some("name"),
+                        None,
+                    );
+                    return null_mut();
+                };
+                if xml_schema_pval_attr_node(
+                    self,
+                    null_mut(),
+                    attr,
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
+                    &raw mut name,
+                ) != 0
+                {
+                    return null_mut();
+                }
+            }
+
+            if top_level == 0 {
+                // Parse as local complex type definition.
+                // #ifdef ENABLE_NAMED_LOCALS
+                //     snprintf(buf, 39, "#CT%d".as_ptr() as _, self.counter++ + 1);
+                //     typ = xmlSchemaAddType(self, schema, XmlSchemaTypeType::XmlSchemaTypeComplex, xmlDictLookup(self.dict, buf, -1), self.target_namespace, node, 0);
+                // #else
+                typ = xml_schema_add_type(
+                    self,
+                    schema,
+                    XmlSchemaTypeType::XmlSchemaTypeComplex,
+                    null_mut(),
+                    self.target_namespace,
+                    node.into(),
+                    0,
+                );
+                // #endif
+                if typ.is_null() {
+                    return null_mut();
+                }
+                // name = (*typ).name;
+                (*typ).node = node.into();
+                (*typ).typ = XmlSchemaTypeType::XmlSchemaTypeComplex;
+            // TODO: We need the target namespace.
+            } else {
+                // Parse as global complex type definition.
+                typ = xml_schema_add_type(
+                    self,
+                    schema,
+                    XmlSchemaTypeType::XmlSchemaTypeComplex,
+                    name,
+                    self.target_namespace,
+                    node.into(),
+                    1,
+                );
+                if typ.is_null() {
+                    return null_mut();
+                }
+                (*typ).node = node.into();
+                (*typ).typ = XmlSchemaTypeType::XmlSchemaTypeComplex;
+                (*typ).flags |= XML_SCHEMAS_TYPE_GLOBAL;
+            }
+            (*typ).target_namespace = self.target_namespace;
+            // Handle attributes.
+            let mut attr = node.properties;
+            while let Some(cur_attr) = attr {
+                if let Some(ns) = cur_attr.ns {
+                    if ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap()) {
+                        xml_schema_pillegal_attr_err(
+                            self,
+                            XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                            null_mut(),
+                            cur_attr,
+                        );
+                    }
+                } else if xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
+                    // Attribute "id".
+                    xml_schema_pval_attr_id(self, node, "id");
+                } else if xml_str_equal(cur_attr.name, c"mixed".as_ptr() as _) {
+                    // Attribute "mixed".
+                    if xml_schema_pget_bool_node_value(self, null_mut(), cur_attr.into()) != 0 {
+                        (*typ).flags |= XML_SCHEMAS_TYPE_MIXED;
+                    }
+                } else if top_level != 0 {
+                    // Attributes of global complex type definitions.
+                    if xml_str_equal(cur_attr.name, c"name".as_ptr() as _) {
+                        // Pass.
+                    } else if xml_str_equal(cur_attr.name, c"abstract".as_ptr() as _) {
+                        // Attribute "abstract".
+                        if xml_schema_pget_bool_node_value(self, null_mut(), cur_attr.into()) != 0 {
+                            (*typ).flags |= XML_SCHEMAS_TYPE_ABSTRACT;
+                        }
+                    } else if xml_str_equal(cur_attr.name, c"final".as_ptr() as _) {
+                        // Attribute "final".
+                        let attr_value = self.get_node_content(Some(cur_attr.into()));
+                        let cattr_value = xml_dict_lookup(
+                            self.dict,
+                            attr_value.as_ptr(),
+                            attr_value.len() as i32,
+                        );
+                        if xml_schema_pval_attr_block_final(
+                            cattr_value,
+                            &raw mut (*typ).flags,
+                            -1,
+                            XML_SCHEMAS_TYPE_FINAL_EXTENSION,
+                            XML_SCHEMAS_TYPE_FINAL_RESTRICTION,
+                            -1,
+                            -1,
+                            -1,
+                        ) != 0
+                        {
+                            xml_schema_psimple_type_err(
+                                self,
+                                XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
+                                null_mut(),
+                                cur_attr.into(),
+                                null_mut(),
+                                Some("(#all | List of (extension | restriction))"),
+                                Some(&attr_value),
+                                None,
+                                None,
+                                None,
+                            );
+                        } else {
+                            is_final = 1;
+                        }
+                    } else if xml_str_equal(cur_attr.name, c"block".as_ptr() as _) {
+                        // Attribute "block".
+                        let attr_value = self.get_node_content(Some(cur_attr.into()));
+                        let cattr_value = xml_dict_lookup(
+                            self.dict,
+                            attr_value.as_ptr(),
+                            attr_value.len() as i32,
+                        );
+                        if xml_schema_pval_attr_block_final(
+                            cattr_value,
+                            &raw mut (*typ).flags,
+                            -1,
+                            XML_SCHEMAS_TYPE_BLOCK_EXTENSION,
+                            XML_SCHEMAS_TYPE_BLOCK_RESTRICTION,
+                            -1,
+                            -1,
+                            -1,
+                        ) != 0
+                        {
+                            xml_schema_psimple_type_err(
+                                self,
+                                XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
+                                null_mut(),
+                                cur_attr.into(),
+                                null_mut(),
+                                Some("(#all | List of (extension | restriction)) "),
+                                Some(&attr_value),
+                                None,
+                                None,
+                                None,
+                            );
+                        } else {
+                            block = 1;
+                        }
+                    } else {
+                        xml_schema_pillegal_attr_err(
+                            self,
+                            XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                            null_mut(),
+                            cur_attr,
+                        );
+                    }
+                } else {
+                    xml_schema_pillegal_attr_err(
+                        self,
+                        XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                        null_mut(),
+                        cur_attr,
+                    );
+                }
+
+                attr = cur_attr.next;
+            }
+            if block == 0 {
+                // Apply default "block" values.
+                if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION != 0 {
+                    (*typ).flags |= XML_SCHEMAS_TYPE_BLOCK_RESTRICTION;
+                }
+                if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION != 0 {
+                    (*typ).flags |= XML_SCHEMAS_TYPE_BLOCK_EXTENSION;
+                }
+            }
+            if is_final == 0 {
+                // Apply default "block" values.
+                if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION != 0 {
+                    (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_RESTRICTION;
+                }
+                if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_EXTENSION != 0 {
+                    (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_EXTENSION;
+                }
+            }
+            // And now for the children...
+            let mut child = node.children.map(|c| XmlNodePtr::try_from(c).unwrap());
+            if is_schema(child, "annotation") {
+                (*typ).annot = self.parse_annotation(child.unwrap(), 1);
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            self.ctxt_type = typ;
+            if is_schema(child, "simpleContent") {
+                // <complexType><simpleContent>...
+                // 3.4.3 : 2.2
+                // Specifying mixed='true' when the <simpleContent>
+                // alternative is chosen has no effect
+                if (*typ).flags & XML_SCHEMAS_TYPE_MIXED != 0 {
+                    (*typ).flags ^= XML_SCHEMAS_TYPE_MIXED;
+                }
+                xml_schema_parse_simple_content(
+                    self,
+                    schema,
+                    child.unwrap(),
+                    &raw mut has_restriction_or_extension,
+                );
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            } else if is_schema(child, "complexContent") {
+                // <complexType><complexContent>...
+                (*typ).content_type = XmlSchemaContentType::XmlSchemaContentEmpty;
+                xml_schema_parse_complex_content(
+                    self,
+                    schema,
+                    child.unwrap(),
+                    &raw mut has_restriction_or_extension,
+                );
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            } else {
+                // E.g <complexType><sequence>... or <complexType><attribute>... etc.
+                //
+                // SPEC
+                // "...the third alternative (neither <simpleContent> nor
+                // <complexContent>) is chosen. This case is understood as shorthand
+                // for complex content restricting the `ur-type definition`, and the
+                // details of the mappings should be modified as necessary.
+                (*typ).base_type =
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnytype);
+                (*typ).flags |= XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION;
+                // Parse model groups.
+                if is_schema(child, "all") {
+                    (*typ).subtypes = xml_schema_parse_model_group(
+                        self,
+                        schema,
+                        child.unwrap(),
+                        XmlSchemaTypeType::XmlSchemaTypeAll,
+                        1,
+                    ) as XmlSchemaTypePtr;
+                    child = child
+                        .unwrap()
+                        .next
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                } else if is_schema(child, "choice") {
+                    (*typ).subtypes = xml_schema_parse_model_group(
+                        self,
+                        schema,
+                        child.unwrap(),
+                        XmlSchemaTypeType::XmlSchemaTypeChoice,
+                        1,
+                    ) as XmlSchemaTypePtr;
+                    child = child
+                        .unwrap()
+                        .next
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                } else if is_schema(child, "sequence") {
+                    (*typ).subtypes = xml_schema_parse_model_group(
+                        self,
+                        schema,
+                        child.unwrap(),
+                        XmlSchemaTypeType::XmlSchemaTypeSequence,
+                        1,
+                    ) as XmlSchemaTypePtr;
+                    child = child
+                        .unwrap()
+                        .next
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                } else if is_schema(child, "group") {
+                    (*typ).subtypes =
+                        xml_schema_parse_model_group_def_ref(self, schema, child.unwrap())
+                            as XmlSchemaTypePtr;
+                    // Note that the reference will be resolved in
+                    // xmlSchemaResolveTypeReferences();
+                    child = child
+                        .unwrap()
+                        .next
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                }
+                // Parse attribute decls/refs.
+                if xml_schema_parse_local_attributes(
+                    self,
+                    schema,
+                    &mut child,
+                    &raw mut (*typ).attr_uses as *mut XmlSchemaItemListPtr<*mut c_void>,
+                    XmlSchemaTypeType::XmlSchemaTypeRestriction as i32,
+                    null_mut(),
+                ) == -1
+                {
+                    return null_mut();
+                }
+                // Parse attribute wildcard.
+                if is_schema(child, "anyAttribute") {
+                    (*typ).attribute_wildcard =
+                        xml_schema_parse_any_attribute(self, schema, child.unwrap());
+                    child = child
+                        .unwrap()
+                        .next
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                }
+            }
+            if let Some(child) = child {
+                xml_schema_pcontent_err(
+                    self,
+                    XmlParserErrors::XmlSchemapS4sElemNotAllowed,
+                    null_mut(),
+                    node,
+                    Some(child.into()),
+                    None,
+                    Some(
+                        "(annotation?, (simpleContent | complexContent | ((group | all | choice | sequence)?, ((attribute | attributeGroup)*, anyAttribute?))))",
+                    ),
+                );
+            }
+            // REDEFINE: SPEC src-redefine (5)
+            if top_level != 0 && self.is_redefine != 0 && has_restriction_or_extension == 0 {
+                xml_schema_pcustom_err(
+                    self,
+                    XmlParserErrors::XmlSchemapSrcRedefine,
+                    null_mut(),
+                    Some(node.into()),
+                    "This is a redefinition, thus the <complexType> must have a <restriction> or <extension> grand-child",
+                    None,
+                );
+            }
+            self.ctxt_type = ctxt_type;
+            typ
+        }
+    }
+
+    /// Parse a XML schema Simple Type definition
+    /// *WARNING* this interface is highly subject to change
+    ///
+    /// Returns -1 in case of error, 0 if the declaration is improper and
+    /// 1 in case of success.
+    #[doc(alias = "xmlSchemaParseSimpleType")]
+    pub(crate) unsafe fn parse_simple_type(
+        &mut self,
+        schema: XmlSchemaPtr,
+        node: XmlNodePtr,
+        top_level: i32,
+    ) -> XmlSchemaTypePtr {
+        unsafe {
+            let typ: XmlSchemaTypePtr;
+            let mut attr_value: *const u8 = null();
+            let mut has_restriction: i32 = 0;
+
+            if schema.is_null() {
+                return null_mut();
+            }
+
+            if top_level != 0 {
+                let Some(attr) = xml_schema_get_prop_node(node, "name") else {
+                    xml_schema_pmissing_attr_err(
+                        self,
+                        XmlParserErrors::XmlSchemapS4sAttrMissing,
+                        null_mut(),
+                        Some(node.into()),
+                        Some("name"),
+                        None,
+                    );
+                    return null_mut();
+                };
+                if xml_schema_pval_attr_node(
+                    self,
+                    null_mut(),
+                    attr,
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
+                    &raw mut attr_value,
+                ) != 0
+                {
+                    return null_mut();
+                }
+                // Skip built-in types.
+                if self.is_s4s != 0 {
+                    if self.is_redefine != 0 {
+                        // REDEFINE: Disallow redefinition of built-in-types.
+                        // TODO: It seems that the spec does not say anything
+                        // about this case.
+                        xml_schema_pcustom_err(
+                            self,
+                            XmlParserErrors::XmlSchemapSrcRedefine,
+                            null_mut(),
+                            Some(node.into()),
+                            "Redefinition of built-in simple types is not supported",
+                            None,
+                        );
+                        return null_mut();
+                    }
+                    let bi_type: XmlSchemaTypePtr = xml_schema_get_predefined_type(
+                        CStr::from_ptr(attr_value as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        XML_SCHEMA_NS.to_str().unwrap(),
+                    );
+                    if !bi_type.is_null() {
+                        return bi_type;
+                    }
+                }
+            }
+            // TargetNamespace:
+            // SPEC "The `actual value` of the target_namespace [attribute]
+            // of the <schema> ancestor element information item if present,
+            // otherwise `absent`.
+            if top_level == 0 {
+                // #ifdef ENABLE_NAMED_LOCALS
+                //         let buf: [c_char; 40];
+                // #endif
+                // Parse as local simple type definition.
+                // #ifdef ENABLE_NAMED_LOCALS
+                //         snprintf(buf, 39, "#ST%d".as_ptr() as _, self.counter++ + 1);
+                //     	typ = xmlSchemaAddType(self, schema, XmlSchemaTypeType::XmlSchemaTypeSimple, xmlDictLookup(self.dict, buf, -1), self.target_namespace, node, 0);
+                // #else
+                typ = xml_schema_add_type(
+                    self,
+                    schema,
+                    XmlSchemaTypeType::XmlSchemaTypeSimple,
+                    null_mut(),
+                    self.target_namespace,
+                    node.into(),
+                    0,
+                );
+                // #endif
+                if typ.is_null() {
+                    return null_mut();
+                }
+                (*typ).typ = XmlSchemaTypeType::XmlSchemaTypeSimple;
+                (*typ).content_type = XmlSchemaContentType::XmlSchemaContentSimple;
+                // Check for illegal attributes.
+                let mut attr = node.properties;
+                while let Some(cur_attr) = attr {
+                    if let Some(ns) = cur_attr.ns {
+                        if ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap()) {
+                            xml_schema_pillegal_attr_err(
+                                self,
+                                XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                                null_mut(),
+                                cur_attr,
+                            );
+                        }
+                    } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _) {
+                        xml_schema_pillegal_attr_err(
+                            self,
+                            XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                            null_mut(),
+                            cur_attr,
+                        );
+                    }
+                    attr = cur_attr.next;
+                }
+            } else {
+                // Parse as global simple type definition.
+                //
+                // Note that attrValue is the value of the attribute "name" here.
+                typ = xml_schema_add_type(
+                    self,
+                    schema,
+                    XmlSchemaTypeType::XmlSchemaTypeSimple,
+                    attr_value,
+                    self.target_namespace,
+                    node.into(),
+                    1,
+                );
+                if typ.is_null() {
+                    return null_mut();
+                }
+                (*typ).typ = XmlSchemaTypeType::XmlSchemaTypeSimple;
+                (*typ).content_type = XmlSchemaContentType::XmlSchemaContentSimple;
+                (*typ).flags |= XML_SCHEMAS_TYPE_GLOBAL;
+                // Check for illegal attributes.
+                let mut attr = node.properties;
+                while let Some(cur_attr) = attr {
+                    if let Some(ns) = cur_attr.ns {
+                        if ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap()) {
+                            xml_schema_pillegal_attr_err(
+                                self,
+                                XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                                null_mut(),
+                                cur_attr,
+                            );
+                        }
+                    } else if !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+                        && !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+                        && !xml_str_equal(cur_attr.name, c"final".as_ptr() as _)
+                    {
+                        xml_schema_pillegal_attr_err(
+                            self,
+                            XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                            null_mut(),
+                            cur_attr,
+                        );
+                    }
+                    attr = cur_attr.next;
+                }
+                // Attribute "final".
+                if let Some(attr) = xml_schema_get_prop_node(node, "final") {
+                    let attr_value = self.get_prop(node, "final");
+                    let cattr_value = attr_value.as_deref().map(|s| CString::new(s).unwrap());
+                    if xml_schema_pval_attr_block_final(
+                        cattr_value
+                            .as_deref()
+                            .map_or(null_mut(), |s| s.as_ptr() as *const u8),
+                        &raw mut (*typ).flags,
+                        -1,
+                        -1,
+                        XML_SCHEMAS_TYPE_FINAL_RESTRICTION,
+                        -1,
+                        XML_SCHEMAS_TYPE_FINAL_LIST,
+                        XML_SCHEMAS_TYPE_FINAL_UNION,
+                    ) != 0
+                    {
+                        let attr_value = attr_value.unwrap();
+                        xml_schema_psimple_type_err(
+                            self,
+                            XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
+                            typ as XmlSchemaBasicItemPtr,
+                            attr.into(),
+                            null_mut(),
+                            Some("(#all | List of (list | union | restriction)"),
+                            Some(&attr_value),
+                            None,
+                            None,
+                            None,
+                        );
+                    }
+                } else {
+                    if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION != 0 {
+                        (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_RESTRICTION;
+                    }
+                    if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_LIST != 0 {
+                        (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_LIST;
+                    }
+                    if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_UNION != 0 {
+                        (*typ).flags |= XML_SCHEMAS_TYPE_FINAL_UNION;
+                    }
+                }
+            }
+            (*typ).target_namespace = self.target_namespace;
+            xml_schema_pval_attr_id(self, node, "id");
+            // And now for the children...
+            let old_ctxt_type: XmlSchemaTypePtr = self.ctxt_type;
+
+            self.ctxt_type = typ;
+
+            let mut child = node.children.map(|c| XmlNodePtr::try_from(c).unwrap());
+            if is_schema(child, "annotation") {
+                (*typ).annot = self.parse_annotation(child.unwrap(), 1);
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            if child.is_none() {
+                xml_schema_pcontent_err(
+                    self,
+                    XmlParserErrors::XmlSchemapS4sElemMissing,
+                    null_mut(),
+                    node,
+                    None,
+                    None,
+                    Some("(annotation?, (restriction | list | union))"),
+                );
+            } else if is_schema(child, "restriction") {
+                xml_schema_parse_restriction(
+                    self,
+                    schema,
+                    child.unwrap(),
+                    XmlSchemaTypeType::XmlSchemaTypeSimple,
+                );
+                has_restriction = 1;
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            } else if is_schema(child, "list") {
+                xml_schema_parse_list(self, schema, child.unwrap());
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            } else if is_schema(child, "union") {
+                xml_schema_parse_union(self, schema, child.unwrap());
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            if let Some(child) = child {
+                xml_schema_pcontent_err(
+                    self,
+                    XmlParserErrors::XmlSchemapS4sElemNotAllowed,
+                    null_mut(),
+                    node,
+                    Some(child.into()),
+                    None,
+                    Some("(annotation?, (restriction | list | union))"),
+                );
+            }
+            // REDEFINE: SPEC src-redefine (5)
+            // "Within the [children], each <simpleType> must have a
+            // <restriction> among its [children] ... the `actual value` of whose
+            // base [attribute] must be the same as the `actual value` of its own
+            // name attribute plus target namespace;"
+            if top_level != 0 && self.is_redefine != 0 && has_restriction == 0 {
+                xml_schema_pcustom_err(
+                    self,
+                    XmlParserErrors::XmlSchemapSrcRedefine,
+                    null_mut(),
+                    Some(node.into()),
+                    "This is a redefinition, thus the <simpleType> must have a <restriction> child",
+                    None,
+                );
+            }
+
+            self.ctxt_type = old_ctxt_type;
+            typ
+        }
+    }
+
+    /// Parses a XML schema element declaration.
+    /// *WARNING* this interface is highly subject to change
+    ///
+    /// Returns the element declaration or a particle; NULL in case
+    /// of an error or if the particle has minOccurs==maxOccurs==0.
+    #[doc(alias = "xmlSchemaParseElement")]
+    pub(crate) unsafe fn parse_element(
+        &mut self,
+        schema: XmlSchemaPtr,
+        node: XmlNodePtr,
+        is_elem_ref: *mut i32,
+        top_level: i32,
+    ) -> XmlSchemaBasicItemPtr {
+        unsafe {
+            let mut decl: XmlSchemaElementPtr = null_mut();
+            let mut particle: XmlSchemaParticlePtr = null_mut();
+            let mut annot: XmlSchemaAnnotPtr = null_mut();
+            let min: i32;
+            let max: i32;
+            let mut is_ref: i32 = 0;
+
+            // 3.3.3 Constraints on XML Representations of Element Declarations
+            // TODO: Complete implementation of 3.3.6
+
+            if schema.is_null() {
+                return null_mut();
+            }
+
+            if !is_elem_ref.is_null() {
+                *is_elem_ref = 0;
+            }
+            // If we get a "ref" attribute on a local <element> we will assume it's
+            // a reference - even if there's a "name" attribute; this seems to be more
+            // robust.
+            let name_attr = xml_schema_get_prop_node(node, "name");
+            let attr = xml_schema_get_prop_node(node, "ref");
+            if top_level != 0 || attr.is_none() {
+                if name_attr.is_none() {
+                    xml_schema_pmissing_attr_err(
+                        self,
+                        XmlParserErrors::XmlSchemapS4sAttrMissing,
+                        null_mut(),
+                        Some(node.into()),
+                        Some("name"),
+                        None,
+                    );
+                    return null_mut();
+                }
+            } else {
+                is_ref = 1;
+            }
+
+            xml_schema_pval_attr_id(self, node, "id");
+            let mut child = node.children.map(|c| XmlNodePtr::try_from(c).unwrap());
+            if is_schema(child, "annotation") {
+                annot = self.parse_annotation(child.unwrap(), 1);
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            // Skip particle part if a global declaration.
+            'return_null: {
+                'declaration_part: {
+                    if top_level != 0 {
+                        break 'declaration_part;
+                    }
+                    // The particle part ==================================================
+                    min = xml_get_min_occurs(self, node, 0, -1, 1, "xs:nonNegativeInteger");
+                    max = xml_get_max_occurs(
+                        self,
+                        node,
+                        0,
+                        UNBOUNDED as i32,
+                        1,
+                        "(xs:nonNegativeInteger | unbounded)",
+                    );
+                    xml_schema_pcheck_particle_correct_2(self, null_mut(), node, min, max);
+                    particle = xml_schema_add_particle(self, Some(node), min, max);
+                    if particle.is_null() {
+                        break 'return_null;
+                    }
+
+                    // (*ret).flags |= XML_SCHEMAS_ELEM_REF;
+
+                    if is_ref != 0 {
+                        let mut ref_ns: *const u8 = null();
+                        let mut refe: *const u8 = null();
+
+                        // The reference part =============================================
+                        if !is_elem_ref.is_null() {
+                            *is_elem_ref = 1;
+                        }
+
+                        xml_schema_pval_attr_node_qname(
+                            self,
+                            schema,
+                            null_mut(),
+                            attr.unwrap(),
+                            &raw mut ref_ns,
+                            &raw mut refe,
+                        );
+                        xml_schema_check_reference(self, schema, node, Some(attr.unwrap()), ref_ns);
+                        // SPEC (3.3.3 : 2.1) "One of ref or name must be present, but not both"
+                        if let Some(name_attr) = name_attr {
+                            xml_schema_pmutual_excl_attr_err(
+                                self,
+                                XmlParserErrors::XmlSchemapSrcElement2_1,
+                                null_mut(),
+                                name_attr,
+                                c"ref".as_ptr() as _,
+                                c"name".as_ptr() as _,
+                            );
+                        }
+                        // Check for illegal attributes.
+                        let mut attr = node.properties;
+                        while let Some(cur_attr) = attr {
+                            if let Some(ns) = cur_attr.ns {
+                                if ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap()) {
+                                    xml_schema_pillegal_attr_err(
+                                        self,
+                                        XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                                        null_mut(),
+                                        cur_attr,
+                                    );
+                                }
+                            } else if xml_str_equal(cur_attr.name, c"ref".as_ptr() as _)
+                                || xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+                                || xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+                                || xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
+                                || xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
+                            {
+                                attr = cur_attr.next;
+                                continue;
+                            } else {
+                                // SPEC (3.3.3 : 2.2)
+                                xml_schema_pcustom_attr_err(
+                                    self,
+                                    XmlParserErrors::XmlSchemapSrcElement2_2,
+                                    null_mut(),
+                                    null_mut(),
+                                    Some(cur_attr),
+                                    "Only the attributes 'minOccurs', 'maxOccurs' and 'id' are allowed in addition to 'ref'",
+                                );
+                                break;
+                            }
+                            attr = cur_attr.next;
+                        }
+                        // No children except <annotation> expected.
+                        if let Some(child) = child {
+                            xml_schema_pcontent_err(
+                                self,
+                                XmlParserErrors::XmlSchemapS4sElemNotAllowed,
+                                null_mut(),
+                                node,
+                                Some(child.into()),
+                                None,
+                                Some("(annotation?)"),
+                            );
+                        }
+                        if min == 0 && max == 0 {
+                            break 'return_null;
+                        }
+                        // Create the reference item and attach it to the particle.
+                        let refer: XmlSchemaQNameRefPtr = xml_schema_new_qname_ref(
+                            self,
+                            XmlSchemaTypeType::XmlSchemaTypeElement,
+                            refe,
+                            ref_ns,
+                        );
+                        if refer.is_null() {
+                            break 'return_null;
+                        }
+                        (*particle).children = refer as XmlSchemaTreeItemPtr;
+                        (*particle).annot = annot;
+                        // Add the particle to pending components, since the reference
+                        // need to be resolved.
+                        xml_schema_add_item_size(
+                            &raw mut (*self.constructor).pending,
+                            10,
+                            particle as _,
+                        );
+                        return particle as XmlSchemaBasicItemPtr;
+                    }
+                }
+                // The declaration part ===============================================
+                // declaration_part:
+                let mut ns: *const u8 = null();
+                let mut name: *const u8 = null();
+                let mut cur_idc: XmlSchemaIDCPtr = null_mut();
+                let mut last_idc: XmlSchemaIDCPtr = null_mut();
+
+                if xml_schema_pval_attr_node(
+                    self,
+                    null_mut(),
+                    // Is this `unwrap` OK ???
+                    name_attr.unwrap(),
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
+                    &raw mut name,
+                ) != 0
+                {
+                    break 'return_null;
+                }
+                // Evaluate the target namespace.
+                if top_level != 0 {
+                    ns = self.target_namespace;
+                } else if let Some(attr) = xml_schema_get_prop_node(node, "form") {
+                    let attr_value = self.get_node_content(Some(attr.into()));
+                    if attr_value == "qualified" {
+                        ns = self.target_namespace;
+                    } else if attr_value != "unqualified" {
+                        xml_schema_psimple_type_err(
+                            self,
+                            XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
+                            null_mut(),
+                            attr.into(),
+                            null_mut(),
+                            Some("(qualified | unqualified)"),
+                            Some(&attr_value),
+                            None,
+                            None,
+                            None,
+                        );
+                    }
+                } else if (*schema).flags & XML_SCHEMAS_QUALIF_ELEM != 0 {
+                    ns = self.target_namespace;
+                }
+                decl = xml_schema_add_element(self, name, ns, node, top_level);
+                if decl.is_null() {
+                    break 'return_null;
+                }
+
+                // Check for illegal attributes.
+                let mut attr = node.properties;
+                while let Some(cur_attr) = attr {
+                    if let Some(ns) = cur_attr.ns {
+                        if ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap()) {
+                            xml_schema_pillegal_attr_err(
+                                self,
+                                XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                                null_mut(),
+                                cur_attr,
+                            );
+                        }
+                    } else if !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+                        && !xml_str_equal(cur_attr.name, c"type".as_ptr() as _)
+                        && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+                        && !xml_str_equal(cur_attr.name, c"default".as_ptr() as _)
+                        && !xml_str_equal(cur_attr.name, c"fixed".as_ptr() as _)
+                        && !xml_str_equal(cur_attr.name, c"block".as_ptr() as _)
+                        && !xml_str_equal(cur_attr.name, c"nillable".as_ptr() as _)
+                    {
+                        if top_level == 0 {
+                            if !xml_str_equal(cur_attr.name, c"maxOccurs".as_ptr() as _)
+                                && !xml_str_equal(cur_attr.name, c"minOccurs".as_ptr() as _)
+                                && !xml_str_equal(cur_attr.name, c"form".as_ptr() as _)
+                            {
+                                xml_schema_pillegal_attr_err(
+                                    self,
+                                    XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                                    null_mut(),
+                                    cur_attr,
+                                );
+                            }
+                        } else if !xml_str_equal(cur_attr.name, c"final".as_ptr() as _)
+                            && !xml_str_equal(cur_attr.name, c"abstract".as_ptr() as _)
+                            && !xml_str_equal(cur_attr.name, c"substitutionGroup".as_ptr() as _)
+                        {
+                            xml_schema_pillegal_attr_err(
+                                self,
+                                XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                                null_mut(),
+                                cur_attr,
+                            );
+                        }
+                    }
+                    attr = cur_attr.next;
+                }
+                // Extract/validate attributes.
+                if top_level != 0 {
+                    // Process top attributes of global element declarations here.
+                    (*decl).flags |= XML_SCHEMAS_ELEM_GLOBAL;
+                    (*decl).flags |= XML_SCHEMAS_ELEM_TOPLEVEL;
+                    xml_schema_pval_attr_qname(
+                        self,
+                        schema,
+                        null_mut(),
+                        node,
+                        "substitutionGroup",
+                        &raw mut (*decl).subst_group_ns,
+                        &raw mut (*decl).subst_group,
+                    );
+                    if xml_get_boolean_prop(self, node, "abstract", 0) != 0 {
+                        (*decl).flags |= XML_SCHEMAS_ELEM_ABSTRACT;
+                    }
+                    // Attribute "final".
+                    if let Some(attr) = xml_schema_get_prop_node(node, "final") {
+                        let attr_value = self.get_node_content(Some(attr.into()));
+                        let cattr_value = xml_dict_lookup(
+                            self.dict,
+                            attr_value.as_ptr(),
+                            attr_value.len() as i32,
+                        );
+                        if xml_schema_pval_attr_block_final(
+                            cattr_value,
+                            &raw mut (*decl).flags,
+                            -1,
+                            XML_SCHEMAS_ELEM_FINAL_EXTENSION,
+                            XML_SCHEMAS_ELEM_FINAL_RESTRICTION,
+                            -1,
+                            -1,
+                            -1,
+                        ) != 0
+                        {
+                            xml_schema_psimple_type_err(
+                                self,
+                                XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
+                                null_mut(),
+                                attr.into(),
+                                null_mut(),
+                                Some("(#all | List of (extension | restriction))"),
+                                Some(&attr_value),
+                                None,
+                                None,
+                                None,
+                            );
+                        }
+                    } else {
+                        if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_EXTENSION != 0 {
+                            (*decl).flags |= XML_SCHEMAS_ELEM_FINAL_EXTENSION;
+                        }
+                        if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION != 0 {
+                            (*decl).flags |= XML_SCHEMAS_ELEM_FINAL_RESTRICTION;
+                        }
+                    }
+                }
+                // Attribute "block".
+                if let Some(attr) = xml_schema_get_prop_node(node, "block") {
+                    let attr_value = self.get_node_content(Some(attr.into()));
+                    let cattr_value =
+                        xml_dict_lookup(self.dict, attr_value.as_ptr(), attr_value.len() as i32);
+                    if xml_schema_pval_attr_block_final(
+                        cattr_value,
+                        &raw mut (*decl).flags,
+                        -1,
+                        XML_SCHEMAS_ELEM_BLOCK_EXTENSION,
+                        XML_SCHEMAS_ELEM_BLOCK_RESTRICTION,
+                        XML_SCHEMAS_ELEM_BLOCK_SUBSTITUTION,
+                        -1,
+                        -1,
+                    ) != 0
+                    {
+                        xml_schema_psimple_type_err(
+                            self,
+                            XmlParserErrors::XmlSchemapS4sAttrInvalidValue,
+                            null_mut(),
+                            attr.into(),
+                            null_mut(),
+                            Some("(#all | List of (extension | restriction | substitution))"),
+                            Some(&attr_value),
+                            None,
+                            None,
+                            None,
+                        );
+                    }
+                } else {
+                    // Apply default "block" values.
+                    if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION != 0 {
+                        (*decl).flags |= XML_SCHEMAS_ELEM_BLOCK_RESTRICTION;
+                    }
+                    if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION != 0 {
+                        (*decl).flags |= XML_SCHEMAS_ELEM_BLOCK_EXTENSION;
+                    }
+                    if (*schema).flags & XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION != 0 {
+                        (*decl).flags |= XML_SCHEMAS_ELEM_BLOCK_SUBSTITUTION;
+                    }
+                }
+                if xml_get_boolean_prop(self, node, "nillable", 0) != 0 {
+                    (*decl).flags |= XML_SCHEMAS_ELEM_NILLABLE;
+                }
+
+                if let Some(attr) = xml_schema_get_prop_node(node, "type") {
+                    xml_schema_pval_attr_node_qname(
+                        self,
+                        schema,
+                        null_mut(),
+                        attr,
+                        &raw mut (*decl).named_type_ns,
+                        &raw mut (*decl).named_type,
+                    );
+                    xml_schema_check_reference(
+                        self,
+                        schema,
+                        node,
+                        Some(attr),
+                        (*decl).named_type_ns,
+                    );
+                }
+                (*decl).value = self.get_prop(node, "default").map_or(null_mut(), |prop| {
+                    xml_dict_lookup(self.dict, prop.as_ptr(), prop.len() as i32)
+                });
+                if let Some(attr) = xml_schema_get_prop_node(node, "fixed") {
+                    let fixed = self.get_node_content(Some(attr.into()));
+                    let fixed = xml_dict_lookup(self.dict, fixed.as_ptr(), fixed.len() as i32);
+                    if !(*decl).value.is_null() {
+                        // 3.3.3 : 1
+                        // default and fixed must not both be present.
+                        xml_schema_pmutual_excl_attr_err(
+                            self,
+                            XmlParserErrors::XmlSchemapSrcElement1,
+                            null_mut(),
+                            attr,
+                            c"default".as_ptr() as _,
+                            c"fixed".as_ptr() as _,
+                        );
+                    } else {
+                        (*decl).flags |= XML_SCHEMAS_ELEM_FIXED;
+                        (*decl).value = fixed;
+                    }
+                }
+                // And now for the children...
+                if is_schema(child, "complexType") {
+                    // 3.3.3 : 3
+                    // "type" and either <simpleType> or <complexType> are mutually
+                    // exclusive
+                    if !(*decl).named_type.is_null() {
+                        xml_schema_pcontent_err(
+                            self,
+                            XmlParserErrors::XmlSchemapSrcElement3,
+                            null_mut(),
+                            node,
+                            child.map(|child| child.into()),
+                            Some(
+                                "The attribute 'type' and the <complexType> child are mutually exclusive",
+                            ),
+                            None,
+                        );
+                    } else {
+                        (*decl).subtypes = self.parse_complex_type(schema, child.unwrap(), 0);
+                    }
+                    child = child
+                        .unwrap()
+                        .next
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                } else if is_schema(child, "simpleType") {
+                    // 3.3.3 : 3
+                    // "type" and either <simpleType> or <complexType> are
+                    // mutually exclusive
+                    if !(*decl).named_type.is_null() {
+                        xml_schema_pcontent_err(
+                            self,
+                            XmlParserErrors::XmlSchemapSrcElement3,
+                            null_mut(),
+                            node,
+                            child.map(|child| child.into()),
+                            Some(
+                                "The attribute 'type' and the <simpleType> child are mutually exclusive",
+                            ),
+                            None,
+                        );
+                    } else {
+                        (*decl).subtypes = self.parse_simple_type(schema, child.unwrap(), 0);
+                    }
+                    child = child
+                        .unwrap()
+                        .next
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                }
+                while is_schema(child, "unique")
+                    || is_schema(child, "key")
+                    || is_schema(child, "keyref")
+                {
+                    if is_schema(child, "unique") {
+                        cur_idc = xml_schema_parse_idc(
+                            self,
+                            schema,
+                            child.unwrap(),
+                            XmlSchemaTypeType::XmlSchemaTypeIDCUnique,
+                            (*decl).target_namespace,
+                        );
+                    } else if is_schema(child, "key") {
+                        cur_idc = xml_schema_parse_idc(
+                            self,
+                            schema,
+                            child.unwrap(),
+                            XmlSchemaTypeType::XmlSchemaTypeIDCKey,
+                            (*decl).target_namespace,
+                        );
+                    } else if is_schema(child, "keyref") {
+                        cur_idc = xml_schema_parse_idc(
+                            self,
+                            schema,
+                            child.unwrap(),
+                            XmlSchemaTypeType::XmlSchemaTypeIDCKeyref,
+                            (*decl).target_namespace,
+                        );
+                    }
+                    if !last_idc.is_null() {
+                        (*last_idc).next = cur_idc;
+                    } else {
+                        (*decl).idcs = cur_idc as _;
+                    }
+                    last_idc = cur_idc;
+                    child = child
+                        .unwrap()
+                        .next
+                        .map(|node| XmlNodePtr::try_from(node).unwrap());
+                }
+                if let Some(child) = child {
+                    xml_schema_pcontent_err(
+                        self,
+                        XmlParserErrors::XmlSchemapS4sElemNotAllowed,
+                        null_mut(),
+                        node,
+                        Some(child.into()),
+                        None,
+                        Some(
+                            "(annotation?, ((simpleType | complexType)?, (unique | key | keyref)*))",
+                        ),
+                    );
+                }
+                (*decl).annot = annot;
+                // NOTE: Element Declaration Representation OK 4. will be checked at a different layer.
+                if top_level != 0 {
+                    return decl as XmlSchemaBasicItemPtr;
+                } else {
+                    (*particle).children = decl as XmlSchemaTreeItemPtr;
+                    return particle as XmlSchemaBasicItemPtr;
+                }
+            }
+
+            // return_null:
+            if !annot.is_null() {
+                if !particle.is_null() {
+                    (*particle).annot = null_mut();
+                }
+                if !decl.is_null() {
+                    (*decl).annot = null_mut();
+                }
+                xml_schema_free_annot(annot);
+            }
+            null_mut()
+        }
+    }
+
+    #[doc(alias = "xmlSchemaParseGlobalAttribute")]
+    unsafe fn parse_global_attribute(
+        &mut self,
+        schema: XmlSchemaPtr,
+        node: XmlNodePtr,
+    ) -> XmlSchemaAttributePtr {
+        unsafe {
+            let mut attr_value: *const u8 = null();
+
+            // Note that the w3c spec assumes the schema to be validated with schema
+            // for schemas beforehand.
+            //
+            // 3.2.3 Constraints on XML Representations of Attribute Declarations
+            if schema.is_null() {
+                return null_mut();
+            }
+            // 3.2.3 : 3.1
+            // One of ref or name must be present, but not both
+            let Some(attr) = xml_schema_get_prop_node(node, "name") else {
+                xml_schema_pmissing_attr_err(
+                    self,
+                    XmlParserErrors::XmlSchemapS4sAttrMissing,
+                    null_mut(),
+                    Some(node.into()),
+                    Some("name"),
+                    None,
+                );
+                return null_mut();
+            };
+            if xml_schema_pval_attr_node(
+                self,
+                null_mut(),
+                attr,
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
+                &raw mut attr_value,
+            ) != 0
+            {
+                return null_mut();
+            }
+            // 3.2.6 Schema Component Constraint: xmlns Not Allowed
+            // TODO: Move this to the component layer.
+            if xml_str_equal(attr_value, c"xmlns".as_ptr() as _) {
+                xml_schema_psimple_type_err(
+                    self,
+                    XmlParserErrors::XmlSchemapNoXmlns,
+                    null_mut(),
+                    attr.into(),
+                    xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
+                    None,
+                    None,
+                    Some("The value of the attribute must not match 'xmlns'"),
+                    None,
+                    None,
+                );
+                return null_mut();
+            }
+            // 3.2.6 Schema Component Constraint: xsi: Not Allowed
+            // TODO: Move this to the component layer.
+            //       Or better leave it here and add it to the component layer
+            //       if we have a schema construction API.
+            if xml_str_equal(self.target_namespace, XML_SCHEMA_INSTANCE_NS.as_ptr() as _) {
+                let ns = XML_SCHEMA_INSTANCE_NS.to_string_lossy();
+                xml_schema_custom_err(
+                    self as *mut Self as XmlSchemaAbstractCtxtPtr,
+                    XmlParserErrors::XmlSchemapNoXsi,
+                    Some(node.into()),
+                    null_mut(),
+                    format!("The target namespace must not match '{ns}'").as_str(),
+                    Some(&ns),
+                    None,
+                );
+            }
+
+            let ret: XmlSchemaAttributePtr =
+                xml_schema_add_attribute(self, schema, attr_value, self.target_namespace, node, 1);
+            if ret.is_null() {
+                return null_mut();
+            }
+            (*ret).flags |= XML_SCHEMAS_ATTR_GLOBAL;
+
+            // Check for illegal attributes.
+            let mut attr = node.properties;
+            while let Some(cur_attr) = attr {
+                if let Some(ns) = cur_attr.ns {
+                    if ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap()) {
+                        xml_schema_pillegal_attr_err(
+                            self,
+                            XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                            null_mut(),
+                            cur_attr,
+                        );
+                    }
+                } else if cur_attr.name().as_deref() != Some("id")
+                    && cur_attr.name().as_deref() != Some("default")
+                    && cur_attr.name().as_deref() != Some("fixed")
+                    && cur_attr.name().as_deref() != Some("name")
+                    && cur_attr.name().as_deref() != Some("type")
+                {
+                    xml_schema_pillegal_attr_err(
+                        self,
+                        XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                        null_mut(),
+                        cur_attr,
+                    );
+                }
+                attr = cur_attr.next;
+            }
+            xml_schema_pval_attr_qname(
+                self,
+                schema,
+                null_mut(),
+                node,
+                "type",
+                &raw mut (*ret).type_ns,
+                &raw mut (*ret).type_name,
+            );
+
+            xml_schema_pval_attr_id(self, node, "id");
+            // Attribute "fixed".
+            (*ret).def_value = self.get_prop(node, "fixed").map_or(null_mut(), |prop| {
+                xml_dict_lookup(self.dict, prop.as_ptr(), prop.len() as i32)
+            });
+            if !(*ret).def_value.is_null() {
+                (*ret).flags |= XML_SCHEMAS_ATTR_FIXED;
+            }
+            // Attribute "default".
+            if let Some(attr) = xml_schema_get_prop_node(node, "default") {
+                // 3.2.3 : 1
+                // default and fixed must not both be present.
+                if (*ret).flags & XML_SCHEMAS_ATTR_FIXED != 0 {
+                    xml_schema_pmutual_excl_attr_err(
+                        self,
+                        XmlParserErrors::XmlSchemapSrcAttribute1,
+                        ret as XmlSchemaBasicItemPtr,
+                        attr,
+                        c"default".as_ptr() as _,
+                        c"fixed".as_ptr() as _,
+                    );
+                } else {
+                    let def_value = self.get_node_content(Some(attr.into()));
+                    (*ret).def_value =
+                        xml_dict_lookup(self.dict, def_value.as_ptr(), def_value.len() as i32);
+                }
+            }
+            // And now for the children...
+            let mut child = node.children.map(|c| XmlNodePtr::try_from(c).unwrap());
+            if is_schema(child, "annotation") {
+                (*ret).annot = self.parse_annotation(child.unwrap(), 1);
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            if is_schema(child, "simpleType") {
+                if !(*ret).type_name.is_null() {
+                    // 3.2.3 : 4
+                    // type and <simpleType> must not both be present.
+                    xml_schema_pcontent_err(
+                        self,
+                        XmlParserErrors::XmlSchemapSrcAttribute4,
+                        null_mut(),
+                        node,
+                        child.map(|child| child.into()),
+                        Some(
+                            "The attribute 'type' and the <simpleType> child are mutually exclusive",
+                        ),
+                        None,
+                    );
+                } else {
+                    (*ret).subtypes = self.parse_simple_type(schema, child.unwrap(), 0);
+                }
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            if let Some(child) = child {
+                xml_schema_pcontent_err(
+                    self,
+                    XmlParserErrors::XmlSchemapS4sElemNotAllowed,
+                    null_mut(),
+                    node,
+                    Some(child.into()),
+                    None,
+                    Some("(annotation?, simpleType?)"),
+                );
+            }
+
+            ret
+        }
+    }
+
+    /// Parse a XML schema Attribute Group declaration
+    /// *WARNING* this interface is highly subject to change
+    ///
+    /// Returns the attribute group definition or NULL in case of error.
+    #[doc(alias = "xmlSchemaParseAttributeGroupDefinition")]
+    unsafe fn parse_attribute_group_definition(
+        &mut self,
+        schema: XmlSchemaPtr,
+        node: XmlNodePtr,
+    ) -> XmlSchemaAttributeGroupPtr {
+        unsafe {
+            let mut name: *const u8 = null();
+            let mut has_refs: i32 = 0;
+
+            if schema.is_null() {
+                return null_mut();
+            }
+
+            let Some(attr) = xml_schema_get_prop_node(node, "name") else {
+                xml_schema_pmissing_attr_err(
+                    self,
+                    XmlParserErrors::XmlSchemapS4sAttrMissing,
+                    null_mut(),
+                    Some(node.into()),
+                    Some("name"),
+                    None,
+                );
+                return null_mut();
+            };
+            // The name is crucial, exit if invalid.
+            if xml_schema_pval_attr_node(
+                self,
+                null_mut(),
+                attr,
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
+                &raw mut name,
+            ) != 0
+            {
+                return null_mut();
+            }
+            let ret: XmlSchemaAttributeGroupPtr = xml_schema_add_attribute_group_definition(
+                self,
+                schema,
+                name,
+                self.target_namespace,
+                node,
+            );
+            if ret.is_null() {
+                return null_mut();
+            }
+            // Check for illegal attributes.
+            let mut attr = node.properties;
+            while let Some(cur_attr) = attr {
+                if let Some(ns) = cur_attr.ns {
+                    if ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap()) {
+                        xml_schema_pillegal_attr_err(
+                            self,
+                            XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                            null_mut(),
+                            cur_attr,
+                        );
+                    }
+                } else if !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+                    && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+                {
+                    xml_schema_pillegal_attr_err(
+                        self,
+                        XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                        null_mut(),
+                        cur_attr,
+                    );
+                }
+                attr = cur_attr.next;
+            }
+            // Attribute ID
+            xml_schema_pval_attr_id(self, node, "id");
+            // And now for the children...
+            let mut child = node.children.map(|c| XmlNodePtr::try_from(c).unwrap());
+            if is_schema(child, "annotation") {
+                (*ret).annot = self.parse_annotation(child.unwrap(), 1);
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            // Parse contained attribute decls/refs.
+            if xml_schema_parse_local_attributes(
+                self,
+                schema,
+                &mut child,
+                &raw mut (*ret).attr_uses as *mut XmlSchemaItemListPtr<*mut c_void>,
+                XmlSchemaTypeType::XmlSchemaTypeAttributeGroup as _,
+                &raw mut has_refs,
+            ) == -1
+            {
+                return null_mut();
+            }
+            if has_refs != 0 {
+                (*ret).flags |= XML_SCHEMAS_ATTRGROUP_HAS_REFS;
+            }
+            // Parse the attribute wildcard.
+            if is_schema(child, "anyAttribute") {
+                (*ret).attribute_wildcard =
+                    xml_schema_parse_any_attribute(self, schema, child.unwrap());
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            if let Some(child) = child {
+                xml_schema_pcontent_err(
+                    self,
+                    XmlParserErrors::XmlSchemapS4sElemNotAllowed,
+                    null_mut(),
+                    node,
+                    Some(child.into()),
+                    None,
+                    Some("(annotation?, ((attribute | attributeGroup)*, anyAttribute?))"),
+                );
+            }
+            ret
+        }
+    }
+
+    /// Parses a XML schema model group definition.
+    ///
+    /// Note that the constraint src-redefine (6.2) can't be applied until
+    /// references have been resolved. So we will do this at the
+    /// component fixup level.
+    ///
+    /// *WARNING* this interface is highly subject to change
+    ///
+    /// Returns -1 in case of error, 0 if the declaration is improper and 1 in case of success.
+    #[doc(alias = "xmlSchemaParseModelGroupDefinition")]
+    unsafe fn parse_model_group_definition(
+        &mut self,
+        schema: XmlSchemaPtr,
+        node: XmlNodePtr,
+    ) -> XmlSchemaModelGroupDefPtr {
+        unsafe {
+            let mut name: *const u8 = null();
+
+            if schema.is_null() {
+                return null_mut();
+            }
+
+            let Some(attr) = xml_schema_get_prop_node(node, "name") else {
+                xml_schema_pmissing_attr_err(
+                    self,
+                    XmlParserErrors::XmlSchemapS4sAttrMissing,
+                    null_mut(),
+                    Some(node.into()),
+                    Some("name"),
+                    None,
+                );
+                return null_mut();
+            };
+            if xml_schema_pval_attr_node(
+                self,
+                null_mut(),
+                attr,
+                xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasNCName),
+                &raw mut name,
+            ) != 0
+            {
+                return null_mut();
+            }
+            let item: XmlSchemaModelGroupDefPtr = xml_schema_add_model_group_definition(
+                self,
+                schema,
+                name,
+                self.target_namespace,
+                node,
+            );
+            if item.is_null() {
+                return null_mut();
+            }
+            // Check for illegal attributes.
+            let mut attr = node.properties;
+            while let Some(cur_attr) = attr {
+                if let Some(ns) = cur_attr.ns {
+                    if ns.href().as_deref() == Some(XML_SCHEMA_NS.to_str().unwrap()) {
+                        xml_schema_pillegal_attr_err(
+                            self,
+                            XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                            null_mut(),
+                            cur_attr,
+                        );
+                    }
+                } else if !xml_str_equal(cur_attr.name, c"name".as_ptr() as _)
+                    && !xml_str_equal(cur_attr.name, c"id".as_ptr() as _)
+                {
+                    xml_schema_pillegal_attr_err(
+                        self,
+                        XmlParserErrors::XmlSchemapS4sAttrNotAllowed,
+                        null_mut(),
+                        cur_attr,
+                    );
+                }
+                attr = cur_attr.next;
+            }
+            xml_schema_pval_attr_id(self, node, "id");
+            // And now for the children...
+            let mut child = node.children.map(|c| XmlNodePtr::try_from(c).unwrap());
+            if is_schema(child, "annotation") {
+                (*item).annot = self.parse_annotation(child.unwrap(), 1);
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            if is_schema(child, "all") {
+                (*item).children = xml_schema_parse_model_group(
+                    self,
+                    schema,
+                    child.unwrap(),
+                    XmlSchemaTypeType::XmlSchemaTypeAll,
+                    0,
+                );
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            } else if is_schema(child, "choice") {
+                (*item).children = xml_schema_parse_model_group(
+                    self,
+                    schema,
+                    child.unwrap(),
+                    XmlSchemaTypeType::XmlSchemaTypeChoice,
+                    0,
+                );
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            } else if is_schema(child, "sequence") {
+                (*item).children = xml_schema_parse_model_group(
+                    self,
+                    schema,
+                    child.unwrap(),
+                    XmlSchemaTypeType::XmlSchemaTypeSequence,
+                    0,
+                );
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+
+            if let Some(child) = child {
+                xml_schema_pcontent_err(
+                    self,
+                    XmlParserErrors::XmlSchemapS4sElemNotAllowed,
+                    null_mut(),
+                    node,
+                    Some(child.into()),
+                    None,
+                    Some("(annotation?, (all | choice | sequence)?)"),
+                );
+            }
+            item
+        }
+    }
+
+    /// Parse a XML schema Notation declaration
+    ///
+    /// Returns the new structure or NULL in case of error
+    #[doc(alias = "xmlSchemaParseNotation")]
+    unsafe fn parse_notation(
+        &mut self,
+        schema: XmlSchemaPtr,
+        node: XmlNodePtr,
+    ) -> XmlSchemaNotationPtr {
+        unsafe {
+            if schema.is_null() {
+                return null_mut();
+            }
+            let Some(name) = self.get_prop(node, "name") else {
+                xml_schema_perr2(
+                    self,
+                    Some(node.into()),
+                    None,
+                    XmlParserErrors::XmlSchemapNotationNoName,
+                    "Notation has no name\n",
+                    None,
+                    None,
+                );
+                return null_mut();
+            };
+            let name = CString::new(name).unwrap();
+            let ret: XmlSchemaNotationPtr = xml_schema_add_notation(
+                self,
+                schema,
+                name.as_ptr() as *const u8,
+                self.target_namespace,
+                node,
+            );
+            if ret.is_null() {
+                return null_mut();
+            }
+            xml_schema_pval_attr_id(self, node, "id");
+
+            let mut child = node.children.map(|c| XmlNodePtr::try_from(c).unwrap());
+            if is_schema(child, "annotation") {
+                (*ret).annot = self.parse_annotation(child.unwrap(), 1);
+                child = child
+                    .unwrap()
+                    .next
+                    .map(|node| XmlNodePtr::try_from(node).unwrap());
+            }
+            if let Some(child) = child {
+                xml_schema_pcontent_err(
+                    self,
+                    XmlParserErrors::XmlSchemapS4sElemNotAllowed,
+                    null_mut(),
+                    node,
+                    Some(child.into()),
+                    None,
+                    Some("(annotation?)"),
+                );
+            }
+
+            ret
+        }
     }
 }
