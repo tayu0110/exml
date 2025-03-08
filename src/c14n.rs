@@ -42,7 +42,6 @@ use crate::{
     io::{XmlOutputBuffer, write_quoted},
     libxml::{
         globals::xml_free,
-        uri::{XmlURIPtr, xml_free_uri, xml_parse_uri},
         xmlstring::{xml_strcmp, xml_strlen},
     },
     list::XmlList,
@@ -51,7 +50,7 @@ use crate::{
         XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, xml_free_prop_list,
         xml_new_ns_prop,
     },
-    uri::build_uri,
+    uri::{XmlURI, build_uri},
     xpath::XmlNodeSet,
 };
 
@@ -83,6 +82,7 @@ pub struct XmlC14NVisibleNsStack {
 }
 
 impl XmlC14NVisibleNsStack {
+    #[doc(alias = "xmlC14NVisibleNsStackSave")]
     fn save(&self, state: &mut XmlC14NVisibleNsStack) {
         state.ns_cur_end = self.ns_cur_end;
         state.ns_prev_start = self.ns_prev_start;
@@ -94,33 +94,25 @@ impl XmlC14NVisibleNsStack {
     ///
     /// Please refer to the document of `xmlC14NVisibleNsStackFind` for original libxml2.
     #[doc(alias = "xmlC14NVisibleNsStackFind")]
-    unsafe fn find(&self, ns: Option<&XmlNs>) -> bool {
-        unsafe {
-            // if the default namespace xmlns="" is not defined yet then we do not want to print it out
-            let prefix: *const u8 =
-                if let Some(prefix) = ns.filter(|ns| ns.prefix().is_some()).map(|ns| ns.prefix) {
-                    prefix
-                } else {
-                    c"".as_ptr() as _
-                };
-            let href: *const u8 =
-                if let Some(href) = ns.filter(|ns| !ns.href.is_null()).map(|ns| ns.href) {
-                    href
-                } else {
-                    c"".as_ptr() as _
-                };
+    unsafe fn find(&self, ns: &XmlNs) -> bool {
+        // if the default namespace xmlns="" is not defined yet then we do not want to print it out
+        let prefix = unsafe { ns.prefix() };
+        let prefix = prefix.as_deref().unwrap_or("");
+        let href = unsafe { ns.href() };
+        let href = href.as_deref().unwrap_or("");
 
-            let has_empty_ns =
-                xml_c14n_str_equal(prefix, null_mut()) && xml_c14n_str_equal(href, null_mut());
+        let has_empty_ns =
+            xml_c14n_str_equal(Some(prefix), None) && xml_c14n_str_equal(Some(href), None);
 
-            let start = if has_empty_ns { 0 } else { self.ns_prev_start };
-            for &ns1 in self.ns_tab[start..self.ns_cur_end].iter().rev() {
-                if xml_c14n_str_equal(prefix, ns1.prefix) {
-                    return xml_c14n_str_equal(href, ns1.href);
+        let start = if has_empty_ns { 0 } else { self.ns_prev_start };
+        for &ns1 in self.ns_tab[start..self.ns_cur_end].iter().rev() {
+            unsafe {
+                if xml_c14n_str_equal(Some(prefix), ns1.prefix().as_deref()) {
+                    return xml_c14n_str_equal(Some(href), ns1.href().as_deref());
                 }
             }
-            has_empty_ns
         }
+        has_empty_ns
     }
 
     #[doc(alias = "xmlC14NVisibleNsStackAdd")]
@@ -135,11 +127,13 @@ impl XmlC14NVisibleNsStack {
         self.ns_cur_end += 1;
     }
 
+    #[doc(alias = "xmlC14NVisibleNsStackShift")]
     fn shift(&mut self) {
         self.ns_prev_start = self.ns_prev_end;
         self.ns_prev_end = self.ns_cur_end;
     }
 
+    #[doc(alias = "xmlC14NVisibleNsStackRestore")]
     fn restore(&mut self, state: &XmlC14NVisibleNsStack) {
         self.ns_cur_end = state.ns_cur_end;
         self.ns_prev_start = state.ns_prev_start;
@@ -213,19 +207,17 @@ impl<T> XmlC14NCtx<'_, T> {
 
             let mut ns = cur.ns_def;
             while let Some(now) = ns {
-                if xml_strlen(now.href as _) > 0 {
-                    let uri: XmlURIPtr = xml_parse_uri(now.href as _);
-                    if uri.is_null() {
+                let href = now.href().unwrap();
+                if !href.is_empty() {
+                    let Some(uri) = XmlURI::parse(&href) else {
                         xml_c14n_err_internal("parsing namespace uri");
                         return -1;
-                    }
-                    if xml_strlen((*uri).scheme as _) == 0 {
-                        let scheme = CStr::from_ptr((*uri).scheme as *const i8).to_string_lossy();
-                        xml_c14n_err_relative_namespace(scheme.as_ref());
-                        xml_free_uri(uri);
+                    };
+                    let scheme = uri.scheme.as_deref().unwrap();
+                    if scheme.is_empty() {
+                        xml_c14n_err_relative_namespace(scheme);
                         return -1;
                     }
-                    xml_free_uri(uri);
                 }
                 ns = now.next;
             }
@@ -320,7 +312,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         && !xml_c14n_is_xml_ns(now)
                         && self.is_visible(Some(now.into()), Some(cur.into()))
                     {
-                        let already_rendered = (*self.ns_rendered).find(Some(&*now));
+                        let already_rendered = (*self.ns_rendered).find(&now);
                         if visible {
                             (*self.ns_rendered).add(now, cur);
                         }
@@ -343,7 +335,7 @@ impl<T> XmlC14NCtx<'_, T> {
             //   - the nearest ancestor element of E in the node-set has a default
             //      namespace node in the node-set (default namespace nodes always
             //      have non-empty values in XPath)
-            if visible && !has_empty_ns && !(*self.ns_rendered).find(Some(&XmlNs::default())) {
+            if visible && !has_empty_ns && !(*self.ns_rendered).find(&XmlNs::default()) {
                 self.print_namespaces(&XmlNs::default());
             }
 
@@ -746,7 +738,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     // cdata sections are processed as text nodes
                     // todo: verify that cdata sections are included in XPath nodes set
                     if visible && !cur.content.is_null() {
-                        let buffer = xml_c11n_normalize_text(
+                        let buffer = normalize_text(
                             CStr::from_ptr(cur.content as *const i8)
                                 .to_string_lossy()
                                 .as_ref(),
@@ -778,7 +770,7 @@ impl<T> XmlC14NCtx<'_, T> {
                             self.buf.borrow_mut().write_str(" ");
 
                             /* todo: do we need to normalize pi? */
-                            let buffer = xml_c11n_normalize_pi(
+                            let buffer = normalize_pi(
                                 CStr::from_ptr(cur.content as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
@@ -817,7 +809,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         let cur = XmlNodePtr::try_from(cur).unwrap();
                         if !cur.content.is_null() {
                             /* todo: do we need to normalize comment? */
-                            let buffer = xml_c11n_normalize_comment(
+                            let buffer = normalize_comment(
                                 CStr::from_ptr(cur.content as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
@@ -962,7 +954,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         !xml_c14n_is_xml_ns(ns)
                             && self.is_visible(Some(ns.into()), Some(cur.into()))
                     }) {
-                        let already_rendered = (*self.ns_rendered).find(Some(&*ns));
+                        let already_rendered = (*self.ns_rendered).find(&ns);
                         if visible {
                             // TODO: replace `cur` to `Rc<XmlNode>`
                             (*self.ns_rendered).add(ns, cur);
@@ -988,7 +980,7 @@ impl<T> XmlC14NCtx<'_, T> {
             if let Some(ns) = ns.filter(|&ns| !xml_c14n_is_xml_ns(ns)) {
                 if visible
                     && self.is_visible(Some(ns.into()), Some(cur.into()))
-                    && self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*ns)) == 0
+                    && !self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, &ns)
                 {
                     list.insert_lower_bound(ns);
                 }
@@ -1012,10 +1004,9 @@ impl<T> XmlC14NCtx<'_, T> {
                         && self.is_visible(Some(cur_attr.into()), Some(cur.into()))
                 }) {
                     let already_rendered =
-                        self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*attr_ns));
-                    // TODO: replace `cur` to `Rc<XmlNode>`
+                        self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, &attr_ns);
                     (*self.ns_rendered).add(attr_ns, cur);
-                    if already_rendered == 0 && visible {
+                    if !already_rendered && visible {
                         list.insert_lower_bound(attr_ns);
                     }
                     if attr_ns.prefix().map_or(0, |pre| pre.len()) == 0 {
@@ -1036,14 +1027,14 @@ impl<T> XmlC14NCtx<'_, T> {
                 && !has_empty_ns_in_inclusive_list
             {
                 let already_rendered =
-                    self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&XmlNs::default()));
-                if already_rendered == 0 {
+                    self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, &XmlNs::default());
+                if !already_rendered {
                     self.print_namespaces(&XmlNs::default());
                 }
             } else if visible
                 && !has_empty_ns
                 && has_empty_ns_in_inclusive_list
-                && !(*self.ns_rendered).find(Some(&XmlNs::default()))
+                && !(*self.ns_rendered).find(&XmlNs::default())
             {
                 self.print_namespaces(&XmlNs::default());
             }
@@ -1060,32 +1051,24 @@ impl<T> XmlC14NCtx<'_, T> {
     unsafe fn exc_c14n_visible_ns_stack_find(
         &self,
         cur: &XmlC14NVisibleNsStack,
-        ns: Option<&XmlNs>,
-    ) -> i32 {
+        ns: &XmlNs,
+    ) -> bool {
         unsafe {
             // if the default namespace xmlns="" is not defined yet then we do not want to print it out
-            let prefix: *const u8 =
-                if let Some(prefix) = ns.filter(|ns| ns.prefix().is_some()).map(|ns| ns.prefix) {
-                    prefix
-                } else {
-                    c"".as_ptr() as _
-                };
-            let href: *const u8 =
-                if let Some(href) = ns.filter(|ns| !ns.href.is_null()).map(|ns| ns.href) {
-                    href
-                } else {
-                    c"".as_ptr() as _
-                };
-            let has_empty_ns: i32 = (xml_c14n_str_equal(prefix, null_mut())
-                && xml_c14n_str_equal(href, null_mut())) as _;
+            let prefix = ns.prefix();
+            let prefix = prefix.as_deref().unwrap_or("");
+            let href = ns.href();
+            let href = href.as_deref().unwrap_or("");
+            let has_empty_ns =
+                xml_c14n_str_equal(Some(prefix), None) && xml_c14n_str_equal(Some(href), None);
 
             for (i, &ns1) in cur.ns_tab[..cur.ns_cur_end].iter().enumerate().rev() {
-                if xml_c14n_str_equal(prefix, ns1.prefix) {
-                    if xml_c14n_str_equal(href, ns1.href) {
+                if xml_c14n_str_equal(Some(prefix), ns1.prefix().as_deref()) {
+                    if xml_c14n_str_equal(Some(href), ns1.href().as_deref()) {
                         let node = cur.node_tab[i];
-                        return self.is_visible(Some(ns1.into()), Some(node.into())) as i32;
+                        return self.is_visible(Some(ns1.into()), Some(node.into()));
                     } else {
-                        return 0;
+                        return false;
                     }
                 }
             }
@@ -1230,7 +1213,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 .children()
                 .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1))
             {
-                let buffer = xml_c11n_normalize_attr(&value);
+                let buffer = normalize_attr(&value);
                 self.buf.borrow_mut().write_str(&buffer);
             }
             self.buf.borrow_mut().write_str("\"");
@@ -1665,26 +1648,11 @@ unsafe fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
 }
 
 #[doc(alias = "xmlC14NStrEqual")]
-unsafe fn xml_c14n_str_equal(mut str1: *const u8, mut str2: *const u8) -> bool {
-    unsafe {
-        if str1 == str2 {
-            return true;
-        }
-        if str1.is_null() {
-            return *str2 == b'\0';
-        }
-        if str2.is_null() {
-            return *str1 == b'\0';
-        }
-        while {
-            if *str1 != *str2 {
-                return false;
-            }
-            str1 = str1.add(1);
-            str2 = str2.add(1);
-            *str2.sub(1) != 0
-        } {}
-        true
+fn xml_c14n_str_equal(str1: Option<&str>, str2: Option<&str>) -> bool {
+    match (str1, str2) {
+        (Some(str1), Some(str2)) => str1 == str2,
+        (Some(s), None) | (None, Some(s)) => s.is_empty(),
+        (None, None) => true,
     }
 }
 
@@ -1700,12 +1668,6 @@ unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> i32 {
         if attr1 == attr2 {
             return 0;
         }
-        // if attr1.is_null() {
-        //     return -1;
-        // }
-        // if attr2.is_null() {
-        //     return 1;
-        // }
 
         if attr1.ns == attr2.ns {
             return xml_strcmp(attr1.name, attr2.name);
@@ -1765,7 +1727,7 @@ macro_rules! grow_buffer_reentrant {
 /// Returns a normalized string (caller is responsible for calling xmlFree())
 /// or NULL if an error occurs
 #[doc(alias = "xmlC11NNormalizeString")]
-fn xml_c11n_normalize_string(input: &str, mode: XmlC14NNormalizationMode) -> String {
+fn normalize_string(input: &str, mode: XmlC14NNormalizationMode) -> String {
     // allocate an translation buffer.
     let mut out = String::new();
 
@@ -1814,23 +1776,23 @@ fn xml_c11n_normalize_string(input: &str, mode: XmlC14NNormalizationMode) -> Str
 }
 
 #[doc(alias = "xmlC11NNormalizeAttr")]
-unsafe fn xml_c11n_normalize_attr(a: &str) -> String {
-    xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeAttr)
+fn normalize_attr(a: &str) -> String {
+    normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeAttr)
 }
 
 #[doc(alias = "xmlC11NNormalizeText")]
-unsafe fn xml_c11n_normalize_text(a: &str) -> String {
-    xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeText)
+fn normalize_text(a: &str) -> String {
+    normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeText)
 }
 
 #[doc(alias = "xmlC11NNormalizeComment")]
-unsafe fn xml_c11n_normalize_comment(a: &str) -> String {
-    xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeComment)
+fn normalize_comment(a: &str) -> String {
+    normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeComment)
 }
 
 #[doc(alias = "xmlC11NNormalizePI")]
-unsafe fn xml_c11n_normalize_pi(a: &str) -> String {
-    xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizePI)
+fn normalize_pi(a: &str) -> String {
+    normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizePI)
 }
 
 /// Handle a redefinition of invalid node error
