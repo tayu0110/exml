@@ -574,7 +574,7 @@ impl<'a> XmlTextWriter<'a> {
                 if self.out.conv.is_none() {
                     self.out.conv = XmlBufRef::with_capacity(4000);
                 }
-                self.out.encode(true);
+                self.out.encode(true).ok();
                 if let Some(mut doc) = self.doc.filter(|doc| doc.encoding.is_none()) {
                     let encoder = self.out.encoder.as_ref().unwrap().borrow();
                     doc.encoding = Some(encoder.name().to_owned());
@@ -692,7 +692,7 @@ impl<'a> XmlTextWriter<'a> {
                         sum += self.out.write_str(">")?;
                         if self.indent != 0 {
                             // count =
-                            self.out.write_str("\n");
+                            self.out.write_str("\n")?;
                         }
                         lk.state.set(XmlTextWriterState::XmlTextwriterText);
                     }
@@ -2339,11 +2339,7 @@ unsafe fn xml_output_buffer_write_base64(
 /// Returns the bytes written (may be 0 because of buffering)
 /// or -1 in case of error
 #[doc(alias = "xmlOutputBufferWriteBinHex")]
-unsafe fn xml_output_buffer_write_bin_hex(
-    out: &mut XmlOutputBuffer,
-    data: &[u8],
-) -> io::Result<usize> {
-    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+fn xml_output_buffer_write_bin_hex(out: &mut XmlOutputBuffer, data: &[u8]) -> io::Result<usize> {
     const LUT: [u8; 512] = {
         let mut lut = [0; 512];
         let mut data = 0;

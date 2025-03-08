@@ -26,7 +26,6 @@
 
 use std::{
     borrow::Cow,
-    ffi::CStr,
     mem::{replace, take},
     ops::{Deref, DerefMut},
     ptr::NonNull,
@@ -236,8 +235,6 @@ impl<T> DerefMut for XmlHashEntryRef<'_, T> {
     }
 }
 
-type Deallocator<T> = fn(T, Option<Cow<'_, CStr>>);
-
 pub struct XmlHashTable<'a, T> {
     table: Box<[XmlHashEntry<'a, T>]>,
     num_elems: usize,
@@ -366,7 +363,7 @@ impl<'a, T> XmlHashTable<'a, T> {
         );
 
         if self.is_empty() {
-            self.grow(1);
+            self.grow(1).ok();
         }
 
         let key =
@@ -524,7 +521,7 @@ impl<'a, T> XmlHashTable<'a, T> {
         );
 
         if self.is_empty() {
-            self.grow(1);
+            self.grow(1).ok();
         }
 
         let key =
@@ -566,7 +563,7 @@ impl<'a, T> XmlHashTable<'a, T> {
         self.num_elems += 1;
 
         if chain_length > MAX_HASH_LEN {
-            self.grow(MAX_HASH_LEN * self.table.len());
+            self.grow(MAX_HASH_LEN * self.table.len()).ok();
         }
 
         Ok(())
@@ -1021,7 +1018,8 @@ impl<'a, T> XmlHashTable<'a, T> {
                     entry.name2.as_ref().map(|n| n.as_ref()),
                     entry.name3.as_ref().map(|n| n.as_ref()),
                     copier(entry.payload.as_ref().unwrap(), entry.name.as_ref()),
-                );
+                )
+                .ok();
 
                 let Some(next) = entry.next.as_ref() else {
                     break;
@@ -1966,12 +1964,10 @@ pub mod libxml_api {
 
     #[cfg(test)]
     mod tests {
-        use std::num::NonZeroU8;
 
         use rand::{
             Rng,
             distr::{Alphanumeric, SampleString},
-            prelude::Distribution,
             seq::IndexedRandom,
             thread_rng,
         };
@@ -1980,13 +1976,13 @@ pub mod libxml_api {
 
         const LEN: usize = 30;
 
-        fn gen_chars(rng: &mut impl Rng) -> Vec<NonZeroU8> {
-            Alphanumeric
-                .sample_iter(rng)
-                .map(|c| NonZeroU8::new(c).unwrap())
-                .take(LEN)
-                .collect::<Vec<_>>()
-        }
+        // fn gen_chars(rng: &mut impl Rng) -> Vec<NonZeroU8> {
+        //     Alphanumeric
+        //         .sample_iter(rng)
+        //         .map(|c| NonZeroU8::new(c).unwrap())
+        //         .take(LEN)
+        //         .collect::<Vec<_>>()
+        // }
 
         fn gen_ncname_len(rng: &mut impl Rng, len: usize) -> CString {
             CString::new(Alphanumeric.sample_string(rng, len)).unwrap()
@@ -2481,12 +2477,10 @@ pub mod libxml_api {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU8;
 
     use rand::{
         Rng,
         distr::{Alphanumeric, SampleString},
-        prelude::Distribution,
         seq::IndexedRandom,
         thread_rng,
     };
@@ -2495,13 +2489,13 @@ mod tests {
 
     const LEN: usize = 30;
 
-    fn gen_chars(rng: &mut impl Rng) -> Vec<NonZeroU8> {
-        Alphanumeric
-            .sample_iter(rng)
-            .map(|c| NonZeroU8::new(c).unwrap())
-            .take(LEN)
-            .collect::<Vec<_>>()
-    }
+    // fn gen_chars(rng: &mut impl Rng) -> Vec<NonZeroU8> {
+    //     Alphanumeric
+    //         .sample_iter(rng)
+    //         .map(|c| NonZeroU8::new(c).unwrap())
+    //         .take(LEN)
+    //         .collect::<Vec<_>>()
+    // }
 
     fn gen_ncname_len(rng: &mut impl Rng, len: usize) -> String {
         Alphanumeric.sample_string(rng, len)
@@ -2530,7 +2524,7 @@ mod tests {
             1 => {
                 let n1 = gen_ncname(rng);
                 let data = rng.random::<u64>();
-                table.add_entry(&n1, data);
+                table.add_entry(&n1, data).ok();
                 assert_eq!(table.lookup(&n1), Some(&data));
                 entries.push((n1, None, None, data));
             }
@@ -2538,7 +2532,7 @@ mod tests {
                 let n1 = gen_ncname(rng);
                 let n2 = gen_ncname(rng);
                 let data = rng.random::<u64>();
-                table.add_entry2(&n1, Some(&n2), data);
+                table.add_entry2(&n1, Some(&n2), data).ok();
                 assert_eq!(table.lookup2(&n1, Some(&n2)), Some(&data));
                 entries.push((n1, Some(n2), None, data));
             }
@@ -2547,7 +2541,7 @@ mod tests {
                 let n2 = gen_ncname(rng);
                 let n3 = gen_ncname(rng);
                 let data = rng.random::<u64>();
-                table.add_entry3(&n1, Some(&n2), Some(&n3), data);
+                table.add_entry3(&n1, Some(&n2), Some(&n3), data).ok();
                 assert_eq!(table.lookup3(&n1, Some(&n2), Some(&n3)), Some(&data));
                 entries.push((n1, Some(n2), Some(n3), data));
             }
@@ -2570,7 +2564,7 @@ mod tests {
             1 => {
                 let n1 = gen_qname(rng);
                 let data = rng.random::<u64>();
-                table.add_entry(&n1, data);
+                table.add_entry(&n1, data).ok();
                 assert_eq!(table.lookup(&n1), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
                 assert_eq!(table.qlookup(Some(&p1), &l1), Some(&data));
@@ -2580,7 +2574,7 @@ mod tests {
                 let n1 = gen_qname(rng);
                 let n2 = gen_qname(rng);
                 let data = rng.random::<u64>();
-                table.add_entry2(&n1, Some(&n2), data);
+                table.add_entry2(&n1, Some(&n2), data).ok();
                 assert_eq!(table.lookup2(&n1, Some(&n2)), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
                 let (p2, l2) = split_qname(&n2).unwrap();
@@ -2595,7 +2589,7 @@ mod tests {
                 let n2 = gen_qname(rng);
                 let n3 = gen_qname(rng);
                 let data = rng.random::<u64>();
-                table.add_entry3(&n1, Some(&n2), Some(&n3), data);
+                table.add_entry3(&n1, Some(&n2), Some(&n3), data).ok();
                 assert_eq!(table.lookup3(&n1, Some(&n2), Some(&n3)), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
                 let (p2, l2) = split_qname(&n2).unwrap();

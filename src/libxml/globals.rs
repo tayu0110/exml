@@ -27,7 +27,7 @@
 // daniel@veillard.com
 
 use std::{
-    ffi::{c_char, c_void},
+    ffi::c_void,
     mem::{size_of, zeroed},
     ptr::{addr_of_mut, null_mut},
     sync::atomic::{AtomicI32, AtomicPtr, Ordering},
@@ -83,8 +83,7 @@ pub type XmlDeregisterNodeFunc = unsafe fn(node: XmlGenericNodePtr);
 
 pub type XmlGlobalStatePtr = *mut XmlGlobalState;
 pub struct XmlGlobalState {
-    pub(crate) xml_parser_version: *const c_char,
-
+    // pub(crate) xml_parser_version: *const c_char,
     pub(crate) xml_default_sax_locator: XmlSAXLocator,
 
     pub(crate) xml_free: Option<XmlFreeFunc>,
@@ -247,7 +246,6 @@ static mut XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF: i32 = 0;
  * Disabled by default
  */
 pub(crate) static _XML_SAVE_NO_EMPTY_TAGS: AtomicI32 = AtomicI32::new(0);
-static mut XML_SAVE_NO_EMPTY_TAGS_THR_DEF: i32 = 0;
 
 /**
  * xmlSubstituteEntitiesDefaultValue:
@@ -269,7 +267,6 @@ static mut XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF: i32 = 0;
  * Global setting passed to generic error callbacks
  */
 pub(crate) static _XML_GENERIC_ERROR_CONTEXT: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
-static mut XML_GENERIC_ERROR_CONTEXT_THR_DEF: AtomicPtr<c_void> = AtomicPtr::new(null_mut());
 
 /**
  * xmlStructuredErrorContext:

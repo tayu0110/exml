@@ -25,16 +25,16 @@ unsafe fn xml_xpath_debug_dump_node<'a>(
         let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
         let Some(cur) = cur else {
-            write!(output, "{}", shift);
-            writeln!(output, "Node is NULL !");
+            write!(output, "{}", shift).ok();
+            writeln!(output, "Node is NULL !").ok();
             return;
         };
 
         if cur.element_type() == XmlElementType::XmlDocumentNode
             || cur.element_type() == XmlElementType::XmlHTMLDocumentNode
         {
-            write!(output, "{}", shift);
-            writeln!(output, " /");
+            write!(output, "{}", shift).ok();
+            writeln!(output, " /").ok();
         } else if cur.element_type() == XmlElementType::XmlAttributeNode {
             xml_debug_dump_attr(output, XmlAttrPtr::try_from(cur).ok(), depth);
         } else {
@@ -52,8 +52,8 @@ unsafe fn xml_xpath_debug_dump_node_list<'a>(
         let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
         let Some(mut cur) = cur else {
-            write!(output, "{}", shift);
-            writeln!(output, "Node is NULL !");
+            write!(output, "{}", shift).ok();
+            writeln!(output, "Node is NULL !").ok();
             return;
         };
         xml_debug_dump_one_node(output, Some(cur), depth);
@@ -73,15 +73,15 @@ unsafe fn xml_xpath_debug_dump_node_set<'a>(
         let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
         let Some(cur) = cur else {
-            write!(output, "{}", shift);
-            writeln!(output, "NodeSet is NULL !");
+            write!(output, "{}", shift).ok();
+            writeln!(output, "NodeSet is NULL !").ok();
             return;
         };
 
-        writeln!(output, "Set contains {} nodes:", cur.node_tab.len());
+        writeln!(output, "Set contains {} nodes:", cur.node_tab.len()).ok();
         for (i, &node) in cur.node_tab.iter().enumerate() {
-            write!(output, "{}", shift);
-            write!(output, "{}", i + 1);
+            write!(output, "{}", shift).ok();
+            write!(output, "{}", i + 1).ok();
             xml_xpath_debug_dump_node(output, Some(node), depth + 1);
         }
     }
@@ -96,13 +96,13 @@ unsafe fn xml_xpath_debug_dump_value_tree<'a>(
         let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
         let Some(cur) = cur.filter(|c| !c.is_empty() && c.get(0).is_some()) else {
-            write!(output, "{}", shift);
-            writeln!(output, "Value Tree is NULL !");
+            write!(output, "{}", shift).ok();
+            writeln!(output, "Value Tree is NULL !").ok();
             return;
         };
 
-        write!(output, "{}", shift);
-        write!(output, "{}", depth.clamp(0, 25) + 1);
+        write!(output, "{}", shift).ok();
+        write!(output, "{}", depth.clamp(0, 25) + 1).ok();
         xml_xpath_debug_dump_node_list(output, (*cur.node_tab[0]).children(), depth + 1);
     }
 }
@@ -122,8 +122,8 @@ unsafe fn xml_xpath_debug_dump_location_set<'a>(
         }
 
         for (i, &loc) in (*cur).loc_tab.iter().enumerate() {
-            write!(output, "{}", shift);
-            write!(output, "{} : ", i + 1);
+            write!(output, "{}", shift).ok();
+            write!(output, "{} : ", i + 1).ok();
             xml_xpath_debug_dump_object(output, loc, depth + 1);
         }
     }
@@ -141,106 +141,106 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
 
         let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
-        write!(output, "{}", shift);
+        write!(output, "{}", shift).ok();
 
         if cur.is_null() {
-            writeln!(output, "Object is empty (NULL)");
+            writeln!(output, "Object is empty (NULL)").ok();
             return;
         }
         match (*cur).typ {
             XmlXPathObjectType::XPathUndefined => {
-                writeln!(output, "Object is uninitialized");
+                writeln!(output, "Object is uninitialized").ok();
             }
             XmlXPathObjectType::XPathNodeset => {
-                writeln!(output, "Object is a Node Set :");
+                writeln!(output, "Object is a Node Set :").ok();
                 xml_xpath_debug_dump_node_set(output, (*cur).nodesetval.as_deref(), depth);
             }
             XmlXPathObjectType::XPathXSLTTree => {
-                writeln!(output, "Object is an XSLT value tree :");
+                writeln!(output, "Object is an XSLT value tree :").ok();
                 xml_xpath_debug_dump_value_tree(output, (*cur).nodesetval.as_deref(), depth);
             }
             XmlXPathObjectType::XPathBoolean => {
-                write!(output, "Object is a Boolean : ");
+                write!(output, "Object is a Boolean : ").ok();
                 if (*cur).boolval {
-                    writeln!(output, "true");
+                    writeln!(output, "true").ok();
                 } else {
-                    writeln!(output, "false");
+                    writeln!(output, "false").ok();
                 }
             }
             XmlXPathObjectType::XPathNumber => {
                 match xml_xpath_is_inf((*cur).floatval) {
                     1 => {
-                        writeln!(output, "Object is a number : Infinity");
+                        writeln!(output, "Object is a number : Infinity").ok();
                     }
                     -1 => {
-                        writeln!(output, "Object is a number : -Infinity");
+                        writeln!(output, "Object is a number : -Infinity").ok();
                     }
                     _ => {
                         if xml_xpath_is_nan((*cur).floatval) {
-                            writeln!(output, "Object is a number : NaN");
+                            writeln!(output, "Object is a number : NaN").ok();
                         } else if (*cur).floatval == 0.0 {
                             /* Omit sign for negative zero. */
-                            writeln!(output, "Object is a number : 0");
+                            writeln!(output, "Object is a number : 0").ok();
                         } else {
-                            writeln!(output, "Object is a number : {}", (*cur).floatval);
+                            writeln!(output, "Object is a number : {}", (*cur).floatval).ok();
                         }
                     }
                 }
             }
             XmlXPathObjectType::XPathString => {
-                write!(output, "Object is a string : ");
+                write!(output, "Object is a string : ").ok();
                 let strval = (*cur).stringval.as_deref();
                 xml_debug_dump_string(Some(output), strval);
-                writeln!(output);
+                writeln!(output).ok();
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathPoint => {
-                write!(output, "Object is a point : index {} in node", (*cur).index,);
+                write!(output, "Object is a point : index {} in node", (*cur).index,).ok();
                 let node = XmlGenericNodePtr::from_raw((*cur).user as *mut XmlNode);
                 xml_xpath_debug_dump_node(output, node, depth + 1);
-                writeln!(output);
+                writeln!(output).ok();
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathRange => {
                 if (*cur).user2.is_null()
                     || ((*cur).user2 == (*cur).user && (*cur).index == (*cur).index2)
                 {
-                    writeln!(output, "Object is a collapsed range :");
-                    write!(output, "{}", shift);
+                    writeln!(output, "Object is a collapsed range :").ok();
+                    write!(output, "{}", shift).ok();
                     if (*cur).index >= 0 {
-                        write!(output, "index {} in ", (*cur).index);
+                        write!(output, "index {} in ", (*cur).index).ok();
                     }
-                    writeln!(output, "node");
+                    writeln!(output, "node").ok();
                     let node = XmlGenericNodePtr::from_raw((*cur).user as *mut XmlNode);
                     xml_xpath_debug_dump_node(output, node, depth + 1);
                 } else {
-                    writeln!(output, "Object is a range :");
-                    write!(output, "{}", shift);
-                    write!(output, "From ");
+                    writeln!(output, "Object is a range :").ok();
+                    write!(output, "{}", shift).ok();
+                    write!(output, "From ").ok();
                     if (*cur).index >= 0 {
-                        write!(output, "index {} in ", (*cur).index);
+                        write!(output, "index {} in ", (*cur).index).ok();
                     }
-                    writeln!(output, "node");
+                    writeln!(output, "node").ok();
                     let node = XmlGenericNodePtr::from_raw((*cur).user as *mut XmlNode);
                     xml_xpath_debug_dump_node(output, node, depth + 1);
-                    write!(output, "{}", shift);
-                    write!(output, "To ");
+                    write!(output, "{}", shift).ok();
+                    write!(output, "To ").ok();
                     if (*cur).index2 >= 0 {
-                        write!(output, "index {} in ", (*cur).index2);
+                        write!(output, "index {} in ", (*cur).index2).ok();
                     }
-                    writeln!(output, "node");
+                    writeln!(output, "node").ok();
                     let node = XmlGenericNodePtr::from_raw((*cur).user2 as *mut XmlNode);
                     xml_xpath_debug_dump_node(output, node, depth + 1);
-                    writeln!(output);
+                    writeln!(output).ok();
                 }
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathObjectType::XPathLocationset => {
-                writeln!(output, "Object is a Location Set:");
+                writeln!(output, "Object is a Location Set:").ok();
                 xml_xpath_debug_dump_location_set(output, (*cur).user as XmlLocationSetPtr, depth);
             }
             XmlXPathObjectType::XPathUsers => {
-                writeln!(output, "Object is user defined");
+                writeln!(output, "Object is user defined").ok();
             }
         }
     }
@@ -255,166 +255,166 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
     unsafe {
         let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
-        write!(output, "{}", shift);
+        write!(output, "{}", shift).ok();
         if op.is_null() {
-            writeln!(output, "Step is NULL");
+            writeln!(output, "Step is NULL").ok();
             return;
         }
         match (*op).op {
             XmlXPathOp::XpathOpEnd => {
-                write!(output, "END");
+                write!(output, "END").ok();
             }
             XmlXPathOp::XpathOpAnd => {
-                write!(output, "AND");
+                write!(output, "AND").ok();
             }
             XmlXPathOp::XpathOpOr => {
-                write!(output, "OR");
+                write!(output, "OR").ok();
             }
             XmlXPathOp::XpathOpEqual => {
                 if (*op).value != 0 {
-                    write!(output, "EQUAL =");
+                    write!(output, "EQUAL =").ok();
                 } else {
-                    write!(output, "EQUAL !=");
+                    write!(output, "EQUAL !=").ok();
                 }
             }
             XmlXPathOp::XpathOpCmp => {
                 if (*op).value != 0 {
-                    write!(output, "CMP <");
+                    write!(output, "CMP <").ok();
                 } else {
-                    write!(output, "CMP >");
+                    write!(output, "CMP >").ok();
                 }
                 if (*op).value2 == 0 {
-                    write!(output, "=");
+                    write!(output, "=").ok();
                 }
             }
             XmlXPathOp::XpathOpPlus => {
                 if (*op).value == 0 {
-                    write!(output, "PLUS -");
+                    write!(output, "PLUS -").ok();
                 } else if (*op).value == 1 {
-                    write!(output, "PLUS +");
+                    write!(output, "PLUS +").ok();
                 } else if (*op).value == 2 {
-                    write!(output, "PLUS unary -");
+                    write!(output, "PLUS unary -").ok();
                 } else if (*op).value == 3 {
-                    write!(output, "PLUS unary - -");
+                    write!(output, "PLUS unary - -").ok();
                 }
             }
             XmlXPathOp::XpathOpMult => {
                 if (*op).value == 0 {
-                    write!(output, "MULT *");
+                    write!(output, "MULT *").ok();
                 } else if (*op).value == 1 {
-                    write!(output, "MULT div");
+                    write!(output, "MULT div").ok();
                 } else {
-                    write!(output, "MULT mod");
+                    write!(output, "MULT mod").ok();
                 }
             }
             XmlXPathOp::XpathOpUnion => {
-                write!(output, "UNION");
+                write!(output, "UNION").ok();
             }
             XmlXPathOp::XpathOpRoot => {
-                write!(output, "ROOT");
+                write!(output, "ROOT").ok();
             }
             XmlXPathOp::XpathOpNode => {
-                write!(output, "NODE");
+                write!(output, "NODE").ok();
             }
             XmlXPathOp::XpathOpSort => {
-                write!(output, "SORT");
+                write!(output, "SORT").ok();
             }
             XmlXPathOp::XpathOpCollect => {
                 let prefix: *const XmlChar = (*op).value4 as _;
                 let name: *const XmlChar = (*op).value5 as _;
 
-                write!(output, "COLLECT ");
+                write!(output, "COLLECT ").ok();
                 match XmlXPathAxisVal::try_from((*op).value) {
                     Ok(XmlXPathAxisVal::AxisAncestor) => {
-                        write!(output, " 'ancestors' ");
+                        write!(output, " 'ancestors' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisAncestorOrSelf) => {
-                        write!(output, " 'ancestors-or-self' ");
+                        write!(output, " 'ancestors-or-self' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisAttribute) => {
-                        write!(output, " 'attributes' ");
+                        write!(output, " 'attributes' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisChild) => {
-                        write!(output, " 'child' ");
+                        write!(output, " 'child' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisDescendant) => {
-                        write!(output, " 'descendant' ");
+                        write!(output, " 'descendant' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisDescendantOrSelf) => {
-                        write!(output, " 'descendant-or-self' ");
+                        write!(output, " 'descendant-or-self' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisFollowing) => {
-                        write!(output, " 'following' ");
+                        write!(output, " 'following' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisFollowingSibling) => {
-                        write!(output, " 'following-siblings' ");
+                        write!(output, " 'following-siblings' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisNamespace) => {
-                        write!(output, " 'namespace' ");
+                        write!(output, " 'namespace' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisParent) => {
-                        write!(output, " 'parent' ");
+                        write!(output, " 'parent' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisPreceding) => {
-                        write!(output, " 'preceding' ");
+                        write!(output, " 'preceding' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisPrecedingSibling) => {
-                        write!(output, " 'preceding-sibling' ");
+                        write!(output, " 'preceding-sibling' ").ok();
                     }
                     Ok(XmlXPathAxisVal::AxisSelf) => {
-                        write!(output, " 'self' ");
+                        write!(output, " 'self' ").ok();
                     }
                     _ => unreachable!(),
                 }
                 match XmlXPathTestVal::try_from((*op).value2) {
                     Ok(XmlXPathTestVal::NodeTestNone) => {
-                        write!(output, "'none' ");
+                        write!(output, "'none' ").ok();
                     }
                     Ok(XmlXPathTestVal::NodeTestType) => {
-                        write!(output, "'type' ");
+                        write!(output, "'type' ").ok();
                     }
                     Ok(XmlXPathTestVal::NodeTestPI) => {
-                        write!(output, "'PI' ");
+                        write!(output, "'PI' ").ok();
                     }
                     Ok(XmlXPathTestVal::NodeTestAll) => {
-                        write!(output, "'all' ");
+                        write!(output, "'all' ").ok();
                     }
                     Ok(XmlXPathTestVal::NodeTestNs) => {
-                        write!(output, "'namespace' ");
+                        write!(output, "'namespace' ").ok();
                     }
                     Ok(XmlXPathTestVal::NodeTestName) => {
-                        write!(output, "'name' ");
+                        write!(output, "'name' ").ok();
                     }
                     _ => unreachable!(),
                 }
                 match XmlXPathTypeVal::try_from((*op).value3) {
                     Ok(XmlXPathTypeVal::NodeTypeNode) => {
-                        write!(output, "'node' ");
+                        write!(output, "'node' ").ok();
                     }
                     Ok(XmlXPathTypeVal::NodeTypeComment) => {
-                        write!(output, "'comment' ");
+                        write!(output, "'comment' ").ok();
                     }
                     Ok(XmlXPathTypeVal::NodeTypeText) => {
-                        write!(output, "'text' ");
+                        write!(output, "'text' ").ok();
                     }
                     Ok(XmlXPathTypeVal::NodeTypePI) => {
-                        write!(output, "'PI' ");
+                        write!(output, "'PI' ").ok();
                     }
                     _ => unreachable!(),
                 }
                 if !prefix.is_null() {
                     let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
-                    write!(output, "{}:", prefix);
+                    write!(output, "{}:", prefix).ok();
                 }
                 if !name.is_null() {
                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                    write!(output, "{}", name);
+                    write!(output, "{}", name).ok();
                 }
             }
             XmlXPathOp::XpathOpValue => {
                 let object: XmlXPathObjectPtr = (*op).value4 as XmlXPathObjectPtr;
 
-                write!(output, "ELEM ");
+                write!(output, "ELEM ").ok();
                 xml_xpath_debug_dump_object(output, object, 0);
                 // goto finish;
                 if (*op).ch1 >= 0 {
@@ -442,9 +442,9 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
 
                 if !prefix.is_null() {
                     let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
-                    write!(output, "VARIABLE {prefix}:{name}");
+                    write!(output, "VARIABLE {prefix}:{name}").ok();
                 } else {
-                    write!(output, "VARIABLE {name}");
+                    write!(output, "VARIABLE {name}").ok();
                 }
             }
             XmlXPathOp::XpathOpFunction => {
@@ -455,29 +455,29 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
 
                 if !prefix.is_null() {
                     let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
-                    write!(output, "FUNCTION {prefix}:{name}({nbargs} args)");
+                    write!(output, "FUNCTION {prefix}:{name}({nbargs} args)").ok();
                 } else {
-                    write!(output, "FUNCTION {name}({nbargs} args)");
+                    write!(output, "FUNCTION {name}({nbargs} args)").ok();
                 }
             }
             XmlXPathOp::XpathOpArg => {
-                write!(output, "ARG");
+                write!(output, "ARG").ok();
             }
             XmlXPathOp::XpathOpPredicate => {
-                write!(output, "PREDICATE");
+                write!(output, "PREDICATE").ok();
             }
             XmlXPathOp::XpathOpFilter => {
-                write!(output, "FILTER");
+                write!(output, "FILTER").ok();
             }
             #[cfg(feature = "libxml_xptr_locs")]
             XmlXPathOp::XpathOpRangeto => {
-                write!(output, "RANGETO");
+                write!(output, "RANGETO").ok();
             } // _ => {
               //     write!(output, "UNKNOWN %d\n", (*op).op);
               //     return;
               // }
         }
-        writeln!(output);
+        writeln!(output).ok();
         // finish:
         if (*op).ch1 >= 0 {
             xml_xpath_debug_dump_step_op(
@@ -512,16 +512,17 @@ pub unsafe fn xml_xpath_debug_dump_comp_expr<'a>(
 
         let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
-        write!(output, "{}", shift);
+        write!(output, "{}", shift).ok();
 
         if !(*comp).stream.is_null() {
-            writeln!(output, "Streaming Expression");
+            writeln!(output, "Streaming Expression").ok();
         } else {
             writeln!(
                 output,
                 "Compiled Expression : {} elements",
                 (*comp).steps.len(),
-            );
+            )
+            .ok();
             xml_xpath_debug_dump_step_op(
                 output,
                 comp,

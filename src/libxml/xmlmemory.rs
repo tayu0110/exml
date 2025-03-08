@@ -52,7 +52,7 @@ const MALLOC_TYPE: usize = 1;
 const REALLOC_TYPE: usize = 2;
 const STRDUP_TYPE: usize = 3;
 const MALLOC_ATOMIC_TYPE: usize = 4;
-const REALLOC_ATOMIC_TYPE: usize = 5;
+// const REALLOC_ATOMIC_TYPE: usize = 5;
 
 #[repr(C)]
 struct Memnod {
@@ -381,7 +381,8 @@ pub unsafe extern "C" fn xml_mem_show<'a>(fp: &mut (impl Write + 'a), _nr: i32) 
         "      MEMORY ALLOCATED : {}, MAX was {}",
         DEBUG_MEM_SIZE.get(),
         DEBUG_MAX_MEM_SIZE.get(),
-    );
+    )
+    .ok();
 }
 
 /// Dump in-extenso the memory blocks allocated to the file .memorylist

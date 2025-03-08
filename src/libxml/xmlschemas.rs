@@ -498,9 +498,9 @@ macro_rules! HERROR {
 // Some flags used for various schema constraints.
 const SUBSET_RESTRICTION: i32 = 1 << 0;
 const SUBSET_EXTENSION: i32 = 1 << 1;
-const SUBSET_SUBSTITUTION: i32 = 1 << 2;
-const SUBSET_LIST: i32 = 1 << 3;
-const SUBSET_UNION: i32 = 1 << 4;
+// const SUBSET_SUBSTITUTION: i32 = 1 << 2;
+// const SUBSET_LIST: i32 = 1 << 3;
+// const SUBSET_UNION: i32 = 1 << 4;
 
 pub(crate) const XML_SCHEMA_CTXT_PARSER: i32 = 1;
 pub(crate) const XML_SCHEMA_CTXT_VALIDATOR: i32 = 2;
@@ -644,7 +644,7 @@ pub struct XmlSchemaConstructionCtxt {
     last_redef: XmlSchemaRedefPtr,
 }
 
-const XML_SCHEMAS_PARSE_ERROR: i32 = 1;
+// const XML_SCHEMAS_PARSE_ERROR: i32 = 1;
 const SCHEMAS_PARSE_OPTIONS: i32 = XmlParserOption::XmlParseNoEnt as i32;
 
 const XML_SCHEMA_MODEL_GROUP_DEF_MARKED: i32 = 1 << 0;
@@ -725,8 +725,8 @@ impl Default for XmlSchemaPSVIIDCBinding {
 const XPATH_STATE_OBJ_TYPE_IDC_SELECTOR: i32 = 1;
 const XPATH_STATE_OBJ_TYPE_IDC_FIELD: i32 = 2;
 
-const XPATH_STATE_OBJ_MATCHES: i32 = -2;
-const XPATH_STATE_OBJ_BLOCKED: i32 = -3;
+// const XPATH_STATE_OBJ_MATCHES: i32 = -2;
+// const XPATH_STATE_OBJ_BLOCKED: i32 = -3;
 
 #[doc(alias = "xmlSchemaIDCStateObjPtr")]
 pub type XmlSchemaIDCStateObjPtr = *mut XmlSchemaIDCStateObj;
@@ -776,7 +776,7 @@ const XML_SCHEMA_ELEM_INFO_LOCAL_TYPE: i32 = 1 << 3;
 
 const XML_SCHEMA_NODE_INFO_VALUE_NEEDED: i32 = 1 << 4;
 const XML_SCHEMA_ELEM_INFO_EMPTY: i32 = 1 << 5;
-const XML_SCHEMA_ELEM_INFO_HAS_CONTENT: i32 = 1 << 6;
+// const XML_SCHEMA_ELEM_INFO_HAS_CONTENT: i32 = 1 << 6;
 
 const XML_SCHEMA_ELEM_INFO_HAS_ELEM_CONTENT: i32 = 1 << 7;
 const XML_SCHEMA_ELEM_INFO_ERR_BAD_CONTENT: i32 = 1 << 8;
@@ -822,16 +822,16 @@ pub struct XmlSchemaNodeInfo {
 
 const XML_SCHEMAS_ATTR_UNKNOWN: i32 = 1;
 const XML_SCHEMAS_ATTR_ASSESSED: i32 = 2;
-const XML_SCHEMAS_ATTR_PROHIBITED: i32 = 3;
+// const XML_SCHEMAS_ATTR_PROHIBITED: i32 = 3;
 const XML_SCHEMAS_ATTR_ERR_MISSING: i32 = 4;
 const XML_SCHEMAS_ATTR_INVALID_VALUE: i32 = 5;
 const XML_SCHEMAS_ATTR_ERR_NO_TYPE: i32 = 6;
 const XML_SCHEMAS_ATTR_ERR_FIXED_VALUE: i32 = 7;
 const XML_SCHEMAS_ATTR_DEFAULT: i32 = 8;
-const XML_SCHEMAS_ATTR_VALIDATE_VALUE: i32 = 9;
+// const XML_SCHEMAS_ATTR_VALIDATE_VALUE: i32 = 9;
 const XML_SCHEMAS_ATTR_ERR_WILD_STRICT_NO_DECL: i32 = 10;
-const XML_SCHEMAS_ATTR_HAS_ATTR_USE: i32 = 11;
-const XML_SCHEMAS_ATTR_HAS_ATTR_DECL: i32 = 12;
+// const XML_SCHEMAS_ATTR_HAS_ATTR_USE: i32 = 11;
+// const XML_SCHEMAS_ATTR_HAS_ATTR_DECL: i32 = 12;
 const XML_SCHEMAS_ATTR_WILD_SKIP: i32 = 13;
 const XML_SCHEMAS_ATTR_WILD_LAX_NO_DECL: i32 = 14;
 const XML_SCHEMAS_ATTR_ERR_WILD_DUPLICATE_ID: i32 = 15;
@@ -18733,7 +18733,7 @@ pub unsafe fn xml_schema_validate_stream(
         // (*ctxt).sax = null_mut();
         (*ctxt).input = None;
         if !plug.is_null() {
-            xml_schema_sax_unplug(plug);
+            xml_schema_sax_unplug(plug).ok();
         }
         // cleanup
         if !pctxt.is_null() {

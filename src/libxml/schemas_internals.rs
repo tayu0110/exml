@@ -268,12 +268,12 @@ pub struct XmlSchemaAnnot {
     pub(crate) content: XmlNodePtr, /* the annotation */
 }
 
-/// Skip unknown attribute from validation Obsolete, not used anymore.
-const XML_SCHEMAS_ANYATTR_SKIP: i32 = 1;
-/// Ignore validation non definition on attributes Obsolete, not used anymore.
-const XML_SCHEMAS_ANYATTR_LAX: i32 = 2;
-/// Apply strict validation rules on attributes Obsolete, not used anymore.
-const XML_SCHEMAS_ANYATTR_STRICT: i32 = 3;
+// /// Skip unknown attribute from validation Obsolete, not used anymore.
+// const XML_SCHEMAS_ANYATTR_SKIP: i32 = 1;
+// /// Ignore validation non definition on attributes Obsolete, not used anymore.
+// const XML_SCHEMAS_ANYATTR_LAX: i32 = 2;
+// /// Apply strict validation rules on attributes Obsolete, not used anymore.
+// const XML_SCHEMAS_ANYATTR_STRICT: i32 = 3;
 /// Skip unknown attribute from validation
 pub(crate) const XML_SCHEMAS_ANY_SKIP: i32 = 1;
 /// Used by wildcards.
@@ -291,8 +291,8 @@ pub(crate) const XML_SCHEMAS_ATTR_USE_REQUIRED: i32 = 1;
 pub(crate) const XML_SCHEMAS_ATTR_USE_OPTIONAL: i32 = 2;
 /// Allow elements in no namespace
 pub(crate) const XML_SCHEMAS_ATTR_GLOBAL: i32 = 1 << 0;
-/// Allow elements in no namespace
-pub(crate) const XML_SCHEMAS_ATTR_NSDEFAULT: i32 = 1 << 7;
+// /// Allow elements in no namespace
+// pub(crate) const XML_SCHEMAS_ATTR_NSDEFAULT: i32 = 1 << 7;
 /// This is set when the "type" and "ref" references have been resolved.
 pub(crate) const XML_SCHEMAS_ATTR_INTERNAL_RESOLVED: i32 = 1 << 8;
 /// The attribute has a fixed value
@@ -308,8 +308,8 @@ pub struct XmlSchemaAttributeLink {
     attr: *mut XmlSchemaAttribute,     /* the linked attribute */
 }
 
-/// If the wildcard is complete.
-const XML_SCHEMAS_WILDCARD_COMPLETE: i32 = 1 << 0;
+// /// If the wildcard is complete.
+// const XML_SCHEMAS_WILDCARD_COMPLETE: i32 = 1 << 0;
 
 pub type XmlSchemaWildcardNsPtr = *mut XmlSchemaWildcardNs;
 /// Used to build a list of namespaces on wildcards.
@@ -374,14 +374,14 @@ pub(crate) const XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION: i32 = 1 << 1;
 pub(crate) const XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION: i32 = 1 << 2;
 /// The type is global
 pub(crate) const XML_SCHEMAS_TYPE_GLOBAL: i32 = 1 << 3;
-/// The complexType owns an attribute wildcard, i.e.
-/// it can be freed by the complexType
-const XML_SCHEMAS_TYPE_OWNED_ATTR_WILDCARD: i32 =    1 << 4 /* Obsolete. */;
-/// The simpleType has a variety of "absent".
-/// TODO: Actually not necessary :-/, since if
-/// none of the variety flags occur then it's
-/// automatically absent.
-const XML_SCHEMAS_TYPE_VARIETY_ABSENT: i32 = 1 << 5;
+// /// The complexType owns an attribute wildcard, i.e.
+// /// it can be freed by the complexType
+// const XML_SCHEMAS_TYPE_OWNED_ATTR_WILDCARD: i32 =    1 << 4 /* Obsolete. */;
+// /// The simpleType has a variety of "absent".
+// /// TODO: Actually not necessary :-/, since if
+// /// none of the variety flags occur then it's
+// /// automatically absent.
+// const XML_SCHEMAS_TYPE_VARIETY_ABSENT: i32 = 1 << 5;
 /// The simpleType has a variety of "list".
 pub(crate) const XML_SCHEMAS_TYPE_VARIETY_LIST: i32 = 1 << 6;
 /// The simpleType has a variety of "union".
@@ -396,14 +396,14 @@ pub(crate) const XML_SCHEMAS_TYPE_FINAL_RESTRICTION: i32 = 1 << 10;
 pub(crate) const XML_SCHEMAS_TYPE_FINAL_LIST: i32 = 1 << 11;
 /// The simpleType has a final of "union".
 pub(crate) const XML_SCHEMAS_TYPE_FINAL_UNION: i32 = 1 << 12;
-/// The simpleType has a final of "default".
-const XML_SCHEMAS_TYPE_FINAL_DEFAULT: i32 = 1 << 13;
+// /// The simpleType has a final of "default".
+// const XML_SCHEMAS_TYPE_FINAL_DEFAULT: i32 = 1 << 13;
 /// Marks the item as a builtin primitive.
 pub(crate) const XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE: i32 = 1 << 14;
 /// Marks the item as marked; used for circular checks.
 pub(crate) const XML_SCHEMAS_TYPE_MARKED: i32 = 1 << 16;
-/// The complexType did not specify 'block' so use the default of the <schema> item.
-const XML_SCHEMAS_TYPE_BLOCK_DEFAULT: i32 = 1 << 17;
+// /// The complexType did not specify 'block' so use the default of the <schema> item.
+// const XML_SCHEMAS_TYPE_BLOCK_DEFAULT: i32 = 1 << 17;
 /// The complexType has a 'block' of "extension".
 pub(crate) const XML_SCHEMAS_TYPE_BLOCK_EXTENSION: i32 = 1 << 18;
 /// The complexType has a 'block' of "restriction".
@@ -448,26 +448,26 @@ pub(crate) const XML_SCHEMAS_ELEM_ABSTRACT: i32 = 1 << 4;
 /// The element is top level
 /// obsolete: use XML_SCHEMAS_ELEM_GLOBAL instead
 pub(crate) const XML_SCHEMAS_ELEM_TOPLEVEL: i32 = 1 << 5;
-/// The element is a reference to a type
-const XML_SCHEMAS_ELEM_REF: i32 = 1 << 6;
-/// Allow elements in no namespace
-/// Obsolete, not used anymore.
-const XML_SCHEMAS_ELEM_NSDEFAULT: i32 = 1 << 7;
+// /// The element is a reference to a type
+// const XML_SCHEMAS_ELEM_REF: i32 = 1 << 6;
+// /// Allow elements in no namespace
+// /// Obsolete, not used anymore.
+// const XML_SCHEMAS_ELEM_NSDEFAULT: i32 = 1 << 7;
 /// This is set when "type", "ref", "substitutionGroup"
 /// References have been resolved.
 pub(crate) const XML_SCHEMAS_ELEM_INTERNAL_RESOLVED: i32 = 1 << 8;
 /// A helper flag for the search of circular references.
 pub(crate) const XML_SCHEMAS_ELEM_CIRCULAR: i32 = 1 << 9;
-/// The "block" attribute is absent
-const XML_SCHEMAS_ELEM_BLOCK_ABSENT: i32 = 1 << 10;
+// /// The "block" attribute is absent
+// const XML_SCHEMAS_ELEM_BLOCK_ABSENT: i32 = 1 << 10;
 /// Disallowed substitutions are absent
 pub(crate) const XML_SCHEMAS_ELEM_BLOCK_EXTENSION: i32 = 1 << 11;
 /// Disallowed substitutions: "restriction"
 pub(crate) const XML_SCHEMAS_ELEM_BLOCK_RESTRICTION: i32 = 1 << 12;
 /// Disallowed substitutions: "substitution"
 pub(crate) const XML_SCHEMAS_ELEM_BLOCK_SUBSTITUTION: i32 = 1 << 13;
-/// Substitution group exclusions are absent
-const XML_SCHEMAS_ELEM_FINAL_ABSENT: i32 = 1 << 14;
+// /// Substitution group exclusions are absent
+// const XML_SCHEMAS_ELEM_FINAL_ABSENT: i32 = 1 << 14;
 /// Substitution group exclusions: "extension"
 pub(crate) const XML_SCHEMAS_ELEM_FINAL_EXTENSION: i32 = 1 << 15;
 /// Substitution group exclusions: "restriction"
@@ -477,8 +477,8 @@ pub(crate) const XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD: i32 = 1 << 17;
 /// This is set when the elem decl has been checked against all constraints
 pub(crate) const XML_SCHEMAS_ELEM_INTERNAL_CHECKED: i32 = 1 << 18;
 
-/// Unknown facet handling
-const XML_SCHEMAS_FACET_UNKNOWN: i32 = 0;
+// /// Unknown facet handling
+// const XML_SCHEMAS_FACET_UNKNOWN: i32 = 0;
 /// Preserve the type of the facet
 pub(crate) const XML_SCHEMAS_FACET_PRESERVE: i32 = 1;
 /// Replace the type of the facet

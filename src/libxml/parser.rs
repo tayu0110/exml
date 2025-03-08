@@ -88,15 +88,14 @@ use crate::{
         },
         htmlparser::{__html_parse_content, HtmlParserOption, html_create_memory_parser_ctxt},
         parser_internals::{
-            INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_NAMELEN,
-            XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF, xml_add_def_attrs,
-            xml_add_special_attr, xml_check_language_id, xml_copy_char, xml_parse_attribute_type,
-            xml_parse_content, xml_parse_content_internal, xml_parse_default_decl,
-            xml_parse_doc_type_decl, xml_parse_element_content_decl, xml_parse_element_end,
-            xml_parse_element_start, xml_parse_entity_ref, xml_parse_entity_value,
-            xml_parse_external_subset, xml_parse_misc, xml_parse_name, xml_parse_nmtoken,
-            xml_parse_pe_reference, xml_parse_reference, xml_parse_start_tag,
-            xml_parse_system_literal,
+            XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_NAMELEN, XML_MAX_TEXT_LENGTH,
+            XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF, xml_add_def_attrs, xml_add_special_attr,
+            xml_check_language_id, xml_copy_char, xml_parse_attribute_type, xml_parse_content,
+            xml_parse_content_internal, xml_parse_default_decl, xml_parse_doc_type_decl,
+            xml_parse_element_content_decl, xml_parse_element_end, xml_parse_element_start,
+            xml_parse_entity_ref, xml_parse_entity_value, xml_parse_external_subset,
+            xml_parse_misc, xml_parse_name, xml_parse_nmtoken, xml_parse_pe_reference,
+            xml_parse_reference, xml_parse_start_tag, xml_parse_system_literal,
         },
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
         uri::{xml_free_uri, xml_parse_uri},
@@ -666,67 +665,67 @@ pub unsafe fn xml_cleanup_parser() {
     }
 }
 
-/// Returns -1 as this is an error to use it.
-#[doc(alias = "xmlParserInputRead")]
-pub(crate) unsafe fn xml_parser_input_read(_input: XmlParserInputPtr, _len: i32) -> i32 {
-    -1
-}
+// /// Returns -1 as this is an error to use it.
+// #[doc(alias = "xmlParserInputRead")]
+// pub(crate) unsafe fn xml_parser_input_read(_input: XmlParserInputPtr, _len: i32) -> i32 {
+//     -1
+// }
 
-/// This function increase the input for the parser. It tries to
-/// preserve pointers to the input buffer, and keep already read data
-///
-/// Returns the amount of c_char read, or -1 in case of error, 0 indicate the end of this entity
-#[doc(alias = "xmlParserInputGrow")]
-pub(crate) unsafe fn xml_parser_input_grow(input: XmlParserInputPtr, len: i32) -> i32 {
-    unsafe {
-        if input.is_null() || len < 0 {
-            return -1;
-        }
-        let Some(input_buffer) = (*input).buf.as_mut() else {
-            return -1;
-        };
-        if (*input).base.is_null() {
-            return -1;
-        }
-        if (*input).cur.is_null() {
-            return -1;
-        }
-        let Some(buf) = input_buffer.borrow().buffer else {
-            return -1;
-        };
+// /// This function increase the input for the parser. It tries to
+// /// preserve pointers to the input buffer, and keep already read data
+// ///
+// /// Returns the amount of c_char read, or -1 in case of error, 0 indicate the end of this entity
+// #[doc(alias = "xmlParserInputGrow")]
+// pub(crate) unsafe fn xml_parser_input_grow(input: XmlParserInputPtr, len: i32) -> i32 {
+//     unsafe {
+//         if input.is_null() || len < 0 {
+//             return -1;
+//         }
+//         let Some(input_buffer) = (*input).buf.as_mut() else {
+//             return -1;
+//         };
+//         if (*input).base.is_null() {
+//             return -1;
+//         }
+//         if (*input).cur.is_null() {
+//             return -1;
+//         }
+//         let Some(buf) = input_buffer.borrow().buffer else {
+//             return -1;
+//         };
 
-        // Don't grow memory buffers.
-        if input_buffer.borrow().encoder.is_none() && input_buffer.borrow().context.is_none() {
-            return 0;
-        }
+//         // Don't grow memory buffers.
+//         if input_buffer.borrow().encoder.is_none() && input_buffer.borrow().context.is_none() {
+//             return 0;
+//         }
 
-        let indx = (*input).offset_from_base();
-        if buf.len() > indx + INPUT_CHUNK {
-            return 0;
-        }
-        let ret: i32 = input_buffer.borrow_mut().grow(len);
+//         let indx = (*input).offset_from_base();
+//         if buf.len() > indx + INPUT_CHUNK {
+//             return 0;
+//         }
+//         let ret: i32 = input_buffer.borrow_mut().grow(len);
 
-        (*input).base = if buf.is_ok() {
-            buf.as_ref().as_ptr()
-        } else {
-            null_mut()
-        };
-        if (*input).base.is_null() {
-            (*input).base = c"".as_ptr() as _;
-            (*input).cur = (*input).base;
-            (*input).end = (*input).base;
-            return -1;
-        }
-        (*input).cur = (*input).base.add(indx);
-        (*input).end = if buf.is_ok() {
-            buf.as_ref().as_ptr().add(buf.len())
-        } else {
-            null_mut()
-        };
+//         (*input).base = if buf.is_ok() {
+//             buf.as_ref().as_ptr()
+//         } else {
+//             null_mut()
+//         };
+//         if (*input).base.is_null() {
+//             (*input).base = c"".as_ptr() as _;
+//             (*input).cur = (*input).base;
+//             (*input).end = (*input).base;
+//             return -1;
+//         }
+//         (*input).cur = (*input).base.add(indx);
+//         (*input).end = if buf.is_ok() {
+//             buf.as_ref().as_ptr().add(buf.len())
+//         } else {
+//             null_mut()
+//         };
 
-        ret
-    }
-}
+//         ret
+//     }
+// }
 
 /// Parse an XML in-memory document and build a tree.
 ///
@@ -2615,31 +2614,31 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     }
 }
 
-/// Parse an external general entity
-/// An external general parsed entity is well-formed if it matches the
-/// production labeled extParsedEnt.
-///
-/// `[78] extParsedEnt ::= TextDecl? content`
-///
-/// Returns 0 if the entity is well formed, -1 in case of args problem and
-///    the parser error code otherwise
-#[doc(alias = "xmlParseExternalEntity")]
-#[deprecated]
-#[cfg(feature = "sax1")]
-pub(crate) unsafe fn xml_parse_external_entity(
-    doc: XmlDocPtr,
-    sax: Option<Box<XmlSAXHandler>>,
-    user_data: Option<GenericErrorContext>,
-    depth: i32,
-    url: Option<&str>,
-    id: Option<&str>,
-    lst: Option<&mut Option<XmlGenericNodePtr>>,
-) -> i32 {
-    unsafe {
-        xml_parse_external_entity_private(doc, null_mut(), sax, user_data, depth, url, id, lst).1
-            as i32
-    }
-}
+// /// Parse an external general entity
+// /// An external general parsed entity is well-formed if it matches the
+// /// production labeled extParsedEnt.
+// ///
+// /// `[78] extParsedEnt ::= TextDecl? content`
+// ///
+// /// Returns 0 if the entity is well formed, -1 in case of args problem and
+// ///    the parser error code otherwise
+// #[doc(alias = "xmlParseExternalEntity")]
+// #[deprecated]
+// #[cfg(feature = "sax1")]
+// pub(crate) unsafe fn xml_parse_external_entity(
+//     doc: XmlDocPtr,
+//     sax: Option<Box<XmlSAXHandler>>,
+//     user_data: Option<GenericErrorContext>,
+//     depth: i32,
+//     url: Option<&str>,
+//     id: Option<&str>,
+//     lst: Option<&mut Option<XmlGenericNodePtr>>,
+// ) -> i32 {
+//     unsafe {
+//         xml_parse_external_entity_private(doc, null_mut(), sax, user_data, depth, url, id, lst).1
+//             as i32
+//     }
+// }
 
 /// Parse an external general entity within an existing parsing context
 /// An external general parsed entity is well-formed if it matches the
@@ -2690,41 +2689,41 @@ pub unsafe fn xml_parse_ctxt_external_entity(
     }
 }
 
-/// Setup the parser context to parse a new buffer; Clears any prior
-/// contents from the parser context. The buffer parameter must not be
-/// NULL, but the filename parameter can be
-#[doc(alias = "xmlSetupParserForBuffer")]
-#[cfg(feature = "sax1")]
-pub(crate) unsafe fn xml_setup_parser_for_buffer(
-    ctxt: XmlParserCtxtPtr,
-    buffer: *const XmlChar,
-    filename: Option<&str>,
-) {
-    unsafe {
-        use crate::parser::{xml_clear_parser_ctxt, xml_new_input_stream};
+// /// Setup the parser context to parse a new buffer; Clears any prior
+// /// contents from the parser context. The buffer parameter must not be
+// /// NULL, but the filename parameter can be
+// #[doc(alias = "xmlSetupParserForBuffer")]
+// #[cfg(feature = "sax1")]
+// pub(crate) unsafe fn xml_setup_parser_for_buffer(
+//     ctxt: XmlParserCtxtPtr,
+//     buffer: *const XmlChar,
+//     filename: Option<&str>,
+// ) {
+//     unsafe {
+//         use crate::parser::{xml_clear_parser_ctxt, xml_new_input_stream};
 
-        if ctxt.is_null() || buffer.is_null() {
-            return;
-        }
+//         if ctxt.is_null() || buffer.is_null() {
+//             return;
+//         }
 
-        let input: XmlParserInputPtr = xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt));
-        if input.is_null() {
-            xml_err_memory(null_mut(), Some("parsing new buffer: out of memory\n"));
-            xml_clear_parser_ctxt(ctxt);
-            return;
-        }
+//         let input: XmlParserInputPtr = xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt));
+//         if input.is_null() {
+//             xml_err_memory(null_mut(), Some("parsing new buffer: out of memory\n"));
+//             xml_clear_parser_ctxt(ctxt);
+//             return;
+//         }
 
-        xml_clear_parser_ctxt(ctxt);
-        if let Some(filename) = filename {
-            let canonic = canonic_path(filename);
-            (*input).filename = Some(canonic.into_owned());
-        }
-        (*input).base = buffer;
-        (*input).cur = buffer;
-        (*input).end = buffer.add(xml_strlen(buffer as _) as _);
-        (*ctxt).input_push(input);
-    }
-}
+//         xml_clear_parser_ctxt(ctxt);
+//         if let Some(filename) = filename {
+//             let canonic = canonic_path(filename);
+//             (*input).filename = Some(canonic.into_owned());
+//         }
+//         (*input).base = buffer;
+//         (*input).cur = buffer;
+//         (*input).end = buffer.add(xml_strlen(buffer as _) as _);
+//         (*ctxt).input_push(input);
+//     }
+// }
 
 /// Creates a parser context for an XML in-memory document.
 ///
@@ -3119,8 +3118,8 @@ unsafe fn xml_parse_qname(ctxt: XmlParserCtxtPtr, prefix: *mut *const XmlChar) -
     }
 }
 
-const XML_PARSER_BIG_ENTITY: usize = 1000;
-const XML_PARSER_LOT_ENTITY: usize = 5000;
+// const XML_PARSER_BIG_ENTITY: usize = 1000;
+// const XML_PARSER_LOT_ENTITY: usize = 5000;
 
 // XML_PARSER_NON_LINEAR is roughly the maximum allowed amplification factor
 // of serialized output after entity expansion.
@@ -9392,72 +9391,6 @@ mod tests {
             assert!(
                 leaks == 0,
                 "{leaks} Leaks are found in xmlLineNumbersDefault()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_parser_input_grow() {
-        unsafe {
-            let mut leaks = 0;
-            for n_in in 0..GEN_NB_XML_PARSER_INPUT_PTR {
-                for n_len in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let input = gen_xml_parser_input_ptr(n_in, 0);
-                    let len = gen_int(n_len, 1);
-
-                    let ret_val = xml_parser_input_grow(input, len);
-                    desret_int(ret_val);
-                    des_xml_parser_input_ptr(n_in, input, 0);
-                    des_int(n_len, len, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlParserInputGrow",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_in);
-                        eprintln!(" {}", n_len);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlParserInputGrow()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_parser_input_read() {
-        unsafe {
-            let mut leaks = 0;
-            for n_in in 0..GEN_NB_XML_PARSER_INPUT_PTR {
-                for n_len in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let input = gen_xml_parser_input_ptr(n_in, 0);
-                    let len = gen_int(n_len, 1);
-
-                    let ret_val = xml_parser_input_read(input, len);
-                    desret_int(ret_val);
-                    des_xml_parser_input_ptr(n_in, input, 0);
-                    des_int(n_len, len, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlParserInputRead",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_in);
-                        eprintln!(" {}", n_len);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlParserInputRead()"
             );
         }
     }

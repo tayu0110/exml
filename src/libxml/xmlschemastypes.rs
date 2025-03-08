@@ -5800,18 +5800,6 @@ macro_rules! PERROR_INT {
     };
 }
 
-macro_rules! FREE_AND_NULL {
-    ($str:expr) => {
-        if !$str.is_null() {
-            xml_free($str as _);
-            #[allow(unused_assignments)]
-            {
-                $str = null_mut();
-            }
-        }
-    };
-}
-
 /// Checks and computes the values of facets.
 ///
 /// Returns 0 if valid, a positive error code if not valid and

@@ -15,7 +15,6 @@
 use std::{
     ffi::CStr,
     io::{ErrorKind, Write},
-    mem::take,
     ops::{Deref, DerefMut},
     ptr::NonNull,
 };
@@ -119,25 +118,26 @@ impl XmlBuf {
         Err(anyhow::anyhow!("Unsupported allocation scheme."))
     }
 
+    #[cfg(test)]
     pub(crate) fn current_allocation_scheme(&self) -> XmlBufferAllocationScheme {
         self.scheme
     }
 
-    /// # Note
-    /// This method *does not shrink the internal allocated buffer*.  
-    pub(crate) fn clear(&mut self) {
-        if !self.error.is_ok() {
-            return;
-        }
+    // /// # Note
+    // /// This method *does not shrink the internal allocated buffer*.
+    // pub(crate) fn clear(&mut self) {
+    //     if !self.error.is_ok() {
+    //         return;
+    //     }
 
-        self.next_use = 0;
-        self.next_rw = 0;
-        if !self.content.is_empty() {
-            self.content[0] = 0;
-        }
-        // TODO: If `self.scheme` is `XmlBufferAllocIO`,
-        // reset the cursor of `content_io` and put NULL-terminator to the head of `content_io`.
-    }
+    //     self.next_use = 0;
+    //     self.next_rw = 0;
+    //     if !self.content.is_empty() {
+    //         self.content[0] = 0;
+    //     }
+    //     // TODO: If `self.scheme` is `XmlBufferAllocIO`,
+    //     // reset the cursor of `content_io` and put NULL-terminator to the head of `content_io`.
+    // }
 
     pub(crate) fn len(&self) -> usize {
         self.next_use
@@ -393,16 +393,16 @@ impl XmlBuf {
         }
     }
 
-    pub(crate) fn detach(&mut self) -> Option<Box<[u8]>> {
-        self.error.is_ok().then(|| {
-            if self.next_rw != 0 {
-                self.trim_head(self.next_rw);
-            }
-            self.next_rw = 0;
-            self.next_use = 0;
-            take(&mut self.content)
-        })
-    }
+    // pub(crate) fn detach(&mut self) -> Option<Box<[u8]>> {
+    //     self.error.is_ok().then(|| {
+    //         if self.next_rw != 0 {
+    //             self.trim_head(self.next_rw);
+    //         }
+    //         self.next_rw = 0;
+    //         self.next_use = 0;
+    //         take(&mut self.content)
+    //     })
+    // }
 
     pub(crate) fn dump(&self, file: Option<&mut impl Write>) -> Result<usize, std::io::Error> {
         if !self.error.is_ok() {
@@ -424,19 +424,19 @@ impl XmlBuf {
         self.content[self.next_rw..].as_mut_ptr()
     }
 
-    pub(crate) fn add_len(&mut self, additional: usize) -> Result<(), anyhow::Error> {
-        ensure!(
-            self.error.is_ok(),
-            "Failed to add len: some errors have already occured."
-        );
-        ensure!(
-            self.len() + additional < self.capacity(),
-            "requested length is too large."
-        );
-        self.next_use += additional;
-        self.content[self.next_use] = 0;
-        Ok(())
-    }
+    // pub(crate) fn add_len(&mut self, additional: usize) -> Result<(), anyhow::Error> {
+    //     ensure!(
+    //         self.error.is_ok(),
+    //         "Failed to add len: some errors have already occured."
+    //     );
+    //     ensure!(
+    //         self.len() + additional < self.capacity(),
+    //         "requested length is too large."
+    //     );
+    //     self.next_use += additional;
+    //     self.content[self.next_use] = 0;
+    //     Ok(())
+    // }
 
     /// Remove the head of the buffer.  
     /// `self.len()` will be `self.len() - len` after execution.  
@@ -497,17 +497,17 @@ impl XmlBufRef {
         NonNull::new(leaked).map(Self)
     }
 
-    pub(crate) fn from_raw(ptr: *mut XmlBuf) -> Option<Self> {
-        NonNull::new(ptr).map(Self)
-    }
+    // pub(crate) fn from_raw(ptr: *mut XmlBuf) -> Option<Self> {
+    //     NonNull::new(ptr).map(Self)
+    // }
 
     pub(crate) fn into_inner(self) -> XmlBuf {
         unsafe { *Box::from_raw(self.0.as_ptr()) }
     }
 
-    pub(crate) fn as_ptr(self) -> *mut XmlBuf {
-        self.0.as_ptr()
-    }
+    // pub(crate) fn as_ptr(self) -> *mut XmlBuf {
+    //     self.0.as_ptr()
+    // }
 
     pub(crate) fn free(self) {
         let _ = self.into_inner();
@@ -557,11 +557,11 @@ mod tests {
     fn buffer_modify_test() {
         let mut buf = XmlBuf::with_capacity(8);
         const TREE1: &[u8] = b"<abc><def/></abc>";
-        buf.push_bytes(TREE1);
+        buf.push_bytes(TREE1).ok();
         assert_eq!(buf.len(), TREE1.len());
         assert_eq!(buf.as_ref(), TREE1);
         const TREE2: &[u8] = b"<ghi/>";
-        buf.push_bytes(TREE2);
+        buf.push_bytes(TREE2).ok();
         assert_eq!(buf.len(), TREE1.len() + TREE2.len());
         assert_eq!(buf.as_ref(), b"<abc><def/></abc><ghi/>");
 
@@ -569,11 +569,12 @@ mod tests {
         assert_eq!(buf.len(), TREE2.len());
         assert_eq!(buf.as_ref(), TREE2);
 
-        buf.push_bytes(TREE1);
+        buf.push_bytes(TREE1).ok();
         assert_eq!(buf.len(), TREE1.len() + TREE2.len());
         assert_eq!(buf.as_ref(), b"<ghi/><abc><def/></abc>");
 
-        buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocIo);
+        buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocIo)
+            .ok();
         assert_eq!(
             buf.current_allocation_scheme(),
             XmlBufferAllocationScheme::XmlBufferAllocIo

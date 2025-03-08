@@ -674,7 +674,6 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
             XmlEntityType::XmlInternalGeneralEntity
             | XmlEntityType::XmlExternalGeneralParsedEntity
             | XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
-            _ => unreachable!(),
         }
         let external_id = ent.external_id;
         let system_id = ent.system_id;
@@ -708,7 +707,6 @@ unsafe fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
                         | XmlEntityType::XmlInternalGeneralEntity
                         | XmlEntityType::XmlExternalGeneralParsedEntity => return,
                         XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
-                        _ => unreachable!(),
                     }
                     xml_xinclude_err!(
                         ctxt,

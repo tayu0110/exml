@@ -94,10 +94,10 @@ impl TryFrom<i32> for XmlXPathObjectType {
     }
 }
 
-#[cfg(all(feature = "libxml_xptr_locs", feature = "xpath"))]
-const XPATH_POINT: usize = 5;
-#[cfg(all(feature = "libxml_xptr_locs", feature = "xpath"))]
-const XPATH_RANGE: usize = 6;
+// #[cfg(all(feature = "libxml_xptr_locs", feature = "xpath"))]
+// const XPATH_POINT: usize = 5;
+// #[cfg(all(feature = "libxml_xptr_locs", feature = "xpath"))]
+// const XPATH_RANGE: usize = 6;
 #[cfg(all(feature = "libxml_xptr_locs", feature = "xpath"))]
 const XPATH_LOCATIONSET: usize = 7;
 

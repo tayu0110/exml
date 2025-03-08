@@ -579,7 +579,7 @@ pub trait NodeCommon {
                                 == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity)
                                     .unwrap()
                             {
-                                table.remove_entry(name, |_, _| {});
+                                table.remove_entry(name, |_, _| {}).ok();
                             }
                         }
                         if let (Some(mut table), Some(name)) =
@@ -589,7 +589,7 @@ pub trait NodeCommon {
                                 == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity)
                                     .unwrap()
                             {
-                                table.remove_entry(name, |_, _| {});
+                                table.remove_entry(name, |_, _| {}).ok();
                             }
                         }
                     }
@@ -601,7 +601,7 @@ pub trait NodeCommon {
                                 == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity)
                                     .unwrap()
                             {
-                                table.remove_entry(name, |_, _| {});
+                                table.remove_entry(name, |_, _| {}).ok();
                             }
                         }
                         if let (Some(mut table), Some(name)) =
@@ -611,7 +611,7 @@ pub trait NodeCommon {
                                 == XmlEntityPtr::from_raw(self as *mut Self as *mut XmlEntity)
                                     .unwrap()
                             {
-                                table.remove_entry(name, |_, _| {});
+                                table.remove_entry(name, |_, _| {}).ok();
                             }
                         }
                     }
@@ -654,14 +654,14 @@ pub trait NodeCommon {
 pub struct XmlGenericNodePtr(pub(super) NonNull<dyn NodeCommon>);
 
 impl XmlGenericNodePtr {
-    /// Allocate new memory and create new `XmlGenericNodePtr` from an owned xml node.
-    ///
-    /// This method leaks allocated memory.  
-    /// Users can use `free` method for deallocating memory.
-    pub(crate) fn new<T: NodeCommon + 'static>(node: T) -> Option<Self> {
-        let boxed: Box<dyn NodeCommon> = Box::new(node);
-        NonNull::new(Box::leak(boxed)).map(Self)
-    }
+    // /// Allocate new memory and create new `XmlGenericNodePtr` from an owned xml node.
+    // ///
+    // /// This method leaks allocated memory.
+    // /// Users can use `free` method for deallocating memory.
+    // pub(crate) fn new<T: NodeCommon + 'static>(node: T) -> Option<Self> {
+    //     let boxed: Box<dyn NodeCommon> = Box::new(node);
+    //     NonNull::new(Box::leak(boxed)).map(Self)
+    // }
 
     // Temporary workaround
     pub fn from_raw<T: NodeCommon>(ptr: *mut T) -> Option<Self> {
@@ -684,26 +684,26 @@ impl XmlGenericNodePtr {
         self.0.as_ptr() as *mut XmlNode
     }
 
-    /// Deallocate memory.
-    ///
-    /// # Safety
-    /// This method should be called only once.  
-    /// If called more than twice, the behavior is undefined.
-    pub(crate) unsafe fn free(self) {
-        unsafe {
-            let _ = *Box::from_raw(self.0.as_ptr());
-        }
-    }
+    // /// Deallocate memory.
+    // ///
+    // /// # Safety
+    // /// This method should be called only once.
+    // /// If called more than twice, the behavior is undefined.
+    // pub(crate) unsafe fn free(self) {
+    //     unsafe {
+    //         let _ = *Box::from_raw(self.0.as_ptr());
+    //     }
+    // }
 
-    /// Acquire the ownership of the inner value.  
-    /// As a result, `self` will be invalid. `self` must not be used after performs this method.
-    ///
-    /// # Safety
-    /// This method should be called only once.  
-    /// If called more than twice, the behavior is undefined.
-    pub(crate) unsafe fn into_inner(self) -> Box<dyn NodeCommon> {
-        unsafe { Box::from_raw(self.0.as_ptr()) }
-    }
+    // /// Acquire the ownership of the inner value.
+    // /// As a result, `self` will be invalid. `self` must not be used after performs this method.
+    // ///
+    // /// # Safety
+    // /// This method should be called only once.
+    // /// If called more than twice, the behavior is undefined.
+    // pub(crate) unsafe fn into_inner(self) -> Box<dyn NodeCommon> {
+    //     unsafe { Box::from_raw(self.0.as_ptr()) }
+    // }
 
     /// Search a Ns registered under a given name space for a document.  
     /// recurse on the parents until it finds the defined namespace or return NULL otherwise.  

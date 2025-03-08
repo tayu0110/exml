@@ -89,12 +89,6 @@ use crate::{
 
 use super::hash::XmlHashTable;
 
-macro_rules! VALID_CTXT {
-    ($ctxt:expr) => {
-        (*(*$ctxt).input).cur <= (*(*$ctxt).input).end
-    };
-}
-
 macro_rules! NXT {
     ($ctxt:expr, $val:expr) => {
         *(*(*$ctxt).input).cur.add($val as usize)
@@ -950,12 +944,12 @@ pub(crate) unsafe fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr) -> *mut Xm
     }
 }
 
-#[doc(alias = "xmlParseCharData")]
-pub(crate) unsafe fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cdata: i32) {
-    unsafe {
-        xml_parse_char_data_internal(ctxt, 0);
-    }
-}
+// #[doc(alias = "xmlParseCharData")]
+// pub(crate) unsafe fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cdata: i32) {
+//     unsafe {
+//         xml_parse_char_data_internal(ctxt, 0);
+//     }
+// }
 
 /// Parse an attribute default declaration
 ///
@@ -1460,7 +1454,9 @@ pub(crate) unsafe fn xml_add_special_attr(
             return;
         }
 
-        atts_special.add_entry2(&fullname, fullattr.as_deref(), typ);
+        atts_special
+            .add_entry2(&fullname, fullattr.as_deref(), typ)
+            .ok();
     }
 }
 
@@ -1616,40 +1612,40 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
     }
 }
 
-/// Parse the declaration for a Mixed Element content
-/// The leading '(' and spaces have been skipped in xmlParseElementContentDecl
-///
-/// `[47] children ::= (choice | seq) ('?' | '*' | '+')?`
-///
-/// `[48] cp ::= (Name | choice | seq) ('?' | '*' | '+')?`
-///
-/// `[49] choice ::= '(' S? cp ( S? '|' S? cp )* S? ')'`
-///
-/// `[50] seq ::= '(' S? cp ( S? ',' S? cp )* S? ')'`
-///
-/// `[ VC: Proper Group/PE Nesting ]` applies to [49] and [50]
-///
-/// TODO Parameter-entity replacement text must be properly nested
-///    with parenthesized groups. That is to say, if either of the
-///    opening or closing parentheses in a choice, seq, or Mixed
-///    construct is contained in the replacement text for a parameter
-///    entity, both must be contained in the same replacement text. For
-///    interoperability, if a parameter-entity reference appears in a
-///    choice, seq, or Mixed construct, its replacement text should not
-///    be empty, and neither the first nor last non-blank character of
-///    the replacement text should be a connector (| or ,).
-///
-/// Returns the tree of xmlElementContentPtr describing the element hierarchy.
-#[doc(alias = "xmlParseElementChildrenContentDecl")]
-pub(crate) unsafe fn xml_parse_element_children_content_decl(
-    ctxt: XmlParserCtxtPtr,
-    inputchk: i32,
-) -> XmlElementContentPtr {
-    unsafe {
-        // stub left for API/ABI compat
-        xml_parse_element_children_content_decl_priv(ctxt, inputchk, 1)
-    }
-}
+// /// Parse the declaration for a Mixed Element content
+// /// The leading '(' and spaces have been skipped in xmlParseElementContentDecl
+// ///
+// /// `[47] children ::= (choice | seq) ('?' | '*' | '+')?`
+// ///
+// /// `[48] cp ::= (Name | choice | seq) ('?' | '*' | '+')?`
+// ///
+// /// `[49] choice ::= '(' S? cp ( S? '|' S? cp )* S? ')'`
+// ///
+// /// `[50] seq ::= '(' S? cp ( S? ',' S? cp )* S? ')'`
+// ///
+// /// `[ VC: Proper Group/PE Nesting ]` applies to [49] and [50]
+// ///
+// /// TODO Parameter-entity replacement text must be properly nested
+// ///    with parenthesized groups. That is to say, if either of the
+// ///    opening or closing parentheses in a choice, seq, or Mixed
+// ///    construct is contained in the replacement text for a parameter
+// ///    entity, both must be contained in the same replacement text. For
+// ///    interoperability, if a parameter-entity reference appears in a
+// ///    choice, seq, or Mixed construct, its replacement text should not
+// ///    be empty, and neither the first nor last non-blank character of
+// ///    the replacement text should be a connector (| or ,).
+// ///
+// /// Returns the tree of xmlElementContentPtr describing the element hierarchy.
+// #[doc(alias = "xmlParseElementChildrenContentDecl")]
+// pub(crate) unsafe fn xml_parse_element_children_content_decl(
+//     ctxt: XmlParserCtxtPtr,
+//     inputchk: i32,
+// ) -> XmlElementContentPtr {
+//     unsafe {
+//         // stub left for API/ABI compat
+//         xml_parse_element_children_content_decl_priv(ctxt, inputchk, 1)
+//     }
+// }
 
 /// Parse the declaration for an Element content either Mixed or Children,
 /// the cases EMPTY and ANY are handled directly in xmlParseElementDecl
@@ -2142,9 +2138,9 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 } else {
                     let mut slice = &mut out[..];
                     if hex == b'x' as i32 || hex == b'X' as i32 {
-                        write!(slice, "#x{:X}", value as u32);
+                        write!(slice, "#x{:X}", value as u32).ok();
                     } else {
-                        write!(slice, "#{}", value as u32);
+                        write!(slice, "#{}", value as u32).ok();
                     }
                     let rem = slice.len();
                     let len = out.len() - rem;
@@ -3084,20 +3080,20 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlCh
     }
 }
 
-/// Parse an end of tag
-///
-/// `[42] ETag ::= '</' Name S? '>'`
-///
-/// With namespace
-///
-/// `[NS 9] ETag ::= '</' QName S? '>'`
-#[doc(alias = "xmlParseEndTag")]
-#[cfg(feature = "sax1")]
-pub(crate) unsafe fn xml_parse_end_tag(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        xml_parse_end_tag1(ctxt, 0);
-    }
-}
+// /// Parse an end of tag
+// ///
+// /// `[42] ETag ::= '</' Name S? '>'`
+// ///
+// /// With namespace
+// ///
+// /// `[NS 9] ETag ::= '</' QName S? '>'`
+// #[doc(alias = "xmlParseEndTag")]
+// #[cfg(feature = "sax1")]
+// pub(crate) unsafe fn xml_parse_end_tag(ctxt: XmlParserCtxtPtr) {
+//     unsafe {
+//         xml_parse_end_tag1(ctxt, 0);
+//     }
+// }
 
 /// Parse the start of an XML element. Returns -1 in case of error, 0 if an
 /// opening tag was parsed, 1 if an empty element was parsed.
@@ -3502,14 +3498,14 @@ pub unsafe fn xml_parse_external_subset(
     }
 }
 
-/// If no entities need to be substituted.
-const XML_SUBSTITUTE_NONE: usize = 0;
+// /// If no entities need to be substituted.
+// const XML_SUBSTITUTE_NONE: usize = 0;
 /// Whether general entities need to be substituted.
 pub(crate) const XML_SUBSTITUTE_REF: usize = 1;
 /// Whether parameter entities need to be substituted.
 pub(crate) const XML_SUBSTITUTE_PEREF: usize = 2;
-/// Both general and parameter entities need to be substituted.
-const XML_SUBSTITUTE_BOTH: usize = 3;
+// /// Both general and parameter entities need to be substituted.
+// const XML_SUBSTITUTE_BOTH: usize = 3;
 
 /// Takes a entity string content and process to do the adequate substitutions.
 ///
@@ -3673,102 +3669,102 @@ pub(crate) unsafe fn xml_string_current_char(
     }
 }
 
-/// ```text
-/// [69] PEReference ::= '%' Name ';'
-///
-/// [ WFC: No Recursion ]
-/// A parsed entity must not contain a recursive reference to itself, either directly or indirectly.
-///
-/// [ WFC: Entity Declared ]
-/// In a document without any DTD, a document with only an internal DTD
-/// subset which contains no parameter entity references, or a document
-/// with "standalone='yes'", ...  ... The declaration of a parameter
-/// entity must precede any reference to it...
-///
-/// [ VC: Entity Declared ]
-/// In a document with an external subset or external parameter entities
-/// with "standalone='no'", ...  ... The declaration of a parameter entity
-/// must precede any reference to it...
-///
-/// [ WFC: In DTD ]
-/// Parameter-entity references may only appear in the DTD.
-/// NOTE: misleading but this is handled.
-/// ```
-///
-/// A PEReference may have been detected in the current input stream
-/// the handling is done accordingly to
-///      http://www.w3.org/TR/REC-xml#entproc
-/// i.e.
-///   - Included in literal in entity values
-///   - Included as Parameter Entity reference within DTDs
-#[doc(alias = "xmlParserHandlePEReference")]
-pub(crate) unsafe fn xml_parser_handle_pereference(ctxt: XmlParserCtxtPtr) {
-    unsafe {
-        match (*ctxt).instate {
-            XmlParserInputState::XmlParserCDATASection => {
-                return;
-            }
-            XmlParserInputState::XmlParserComment => {
-                return;
-            }
-            XmlParserInputState::XmlParserStartTag => {
-                return;
-            }
-            XmlParserInputState::XmlParserEndTag => {
-                return;
-            }
-            XmlParserInputState::XmlParserEOF => {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefAtEOF, None);
-                return;
-            }
-            XmlParserInputState::XmlParserProlog
-            | XmlParserInputState::XmlParserStart
-            | XmlParserInputState::XmlParserMisc => {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefInProlog, None);
-                return;
-            }
-            XmlParserInputState::XmlParserEntityDecl
-            | XmlParserInputState::XmlParserContent
-            | XmlParserInputState::XmlParserAttributeValue
-            | XmlParserInputState::XmlParserPI
-            | XmlParserInputState::XmlParserSystemLiteral
-            | XmlParserInputState::XmlParserPublicLiteral => {
-                // we just ignore it there
-                return;
-            }
-            XmlParserInputState::XmlParserEpilog => {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefInEpilog, None);
-                return;
-            }
-            XmlParserInputState::XmlParserEntityValue => {
-                // NOTE: in the case of entity values, we don't do the
-                //       substitution here since we need the literal
-                //       entity value to be able to save the internal
-                //       subset of the document.
-                //       This will be handled by xmlStringDecodeEntities
-                return;
-            }
-            XmlParserInputState::XmlParserDTD => {
-                // [WFC: Well-Formedness Constraint: PEs in Internal Subset]
-                // In the internal DTD subset, parameter-entity references
-                // can occur only where markup declarations can occur, not
-                // within markup declarations.
-                // In that case this is handled in xmlParseMarkupDecl
-                if (*ctxt).external == 0 && (*ctxt).input_tab.len() == 1 {
-                    return;
-                }
-                if xml_is_blank_char(NXT!(ctxt, 1) as u32) || NXT!(ctxt, 1) == 0 {
-                    return;
-                }
-            }
-            XmlParserInputState::XmlParserIgnore => {
-                return;
-            }
-        }
+// /// ```text
+// /// [69] PEReference ::= '%' Name ';'
+// ///
+// /// [ WFC: No Recursion ]
+// /// A parsed entity must not contain a recursive reference to itself, either directly or indirectly.
+// ///
+// /// [ WFC: Entity Declared ]
+// /// In a document without any DTD, a document with only an internal DTD
+// /// subset which contains no parameter entity references, or a document
+// /// with "standalone='yes'", ...  ... The declaration of a parameter
+// /// entity must precede any reference to it...
+// ///
+// /// [ VC: Entity Declared ]
+// /// In a document with an external subset or external parameter entities
+// /// with "standalone='no'", ...  ... The declaration of a parameter entity
+// /// must precede any reference to it...
+// ///
+// /// [ WFC: In DTD ]
+// /// Parameter-entity references may only appear in the DTD.
+// /// NOTE: misleading but this is handled.
+// /// ```
+// ///
+// /// A PEReference may have been detected in the current input stream
+// /// the handling is done accordingly to
+// ///      http://www.w3.org/TR/REC-xml#entproc
+// /// i.e.
+// ///   - Included in literal in entity values
+// ///   - Included as Parameter Entity reference within DTDs
+// #[doc(alias = "xmlParserHandlePEReference")]
+// pub(crate) unsafe fn xml_parser_handle_pereference(ctxt: XmlParserCtxtPtr) {
+//     unsafe {
+//         match (*ctxt).instate {
+//             XmlParserInputState::XmlParserCDATASection => {
+//                 return;
+//             }
+//             XmlParserInputState::XmlParserComment => {
+//                 return;
+//             }
+//             XmlParserInputState::XmlParserStartTag => {
+//                 return;
+//             }
+//             XmlParserInputState::XmlParserEndTag => {
+//                 return;
+//             }
+//             XmlParserInputState::XmlParserEOF => {
+//                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefAtEOF, None);
+//                 return;
+//             }
+//             XmlParserInputState::XmlParserProlog
+//             | XmlParserInputState::XmlParserStart
+//             | XmlParserInputState::XmlParserMisc => {
+//                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefInProlog, None);
+//                 return;
+//             }
+//             XmlParserInputState::XmlParserEntityDecl
+//             | XmlParserInputState::XmlParserContent
+//             | XmlParserInputState::XmlParserAttributeValue
+//             | XmlParserInputState::XmlParserPI
+//             | XmlParserInputState::XmlParserSystemLiteral
+//             | XmlParserInputState::XmlParserPublicLiteral => {
+//                 // we just ignore it there
+//                 return;
+//             }
+//             XmlParserInputState::XmlParserEpilog => {
+//                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrPERefInEpilog, None);
+//                 return;
+//             }
+//             XmlParserInputState::XmlParserEntityValue => {
+//                 // NOTE: in the case of entity values, we don't do the
+//                 //       substitution here since we need the literal
+//                 //       entity value to be able to save the internal
+//                 //       subset of the document.
+//                 //       This will be handled by xmlStringDecodeEntities
+//                 return;
+//             }
+//             XmlParserInputState::XmlParserDTD => {
+//                 // [WFC: Well-Formedness Constraint: PEs in Internal Subset]
+//                 // In the internal DTD subset, parameter-entity references
+//                 // can occur only where markup declarations can occur, not
+//                 // within markup declarations.
+//                 // In that case this is handled in xmlParseMarkupDecl
+//                 if (*ctxt).external == 0 && (*ctxt).input_tab.len() == 1 {
+//                     return;
+//                 }
+//                 if xml_is_blank_char(NXT!(ctxt, 1) as u32) || NXT!(ctxt, 1) == 0 {
+//                     return;
+//                 }
+//             }
+//             XmlParserInputState::XmlParserIgnore => {
+//                 return;
+//             }
+//         }
 
-        xml_parse_pe_reference(ctxt);
-    }
-}
+//         xml_parse_pe_reference(ctxt);
+//     }
+// }
 
 /// Checks that the value conforms to the LanguageID production:
 ///

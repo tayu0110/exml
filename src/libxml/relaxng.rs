@@ -6241,103 +6241,103 @@ unsafe fn xml_relaxng_dump_define<'a>(output: &mut (impl Write + 'a), define: Xm
         }
         match (*define).typ {
             XmlRelaxNGType::Empty => {
-                writeln!(output, "<empty/>");
+                writeln!(output, "<empty/>").ok();
             }
             XmlRelaxNGType::NotAllowed => {
-                writeln!(output, "<notAllowed/>");
+                writeln!(output, "<notAllowed/>").ok();
             }
             XmlRelaxNGType::Text => {
-                writeln!(output, "<text/>");
+                writeln!(output, "<text/>").ok();
             }
             XmlRelaxNGType::Element => {
-                writeln!(output, "<element>");
+                writeln!(output, "<element>").ok();
                 if !(*define).name.is_null() {
-                    write!(output, "<name");
+                    write!(output, "<name").ok();
                     if !(*define).ns.is_null() {
                         let ns = CStr::from_ptr((*define).ns as *const i8).to_string_lossy();
-                        write!(output, " ns=\"{ns}\"");
+                        write!(output, " ns=\"{ns}\"").ok();
                     }
                     let name = CStr::from_ptr((*define).name as *const i8).to_string_lossy();
-                    writeln!(output, ">{name}</name>");
+                    writeln!(output, ">{name}</name>").ok();
                 }
                 xml_relaxng_dump_defines(output, (*define).attrs);
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</element>");
+                writeln!(output, "</element>").ok();
             }
             XmlRelaxNGType::List => {
-                writeln!(output, "<list>");
+                writeln!(output, "<list>").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</list>");
+                writeln!(output, "</list>").ok();
             }
             XmlRelaxNGType::Oneormore => {
-                writeln!(output, "<oneOrMore>");
+                writeln!(output, "<oneOrMore>").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</oneOrMore>");
+                writeln!(output, "</oneOrMore>").ok();
             }
             XmlRelaxNGType::Zeroormore => {
-                writeln!(output, "<zeroOrMore>");
+                writeln!(output, "<zeroOrMore>").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</zeroOrMore>");
+                writeln!(output, "</zeroOrMore>").ok();
             }
             XmlRelaxNGType::Choice => {
-                writeln!(output, "<choice>");
+                writeln!(output, "<choice>").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</choice>");
+                writeln!(output, "</choice>").ok();
             }
             XmlRelaxNGType::Group => {
-                writeln!(output, "<group>");
+                writeln!(output, "<group>").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</group>");
+                writeln!(output, "</group>").ok();
             }
             XmlRelaxNGType::Interleave => {
-                writeln!(output, "<interleave>");
+                writeln!(output, "<interleave>").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</interleave>");
+                writeln!(output, "</interleave>").ok();
             }
             XmlRelaxNGType::Optional => {
-                writeln!(output, "<optional>");
+                writeln!(output, "<optional>").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</optional>");
+                writeln!(output, "</optional>").ok();
             }
             XmlRelaxNGType::Attribute => {
-                writeln!(output, "<attribute>");
+                writeln!(output, "<attribute>").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</attribute>");
+                writeln!(output, "</attribute>").ok();
             }
             XmlRelaxNGType::Def => {
-                write!(output, "<define");
+                write!(output, "<define").ok();
                 if !(*define).name.is_null() {
                     let name = CStr::from_ptr((*define).name as *const i8).to_string_lossy();
-                    write!(output, " name=\"{name}\"");
+                    write!(output, " name=\"{name}\"").ok();
                 }
-                writeln!(output, ">");
+                writeln!(output, ">").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</define>");
+                writeln!(output, "</define>").ok();
             }
             XmlRelaxNGType::Ref => {
-                write!(output, "<ref");
+                write!(output, "<ref").ok();
                 if !(*define).name.is_null() {
                     let name = CStr::from_ptr((*define).name as *const i8).to_string_lossy();
-                    write!(output, " name=\"{name}\"");
+                    write!(output, " name=\"{name}\"").ok();
                 }
-                writeln!(output, ">");
+                writeln!(output, ">").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</ref>");
+                writeln!(output, "</ref>").ok();
             }
             XmlRelaxNGType::Parentref => {
-                write!(output, "<parentRef");
+                write!(output, "<parentRef").ok();
                 if !(*define).name.is_null() {
                     let name = CStr::from_ptr((*define).name as *const i8).to_string_lossy();
-                    write!(output, " name=\"{name}\"");
+                    write!(output, " name=\"{name}\"").ok();
                 }
-                writeln!(output, ">");
+                writeln!(output, ">").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</parentRef>");
+                writeln!(output, "</parentRef>").ok();
             }
             XmlRelaxNGType::Externalref => {
-                write!(output, "<externalRef>");
+                write!(output, "<externalRef>").ok();
                 xml_relaxng_dump_defines(output, (*define).content);
-                writeln!(output, "</externalRef>");
+                writeln!(output, "</externalRef>").ok();
             }
             XmlRelaxNGType::Datatype | XmlRelaxNGType::Value => {
                 // TODO
@@ -6365,31 +6365,31 @@ unsafe fn xml_relaxng_dump_grammar<'a>(
             return;
         }
 
-        write!(output, "<grammar");
+        write!(output, "<grammar").ok();
         if top != 0 {
-            write!(output, " xmlns=\"http://relaxng.org/ns/structure/1.0\"");
+            write!(output, " xmlns=\"http://relaxng.org/ns/structure/1.0\"").ok();
         }
         match (*grammar).combine {
             XmlRelaxNGCombine::Undefined => {}
             XmlRelaxNGCombine::Choice => {
-                write!(output, " combine=\"choice\"");
+                write!(output, " combine=\"choice\"").ok();
             }
             XmlRelaxNGCombine::Interleave => {
-                write!(output, " combine=\"interleave\"");
+                write!(output, " combine=\"interleave\"").ok();
             } // _ => {
-              //     write!(output, " <!-- invalid combine value -->");
+              //     write!(output, " <!-- invalid combine value -->").ok();
               // }
         }
-        writeln!(output, ">");
+        writeln!(output, ">").ok();
         if (*grammar).start.is_null() {
-            write!(output, " <!-- grammar had no start -->");
+            write!(output, " <!-- grammar had no start -->").ok();
         } else {
-            writeln!(output, "<start>");
+            writeln!(output, "<start>").ok();
             xml_relaxng_dump_define(output, (*grammar).start);
-            writeln!(output, "</start>");
+            writeln!(output, "</start>").ok();
         }
         /* TODO ? Dump the defines ? */
-        writeln!(output, "</grammar>");
+        writeln!(output, "</grammar>").ok();
     }
 }
 
@@ -6399,21 +6399,21 @@ unsafe fn xml_relaxng_dump_grammar<'a>(
 pub unsafe fn xml_relaxng_dump<'a>(output: &mut (impl Write + 'a), schema: XmlRelaxNGPtr) {
     unsafe {
         if schema.is_null() {
-            writeln!(output, "RelaxNG empty or failed to compile");
+            writeln!(output, "RelaxNG empty or failed to compile").ok();
             return;
         }
-        write!(output, "RelaxNG: ");
+        write!(output, "RelaxNG: ").ok();
         if let Some(doc) = (*schema).doc {
             if let Some(url) = doc.url.as_deref() {
-                writeln!(output, "{url}");
+                writeln!(output, "{url}").ok();
             } else {
-                writeln!(output);
+                writeln!(output).ok();
             }
         } else {
-            writeln!(output, "no document");
+            writeln!(output, "no document").ok();
         }
         if (*schema).topgrammar.is_null() {
-            writeln!(output, "RelaxNG has no top grammar");
+            writeln!(output, "RelaxNG has no top grammar").ok();
             return;
         }
         xml_relaxng_dump_grammar(output, (*schema).topgrammar, 1);
@@ -6426,13 +6426,13 @@ pub unsafe fn xml_relaxng_dump<'a>(output: &mut (impl Write + 'a), schema: XmlRe
 pub unsafe fn xml_relaxng_dump_tree(output: &mut impl Write, schema: XmlRelaxNGPtr) {
     unsafe {
         if schema.is_null() {
-            writeln!(output, "RelaxNG empty or failed to compile");
+            writeln!(output, "RelaxNG empty or failed to compile").ok();
             return;
         }
         if let Some(mut doc) = (*schema).doc {
             doc.dump_file(output);
         } else {
-            writeln!(output, "no document");
+            writeln!(output, "no document").ok();
         }
     }
 }

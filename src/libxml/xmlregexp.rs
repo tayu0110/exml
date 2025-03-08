@@ -3191,163 +3191,163 @@ pub unsafe fn xml_regexp_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i3
 unsafe fn xml_reg_print_atom_type<'a>(output: &mut (impl Write + 'a), typ: XmlRegAtomType) {
     match typ {
         XmlRegAtomType::XmlRegexpEpsilon => {
-            write!(output, "epsilon ");
+            write!(output, "epsilon ").ok();
         }
         XmlRegAtomType::XmlRegexpCharval => {
-            write!(output, "charval ");
+            write!(output, "charval ").ok();
         }
         XmlRegAtomType::XmlRegexpRanges => {
-            write!(output, "ranges ");
+            write!(output, "ranges ").ok();
         }
         XmlRegAtomType::XmlRegexpSubreg => {
-            write!(output, "subexpr ");
+            write!(output, "subexpr ").ok();
         }
         XmlRegAtomType::XmlRegexpString => {
-            write!(output, "string ");
+            write!(output, "string ").ok();
         }
         XmlRegAtomType::XmlRegexpAnychar => {
-            write!(output, "anychar ");
+            write!(output, "anychar ").ok();
         }
         XmlRegAtomType::XmlRegexpAnyspace => {
-            write!(output, "anyspace ");
+            write!(output, "anyspace ").ok();
         }
         XmlRegAtomType::XmlRegexpNotspace => {
-            write!(output, "notspace ");
+            write!(output, "notspace ").ok();
         }
         XmlRegAtomType::XmlRegexpInitname => {
-            write!(output, "initname ");
+            write!(output, "initname ").ok();
         }
         XmlRegAtomType::XmlRegexpNotinitname => {
-            write!(output, "notinitname ");
+            write!(output, "notinitname ").ok();
         }
         XmlRegAtomType::XmlRegexpNamechar => {
-            write!(output, "namechar ");
+            write!(output, "namechar ").ok();
         }
         XmlRegAtomType::XmlRegexpNotnamechar => {
-            write!(output, "notnamechar ");
+            write!(output, "notnamechar ").ok();
         }
         XmlRegAtomType::XmlRegexpDecimal => {
-            write!(output, "decimal ");
+            write!(output, "decimal ").ok();
         }
         XmlRegAtomType::XmlRegexpNotdecimal => {
-            write!(output, "notdecimal ");
+            write!(output, "notdecimal ").ok();
         }
         XmlRegAtomType::XmlRegexpRealchar => {
-            write!(output, "realchar ");
+            write!(output, "realchar ").ok();
         }
         XmlRegAtomType::XmlRegexpNotrealchar => {
-            write!(output, "notrealchar ");
+            write!(output, "notrealchar ").ok();
         }
         XmlRegAtomType::XmlRegexpLetter => {
-            write!(output, "LETTER ");
+            write!(output, "LETTER ").ok();
         }
         XmlRegAtomType::XmlRegexpLetterUppercase => {
-            write!(output, "LETTER_UPPERCASE ");
+            write!(output, "LETTER_UPPERCASE ").ok();
         }
         XmlRegAtomType::XmlRegexpLetterLowercase => {
-            write!(output, "LETTER_LOWERCASE ");
+            write!(output, "LETTER_LOWERCASE ").ok();
         }
         XmlRegAtomType::XmlRegexpLetterTitlecase => {
-            write!(output, "LETTER_TITLECASE ");
+            write!(output, "LETTER_TITLECASE ").ok();
         }
         XmlRegAtomType::XmlRegexpLetterModifier => {
-            write!(output, "LETTER_MODIFIER ");
+            write!(output, "LETTER_MODIFIER ").ok();
         }
         XmlRegAtomType::XmlRegexpLetterOthers => {
-            write!(output, "LETTER_OTHERS ");
+            write!(output, "LETTER_OTHERS ").ok();
         }
         XmlRegAtomType::XmlRegexpMark => {
-            write!(output, "MARK ");
+            write!(output, "MARK ").ok();
         }
         XmlRegAtomType::XmlRegexpMarkNonspacing => {
-            write!(output, "MARK_NONSPACING ");
+            write!(output, "MARK_NONSPACING ").ok();
         }
         XmlRegAtomType::XmlRegexpMarkSpacecombining => {
-            write!(output, "MARK_SPACECOMBINING ");
+            write!(output, "MARK_SPACECOMBINING ").ok();
         }
         XmlRegAtomType::XmlRegexpMarkEnclosing => {
-            write!(output, "MARK_ENCLOSING ");
+            write!(output, "MARK_ENCLOSING ").ok();
         }
         XmlRegAtomType::XmlRegexpNumber => {
-            write!(output, "NUMBER ");
+            write!(output, "NUMBER ").ok();
         }
         XmlRegAtomType::XmlRegexpNumberDecimal => {
-            write!(output, "NUMBER_DECIMAL ");
+            write!(output, "NUMBER_DECIMAL ").ok();
         }
         XmlRegAtomType::XmlRegexpNumberLetter => {
-            write!(output, "NUMBER_LETTER ");
+            write!(output, "NUMBER_LETTER ").ok();
         }
         XmlRegAtomType::XmlRegexpNumberOthers => {
-            write!(output, "NUMBER_OTHERS ");
+            write!(output, "NUMBER_OTHERS ").ok();
         }
         XmlRegAtomType::XmlRegexpPunct => {
-            write!(output, "PUNCT ");
+            write!(output, "PUNCT ").ok();
         }
         XmlRegAtomType::XmlRegexpPunctConnector => {
-            write!(output, "PUNCT_CONNECTOR ");
+            write!(output, "PUNCT_CONNECTOR ").ok();
         }
         XmlRegAtomType::XmlRegexpPunctDash => {
-            write!(output, "PUNCT_DASH ");
+            write!(output, "PUNCT_DASH ").ok();
         }
         XmlRegAtomType::XmlRegexpPunctOpen => {
-            write!(output, "PUNCT_OPEN ");
+            write!(output, "PUNCT_OPEN ").ok();
         }
         XmlRegAtomType::XmlRegexpPunctClose => {
-            write!(output, "PUNCT_CLOSE ");
+            write!(output, "PUNCT_CLOSE ").ok();
         }
         XmlRegAtomType::XmlRegexpPunctInitquote => {
-            write!(output, "PUNCT_INITQUOTE ");
+            write!(output, "PUNCT_INITQUOTE ").ok();
         }
         XmlRegAtomType::XmlRegexpPunctFinquote => {
-            write!(output, "PUNCT_FINQUOTE ");
+            write!(output, "PUNCT_FINQUOTE ").ok();
         }
         XmlRegAtomType::XmlRegexpPunctOthers => {
-            write!(output, "PUNCT_OTHERS ");
+            write!(output, "PUNCT_OTHERS ").ok();
         }
         XmlRegAtomType::XmlRegexpSepar => {
-            write!(output, "SEPAR ");
+            write!(output, "SEPAR ").ok();
         }
         XmlRegAtomType::XmlRegexpSeparSpace => {
-            write!(output, "SEPAR_SPACE ");
+            write!(output, "SEPAR_SPACE ").ok();
         }
         XmlRegAtomType::XmlRegexpSeparLine => {
-            write!(output, "SEPAR_LINE ");
+            write!(output, "SEPAR_LINE ").ok();
         }
         XmlRegAtomType::XmlRegexpSeparPara => {
-            write!(output, "SEPAR_PARA ");
+            write!(output, "SEPAR_PARA ").ok();
         }
         XmlRegAtomType::XmlRegexpSymbol => {
-            write!(output, "SYMBOL ");
+            write!(output, "SYMBOL ").ok();
         }
         XmlRegAtomType::XmlRegexpSymbolMath => {
-            write!(output, "SYMBOL_MATH ");
+            write!(output, "SYMBOL_MATH ").ok();
         }
         XmlRegAtomType::XmlRegexpSymbolCurrency => {
-            write!(output, "SYMBOL_CURRENCY ");
+            write!(output, "SYMBOL_CURRENCY ").ok();
         }
         XmlRegAtomType::XmlRegexpSymbolModifier => {
-            write!(output, "SYMBOL_MODIFIER ");
+            write!(output, "SYMBOL_MODIFIER ").ok();
         }
         XmlRegAtomType::XmlRegexpSymbolOthers => {
-            write!(output, "SYMBOL_OTHERS ");
+            write!(output, "SYMBOL_OTHERS ").ok();
         }
         XmlRegAtomType::XmlRegexpOther => {
-            write!(output, "OTHER ");
+            write!(output, "OTHER ").ok();
         }
         XmlRegAtomType::XmlRegexpOtherControl => {
-            write!(output, "OTHER_CONTROL ");
+            write!(output, "OTHER_CONTROL ").ok();
         }
         XmlRegAtomType::XmlRegexpOtherFormat => {
-            write!(output, "OTHER_FORMAT ");
+            write!(output, "OTHER_FORMAT ").ok();
         }
         XmlRegAtomType::XmlRegexpOtherPrivate => {
-            write!(output, "OTHER_PRIVATE ");
+            write!(output, "OTHER_PRIVATE ").ok();
         }
         XmlRegAtomType::XmlRegexpOtherNa => {
-            write!(output, "OTHER_NA ");
+            write!(output, "OTHER_NA ").ok();
         }
         XmlRegAtomType::XmlRegexpBlockName => {
-            write!(output, "BLOCK ");
+            write!(output, "BLOCK ").ok();
         }
     }
 }
@@ -3355,37 +3355,37 @@ unsafe fn xml_reg_print_atom_type<'a>(output: &mut (impl Write + 'a), typ: XmlRe
 unsafe fn xml_reg_print_quant_type<'a>(output: &mut (impl Write + 'a), typ: XmlRegQuantType) {
     match typ {
         XmlRegQuantType::XmlRegexpQuantEpsilon => {
-            write!(output, "epsilon ");
+            write!(output, "epsilon ").ok();
         }
         XmlRegQuantType::XmlRegexpQuantOnce => {
-            write!(output, "once ");
+            write!(output, "once ").ok();
         }
         XmlRegQuantType::XmlRegexpQuantOpt => {
-            write!(output, "? ");
+            write!(output, "? ").ok();
         }
         XmlRegQuantType::XmlRegexpQuantMult => {
-            write!(output, "* ");
+            write!(output, "* ").ok();
         }
         XmlRegQuantType::XmlRegexpQuantPlus => {
-            write!(output, "+ ");
+            write!(output, "+ ").ok();
         }
         XmlRegQuantType::XmlRegexpQuantRange => {
-            write!(output, "range ");
+            write!(output, "range ").ok();
         }
         XmlRegQuantType::XmlRegexpQuantOnceonly => {
-            write!(output, "onceonly ");
+            write!(output, "onceonly ").ok();
         }
         XmlRegQuantType::XmlRegexpQuantAll => {
-            write!(output, "all ");
+            write!(output, "all ").ok();
         }
     }
 }
 
 unsafe fn xml_reg_print_range<'a>(output: &mut (impl Write + 'a), range: XmlRegRangePtr) {
     unsafe {
-        write!(output, "  range: ");
+        write!(output, "  range: ").ok();
         if (*range).neg != 0 {
-            write!(output, "negative ");
+            write!(output, "negative ").ok();
         }
         xml_reg_print_atom_type(output, (*range).typ);
         writeln!(
@@ -3393,36 +3393,38 @@ unsafe fn xml_reg_print_range<'a>(output: &mut (impl Write + 'a), range: XmlRegR
             "{} - {}",
             char::from_u32((*range).start as u32).unwrap(),
             char::from_u32((*range).end as u32).unwrap()
-        );
+        )
+        .ok();
     }
 }
 
 unsafe fn xml_reg_print_atom<'a>(output: &mut (impl Write + 'a), atom: XmlRegAtomPtr) {
     unsafe {
-        write!(output, " atom: ");
+        write!(output, " atom: ").ok();
         if atom.is_null() {
-            writeln!(output, "NULL");
+            writeln!(output, "NULL").ok();
             return;
         }
         if (*atom).neg != 0 {
-            write!(output, "not ");
+            write!(output, "not ").ok();
         }
         xml_reg_print_atom_type(output, (*atom).typ);
         xml_reg_print_quant_type(output, (*atom).quant);
         if matches!((*atom).quant, XmlRegQuantType::XmlRegexpQuantRange) {
-            write!(output, "{}-{} ", (*atom).min, (*atom).max);
+            write!(output, "{}-{} ", (*atom).min, (*atom).max).ok();
         }
         if matches!((*atom).typ, XmlRegAtomType::XmlRegexpString) {
-            write!(output, "'{}' ", (*atom).valuep.as_deref().unwrap());
+            write!(output, "'{}' ", (*atom).valuep.as_deref().unwrap()).ok();
         }
         if matches!((*atom).typ, XmlRegAtomType::XmlRegexpCharval) {
             writeln!(
                 output,
                 "char {}",
                 char::from_u32((*atom).codepoint as u32).unwrap()
-            );
+            )
+            .ok();
         } else if matches!((*atom).typ, XmlRegAtomType::XmlRegexpRanges) {
-            writeln!(output, "{} entries", (*atom).ranges.len());
+            writeln!(output, "{} entries", (*atom).ranges.len()).ok();
             for &range in &(*atom).ranges {
                 xml_reg_print_range(output, range);
             }
@@ -3432,37 +3434,38 @@ unsafe fn xml_reg_print_atom<'a>(output: &mut (impl Write + 'a), atom: XmlRegAto
                 "start {} end {}",
                 (*(*atom).start).no,
                 (*(*atom).stop).no
-            );
+            )
+            .ok();
         } else {
-            writeln!(output);
+            writeln!(output).ok();
         }
     }
 }
 
 unsafe fn xml_reg_print_trans<'a>(output: &mut (impl Write + 'a), trans: &XmlRegTrans) {
     unsafe {
-        write!(output, "  trans: ");
+        write!(output, "  trans: ").ok();
         if trans.to < 0 {
-            writeln!(output, "removed");
+            writeln!(output, "removed").ok();
             return;
         }
         if trans.nd != 0 {
             if trans.nd == 2 {
-                write!(output, "last not determinist, ");
+                write!(output, "last not determinist, ").ok();
             } else {
-                write!(output, "not determinist, ");
+                write!(output, "not determinist, ").ok();
             }
         }
         if trans.counter >= 0 {
-            write!(output, "counted {}, ", trans.counter);
+            write!(output, "counted {}, ", trans.counter).ok();
         }
         if trans.count as usize == REGEXP_ALL_COUNTER {
-            write!(output, "all transition, ");
+            write!(output, "all transition, ").ok();
         } else if trans.count >= 0 {
-            write!(output, "count based {}, ", trans.count);
+            write!(output, "count based {}, ", trans.count).ok();
         }
         if trans.atom.is_null() {
-            writeln!(output, "epsilon to {}", trans.to);
+            writeln!(output, "epsilon to {}", trans.to).ok();
             return;
         }
         if matches!((*trans.atom).typ, XmlRegAtomType::XmlRegexpCharval) {
@@ -3470,24 +3473,25 @@ unsafe fn xml_reg_print_trans<'a>(output: &mut (impl Write + 'a), trans: &XmlReg
                 output,
                 "char {} ",
                 char::from_u32((*trans.atom).codepoint as u32).unwrap()
-            );
+            )
+            .ok();
         }
-        writeln!(output, "atom {}, to {}", (*trans.atom).no, trans.to);
+        writeln!(output, "atom {}, to {}", (*trans.atom).no, trans.to).ok();
     }
 }
 
 unsafe fn xml_reg_print_state<'a>(output: &mut (impl Write + 'a), state: XmlRegStatePtr) {
     unsafe {
-        write!(output, " state: ");
+        write!(output, " state: ").ok();
         if state.is_null() {
-            writeln!(output, "NULL");
+            writeln!(output, "NULL").ok();
             return;
         }
         if matches!((*state).typ, XmlRegStateType::XmlRegexpStartState) {
-            write!(output, "START ");
+            write!(output, "START ").ok();
         }
         if matches!((*state).typ, XmlRegStateType::XmlRegexpFinalState) {
-            write!(output, "FINAL ");
+            write!(output, "FINAL ").ok();
         }
 
         writeln!(
@@ -3495,7 +3499,8 @@ unsafe fn xml_reg_print_state<'a>(output: &mut (impl Write + 'a), state: XmlRegS
             "{}, {} transitions:",
             (*state).no,
             (*state).trans.len(),
-        );
+        )
+        .ok();
         for trans in &(*state).trans {
             xml_reg_print_trans(output, trans);
         }
@@ -3506,30 +3511,31 @@ unsafe fn xml_reg_print_state<'a>(output: &mut (impl Write + 'a), state: XmlRegS
 #[doc(alias = "xmlRegexpPrint")]
 pub unsafe fn xml_regexp_print<'a>(output: &mut (impl Write + 'a), regexp: XmlRegexpPtr) {
     unsafe {
-        write!(output, " regexp: ");
+        write!(output, " regexp: ").ok();
         if regexp.is_null() {
-            writeln!(output, "NULL");
+            writeln!(output, "NULL").ok();
             return;
         }
         write!(
             output,
             "'{}' ",
             CStr::from_ptr((*regexp).string as *const i8).to_string_lossy()
-        );
-        writeln!(output);
-        writeln!(output, "{} atoms:", (*regexp).atoms.len());
+        )
+        .ok();
+        writeln!(output).ok();
+        writeln!(output, "{} atoms:", (*regexp).atoms.len()).ok();
         for (i, &atom) in (*regexp).atoms.iter().enumerate() {
-            write!(output, " {i:02} ");
+            write!(output, " {i:02} ").ok();
             xml_reg_print_atom(output, atom);
         }
-        write!(output, "{} states:", (*regexp).states.len());
-        writeln!(output);
+        write!(output, "{} states:", (*regexp).states.len()).ok();
+        writeln!(output).ok();
         for &state in &(*regexp).states {
             xml_reg_print_state(output, state);
         }
-        writeln!(output, "{} counters:", (*regexp).counters.len());
+        writeln!(output, "{} counters:", (*regexp).counters.len()).ok();
         for (i, counter) in (*regexp).counters.iter().enumerate() {
-            writeln!(output, " {i}: min {} max {}", counter.min, counter.max);
+            writeln!(output, " {i}: min {} max {}", counter.min, counter.max).ok();
         }
     }
 }
@@ -7103,12 +7109,12 @@ unsafe fn xml_exp_dump_int<'a>(buf: &mut (impl Write + 'a), expr: XmlExpNodePtr,
             return;
         }
         if glob != 0 {
-            write!(buf, "(");
+            write!(buf, "(").ok();
         }
         if (*expr).typ == XmlExpNodeType::XmlExpEmpty as u8 {
-            write!(buf, "empty");
+            write!(buf, "empty").ok();
         } else if (*expr).typ == XmlExpNodeType::XmlExpForbid as u8 {
-            write!(buf, "forbidden");
+            write!(buf, "forbidden").ok();
         } else if (*expr).typ == XmlExpNodeType::XmlExpAtom as u8 {
             write!(
                 buf,
@@ -7116,7 +7122,8 @@ unsafe fn xml_exp_dump_int<'a>(buf: &mut (impl Write + 'a), expr: XmlExpNodePtr,
                 CStr::from_ptr((*expr).field.f_str as *const i8)
                     .to_string_lossy()
                     .as_ref()
-            );
+            )
+            .ok();
         } else if (*expr).typ == XmlExpNodeType::XmlExpSeq as u8 {
             c = (*expr).exp_left;
             if (*c).typ == XmlExpNodeType::XmlExpSeq as u8
@@ -7126,7 +7133,7 @@ unsafe fn xml_exp_dump_int<'a>(buf: &mut (impl Write + 'a), expr: XmlExpNodePtr,
             } else {
                 xml_exp_dump_int(buf, c, 0);
             }
-            write!(buf, " , ");
+            write!(buf, " , ").ok();
             c = (*expr).field.children.f_right;
             if (*c).typ == XmlExpNodeType::XmlExpSeq as u8
                 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
@@ -7144,7 +7151,7 @@ unsafe fn xml_exp_dump_int<'a>(buf: &mut (impl Write + 'a), expr: XmlExpNodePtr,
             } else {
                 xml_exp_dump_int(buf, c, 0);
             }
-            write!(buf, " | ");
+            write!(buf, " | ").ok();
             c = (*expr).field.children.f_right;
             if (*c).typ == XmlExpNodeType::XmlExpSeq as u8
                 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
@@ -7197,12 +7204,12 @@ unsafe fn xml_exp_dump_int<'a>(buf: &mut (impl Write + 'a), expr: XmlExpNodePtr,
                 );
             }
             rep[39] = 0;
-            write!(buf, "{}", CStr::from_ptr(rep.as_ptr()).to_string_lossy());
+            write!(buf, "{}", CStr::from_ptr(rep.as_ptr()).to_string_lossy()).ok();
         } else {
             eprintln!("Error in tree");
         }
         if glob != 0 {
-            write!(buf, ")");
+            write!(buf, ")").ok();
         }
     }
 }

@@ -33,14 +33,14 @@
 use std::{
     cmp::Ordering,
     ffi::{CStr, CString},
-    ptr::{drop_in_place, null_mut},
+    ptr::null_mut,
     rc::Rc,
 };
 
 use crate::{
     error::{__xml_raise_error, XmlParserErrors},
     io::{XmlOutputBuffer, write_quoted},
-    libxml::{globals::xml_free, xmlstring::xml_strlen},
+    libxml::xmlstring::xml_strlen,
     list::XmlList,
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocPtr, XmlElementType,
@@ -228,16 +228,16 @@ impl<T> XmlC14NCtx<'_, T> {
     unsafe fn print_namespaces(&mut self, ns: &XmlNs) -> i32 {
         unsafe {
             if let Some(prefix) = ns.prefix() {
-                self.buf.write_str(" xmlns:");
-                self.buf.write_str(&prefix);
-                self.buf.write_str("=");
+                self.buf.write_str(" xmlns:").ok();
+                self.buf.write_str(&prefix).ok();
+                self.buf.write_str("=").ok();
             } else {
-                self.buf.write_str(" xmlns=");
+                self.buf.write_str(" xmlns=").ok();
             }
             if !ns.href.is_null() {
-                write_quoted(&mut self.buf, &ns.href().unwrap());
+                write_quoted(&mut self.buf, &ns.href().unwrap()).ok();
             } else {
-                self.buf.write_str("\"\"");
+                self.buf.write_str("\"\"").ok();
             }
             1
         }
@@ -611,15 +611,16 @@ impl<T> XmlC14NCtx<'_, T> {
                     self.parent_is_doc = false;
                     self.pos = XmlC14NPosition::XmlC14NInsideDocumentElement;
                 }
-                self.buf.write_str("<");
+                self.buf.write_str("<").ok();
 
                 if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
-                    self.buf.write_str(&prefix);
-                    self.buf.write_str(":");
+                    self.buf.write_str(&prefix).ok();
+                    self.buf.write_str(":").ok();
                 }
 
                 self.buf
-                    .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
+                    .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref())
+                    .ok();
             }
 
             let ret = if !self.is_exclusive() {
@@ -643,7 +644,7 @@ impl<T> XmlC14NCtx<'_, T> {
             }
 
             if visible {
-                self.buf.write_str(">");
+                self.buf.write_str(">").ok();
             }
             if let Some(children) = cur.children() {
                 let ret = self.process_node_list(Some(children));
@@ -653,15 +654,16 @@ impl<T> XmlC14NCtx<'_, T> {
                 }
             }
             if visible {
-                self.buf.write_str("</");
+                self.buf.write_str("</").ok();
                 if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
-                    self.buf.write_str(&prefix);
-                    self.buf.write_str(":");
+                    self.buf.write_str(&prefix).ok();
+                    self.buf.write_str(":").ok();
                 }
 
                 self.buf
-                    .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
-                self.buf.write_str(">");
+                    .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref())
+                    .ok();
+                self.buf.write_str(">").ok();
                 if parent_is_doc {
                     // restore this flag from the stack for next node
                     self.parent_is_doc = parent_is_doc;
@@ -723,7 +725,7 @@ impl<T> XmlC14NCtx<'_, T> {
                                 .to_string_lossy()
                                 .as_ref(),
                         );
-                        self.buf.write_str(&buffer);
+                        self.buf.write_str(&buffer).ok();
                     }
                 }
                 XmlElementType::XmlPINode => {
@@ -739,15 +741,15 @@ impl<T> XmlC14NCtx<'_, T> {
                     // order than the document element.
                     if visible {
                         if matches!(self.pos, XmlC14NPosition::XmlC14NAfterDocumentElement) {
-                            self.buf.write_str("\x0A<?");
+                            self.buf.write_str("\x0A<?").ok();
                         } else {
-                            self.buf.write_str("<?");
+                            self.buf.write_str("<?").ok();
                         }
 
-                        self.buf.write_str(&cur.name().unwrap());
+                        self.buf.write_str(&cur.name().unwrap()).ok();
                         let cur = XmlNodePtr::try_from(cur).unwrap();
                         if !cur.content.is_null() && *cur.content != b'\0' {
-                            self.buf.write_str(" ");
+                            self.buf.write_str(" ").ok();
 
                             /* todo: do we need to normalize pi? */
                             let buffer = normalize_pi(
@@ -755,13 +757,13 @@ impl<T> XmlC14NCtx<'_, T> {
                                     .to_string_lossy()
                                     .as_ref(),
                             );
-                            self.buf.write_str(&buffer);
+                            self.buf.write_str(&buffer).ok();
                         }
 
                         if matches!(self.pos, XmlC14NPosition::XmlC14NBeforeDocumentElement) {
-                            self.buf.write_str("?>\x0A");
+                            self.buf.write_str("?>\x0A").ok();
                         } else {
-                            self.buf.write_str("?>");
+                            self.buf.write_str("?>").ok();
                         }
                     }
                 }
@@ -781,9 +783,9 @@ impl<T> XmlC14NCtx<'_, T> {
                     // declaration).
                     if visible && self.with_comments {
                         if matches!(self.pos, XmlC14NPosition::XmlC14NAfterDocumentElement) {
-                            self.buf.write_str("\x0A<!--");
+                            self.buf.write_str("\x0A<!--").ok();
                         } else {
-                            self.buf.write_str("<!--");
+                            self.buf.write_str("<!--").ok();
                         }
 
                         let cur = XmlNodePtr::try_from(cur).unwrap();
@@ -794,13 +796,13 @@ impl<T> XmlC14NCtx<'_, T> {
                                     .to_string_lossy()
                                     .as_ref(),
                             );
-                            self.buf.write_str(&buffer);
+                            self.buf.write_str(&buffer).ok();
                         }
 
                         if matches!(self.pos, XmlC14NPosition::XmlC14NBeforeDocumentElement) {
-                            self.buf.write_str("-->\x0A");
+                            self.buf.write_str("-->\x0A").ok();
                         } else {
-                            self.buf.write_str("-->");
+                            self.buf.write_str("-->").ok();
                         }
                     }
                 }
@@ -1167,19 +1169,19 @@ impl<T> XmlC14NCtx<'_, T> {
     #[doc(alias = "xmlC14NPrintAttrs")]
     unsafe fn print_attrs(&mut self, attr: XmlAttrPtr) -> bool {
         unsafe {
-            self.buf.write_str(" ");
+            self.buf.write_str(" ").ok();
             if let Some(prefix) = attr
                 .ns
                 .as_deref()
                 .and_then(|ns| ns.prefix())
                 .filter(|p| !p.is_empty())
             {
-                self.buf.write_str(&prefix);
-                self.buf.write_str(":");
+                self.buf.write_str(&prefix).ok();
+                self.buf.write_str(":").ok();
             }
 
-            self.buf.write_str(&attr.name().unwrap());
-            self.buf.write_str("=\"");
+            self.buf.write_str(&attr.name().unwrap()).ok();
+            self.buf.write_str("=\"").ok();
 
             // todo: should we log an error if value==NULL ?
             if let Some(value) = attr
@@ -1187,9 +1189,9 @@ impl<T> XmlC14NCtx<'_, T> {
                 .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1))
             {
                 let buffer = normalize_attr(&value);
-                self.buf.write_str(&buffer);
+                self.buf.write_str(&buffer).ok();
             }
-            self.buf.write_str("\"");
+            self.buf.write_str("\"").ok();
             true
         }
     }
@@ -1480,20 +1482,6 @@ unsafe fn xml_c14n_err<T>(
     }
 }
 
-/// Cleanups the C14N context object.
-#[doc(alias = "xmlC14NFreeCtx")]
-unsafe fn xml_c14n_free_ctx<T>(ctx: XmlC14NCtxPtr<'_, T>) {
-    unsafe {
-        if ctx.is_null() {
-            xml_c14n_err_param("freeing context");
-            return;
-        }
-
-        drop_in_place(ctx);
-        xml_free(ctx as _);
-    }
-}
-
 /// Creates new C14N context object to store C14N parameters.
 ///
 /// Returns pointer to newly created object (success) or NULL (fail)
@@ -1609,7 +1597,7 @@ fn xml_c14n_str_equal(str1: Option<&str>, str2: Option<&str>) -> bool {
     }
 }
 
-const XML_NAMESPACES_DEFAULT: usize = 16;
+// const XML_NAMESPACES_DEFAULT: usize = 16;
 
 /// Prints the given attribute to the output buffer from C14N context.
 ///

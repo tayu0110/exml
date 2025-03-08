@@ -8771,14 +8771,13 @@ pub unsafe fn xml_xpath_next_descendant(
         loop {
             cur = cur.parent()?;
             if Some(cur) == (*(*ctxt).context).node {
-                return None;
+                break None;
             }
             if let Some(next) = cur.next() {
                 cur = next;
-                return Some(cur);
+                break Some(cur);
             }
         }
-        None
     }
 }
 

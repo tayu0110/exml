@@ -345,7 +345,7 @@ pub(crate) unsafe fn xml_xptr_new_range(
 /// Returns the newly created object.
 #[doc(alias = "xmlXPtrNewRangePoints")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_new_range_points(
+pub unsafe fn xml_xptr_new_range_points(
     start: XmlXPathObjectPtr,
     end: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
@@ -374,67 +374,67 @@ pub(crate) unsafe fn xml_xptr_new_range_points(
     }
 }
 
-/// Create a new xmlXPathObjectPtr of type range from a node to a point
-///
-/// Returns the newly created object.
-#[doc(alias = "xmlXPtrNewRangeNodePoint")]
-#[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_new_range_node_point(
-    start: XmlGenericNodePtr,
-    end: XmlXPathObjectPtr,
-) -> XmlXPathObjectPtr {
-    unsafe {
-        // if start.is_null() {
-        //     return null_mut();
-        // }
-        if end.is_null() {
-            return null_mut();
-        }
-        if !matches!((*end).typ, XmlXPathObjectType::XPathPoint) {
-            return null_mut();
-        }
+// /// Create a new xmlXPathObjectPtr of type range from a node to a point
+// ///
+// /// Returns the newly created object.
+// #[doc(alias = "xmlXPtrNewRangeNodePoint")]
+// #[cfg(feature = "libxml_xptr_locs")]
+// pub(crate) unsafe fn xml_xptr_new_range_node_point(
+//     start: XmlGenericNodePtr,
+//     end: XmlXPathObjectPtr,
+// ) -> XmlXPathObjectPtr {
+//     unsafe {
+//         // if start.is_null() {
+//         //     return null_mut();
+//         // }
+//         if end.is_null() {
+//             return null_mut();
+//         }
+//         if !matches!((*end).typ, XmlXPathObjectType::XPathPoint) {
+//             return null_mut();
+//         }
 
-        let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(
-            Some(start),
-            -1,
-            XmlGenericNodePtr::from_raw((*end).user as *mut XmlNode),
-            (*end).index,
-        );
-        xml_xptr_range_check_order(ret);
-        ret
-    }
-}
+//         let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(
+//             Some(start),
+//             -1,
+//             XmlGenericNodePtr::from_raw((*end).user as *mut XmlNode),
+//             (*end).index,
+//         );
+//         xml_xptr_range_check_order(ret);
+//         ret
+//     }
+// }
 
-/// Create a new xmlXPathObjectPtr of type range from a point to a node
-///
-/// Returns the newly created object.
-#[doc(alias = "xmlXPtrNewRangePointNode")]
-#[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_new_range_point_node(
-    start: XmlXPathObjectPtr,
-    end: XmlGenericNodePtr,
-) -> XmlXPathObjectPtr {
-    unsafe {
-        if start.is_null() {
-            return null_mut();
-        }
-        // if end.is_null() {
-        //     return null_mut();
-        // }
-        if !matches!((*start).typ, XmlXPathObjectType::XPathPoint) {
-            return null_mut();
-        }
+// /// Create a new xmlXPathObjectPtr of type range from a point to a node
+// ///
+// /// Returns the newly created object.
+// #[doc(alias = "xmlXPtrNewRangePointNode")]
+// #[cfg(feature = "libxml_xptr_locs")]
+// pub(crate) unsafe fn xml_xptr_new_range_point_node(
+//     start: XmlXPathObjectPtr,
+//     end: XmlGenericNodePtr,
+// ) -> XmlXPathObjectPtr {
+//     unsafe {
+//         if start.is_null() {
+//             return null_mut();
+//         }
+//         // if end.is_null() {
+//         //     return null_mut();
+//         // }
+//         if !matches!((*start).typ, XmlXPathObjectType::XPathPoint) {
+//             return null_mut();
+//         }
 
-        let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(
-            XmlGenericNodePtr::from_raw((*start).user as *mut XmlNode),
-            (*start).index,
-            Some(end),
-            -1,
-        );
-        xml_xptr_range_check_order(ret);
-        ret
-    }
-}
+//         let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(
+//             XmlGenericNodePtr::from_raw((*start).user as *mut XmlNode),
+//             (*start).index,
+//             Some(end),
+//             -1,
+//         );
+//         xml_xptr_range_check_order(ret);
+//         ret
+//     }
+// }
 
 /// Create a new xmlXPathObjectPtr of type range using 2 nodes
 ///
@@ -446,13 +446,6 @@ pub(crate) unsafe fn xml_xptr_new_range_nodes(
     end: XmlGenericNodePtr,
 ) -> XmlXPathObjectPtr {
     unsafe {
-        // if start.is_null() {
-        //     return null_mut();
-        // }
-        // if end.is_null() {
-        //     return null_mut();
-        // }
-
         let ret: XmlXPathObjectPtr = xml_xptr_new_range_internal(Some(start), -1, Some(end), -1);
         xml_xptr_range_check_order(ret);
         ret
@@ -632,40 +625,40 @@ pub(crate) unsafe fn xml_xptr_wrap_location_set(val: XmlLocationSetPtr) -> XmlXP
     }
 }
 
-/// Removes an xmlXPathObjectPtr from an existing LocationSet
-#[doc(alias = "xmlXPtrLocationSetDel")]
-#[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_location_set_del(cur: XmlLocationSetPtr, val: XmlXPathObjectPtr) {
-    unsafe {
-        if cur.is_null() {
-            return;
-        }
-        if val.is_null() {
-            return;
-        }
+// /// Removes an xmlXPathObjectPtr from an existing LocationSet
+// #[doc(alias = "xmlXPtrLocationSetDel")]
+// #[cfg(feature = "libxml_xptr_locs")]
+// pub(crate) unsafe fn xml_xptr_location_set_del(cur: XmlLocationSetPtr, val: XmlXPathObjectPtr) {
+//     unsafe {
+//         if cur.is_null() {
+//             return;
+//         }
+//         if val.is_null() {
+//             return;
+//         }
 
-        // check against doublons
-        let Some(i) = (*cur).loc_tab.iter().position(|&loc| loc == val) else {
-            return;
-        };
-        (*cur).loc_tab.remove(i);
-    }
-}
+//         // check against doublons
+//         let Some(i) = (*cur).loc_tab.iter().position(|&loc| loc == val) else {
+//             return;
+//         };
+//         (*cur).loc_tab.remove(i);
+//     }
+// }
 
-/// Removes an entry from an existing LocationSet list.
-#[doc(alias = "xmlXPtrLocationSetRemove")]
-#[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_location_set_remove(cur: XmlLocationSetPtr, val: i32) {
-    unsafe {
-        if cur.is_null() {
-            return;
-        }
-        if val >= (*cur).loc_tab.len() as i32 {
-            return;
-        }
-        (*cur).loc_tab.remove(val as usize);
-    }
-}
+// /// Removes an entry from an existing LocationSet list.
+// #[doc(alias = "xmlXPtrLocationSetRemove")]
+// #[cfg(feature = "libxml_xptr_locs")]
+// pub(crate) unsafe fn xml_xptr_location_set_remove(cur: XmlLocationSetPtr, val: i32) {
+//     unsafe {
+//         if cur.is_null() {
+//             return;
+//         }
+//         if val >= (*cur).loc_tab.len() as i32 {
+//             return;
+//         }
+//         (*cur).loc_tab.remove(val as usize);
+//     }
+// }
 
 /// Returns the number of child for an element, -1 in case of error
 #[doc(alias = "xmlXPtrGetArity")]
@@ -1823,46 +1816,46 @@ unsafe fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPtr, nargs: i
     }
 }
 
-/// Count the number of location children of @node or the length of the
-/// string value in case of text/PI/Comments nodes
-///
-/// Returns the number of location children
-#[doc(alias = "xmlXPtrNbLocChildren")]
-#[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_nb_loc_children(node: XmlGenericNodePtr) -> i32 {
-    unsafe {
-        use crate::tree::XmlNodePtr;
+// /// Count the number of location children of @node or the length of the
+// /// string value in case of text/PI/Comments nodes
+// ///
+// /// Returns the number of location children
+// #[doc(alias = "xmlXPtrNbLocChildren")]
+// #[cfg(feature = "libxml_xptr_locs")]
+// unsafe fn xml_xptr_nb_loc_children(node: XmlGenericNodePtr) -> i32 {
+//     unsafe {
+//         use crate::tree::XmlNodePtr;
 
-        let mut ret: i32 = 0;
-        // if node.is_null() {
-        //     return -1;
-        // }
-        match node.element_type() {
-            XmlElementType::XmlHTMLDocumentNode
-            | XmlElementType::XmlDocumentNode
-            | XmlElementType::XmlElementNode => {
-                let mut node = node.children();
-                while let Some(now) = node {
-                    if now.element_type() == XmlElementType::XmlElementNode {
-                        ret += 1;
-                    }
-                    node = now.next();
-                }
-            }
-            XmlElementType::XmlAttributeNode => return -1,
-            XmlElementType::XmlPINode
-            | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCDATASectionNode
-            | XmlElementType::XmlEntityRefNode => {
-                let node = XmlNodePtr::try_from(node).unwrap();
-                ret = xml_strlen(node.content);
-            }
-            _ => return -1,
-        }
-        ret
-    }
-}
+//         let mut ret: i32 = 0;
+//         // if node.is_null() {
+//         //     return -1;
+//         // }
+//         match node.element_type() {
+//             XmlElementType::XmlHTMLDocumentNode
+//             | XmlElementType::XmlDocumentNode
+//             | XmlElementType::XmlElementNode => {
+//                 let mut node = node.children();
+//                 while let Some(now) = node {
+//                     if now.element_type() == XmlElementType::XmlElementNode {
+//                         ret += 1;
+//                     }
+//                     node = now.next();
+//                 }
+//             }
+//             XmlElementType::XmlAttributeNode => return -1,
+//             XmlElementType::XmlPINode
+//             | XmlElementType::XmlCommentNode
+//             | XmlElementType::XmlTextNode
+//             | XmlElementType::XmlCDATASectionNode
+//             | XmlElementType::XmlEntityRefNode => {
+//                 let node = XmlNodePtr::try_from(node).unwrap();
+//                 ret = xml_strlen(node.content);
+//             }
+//             _ => return -1,
+//         }
+//         ret
+//     }
+// }
 
 /// Function implementing end-point() operation
 /// as described in 5.4.3
@@ -2639,270 +2632,270 @@ pub unsafe fn xml_xptr_eval(str: *const XmlChar, ctx: XmlXPathContextPtr) -> Xml
 /// step which is handled in xpath.c.
 #[doc(alias = "xmlXPtrRangeToFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_range_to_function(ctxt: XmlXPathParserContextPtr, _nargs: i32) {
+pub unsafe fn xml_xptr_range_to_function(ctxt: XmlXPathParserContextPtr, _nargs: i32) {
     unsafe {
         XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
     }
 }
 
-/// Build a node list tree copy of the range
-///
-/// Returns an xmlNodePtr list or NULL. The caller has to free the node tree.
-#[doc(alias = "xmlXPtrBuildRangeNodeList")]
-#[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> Option<XmlGenericNodePtr> {
-    unsafe {
-        use crate::tree::{
-            XmlGenericNodePtr, XmlNodePtr, xml_copy_node, xml_new_text, xml_new_text_len,
-        };
-        let mut list = None;
-        let mut last: Option<XmlGenericNodePtr> = None;
-        let mut parent: Option<XmlGenericNodePtr> = None;
+// /// Build a node list tree copy of the range
+// ///
+// /// Returns an xmlNodePtr list or NULL. The caller has to free the node tree.
+// #[doc(alias = "xmlXPtrBuildRangeNodeList")]
+// #[cfg(feature = "libxml_xptr_locs")]
+// unsafe fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> Option<XmlGenericNodePtr> {
+//     unsafe {
+//         use crate::tree::{
+//             XmlGenericNodePtr, XmlNodePtr, xml_copy_node, xml_new_text, xml_new_text_len,
+//         };
+//         let mut list = None;
+//         let mut last: Option<XmlGenericNodePtr> = None;
+//         let mut parent: Option<XmlGenericNodePtr> = None;
 
-        if range.is_null() {
-            return None;
-        }
-        if (*range).typ != XmlXPathObjectType::XPathRange {
-            return None;
-        }
-        let start = XmlGenericNodePtr::from_raw((*range).user as *mut XmlNode);
+//         if range.is_null() {
+//             return None;
+//         }
+//         if (*range).typ != XmlXPathObjectType::XPathRange {
+//             return None;
+//         }
+//         let start = XmlGenericNodePtr::from_raw((*range).user as *mut XmlNode);
 
-        if start.is_none_or(|start| start.element_type() == XmlElementType::XmlNamespaceDecl) {
-            return None;
-        }
-        let Some(mut end) = XmlGenericNodePtr::from_raw((*range).user2 as *mut XmlNode) else {
-            return xml_copy_node(start.unwrap(), 1);
-        };
-        if end.element_type() == XmlElementType::XmlNamespaceDecl {
-            return None;
-        }
+//         if start.is_none_or(|start| start.element_type() == XmlElementType::XmlNamespaceDecl) {
+//             return None;
+//         }
+//         let Some(mut end) = XmlGenericNodePtr::from_raw((*range).user2 as *mut XmlNode) else {
+//             return xml_copy_node(start.unwrap(), 1);
+//         };
+//         if end.element_type() == XmlElementType::XmlNamespaceDecl {
+//             return None;
+//         }
 
-        let mut cur = start;
-        let mut index1 = (*range).index;
-        let mut index2 = (*range).index2;
-        while let Some(cur_node) = cur {
-            if cur_node == end {
-                if cur_node.element_type() == XmlElementType::XmlTextNode {
-                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    let mut content: *const XmlChar = cur_node.content;
-                    let mut len: i32;
+//         let mut cur = start;
+//         let mut index1 = (*range).index;
+//         let mut index2 = (*range).index2;
+//         while let Some(cur_node) = cur {
+//             if cur_node == end {
+//                 if cur_node.element_type() == XmlElementType::XmlTextNode {
+//                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+//                     let mut content: *const XmlChar = cur_node.content;
+//                     let mut len: i32;
 
-                    let tmp = if content.is_null() {
-                        xml_new_text_len(null_mut(), 0)
-                    } else {
-                        len = index2;
-                        if cur == start && index1 > 1 {
-                            content = content.add(index1 as usize - 1);
-                            len -= index1 - 1;
-                            // index1 = 0;
-                        } else {
-                            len = index2;
-                        }
-                        xml_new_text_len(content, len)
-                    };
-                    // single sub text node selection
-                    if list.is_none() {
-                        return tmp.map(|node| node.into());
-                    }
-                    // prune and return full set
-                    if let Some(last) = last {
-                        last.add_next_sibling(tmp.unwrap().into());
-                    } else {
-                        parent.unwrap().add_child(tmp.unwrap().into());
-                    }
-                    return list;
-                } else {
-                    let tmp = xml_copy_node(cur_node, 0);
-                    if list.is_some() {
-                        if let Some(last) = last {
-                            parent = last.add_next_sibling(tmp.unwrap());
-                        } else {
-                            parent = parent.unwrap().add_child(tmp.unwrap());
-                        }
-                    } else {
-                        list = tmp;
-                        parent = tmp;
-                    }
-                    last = None;
+//                     let tmp = if content.is_null() {
+//                         xml_new_text_len(null_mut(), 0)
+//                     } else {
+//                         len = index2;
+//                         if cur == start && index1 > 1 {
+//                             content = content.add(index1 as usize - 1);
+//                             len -= index1 - 1;
+//                             // index1 = 0;
+//                         } else {
+//                             len = index2;
+//                         }
+//                         xml_new_text_len(content, len)
+//                     };
+//                     // single sub text node selection
+//                     if list.is_none() {
+//                         return tmp.map(|node| node.into());
+//                     }
+//                     // prune and return full set
+//                     if let Some(last) = last {
+//                         last.add_next_sibling(tmp.unwrap().into());
+//                     } else {
+//                         parent.unwrap().add_child(tmp.unwrap().into());
+//                     }
+//                     return list;
+//                 } else {
+//                     let tmp = xml_copy_node(cur_node, 0);
+//                     if list.is_some() {
+//                         if let Some(last) = last {
+//                             parent = last.add_next_sibling(tmp.unwrap());
+//                         } else {
+//                             parent = parent.unwrap().add_child(tmp.unwrap());
+//                         }
+//                     } else {
+//                         list = tmp;
+//                         parent = tmp;
+//                     }
+//                     last = None;
 
-                    if index2 > 1 {
-                        end = xml_xptr_get_nth_child(cur_node, index2 as usize - 1).unwrap();
-                        index2 = 0;
-                    }
-                    if cur == start && index1 > 1 {
-                        cur = xml_xptr_get_nth_child(cur_node, index1 as usize - 1);
-                        index1 = 0;
-                    } else {
-                        cur = cur_node.children();
-                    }
-                    // Now gather the remaining nodes from cur to end
-                    continue; /* while */
-                }
-            } else if cur == start && list.is_none() {
-                // looks superfluous but ...
-                if matches!(
-                    cur_node.element_type(),
-                    XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
-                ) {
-                    let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
-                    let mut content: *const XmlChar = cur_node.content;
+//                     if index2 > 1 {
+//                         end = xml_xptr_get_nth_child(cur_node, index2 as usize - 1).unwrap();
+//                         index2 = 0;
+//                     }
+//                     if cur == start && index1 > 1 {
+//                         cur = xml_xptr_get_nth_child(cur_node, index1 as usize - 1);
+//                         index1 = 0;
+//                     } else {
+//                         cur = cur_node.children();
+//                     }
+//                     // Now gather the remaining nodes from cur to end
+//                     continue; /* while */
+//                 }
+//             } else if cur == start && list.is_none() {
+//                 // looks superfluous but ...
+//                 if matches!(
+//                     cur_node.element_type(),
+//                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+//                 ) {
+//                     let cur_node = XmlNodePtr::try_from(cur_node).unwrap();
+//                     let mut content: *const XmlChar = cur_node.content;
 
-                    let tmp = if content.is_null() {
-                        xml_new_text_len(null_mut(), 0)
-                    } else {
-                        if index1 > 1 {
-                            content = content.add(index1 as usize - 1);
-                        }
-                        xml_new_text(content)
-                    };
-                    last = tmp.map(|tmp| tmp.into());
-                    list = tmp.map(|tmp| tmp.into());
-                } else {
-                    if cur == start && index1 > 1 {
-                        let tmp = xml_copy_node(cur_node, 0);
-                        list = tmp;
-                        parent = tmp;
-                        last = None;
-                        cur = xml_xptr_get_nth_child(cur_node, index1 as usize - 1);
-                        index1 = 0;
-                        // Now gather the remaining nodes from cur to end
-                        continue; /* while */
-                    }
-                    let tmp = xml_copy_node(cur_node, 1);
-                    list = tmp;
-                    parent = None;
-                    last = tmp;
-                }
-            } else {
-                let mut tmp = None;
-                match cur_node.element_type() {
-                    XmlElementType::XmlDTDNode
-                    | XmlElementType::XmlElementDecl
-                    | XmlElementType::XmlAttributeDecl
-                    | XmlElementType::XmlEntityNode => { /* Do not copy DTD information */ }
-                    XmlElementType::XmlEntityDecl => {
-                        // TODO /* handle crossing entities -> stack needed */
-                    }
-                    XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
-                        // don't consider it part of the tree content
-                    }
-                    XmlElementType::XmlAttributeNode => {
-                        // Humm, should not happen !
-                        STRANGE!();
-                    }
-                    _ => {
-                        tmp = xml_copy_node(cur_node, 1);
-                    }
-                }
-                if let Some(tmp) = tmp {
-                    if list.is_none() || (last.is_none() && parent.is_none()) {
-                        STRANGE!();
-                        return None;
-                    }
-                    if let Some(last) = last {
-                        last.add_next_sibling(tmp);
-                    } else {
-                        last = parent.unwrap().add_child(tmp);
-                    }
-                }
-            }
-            // Skip to next node in document order
-            if list.is_none() || (last.is_none() && parent.is_none()) {
-                STRANGE!();
-                return None;
-            }
-            cur = xml_xptr_advance_node(cur_node, null_mut());
-        }
-        list
-    }
-}
+//                     let tmp = if content.is_null() {
+//                         xml_new_text_len(null_mut(), 0)
+//                     } else {
+//                         if index1 > 1 {
+//                             content = content.add(index1 as usize - 1);
+//                         }
+//                         xml_new_text(content)
+//                     };
+//                     last = tmp.map(|tmp| tmp.into());
+//                     list = tmp.map(|tmp| tmp.into());
+//                 } else {
+//                     if cur == start && index1 > 1 {
+//                         let tmp = xml_copy_node(cur_node, 0);
+//                         list = tmp;
+//                         parent = tmp;
+//                         last = None;
+//                         cur = xml_xptr_get_nth_child(cur_node, index1 as usize - 1);
+//                         index1 = 0;
+//                         // Now gather the remaining nodes from cur to end
+//                         continue; /* while */
+//                     }
+//                     let tmp = xml_copy_node(cur_node, 1);
+//                     list = tmp;
+//                     parent = None;
+//                     last = tmp;
+//                 }
+//             } else {
+//                 let mut tmp = None;
+//                 match cur_node.element_type() {
+//                     XmlElementType::XmlDTDNode
+//                     | XmlElementType::XmlElementDecl
+//                     | XmlElementType::XmlAttributeDecl
+//                     | XmlElementType::XmlEntityNode => { /* Do not copy DTD information */ }
+//                     XmlElementType::XmlEntityDecl => {
+//                         // TODO /* handle crossing entities -> stack needed */
+//                     }
+//                     XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
+//                         // don't consider it part of the tree content
+//                     }
+//                     XmlElementType::XmlAttributeNode => {
+//                         // Humm, should not happen !
+//                         STRANGE!();
+//                     }
+//                     _ => {
+//                         tmp = xml_copy_node(cur_node, 1);
+//                     }
+//                 }
+//                 if let Some(tmp) = tmp {
+//                     if list.is_none() || (last.is_none() && parent.is_none()) {
+//                         STRANGE!();
+//                         return None;
+//                     }
+//                     if let Some(last) = last {
+//                         last.add_next_sibling(tmp);
+//                     } else {
+//                         last = parent.unwrap().add_child(tmp);
+//                     }
+//                 }
+//             }
+//             // Skip to next node in document order
+//             if list.is_none() || (last.is_none() && parent.is_none()) {
+//                 STRANGE!();
+//                 return None;
+//             }
+//             cur = xml_xptr_advance_node(cur_node, null_mut());
+//         }
+//         list
+//     }
+// }
 
-/// Build a node list tree copy of the XPointer result.
-/// This will drop Attributes and Namespace declarations.
-///
-/// Returns an xmlNodePtr list or NULL. The caller has to free the node tree.
-#[doc(alias = "xmlXPtrBuildNodeList")]
-#[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> Option<XmlGenericNodePtr> {
-    unsafe {
-        use crate::tree::{XmlGenericNodePtr, xml_copy_node};
+// /// Build a node list tree copy of the XPointer result.
+// /// This will drop Attributes and Namespace declarations.
+// ///
+// /// Returns an xmlNodePtr list or NULL. The caller has to free the node tree.
+// #[doc(alias = "xmlXPtrBuildNodeList")]
+// #[cfg(feature = "libxml_xptr_locs")]
+// pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> Option<XmlGenericNodePtr> {
+//     unsafe {
+//         use crate::tree::{XmlGenericNodePtr, xml_copy_node};
 
-        let mut list = None;
-        let mut last: Option<XmlGenericNodePtr> = None;
+//         let mut list = None;
+//         let mut last: Option<XmlGenericNodePtr> = None;
 
-        if obj.is_null() {
-            return None;
-        }
-        match (*obj).typ {
-            XmlXPathObjectType::XPathNodeset => {
-                let set = (*obj).nodesetval.as_deref()?;
-                for &node in &set.node_tab {
-                    match node.element_type() {
-                        XmlElementType::XmlTextNode
-                        | XmlElementType::XmlCDATASectionNode
-                        | XmlElementType::XmlElementNode
-                        | XmlElementType::XmlEntityRefNode
-                        | XmlElementType::XmlEntityNode
-                        | XmlElementType::XmlPINode
-                        | XmlElementType::XmlCommentNode
-                        | XmlElementType::XmlDocumentNode
-                        | XmlElementType::XmlHTMLDocumentNode
-                        | XmlElementType::XmlXIncludeStart
-                        | XmlElementType::XmlXIncludeEnd => {}
-                        XmlElementType::XmlAttributeNode
-                        | XmlElementType::XmlNamespaceDecl
-                        | XmlElementType::XmlDocumentTypeNode
-                        | XmlElementType::XmlDocumentFragNode
-                        | XmlElementType::XmlNotationNode
-                        | XmlElementType::XmlDTDNode
-                        | XmlElementType::XmlElementDecl
-                        | XmlElementType::XmlAttributeDecl
-                        | XmlElementType::XmlEntityDecl => continue,
-                        _ => unreachable!(),
-                    }
-                    if let Some(l) = last {
-                        l.add_next_sibling(xml_copy_node(node, 1).unwrap());
-                        if let Some(next) = l.next() {
-                            last = Some(next);
-                        }
-                    } else {
-                        list = xml_copy_node(node, 1);
-                        last = list;
-                    }
-                }
-            }
-            XmlXPathObjectType::XPathLocationset => {
-                let set: XmlLocationSetPtr = (*obj).user as XmlLocationSetPtr;
-                if set.is_null() {
-                    return None;
-                }
-                for &loc in &(*set).loc_tab {
-                    if let Some(last) = last {
-                        last.add_next_sibling(xml_xptr_build_node_list(loc).unwrap());
-                    } else {
-                        list = xml_xptr_build_node_list(loc);
-                        last = list;
-                    }
-                    if let Some(mut l) = last {
-                        while let Some(next) = l.next() {
-                            l = next;
-                        }
-                        last = Some(l);
-                    }
-                }
-            }
-            XmlXPathObjectType::XPathRange => return xml_xptr_build_range_node_list(obj),
-            XmlXPathObjectType::XPathPoint => {
-                return xml_copy_node(
-                    XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode).unwrap(),
-                    0,
-                );
-            }
-            _ => {}
-        }
-        list
-    }
-}
+//         if obj.is_null() {
+//             return None;
+//         }
+//         match (*obj).typ {
+//             XmlXPathObjectType::XPathNodeset => {
+//                 let set = (*obj).nodesetval.as_deref()?;
+//                 for &node in &set.node_tab {
+//                     match node.element_type() {
+//                         XmlElementType::XmlTextNode
+//                         | XmlElementType::XmlCDATASectionNode
+//                         | XmlElementType::XmlElementNode
+//                         | XmlElementType::XmlEntityRefNode
+//                         | XmlElementType::XmlEntityNode
+//                         | XmlElementType::XmlPINode
+//                         | XmlElementType::XmlCommentNode
+//                         | XmlElementType::XmlDocumentNode
+//                         | XmlElementType::XmlHTMLDocumentNode
+//                         | XmlElementType::XmlXIncludeStart
+//                         | XmlElementType::XmlXIncludeEnd => {}
+//                         XmlElementType::XmlAttributeNode
+//                         | XmlElementType::XmlNamespaceDecl
+//                         | XmlElementType::XmlDocumentTypeNode
+//                         | XmlElementType::XmlDocumentFragNode
+//                         | XmlElementType::XmlNotationNode
+//                         | XmlElementType::XmlDTDNode
+//                         | XmlElementType::XmlElementDecl
+//                         | XmlElementType::XmlAttributeDecl
+//                         | XmlElementType::XmlEntityDecl => continue,
+//                         _ => unreachable!(),
+//                     }
+//                     if let Some(l) = last {
+//                         l.add_next_sibling(xml_copy_node(node, 1).unwrap());
+//                         if let Some(next) = l.next() {
+//                             last = Some(next);
+//                         }
+//                     } else {
+//                         list = xml_copy_node(node, 1);
+//                         last = list;
+//                     }
+//                 }
+//             }
+//             XmlXPathObjectType::XPathLocationset => {
+//                 let set: XmlLocationSetPtr = (*obj).user as XmlLocationSetPtr;
+//                 if set.is_null() {
+//                     return None;
+//                 }
+//                 for &loc in &(*set).loc_tab {
+//                     if let Some(last) = last {
+//                         last.add_next_sibling(xml_xptr_build_node_list(loc).unwrap());
+//                     } else {
+//                         list = xml_xptr_build_node_list(loc);
+//                         last = list;
+//                     }
+//                     if let Some(mut l) = last {
+//                         while let Some(next) = l.next() {
+//                             l = next;
+//                         }
+//                         last = Some(l);
+//                     }
+//                 }
+//             }
+//             XmlXPathObjectType::XPathRange => return xml_xptr_build_range_node_list(obj),
+//             XmlXPathObjectType::XPathPoint => {
+//                 return xml_copy_node(
+//                     XmlGenericNodePtr::from_raw((*obj).user as *mut XmlNode).unwrap(),
+//                     0,
+//                 );
+//             }
+//             _ => {}
+//         }
+//         list
+//     }
+// }
 
 /// ```text
 /// [8]   Predicate ::=   '[' PredicateExpr ']'
@@ -2913,7 +2906,7 @@ pub(crate) unsafe fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> Option<
 /// a Location Set instead of a node set
 #[doc(alias = "xmlXPtrEvalRangePredicate")]
 #[cfg(feature = "libxml_xptr_locs")]
-pub(crate) unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
+pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         let cur: *const XmlChar;
         let mut res: XmlXPathObjectPtr;

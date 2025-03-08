@@ -62,12 +62,8 @@ use crate::{
     generic_error,
     io::{XmlParserInputBuffer, xml_parser_get_directory},
     libxml::{
-        chvalid::xml_is_blank_char,
-        globals::xml_free,
-        parser::xml_parse_document,
-        parser_internals::XML_MAX_NAMELEN,
-        threads::xml_get_thread_id,
-        xmlstring::{XmlChar, xml_str_equal},
+        chvalid::xml_is_blank_char, globals::xml_free, parser::xml_parse_document,
+        parser_internals::XML_MAX_NAMELEN, threads::xml_get_thread_id, xmlstring::xml_str_equal,
     },
     parser::{XmlParserInputPtr, xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt},
     tree::{
@@ -196,7 +192,7 @@ static XML_CATALOG_INITIALIZED: AtomicBool = AtomicBool::new(false);
 static XML_DEFAULT_CATALOG: RwLock<Option<XmlCatalog>> = RwLock::new(None);
 
 const XML_XML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
-const XML_SGML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/sgml/catalog");
+// const XML_SGML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/sgml/catalog");
 
 /// The namespace for the XML Catalogs elements.
 pub(crate) const XML_CATALOGS_NAMESPACE: &CStr = c"urn:oasis:names:tc:entity:xmlns:xml:catalog";
@@ -262,7 +258,7 @@ pub(crate) enum XmlCatalogType {
     XmlSGMLCatalogType,
 }
 
-const XML_MAX_SGML_CATA_DEPTH: usize = 10;
+// const XML_MAX_SGML_CATA_DEPTH: usize = 10;
 
 pub type XmlCatalogPtr = *mut XmlCatalog;
 #[repr(C)]
@@ -1719,13 +1715,13 @@ impl XmlCatalogEntry {
         )
     }
 
-    /// Fetch and parse the subcatalog referenced by an entry
-    ///
-    /// Returns 0 in case of success, -1 otherwise
-    #[doc(alias = "xmlFetchXMLCatalogFile")]
-    unsafe fn fetch_xml_catalog_file(&mut self) -> i32 {
-        unsafe { self.node.write().unwrap().fetch_xml_catalog_file() }
-    }
+    // /// Fetch and parse the subcatalog referenced by an entry
+    // ///
+    // /// Returns 0 in case of success, -1 otherwise
+    // #[doc(alias = "xmlFetchXMLCatalogFile")]
+    // unsafe fn fetch_xml_catalog_file(&mut self) -> i32 {
+    //     unsafe { self.node.write().unwrap().fetch_xml_catalog_file() }
+    // }
 
     /// Do a complete resolution lookup of an URI using a
     /// document's private catalog list
@@ -1807,27 +1803,27 @@ impl XmlCatalogEntry {
         unsafe { CatalogEntryListNode::list_xml_resolve(&self.node, pub_id, sys_id) }
     }
 
-    /// Do a complete resolution lookup of an External Identifier for a list of catalog entries.
-    ///
-    /// Implements (or tries to) 7.2.2. URI Resolution
-    /// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
-    ///
-    /// Returns the URI of the resource or null_mut() if not found
-    #[doc(alias = "xmlCatalogXMLResolveURI")]
-    unsafe fn xml_resolve_uri(&mut self, uri: &str) -> Option<String> {
-        unsafe { CatalogEntryListNode::xml_resolve_uri(&self.node, uri) }
-    }
+    // /// Do a complete resolution lookup of an External Identifier for a list of catalog entries.
+    // ///
+    // /// Implements (or tries to) 7.2.2. URI Resolution
+    // /// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
+    // ///
+    // /// Returns the URI of the resource or null_mut() if not found
+    // #[doc(alias = "xmlCatalogXMLResolveURI")]
+    // unsafe fn xml_resolve_uri(&mut self, uri: &str) -> Option<String> {
+    //     unsafe { CatalogEntryListNode::xml_resolve_uri(&self.node, uri) }
+    // }
 
-    /// Do a complete resolution lookup of an External Identifier for a list of catalog entries.
-    ///
-    /// Implements (or tries to) 7.1. External Identifier Resolution
-    /// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
-    ///
-    /// Returns the URI of the resource or null_mut() if not found
-    #[doc(alias = "xmlCatalogXMLResolve")]
-    unsafe fn xml_resolve(&mut self, pub_id: Option<&str>, sys_id: Option<&str>) -> Option<String> {
-        unsafe { CatalogEntryListNode::xml_resolve(&self.node, pub_id, sys_id) }
-    }
+    // /// Do a complete resolution lookup of an External Identifier for a list of catalog entries.
+    // ///
+    // /// Implements (or tries to) 7.1. External Identifier Resolution
+    // /// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
+    // ///
+    // /// Returns the URI of the resource or null_mut() if not found
+    // #[doc(alias = "xmlCatalogXMLResolve")]
+    // unsafe fn xml_resolve(&mut self, pub_id: Option<&str>, sys_id: Option<&str>) -> Option<String> {
+    //     unsafe { CatalogEntryListNode::xml_resolve(&self.node, pub_id, sys_id) }
+    // }
 
     /// Add the new entry to the catalog list
     ///
@@ -2766,7 +2762,7 @@ fn xml_get_sgml_catalog_entry_type(name: Option<&str>) -> XmlCatalogEntryType {
     typ
 }
 
-const XML_CATAL_BREAK: *mut XmlChar = usize::MAX as *mut XmlChar;
+// const XML_CATAL_BREAK: *mut XmlChar = usize::MAX as *mut XmlChar;
 const XML_URN_PUBID: &str = "urn:publicid:";
 const MAX_DELEGATE: usize = 50;
 const MAX_CATAL_DEPTH: usize = 50;

@@ -27,17 +27,14 @@
 use std::ops::RangeInclusive;
 
 // Define our typedefs and structures
-pub(crate) type XmlChSRangePtr = *mut XmlChSRange;
 pub(crate) struct XmlChSRange {
     pub(crate) range: RangeInclusive<u16>,
 }
 
-pub(crate) type XmlChLRangePtr = *mut XmlChLRange;
 pub(crate) struct XmlChLRange {
     pub(crate) range: RangeInclusive<u32>,
 }
 
-pub(crate) type XmlChRangeGroupPtr = *mut XmlChRangeGroup;
 pub struct XmlChRangeGroup {
     pub(crate) short_range: &'static [XmlChSRange], /* points to an array of ranges */
     pub(crate) long_range: &'static [XmlChLRange],
@@ -110,17 +107,17 @@ pub(crate) fn xml_is_base_char(c: u32) -> bool {
     }
 }
 
-const XML_IS_CHAR_SRNG: &[XmlChSRange] = &[
-    XmlChSRange {
-        range: 0x100..=0xd7ff,
-    },
-    XmlChSRange {
-        range: 0xe000..=0xfffd,
-    },
-];
-const XML_IS_CHAR_LRNG: &[XmlChLRange] = &[XmlChLRange {
-    range: 0x10000..=0x10ffff,
-}];
+// const XML_IS_CHAR_SRNG: &[XmlChSRange] = &[
+//     XmlChSRange {
+//         range: 0x100..=0xd7ff,
+//     },
+//     XmlChSRange {
+//         range: 0xe000..=0xfffd,
+//     },
+// ];
+// const XML_IS_CHAR_LRNG: &[XmlChLRange] = &[XmlChLRange {
+//     range: 0x10000..=0x10ffff,
+// }];
 
 #[doc(alias = "XmlIsBlankCh")]
 fn xml_is_blank_ch(c: u8) -> bool {
@@ -148,10 +145,10 @@ pub(crate) fn xml_is_char(c: u32) -> bool {
     }
 }
 
-pub(crate) const XML_IS_CHAR_GROUP: XmlChRangeGroup = XmlChRangeGroup {
-    short_range: XML_IS_CHAR_SRNG,
-    long_range: XML_IS_CHAR_LRNG,
-};
+// pub(crate) const XML_IS_CHAR_GROUP: XmlChRangeGroup = XmlChRangeGroup {
+//     short_range: XML_IS_CHAR_SRNG,
+//     long_range: XML_IS_CHAR_LRNG,
+// };
 
 #[doc(alias = "xmlIsCombiningQ")]
 pub(crate) fn xml_is_combining(c: u32) -> bool {
@@ -578,21 +575,21 @@ pub(crate) fn xml_is_ideographic(c: u32) -> bool {
     }
 }
 
-const XML_IS_IDEOGRAPHIC_SRNG: &[XmlChSRange] = &[
-    XmlChSRange {
-        range: 0x3007..=0x3007,
-    },
-    XmlChSRange {
-        range: 0x3021..=0x3029,
-    },
-    XmlChSRange {
-        range: 0x4e00..=0x9fa5,
-    },
-];
-pub(crate) const XML_IS_IDEOGRAPHIC_GROUP: XmlChRangeGroup = XmlChRangeGroup {
-    short_range: XML_IS_IDEOGRAPHIC_SRNG,
-    long_range: &[],
-};
+// const XML_IS_IDEOGRAPHIC_SRNG: &[XmlChSRange] = &[
+//     XmlChSRange {
+//         range: 0x3007..=0x3007,
+//     },
+//     XmlChSRange {
+//         range: 0x3021..=0x3029,
+//     },
+//     XmlChSRange {
+//         range: 0x4e00..=0x9fa5,
+//     },
+// ];
+// pub(crate) const XML_IS_IDEOGRAPHIC_GROUP: XmlChRangeGroup = XmlChRangeGroup {
+//     short_range: XML_IS_IDEOGRAPHIC_SRNG,
+//     long_range: &[],
+// };
 
 pub const XML_IS_PUBID_CHAR_TAB: [bool; 256] = [
     false, false, false, false, false, false, false, false, false, false, true, false, false, true,

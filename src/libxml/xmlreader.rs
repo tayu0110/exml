@@ -3223,7 +3223,7 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
                 (*reader).rng_valid_ctxt = null_mut();
             }
             if !(*reader).xsd_plug.is_null() {
-                xml_schema_sax_unplug((*reader).xsd_plug);
+                xml_schema_sax_unplug((*reader).xsd_plug).ok();
                 (*reader).xsd_plug = null_mut();
             }
             if !(*reader).xsd_valid_ctxt.is_null() {
@@ -4943,7 +4943,7 @@ unsafe fn xml_text_reader_schema_validate_internal(
 
         // Cleanup previous validation stuff.
         if !(*reader).xsd_plug.is_null() {
-            xml_schema_sax_unplug((*reader).xsd_plug);
+            xml_schema_sax_unplug((*reader).xsd_plug).ok();
             (*reader).xsd_plug = null_mut();
         }
         if !(*reader).xsd_valid_ctxt.is_null() {
@@ -5088,7 +5088,7 @@ pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSc
         }
         if schema.is_null() {
             if !(*reader).xsd_plug.is_null() {
-                xml_schema_sax_unplug((*reader).xsd_plug);
+                xml_schema_sax_unplug((*reader).xsd_plug).ok();
                 (*reader).xsd_plug = null_mut();
             }
             if !(*reader).xsd_valid_ctxt.is_null() {
@@ -5108,7 +5108,7 @@ pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSc
             return -1;
         }
         if !(*reader).xsd_plug.is_null() {
-            xml_schema_sax_unplug((*reader).xsd_plug);
+            xml_schema_sax_unplug((*reader).xsd_plug).ok();
             (*reader).xsd_plug = null_mut();
         }
         if !(*reader).xsd_valid_ctxt.is_null() {

@@ -1222,7 +1222,7 @@ pub fn escape_url(s: &str) -> Option<String> {
     }
 
     if let Some(port) = uri.port.filter(|&p| p > 0) {
-        write!(ret, ":{port}");
+        write!(ret, ":{port}").ok()?;
     }
 
     if let Some(path) = uri.path.as_deref() {

@@ -686,17 +686,6 @@ pub unsafe fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
     }
 }
 
-/// Handle an out of memory condition
-#[doc(alias = "htmlSaveErrMemory")]
-#[cfg(feature = "libxml_output")]
-unsafe fn html_save_err_memory(extra: &str) {
-    unsafe {
-        use crate::error::{__xml_simple_oom_error, XmlErrorDomain};
-
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, None, Some(extra));
-    }
-}
-
 /// Dump an HTML node, recursive behaviour,children are printed too.
 ///
 /// Returns the number of byte written or -1 in case of error
@@ -902,19 +891,19 @@ unsafe fn html_dtd_dump_output(
             return;
         };
 
-        buf.write_str("<!DOCTYPE ");
-        buf.write_str(cur.name.as_deref().unwrap());
+        buf.write_str("<!DOCTYPE ").ok();
+        buf.write_str(cur.name.as_deref().unwrap()).ok();
         if let Some(external_id) = cur.external_id.as_deref() {
-            buf.write_str(" PUBLIC ");
+            buf.write_str(" PUBLIC ").ok();
             if let Some(mut buf) = buf.buffer {
                 let external_id = CString::new(external_id).unwrap();
-                buf.push_quoted_cstr(&external_id);
+                buf.push_quoted_cstr(&external_id).ok();
             }
             if let Some(system_id) = cur.system_id.as_deref() {
-                buf.write_str(" ");
+                buf.write_str(" ").ok();
                 if let Some(mut buf) = buf.buffer {
                     let system_id = CString::new(system_id).unwrap();
-                    buf.push_quoted_cstr(&system_id);
+                    buf.push_quoted_cstr(&system_id).ok();
                 }
             }
         } else if let Some(system_id) = cur
@@ -922,13 +911,13 @@ unsafe fn html_dtd_dump_output(
             .as_deref()
             .filter(|&s| s != "about:legacy-compat")
         {
-            buf.write_str(" SYSTEM ");
+            buf.write_str(" SYSTEM ").ok();
             if let Some(mut buf) = buf.buffer {
                 let system_id = CString::new(system_id).unwrap();
-                buf.push_quoted_cstr(&system_id);
+                buf.push_quoted_cstr(&system_id).ok();
             }
         }
-        buf.write_str(">\n");
+        buf.write_str(">\n").ok();
     }
 }
 
@@ -946,19 +935,20 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr
         // a { character (see Section B.7.1 of the HTML 4.0 Recommendation).
         // This is implemented in xmlEncodeEntitiesReentrant
 
-        buf.write_str(" ");
+        buf.write_str(" ").ok();
         if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
-            buf.write_str(&prefix);
-            buf.write_str(":");
+            buf.write_str(&prefix).ok();
+            buf.write_str(":").ok();
         }
 
-        buf.write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
+        buf.write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref())
+            .ok();
         if let Some(children) = cur
             .children()
             .filter(|_| html_is_boolean_attr(cur.name as _) == 0)
         {
             if let Some(value) = children.get_string(doc, 0) {
-                buf.write_str("=");
+                buf.write_str("=").ok();
                 if cur.ns.is_none()
                     && cur
                         .parent()
@@ -984,14 +974,14 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr
                     let escaped = escape_url_except(tmp, b"\"#$%&+,/:;<=>?@[\\]^`{|}");
                     if let Some(mut buf) = buf.buffer {
                         let escaped = CString::new(escaped.as_ref()).unwrap();
-                        buf.push_quoted_cstr(&escaped);
+                        buf.push_quoted_cstr(&escaped).ok();
                     }
                 } else if let Some(mut buf) = buf.buffer {
                     let value = CString::new(value.as_str()).unwrap();
-                    buf.push_quoted_cstr(&value);
+                    buf.push_quoted_cstr(&value).ok();
                 }
             } else {
-                buf.write_str("=\"\"");
+                buf.write_str("=\"\"").ok();
             }
         }
     }
@@ -1044,7 +1034,7 @@ pub unsafe fn html_node_dump_format_output(
                             continue;
                         }
                     } else {
-                        buf.write_str("\n");
+                        buf.write_str("\n").ok();
                     }
                 }
 
@@ -1064,13 +1054,14 @@ pub unsafe fn html_node_dump_format_output(
                         None
                     };
 
-                    buf.write_str("<");
+                    buf.write_str("<").ok();
                     if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
-                        buf.write_str(&prefix);
-                        buf.write_str(":");
+                        buf.write_str(&prefix).ok();
+                        buf.write_str(":").ok();
                     }
 
-                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
+                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
+                        .ok();
                     if let Some(ns_def) = node.ns_def {
                         xml_ns_list_dump_output(buf, Some(ns_def));
                     }
@@ -1081,9 +1072,9 @@ pub unsafe fn html_node_dump_format_output(
                     }
 
                     if info.is_some_and(|info| info.empty != 0) {
-                        buf.write_str(">");
+                        buf.write_str(">").ok();
                     } else if let Some(children) = node.children() {
-                        buf.write_str(">");
+                        buf.write_str(">").ok();
                         if format != 0
                             && info.is_some_and(|info| info.isinline == 0)
                             && !matches!(
@@ -1095,7 +1086,7 @@ pub unsafe fn html_node_dump_format_output(
                             && *node.name.add(0) != b'p'
                         {
                             // p, pre, param
-                            buf.write_str("\n");
+                            buf.write_str("\n").ok();
                         }
                         parent = Some(node.into());
                         cur = children;
@@ -1103,16 +1094,17 @@ pub unsafe fn html_node_dump_format_output(
                     } else if info.is_some_and(|info| {
                         info.save_end_tag != 0 && info.name != "html" && info.name != "body"
                     }) {
-                        buf.write_str(">");
+                        buf.write_str(">").ok();
                     } else {
-                        buf.write_str("></");
+                        buf.write_str("></").ok();
                         if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
-                            buf.write_str(&prefix);
-                            buf.write_str(":");
+                            buf.write_str(&prefix).ok();
+                            buf.write_str(":").ok();
                         }
 
-                        buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
-                        buf.write_str(">");
+                        buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
+                            .ok();
+                        buf.write_str(">").ok();
                     }
 
                     if format != 0
@@ -1127,7 +1119,7 @@ pub unsafe fn html_node_dump_format_output(
                             .and_then(|parent| parent.name())
                             .is_some_and(|name| !name.starts_with('p'))
                     {
-                        buf.write_str("\n");
+                        buf.write_str("\n").ok();
                     }
                 }
                 XmlElementType::XmlAttributeNode => {
@@ -1149,51 +1141,58 @@ pub unsafe fn html_node_dump_format_output(
                     {
                         let buffer: *mut XmlChar = xml_encode_entities_reentrant(doc, node.content);
                         if !buffer.is_null() {
-                            buf.write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
+                            buf.write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref())
+                                .ok();
                             xml_free(buffer as _);
                         }
                     } else {
-                        buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref());
+                        buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref())
+                            .ok();
                     }
                 }
 
                 HTML_COMMENT_NODE => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
                     if !node.content.is_null() {
-                        buf.write_str("<!--");
+                        buf.write_str("<!--").ok();
 
-                        buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref());
-                        buf.write_str("-->");
+                        buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref())
+                            .ok();
+                        buf.write_str("-->").ok();
                     }
                 }
 
                 HTML_PI_NODE => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
                     if !node.name.is_null() {
-                        buf.write_str("<?");
+                        buf.write_str("<?").ok();
 
-                        buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
+                        buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
+                            .ok();
                         if !node.content.is_null() {
-                            buf.write_str(" ");
+                            buf.write_str(" ").ok();
 
                             buf.write_str(
                                 CStr::from_ptr(node.content as _).to_string_lossy().as_ref(),
-                            );
+                            )
+                            .ok();
                         }
-                        buf.write_str(">");
+                        buf.write_str(">").ok();
                     }
                 }
                 HTML_ENTITY_REF_NODE => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
-                    buf.write_str("&");
+                    buf.write_str("&").ok();
 
-                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
-                    buf.write_str(";");
+                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
+                        .ok();
+                    buf.write_str(";").ok();
                 }
                 HTML_PRESERVE_NODE => {
                     let node = XmlNodePtr::try_from(cur).unwrap();
                     if !node.content.is_null() {
-                        buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref());
+                        buf.write_str(CStr::from_ptr(node.content as _).to_string_lossy().as_ref())
+                            .ok();
                     }
                 }
                 _ => {}
@@ -1216,7 +1215,7 @@ pub unsafe fn html_node_dump_format_output(
                     cur.element_type(),
                     XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode
                 ) {
-                    buf.write_str("\n");
+                    buf.write_str("\n").ok();
                 } else {
                     // Is this convertion OK ?????
                     let node = XmlNodePtr::try_from(cur).unwrap();
@@ -1237,17 +1236,18 @@ pub unsafe fn html_node_dump_format_output(
                         && *node.name.add(0) != b'p'
                     {
                         // p, pre, param
-                        buf.write_str("\n");
+                        buf.write_str("\n").ok();
                     }
 
-                    buf.write_str("</");
+                    buf.write_str("</").ok();
                     if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
-                        buf.write_str(&prefix);
-                        buf.write_str(":");
+                        buf.write_str(&prefix).ok();
+                        buf.write_str(":").ok();
                     }
 
-                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref());
-                    buf.write_str(">");
+                    buf.write_str(CStr::from_ptr(node.name as _).to_string_lossy().as_ref())
+                        .ok();
+                    buf.write_str(">").ok();
 
                     if format != 0
                         && info.is_some_and(|info| info.isinline == 0)
@@ -1261,7 +1261,7 @@ pub unsafe fn html_node_dump_format_output(
                             .and_then(|parent| parent.name())
                             .is_some_and(|name| !name.starts_with('p'))
                     {
-                        buf.write_str("\n");
+                        buf.write_str("\n").ok();
                     }
                 }
             }

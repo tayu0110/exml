@@ -66,7 +66,7 @@ use crate::{
     parser::{XmlParserCtxtPtr, split_qname2},
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
-        XmlAttributeType, XmlDoc, XmlDocProperties, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
+        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
         XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
         XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlID,
         XmlNodePtr, XmlNotation, XmlRef, xml_build_qname, xml_free_attribute, xml_free_element,
@@ -858,7 +858,8 @@ pub unsafe fn xml_add_element_decl(
                 dtd.elements
                     .as_mut()
                     .unwrap()
-                    .remove_entry2(name, ns, |_, _| {});
+                    .remove_entry2(name, ns, |_, _| {})
+                    .ok();
                 xml_free_element(Some(ret));
             }
         }
@@ -972,13 +973,13 @@ unsafe fn xml_dump_element_occur<'a>(buf: &mut (impl Write + 'a), cur: XmlElemen
         match (*cur).ocur {
             XmlElementContentOccur::XmlElementContentOnce => {}
             XmlElementContentOccur::XmlElementContentOpt => {
-                write!(buf, "?");
+                write!(buf, "?").ok();
             }
             XmlElementContentOccur::XmlElementContentMult => {
-                write!(buf, "*");
+                write!(buf, "*").ok();
             }
             XmlElementContentOccur::XmlElementContentPlus => {
-                write!(buf, "+");
+                write!(buf, "+").ok();
             }
         }
     }
@@ -993,7 +994,7 @@ unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: Xml
             return;
         }
 
-        write!(buf, "(");
+        write!(buf, "(").ok();
         let mut cur = content;
 
         while {
@@ -1004,7 +1005,7 @@ unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: Xml
 
                 match (*cur).typ {
                     XmlElementContentType::XmlElementContentPCDATA => {
-                        write!(buf, "#PCDATA");
+                        write!(buf, "#PCDATA").ok();
                     }
                     XmlElementContentType::XmlElementContentElement => {
                         if !(*cur).prefix.is_null() {
@@ -1014,7 +1015,8 @@ unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: Xml
                                 CStr::from_ptr((*cur).prefix as *const i8)
                                     .to_string_lossy()
                                     .as_ref()
-                            );
+                            )
+                            .ok();
                         }
                         write!(
                             buf,
@@ -1022,7 +1024,8 @@ unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: Xml
                             CStr::from_ptr((*cur).name as *const i8)
                                 .to_string_lossy()
                                 .as_ref(),
-                        );
+                        )
+                        .ok();
                     }
                     XmlElementContentType::XmlElementContentSeq
                     | XmlElementContentType::XmlElementContentOr => {
@@ -1034,7 +1037,7 @@ unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: Xml
                                     XmlElementContentOccur::XmlElementContentOnce
                                 ))
                         {
-                            write!(buf, "(");
+                            write!(buf, "(").ok();
                         }
                         cur = (*cur).c1;
                         break 'to_continue;
@@ -1062,15 +1065,15 @@ unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: Xml
                     ) && ((*cur).typ != (*parent).typ
                         || !matches!((*cur).ocur, XmlElementContentOccur::XmlElementContentOnce))
                     {
-                        write!(buf, ")");
+                        write!(buf, ")").ok();
                     }
                     xml_dump_element_occur(buf, cur);
 
                     if cur == (*parent).c1 {
                         if (*parent).typ == XmlElementContentType::XmlElementContentSeq {
-                            write!(buf, " , ");
+                            write!(buf, " , ").ok();
                         } else if (*parent).typ == XmlElementContentType::XmlElementContentOr {
-                            write!(buf, " | ");
+                            write!(buf, " | ").ok();
                         }
 
                         cur = (*parent).c2;
@@ -1083,7 +1086,7 @@ unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: Xml
             cur != content
         } {}
 
-        write!(buf, ")");
+        write!(buf, ")").ok();
         xml_dump_element_occur(buf, content);
     }
 }
@@ -1096,36 +1099,36 @@ pub unsafe fn xml_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlEl
         let name = elem.name.as_deref().unwrap();
         match elem.etype {
             XmlElementTypeVal::XmlElementTypeEmpty => {
-                write!(buf, "<!ELEMENT ");
+                write!(buf, "<!ELEMENT ").ok();
                 if let Some(prefix) = elem.prefix.as_deref() {
-                    write!(buf, "{prefix}:");
+                    write!(buf, "{prefix}:").ok();
                 }
-                writeln!(buf, "{} EMPTY>", name);
+                writeln!(buf, "{} EMPTY>", name).ok();
             }
             XmlElementTypeVal::XmlElementTypeAny => {
-                write!(buf, "<!ELEMENT ");
+                write!(buf, "<!ELEMENT ").ok();
                 if let Some(prefix) = elem.prefix.as_deref() {
-                    write!(buf, "{prefix}:");
+                    write!(buf, "{prefix}:").ok();
                 }
-                writeln!(buf, "{} ANY>", name);
+                writeln!(buf, "{} ANY>", name).ok();
             }
             XmlElementTypeVal::XmlElementTypeMixed => {
-                write!(buf, "<!ELEMENT ");
+                write!(buf, "<!ELEMENT ").ok();
                 if let Some(prefix) = elem.prefix.as_deref() {
-                    write!(buf, "{prefix}:");
+                    write!(buf, "{prefix}:").ok();
                 }
-                write!(buf, "{} ", name);
+                write!(buf, "{} ", name).ok();
                 xml_dump_element_content(buf, elem.content);
-                writeln!(buf, ">",);
+                writeln!(buf, ">",).ok();
             }
             XmlElementTypeVal::XmlElementTypeElement => {
-                write!(buf, "<!ELEMENT ");
+                write!(buf, "<!ELEMENT ").ok();
                 if let Some(prefix) = elem.prefix.as_deref() {
-                    write!(buf, "{prefix}:");
+                    write!(buf, "{prefix}:").ok();
                 }
-                write!(buf, "{} ", name);
+                write!(buf, "{} ", name).ok();
                 xml_dump_element_content(buf, elem.content);
-                writeln!(buf, ">",);
+                writeln!(buf, ">",).ok();
             }
             _ => {
                 xml_err_valid!(
@@ -1928,14 +1931,14 @@ pub unsafe fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: Xml
     unsafe {
         use crate::{io::write_quoted, tree::xml_dump_enumeration};
 
-        write!(buf, "<!ATTLIST ");
+        write!(buf, "<!ATTLIST ").ok();
         let elem = attr.elem.as_deref().unwrap();
-        write!(buf, "{elem}");
-        write!(buf, " ");
+        write!(buf, "{elem}").ok();
+        write!(buf, " ").ok();
         if let Some(prefix) = attr.prefix.as_deref() {
-            write!(buf, "{}:", prefix);
+            write!(buf, "{}:", prefix).ok();
         }
-        write!(buf, "{}", (*attr).name().unwrap());
+        write!(buf, "{}", (*attr).name().unwrap()).ok();
         match attr.atype {
             XmlAttributeType::XmlAttributeCDATA => write!(buf, " CDATA").ok(),
             XmlAttributeType::XmlAttributeID => write!(buf, " ID").ok(),
@@ -1946,12 +1949,12 @@ pub unsafe fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: Xml
             XmlAttributeType::XmlAttributeNmtoken => write!(buf, " NMTOKEN").ok(),
             XmlAttributeType::XmlAttributeNmtokens => write!(buf, " NMTOKENS").ok(),
             XmlAttributeType::XmlAttributeEnumeration => {
-                write!(buf, " (");
+                write!(buf, " (").ok();
                 xml_dump_enumeration(buf, attr.tree.as_deref().unwrap());
                 Some(())
             }
             XmlAttributeType::XmlAttributeNotation => {
-                write!(buf, " NOTATION (");
+                write!(buf, " NOTATION (").ok();
                 xml_dump_enumeration(buf, attr.tree.as_deref().unwrap());
                 Some(())
             }
@@ -1963,15 +1966,16 @@ pub unsafe fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: Xml
             XmlAttributeDefault::XmlAttributeFixed => write!(buf, " #FIXED").ok(),
         };
         if !attr.default_value.is_null() {
-            write!(buf, " ");
+            write!(buf, " ").ok();
             write_quoted(
                 buf,
                 CStr::from_ptr(attr.default_value as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-            );
+            )
+            .ok();
         }
-        writeln!(buf, ">");
+        writeln!(buf, ">").ok();
     }
 }
 
@@ -2241,10 +2245,12 @@ pub unsafe fn xml_remove_id(mut doc: XmlDocPtr, mut attr: XmlAttrPtr) -> i32 {
             return -1;
         }
 
-        table.remove_entry(
-            CStr::from_ptr(id as *const i8).to_string_lossy().as_ref(),
-            |_, _| {},
-        );
+        table
+            .remove_entry(
+                CStr::from_ptr(id as *const i8).to_string_lossy().as_ref(),
+                |_, _| {},
+            )
+            .ok();
         xml_free(id as _);
         attr.atype = None;
         0
@@ -2350,56 +2356,56 @@ pub(crate) unsafe fn xml_is_ref(
     0
 }
 
-/// Remove the given attribute from the Ref table maintained internally.
-///
-/// Returns -1 if the lookup failed and 0 otherwise
-#[doc(alias = "xmlRemoveRef")]
-pub(crate) unsafe fn xml_remove_ref(mut doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
-    unsafe {
-        if doc.refs.is_none() {
-            return -1;
-        }
+// /// Remove the given attribute from the Ref table maintained internally.
+// ///
+// /// Returns -1 if the lookup failed and 0 otherwise
+// #[doc(alias = "xmlRemoveRef")]
+// pub(crate) unsafe fn xml_remove_ref(mut doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
+//     unsafe {
+//         if doc.refs.is_none() {
+//             return -1;
+//         }
 
-        let Some(id) = attr.children().and_then(|c| c.get_string(Some(doc), 1)) else {
-            return -1;
-        };
+//         let Some(id) = attr.children().and_then(|c| c.get_string(Some(doc), 1)) else {
+//             return -1;
+//         };
 
-        let table = doc.refs.as_mut().unwrap();
-        let Some(ref_list) = table.get_mut(&id) else {
-            return -1;
-        };
+//         let table = doc.refs.as_mut().unwrap();
+//         let Some(ref_list) = table.get_mut(&id) else {
+//             return -1;
+//         };
 
-        // At this point, ref_list refers to a list of references which
-        // have the same key as the supplied attr. Our list of references
-        // is ordered by reference address and we don't have that information
-        // here to use when removing. We'll have to walk the list and
-        // check for a matching attribute, when we find one stop the walk
-        // and remove the entry.
-        // The list is ordered by reference, so that means we don't have the
-        // key. Passing the list and the reference to the walker means we
-        // will have enough data to be able to remove the entry.
+//         // At this point, ref_list refers to a list of references which
+//         // have the same key as the supplied attr. Our list of references
+//         // is ordered by reference address and we don't have that information
+//         // here to use when removing. We'll have to walk the list and
+//         // check for a matching attribute, when we find one stop the walk
+//         // and remove the entry.
+//         // The list is ordered by reference, so that means we don't have the
+//         // key. Passing the list and the reference to the walker means we
+//         // will have enough data to be able to remove the entry.
 
-        // Remove the supplied attr from our list
-        ref_list.remove_first_by(|refe| refe.attr == Some(attr));
+//         // Remove the supplied attr from our list
+//         ref_list.remove_first_by(|refe| refe.attr == Some(attr));
 
-        // If the list is empty then remove the list entry in the hash
-        if ref_list.is_empty() {
-            table.remove(&id);
-        }
-        0
-    }
-}
+//         // If the list is empty then remove the list entry in the hash
+//         if ref_list.is_empty() {
+//             table.remove(&id);
+//         }
+//         0
+//     }
+// }
 
-/// Find the set of references for the supplied ID.
-///
-/// Returns `None` if not found, otherwise node set for the ID.
-#[doc(alias = "xmlGetRefs")]
-pub(crate) unsafe fn xml_get_refs<'a>(
-    doc: &'a XmlDoc,
-    id: &str,
-) -> Option<&'a XmlList<Box<XmlRef>>> {
-    doc.refs.as_ref()?.get(id)
-}
+// /// Find the set of references for the supplied ID.
+// ///
+// /// Returns `None` if not found, otherwise node set for the ID.
+// #[doc(alias = "xmlGetRefs")]
+// pub(crate) unsafe fn xml_get_refs<'a>(
+//     doc: &'a XmlDoc,
+//     id: &str,
+// ) -> Option<&'a XmlList<Box<XmlRef>>> {
+//     doc.refs.as_ref()?.get(id)
+// }
 
 /// Allocate a validation context structure.
 ///
@@ -2490,16 +2496,6 @@ pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
         // name_ok:
         1
     }
-}
-
-macro_rules! CHECK_DTD {
-    ($doc:expr) => {
-        if $doc.is_null() {
-            return 0;
-        } else if (*$doc).int_subset.is_none() && (*$doc).ext_subset.is_none() {
-            return 0;
-        }
-    };
 }
 
 /// Try to validate a single element definition

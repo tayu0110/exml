@@ -382,16 +382,6 @@ impl Display for InvalidNodePointerCastError {
     }
 }
 
-macro_rules! CUR_SCHAR {
-    ($s:expr, $l:expr) => {
-        $crate::libxml::parser_internals::xml_string_current_char(
-            std::ptr::null_mut(),
-            $s,
-            std::ptr::addr_of_mut!($l),
-        )
-    };
-}
-
 /// Check that a value conforms to the lexical space of NCName
 ///
 /// Returns `Ok` if this validates, `Err` otherwise.
@@ -1227,7 +1217,6 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> Option<XmlDtdPtr> {
                             .map(XmlGenericNodePtr::from);
                     }
                     XmlEntityType::XmlInternalPredefinedEntity => {}
-                    _ => unreachable!(),
                 }
             } else if let Ok(tmp) = XmlElementPtr::try_from(cur_node) {
                 q = xml_get_dtd_qelement_desc(

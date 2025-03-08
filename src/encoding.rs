@@ -403,12 +403,12 @@ impl CustomEncodingHandler {
 const MAX_ENCODING_HANDLERS: usize = 50;
 static HANDLERS: Mutex<Vec<CustomEncodingHandler>> = Mutex::new(vec![]);
 
-pub(crate) fn cleanup_encoding_handlers() {
-    cleanup_encoding_aliases();
+// pub(crate) fn cleanup_encoding_handlers() {
+//     cleanup_encoding_aliases();
 
-    let mut handlers = HANDLERS.lock().unwrap();
-    handlers.clear();
-}
+//     let mut handlers = HANDLERS.lock().unwrap();
+//     handlers.clear();
+// }
 
 macro_rules! xml_encoding_err {
     ($error:expr, $msg:literal, $val:expr) => {

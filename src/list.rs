@@ -534,19 +534,19 @@ impl<T: 'static> XmlList<T> {
         count
     }
 
-    /// In original libxml2, this is the public API.  
-    /// However, XmlLinkRef should only be published in the crate
-    /// because publishing XmlLinkRef may break the constraints of XmlList.
-    pub(crate) fn first(&self) -> Option<&XmlLinkRef<T>> {
-        self.head.as_ref()
-    }
+    // /// In original libxml2, this is the public API.
+    // /// However, XmlLinkRef should only be published in the crate
+    // /// because publishing XmlLinkRef may break the constraints of XmlList.
+    // pub(crate) fn first(&self) -> Option<&XmlLinkRef<T>> {
+    //     self.head.as_ref()
+    // }
 
-    /// In original libxml2, this is the public API.  
-    /// However, XmlLinkRef should only be published in the crate
-    /// because publishing XmlLinkRef may break the constraints of XmlList.
-    pub(crate) fn last(&self) -> Option<&XmlLinkRef<T>> {
-        self.tail.as_ref()
-    }
+    // /// In original libxml2, this is the public API.
+    // /// However, XmlLinkRef should only be published in the crate
+    // /// because publishing XmlLinkRef may break the constraints of XmlList.
+    // pub(crate) fn last(&self) -> Option<&XmlLinkRef<T>> {
+    //     self.tail.as_ref()
+    // }
 
     /// Remove the head of the list and return its data.
     ///
@@ -1010,7 +1010,7 @@ impl<T> XmlListRef<T> {
 
     pub fn free(self) {
         unsafe {
-            Box::from_raw(self.0.as_ptr());
+            let _ = Box::from_raw(self.0.as_ptr());
         }
     }
 }

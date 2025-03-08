@@ -737,7 +737,7 @@ pub fn xml_xpath_cast_boolean_to_string(val: bool) -> &'static str {
 
 const DBL_DIG: usize = 15;
 const EXPONENT_DIGITS: usize = 3 + 2;
-const LOWER_DOUBLE_EXP: usize = 5;
+// const LOWER_DOUBLE_EXP: usize = 5;
 const UPPER_DOUBLE: f64 = 1E9;
 const LOWER_DOUBLE: f64 = 1E-5;
 

@@ -5385,21 +5385,9 @@ pub unsafe fn html_auto_close_tag(
  *   COPY(to) copy one c_char to *to, increment CUR_PTR and to accordingly
  */
 
-macro_rules! UPPER {
-    ($ctxt:expr) => {
-        (*(*(*$ctxt).input).cur).to_ascii_uppercase()
-    };
-}
-
 macro_rules! NXT {
     ($ctxt:expr, $val:expr) => {
         *(*(*$ctxt).input).cur.add($val as usize)
-    };
-}
-
-macro_rules! UPP {
-    ($ctxt:expr, $val:expr) => {
-        (*(*(*$ctxt).input).cur.add($val as usize)).to_ascii_uppercase()
     };
 }
 
@@ -6156,7 +6144,7 @@ pub(crate) unsafe fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> i32 {
     }
 }
 
-const HTML_MAX_NAMELEN: usize = 1000;
+// const HTML_MAX_NAMELEN: usize = 1000;
 const HTML_PARSER_BIG_BUFFER_SIZE: usize = 1000;
 const HTML_PARSER_BUFFER_SIZE: usize = 100;
 
@@ -8555,258 +8543,258 @@ unsafe fn html_parse_char_data(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/// Parse a content: comment, sub-element, reference or text.
-/// Kept for compatibility with old code
-#[doc(alias = "htmlParseContent")]
-unsafe fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
-    unsafe {
-        let mut name: *const XmlChar;
+// /// Parse a content: comment, sub-element, reference or text.
+// /// Kept for compatibility with old code
+// #[doc(alias = "htmlParseContent")]
+// unsafe fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
+//     unsafe {
+//         let mut name: *const XmlChar;
 
-        let current_node = (*ctxt).name.clone();
-        let depth = (*ctxt).name_tab.len();
-        loop {
-            (*ctxt).grow();
+//         let current_node = (*ctxt).name.clone();
+//         let depth = (*ctxt).name_tab.len();
+//         loop {
+//             (*ctxt).grow();
 
-            if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                break;
-            }
+//             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
+//                 break;
+//             }
 
-            // Our tag or one of it's parent or children is ending.
-            if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
-                if html_parse_end_tag(ctxt) != 0
-                    && (current_node.is_some() || (*ctxt).name_tab.is_empty())
-                {
-                    return;
-                }
-                continue; /* while */
-            } else if (*ctxt).current_byte() == b'<'
-                && (NXT!(ctxt, 1).is_ascii_alphabetic()
-                    || NXT!(ctxt, 1) == b'_'
-                    || NXT!(ctxt, 1) == b':')
-            {
-                name = html_parse_html_name_non_invasive(ctxt);
-                if name.is_null() {
-                    html_parse_err(
-                        ctxt,
-                        XmlParserErrors::XmlErrNameRequired,
-                        "htmlParseStartTag: invalid element name\n",
-                        None,
-                        None,
-                    );
-                    // Dump the bogus tag like browsers do
-                    #[allow(clippy::while_immutable_condition)]
-                    while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() != b'>' {
-                        (*ctxt).skip_char();
-                    }
+//             // Our tag or one of it's parent or children is ending.
+//             if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
+//                 if html_parse_end_tag(ctxt) != 0
+//                     && (current_node.is_some() || (*ctxt).name_tab.is_empty())
+//                 {
+//                     return;
+//                 }
+//                 continue; /* while */
+//             } else if (*ctxt).current_byte() == b'<'
+//                 && (NXT!(ctxt, 1).is_ascii_alphabetic()
+//                     || NXT!(ctxt, 1) == b'_'
+//                     || NXT!(ctxt, 1) == b':')
+//             {
+//                 name = html_parse_html_name_non_invasive(ctxt);
+//                 if name.is_null() {
+//                     html_parse_err(
+//                         ctxt,
+//                         XmlParserErrors::XmlErrNameRequired,
+//                         "htmlParseStartTag: invalid element name\n",
+//                         None,
+//                         None,
+//                     );
+//                     // Dump the bogus tag like browsers do
+//                     #[allow(clippy::while_immutable_condition)]
+//                     while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() != b'>' {
+//                         (*ctxt).skip_char();
+//                     }
 
-                    return;
-                }
+//                     return;
+//                 }
 
-                if (*ctxt).name.is_some()
-                    && html_check_auto_close(name, (*ctxt).name.as_deref()) == 1
-                {
-                    html_auto_close(ctxt, name);
-                    continue;
-                }
-            }
+//                 if (*ctxt).name.is_some()
+//                     && html_check_auto_close(name, (*ctxt).name.as_deref()) == 1
+//                 {
+//                     html_auto_close(ctxt, name);
+//                     continue;
+//                 }
+//             }
 
-            // Has this node been popped out during parsing of the next element
-            if !(*ctxt).name_tab.is_empty()
-                && depth >= (*ctxt).name_tab.len()
-                && current_node != (*ctxt).name
-            {
-                return;
-            }
+//             // Has this node been popped out during parsing of the next element
+//             if !(*ctxt).name_tab.is_empty()
+//                 && depth >= (*ctxt).name_tab.len()
+//                 && current_node != (*ctxt).name
+//             {
+//                 return;
+//             }
 
-            if (*ctxt).current_byte() != 0
-                && (current_node.as_deref() == Some("script")
-                    || current_node.as_deref() == Some("style"))
-            {
-                // Handle SCRIPT/STYLE separately
-                html_parse_script(ctxt);
-            } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'!' {
-                // Sometimes DOCTYPE arrives in the middle of the document
-                if (*ctxt).content_bytes().len() >= 9
-                    && (*ctxt).content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
-                {
-                    html_parse_err(
-                        ctxt,
-                        XmlParserErrors::XmlHTMLStrucureError,
-                        "Misplaced DOCTYPE declaration\n",
-                        Some("DOCTYPE"),
-                        None,
-                    );
-                    html_parse_doc_type_decl(ctxt);
-                } else if NXT!(ctxt, 2) == b'-' && NXT!(ctxt, 3) == b'-' {
-                    //  case :  a comment
-                    html_parse_comment(ctxt);
-                } else {
-                    html_skip_bogus_comment(ctxt);
-                }
-            } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?' {
-                // Second case : a Processing Instruction.
-                html_parse_pi(ctxt);
-            } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1).is_ascii_alphabetic() {
-                // Third case :  a sub-element.
-                html_parse_element(ctxt);
-            } else if (*ctxt).current_byte() == b'<' {
-                if (*ctxt).disable_sax == 0 {
-                    if let Some(characters) =
-                        (*ctxt).sax.as_deref_mut().and_then(|sax| sax.characters)
-                    {
-                        characters((*ctxt).user_data.clone(), "<");
-                    }
-                }
-                (*ctxt).skip_char();
-            } else if (*ctxt).current_byte() == b'&' {
-                // Fourth case : a reference. If if has not been resolved,
-                //    parsing returns it's Name, create the node
-                html_parse_reference(ctxt);
-            } else if (*ctxt).current_byte() == 0 {
-                // Fifth case : end of the resource
-                html_auto_close_on_end(ctxt);
-                break;
-            } else {
-                // Last case, text. Note that References are handled directly.
-                html_parse_char_data(ctxt);
-            }
+//             if (*ctxt).current_byte() != 0
+//                 && (current_node.as_deref() == Some("script")
+//                     || current_node.as_deref() == Some("style"))
+//             {
+//                 // Handle SCRIPT/STYLE separately
+//                 html_parse_script(ctxt);
+//             } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'!' {
+//                 // Sometimes DOCTYPE arrives in the middle of the document
+//                 if (*ctxt).content_bytes().len() >= 9
+//                     && (*ctxt).content_bytes()[2..9].eq_ignore_ascii_case(b"DOCTYPE")
+//                 {
+//                     html_parse_err(
+//                         ctxt,
+//                         XmlParserErrors::XmlHTMLStrucureError,
+//                         "Misplaced DOCTYPE declaration\n",
+//                         Some("DOCTYPE"),
+//                         None,
+//                     );
+//                     html_parse_doc_type_decl(ctxt);
+//                 } else if NXT!(ctxt, 2) == b'-' && NXT!(ctxt, 3) == b'-' {
+//                     //  case :  a comment
+//                     html_parse_comment(ctxt);
+//                 } else {
+//                     html_skip_bogus_comment(ctxt);
+//                 }
+//             } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?' {
+//                 // Second case : a Processing Instruction.
+//                 html_parse_pi(ctxt);
+//             } else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1).is_ascii_alphabetic() {
+//                 // Third case :  a sub-element.
+//                 html_parse_element(ctxt);
+//             } else if (*ctxt).current_byte() == b'<' {
+//                 if (*ctxt).disable_sax == 0 {
+//                     if let Some(characters) =
+//                         (*ctxt).sax.as_deref_mut().and_then(|sax| sax.characters)
+//                     {
+//                         characters((*ctxt).user_data.clone(), "<");
+//                     }
+//                 }
+//                 (*ctxt).skip_char();
+//             } else if (*ctxt).current_byte() == b'&' {
+//                 // Fourth case : a reference. If if has not been resolved,
+//                 //    parsing returns it's Name, create the node
+//                 html_parse_reference(ctxt);
+//             } else if (*ctxt).current_byte() == 0 {
+//                 // Fifth case : end of the resource
+//                 html_auto_close_on_end(ctxt);
+//                 break;
+//             } else {
+//                 // Last case, text. Note that References are handled directly.
+//                 html_parse_char_data(ctxt);
+//             }
 
-            (*ctxt).shrink();
-            (*ctxt).grow();
-        }
-    }
-}
+//             (*ctxt).shrink();
+//             (*ctxt).grow();
+//         }
+//     }
+// }
 
-/// Parse an HTML element, this is highly recursive
-/// this is kept for compatibility with previous code versions
-///
-/// `[39] element ::= EmptyElemTag | STag content ETag`
-///
-/// `[41] Attribute ::= Name Eq AttValue`
-#[doc(alias = "htmlParseElement")]
-pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
-    unsafe {
-        let mut node_info = XmlParserNodeInfo::default();
-        let mut oldptr: *const XmlChar;
+// /// Parse an HTML element, this is highly recursive
+// /// this is kept for compatibility with previous code versions
+// ///
+// /// `[39] element ::= EmptyElemTag | STag content ETag`
+// ///
+// /// `[41] Attribute ::= Name Eq AttValue`
+// #[doc(alias = "htmlParseElement")]
+// pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
+//     unsafe {
+//         let mut node_info = XmlParserNodeInfo::default();
+//         let mut oldptr: *const XmlChar;
 
-        if ctxt.is_null() || (*ctxt).input.is_null() {
-            html_parse_err(
-                ctxt,
-                XmlParserErrors::XmlErrInternalError,
-                "htmlParseElement: context error\n",
-                None,
-                None,
-            );
-            return;
-        }
+//         if ctxt.is_null() || (*ctxt).input.is_null() {
+//             html_parse_err(
+//                 ctxt,
+//                 XmlParserErrors::XmlErrInternalError,
+//                 "htmlParseElement: context error\n",
+//                 None,
+//                 None,
+//             );
+//             return;
+//         }
 
-        if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-            return;
-        }
+//         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
+//             return;
+//         }
 
-        // Capture start position
-        if (*ctxt).record_info != 0 {
-            node_info.begin_pos =
-                (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
-            node_info.begin_line = (*(*ctxt).input).line as _;
-        }
+//         // Capture start position
+//         if (*ctxt).record_info != 0 {
+//             node_info.begin_pos =
+//                 (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
+//             node_info.begin_line = (*(*ctxt).input).line as _;
+//         }
 
-        let failed: i32 = html_parse_start_tag(ctxt);
-        let name = (*ctxt).name.clone();
-        let Some(name) = name.filter(|_| failed != -1) else {
-            if (*ctxt).current_byte() == b'>' {
-                (*ctxt).skip_char();
-            }
-            return;
-        };
+//         let failed: i32 = html_parse_start_tag(ctxt);
+//         let name = (*ctxt).name.clone();
+//         let Some(name) = name.filter(|_| failed != -1) else {
+//             if (*ctxt).current_byte() == b'>' {
+//                 (*ctxt).skip_char();
+//             }
+//             return;
+//         };
 
-        // Lookup the info for that element.
-        let info = html_tag_lookup(&name);
-        if info.is_none() {
-            html_parse_err(
-                ctxt,
-                XmlParserErrors::XmlHTMLUnknownTag,
-                format!("Tag {name} invalid\n").as_str(),
-                Some(&name),
-                None,
-            );
-        }
+//         // Lookup the info for that element.
+//         let info = html_tag_lookup(&name);
+//         if info.is_none() {
+//             html_parse_err(
+//                 ctxt,
+//                 XmlParserErrors::XmlHTMLUnknownTag,
+//                 format!("Tag {name} invalid\n").as_str(),
+//                 Some(&name),
+//                 None,
+//             );
+//         }
 
-        // Check for an Empty Element labeled the XML/SGML way
-        if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
-            (*ctxt).advance(2);
-            if let Some(end_element) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element) {
-                end_element((*ctxt).user_data.clone(), &name);
-            }
-            html_name_pop(ctxt);
-            return;
-        }
+//         // Check for an Empty Element labeled the XML/SGML way
+//         if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
+//             (*ctxt).advance(2);
+//             if let Some(end_element) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element) {
+//                 end_element((*ctxt).user_data.clone(), &name);
+//             }
+//             html_name_pop(ctxt);
+//             return;
+//         }
 
-        if (*ctxt).current_byte() == b'>' {
-            (*ctxt).skip_char();
-        } else {
-            html_parse_err(
-                ctxt,
-                XmlParserErrors::XmlErrGtRequired,
-                format!("Couldn't find end of Start Tag {name}\n").as_str(),
-                Some(&name),
-                None,
-            );
+//         if (*ctxt).current_byte() == b'>' {
+//             (*ctxt).skip_char();
+//         } else {
+//             html_parse_err(
+//                 ctxt,
+//                 XmlParserErrors::XmlErrGtRequired,
+//                 format!("Couldn't find end of Start Tag {name}\n").as_str(),
+//                 Some(&name),
+//                 None,
+//             );
 
-            // end of parsing of this node.
-            if Some(name.as_str()) == (*ctxt).name.as_deref() {
-                (*ctxt).node_pop();
-                html_name_pop(ctxt);
-            }
+//             // end of parsing of this node.
+//             if Some(name.as_str()) == (*ctxt).name.as_deref() {
+//                 (*ctxt).node_pop();
+//                 html_name_pop(ctxt);
+//             }
 
-            // Capture end position and add node
-            if (*ctxt).record_info != 0 {
-                node_info.end_pos =
-                    (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
-                node_info.end_line = (*(*ctxt).input).line as _;
-                node_info.node = (*ctxt).node;
-                xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
-            }
-            return;
-        }
+//             // Capture end position and add node
+//             if (*ctxt).record_info != 0 {
+//                 node_info.end_pos =
+//                     (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
+//                 node_info.end_line = (*(*ctxt).input).line as _;
+//                 node_info.node = (*ctxt).node;
+//                 xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
+//             }
+//             return;
+//         }
 
-        // Check for an Empty Element from DTD definition
-        if info.is_some_and(|info| info.empty != 0) {
-            if let Some(end_element) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element) {
-                end_element((*ctxt).user_data.clone(), &name);
-            }
-            html_name_pop(ctxt);
-            return;
-        }
+//         // Check for an Empty Element from DTD definition
+//         if info.is_some_and(|info| info.empty != 0) {
+//             if let Some(end_element) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element) {
+//                 end_element((*ctxt).user_data.clone(), &name);
+//             }
+//             html_name_pop(ctxt);
+//             return;
+//         }
 
-        // Parse the content of the element:
-        let current_node = (*ctxt).name.clone();
-        let depth = (*ctxt).name_tab.len();
-        #[allow(clippy::while_immutable_condition)]
-        while (*ctxt).current_byte() != 0 {
-            oldptr = (*(*ctxt).input).cur;
-            html_parse_content(ctxt);
-            if oldptr == (*(*ctxt).input).cur {
-                break;
-            }
-            if (*ctxt).name_tab.len() < depth {
-                break;
-            }
-        }
+//         // Parse the content of the element:
+//         let current_node = (*ctxt).name.clone();
+//         let depth = (*ctxt).name_tab.len();
+//         #[allow(clippy::while_immutable_condition)]
+//         while (*ctxt).current_byte() != 0 {
+//             oldptr = (*(*ctxt).input).cur;
+//             html_parse_content(ctxt);
+//             if oldptr == (*(*ctxt).input).cur {
+//                 break;
+//             }
+//             if (*ctxt).name_tab.len() < depth {
+//                 break;
+//             }
+//         }
 
-        // Capture end position and add node
-        if current_node.is_some() && (*ctxt).record_info != 0 {
-            node_info.end_pos =
-                (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
-            node_info.end_line = (*(*ctxt).input).line as _;
-            node_info.node = (*ctxt).node;
-            xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
-        }
-        if (*ctxt).current_byte() == 0 {
-            html_auto_close_on_end(ctxt);
-        }
-    }
-}
+//         // Capture end position and add node
+//         if current_node.is_some() && (*ctxt).record_info != 0 {
+//             node_info.end_pos =
+//                 (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
+//             node_info.end_line = (*(*ctxt).input).line as _;
+//             node_info.node = (*ctxt).node;
+//             xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
+//         }
+//         if (*ctxt).current_byte() == 0 {
+//             html_auto_close_on_end(ctxt);
+//         }
+//     }
+// }
 
 /// Allocate and initialize a new parser context.
 ///
@@ -10868,17 +10856,6 @@ pub enum HtmlParserOption {
     HtmlParseIgnoreEnc = 1 << 21, /* ignore internal document encoding hint */
 }
 
-/// Free a string if it is not owned by the "dict" dictionary in the current scope
-macro_rules! DICT_FREE {
-    ($dict:expr, $str:expr) => {
-        if !$str.is_null()
-            && ($dict.is_null() || crate::libxml::dict::xml_dict_owns($dict, $str) == 0)
-        {
-            xml_free($str as _);
-        }
-    };
-}
-
 /// Reset a parser context
 #[doc(alias = "htmlCtxtReset")]
 pub unsafe fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
@@ -11752,32 +11729,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in htmlParseCharRef()");
-        }
-    }
-
-    #[test]
-    fn test_html_parse_element() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_HTML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_html_parser_ctxt_ptr(n_ctxt, 0);
-
-                html_parse_element(ctxt);
-                des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in htmlParseElement",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlParseElement()");
         }
     }
 
