@@ -31,8 +31,7 @@
 // Author: Aleksey Sanin <aleksey@aleksey.com>
 
 use std::{
-    cell::RefCell,
-    ffi::{CStr, CString, c_char},
+    ffi::{CStr, CString},
     ptr::{drop_in_place, null_mut},
     rc::Rc,
 };
@@ -158,7 +157,7 @@ pub struct XmlC14NCtx<'a, T> {
     is_visible_callback: Option<XmlC14NIsVisibleCallback<T>>,
     user_data: T,
     with_comments: bool,
-    buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
+    buf: XmlOutputBuffer<'a>,
 
     // position in the XML document
     pos: XmlC14NPosition,
@@ -232,16 +231,16 @@ impl<T> XmlC14NCtx<'_, T> {
     unsafe fn print_namespaces(&mut self, ns: &XmlNs) -> i32 {
         unsafe {
             if let Some(prefix) = ns.prefix() {
-                self.buf.borrow_mut().write_str(" xmlns:");
-                self.buf.borrow_mut().write_str(&prefix);
-                self.buf.borrow_mut().write_str("=");
+                self.buf.write_str(" xmlns:");
+                self.buf.write_str(&prefix);
+                self.buf.write_str("=");
             } else {
-                self.buf.borrow_mut().write_str(" xmlns=");
+                self.buf.write_str(" xmlns=");
             }
             if !ns.href.is_null() {
-                write_quoted(&mut *self.buf.borrow_mut(), &ns.href().unwrap());
+                write_quoted(&mut self.buf, &ns.href().unwrap());
             } else {
-                self.buf.borrow_mut().write_str("\"\"");
+                self.buf.write_str("\"\"");
             }
             1
         }
@@ -629,15 +628,14 @@ impl<T> XmlC14NCtx<'_, T> {
                     self.parent_is_doc = false;
                     self.pos = XmlC14NPosition::XmlC14NInsideDocumentElement;
                 }
-                self.buf.borrow_mut().write_str("<");
+                self.buf.write_str("<");
 
                 if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
-                    self.buf.borrow_mut().write_str(&prefix);
-                    self.buf.borrow_mut().write_str(":");
+                    self.buf.write_str(&prefix);
+                    self.buf.write_str(":");
                 }
 
                 self.buf
-                    .borrow_mut()
                     .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
             }
 
@@ -662,7 +660,7 @@ impl<T> XmlC14NCtx<'_, T> {
             }
 
             if visible {
-                self.buf.borrow_mut().write_str(">");
+                self.buf.write_str(">");
             }
             if let Some(children) = cur.children() {
                 let ret = self.process_node_list(Some(children));
@@ -672,16 +670,15 @@ impl<T> XmlC14NCtx<'_, T> {
                 }
             }
             if visible {
-                self.buf.borrow_mut().write_str("</");
+                self.buf.write_str("</");
                 if let Some(prefix) = cur.ns.as_deref().and_then(|ns| ns.prefix()) {
-                    self.buf.borrow_mut().write_str(&prefix);
-                    self.buf.borrow_mut().write_str(":");
+                    self.buf.write_str(&prefix);
+                    self.buf.write_str(":");
                 }
 
                 self.buf
-                    .borrow_mut()
                     .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
-                self.buf.borrow_mut().write_str(">");
+                self.buf.write_str(">");
                 if parent_is_doc {
                     // restore this flag from the stack for next node
                     self.parent_is_doc = parent_is_doc;
@@ -743,7 +740,7 @@ impl<T> XmlC14NCtx<'_, T> {
                                 .to_string_lossy()
                                 .as_ref(),
                         );
-                        self.buf.borrow_mut().write_str(&buffer);
+                        self.buf.write_str(&buffer);
                     }
                 }
                 XmlElementType::XmlPINode => {
@@ -759,15 +756,15 @@ impl<T> XmlC14NCtx<'_, T> {
                     // order than the document element.
                     if visible {
                         if matches!(self.pos, XmlC14NPosition::XmlC14NAfterDocumentElement) {
-                            self.buf.borrow_mut().write_str("\x0A<?");
+                            self.buf.write_str("\x0A<?");
                         } else {
-                            self.buf.borrow_mut().write_str("<?");
+                            self.buf.write_str("<?");
                         }
 
-                        self.buf.borrow_mut().write_str(&cur.name().unwrap());
+                        self.buf.write_str(&cur.name().unwrap());
                         let cur = XmlNodePtr::try_from(cur).unwrap();
                         if !cur.content.is_null() && *cur.content != b'\0' {
-                            self.buf.borrow_mut().write_str(" ");
+                            self.buf.write_str(" ");
 
                             /* todo: do we need to normalize pi? */
                             let buffer = normalize_pi(
@@ -775,13 +772,13 @@ impl<T> XmlC14NCtx<'_, T> {
                                     .to_string_lossy()
                                     .as_ref(),
                             );
-                            self.buf.borrow_mut().write_str(&buffer);
+                            self.buf.write_str(&buffer);
                         }
 
                         if matches!(self.pos, XmlC14NPosition::XmlC14NBeforeDocumentElement) {
-                            self.buf.borrow_mut().write_str("?>\x0A");
+                            self.buf.write_str("?>\x0A");
                         } else {
-                            self.buf.borrow_mut().write_str("?>");
+                            self.buf.write_str("?>");
                         }
                     }
                 }
@@ -801,9 +798,9 @@ impl<T> XmlC14NCtx<'_, T> {
                     // declaration).
                     if visible && self.with_comments {
                         if matches!(self.pos, XmlC14NPosition::XmlC14NAfterDocumentElement) {
-                            self.buf.borrow_mut().write_str("\x0A<!--");
+                            self.buf.write_str("\x0A<!--");
                         } else {
-                            self.buf.borrow_mut().write_str("<!--");
+                            self.buf.write_str("<!--");
                         }
 
                         let cur = XmlNodePtr::try_from(cur).unwrap();
@@ -814,13 +811,13 @@ impl<T> XmlC14NCtx<'_, T> {
                                     .to_string_lossy()
                                     .as_ref(),
                             );
-                            self.buf.borrow_mut().write_str(&buffer);
+                            self.buf.write_str(&buffer);
                         }
 
                         if matches!(self.pos, XmlC14NPosition::XmlC14NBeforeDocumentElement) {
-                            self.buf.borrow_mut().write_str("-->\x0A");
+                            self.buf.write_str("-->\x0A");
                         } else {
-                            self.buf.borrow_mut().write_str("-->");
+                            self.buf.write_str("-->");
                         }
                     }
                 }
@@ -1194,19 +1191,19 @@ impl<T> XmlC14NCtx<'_, T> {
     #[doc(alias = "xmlC14NPrintAttrs")]
     unsafe fn print_attrs(&mut self, attr: XmlAttrPtr) -> bool {
         unsafe {
-            self.buf.borrow_mut().write_str(" ");
+            self.buf.write_str(" ");
             if let Some(prefix) = attr
                 .ns
                 .as_deref()
                 .and_then(|ns| ns.prefix())
                 .filter(|p| !p.is_empty())
             {
-                self.buf.borrow_mut().write_str(&prefix);
-                self.buf.borrow_mut().write_str(":");
+                self.buf.write_str(&prefix);
+                self.buf.write_str(":");
             }
 
-            self.buf.borrow_mut().write_str(&attr.name().unwrap());
-            self.buf.borrow_mut().write_str("=\"");
+            self.buf.write_str(&attr.name().unwrap());
+            self.buf.write_str("=\"");
 
             // todo: should we log an error if value==NULL ?
             if let Some(value) = attr
@@ -1214,9 +1211,9 @@ impl<T> XmlC14NCtx<'_, T> {
                 .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1))
             {
                 let buffer = normalize_attr(&value);
-                self.buf.borrow_mut().write_str(&buffer);
+                self.buf.write_str(&buffer);
             }
-            self.buf.borrow_mut().write_str("\"");
+            self.buf.write_str("\"");
             true
         }
     }
@@ -1274,12 +1271,15 @@ unsafe fn xml_c14n_is_node_in_nodeset(
 #[doc(alias = "xmlC14NDocSaveTo")]
 pub unsafe fn xml_c14n_doc_save_to<'a>(
     doc: &'a mut XmlDoc,
-    nodes: Option<&mut XmlNodeSet>,
+    nodes: Option<&'a mut XmlNodeSet>,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: Option<Vec<String>>,
     with_comments: bool,
-    buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
-) -> i32 {
+    buf: XmlOutputBuffer<'a>,
+) -> Result<
+    XmlC14NCtx<'a, Option<&'a mut XmlNodeSet>>,
+    Option<XmlC14NCtx<'a, Option<&'a mut XmlNodeSet>>>,
+> {
     unsafe {
         xml_c14n_execute(
             doc,
@@ -1386,8 +1386,6 @@ pub unsafe fn xml_c14n_doc_dump_memory(
     doc_txt_ptr: &mut String,
 ) -> i32 {
     unsafe {
-        let mut ret: i32;
-
         doc_txt_ptr.clear();
 
         // create memory buffer with UTF8 (default) encoding
@@ -1395,40 +1393,36 @@ pub unsafe fn xml_c14n_doc_dump_memory(
             xml_c14n_err_memory("creating output buffer");
             return -1;
         };
-        let buf = Rc::new(RefCell::new(buf));
 
         // canonize document and write to buffer
-        ret = xml_c14n_doc_save_to(
-            doc,
-            nodes,
-            mode,
-            inclusive_ns_prefixes,
-            with_comments,
-            buf.clone(),
-        );
-        if ret < 0 {
-            xml_c14n_err_internal("saving doc to output buffer");
-            buf.borrow_mut().flush();
-            return -1;
-        }
-
-        ret = buf.borrow().buffer.map_or(0, |buf| buf.len() as i32);
-        if ret >= 0 {
-            if let Some(buffer) = buf.borrow_mut().buffer.take() {
-                let mut bytes = vec![];
-                buffer.dump(Some(&mut bytes)).ok();
-                let text = String::from_utf8(bytes);
-                match text {
-                    Ok(text) => *doc_txt_ptr = text,
-                    Err(_) => {
-                        xml_c14n_err_memory("copying canonicalized document");
-                        return -1;
+        match xml_c14n_doc_save_to(doc, nodes, mode, inclusive_ns_prefixes, with_comments, buf) {
+            Ok(mut ctx) => {
+                let ret = ctx.buf.buffer.map_or(0, |buf| buf.len() as i32);
+                if ret >= 0 {
+                    if let Some(buffer) = ctx.buf.buffer.take() {
+                        let mut bytes = vec![];
+                        buffer.dump(Some(&mut bytes)).ok();
+                        let text = String::from_utf8(bytes);
+                        match text {
+                            Ok(text) => *doc_txt_ptr = text,
+                            Err(_) => {
+                                xml_c14n_err_memory("copying canonicalized document");
+                                return -1;
+                            }
+                        }
                     }
                 }
+
+                ret
+            }
+            Err(ctx) => {
+                xml_c14n_err_internal("saving doc to output buffer");
+                if let Some(mut ctx) = ctx {
+                    ctx.buf.flush();
+                }
+                -1
             }
         }
-
-        ret
     }
 }
 
@@ -1444,45 +1438,35 @@ pub unsafe fn xml_c14n_doc_save(
     mode: XmlC14NMode,
     inclusive_ns_prefixes: Option<Vec<String>>,
     with_comments: bool,
-    filename: *const c_char,
+    filename: &str,
     compression: i32,
 ) -> i32 {
     unsafe {
-        if filename.is_null() {
-            xml_c14n_err_param("saving doc");
-            return -1;
-        }
-
         // save the content to a temp buffer, use default UTF8 encoding.
-        let filename = CStr::from_ptr(filename).to_string_lossy();
-        let Some(buf) = XmlOutputBuffer::from_uri(filename.as_ref(), None, compression) else {
+        let Some(buf) = XmlOutputBuffer::from_uri(filename, None, compression) else {
             xml_c14n_err_internal("creating temporary filename");
             return -1;
         };
 
-        let buf = Rc::new(RefCell::new(buf));
         // canonize document and write to buffer
-        let ret = xml_c14n_doc_save_to(
-            doc,
-            nodes,
-            mode,
-            inclusive_ns_prefixes,
-            with_comments,
-            buf.clone(),
-        );
-        if ret < 0 {
-            xml_c14n_err_internal("canonize document to buffer");
-            buf.borrow_mut().flush();
-            return -1;
-        }
-
-        // get the numbers of bytes written
-        let is_ok = buf.borrow().error.is_ok();
-        if is_ok {
-            buf.borrow_mut().flush();
-            buf.borrow().written
-        } else {
-            -1
+        match xml_c14n_doc_save_to(doc, nodes, mode, inclusive_ns_prefixes, with_comments, buf) {
+            Ok(mut ctx) => {
+                // get the numbers of bytes written
+                let is_ok = ctx.buf.error.is_ok();
+                if is_ok {
+                    ctx.buf.flush();
+                    ctx.buf.written
+                } else {
+                    -1
+                }
+            }
+            Err(ctx) => {
+                xml_c14n_err_internal("canonize document to buffer");
+                if let Some(mut ctx) = ctx {
+                    ctx.buf.flush();
+                }
+                -1
+            }
         }
     }
 }
@@ -1556,11 +1540,11 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
     mode: XmlC14NMode,
     inclusive_ns_prefixes: Option<Vec<String>>,
     with_comments: bool,
-    buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
+    buf: XmlOutputBuffer<'a>,
 ) -> Option<XmlC14NCtx<'a, T>> {
     unsafe {
         // Validate the encoding output buffer encoding
-        if buf.borrow().encoder.is_some() {
+        if buf.encoder.is_some() {
             xml_c14n_err::<T>(
                 null_mut(),
                 Some(XmlDocPtr::from_raw(doc).unwrap().unwrap().into()),
@@ -1840,8 +1824,6 @@ unsafe fn xml_c14n_err_unknown_node(node_type: i32, extra: &str) {
 /// Dumps the canonized image of given XML document into the provided buffer.
 /// For details see "Canonical XML" (<http://www.w3.org/TR/xml-c14n>) or
 /// "Exclusive XML Canonicalization" (<http://www.w3.org/TR/xml-exc-c14n>)
-///
-/// Returns non-negative value on success or a negative value on fail
 #[doc(alias = "xmlC14NExecute")]
 pub unsafe fn xml_c14n_execute<'a, T>(
     doc: &'a mut XmlDoc,
@@ -1850,20 +1832,18 @@ pub unsafe fn xml_c14n_execute<'a, T>(
     mode: XmlC14NMode,
     inclusive_ns_prefixes: Option<Vec<String>>,
     with_comments: bool,
-    buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
-) -> i32 {
+    buf: XmlOutputBuffer<'a>,
+) -> Result<XmlC14NCtx<'a, T>, Option<XmlC14NCtx<'a, T>>> {
     unsafe {
-        let mut ret: i32;
-
         //  Validate the encoding output buffer encoding
-        if buf.borrow().encoder.is_some() {
+        if buf.encoder.is_some() {
             xml_c14n_err::<T>(
                 null_mut(),
                 Some(XmlDocPtr::from_raw(doc).unwrap().unwrap().into()),
                 XmlParserErrors::XmlC14NRequiresUtf8,
                 "xmlC14NExecute: output buffer encoder != NULL but C14N requires UTF8 output\n",
             );
-            return -1;
+            return Err(None);
         }
 
         let children = doc.children;
@@ -1876,7 +1856,7 @@ pub unsafe fn xml_c14n_execute<'a, T>(
             mode,
             inclusive_ns_prefixes,
             with_comments,
-            buf.clone(),
+            buf,
         )
         .unwrap();
 
@@ -1887,20 +1867,20 @@ pub unsafe fn xml_c14n_execute<'a, T>(
         // XML declaration, nor anything from within the document type
         // declaration.
         if let Some(children) = children {
-            ret = ctx.process_node_list(Some(children));
+            let ret = ctx.process_node_list(Some(children));
             if ret < 0 {
                 xml_c14n_err_internal("processing docs children list");
-                return -1;
+                return Err(Some(ctx));
             }
         }
 
         // Flush buffer to get number of bytes written
-        ret = buf.borrow_mut().flush();
+        let ret = ctx.buf.flush();
         if ret < 0 {
             xml_c14n_err_internal("flushing output buffer");
-            return -1;
+            return Err(Some(ctx));
         }
 
-        ret
+        Ok(ctx)
     }
 }
