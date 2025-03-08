@@ -31,6 +31,7 @@
 // Author: Aleksey Sanin <aleksey@aleksey.com>
 
 use std::{
+    cmp::Ordering,
     ffi::{CStr, CString},
     ptr::{drop_in_place, null_mut},
     rc::Rc,
@@ -39,10 +40,7 @@ use std::{
 use crate::{
     error::{__xml_raise_error, XmlParserErrors},
     io::{XmlOutputBuffer, write_quoted},
-    libxml::{
-        globals::xml_free,
-        xmlstring::{xml_strcmp, xml_strlen},
-    },
+    libxml::{globals::xml_free, xmlstring::xml_strlen},
     list::XmlList,
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocPtr, XmlElementType,
@@ -288,14 +286,7 @@ impl<T> XmlC14NCtx<'_, T> {
             }
 
             // Create a sorted list to store element namespaces
-            let mut list = XmlList::new(
-                None,
-                Rc::new(|ns1, ns2| match xml_c14n_ns_compare(*ns1, *ns2) {
-                    ..0 => std::cmp::Ordering::Less,
-                    0 => std::cmp::Ordering::Equal,
-                    1.. => std::cmp::Ordering::Greater,
-                }),
-            );
+            let mut list = XmlList::new(None, Rc::new(|ns1, ns2| xml_c14n_ns_compare(*ns1, *ns2)));
 
             // check all namespaces
             let mut n = Some(cur);
@@ -340,7 +331,6 @@ impl<T> XmlC14NCtx<'_, T> {
             // print out all elements from list
             list.walk(|data| self.print_namespaces(data) != 0);
 
-            // Cleanup
             0
         }
     }
@@ -382,13 +372,7 @@ impl<T> XmlC14NCtx<'_, T> {
             // Create a sorted list to store element attributes
             let mut list = XmlList::new(
                 None,
-                Rc::new(
-                    |&attr1, &attr2| match xml_c14n_attrs_compare(attr1, attr2) {
-                        ..0 => std::cmp::Ordering::Less,
-                        0 => std::cmp::Ordering::Equal,
-                        1.. => std::cmp::Ordering::Greater,
-                    },
-                ),
+                Rc::new(|&attr1, &attr2| xml_c14n_attrs_compare(attr1, attr2)),
             );
             match self.mode {
                 XmlC14NMode::XmlC14N1_0 => {
@@ -922,14 +906,7 @@ impl<T> XmlC14NCtx<'_, T> {
             }
 
             // Create a sorted list to store element namespaces
-            let mut list = XmlList::new(
-                None,
-                Rc::new(|ns1, ns2| match xml_c14n_ns_compare(*ns1, *ns2) {
-                    ..0 => std::cmp::Ordering::Less,
-                    0 => std::cmp::Ordering::Equal,
-                    1.. => std::cmp::Ordering::Greater,
-                }),
-            );
+            let mut list = XmlList::new(None, Rc::new(|ns1, ns2| xml_c14n_ns_compare(*ns1, *ns2)));
 
             // process inclusive namespaces:
             // All namespace nodes appearing on inclusive ns list are
@@ -1596,13 +1573,17 @@ unsafe fn xml_c14n_err_relative_namespace(ns_uri: &str) {
 ///
 /// Returns -1 if ns1 < ns2, 0 if ns1 == ns2 or 1 if ns1 > ns2.
 #[doc(alias = "xmlC14NNsCompare")]
-unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> i32 {
+unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> Ordering {
+    if ns1 == ns2 {
+        return Ordering::Equal;
+    }
     unsafe {
-        if ns1 == ns2 {
-            return 0;
+        match (ns1.prefix(), ns2.prefix()) {
+            (Some(p1), Some(p2)) => p1.cmp(&p2),
+            (Some(_), None) => Ordering::Greater,
+            (None, Some(_)) => Ordering::Less,
+            (None, None) => Ordering::Equal,
         }
-
-        xml_strcmp(ns1.prefix, ns2.prefix)
     }
 }
 
@@ -1634,38 +1615,34 @@ const XML_NAMESPACES_DEFAULT: usize = 16;
 ///
 /// Returns -1 if attr1 < attr2, 0 if attr1 == attr2 or 1 if attr1 > attr2.
 #[doc(alias = "xmlC14NAttrsCompare")]
-unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> i32 {
+unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> Ordering {
+    // Simple cases
+    if attr1 == attr2 {
+        return Ordering::Equal;
+    }
+    if attr1.ns == attr2.ns {
+        return attr1.name().cmp(&attr2.name());
+    }
+    // Attributes in the default namespace are first
+    // because the default namespace is not applied to
+    // unqualified attributes
+    let Some(attr1_ns) = attr1.ns else {
+        return Ordering::Less;
+    };
+    let Some(attr2_ns) = attr2.ns else {
+        return Ordering::Greater;
+    };
     unsafe {
-        // Simple cases
-        if attr1 == attr2 {
-            return 0;
-        }
-
-        if attr1.ns == attr2.ns {
-            return xml_strcmp(attr1.name, attr2.name);
-        }
-
-        // Attributes in the default namespace are first
-        // because the default namespace is not applied to
-        // unqualified attributes
-        let Some(attr1_ns) = attr1.ns else {
-            return -1;
-        };
-        let Some(attr2_ns) = attr2.ns else {
-            return 1;
-        };
         if attr1_ns.prefix().is_none() {
-            return -1;
+            return Ordering::Less;
         }
         if attr2_ns.prefix().is_none() {
-            return 1;
+            return Ordering::Greater;
         }
-
-        let mut ret: i32 = xml_strcmp(attr1_ns.href, attr2_ns.href);
-        if ret == 0 {
-            ret = xml_strcmp(attr1.name, attr2.name);
+        match attr1_ns.href().cmp(&attr2_ns.href()) {
+            Ordering::Equal => attr1.name().cmp(&attr2.name()),
+            diff => diff,
         }
-        ret
     }
 }
 
