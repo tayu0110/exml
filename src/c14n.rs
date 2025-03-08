@@ -1708,18 +1708,6 @@ unsafe fn xml_c14n_is_xml_attr(attr: XmlAttrPtr) -> bool {
     }
 }
 
-// Macro used to grow the current buffer.
-macro_rules! grow_buffer_reentrant {
-    ($buffer:expr, $buffer_size:expr) => {
-        $buffer_size *= 2;
-        $buffer = $crate::libxml::globals::xml_realloc($buffer as _, $buffer_size as usize) as _;
-        if $buffer.is_null() {
-            xml_c14n_err_memory("growing buffer");
-            return null_mut();
-        }
-    };
-}
-
 /// Converts a string to a canonical (normalized) format.  
 /// The code is stolen from xmlEncodeEntitiesReentrant().  
 /// Added normalization of \x09, \x0a, \x0A and the `mode` parameter
