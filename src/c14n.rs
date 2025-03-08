@@ -31,7 +31,6 @@
 // Author: Aleksey Sanin <aleksey@aleksey.com>
 
 use std::{
-    any::type_name,
     cell::RefCell,
     ffi::{CStr, CString, c_char},
     ptr::{drop_in_place, null_mut},
@@ -42,7 +41,7 @@ use crate::{
     error::{__xml_raise_error, XmlParserErrors},
     io::{XmlOutputBuffer, write_quoted},
     libxml::{
-        globals::{xml_free, xml_malloc_atomic},
+        globals::xml_free,
         uri::{XmlURIPtr, xml_free_uri, xml_parse_uri},
         xmlstring::{xml_strcmp, xml_strlen},
     },
@@ -63,24 +62,6 @@ pub enum XmlC14NMode {
     XmlC14N1_0 = 0,          /* Original C14N 1.0 spec */
     XmlC14NExclusive1_0 = 1, /* Exclusive C14N 1.0 spec */
     XmlC14N1_1 = 2,          /* C14N 1.1 spec */
-}
-
-impl TryFrom<i32> for XmlC14NMode {
-    type Error = anyhow::Error;
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XmlC14N1_0 as i32 {
-            Ok(Self::XmlC14N1_0)
-        } else if value == Self::XmlC14NExclusive1_0 as i32 {
-            Ok(Self::XmlC14NExclusive1_0)
-        } else if value == Self::XmlC14N1_1 as i32 {
-            Ok(Self::XmlC14N1_1)
-        } else {
-            Err(anyhow::anyhow!(
-                "Invalid convert from value '{value}' to {}",
-                type_name::<Self>()
-            ))
-        }
-    }
 }
 
 #[repr(C)]
@@ -632,7 +613,7 @@ impl<T> XmlC14NCtx<'_, T> {
         unsafe {
             let mut parent_is_doc = false;
 
-            if !matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+            if !matches!(cur.element_type(), XmlElementType::XmlElementNode) {
                 xml_c14n_err_param("processing element node");
                 return -1;
             }
@@ -691,7 +672,7 @@ impl<T> XmlC14NCtx<'_, T> {
             if visible {
                 self.buf.borrow_mut().write_str(">");
             }
-            if let Some(children) = (*cur).children() {
+            if let Some(children) = cur.children() {
                 let ret = self.process_node_list(Some(children));
                 if ret < 0 {
                     xml_c14n_err_internal("processing childrens list");
@@ -749,7 +730,7 @@ impl<T> XmlC14NCtx<'_, T> {
             let mut ret: i32 = 0;
 
             let visible = self.is_visible(Some(cur), cur.parent());
-            match (*cur).element_type() {
+            match cur.element_type() {
                 XmlElementType::XmlElementNode => {
                     let cur = XmlNodePtr::try_from(cur).unwrap();
                     ret = self.process_element_node(cur, visible);
@@ -765,16 +746,12 @@ impl<T> XmlC14NCtx<'_, T> {
                     // cdata sections are processed as text nodes
                     // todo: verify that cdata sections are included in XPath nodes set
                     if visible && !cur.content.is_null() {
-                        let buffer: *mut u8 = xml_c11n_normalize_text(cur.content);
-                        if !buffer.is_null() {
-                            self.buf
-                                .borrow_mut()
-                                .write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
-                            xml_free(buffer as _);
-                        } else {
-                            xml_c14n_err_internal("normalizing text node");
-                            return -1;
-                        }
+                        let buffer = xml_c11n_normalize_text(
+                            CStr::from_ptr(cur.content as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        );
+                        self.buf.borrow_mut().write_str(&buffer);
                     }
                 }
                 XmlElementType::XmlPINode => {
@@ -795,22 +772,18 @@ impl<T> XmlC14NCtx<'_, T> {
                             self.buf.borrow_mut().write_str("<?");
                         }
 
-                        self.buf.borrow_mut().write_str(&(*cur).name().unwrap());
+                        self.buf.borrow_mut().write_str(&cur.name().unwrap());
                         let cur = XmlNodePtr::try_from(cur).unwrap();
                         if !cur.content.is_null() && *cur.content != b'\0' {
                             self.buf.borrow_mut().write_str(" ");
 
                             /* todo: do we need to normalize pi? */
-                            let buffer: *mut u8 = xml_c11n_normalize_pi(cur.content);
-                            if !buffer.is_null() {
-                                self.buf.borrow_mut().write_str(
-                                    CStr::from_ptr(buffer as _).to_string_lossy().as_ref(),
-                                );
-                                xml_free(buffer as _);
-                            } else {
-                                xml_c14n_err_internal("normalizing pi node");
-                                return -1;
-                            }
+                            let buffer = xml_c11n_normalize_pi(
+                                CStr::from_ptr(cur.content as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            );
+                            self.buf.borrow_mut().write_str(&buffer);
                         }
 
                         if matches!(self.pos, XmlC14NPosition::XmlC14NBeforeDocumentElement) {
@@ -844,16 +817,12 @@ impl<T> XmlC14NCtx<'_, T> {
                         let cur = XmlNodePtr::try_from(cur).unwrap();
                         if !cur.content.is_null() {
                             /* todo: do we need to normalize comment? */
-                            let buffer: *mut u8 = xml_c11n_normalize_comment(cur.content);
-                            if !buffer.is_null() {
-                                self.buf.borrow_mut().write_str(
-                                    CStr::from_ptr(buffer as _).to_string_lossy().as_ref(),
-                                );
-                                xml_free(buffer as _);
-                            } else {
-                                xml_c14n_err_internal("normalizing comment node");
-                                return -1;
-                            }
+                            let buffer = xml_c11n_normalize_comment(
+                                CStr::from_ptr(cur.content as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            );
+                            self.buf.borrow_mut().write_str(&buffer);
                         }
 
                         if matches!(self.pos, XmlC14NPosition::XmlC14NBeforeDocumentElement) {
@@ -865,7 +834,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 }
                 XmlElementType::XmlDocumentNode | XmlElementType::XmlDocumentFragNode => {
                     // should be processed as document?
-                    if let Some(children) = (*cur).children() {
+                    if let Some(children) = cur.children() {
                         self.pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
                         self.parent_is_doc = true;
                         ret = self.process_node_list(Some(children));
@@ -874,7 +843,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 #[cfg(feature = "html")]
                 XmlElementType::XmlHTMLDocumentNode => {
                     // should be processed as document?
-                    if let Some(children) = (*cur).children() {
+                    if let Some(children) = cur.children() {
                         self.pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
                         self.parent_is_doc = true;
                         ret = self.process_node_list(Some(children));
@@ -1242,8 +1211,6 @@ impl<T> XmlC14NCtx<'_, T> {
     #[doc(alias = "xmlC14NPrintAttrs")]
     unsafe fn print_attrs(&mut self, attr: XmlAttrPtr) -> bool {
         unsafe {
-            let buffer: *mut u8;
-
             self.buf.borrow_mut().write_str(" ");
             if let Some(prefix) = attr
                 .ns
@@ -1263,17 +1230,8 @@ impl<T> XmlC14NCtx<'_, T> {
                 .children()
                 .and_then(|c| c.get_string(XmlDocPtr::from_raw(self.doc).unwrap(), 1))
             {
-                let value = CString::new(value).unwrap();
-                buffer = xml_c11n_normalize_attr(value.as_ptr() as *const u8);
-                if !buffer.is_null() {
-                    self.buf
-                        .borrow_mut()
-                        .write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
-                    xml_free(buffer as _);
-                } else {
-                    xml_c14n_err_internal("normalizing attributes axis");
-                    return false;
-                }
+                let buffer = xml_c11n_normalize_attr(&value);
+                self.buf.borrow_mut().write_str(&buffer);
             }
             self.buf.borrow_mut().write_str("\"");
             true
@@ -1807,160 +1765,72 @@ macro_rules! grow_buffer_reentrant {
 /// Returns a normalized string (caller is responsible for calling xmlFree())
 /// or NULL if an error occurs
 #[doc(alias = "xmlC11NNormalizeString")]
-unsafe fn xml_c11n_normalize_string(input: *const u8, mode: XmlC14NNormalizationMode) -> *mut u8 {
-    unsafe {
-        let mut cur: *const u8 = input;
+fn xml_c11n_normalize_string(input: &str, mode: XmlC14NNormalizationMode) -> String {
+    // allocate an translation buffer.
+    let mut out = String::new();
 
-        if input.is_null() {
-            return null_mut();
+    for cur in input.chars() {
+        if cur == '<'
+            && matches!(
+                mode,
+                XmlC14NNormalizationMode::XmlC14NNormalizeAttr
+                    | XmlC14NNormalizationMode::XmlC14NNormalizeText
+            )
+        {
+            out.push_str("&lt;");
+        } else if cur == '>' && matches!(mode, XmlC14NNormalizationMode::XmlC14NNormalizeText) {
+            out.push_str("&gt;");
+        } else if cur == '&'
+            && matches!(
+                mode,
+                XmlC14NNormalizationMode::XmlC14NNormalizeAttr
+                    | XmlC14NNormalizationMode::XmlC14NNormalizeText
+            )
+        {
+            out.push_str("&amp;");
+        } else if cur == '"' && matches!(mode, XmlC14NNormalizationMode::XmlC14NNormalizeAttr) {
+            out.push_str("&quot;");
+        } else if cur == '\x09' && matches!(mode, XmlC14NNormalizationMode::XmlC14NNormalizeAttr) {
+            out.push_str("&#x9;");
+        } else if cur == '\x0A' && matches!(mode, XmlC14NNormalizationMode::XmlC14NNormalizeAttr) {
+            out.push_str("&#xA;");
+        } else if cur == '\x0D'
+            && matches!(
+                mode,
+                XmlC14NNormalizationMode::XmlC14NNormalizeAttr
+                    | XmlC14NNormalizationMode::XmlC14NNormalizeText
+                    | XmlC14NNormalizationMode::XmlC14NNormalizeComment
+                    | XmlC14NNormalizationMode::XmlC14NNormalizePI
+            )
+        {
+            out.push_str("&#xD;");
+        } else {
+            // Works because on UTF-8, all extended sequences cannot
+            // result in bytes in the ASCII range.
+            out.push(cur);
         }
-
-        // allocate an translation buffer.
-        let mut buffer_size: i32 = 1000;
-        let mut buffer: *mut u8 = xml_malloc_atomic(buffer_size as usize) as _;
-        if buffer.is_null() {
-            xml_c14n_err_memory("allocating buffer");
-            return null_mut();
-        }
-        let mut out: *mut u8 = buffer;
-
-        while *cur != b'\0' {
-            if out.offset_from(buffer) > buffer_size as isize - 10 {
-                let index: i32 = out.offset_from(buffer) as _;
-
-                grow_buffer_reentrant!(buffer, buffer_size);
-                out = buffer.add(index as usize);
-            }
-
-            if *cur == b'<'
-                && matches!(
-                    mode,
-                    XmlC14NNormalizationMode::XmlC14NNormalizeAttr
-                        | XmlC14NNormalizationMode::XmlC14NNormalizeText
-                )
-            {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'l';
-                out = out.add(1);
-                *out = b't';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'>' && matches!(mode, XmlC14NNormalizationMode::XmlC14NNormalizeText)
-            {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'g';
-                out = out.add(1);
-                *out = b't';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'&'
-                && matches!(
-                    mode,
-                    XmlC14NNormalizationMode::XmlC14NNormalizeAttr
-                        | XmlC14NNormalizationMode::XmlC14NNormalizeText
-                )
-            {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'a';
-                out = out.add(1);
-                *out = b'm';
-                out = out.add(1);
-                *out = b'p';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'"' && matches!(mode, XmlC14NNormalizationMode::XmlC14NNormalizeAttr)
-            {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'q';
-                out = out.add(1);
-                *out = b'u';
-                out = out.add(1);
-                *out = b'o';
-                out = out.add(1);
-                *out = b't';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'\x09'
-                && matches!(mode, XmlC14NNormalizationMode::XmlC14NNormalizeAttr)
-            {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'#';
-                out = out.add(1);
-                *out = b'x';
-                out = out.add(1);
-                *out = b'9';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'\x0A'
-                && matches!(mode, XmlC14NNormalizationMode::XmlC14NNormalizeAttr)
-            {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'#';
-                out = out.add(1);
-                *out = b'x';
-                out = out.add(1);
-                *out = b'A';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else if *cur == b'\x0D'
-                && matches!(
-                    mode,
-                    XmlC14NNormalizationMode::XmlC14NNormalizeAttr
-                        | XmlC14NNormalizationMode::XmlC14NNormalizeText
-                        | XmlC14NNormalizationMode::XmlC14NNormalizeComment
-                        | XmlC14NNormalizationMode::XmlC14NNormalizePI
-                )
-            {
-                *out = b'&';
-                out = out.add(1);
-                *out = b'#';
-                out = out.add(1);
-                *out = b'x';
-                out = out.add(1);
-                *out = b'D';
-                out = out.add(1);
-                *out = b';';
-                out = out.add(1);
-            } else {
-                // Works because on UTF-8, all extended sequences cannot
-                // result in bytes in the ASCII range.
-                *out = *cur;
-                out = out.add(1);
-            }
-            cur = cur.add(1);
-        }
-        *out = 0;
-        buffer
     }
+    out
 }
 
 #[doc(alias = "xmlC11NNormalizeAttr")]
-unsafe fn xml_c11n_normalize_attr(a: *const u8) -> *mut u8 {
-    unsafe { xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeAttr) }
+unsafe fn xml_c11n_normalize_attr(a: &str) -> String {
+    xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeAttr)
 }
 
-unsafe fn xml_c11n_normalize_text(a: *const u8) -> *mut u8 {
-    unsafe { xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeText) }
+#[doc(alias = "xmlC11NNormalizeText")]
+unsafe fn xml_c11n_normalize_text(a: &str) -> String {
+    xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeText)
 }
 
-unsafe fn xml_c11n_normalize_comment(a: *const u8) -> *mut u8 {
-    unsafe { xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeComment) }
+#[doc(alias = "xmlC11NNormalizeComment")]
+unsafe fn xml_c11n_normalize_comment(a: &str) -> String {
+    xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeComment)
 }
 
-unsafe fn xml_c11n_normalize_pi(a: *const u8) -> *mut u8 {
-    unsafe { xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizePI) }
+#[doc(alias = "xmlC11NNormalizePI")]
+unsafe fn xml_c11n_normalize_pi(a: &str) -> String {
+    xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizePI)
 }
 
 /// Handle a redefinition of invalid node error
