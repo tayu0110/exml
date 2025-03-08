@@ -5,6 +5,8 @@ use std::{
     rc::Rc,
 };
 
+use libc::memset;
+
 use crate::{
     dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference},
     encoding::XmlCharEncoding,
@@ -14,15 +16,18 @@ use crate::{
         globals::xml_free,
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
         xmlreader::{XmlTextReaderPtr, xml_text_reader_lookup_namespace},
-        xmlregexp::XmlRegExecCtxtPtr,
+        xmlregexp::{XmlRegExecCtxtPtr, xml_reg_free_exec_ctxt},
         xmlschemas::{
-            XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR, XmlSchemaAttrInfoPtr,
-            XmlSchemaBucketPtr, XmlSchemaConstructionCtxtPtr, XmlSchemaIDCAugPtr,
-            XmlSchemaIDCMatcherPtr, XmlSchemaIDCStateObjPtr, XmlSchemaNodeInfoPtr,
-            XmlSchemaPSVIIDCKeyPtr, XmlSchemaPSVIIDCNodePtr, XmlSchemaRedefPtr,
-            XmlSchemaValidityLocatorFunc, xml_schema_clear_attr_infos, xml_schema_clear_elem_info,
+            XML_SCHEMA_CTXT_PARSER, XML_SCHEMA_CTXT_VALIDATOR,
+            XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES, XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES,
+            XmlSchemaAttrInfo, XmlSchemaAttrInfoPtr, XmlSchemaBucketPtr,
+            XmlSchemaConstructionCtxtPtr, XmlSchemaIDCAugPtr, XmlSchemaIDCMatcherPtr,
+            XmlSchemaIDCStateObjPtr, XmlSchemaNodeInfoPtr, XmlSchemaPSVIIDCKeyPtr,
+            XmlSchemaPSVIIDCNodePtr, XmlSchemaRedefPtr, XmlSchemaValidityLocatorFunc,
             xml_schema_construction_ctxt_free, xml_schema_free_idc_state_obj_list,
-            xml_schema_idc_free_key, xml_schema_validate_stream,
+            xml_schema_idc_free_key, xml_schema_idc_free_matcher_list,
+            xml_schema_idc_release_matcher_list, xml_schema_idcfree_idc_table,
+            xml_schema_validate_stream,
         },
         xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_value},
     },
@@ -587,6 +592,211 @@ impl XmlSchemaValidCtxt {
     pub fn set_filename(&mut self, filename: Option<&str>) {
         self.filename = filename.map(|f| f.to_owned());
     }
+
+    /// Free the resources associated to the schema validation context;
+    /// leaves some fields alive intended for reuse of the context.
+    #[doc(alias = "xmlSchemaClearValidCtxt")]
+    pub(crate) unsafe fn clear(&mut self) {
+        // TODO: Should we clear the flags?
+        //   Might be problematic if one reuses the context
+        //   and assumes that the options remain the same.
+        self.flags = 0;
+        self.validation_root = None;
+        self.doc = None;
+        #[cfg(feature = "libxml_reader")]
+        {
+            self.reader = null_mut();
+        }
+        self.has_keyrefs = 0;
+        unsafe {
+            if !self.value.is_null() {
+                xml_schema_free_value(self.value);
+                self.value = null_mut();
+            }
+            // Augmented IDC information.
+            if !self.aidcs.is_null() {
+                let mut cur: XmlSchemaIDCAugPtr = self.aidcs;
+                let mut next: XmlSchemaIDCAugPtr;
+                while !cur.is_null() {
+                    next = (*cur).next;
+                    xml_free(cur as _);
+                    cur = next;
+                }
+                self.aidcs = null_mut();
+            }
+
+            if !self.idc_nodes.is_null() {
+                let mut item: XmlSchemaPSVIIDCNodePtr;
+
+                for i in 0..self.nb_idc_nodes {
+                    item = *self.idc_nodes.add(i as usize);
+                    xml_free((*item).keys as _);
+                    xml_free(item as _);
+                }
+                xml_free(self.idc_nodes as _);
+                self.idc_nodes = null_mut();
+                self.nb_idc_nodes = 0;
+                self.size_idc_nodes = 0;
+            }
+
+            if !self.idc_keys.is_null() {
+                for i in 0..self.nb_idc_keys {
+                    xml_schema_idc_free_key(*self.idc_keys.add(i as usize));
+                }
+                xml_free(self.idc_keys as _);
+                self.idc_keys = null_mut();
+                self.nb_idc_keys = 0;
+                self.size_idc_keys = 0;
+            }
+
+            // Note that we won't delete the XPath state pool here.
+            if !self.xpath_states.is_null() {
+                xml_schema_free_idc_state_obj_list(self.xpath_states);
+                self.xpath_states = null_mut();
+            }
+            // Attribute info.
+            if self.nb_attr_infos != 0 {
+                self.clear_attr_infos();
+            }
+            // Element info.
+            if !self.elem_infos.is_null() {
+                let mut ei: XmlSchemaNodeInfoPtr;
+
+                for i in 0..self.size_elem_infos {
+                    ei = *self.elem_infos.add(i as usize);
+                    if ei.is_null() {
+                        break;
+                    }
+                    self.clear_elem_info(ei);
+                }
+            }
+            (*self.node_qnames).clear();
+            // Recreate the dict.
+            xml_dict_free(self.dict);
+            // TODO: Is is save to recreate it? Do we have a scenario
+            // where the user provides the dict?
+            self.dict = xml_dict_create();
+
+            self.filename = None;
+
+            // Note that some cleanup functions can move items to the cache,
+            // so the cache shouldn't be freed too early.
+            if !self.idc_matcher_cache.is_null() {
+                let mut matcher: XmlSchemaIDCMatcherPtr = self.idc_matcher_cache;
+                let mut tmp: XmlSchemaIDCMatcherPtr;
+
+                while !matcher.is_null() {
+                    tmp = matcher;
+                    matcher = (*matcher).next_cached;
+                    xml_schema_idc_free_matcher_list(tmp);
+                }
+                self.idc_matcher_cache = null_mut();
+            }
+        }
+    }
+
+    #[doc(alias = "xmlSchemaClearElemInfo")]
+    pub(crate) unsafe fn clear_elem_info(&mut self, ielem: XmlSchemaNodeInfoPtr) {
+        unsafe {
+            macro_rules! FREE_AND_NULL {
+                ($str:expr) => {
+                    if !$str.is_null() {
+                        $crate::libxml::globals::xml_free($str as _);
+                        #[allow(unused_assignments)]
+                        {
+                            $str = null_mut();
+                        }
+                    }
+                };
+            }
+            (*ielem).has_keyrefs = 0;
+            (*ielem).applied_xpath = 0;
+            if (*ielem).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES != 0 {
+                if !((*ielem).local_name).is_null() {
+                    xml_free(((*ielem).local_name) as _);
+                    ((*ielem).local_name) = null_mut();
+                };
+                if !((*ielem).ns_name).is_null() {
+                    xml_free(((*ielem).ns_name) as _);
+                    ((*ielem).ns_name) = null_mut();
+                };
+            } else {
+                (*ielem).local_name = null_mut();
+                (*ielem).ns_name = null_mut();
+            }
+            if (*ielem).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES != 0 {
+                if !((*ielem).value).is_null() {
+                    xml_free(((*ielem).value) as _);
+                    ((*ielem).value) = null_mut();
+                };
+            } else {
+                (*ielem).value = null_mut();
+            }
+            if !(*ielem).val.is_null() {
+                // PSVI TODO: Be careful not to free it when the value is exposed via PSVI.
+                xml_schema_free_value((*ielem).val);
+                (*ielem).val = null_mut();
+            }
+            if !(*ielem).idc_matchers.is_null() {
+                // REVISIT OPTIMIZE TODO: Use a pool of IDC matchers.
+                // Does it work?
+                xml_schema_idc_release_matcher_list(self, (*ielem).idc_matchers);
+                // #if 0
+                //     xmlSchemaIDCFreeMatcherList((*ielem).idcMatchers);
+                // #endif
+                (*ielem).idc_matchers = null_mut();
+            }
+            if !(*ielem).idc_table.is_null() {
+                // OPTIMIZE TODO: Use a pool of IDC tables??.
+                xml_schema_idcfree_idc_table((*ielem).idc_table);
+                (*ielem).idc_table = null_mut();
+            }
+            if !(*ielem).regex_ctxt.is_null() {
+                xml_reg_free_exec_ctxt((*ielem).regex_ctxt);
+                (*ielem).regex_ctxt = null_mut();
+            }
+            if !(*ielem).ns_bindings.is_null() {
+                xml_free((*ielem).ns_bindings as _);
+                (*ielem).ns_bindings = null_mut();
+                (*ielem).nb_ns_bindings = 0;
+                (*ielem).size_ns_bindings = 0;
+            }
+        }
+    }
+
+    /// Cleanup currently used attribute infos.
+    #[doc(alias = "xmlSchemaClearAttrInfos")]
+    pub(crate) unsafe fn clear_attr_infos(&mut self) {
+        unsafe {
+            let mut attr: XmlSchemaAttrInfoPtr;
+
+            if self.nb_attr_infos == 0 {
+                return;
+            }
+            for i in 0..self.nb_attr_infos {
+                attr = *self.attr_infos.add(i as usize);
+                if (*attr).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES != 0 {
+                    if !(*attr).local_name.is_null() {
+                        xml_free((*attr).local_name as _);
+                    }
+                    if !(*attr).ns_name.is_null() {
+                        xml_free((*attr).ns_name as _);
+                    }
+                }
+                if (*attr).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES != 0
+                    && !(*attr).value.is_null()
+                {
+                    xml_free((*attr).value as _);
+                }
+                if !(*attr).val.is_null() {
+                    xml_schema_free_value((*attr).val);
+                    (*attr).val = null_mut();
+                }
+                memset(attr as _, 0, size_of::<XmlSchemaAttrInfo>());
+            }
+            self.nb_attr_infos = 0;
+        }
+    }
 }
 
 impl Default for XmlSchemaValidCtxt {
@@ -715,7 +925,7 @@ pub unsafe fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr) {
 
             // Just a paranoid call to the cleanup.
             if (*ctxt).nb_attr_infos != 0 {
-                xml_schema_clear_attr_infos(ctxt);
+                (*ctxt).clear_attr_infos();
             }
             for i in 0..(*ctxt).size_attr_infos {
                 attr = *(*ctxt).attr_infos.add(i as usize);
@@ -731,7 +941,7 @@ pub unsafe fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr) {
                 if ei.is_null() {
                     break;
                 }
-                xml_schema_clear_elem_info(ctxt, ei);
+                (*ctxt).clear_elem_info(ei);
                 xml_free(ei as _);
             }
             xml_free((*ctxt).elem_infos as _);
