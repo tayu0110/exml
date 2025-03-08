@@ -698,17 +698,6 @@ impl XmlSchemaValidCtxt {
     #[doc(alias = "xmlSchemaClearElemInfo")]
     pub(crate) unsafe fn clear_elem_info(&mut self, ielem: XmlSchemaNodeInfoPtr) {
         unsafe {
-            macro_rules! FREE_AND_NULL {
-                ($str:expr) => {
-                    if !$str.is_null() {
-                        $crate::libxml::globals::xml_free($str as _);
-                        #[allow(unused_assignments)]
-                        {
-                            $str = null_mut();
-                        }
-                    }
-                };
-            }
             (*ielem).has_keyrefs = 0;
             (*ielem).applied_xpath = 0;
             if (*ielem).flags & XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES != 0 {
