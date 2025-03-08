@@ -22,8 +22,7 @@ use crate::{
             XmlSchemaPSVIIDCKeyPtr, XmlSchemaPSVIIDCNodePtr, XmlSchemaRedefPtr,
             XmlSchemaValidityLocatorFunc, xml_schema_clear_attr_infos, xml_schema_clear_elem_info,
             xml_schema_construction_ctxt_free, xml_schema_free_idc_state_obj_list,
-            xml_schema_idc_free_key, xml_schema_set_valid_errors,
-            xml_schema_set_valid_structured_errors,
+            xml_schema_idc_free_key, xml_schema_validate_stream,
         },
         xmlschemastypes::{XmlSchemaValPtr, xml_schema_free_value},
     },
@@ -139,7 +138,7 @@ impl XmlSchemaParserCtxt {
             self.warning = warn;
             self.err_ctxt = ctx.clone();
             if !self.vctxt.is_null() {
-                xml_schema_set_valid_errors(self.vctxt, err, warn, ctx);
+                (*self.vctxt).set_errors(err, warn, ctx);
             }
         }
     }
@@ -155,7 +154,7 @@ impl XmlSchemaParserCtxt {
             self.serror = serror;
             self.err_ctxt = ctx.clone();
             if !self.vctxt.is_null() {
-                xml_schema_set_valid_structured_errors(self.vctxt, serror, ctx);
+                (*self.vctxt).set_structured_errors(serror, ctx);
             }
         }
     }
@@ -346,7 +345,7 @@ pub struct XmlSchemaValidCtxt {
     // sax: XmlSAXHandlerPtr,
     pub(crate) parser_ctxt: XmlParserCtxtPtr,
     user_data: *mut c_void, /* TODO: What is this for? */
-    pub(crate) filename: *mut i8,
+    pub(crate) filename: Option<String>,
 
     pub(crate) err: i32,
     pub(crate) nberrors: i32,
@@ -473,6 +472,121 @@ impl XmlSchemaValidCtxt {
             }
         }
     }
+
+    /// Do a schemas validation of the given resource, it will use the
+    /// SAX streamable validation internally.
+    ///
+    /// Returns 0 if the document is valid, a positive error code
+    /// number otherwise and -1 in case of an internal or API error.
+    #[doc(alias = "xmlSchemaValidateFile")]
+    pub unsafe fn validate_file(&mut self, filename: &str, _options: i32) -> i32 {
+        unsafe {
+            let Some(input) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None)
+            else {
+                return -1;
+            };
+            let ret: i32 =
+                xml_schema_validate_stream(self, input, XmlCharEncoding::None, None, None);
+            ret
+        }
+    }
+
+    /// Get the validation context options.
+    ///
+    /// Returns the option combination or -1 on error.
+    #[doc(alias = "xmlSchemaValidCtxtGetOptions")]
+    pub fn get_options(&self) -> i32 {
+        self.options
+    }
+
+    /// Get the error and warning callback information
+    ///
+    /// Returns -1 in case of error and 0 otherwise
+    #[doc(alias = "xmlSchemaGetValidErrors")]
+    pub fn get_errors(
+        &self,
+        err: Option<&mut Option<GenericError>>,
+        warn: Option<&mut Option<GenericError>>,
+        ctx: Option<&mut Option<GenericErrorContext>>,
+    ) -> i32 {
+        if let Some(err) = err {
+            *err = self.error;
+        }
+        if let Some(warn) = warn {
+            *warn = self.warning;
+        }
+        if let Some(ctx) = ctx {
+            *ctx = self.err_ctxt.clone();
+        }
+        0
+    }
+
+    /// Allow access to the parser context of the schema validation context
+    ///
+    /// Returns the parser context of the schema validation context or NULL in case of error.
+    #[doc(alias = "xmlSchemaValidCtxtGetParserCtxt")]
+    pub fn get_parser_context(&self) -> XmlParserCtxtPtr {
+        self.parser_ctxt
+    }
+
+    /// Sets the options to be used during the validation.
+    ///
+    /// Returns 0 in case of success, -1 in case of an API error.
+    #[doc(alias = "xmlSchemaSetValidOptions")]
+    pub fn set_options(&mut self, options: i32) -> i32 {
+        // WARNING: Change the start value if adding to the xmlSchemaValidOption.
+        // TODO: Is there an other, more easy to maintain, way?
+        for i in 1..i32::BITS as usize {
+            if options & (1 << i) != 0 {
+                return -1;
+            }
+        }
+        self.options = options;
+        0
+    }
+
+    /// Set the error and warning callback information
+    #[doc(alias = "xmlSchemaSetValidErrors")]
+    pub unsafe fn set_errors(
+        &mut self,
+        err: Option<GenericError>,
+        warn: Option<GenericError>,
+        ctx: Option<GenericErrorContext>,
+    ) {
+        self.error = err;
+        self.warning = warn;
+        self.err_ctxt = ctx.clone();
+        unsafe {
+            if !self.pctxt.is_null() {
+                (*self.pctxt).set_errors(err, warn, ctx);
+            }
+        }
+    }
+
+    /// Set the structured error callback
+    #[doc(alias = "xmlSchemaSetValidStructuredErrors")]
+    pub unsafe fn set_structured_errors(
+        &mut self,
+        serror: Option<StructuredError>,
+        ctx: Option<GenericErrorContext>,
+    ) {
+        self.serror = serror;
+        self.error = None;
+        self.warning = None;
+        self.err_ctxt = ctx.clone();
+        unsafe {
+            if !self.pctxt.is_null() {
+                (*self.pctxt).set_structured_errors(serror, ctx);
+            }
+        }
+    }
+
+    /// Workaround to provide file error reporting information when this is
+    /// not provided by current APIs
+    #[doc(alias = "xmlSchemaValidateSetFilename")]
+    pub fn set_filename(&mut self, filename: Option<&str>) {
+        self.filename = filename.map(|f| f.to_owned());
+    }
 }
 
 impl Default for XmlSchemaValidCtxt {
@@ -489,7 +603,7 @@ impl Default for XmlSchemaValidCtxt {
             enc: XmlCharEncoding::None,
             parser_ctxt: null_mut(),
             user_data: null_mut(),
-            filename: null_mut(),
+            filename: None,
             err: 0,
             nberrors: 0,
             node: None,
@@ -627,9 +741,6 @@ pub unsafe fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr) {
         }
         if !(*ctxt).dict.is_null() {
             xml_dict_free((*ctxt).dict);
-        }
-        if !(*ctxt).filename.is_null() {
-            xml_free((*ctxt).filename as _);
         }
 
         let _ = Box::from_raw(ctxt);

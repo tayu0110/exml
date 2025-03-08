@@ -3407,7 +3407,7 @@ unsafe fn schemas_one_test(
     };
 
     unsafe {
-        use exml::libxml::xmlschemas::{xml_schema_set_valid_errors, xml_schema_validate_doc};
+        use exml::libxml::xmlschemas::xml_schema_validate_doc;
 
         let mut ret: i32 = 0;
 
@@ -3436,8 +3436,7 @@ unsafe fn schemas_one_test(
         };
 
         let ctxt: XmlSchemaValidCtxtPtr = xml_schema_new_valid_ctxt(schemas);
-        xml_schema_set_valid_errors(
-            ctxt,
+        (*ctxt).set_errors(
             Some(test_error_handler),
             Some(test_error_handler),
             Some(GenericErrorContext::new(ctxt)),

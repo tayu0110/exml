@@ -840,9 +840,11 @@ pub(crate) unsafe fn xml_schema_err4_line(
                         }
                     }
                 }
-                if file.is_null() && !(*vctxt).filename.is_null() {
-                    file = (*vctxt).filename;
-                }
+                let file = if file.is_null() && (*vctxt).filename.is_some() {
+                    (*vctxt).filename.clone()
+                } else {
+                    (!file.is_null()).then(|| CStr::from_ptr(file).to_string_lossy().into_owned())
+                };
 
                 __xml_raise_error!(
                     schannel,
@@ -853,8 +855,7 @@ pub(crate) unsafe fn xml_schema_err4_line(
                     XmlErrorDomain::XmlFromSchemasv,
                     error,
                     error_level,
-                    (!file.is_null())
-                        .then(|| CStr::from_ptr(file).to_string_lossy().into_owned().into()),
+                    file.map(|f| f.into()),
                     line,
                     str1.map(|s| s.to_owned().into()),
                     str2.map(|s| s.to_owned().into()),

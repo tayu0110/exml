@@ -77,10 +77,7 @@ use exml::{
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
         },
         xmlreader::XmlTextReaderPtr,
-        xmlschemas::{
-            xml_schema_set_valid_errors, xml_schema_validate_doc, xml_schema_validate_set_filename,
-            xml_schema_validate_stream,
-        },
+        xmlschemas::{xml_schema_validate_doc, xml_schema_validate_stream},
         xmlstring::XmlChar,
     },
     parser::{
@@ -1924,14 +1921,13 @@ unsafe fn test_sax(filename: &str) {
                     PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     return;
                 }
-                xml_schema_set_valid_errors(
-                    vctxt,
+                (*vctxt).set_errors(
                     Some(generic_error_default),
                     Some(generic_error_default),
                     None,
                 );
                 let cfilename = CString::new(filename).unwrap();
-                xml_schema_validate_set_filename(vctxt, cfilename.as_ptr());
+                (*vctxt).set_filename(Some(filename));
                 let handler = {
                     let mut hdl = XmlSAXHandler::default();
                     std::ptr::copy(handler, &mut hdl, 1);
@@ -3310,8 +3306,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 xml_free_doc(doc);
                 return;
             }
-            xml_schema_set_valid_errors(
-                ctxt,
+            (*ctxt).set_errors(
                 Some(generic_error_default),
                 Some(generic_error_default),
                 None,

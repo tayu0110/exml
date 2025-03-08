@@ -67,7 +67,6 @@ use crate::{
         },
         xmlschemas::{
             XmlSchemaSAXPlugPtr, xml_schema_is_valid, xml_schema_sax_plug, xml_schema_sax_unplug,
-            xml_schema_set_valid_errors, xml_schema_set_valid_structured_errors,
             xml_schema_validate_set_locator,
         },
         xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strdup, xml_strlen},
@@ -5024,16 +5023,14 @@ unsafe fn xml_text_reader_schema_validate_internal(
         // TODO: In case the user provides the validation context we
         //   could make this redirection optional.
         if (*reader).error_func.is_some() {
-            xml_schema_set_valid_errors(
-                (*reader).xsd_valid_ctxt,
+            (*(*reader).xsd_valid_ctxt).set_errors(
                 Some(xml_text_reader_validity_error_relay),
                 Some(xml_text_reader_validity_warning_relay),
                 Some(ctx.clone()),
             );
         }
         if (*reader).serror_func.is_some() {
-            xml_schema_set_valid_structured_errors(
-                (*reader).xsd_valid_ctxt,
+            (*(*reader).xsd_valid_ctxt).set_structured_errors(
                 Some(xml_text_reader_validity_structured_relay),
                 Some(ctx.clone()),
             );
@@ -5151,16 +5148,14 @@ pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSc
 
         let ctx = GenericErrorContext::new(reader);
         if (*reader).error_func.is_some() {
-            xml_schema_set_valid_errors(
-                (*reader).xsd_valid_ctxt,
+            (*(*reader).xsd_valid_ctxt).set_errors(
                 Some(xml_text_reader_validity_error_relay),
                 Some(xml_text_reader_validity_warning_relay),
                 Some(ctx.clone()),
             );
         }
         if (*reader).serror_func.is_some() {
-            xml_schema_set_valid_structured_errors(
-                (*reader).xsd_valid_ctxt,
+            (*(*reader).xsd_valid_ctxt).set_structured_errors(
                 Some(xml_text_reader_validity_structured_relay),
                 Some(ctx.clone()),
             );
@@ -5627,17 +5622,12 @@ pub unsafe fn xml_text_reader_set_error_handler(
                     );
                 }
                 if !(*reader).xsd_valid_ctxt.is_null() {
-                    xml_schema_set_valid_errors(
-                        (*reader).xsd_valid_ctxt,
+                    (*(*reader).xsd_valid_ctxt).set_errors(
                         Some(xml_text_reader_validity_error_relay),
                         Some(xml_text_reader_validity_warning_relay),
                         Some(ctx.clone()),
                     );
-                    xml_schema_set_valid_structured_errors(
-                        (*reader).xsd_valid_ctxt,
-                        None,
-                        Some(ctx),
-                    );
+                    (*(*reader).xsd_valid_ctxt).set_structured_errors(None, Some(ctx));
                 }
             }
         } else {
@@ -5668,17 +5658,8 @@ pub unsafe fn xml_text_reader_set_error_handler(
                     );
                 }
                 if !(*reader).xsd_valid_ctxt.is_null() {
-                    xml_schema_set_valid_errors(
-                        (*reader).xsd_valid_ctxt,
-                        None,
-                        None,
-                        Some(ctx.clone()),
-                    );
-                    xml_schema_set_valid_structured_errors(
-                        (*reader).xsd_valid_ctxt,
-                        None,
-                        Some(ctx),
-                    );
+                    (*(*reader).xsd_valid_ctxt).set_errors(None, None, Some(ctx.clone()));
+                    (*(*reader).xsd_valid_ctxt).set_structured_errors(None, Some(ctx));
                 }
             }
         }
@@ -5726,14 +5707,8 @@ pub unsafe fn xml_text_reader_set_structured_error_handler(
                     );
                 }
                 if !(*reader).xsd_valid_ctxt.is_null() {
-                    xml_schema_set_valid_errors(
-                        (*reader).xsd_valid_ctxt,
-                        None,
-                        None,
-                        Some(ctx.clone()),
-                    );
-                    xml_schema_set_valid_structured_errors(
-                        (*reader).xsd_valid_ctxt,
+                    (*(*reader).xsd_valid_ctxt).set_errors(None, None, Some(ctx.clone()));
+                    (*(*reader).xsd_valid_ctxt).set_structured_errors(
                         Some(xml_text_reader_validity_structured_relay),
                         Some(ctx),
                     );
@@ -5768,17 +5743,8 @@ pub unsafe fn xml_text_reader_set_structured_error_handler(
                     );
                 }
                 if !(*reader).xsd_valid_ctxt.is_null() {
-                    xml_schema_set_valid_errors(
-                        (*reader).xsd_valid_ctxt,
-                        None,
-                        None,
-                        Some(ctx.clone()),
-                    );
-                    xml_schema_set_valid_structured_errors(
-                        (*reader).xsd_valid_ctxt,
-                        None,
-                        Some(ctx),
-                    );
+                    (*(*reader).xsd_valid_ctxt).set_errors(None, None, Some(ctx.clone()));
+                    (*(*reader).xsd_valid_ctxt).set_structured_errors(None, Some(ctx));
                 }
             }
         }

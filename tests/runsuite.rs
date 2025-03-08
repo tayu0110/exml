@@ -31,7 +31,7 @@ use exml::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,
         },
-        xmlschemas::{xml_schema_set_valid_errors, xml_schema_validate_doc},
+        xmlschemas::xml_schema_validate_doc,
         xmlschemastypes::xml_schema_init_types,
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
     },
@@ -916,8 +916,7 @@ unsafe fn xstc_test_instance(
                         xml_read_file(&path, None, XmlParserOption::XmlParseNoEnt as i32)
                     {
                         ctxt = xml_schema_new_valid_ctxt(schemas);
-                        xml_schema_set_valid_errors(
-                            ctxt,
+                        (*ctxt).set_errors(
                             Some(test_error_handler),
                             Some(test_error_handler),
                             Some(GenericErrorContext::new(ctxt)) as _,

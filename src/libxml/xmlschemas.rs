@@ -36,7 +36,7 @@ use crate::{
     encoding::XmlCharEncoding,
     error::{XmlErrorDomain, XmlParserErrors},
     generic_error,
-    globals::{GLOBAL_STATE, GenericError, GenericErrorContext, StructuredError},
+    globals::{GLOBAL_STATE, GenericErrorContext},
     io::XmlParserInputBuffer,
     libxml::{
         chvalid::xml_is_blank_char,
@@ -10335,17 +10335,8 @@ unsafe fn xml_schema_create_vctxt_on_pctxt(ctxt: XmlSchemaParserCtxtPtr) -> i32 
                 return -1;
             }
             // TODO: Pass user data.
-            xml_schema_set_valid_errors(
-                (*ctxt).vctxt,
-                (*ctxt).error,
-                (*ctxt).warning,
-                (*ctxt).err_ctxt.clone(),
-            );
-            xml_schema_set_valid_structured_errors(
-                (*ctxt).vctxt,
-                (*ctxt).serror,
-                (*ctxt).err_ctxt.clone(),
-            );
+            (*(*ctxt).vctxt).set_errors((*ctxt).error, (*ctxt).warning, (*ctxt).err_ctxt.clone());
+            (*(*ctxt).vctxt).set_structured_errors((*ctxt).serror, (*ctxt).err_ctxt.clone());
         }
         0
     }
@@ -13576,126 +13567,6 @@ pub(crate) unsafe fn xml_schema_fixup_components(
         }
         ret
     }
-}
-
-/// Set the error and warning callback information
-#[doc(alias = "xmlSchemaSetValidErrors")]
-pub unsafe fn xml_schema_set_valid_errors(
-    ctxt: XmlSchemaValidCtxtPtr,
-    err: Option<GenericError>,
-    warn: Option<GenericError>,
-    ctx: Option<GenericErrorContext>,
-) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        (*ctxt).error = err;
-        (*ctxt).warning = warn;
-        (*ctxt).err_ctxt = ctx.clone();
-        if !(*ctxt).pctxt.is_null() {
-            (*(*ctxt).pctxt).set_errors(err, warn, ctx);
-        }
-    }
-}
-
-/// Set the structured error callback
-#[doc(alias = "xmlSchemaSetValidStructuredErrors")]
-pub unsafe fn xml_schema_set_valid_structured_errors(
-    ctxt: XmlSchemaValidCtxtPtr,
-    serror: Option<StructuredError>,
-    ctx: Option<GenericErrorContext>,
-) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        (*ctxt).serror = serror;
-        (*ctxt).error = None;
-        (*ctxt).warning = None;
-        (*ctxt).err_ctxt = ctx.clone();
-        if !(*ctxt).pctxt.is_null() {
-            (*(*ctxt).pctxt).set_structured_errors(serror, ctx);
-        }
-    }
-}
-
-/// Get the error and warning callback information
-///
-/// Returns -1 in case of error and 0 otherwise
-#[doc(alias = "xmlSchemaGetValidErrors")]
-pub unsafe fn xml_schema_get_valid_errors(
-    ctxt: XmlSchemaValidCtxtPtr,
-    err: *mut Option<GenericError>,
-    warn: *mut Option<GenericError>,
-    ctx: *mut Option<GenericErrorContext>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return -1;
-        }
-        if !err.is_null() {
-            *err = (*ctxt).error;
-        }
-        if !warn.is_null() {
-            *warn = (*ctxt).warning;
-        }
-        if !ctx.is_null() {
-            *ctx = (*ctxt).err_ctxt.clone();
-        }
-        0
-    }
-}
-
-/// Sets the options to be used during the validation.
-///
-/// Returns 0 in case of success, -1 in case of an API error.
-#[doc(alias = "xmlSchemaSetValidOptions")]
-pub unsafe fn xml_schema_set_valid_options(ctxt: XmlSchemaValidCtxtPtr, options: i32) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return -1;
-        }
-        // WARNING: Change the start value if adding to the xmlSchemaValidOption.
-        // TODO: Is there an other, more easy to maintain, way?
-        for i in 1..i32::BITS as usize {
-            if options & (1 << i) != 0 {
-                return -1;
-            }
-        }
-        (*ctxt).options = options;
-        0
-    }
-}
-
-/// Workaround to provide file error reporting information when this is
-/// not provided by current APIs
-#[doc(alias = "xmlSchemaValidateSetFilename")]
-pub unsafe fn xml_schema_validate_set_filename(
-    vctxt: XmlSchemaValidCtxtPtr,
-    filename: *const c_char,
-) {
-    unsafe {
-        if vctxt.is_null() {
-            return;
-        }
-        if !(*vctxt).filename.is_null() {
-            xml_free((*vctxt).filename as _);
-        }
-        if !filename.is_null() {
-            (*vctxt).filename = xml_strdup(filename as _) as _;
-        } else {
-            (*vctxt).filename = null_mut();
-        }
-    }
-}
-
-/// Get the validation context options.
-///
-/// Returns the option combination or -1 on error.
-#[doc(alias = "xmlSchemaValidCtxtGetOptions")]
-pub unsafe fn xml_schema_valid_ctxt_get_options(ctxt: XmlSchemaValidCtxtPtr) -> i32 {
-    unsafe { if ctxt.is_null() { -1 } else { (*ctxt).options } }
 }
 
 /// Frees an IDC key together with its compiled value.
@@ -18822,10 +18693,7 @@ unsafe fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
         // where the user provides the dict?
         (*vctxt).dict = xml_dict_create();
 
-        if !(*vctxt).filename.is_null() {
-            xml_free((*vctxt).filename as _);
-            (*vctxt).filename = null_mut();
-        }
+        (*vctxt).filename = None;
 
         // Note that some cleanup functions can move items to the cache,
         // so the cache shouldn't be freed too early.
@@ -19064,48 +18932,6 @@ pub unsafe fn xml_schema_validate_stream(
             xml_free_parser_ctxt(pctxt);
         }
         ret
-    }
-}
-
-/// Do a schemas validation of the given resource, it will use the
-/// SAX streamable validation internally.
-///
-/// Returns 0 if the document is valid, a positive error code
-/// number otherwise and -1 in case of an internal or API error.
-#[doc(alias = "xmlSchemaValidateFile")]
-pub unsafe fn xml_schema_validate_file(
-    ctxt: XmlSchemaValidCtxtPtr,
-    filename: *const c_char,
-    _options: i32,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() || filename.is_null() {
-            return -1;
-        }
-
-        let Some(input) = XmlParserInputBuffer::from_uri(
-            CStr::from_ptr(filename).to_string_lossy().as_ref(),
-            XmlCharEncoding::None,
-        ) else {
-            return -1;
-        };
-        let ret: i32 = xml_schema_validate_stream(ctxt, input, XmlCharEncoding::None, None, None);
-        ret
-    }
-}
-
-/// Allow access to the parser context of the schema validation context
-///
-/// Returns the parser context of the schema validation context or NULL in case of error.
-#[doc(alias = "xmlSchemaValidCtxtGetParserCtxt")]
-pub unsafe fn xml_schema_valid_ctxt_get_parser_ctxt(
-    ctxt: XmlSchemaValidCtxtPtr,
-) -> XmlParserCtxtPtr {
-    unsafe {
-        if ctxt.is_null() {
-            return null_mut();
-        }
-        (*ctxt).parser_ctxt
     }
 }
 
@@ -20322,175 +20148,6 @@ mod tests {
                         );
                         eprint!(" {}", n_buffer);
                         eprintln!(" {}", n_size);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_set_valid_options() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_SCHEMA_VALID_CTXT_PTR {
-                for n_options in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_schema_valid_ctxt_ptr(n_ctxt, 0);
-                    let options = gen_int(n_options, 1);
-
-                    let ret_val = xml_schema_set_valid_options(ctxt, options);
-                    desret_int(ret_val);
-                    des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_int(n_options, options, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSchemaSetValidOptions",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlSchemaSetValidOptions()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_options);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_valid_ctxt_get_options() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_SCHEMA_VALID_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_schema_valid_ctxt_ptr(n_ctxt, 0);
-
-                let ret_val = xml_schema_valid_ctxt_get_options(ctxt);
-                desret_int(ret_val);
-                des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSchemaValidCtxtGetOptions",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlSchemaValidCtxtGetOptions()"
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_valid_ctxt_get_parser_ctxt() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_SCHEMA_VALID_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_schema_valid_ctxt_ptr(n_ctxt, 0);
-
-                let ret_val = xml_schema_valid_ctxt_get_parser_ctxt(ctxt);
-                desret_xml_parser_ctxt_ptr(ret_val);
-                des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSchemaValidCtxtGetParserCtxt",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlSchemaValidCtxtGetParserCtxt()"
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_validate_file() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_SCHEMA_VALID_CTXT_PTR {
-                for n_filename in 0..GEN_NB_FILEPATH {
-                    for n_options in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_schema_valid_ctxt_ptr(n_ctxt, 0);
-                        let filename = gen_filepath(n_filename, 1);
-                        let options = gen_int(n_options, 2);
-
-                        let ret_val = xml_schema_validate_file(ctxt, filename, options);
-                        desret_int(ret_val);
-                        des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_filepath(n_filename, filename, 1);
-                        des_int(n_options, options, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSchemaValidateFile",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlSchemaValidateFile()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_filename);
-                            eprintln!(" {}", n_options);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_validate_set_filename() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_vctxt in 0..GEN_NB_XML_SCHEMA_VALID_CTXT_PTR {
-                for n_filename in 0..GEN_NB_FILEPATH {
-                    let mem_base = xml_mem_blocks();
-                    let vctxt = gen_xml_schema_valid_ctxt_ptr(n_vctxt, 0);
-                    let filename = gen_filepath(n_filename, 1);
-
-                    xml_schema_validate_set_filename(vctxt, filename);
-                    des_xml_schema_valid_ctxt_ptr(n_vctxt, vctxt, 0);
-                    des_filepath(n_filename, filename, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSchemaValidateSetFilename",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlSchemaValidateSetFilename()"
-                        );
-                        eprint!(" {}", n_vctxt);
-                        eprintln!(" {}", n_filename);
                     }
                 }
             }
