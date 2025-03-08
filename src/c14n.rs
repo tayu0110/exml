@@ -69,7 +69,6 @@ pub enum XmlC14NPosition {
     XmlC14NAfterDocumentElement = 2,
 }
 
-pub type XmlC14NVisibleNsStackPtr = *mut XmlC14NVisibleNsStack;
 #[repr(C)]
 #[derive(Default)]
 pub struct XmlC14NVisibleNsStack {
@@ -1501,17 +1500,6 @@ unsafe fn xml_c14n_err<T>(
             0,
             msg,
         );
-    }
-}
-
-unsafe fn xml_c14n_visible_ns_stack_destroy(cur: XmlC14NVisibleNsStackPtr) {
-    unsafe {
-        if cur.is_null() {
-            xml_c14n_err_param("destroying namespaces stack");
-            return;
-        }
-        drop_in_place(cur);
-        xml_free(cur as _);
     }
 }
 
