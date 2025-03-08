@@ -13,6 +13,8 @@
 #![warn(unused_unsafe)]
 
 pub mod buf;
+#[cfg(all(feature = "c14n", feature = "libxml_output"))]
+pub mod c14n;
 pub mod dict;
 pub mod encoding;
 pub mod error;

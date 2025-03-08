@@ -41,6 +41,11 @@ use std::{
 use crate::{
     error::{__xml_raise_error, XmlParserErrors},
     io::{XmlOutputBuffer, write_quoted},
+    libxml::{
+        globals::{xml_free, xml_malloc_atomic},
+        uri::{XmlURIPtr, xml_free_uri, xml_parse_uri},
+        xmlstring::{xml_strcmp, xml_strlen},
+    },
     list::XmlList,
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttr, XmlAttrPtr, XmlDoc, XmlDocPtr, XmlElementType,
@@ -49,12 +54,6 @@ use crate::{
     },
     uri::build_uri,
     xpath::XmlNodeSet,
-};
-
-use super::{
-    globals::{xml_free, xml_malloc_atomic, xml_realloc},
-    uri::{XmlURIPtr, xml_free_uri, xml_parse_uri},
-    xmlstring::{XmlChar, xml_strcmp, xml_strlen},
 };
 
 // Predefined values for C14N modes
@@ -117,13 +116,13 @@ impl XmlC14NVisibleNsStack {
     unsafe fn find(&self, ns: Option<&XmlNs>) -> bool {
         unsafe {
             // if the default namespace xmlns="" is not defined yet then we do not want to print it out
-            let prefix: *const XmlChar =
+            let prefix: *const u8 =
                 if let Some(prefix) = ns.filter(|ns| ns.prefix().is_some()).map(|ns| ns.prefix) {
                     prefix
                 } else {
                     c"".as_ptr() as _
                 };
-            let href: *const XmlChar =
+            let href: *const u8 =
                 if let Some(href) = ns.filter(|ns| !ns.href.is_null()).map(|ns| ns.href) {
                     href
                 } else {
@@ -766,7 +765,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     // cdata sections are processed as text nodes
                     // todo: verify that cdata sections are included in XPath nodes set
                     if visible && !cur.content.is_null() {
-                        let buffer: *mut XmlChar = xml_c11n_normalize_text(cur.content);
+                        let buffer: *mut u8 = xml_c11n_normalize_text(cur.content);
                         if !buffer.is_null() {
                             self.buf
                                 .borrow_mut()
@@ -802,7 +801,7 @@ impl<T> XmlC14NCtx<'_, T> {
                             self.buf.borrow_mut().write_str(" ");
 
                             /* todo: do we need to normalize pi? */
-                            let buffer: *mut XmlChar = xml_c11n_normalize_pi(cur.content);
+                            let buffer: *mut u8 = xml_c11n_normalize_pi(cur.content);
                             if !buffer.is_null() {
                                 self.buf.borrow_mut().write_str(
                                     CStr::from_ptr(buffer as _).to_string_lossy().as_ref(),
@@ -845,7 +844,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         let cur = XmlNodePtr::try_from(cur).unwrap();
                         if !cur.content.is_null() {
                             /* todo: do we need to normalize comment? */
-                            let buffer: *mut XmlChar = xml_c11n_normalize_comment(cur.content);
+                            let buffer: *mut u8 = xml_c11n_normalize_comment(cur.content);
                             if !buffer.is_null() {
                                 self.buf.borrow_mut().write_str(
                                     CStr::from_ptr(buffer as _).to_string_lossy().as_ref(),
@@ -1096,13 +1095,13 @@ impl<T> XmlC14NCtx<'_, T> {
     ) -> i32 {
         unsafe {
             // if the default namespace xmlns="" is not defined yet then we do not want to print it out
-            let prefix: *const XmlChar =
+            let prefix: *const u8 =
                 if let Some(prefix) = ns.filter(|ns| ns.prefix().is_some()).map(|ns| ns.prefix) {
                     prefix
                 } else {
                     c"".as_ptr() as _
                 };
-            let href: *const XmlChar =
+            let href: *const u8 =
                 if let Some(href) = ns.filter(|ns| !ns.href.is_null()).map(|ns| ns.href) {
                     href
                 } else {
@@ -1243,7 +1242,7 @@ impl<T> XmlC14NCtx<'_, T> {
     #[doc(alias = "xmlC14NPrintAttrs")]
     unsafe fn print_attrs(&mut self, attr: XmlAttrPtr) -> bool {
         unsafe {
-            let buffer: *mut XmlChar;
+            let buffer: *mut u8;
 
             self.buf.borrow_mut().write_str(" ");
             if let Some(prefix) = attr
@@ -1689,12 +1688,6 @@ unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> i32 {
         if ns1 == ns2 {
             return 0;
         }
-        // if ns1.is_null() {
-        //     return -1;
-        // }
-        // if ns2.is_null() {
-        //     return 1;
-        // }
 
         xml_strcmp(ns1.prefix, ns2.prefix)
     }
@@ -1714,7 +1707,7 @@ unsafe fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
 }
 
 #[doc(alias = "xmlC14NStrEqual")]
-unsafe fn xml_c14n_str_equal(mut str1: *const XmlChar, mut str2: *const XmlChar) -> bool {
+unsafe fn xml_c14n_str_equal(mut str1: *const u8, mut str2: *const u8) -> bool {
     unsafe {
         if str1 == str2 {
             return true;
@@ -1799,7 +1792,7 @@ unsafe fn xml_c14n_is_xml_attr(attr: XmlAttrPtr) -> bool {
 macro_rules! grow_buffer_reentrant {
     ($buffer:expr, $buffer_size:expr) => {
         $buffer_size *= 2;
-        $buffer = xml_realloc($buffer as _, $buffer_size as usize) as _;
+        $buffer = $crate::libxml::globals::xml_realloc($buffer as _, $buffer_size as usize) as _;
         if $buffer.is_null() {
             xml_c14n_err_memory("growing buffer");
             return null_mut();
@@ -1814,12 +1807,9 @@ macro_rules! grow_buffer_reentrant {
 /// Returns a normalized string (caller is responsible for calling xmlFree())
 /// or NULL if an error occurs
 #[doc(alias = "xmlC11NNormalizeString")]
-unsafe fn xml_c11n_normalize_string(
-    input: *const XmlChar,
-    mode: XmlC14NNormalizationMode,
-) -> *mut XmlChar {
+unsafe fn xml_c11n_normalize_string(input: *const u8, mode: XmlC14NNormalizationMode) -> *mut u8 {
     unsafe {
-        let mut cur: *const XmlChar = input;
+        let mut cur: *const u8 = input;
 
         if input.is_null() {
             return null_mut();
@@ -1827,12 +1817,12 @@ unsafe fn xml_c11n_normalize_string(
 
         // allocate an translation buffer.
         let mut buffer_size: i32 = 1000;
-        let mut buffer: *mut XmlChar = xml_malloc_atomic(buffer_size as usize) as _;
+        let mut buffer: *mut u8 = xml_malloc_atomic(buffer_size as usize) as _;
         if buffer.is_null() {
             xml_c14n_err_memory("allocating buffer");
             return null_mut();
         }
-        let mut out: *mut XmlChar = buffer;
+        let mut out: *mut u8 = buffer;
 
         while *cur != b'\0' {
             if out.offset_from(buffer) > buffer_size as isize - 10 {
@@ -1957,19 +1947,19 @@ unsafe fn xml_c11n_normalize_string(
 }
 
 #[doc(alias = "xmlC11NNormalizeAttr")]
-unsafe fn xml_c11n_normalize_attr(a: *const u8) -> *mut XmlChar {
+unsafe fn xml_c11n_normalize_attr(a: *const u8) -> *mut u8 {
     unsafe { xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeAttr) }
 }
 
-unsafe fn xml_c11n_normalize_text(a: *const u8) -> *mut XmlChar {
+unsafe fn xml_c11n_normalize_text(a: *const u8) -> *mut u8 {
     unsafe { xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeText) }
 }
 
-unsafe fn xml_c11n_normalize_comment(a: *const u8) -> *mut XmlChar {
+unsafe fn xml_c11n_normalize_comment(a: *const u8) -> *mut u8 {
     unsafe { xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeComment) }
 }
 
-unsafe fn xml_c11n_normalize_pi(a: *const u8) -> *mut XmlChar {
+unsafe fn xml_c11n_normalize_pi(a: *const u8) -> *mut u8 {
     unsafe { xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizePI) }
 }
 

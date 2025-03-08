@@ -21,7 +21,7 @@ use std::{
 
 use const_format::concatcp;
 #[cfg(feature = "c14n")]
-use exml::libxml::c14n::XmlC14NMode;
+use exml::c14n::XmlC14NMode;
 #[cfg(feature = "schematron")]
 use exml::libxml::schematron::XmlSchematronPtr;
 #[cfg(feature = "schema")]
@@ -4496,11 +4496,9 @@ unsafe fn c14n_run_test(
 ) -> i32 {
     unsafe {
         use exml::{
+            c14n::xml_c14n_doc_dump_memory,
             globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
-            libxml::{
-                c14n::xml_c14n_doc_dump_memory,
-                parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS, XmlParserOption},
-            },
+            libxml::parser::{XML_COMPLETE_ATTRS, XML_DETECT_IDS, XmlParserOption},
             xpath::xml_xpath_free_object,
         };
 
@@ -4704,7 +4702,7 @@ unsafe fn c14n_with_comment_test(
     _options: i32,
 ) -> i32 {
     unsafe {
-        use exml::libxml::c14n::XmlC14NMode;
+        use exml::c14n::XmlC14NMode;
 
         c14n_common_test(
             filename,
@@ -4723,7 +4721,7 @@ unsafe fn c14n_without_comment_test(
     _options: i32,
 ) -> i32 {
     unsafe {
-        use exml::libxml::c14n::XmlC14NMode;
+        use exml::c14n::XmlC14NMode;
 
         c14n_common_test(
             filename,
@@ -4742,7 +4740,7 @@ unsafe fn c14n_exc_without_comment_test(
     _options: i32,
 ) -> i32 {
     unsafe {
-        use exml::libxml::c14n::XmlC14NMode;
+        use exml::c14n::XmlC14NMode;
 
         c14n_common_test(
             filename,
@@ -4761,7 +4759,7 @@ unsafe fn c14n11_without_comment_test(
     _options: i32,
 ) -> i32 {
     unsafe {
-        use exml::libxml::c14n::XmlC14NMode;
+        use exml::c14n::XmlC14NMode;
 
         c14n_common_test(
             filename,

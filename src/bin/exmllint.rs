@@ -27,6 +27,8 @@ use std::{
 };
 
 use clap::Parser;
+#[cfg(feature = "c14n")]
+use exml::c14n::{XmlC14NMode, xml_c14n_doc_dump_memory};
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
 #[cfg(feature = "schema")]
@@ -41,7 +43,6 @@ use exml::{
     },
     io::{XmlParserInputBuffer, xml_no_net_external_entity_loader},
     libxml::{
-        c14n::{XmlC14NMode, xml_c14n_doc_dump_memory},
         debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
         globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
         htmlparser::{

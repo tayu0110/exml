@@ -1,5 +1,3 @@
-#[cfg(all(feature = "c14n", feature = "libxml_output"))]
-pub mod c14n;
 #[cfg(feature = "catalog")]
 pub mod catalog;
 pub mod chvalid;
