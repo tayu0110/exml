@@ -15,6 +15,8 @@
 pub mod buf;
 #[cfg(all(feature = "c14n", feature = "libxml_output"))]
 pub mod c14n;
+#[cfg(feature = "libxml_debug")]
+pub mod debug_xml;
 pub mod dict;
 pub mod encoding;
 pub mod error;

@@ -1,18 +1,16 @@
 use std::{ffi::CStr, io::Write};
 
-#[cfg(feature = "libxml_xptr_locs")]
-use crate::{libxml::xpointer::XmlLocationSetPtr, tree::XmlNode};
 use crate::{
-    libxml::{
-        debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node},
-        xmlstring::XmlChar,
-    },
+    debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node, xml_debug_dump_string},
+    libxml::xmlstring::XmlChar,
     tree::{XmlAttrPtr, XmlElementType, XmlGenericNodePtr},
     xpath::{
         XmlXPathAxisVal, XmlXPathObjectType, XmlXPathOp, XmlXPathTestVal, XmlXPathTypeVal,
         xml_xpath_is_inf, xml_xpath_is_nan,
     },
 };
+#[cfg(feature = "libxml_xptr_locs")]
+use crate::{libxml::xpointer::XmlLocationSetPtr, tree::XmlNode};
 
 use super::{XmlNodeSet, XmlXPathCompExprPtr, XmlXPathObjectPtr, XmlXPathStepOpPtr};
 
@@ -137,8 +135,6 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
     depth: i32,
 ) {
     unsafe {
-        use crate::libxml::debug_xml::xml_debug_dump_string;
-
         let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
         write!(output, "{}", shift).ok();

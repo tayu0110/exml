@@ -1,8 +1,6 @@
 #[cfg(feature = "catalog")]
 pub mod catalog;
 pub mod chvalid;
-#[cfg(feature = "libxml_debug")]
-pub mod debug_xml;
 pub mod dict;
 pub mod globals;
 pub mod hash;

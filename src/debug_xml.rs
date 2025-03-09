@@ -28,23 +28,22 @@ use std::{
 #[cfg(feature = "xpath")]
 use crate::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathObjectType};
 use crate::{
+    dict::{XmlDictPtr, xml_dict_lookup, xml_dict_owns},
     error::{__xml_raise_error, XmlParserErrors},
     generic_error,
-    libxml::chvalid::xml_is_blank_char,
+    libxml::{
+        chvalid::xml_is_blank_char,
+        parser::{XmlParserOption, xml_parse_in_node_context},
+        parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
+        valid::xml_snprintf_element_content,
+        xmlstring::xml_strstr,
+    },
     tree::{
         NodeCommon, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr,
         XmlDtdPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityPtr,
         XmlEntityType, XmlGenericNodePtr, XmlNodePtr, XmlNs, XmlNsPtr, validate_name,
         xml_free_node_list, xml_get_doc_entity,
     },
-};
-
-use super::{
-    dict::{XmlDictPtr, xml_dict_lookup, xml_dict_owns},
-    parser::{XmlParserOption, xml_parse_in_node_context},
-    parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-    valid::xml_snprintf_element_content,
-    xmlstring::{XmlChar, xml_strstr},
 };
 
 /// Handle a debug error.
@@ -957,7 +956,7 @@ impl XmlDebugCtxt<'_> {
                     if self.check == 0 {
                         self.dump_spaces();
                         let node = XmlNodePtr::try_from(node).unwrap();
-                        if node.name == XML_STRING_TEXT_NOENC.as_ptr() as *const XmlChar {
+                        if node.name == XML_STRING_TEXT_NOENC.as_ptr() as *const u8 {
                             write!(self.output, "TEXT no enc").ok();
                         } else {
                             write!(self.output, "TEXT").ok();
@@ -2222,6 +2221,8 @@ impl XmlShellCtxt<'_> {
         _node: Option<XmlGenericNodePtr>,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
+        use crate::libxml::valid::XmlValidCtxt;
+
         unsafe {
             use crate::{
                 globals::GLOBAL_STATE,
@@ -2231,8 +2232,6 @@ impl XmlShellCtxt<'_> {
                 },
                 tree::xml_free_dtd,
             };
-
-            use super::valid::XmlValidCtxt;
 
             let mut vctxt = XmlValidCtxt::default();
             let mut res: i32 = -1;
@@ -2376,6 +2375,8 @@ impl XmlShellCtxt<'_> {
         _node: Option<XmlGenericNodePtr>,
         _node2: Option<XmlGenericNodePtr>,
     ) -> i32 {
+        use crate::libxml::relaxng::XmlRelaxNGPtr;
+
         unsafe {
             use crate::{
                 globals::GLOBAL_STATE,
@@ -2388,8 +2389,6 @@ impl XmlShellCtxt<'_> {
                     xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt,
                 },
             };
-
-            use super::relaxng::XmlRelaxNGPtr;
 
             let ctxt = xml_relaxng_new_parser_ctxt(schemas);
             let generic_error = GLOBAL_STATE.with_borrow(|state| state.generic_error);

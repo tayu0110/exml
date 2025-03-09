@@ -34,6 +34,7 @@ use exml::libxml::catalog::xml_load_catalogs;
 #[cfg(feature = "schema")]
 use exml::xmlschemas::schema::XmlSchema;
 use exml::{
+    debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
     encoding::{XmlCharEncoding, add_encoding_alias},
     error::generic_error_default,
     generic_error,
@@ -43,7 +44,6 @@ use exml::{
     },
     io::{XmlParserInputBuffer, xml_no_net_external_entity_loader},
     libxml::{
-        debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
         globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
         htmlparser::{
             HtmlParserCtxtPtr, HtmlParserOption, html_create_push_parser_ctxt,
