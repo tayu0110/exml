@@ -1868,8 +1868,6 @@ pub type XmlShellReadlineFunc = fn(prompt: &str) -> Option<String>;
 
 /// A debugging shell context.  
 /// TODO: add the defined function tables.
-#[cfg(feature = "xpath")]
-pub type XmlShellCtxtPtr<'a> = *mut XmlShellCtxt<'a>;
 #[doc(alias = "xmlShellCtxt")]
 #[cfg(feature = "xpath")]
 #[repr(C)]
@@ -1883,13 +1881,767 @@ pub struct XmlShellCtxt<'a> {
     input: XmlShellReadlineFunc,
 }
 
+#[cfg(feature = "xpath")]
+impl XmlShellCtxt<'_> {
+    /// Implements the XML shell function "ls"
+    /// Does an Unix like listing of the given node (like a directory)
+    ///
+    /// Returns 0
+    #[doc(alias = "xmlShellList")]
+    #[cfg(feature = "xpath")]
+    pub unsafe fn xml_shell_list(
+        &mut self,
+        _arg: Option<&str>,
+        node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            let Some(node) = node else {
+                writeln!(self.output, "NULL").ok();
+                return 0;
+            };
+            let mut cur = if let Ok(doc) = XmlDocPtr::try_from(node) {
+                doc.children()
+            } else if let Ok(ns) = XmlNsPtr::try_from(node) {
+                xml_ls_one_node(&mut self.output, Some(ns.into()));
+                return 0;
+            } else if let Some(children) = node.children() {
+                Some(children)
+            } else {
+                xml_ls_one_node(&mut self.output, Some(node));
+                return 0;
+            };
+            while let Some(now) = cur {
+                xml_ls_one_node(&mut self.output, Some(now));
+                cur = now.next();
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "base"
+    /// dumps the current XML base of the node
+    ///
+    /// Returns 0
+    #[doc(alias = "xmlShellBase")]
+    #[cfg(feature = "xpath")]
+    pub unsafe fn xml_shell_base(
+        &mut self,
+        _arg: Option<&str>,
+        node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            let Some(node) = node else {
+                writeln!(self.output, "NULL").ok();
+                return 0;
+            };
+
+            if let Some(base) = node.get_base(node.document()) {
+                writeln!(self.output, "{base}").ok();
+            } else {
+                writeln!(self.output, " No base found !!!").ok();
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "dir"
+    /// dumps information about the node (namespace, attributes, content).
+    ///
+    /// Returns 0
+    #[doc(alias = "xmlShellDir")]
+    #[cfg(feature = "xpath")]
+    pub unsafe fn xml_shell_dir(
+        &mut self,
+        _arg: Option<&str>,
+        node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            let Some(node) = node else {
+                writeln!(self.output, "NULL").ok();
+                return 0;
+            };
+            if let Ok(doc) = XmlDocPtr::try_from(node) {
+                xml_debug_dump_document_head(Some(&mut self.output), Some(doc));
+            } else if node.element_type() == XmlElementType::XmlAttributeNode {
+                xml_debug_dump_attr(&mut self.output, XmlAttrPtr::try_from(node).ok(), 0);
+            } else {
+                xml_debug_dump_one_node(&mut self.output, Some(node), 0);
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "load"
+    /// loads a new document specified by the filename
+    ///
+    /// Returns 0 or -1 if loading failed
+    #[doc(alias = "xmlShellLoad")]
+    #[cfg(feature = "xpath")]
+    pub unsafe fn xml_shell_load(
+        &mut self,
+        filename: &str,
+        _node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            use crate::{
+                libxml::htmlparser::html_parse_file,
+                parser::xml_read_file,
+                uri::canonic_path,
+                xpath::{xml_xpath_free_context, xml_xpath_new_context},
+            };
+
+            use crate::tree::xml_free_doc;
+
+            let mut html: i32 = 0;
+
+            if let Some(doc) = self.doc {
+                html = (doc.typ == XmlElementType::XmlHTMLDocumentNode) as i32;
+            }
+
+            let Some(doc) = (if html != 0 {
+                #[cfg(feature = "html")]
+                {
+                    html_parse_file(filename, None)
+                }
+                #[cfg(not(feature = "html"))]
+                {
+                    write!(self.output, "HTML support not compiled in\n".as_ptr()).ok();
+                    None
+                }
+            } else {
+                xml_read_file(filename, None, 0)
+            }) else {
+                return -1;
+            };
+            if self.loaded == 1 {
+                if let Some(doc) = self.doc {
+                    xml_free_doc(doc);
+                }
+            }
+            self.loaded = 1;
+            #[cfg(feature = "xpath")]
+            {
+                xml_xpath_free_context(self.pctxt);
+            }
+            self.doc = Some(doc);
+            self.node = Some(doc.into());
+            #[cfg(feature = "xpath")]
+            {
+                self.pctxt = xml_xpath_new_context(Some(doc));
+            }
+            let canonic = canonic_path(filename);
+            self.filename = canonic.into_owned();
+            0
+        }
+    }
+
+    /// Implements the XML shell function "cat"
+    /// dumps the serialization node content (XML or HTML).
+    ///
+    /// Returns 0
+    #[doc(alias = "xmlShellCat")]
+    #[cfg(all(feature = "xpath", feature = "libxml_output"))]
+    pub unsafe fn xml_shell_cat(
+        &mut self,
+        _arg: Option<&str>,
+        node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            use crate::libxml::htmltree::{html_doc_dump, html_node_dump_file};
+
+            let Some(node) = node else {
+                writeln!(self.output, "NULL").ok();
+                return 0;
+            };
+            if let Some(doc) = self
+                .doc
+                .filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode)
+            {
+                #[cfg(feature = "html")]
+                if let Some(doc) = XmlDocPtr::try_from(node)
+                    .ok()
+                    .filter(|doc| doc.element_type() == XmlElementType::XmlHTMLDocumentNode)
+                {
+                    html_doc_dump(&mut self.output, doc);
+                } else {
+                    html_node_dump_file(&mut self.output, Some(doc), Some(node));
+                }
+                #[cfg(not(feature = "html"))]
+                if let Some(mut doc) = XmlDocPtr::try_from(node)
+                    .ok()
+                    .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
+                {
+                    doc.dump_file(self.output);
+                } else {
+                    xml_elem_dump(self.output, self.doc, node);
+                }
+            } else if let Some(mut doc) = XmlDocPtr::try_from(node)
+                .ok()
+                .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
+            {
+                doc.dump_file(&mut self.output);
+            } else {
+                // Is this `unwrap` OK ????
+                XmlNodePtr::try_from(node)
+                    .unwrap()
+                    .dump_file(&mut self.output, self.doc);
+            }
+            writeln!(self.output).ok();
+            0
+        }
+    }
+
+    /// Implements the XML shell function "write"
+    /// Write the current node to the filename, it saves the serialization
+    /// of the subtree under the @node specified
+    ///
+    /// Returns 0 or -1 in case of error
+    #[doc(alias = "xmlShellWrite")]
+    #[cfg(all(feature = "xpath", feature = "libxml_output"))]
+    pub unsafe fn xml_shell_write(
+        &mut self,
+        filename: &str,
+        node: XmlGenericNodePtr,
+        _node2: Option<XmlNodePtr>,
+    ) -> i32 {
+        unsafe {
+            use std::fs::File;
+
+            use crate::libxml::htmltree::html_save_file;
+
+            if filename.is_empty() {
+                return -1;
+            }
+            let cfilename = CString::new(filename).unwrap();
+            match node.element_type() {
+                XmlElementType::XmlDocumentNode => {
+                    if self.doc.is_none_or(|mut doc| doc.save_file(filename) < -1) {
+                        generic_error!("Failed to write to {filename}\n");
+                        return -1;
+                    }
+                }
+                XmlElementType::XmlHTMLDocumentNode => {
+                    #[cfg(feature = "html")]
+                    if html_save_file(cfilename.as_ptr(), self.doc.unwrap()) < 0 {
+                        generic_error!("Failed to write to {filename}\n");
+                        return -1;
+                    }
+                    #[cfg(not(feature = "html"))]
+                    if xml_save_file(filename as *mut c_char, self.doc) < -1 {
+                        generic_error!(
+                            "Failed to write to {}\n",
+                            CStr::from_ptr(filename as *const i8).to_string_lossy()
+                        );
+                        return -1;
+                    }
+                }
+                _ => {
+                    match File::options()
+                        .write(true)
+                        .truncate(true)
+                        .create(true)
+                        .open(filename)
+                    {
+                        Ok(mut f) => {
+                            let mut node = XmlNodePtr::try_from(node).unwrap();
+                            node.dump_file(&mut f, self.doc);
+                        }
+                        _ => {
+                            generic_error!("Failed to write to {filename}\n");
+                            return -1;
+                        }
+                    }
+                }
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "save"
+    /// Write the current document to the filename, or it's original name
+    ///
+    /// Returns 0 or -1 in case of error
+    #[doc(alias = "xmlShellSave")]
+    #[cfg(all(feature = "xpath", feature = "libxml_output"))]
+    pub unsafe fn xml_shell_save(
+        &mut self,
+        filename: Option<&str>,
+        _node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            use crate::libxml::htmltree::html_save_file;
+
+            let Some(mut doc) = self.doc else {
+                return -1;
+            };
+            let filename = filename
+                .filter(|filename| !filename.is_empty())
+                .unwrap_or(&self.filename);
+            match doc.typ {
+                XmlElementType::XmlDocumentNode => {
+                    if doc.save_file(filename) < 0 {
+                        generic_error!("Failed to save to {}\n", filename);
+                    }
+                }
+                XmlElementType::XmlHTMLDocumentNode => {
+                    let cfilename = CString::new(filename).unwrap();
+                    #[cfg(feature = "html")]
+                    if html_save_file(cfilename.as_ptr() as *mut c_char, doc) < 0 {
+                        generic_error!("Failed to save to {}\n", filename);
+                    }
+                    #[cfg(not(feature = "html"))]
+                    if (xml_save_file(filename as *mut c_char, self.doc) < 0) {
+                        generic_error!("Failed to save to {}\n", filename);
+                    }
+                }
+                _ => {
+                    generic_error!("To save to subparts of a document use the 'write' command\n");
+                    return -1;
+                }
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "validate"
+    /// Validate the document, if a DTD path is provided, then the validation
+    /// is done against the given DTD.
+    ///
+    /// Returns 0 or -1 in case of error
+    #[doc(alias = "xmlShellValidate")]
+    #[cfg(all(feature = "xpath", feature = "libxml_valid"))]
+    pub unsafe fn xml_shell_validate(
+        &mut self,
+        dtd: Option<&str>,
+        _node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            use crate::{
+                globals::GLOBAL_STATE,
+                libxml::{
+                    parser::xml_parse_dtd,
+                    valid::{xml_validate_document, xml_validate_dtd},
+                },
+                tree::xml_free_dtd,
+            };
+
+            use super::valid::XmlValidCtxt;
+
+            let mut vctxt = XmlValidCtxt::default();
+            let mut res: i32 = -1;
+
+            let Some(doc) = self.doc else {
+                return -1;
+            };
+            vctxt.error = Some(GLOBAL_STATE.with_borrow(|state| state.generic_error));
+            vctxt.warning = vctxt.error;
+
+            if let Some(dtd) = dtd.filter(|dtd| !dtd.is_empty()) {
+                let subset = xml_parse_dtd(None, Some(dtd));
+                if let Some(subset) = subset {
+                    res = xml_validate_dtd(addr_of_mut!(vctxt), doc, subset);
+                    xml_free_dtd(subset);
+                }
+            } else {
+                res = xml_validate_document(addr_of_mut!(vctxt), doc);
+            }
+            res
+        }
+    }
+
+    /// Implements the XML shell function "du"
+    /// show the structure of the subtree under node @tree
+    /// If @tree is null, the command works on the current node.
+    ///
+    /// Returns 0 or -1 in case of error
+    #[doc(alias = "xmlShellDu")]
+    #[cfg(feature = "xpath")]
+    pub unsafe fn xml_shell_du(
+        &mut self,
+        _arg: Option<&str>,
+        tree: XmlGenericNodePtr,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            let mut indent: i32 = 0;
+
+            let mut node = Some(tree);
+            while let Some(now) = node {
+                if now.element_type() == XmlElementType::XmlDocumentNode
+                    || now.element_type() == XmlElementType::XmlHTMLDocumentNode
+                {
+                    writeln!(self.output, "/").ok();
+                } else if let Some(node) = XmlNodePtr::try_from(now)
+                    .ok()
+                    .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
+                {
+                    for _ in 0..indent {
+                        write!(self.output, "  ").ok();
+                    }
+                    if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
+                        write!(self.output, "{prefix}:").ok();
+                    }
+                    let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
+                    writeln!(self.output, "{name}").ok();
+                }
+
+                // Browse the full subtree, deep first
+                if let Ok(doc) = XmlDocPtr::try_from(now) {
+                    node = doc.children;
+                } else if let Some(children) = now
+                    .children()
+                    .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
+                {
+                    // deep first
+                    node = Some(children);
+                    indent += 1;
+                } else if let Some(next) = now.next().filter(|_| node != Some(tree)) {
+                    // then siblings
+                    node = Some(next);
+                } else if node != Some(tree) {
+                    // go up to parents->next if needed
+                    while node != Some(tree) {
+                        if let Some(parent) = now.parent() {
+                            node = Some(parent);
+                            indent -= 1;
+                        }
+                        if let Some(next) = now.next().filter(|_| node != Some(tree)) {
+                            node = Some(next);
+                            break;
+                        }
+                        if now.parent().is_none() {
+                            node = None;
+                            break;
+                        }
+                        if node == Some(tree) {
+                            node = None;
+                            break;
+                        }
+                    }
+                    // exit condition
+                    if node == Some(tree) {
+                        node = None;
+                    }
+                } else {
+                    node = None;
+                }
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "pwd"
+    /// Show the full path from the root to the node, if needed building
+    /// thumblers when similar elements exists at a given ancestor level.
+    /// The output is compatible with XPath commands.
+    ///
+    /// Returns 0 or -1 in case of error
+    #[doc(alias = "xmlShellPwd")]
+    #[cfg(feature = "xpath")]
+    pub unsafe fn xml_shell_pwd(
+        &mut self,
+        buffer: &mut String,
+        node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        let Some(node) = node else {
+            return -1;
+        };
+        unsafe {
+            let Some(path) = node.get_node_path() else {
+                return -1;
+            };
+
+            *buffer = path;
+        }
+        0
+    }
+
+    /// Implements the XML shell function "relaxng"
+    /// validating the instance against a Relax-NG schemas
+    ///
+    /// Returns 0
+    #[doc(alias = "xmlShellRNGValidate")]
+    #[cfg(feature = "schema")]
+    unsafe fn xml_shell_rng_validate(
+        &mut self,
+        schemas: &str,
+        _node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            use crate::{
+                globals::GLOBAL_STATE,
+                libxml::relaxng::{
+                    xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
+                    xml_relaxng_validate_doc,
+                },
+                relaxng::{
+                    xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
+                    xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt,
+                },
+            };
+
+            use super::relaxng::XmlRelaxNGPtr;
+
+            let ctxt = xml_relaxng_new_parser_ctxt(schemas);
+            let generic_error = GLOBAL_STATE.with_borrow(|state| state.generic_error);
+            (*ctxt).set_parser_errors(Some(generic_error), Some(generic_error), None);
+            let relaxngschemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
+            xml_relaxng_free_parser_ctxt(ctxt);
+            if relaxngschemas.is_null() {
+                generic_error!("Relax-NG schema {} failed to compile\n", schemas);
+                return -1;
+            }
+            let vctxt = xml_relaxng_new_valid_ctxt(relaxngschemas);
+            xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), None);
+            let ret = if let Some(doc) = self.doc {
+                xml_relaxng_validate_doc(vctxt, doc)
+            } else {
+                -1
+            };
+
+            match ret.cmp(&0) {
+                std::cmp::Ordering::Equal => {
+                    eprintln!("{} validates", self.filename);
+                }
+                std::cmp::Ordering::Greater => {
+                    eprintln!("{} fails to validate", self.filename);
+                }
+                std::cmp::Ordering::Less => {
+                    eprintln!("{} validation generated an internal error", self.filename);
+                }
+            }
+            xml_relaxng_free_valid_ctxt(vctxt);
+            if !relaxngschemas.is_null() {
+                xml_relaxng_free(relaxngschemas);
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "grep"
+    /// dumps information about the node (namespace, attributes, content).
+    ///
+    /// Returns 0
+    #[doc(alias = "xmlShellGrep")]
+    unsafe fn xml_shell_grep(
+        &mut self,
+        arg: Option<&str>,
+        mut node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            if node.is_none() {
+                return 0;
+            }
+            let Some(arg) = arg else {
+                return 0;
+            };
+            // what does the following do... ?
+            // #[cfg(feature = "regexp")]
+            // if !xmlStrchr(arg as *mut xmlChar, b'?').is_null()
+            //     || !xmlStrchr(arg as *mut xmlChar, b'*').is_null()
+            //     || !xmlStrchr(arg as *mut xmlChar, b'.').is_null()
+            //     || !xmlStrchr(arg as *mut xmlChar, b'[').is_null()
+            // {}
+            while let Some(now) = node {
+                if let Ok(now) = XmlNodePtr::try_from(now) {
+                    let arg = CString::new(arg).unwrap();
+                    if now.element_type() == XmlElementType::XmlCommentNode {
+                        if !xml_strstr(now.content, arg.as_ptr() as *mut u8).is_null() {
+                            let path = now.get_node_path().unwrap();
+                            write!(self.output, "{path} : ").ok();
+                            self.xml_shell_list(None, Some(now.into()), None);
+                        }
+                    } else if now.element_type() == XmlElementType::XmlTextNode
+                        && !xml_strstr(now.content, arg.as_ptr() as *mut u8).is_null()
+                    {
+                        let path = now.parent().unwrap().get_node_path().unwrap();
+                        write!(self.output, "{path} : ").ok();
+                        self.xml_shell_list(None, now.parent, None);
+                    }
+                }
+
+                // Browse the full subtree, deep first
+                if let Ok(doc) = XmlDocPtr::try_from(now) {
+                    node = doc.children;
+                } else if let Some(children) = now
+                    .children()
+                    .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
+                {
+                    // deep first
+                    node = Some(children);
+                } else if let Some(next) = now.next() {
+                    // then siblings
+                    node = Some(next);
+                } else {
+                    // go up to parents->next if needed
+                    while let Some(now) = node {
+                        if let Some(parent) = now.parent() {
+                            node = Some(parent);
+                        }
+                        if let Some(next) = now.next() {
+                            node = Some(next);
+                            break;
+                        }
+                        if now.parent().is_none() {
+                            node = None;
+                            break;
+                        }
+                    }
+                }
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "dir"
+    /// dumps information about the node (namespace, attributes, content).
+    ///
+    /// Returns 0
+    #[doc(alias = "xmlShellSetContent")]
+    unsafe fn xml_shell_set_content(
+        &mut self,
+        value: Option<&str>,
+        node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            let Some(mut node) = node else {
+                writeln!(self.output, "NULL").ok();
+                return 0;
+            };
+            let Some(value) = value else {
+                writeln!(self.output, "NULL").ok();
+                return 0;
+            };
+
+            let mut results = None;
+            let ret = xml_parse_in_node_context(node, value.as_bytes().to_vec(), 0, &mut results);
+            if ret == XmlParserErrors::XmlErrOK {
+                if let Some(children) = node.children() {
+                    xml_free_node_list(Some(children));
+                    node.set_children(None);
+                    node.set_last(None);
+                }
+                node.add_child_list(results.unwrap());
+            } else {
+                writeln!(self.output, "failed to parse content").ok();
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "setns"
+    /// register/unregister a prefix=namespace pair on the XPath context
+    ///
+    /// Returns 0 on success and a negative value otherwise.
+    #[doc(alias = "xmlShellRegisterNamespace")]
+    #[cfg(feature = "xpath")]
+    unsafe fn xml_shell_register_namespace(
+        &mut self,
+        arg: Option<&str>,
+        _node: Option<XmlGenericNodePtr>,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            use crate::xpath::internals::xml_xpath_register_ns;
+
+            let Some(mut arg) = arg else {
+                return 0;
+            };
+
+            arg = arg.trim_start();
+            while !arg.is_empty() {
+                let Some((prefix, rem)) = arg.split_once('=') else {
+                    writeln!(self.output, "setns: prefix=[nsuri] required").ok();
+                    return -1;
+                };
+                let (href, rem) = rem.split_once(' ').unwrap_or((rem, ""));
+                arg = rem.trim_start();
+
+                // do register namespace
+                if xml_xpath_register_ns(self.pctxt, prefix, Some(href)) != 0 {
+                    writeln!(
+                        self.output,
+                        "Error: unable to register NS with prefix=\"{prefix}\" and href=\"{href}\""
+                    )
+                    .ok();
+                    return -1;
+                }
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "setrootns"
+    /// which registers all namespaces declarations found on the root element.
+    ///
+    /// Returns 0 on success and a negative value otherwise.
+    #[doc(alias = "xmlShellRegisterRootNamespaces")]
+    #[cfg(feature = "xpath")]
+    unsafe fn xml_shell_register_root_namespaces(
+        &mut self,
+        _arg: Option<&str>,
+        root: XmlNodePtr,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            use crate::xpath::internals::xml_xpath_register_ns;
+
+            if root.element_type() != XmlElementType::XmlElementNode
+                || root.ns_def.is_none()
+                || self.pctxt.is_null()
+            {
+                return -1;
+            }
+            let mut ns = root.ns_def;
+            while let Some(now) = ns {
+                if let Some(prefix) = now.prefix() {
+                    xml_xpath_register_ns(self.pctxt, &prefix, now.href().as_deref());
+                } else {
+                    xml_xpath_register_ns(self.pctxt, "defaultns", now.href().as_deref());
+                }
+                ns = now.next;
+            }
+            0
+        }
+    }
+
+    /// Implements the XML shell function "setbase"
+    /// change the current XML base of the node
+    ///
+    /// Returns 0
+    #[doc(alias = "xmlShellSetBase")]
+    #[cfg(feature = "libxml_tree")]
+    unsafe fn xml_shell_set_base(
+        &mut self,
+        arg: Option<&str>,
+        node: XmlGenericNodePtr,
+        _node2: Option<XmlGenericNodePtr>,
+    ) -> i32 {
+        unsafe {
+            node.set_base(arg);
+            0
+        }
+    }
+}
+
 /// This is a generic signature for the XML shell functions.
 ///
 /// Returns an int, negative returns indicating errors.
 #[doc(alias = "xmlShellCmd")]
 #[cfg(feature = "xpath")]
 pub type XmlShellCmd = unsafe fn(
-    ctxt: XmlShellCtxtPtr,
+    ctxt: &mut XmlShellCtxt<'_>,
     arg: Option<&str>,
     node: Option<XmlGenericNodePtr>,
     node2: Option<XmlGenericNodePtr>,
@@ -1923,13 +2675,13 @@ pub fn xml_shell_print_xpath_error(error_type: XmlXPathObjectType, arg: Option<&
 /// Print node to the output FILE
 #[doc(alias = "xmlShellPrintNodeCtxt")]
 #[cfg(feature = "libxml_output")]
-unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlGenericNodePtr) {
+unsafe fn xml_shell_print_node_ctxt(ctxt: Option<&mut XmlShellCtxt<'_>>, node: XmlGenericNodePtr) {
     unsafe {
         let stdout = &mut stdout();
-        let fp = if ctxt.is_null() {
-            stdout as &mut dyn Write
+        let fp = if let Some(ctxt) = ctxt {
+            ctxt.output.as_mut()
         } else {
-            (*ctxt).output.as_mut()
+            stdout as &mut dyn Write
         };
         let mut boxed = Box::new(fp);
         if let Some(mut doc) = XmlDocPtr::try_from(node)
@@ -1952,19 +2704,18 @@ unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlGenericNodeP
 
 /// Prints result to the output FILE
 #[doc(alias = "xmlShellPrintXPathResultCtxt")]
-unsafe fn xml_shell_print_xpath_result_ctxt(ctxt: XmlShellCtxtPtr, list: XmlXPathObjectPtr) {
+unsafe fn xml_shell_print_xpath_result_ctxt(
+    mut ctxt: Option<&mut XmlShellCtxt<'_>>,
+    list: XmlXPathObjectPtr,
+) {
     unsafe {
-        if !ctxt.is_null() {
-            return;
-        }
-
         if !list.is_null() {
             match (*list).typ {
                 XmlXPathObjectType::XPathNodeset => {
                     #[cfg(feature = "libxml_output")]
                     if let Some(nodeset) = (*list).nodesetval.as_deref() {
                         for &node in &nodeset.node_tab {
-                            xml_shell_print_node_ctxt(ctxt, node);
+                            xml_shell_print_node_ctxt(ctxt.as_deref_mut(), node);
                         }
                     } else {
                         generic_error!("Empty node set\n");
@@ -1996,172 +2747,7 @@ unsafe fn xml_shell_print_xpath_result_ctxt(ctxt: XmlShellCtxtPtr, list: XmlXPat
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_shell_print_xpath_result(list: XmlXPathObjectPtr) {
     unsafe {
-        xml_shell_print_xpath_result_ctxt(null_mut(), list);
-    }
-}
-
-/// Implements the XML shell function "ls"
-/// Does an Unix like listing of the given node (like a directory)
-///
-/// Returns 0
-#[doc(alias = "xmlShellList")]
-#[cfg(feature = "xpath")]
-pub unsafe fn xml_shell_list(
-    ctxt: XmlShellCtxtPtr,
-    _arg: Option<&str>,
-    node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return 0;
-        }
-        let Some(node) = node else {
-            writeln!((*ctxt).output, "NULL").ok();
-            return 0;
-        };
-        let mut cur = if let Ok(doc) = XmlDocPtr::try_from(node) {
-            doc.children()
-        } else if let Ok(ns) = XmlNsPtr::try_from(node) {
-            xml_ls_one_node(&mut (*ctxt).output, Some(ns.into()));
-            return 0;
-        } else if let Some(children) = node.children() {
-            Some(children)
-        } else {
-            xml_ls_one_node(&mut (*ctxt).output, Some(node));
-            return 0;
-        };
-        while let Some(now) = cur {
-            xml_ls_one_node(&mut (*ctxt).output, Some(now));
-            cur = now.next();
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "base"
-/// dumps the current XML base of the node
-///
-/// Returns 0
-#[doc(alias = "xmlShellBase")]
-#[cfg(feature = "xpath")]
-pub unsafe fn xml_shell_base(
-    ctxt: XmlShellCtxtPtr,
-    _arg: Option<&str>,
-    node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return 0;
-        }
-        let Some(node) = node else {
-            writeln!((*ctxt).output, "NULL").ok();
-            return 0;
-        };
-
-        if let Some(base) = node.get_base(node.document()) {
-            writeln!((*ctxt).output, "{base}").ok();
-        } else {
-            writeln!((*ctxt).output, " No base found !!!").ok();
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "dir"
-/// dumps information about the node (namespace, attributes, content).
-///
-/// Returns 0
-#[doc(alias = "xmlShellDir")]
-#[cfg(feature = "xpath")]
-pub unsafe fn xml_shell_dir(
-    ctxt: XmlShellCtxtPtr,
-    _arg: Option<&str>,
-    node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return 0;
-        }
-        let Some(node) = node else {
-            writeln!((*ctxt).output, "NULL").ok();
-            return 0;
-        };
-        if let Ok(doc) = XmlDocPtr::try_from(node) {
-            xml_debug_dump_document_head(Some(&mut (*ctxt).output), Some(doc));
-        } else if node.element_type() == XmlElementType::XmlAttributeNode {
-            xml_debug_dump_attr(&mut (*ctxt).output, XmlAttrPtr::try_from(node).ok(), 0);
-        } else {
-            xml_debug_dump_one_node(&mut (*ctxt).output, Some(node), 0);
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "load"
-/// loads a new document specified by the filename
-///
-/// Returns 0 or -1 if loading failed
-#[doc(alias = "xmlShellLoad")]
-#[cfg(feature = "xpath")]
-pub unsafe fn xml_shell_load(
-    ctxt: &mut XmlShellCtxt<'_>,
-    filename: &str,
-    _node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        use crate::{
-            libxml::htmlparser::html_parse_file,
-            parser::xml_read_file,
-            uri::canonic_path,
-            xpath::{xml_xpath_free_context, xml_xpath_new_context},
-        };
-
-        use crate::tree::xml_free_doc;
-
-        let mut html: i32 = 0;
-
-        if let Some(doc) = ctxt.doc {
-            html = (doc.typ == XmlElementType::XmlHTMLDocumentNode) as i32;
-        }
-
-        let Some(doc) = (if html != 0 {
-            #[cfg(feature = "html")]
-            {
-                html_parse_file(filename, None)
-            }
-            #[cfg(not(feature = "html"))]
-            {
-                write!((*ctxt).output, "HTML support not compiled in\n".as_ptr()).ok();
-                None
-            }
-        } else {
-            xml_read_file(filename, None, 0)
-        }) else {
-            return -1;
-        };
-        if ctxt.loaded == 1 {
-            if let Some(doc) = ctxt.doc {
-                xml_free_doc(doc);
-            }
-        }
-        ctxt.loaded = 1;
-        #[cfg(feature = "xpath")]
-        {
-            xml_xpath_free_context(ctxt.pctxt);
-        }
-        ctxt.doc = Some(doc);
-        ctxt.node = Some(doc.into());
-        #[cfg(feature = "xpath")]
-        {
-            ctxt.pctxt = xml_xpath_new_context(Some(doc));
-        }
-        let canonic = canonic_path(filename);
-        ctxt.filename = canonic.into_owned();
-        0
+        xml_shell_print_xpath_result_ctxt(None, list);
     }
 }
 
@@ -2170,628 +2756,7 @@ pub unsafe fn xml_shell_load(
 #[cfg(all(feature = "xpath", feature = "libxml_output"))]
 pub unsafe fn xml_shell_print_node(node: XmlGenericNodePtr) {
     unsafe {
-        xml_shell_print_node_ctxt(null_mut(), node);
-    }
-}
-
-/// Implements the XML shell function "cat"
-/// dumps the serialization node content (XML or HTML).
-///
-/// Returns 0
-#[doc(alias = "xmlShellCat")]
-#[cfg(all(feature = "xpath", feature = "libxml_output"))]
-pub unsafe fn xml_shell_cat(
-    ctxt: XmlShellCtxtPtr,
-    _arg: Option<&str>,
-    node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        use crate::libxml::htmltree::{html_doc_dump, html_node_dump_file};
-
-        if ctxt.is_null() {
-            return 0;
-        }
-        let Some(node) = node else {
-            writeln!((*ctxt).output, "NULL").ok();
-            return 0;
-        };
-        if let Some(doc) = (*ctxt)
-            .doc
-            .filter(|doc| doc.typ == XmlElementType::XmlHTMLDocumentNode)
-        {
-            #[cfg(feature = "html")]
-            if let Some(doc) = XmlDocPtr::try_from(node)
-                .ok()
-                .filter(|doc| doc.element_type() == XmlElementType::XmlHTMLDocumentNode)
-            {
-                html_doc_dump(&mut (*ctxt).output, doc);
-            } else {
-                html_node_dump_file(&mut (*ctxt).output, Some(doc), Some(node));
-            }
-            #[cfg(not(feature = "html"))]
-            if let Some(mut doc) = XmlDocPtr::try_from(node)
-                .ok()
-                .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
-            {
-                doc.dump_file((*ctxt).output);
-            } else {
-                xml_elem_dump((*ctxt).output, (*ctxt).doc, node);
-            }
-        } else if let Some(mut doc) = XmlDocPtr::try_from(node)
-            .ok()
-            .filter(|doc| doc.element_type() == XmlElementType::XmlDocumentNode)
-        {
-            doc.dump_file(&mut (*ctxt).output);
-        } else {
-            // Is this `unwrap` OK ????
-            XmlNodePtr::try_from(node)
-                .unwrap()
-                .dump_file(&mut (*ctxt).output, (*ctxt).doc);
-        }
-        writeln!((*ctxt).output).ok();
-        0
-    }
-}
-
-/// Implements the XML shell function "write"
-/// Write the current node to the filename, it saves the serialization
-/// of the subtree under the @node specified
-///
-/// Returns 0 or -1 in case of error
-#[doc(alias = "xmlShellWrite")]
-#[cfg(all(feature = "xpath", feature = "libxml_output"))]
-pub unsafe fn xml_shell_write(
-    ctxt: XmlShellCtxtPtr,
-    filename: &str,
-    node: XmlGenericNodePtr,
-    _node2: Option<XmlNodePtr>,
-) -> i32 {
-    unsafe {
-        use std::fs::File;
-
-        use crate::libxml::htmltree::html_save_file;
-
-        if filename.is_empty() {
-            return -1;
-        }
-        let cfilename = CString::new(filename).unwrap();
-        match node.element_type() {
-            XmlElementType::XmlDocumentNode => {
-                if (*ctxt)
-                    .doc
-                    .is_none_or(|mut doc| doc.save_file(filename) < -1)
-                {
-                    generic_error!("Failed to write to {filename}\n");
-                    return -1;
-                }
-            }
-            XmlElementType::XmlHTMLDocumentNode => {
-                #[cfg(feature = "html")]
-                if html_save_file(cfilename.as_ptr(), (*ctxt).doc.unwrap()) < 0 {
-                    generic_error!("Failed to write to {filename}\n");
-                    return -1;
-                }
-                #[cfg(not(feature = "html"))]
-                if xml_save_file(filename as *mut c_char, (*ctxt).doc) < -1 {
-                    generic_error!(
-                        "Failed to write to {}\n",
-                        CStr::from_ptr(filename as *const i8).to_string_lossy()
-                    );
-                    return -1;
-                }
-            }
-            _ => {
-                match File::options()
-                    .write(true)
-                    .truncate(true)
-                    .create(true)
-                    .open(filename)
-                {
-                    Ok(mut f) => {
-                        let mut node = XmlNodePtr::try_from(node).unwrap();
-                        node.dump_file(&mut f, (*ctxt).doc);
-                    }
-                    _ => {
-                        generic_error!("Failed to write to {filename}\n");
-                        return -1;
-                    }
-                }
-            }
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "save"
-/// Write the current document to the filename, or it's original name
-///
-/// Returns 0 or -1 in case of error
-#[doc(alias = "xmlShellSave")]
-#[cfg(all(feature = "xpath", feature = "libxml_output"))]
-pub unsafe fn xml_shell_save(
-    ctxt: XmlShellCtxtPtr,
-    filename: Option<&str>,
-    _node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        use crate::libxml::htmltree::html_save_file;
-
-        if ctxt.is_null() {
-            return -1;
-        }
-        let Some(mut doc) = (*ctxt).doc else {
-            return -1;
-        };
-        let filename = filename
-            .filter(|filename| !filename.is_empty())
-            .unwrap_or(&(*ctxt).filename);
-        match doc.typ {
-            XmlElementType::XmlDocumentNode => {
-                if doc.save_file(filename) < 0 {
-                    generic_error!("Failed to save to {}\n", filename);
-                }
-            }
-            XmlElementType::XmlHTMLDocumentNode => {
-                let cfilename = CString::new(filename).unwrap();
-                #[cfg(feature = "html")]
-                if html_save_file(cfilename.as_ptr() as *mut c_char, doc) < 0 {
-                    generic_error!("Failed to save to {}\n", filename);
-                }
-                #[cfg(not(feature = "html"))]
-                if (xml_save_file(filename as *mut c_char, (*ctxt).doc) < 0) {
-                    generic_error!("Failed to save to {}\n", filename);
-                }
-            }
-            _ => {
-                generic_error!("To save to subparts of a document use the 'write' command\n");
-                return -1;
-            }
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "validate"
-/// Validate the document, if a DTD path is provided, then the validation
-/// is done against the given DTD.
-///
-/// Returns 0 or -1 in case of error
-#[doc(alias = "xmlShellValidate")]
-#[cfg(all(feature = "xpath", feature = "libxml_valid"))]
-pub unsafe fn xml_shell_validate(
-    ctxt: XmlShellCtxtPtr,
-    dtd: Option<&str>,
-    _node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        use crate::{
-            globals::GLOBAL_STATE,
-            libxml::{
-                parser::xml_parse_dtd,
-                valid::{xml_validate_document, xml_validate_dtd},
-            },
-            tree::xml_free_dtd,
-        };
-
-        use super::valid::XmlValidCtxt;
-
-        let mut vctxt = XmlValidCtxt::default();
-        let mut res: i32 = -1;
-
-        if ctxt.is_null() {
-            return -1;
-        }
-        let Some(doc) = (*ctxt).doc else {
-            return -1;
-        };
-        vctxt.error = Some(GLOBAL_STATE.with_borrow(|state| state.generic_error));
-        vctxt.warning = vctxt.error;
-
-        if let Some(dtd) = dtd.filter(|dtd| !dtd.is_empty()) {
-            let subset = xml_parse_dtd(None, Some(dtd));
-            if let Some(subset) = subset {
-                res = xml_validate_dtd(addr_of_mut!(vctxt), doc, subset);
-                xml_free_dtd(subset);
-            }
-        } else {
-            res = xml_validate_document(addr_of_mut!(vctxt), doc);
-        }
-        res
-    }
-}
-
-/// Implements the XML shell function "du"
-/// show the structure of the subtree under node @tree
-/// If @tree is null, the command works on the current node.
-///
-/// Returns 0 or -1 in case of error
-#[doc(alias = "xmlShellDu")]
-#[cfg(feature = "xpath")]
-pub unsafe fn xml_shell_du(
-    ctxt: XmlShellCtxtPtr,
-    _arg: Option<&str>,
-    tree: XmlGenericNodePtr,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        let mut indent: i32 = 0;
-
-        if ctxt.is_null() {
-            return -1;
-        }
-
-        let mut node = Some(tree);
-        while let Some(now) = node {
-            if now.element_type() == XmlElementType::XmlDocumentNode
-                || now.element_type() == XmlElementType::XmlHTMLDocumentNode
-            {
-                writeln!((*ctxt).output, "/").ok();
-            } else if let Some(node) = XmlNodePtr::try_from(now)
-                .ok()
-                .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
-            {
-                for _ in 0..indent {
-                    write!((*ctxt).output, "  ").ok();
-                }
-                if let Some(prefix) = node.ns.as_deref().and_then(|ns| ns.prefix()) {
-                    write!((*ctxt).output, "{prefix}:").ok();
-                }
-                let name = CStr::from_ptr(node.name as *const i8).to_string_lossy();
-                writeln!((*ctxt).output, "{name}").ok();
-            }
-
-            // Browse the full subtree, deep first
-            if let Ok(doc) = XmlDocPtr::try_from(now) {
-                node = doc.children;
-            } else if let Some(children) = now
-                .children()
-                .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
-            {
-                // deep first
-                node = Some(children);
-                indent += 1;
-            } else if let Some(next) = now.next().filter(|_| node != Some(tree)) {
-                // then siblings
-                node = Some(next);
-            } else if node != Some(tree) {
-                // go up to parents->next if needed
-                while node != Some(tree) {
-                    if let Some(parent) = now.parent() {
-                        node = Some(parent);
-                        indent -= 1;
-                    }
-                    if let Some(next) = now.next().filter(|_| node != Some(tree)) {
-                        node = Some(next);
-                        break;
-                    }
-                    if now.parent().is_none() {
-                        node = None;
-                        break;
-                    }
-                    if node == Some(tree) {
-                        node = None;
-                        break;
-                    }
-                }
-                // exit condition
-                if node == Some(tree) {
-                    node = None;
-                }
-            } else {
-                node = None;
-            }
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "pwd"
-/// Show the full path from the root to the node, if needed building
-/// thumblers when similar elements exists at a given ancestor level.
-/// The output is compatible with XPath commands.
-///
-/// Returns 0 or -1 in case of error
-#[doc(alias = "xmlShellPwd")]
-#[cfg(feature = "xpath")]
-pub unsafe fn xml_shell_pwd(
-    _ctxt: XmlShellCtxtPtr,
-    buffer: &mut String,
-    node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    let Some(node) = node else {
-        return -1;
-    };
-    unsafe {
-        let Some(path) = node.get_node_path() else {
-            return -1;
-        };
-
-        *buffer = path;
-    }
-    0
-}
-
-/// Implements the XML shell function "relaxng"
-/// validating the instance against a Relax-NG schemas
-///
-/// Returns 0
-#[doc(alias = "xmlShellRNGValidate")]
-#[cfg(feature = "schema")]
-unsafe fn xml_shell_rng_validate(
-    sctxt: XmlShellCtxtPtr,
-    schemas: &str,
-    _node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        use crate::{
-            globals::GLOBAL_STATE,
-            libxml::relaxng::{
-                xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
-                xml_relaxng_validate_doc,
-            },
-            relaxng::{
-                xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
-                xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt,
-            },
-        };
-
-        use super::relaxng::XmlRelaxNGPtr;
-
-        let ctxt = xml_relaxng_new_parser_ctxt(schemas);
-        let generic_error = GLOBAL_STATE.with_borrow(|state| state.generic_error);
-        (*ctxt).set_parser_errors(Some(generic_error), Some(generic_error), None);
-        let relaxngschemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
-        xml_relaxng_free_parser_ctxt(ctxt);
-        if relaxngschemas.is_null() {
-            generic_error!("Relax-NG schema {} failed to compile\n", schemas);
-            return -1;
-        }
-        let vctxt = xml_relaxng_new_valid_ctxt(relaxngschemas);
-        xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), None);
-        let ret = if let Some(doc) = (*sctxt).doc {
-            xml_relaxng_validate_doc(vctxt, doc)
-        } else {
-            -1
-        };
-
-        match ret.cmp(&0) {
-            std::cmp::Ordering::Equal => {
-                eprintln!("{} validates", (*sctxt).filename);
-            }
-            std::cmp::Ordering::Greater => {
-                eprintln!("{} fails to validate", (*sctxt).filename);
-            }
-            std::cmp::Ordering::Less => {
-                eprintln!(
-                    "{} validation generated an internal error",
-                    (*sctxt).filename
-                );
-            }
-        }
-        xml_relaxng_free_valid_ctxt(vctxt);
-        if !relaxngschemas.is_null() {
-            xml_relaxng_free(relaxngschemas);
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "grep"
-/// dumps information about the node (namespace, attributes, content).
-///
-/// Returns 0
-#[doc(alias = "xmlShellGrep")]
-unsafe fn xml_shell_grep(
-    ctxt: XmlShellCtxtPtr,
-    arg: Option<&str>,
-    mut node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return 0;
-        }
-        if node.is_none() {
-            return 0;
-        }
-        let Some(arg) = arg else {
-            return 0;
-        };
-        // what does the following do... ?
-        // #[cfg(feature = "regexp")]
-        // if !xmlStrchr(arg as *mut xmlChar, b'?').is_null()
-        //     || !xmlStrchr(arg as *mut xmlChar, b'*').is_null()
-        //     || !xmlStrchr(arg as *mut xmlChar, b'.').is_null()
-        //     || !xmlStrchr(arg as *mut xmlChar, b'[').is_null()
-        // {}
-        while let Some(now) = node {
-            if let Ok(now) = XmlNodePtr::try_from(now) {
-                let arg = CString::new(arg).unwrap();
-                if now.element_type() == XmlElementType::XmlCommentNode {
-                    if !xml_strstr(now.content, arg.as_ptr() as *mut u8).is_null() {
-                        let path = now.get_node_path().unwrap();
-                        write!((*ctxt).output, "{path} : ").ok();
-                        xml_shell_list(ctxt, None, Some(now.into()), None);
-                    }
-                } else if now.element_type() == XmlElementType::XmlTextNode
-                    && !xml_strstr(now.content, arg.as_ptr() as *mut u8).is_null()
-                {
-                    let path = now.parent().unwrap().get_node_path().unwrap();
-                    write!((*ctxt).output, "{path} : ").ok();
-                    xml_shell_list(ctxt, None, now.parent, None);
-                }
-            }
-
-            // Browse the full subtree, deep first
-            if let Ok(doc) = XmlDocPtr::try_from(now) {
-                node = doc.children;
-            } else if let Some(children) = now
-                .children()
-                .filter(|_| now.element_type() != XmlElementType::XmlEntityRefNode)
-            {
-                // deep first
-                node = Some(children);
-            } else if let Some(next) = now.next() {
-                // then siblings
-                node = Some(next);
-            } else {
-                // go up to parents->next if needed
-                while let Some(now) = node {
-                    if let Some(parent) = now.parent() {
-                        node = Some(parent);
-                    }
-                    if let Some(next) = now.next() {
-                        node = Some(next);
-                        break;
-                    }
-                    if now.parent().is_none() {
-                        node = None;
-                        break;
-                    }
-                }
-            }
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "dir"
-/// dumps information about the node (namespace, attributes, content).
-///
-/// Returns 0
-#[doc(alias = "xmlShellSetContent")]
-unsafe fn xml_shell_set_content(
-    ctxt: XmlShellCtxtPtr,
-    value: Option<&str>,
-    node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return 0;
-        }
-        let Some(mut node) = node else {
-            writeln!((*ctxt).output, "NULL").ok();
-            return 0;
-        };
-        let Some(value) = value else {
-            writeln!((*ctxt).output, "NULL").ok();
-            return 0;
-        };
-
-        let mut results = None;
-        let ret = xml_parse_in_node_context(node, value.as_bytes().to_vec(), 0, &mut results);
-        if ret == XmlParserErrors::XmlErrOK {
-            if let Some(children) = node.children() {
-                xml_free_node_list(Some(children));
-                node.set_children(None);
-                node.set_last(None);
-            }
-            node.add_child_list(results.unwrap());
-        } else {
-            writeln!((*ctxt).output, "failed to parse content").ok();
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "setns"
-/// register/unregister a prefix=namespace pair on the XPath context
-///
-/// Returns 0 on success and a negative value otherwise.
-#[doc(alias = "xmlShellRegisterNamespace")]
-#[cfg(feature = "xpath")]
-unsafe fn xml_shell_register_namespace(
-    ctxt: XmlShellCtxtPtr,
-    arg: Option<&str>,
-    _node: Option<XmlGenericNodePtr>,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        use crate::xpath::internals::xml_xpath_register_ns;
-
-        let Some(mut arg) = arg else {
-            return 0;
-        };
-
-        arg = arg.trim_start();
-        while !arg.is_empty() {
-            let Some((prefix, rem)) = arg.split_once('=') else {
-                writeln!((*ctxt).output, "setns: prefix=[nsuri] required").ok();
-                return -1;
-            };
-            let (href, rem) = rem.split_once(' ').unwrap_or((rem, ""));
-            arg = rem.trim_start();
-
-            // do register namespace
-            if xml_xpath_register_ns((*ctxt).pctxt, prefix, Some(href)) != 0 {
-                writeln!(
-                    (*ctxt).output,
-                    "Error: unable to register NS with prefix=\"{prefix}\" and href=\"{href}\""
-                )
-                .ok();
-                return -1;
-            }
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "setrootns"
-/// which registers all namespaces declarations found on the root element.
-///
-/// Returns 0 on success and a negative value otherwise.
-#[doc(alias = "xmlShellRegisterRootNamespaces")]
-#[cfg(feature = "xpath")]
-unsafe fn xml_shell_register_root_namespaces(
-    ctxt: XmlShellCtxtPtr,
-    _arg: Option<&str>,
-    root: XmlNodePtr,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        use crate::xpath::internals::xml_xpath_register_ns;
-
-        if root.element_type() != XmlElementType::XmlElementNode
-            || root.ns_def.is_none()
-            || ctxt.is_null()
-            || (*ctxt).pctxt.is_null()
-        {
-            return -1;
-        }
-        let mut ns = root.ns_def;
-        while let Some(now) = ns {
-            if let Some(prefix) = now.prefix() {
-                xml_xpath_register_ns((*ctxt).pctxt, &prefix, now.href().as_deref());
-            } else {
-                xml_xpath_register_ns((*ctxt).pctxt, "defaultns", now.href().as_deref());
-            }
-            ns = now.next;
-        }
-        0
-    }
-}
-
-/// Implements the XML shell function "setbase"
-/// change the current XML base of the node
-///
-/// Returns 0
-#[doc(alias = "xmlShellSetBase")]
-#[cfg(feature = "libxml_tree")]
-unsafe fn xml_shell_set_base(
-    _ctxt: XmlShellCtxtPtr,
-    arg: Option<&str>,
-    node: XmlGenericNodePtr,
-    _node2: Option<XmlGenericNodePtr>,
-) -> i32 {
-    unsafe {
-        node.set_base(arg);
-        0
+        xml_shell_print_node_ctxt(None, node);
     }
 }
 
@@ -2941,29 +2906,29 @@ pub unsafe fn xml_shell<'a>(
                 }
                 #[cfg(feature = "libxml_valid")]
                 "validate" => {
-                    xml_shell_validate(&raw mut ctxt, Some(arg), None, None);
+                    ctxt.xml_shell_validate(Some(arg), None, None);
                 }
                 "load" => {
-                    xml_shell_load(&mut ctxt, arg, None, None);
+                    ctxt.xml_shell_load(arg, None, None);
                 }
                 #[cfg(feature = "schema")]
                 "relaxng" => {
-                    xml_shell_rng_validate(&raw mut ctxt, arg, None, None);
+                    ctxt.xml_shell_rng_validate(arg, None, None);
                 }
                 #[cfg(feature = "libxml_output")]
                 "save" => {
-                    xml_shell_save(&raw mut ctxt, Some(arg), None, None);
+                    ctxt.xml_shell_save(Some(arg), None, None);
                 }
                 #[cfg(feature = "libxml_output")]
                 "write" => {
                     if arg.is_empty() {
                         generic_error!("Write command requires a filename argument\n");
                     } else {
-                        xml_shell_write(&raw mut ctxt, arg, ctxt.node.unwrap(), None);
+                        ctxt.xml_shell_write(arg, ctxt.node.unwrap(), None);
                     }
                 }
                 "grep" => {
-                    xml_shell_grep(&raw mut ctxt, Some(arg), ctxt.node, None);
+                    ctxt.xml_shell_grep(Some(arg), ctxt.node, None);
                 }
                 "free" => {
                     if arg.is_empty() {
@@ -2976,13 +2941,13 @@ pub unsafe fn xml_shell<'a>(
                 "pwd" => {
                     let mut dir = String::with_capacity(500);
 
-                    if xml_shell_pwd(&raw mut ctxt, &mut dir, ctxt.node, None) == 0 {
+                    if ctxt.xml_shell_pwd(&mut dir, ctxt.node, None) == 0 {
                         writeln!(ctxt.output, "{dir}").ok();
                     }
                 }
                 "du" => {
                     if arg.is_empty() {
-                        xml_shell_du(&raw mut ctxt, None, ctxt.node.unwrap(), None);
+                        ctxt.xml_shell_du(None, ctxt.node.unwrap(), None);
                         continue;
                     }
                     (*ctxt.pctxt).node = ctxt.node;
@@ -3004,7 +2969,7 @@ pub unsafe fn xml_shell<'a>(
                             XmlXPathObjectType::XPathNodeset => {
                                 if let Some(nodeset) = (*list).nodesetval.as_deref() {
                                     for &node in &nodeset.node_tab {
-                                        xml_shell_du(&raw mut ctxt, None, node, None);
+                                        ctxt.xml_shell_du(None, node, None);
                                     }
                                 }
                             }
@@ -3046,23 +3011,23 @@ pub unsafe fn xml_shell<'a>(
                     (*ctxt.pctxt).node = None;
                 }
                 "base" => {
-                    xml_shell_base(&raw mut ctxt, None, ctxt.node, None);
+                    ctxt.xml_shell_base(None, ctxt.node, None);
                 }
                 "set" => {
-                    xml_shell_set_content(&raw mut ctxt, Some(arg), ctxt.node, None);
+                    ctxt.xml_shell_set_content(Some(arg), ctxt.node, None);
                 }
                 #[cfg(feature = "xpath")]
                 "setns" => {
                     if arg.is_empty() {
                         generic_error!("setns: prefix=[nsuri] required\n");
                     } else {
-                        xml_shell_register_namespace(&raw mut ctxt, Some(arg), None, None);
+                        ctxt.xml_shell_register_namespace(Some(arg), None, None);
                     }
                 }
                 #[cfg(feature = "xpath")]
                 "setrootns" => {
                     let root = doc.get_root_element();
-                    xml_shell_register_root_namespaces(&raw mut ctxt, None, root.unwrap(), None);
+                    ctxt.xml_shell_register_root_namespaces(None, root.unwrap(), None);
                 }
                 #[cfg(feature = "xpath")]
                 "xpath" => {
@@ -3078,16 +3043,16 @@ pub unsafe fn xml_shell<'a>(
                 }
                 #[cfg(feature = "libxml_tree")]
                 "setbase" => {
-                    xml_shell_set_base(&raw mut ctxt, Some(arg), ctxt.node.unwrap(), None);
+                    ctxt.xml_shell_set_base(Some(arg), ctxt.node.unwrap(), None);
                 }
                 "ls" | "dir" => {
                     let dir = command == "dir";
 
                     if arg.is_empty() {
                         if dir {
-                            xml_shell_dir(&raw mut ctxt, None, ctxt.node, None);
+                            ctxt.xml_shell_dir(None, ctxt.node, None);
                         } else {
-                            xml_shell_list(&raw mut ctxt, None, ctxt.node, None);
+                            ctxt.xml_shell_list(None, ctxt.node, None);
                         }
                         continue;
                     }
@@ -3114,9 +3079,9 @@ pub unsafe fn xml_shell<'a>(
 
                                 for &node in &nodeset.node_tab {
                                     if dir {
-                                        xml_shell_dir(&raw mut ctxt, None, Some(node), None);
+                                        ctxt.xml_shell_dir(None, Some(node), None);
                                     } else {
-                                        xml_shell_list(&raw mut ctxt, None, Some(node), None);
+                                        ctxt.xml_shell_list(None, Some(node), None);
                                     }
                                 }
                             }
@@ -3161,7 +3126,7 @@ pub unsafe fn xml_shell<'a>(
                     let mut dir = String::with_capacity(500);
 
                     if arg.is_empty() {
-                        if xml_shell_pwd(&raw mut ctxt, &mut dir, ctxt.node, None) == 0 {
+                        if ctxt.xml_shell_pwd(&mut dir, ctxt.node, None) == 0 {
                             writeln!(ctxt.output, "{dir}").ok();
                         }
                     } else {
@@ -3184,13 +3149,7 @@ pub unsafe fn xml_shell<'a>(
                                     if let Some(nodeset) = (*list).nodesetval.as_deref() {
                                         for &node in &nodeset.node_tab {
                                             dir.clear();
-                                            if xml_shell_pwd(
-                                                &raw mut ctxt,
-                                                &mut dir,
-                                                Some(node),
-                                                None,
-                                            ) == 0
-                                            {
+                                            if ctxt.xml_shell_pwd(&mut dir, Some(node), None) == 0 {
                                                 writeln!(ctxt.output, "{dir}").ok();
                                             }
                                         }
@@ -3325,71 +3284,71 @@ pub unsafe fn xml_shell<'a>(
                 }
                 "cat" => {
                     if arg.is_empty() {
-                        xml_shell_cat(&raw mut ctxt, None, ctxt.node, None);
-                    } else {
+                        ctxt.xml_shell_cat(None, ctxt.node, None);
+                        continue;
+                    }
+                    (*ctxt.pctxt).node = ctxt.node;
+                    #[cfg(feature = "xpath")]
+                    {
                         (*ctxt.pctxt).node = ctxt.node;
-                        #[cfg(feature = "xpath")]
-                        {
-                            (*ctxt.pctxt).node = ctxt.node;
-                            let arg = CString::new(arg).unwrap();
-                            list = xml_xpath_eval(arg.as_ptr() as *const u8, ctxt.pctxt);
-                        }
-                        #[cfg(not(feature = "xpath"))]
-                        {
-                            list = null_mut();
-                        }
-                        if !list.is_null() {
-                            match (*list).typ {
-                                XmlXPathObjectType::XPathUndefined => {
-                                    generic_error!("{}: no such node\n", arg);
-                                }
-                                XmlXPathObjectType::XPathNodeset => {
-                                    if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                                        for &node in &nodeset.node_tab {
-                                            if !arg.is_empty() {
-                                                writeln!(ctxt.output, " -------").ok();
-                                            }
-                                            xml_shell_cat(&raw mut ctxt, None, Some(node), None);
+                        let arg = CString::new(arg).unwrap();
+                        list = xml_xpath_eval(arg.as_ptr() as *const u8, ctxt.pctxt);
+                    }
+                    #[cfg(not(feature = "xpath"))]
+                    {
+                        list = null_mut();
+                    }
+                    if !list.is_null() {
+                        match (*list).typ {
+                            XmlXPathObjectType::XPathUndefined => {
+                                generic_error!("{}: no such node\n", arg);
+                            }
+                            XmlXPathObjectType::XPathNodeset => {
+                                if let Some(nodeset) = (*list).nodesetval.as_deref() {
+                                    for &node in &nodeset.node_tab {
+                                        if !arg.is_empty() {
+                                            writeln!(ctxt.output, " -------").ok();
                                         }
+                                        ctxt.xml_shell_cat(None, Some(node), None);
                                     }
                                 }
-                                XmlXPathObjectType::XPathBoolean => {
-                                    generic_error!("{} is a Boolean\n", arg);
-                                }
-                                XmlXPathObjectType::XPathNumber => {
-                                    generic_error!("{} is a number\n", arg);
-                                }
-                                XmlXPathObjectType::XPathString => {
-                                    generic_error!("{} is a string\n", arg);
-                                }
-                                #[cfg(feature = "libxml_xptr_locs")]
-                                XmlXPathObjectType::XPathPoint => {
-                                    generic_error!("{} is a point\n", arg);
-                                }
-                                #[cfg(feature = "libxml_xptr_locs")]
-                                XmlXPathObjectType::XPathRange => {
-                                    generic_error!("{} is a range\n", arg);
-                                }
-                                #[cfg(feature = "libxml_xptr_locs")]
-                                XmlXPathObjectType::XPathLocationset => {
-                                    generic_error!("{} is a range\n", arg);
-                                }
-                                XmlXPathObjectType::XPathUsers => {
-                                    generic_error!("{} is user-defined\n", arg);
-                                }
-                                XmlXPathObjectType::XPathXSLTTree => {
-                                    generic_error!("{} is an XSLT value tree\n", arg);
-                                }
                             }
-                            #[cfg(feature = "xpath")]
-                            {
-                                xml_xpath_free_object(list);
+                            XmlXPathObjectType::XPathBoolean => {
+                                generic_error!("{} is a Boolean\n", arg);
                             }
-                        } else {
-                            generic_error!("{}: no such node\n", arg);
+                            XmlXPathObjectType::XPathNumber => {
+                                generic_error!("{} is a number\n", arg);
+                            }
+                            XmlXPathObjectType::XPathString => {
+                                generic_error!("{} is a string\n", arg);
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathPoint => {
+                                generic_error!("{} is a point\n", arg);
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathRange => {
+                                generic_error!("{} is a range\n", arg);
+                            }
+                            #[cfg(feature = "libxml_xptr_locs")]
+                            XmlXPathObjectType::XPathLocationset => {
+                                generic_error!("{} is a range\n", arg);
+                            }
+                            XmlXPathObjectType::XPathUsers => {
+                                generic_error!("{} is user-defined\n", arg);
+                            }
+                            XmlXPathObjectType::XPathXSLTTree => {
+                                generic_error!("{} is an XSLT value tree\n", arg);
+                            }
                         }
-                        (*ctxt.pctxt).node = None;
+                        #[cfg(feature = "xpath")]
+                        {
+                            xml_xpath_free_object(list);
+                        }
+                    } else {
+                        generic_error!("{}: no such node\n", arg);
                     }
+                    (*ctxt.pctxt).node = None;
                 }
                 _ => {
                     generic_error!("Unknown command {command}\n");
