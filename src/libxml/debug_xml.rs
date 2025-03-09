@@ -2864,13 +2864,47 @@ unsafe fn xml_shell_set_base(
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
     unsafe {
-        // if node.is_null() {
-        //     return 0;
-        // }
         node.set_base(arg);
         0
     }
 }
+
+const XML_SHELL_HELP_CONTENT: &str = r#"
+    base         display XML base of the node
+    setbase URI  change the XML base of the node
+    bye          leave shell
+    cat [node]   display node or current node
+    cd [path]    change directory to path or to root
+    dir [path]   dumps information about the node (namespace, attributes, content)
+    du [path]    show the structure of the subtree under path or the current node
+    exit         leave shell
+    help         display this help
+    free         display memory usage
+    load [name]  load a new document with name
+    ls [path]    list contents of path or the current directory
+    set xml_fragment replace the current node content with the fragment parsed in context
+    pwd          display current working directory
+    whereis      display absolute path of [path] or current working directory
+    quit         leave shell
+    grep string  search for a string in the subtree
+"#;
+const XML_SHELL_HELP_CONTENT_XPATH: &str = r#"
+    xpath expr   evaluate the XPath expression in that context and print the result
+    setns nsreg  register a namespace to a prefix in the XPath evaluation context
+                 format for nsreg is: prefix=[nsuri] (i.e. prefix= unsets a prefix)
+    setrootns    register all namespace found on the root element
+                 the default namespace if any uses 'defaultns' prefix
+"#;
+const XML_SHELL_HELP_CONTENT_OUTPUT: &str = r#"
+    save [name]  save this document to name or the original name
+    write [name] write the current node to the filename
+"#;
+const XML_SHELL_HELP_CONTENT_VALID: &str = r#"
+    validate     check the document for errors
+"#;
+const XML_SHELL_HELP_CONTENT_SCHEMA: &str = r#"
+    relaxng rng  validate the document against the Relax-NG schemas
+"#;
 
 /// Implements the XML shell
 /// This allow to load, validate, view, modify and save a document
@@ -3028,122 +3062,23 @@ pub unsafe fn xml_shell<'a>(
                 break;
             }
             if strcmp(command.as_mut_ptr(), c"help".as_ptr()) == 0 {
-                writeln!(
-                    (*ctxt).output,
-                    "\tbase         display XML base of the node",
-                )
-                .ok();
-                writeln!(
-                    (*ctxt).output,
-                    "\tsetbase URI  change the XML base of the node"
-                )
-                .ok();
-                writeln!((*ctxt).output, "\tbye          leave shell").ok();
-                writeln!(
-                    (*ctxt).output,
-                    "\tcat [node]   display node or current node"
-                )
-                .ok();
-                writeln!(
-                    (*ctxt).output,
-                    "\tcd [path]    change directory to path or to root"
-                )
-                .ok();
-                writeln!(
-                    (*ctxt).output,
-                    "\tdir [path]   dumps information about the node (namespace, attributes, content)"
-                ).ok();
-                writeln!(
-                    (*ctxt).output,
-                    "\tdu [path]    show the structure of the subtree under path or the current node"
-                ).ok();
-                writeln!((*ctxt).output, "\texit         leave shell").ok();
-                writeln!((*ctxt).output, "\thelp         display this help").ok();
-                writeln!((*ctxt).output, "\tfree         display memory usage").ok();
-                writeln!(
-                    (*ctxt).output,
-                    "\tload [name]  load a new document with name"
-                )
-                .ok();
-                writeln!(
-                    (*ctxt).output,
-                    "\tls [path]    list contents of path or the current directory"
-                )
-                .ok();
-                writeln!(
-                    (*ctxt).output,
-                    "\tset xml_fragment replace the current node content with the fragment parsed in context"
-                ).ok();
+                writeln!((*ctxt).output, "{}", XML_SHELL_HELP_CONTENT).ok();
                 #[cfg(feature = "xpath")]
                 {
-                    writeln!(
-                        (*ctxt).output,
-                        "\txpath expr   evaluate the XPath expression in that context and print the result"
-                    ).ok();
-                    writeln!(
-                        (*ctxt).output,
-                        "\tsetns nsreg  register a namespace to a prefix in the XPath evaluation context"
-                    ).ok();
-                    writeln!(
-                        (*ctxt).output,
-                        "\t             format for nsreg is: prefix=[nsuri] (i.e. prefix= unsets a prefix)"
-                    ).ok();
-                    writeln!(
-                        (*ctxt).output,
-                        "\tsetrootns    register all namespace found on the root element"
-                    )
-                    .ok();
-                    writeln!(
-                        (*ctxt).output,
-                        "\t             the default namespace if any uses 'defaultns' prefix"
-                    )
-                    .ok();
+                    writeln!((*ctxt).output, "{}", XML_SHELL_HELP_CONTENT_XPATH).ok();
                 }
-                writeln!(
-                    (*ctxt).output,
-                    "\tpwd          display current working directory"
-                )
-                .ok();
-                writeln!(
-                    (*ctxt).output,
-                    "\twhereis      display absolute path of [path] or current working directory"
-                )
-                .ok();
-                writeln!((*ctxt).output, "\tquit         leave shell").ok();
                 #[cfg(feature = "libxml_output")]
                 {
-                    writeln!(
-                        (*ctxt).output,
-                        "\tsave [name]  save this document to name or the original name"
-                    )
-                    .ok();
-                    writeln!(
-                        (*ctxt).output,
-                        "\twrite [name] write the current node to the filename"
-                    )
-                    .ok();
+                    writeln!((*ctxt).output, "{}", XML_SHELL_HELP_CONTENT_OUTPUT).ok();
                 }
                 #[cfg(feature = "libxml_valid")]
                 {
-                    writeln!(
-                        (*ctxt).output,
-                        "\tvalidate     check the document for errors"
-                    )
-                    .ok();
+                    writeln!((*ctxt).output, "{}", XML_SHELL_HELP_CONTENT_VALID).ok();
                 }
                 #[cfg(feature = "schema")]
                 {
-                    writeln!(
-                        (*ctxt).output,
-                        "\trelaxng rng  validate the document against the Relax-NG schemas"
-                    )
-                    .ok();
+                    writeln!((*ctxt).output, "{}", XML_SHELL_HELP_CONTENT_SCHEMA).ok();
                 }
-                writeln!(
-                    (*ctxt).output,
-                    "\tgrep string  search for a string in the subtree"
-                )
-                .ok();
             } else if {
                 #[cfg(feature = "libxml_valid")]
                 {
