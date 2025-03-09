@@ -572,30 +572,28 @@ pub unsafe fn xml_free_doc_element_content(_doc: Option<XmlDocPtr>, mut cur: Xml
 /// Intended just for the debug routine
 #[doc(alias = "xmlSnprintfElementContent")]
 pub unsafe fn xml_snprintf_element_content(
-    buf: *mut c_char,
-    size: i32,
+    buf: &mut String,
+    size: usize,
     content: XmlElementContentPtr,
     englob: i32,
 ) {
     unsafe {
-        let mut len: i32;
-
         if content.is_null() {
             return;
         }
-        len = strlen(buf as _) as _;
+        let len = buf.len();
         if size - len < 50 {
-            if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
-                strcat(buf, c" ...".as_ptr() as _);
+            if size - len > 4 && !buf.ends_with('.') {
+                buf.push_str(" ...");
             }
             return;
         }
         if englob != 0 {
-            strcat(buf, c"(".as_ptr() as _);
+            buf.push('(');
         }
         match (*content).typ {
             XmlElementContentType::XmlElementContentPCDATA => {
-                strcat(buf, c"#PCDATA".as_ptr() as _);
+                buf.push_str("#PCDATA");
             }
             XmlElementContentType::XmlElementContentElement => {
                 let mut qname_len: i32 = xml_strlen((*content).name);
@@ -603,16 +601,24 @@ pub unsafe fn xml_snprintf_element_content(
                 if !(*content).prefix.is_null() {
                     qname_len += xml_strlen((*content).prefix) + 1;
                 }
-                if size - len < qname_len + 10 {
-                    strcat(buf, c" ...".as_ptr() as _);
+                if size - len < qname_len as usize + 10 {
+                    buf.push_str(" ...");
                     return;
                 }
                 if !(*content).prefix.is_null() {
-                    strcat(buf, (*content).prefix as _);
-                    strcat(buf, c":".as_ptr() as _);
+                    buf.push_str(
+                        CStr::from_ptr((*content).prefix as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                    buf.push(':');
                 }
                 if !(*content).name.is_null() {
-                    strcat(buf, (*content).name as _);
+                    buf.push_str(
+                        CStr::from_ptr((*content).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
                 }
             }
             XmlElementContentType::XmlElementContentSeq => {
@@ -625,14 +631,14 @@ pub unsafe fn xml_snprintf_element_content(
                 } else {
                     xml_snprintf_element_content(buf, size, (*content).c1, 0);
                 }
-                len = strlen(buf as _) as _;
+                let len = buf.len();
                 if size - len < 50 {
-                    if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
-                        strcat(buf, c" ...".as_ptr() as _);
+                    if size - len > 4 && !buf.ends_with('.') {
+                        buf.push_str(" ...");
                     }
                     return;
                 }
-                strcat(buf, c" , ".as_ptr() as _);
+                buf.push_str(" , ");
                 if (matches!(
                     (*(*content).c2).typ,
                     XmlElementContentType::XmlElementContentOr
@@ -658,14 +664,14 @@ pub unsafe fn xml_snprintf_element_content(
                 } else {
                     xml_snprintf_element_content(buf, size, (*content).c1, 0);
                 }
-                len = strlen(buf as _) as _;
+                let len = buf.len();
                 if size - len < 50 {
-                    if size - len > 4 && *buf.add(len as usize - 1) != b'.' as i8 {
-                        strcat(buf, c" ...".as_ptr() as _);
+                    if size - len > 4 && !buf.ends_with('.') {
+                        buf.push_str(" ...");
                     }
                     return;
                 }
-                strcat(buf, c" | ".as_ptr() as _);
+                buf.push_str(" | ");
                 if (matches!(
                     (*(*content).c2).typ,
                     XmlElementContentType::XmlElementContentSeq
@@ -682,23 +688,17 @@ pub unsafe fn xml_snprintf_element_content(
                 }
             }
         }
-        if size as usize - strlen(buf as _) <= 2 {
+        if size - buf.len() <= 2 {
             return;
         }
         if englob != 0 {
-            strcat(buf, c")".as_ptr() as _);
+            buf.push(')');
         }
         match (*content).ocur {
             XmlElementContentOccur::XmlElementContentOnce => {}
-            XmlElementContentOccur::XmlElementContentOpt => {
-                strcat(buf, c"?".as_ptr() as _);
-            }
-            XmlElementContentOccur::XmlElementContentMult => {
-                strcat(buf, c"*".as_ptr() as _);
-            }
-            XmlElementContentOccur::XmlElementContentPlus => {
-                strcat(buf, c"+".as_ptr() as _);
-            }
+            XmlElementContentOccur::XmlElementContentOpt => buf.push('?'),
+            XmlElementContentOccur::XmlElementContentMult => buf.push('*'),
+            XmlElementContentOccur::XmlElementContentPlus => buf.push('+'),
         }
     }
 }
@@ -4668,24 +4668,21 @@ unsafe fn xml_validate_element_content(
 
             if warn != 0 && (ret != 1 && ret != -3) {
                 if !ctxt.is_null() {
-                    let mut expr: [c_char; 5000] = [0; 5000];
+                    let mut expr = String::with_capacity(5000);
                     let mut list: [c_char; 5000] = [0; 5000];
 
-                    expr[0] = 0;
-                    xml_snprintf_element_content(expr.as_mut_ptr().add(0) as _, 5000, cont, 1);
+                    xml_snprintf_element_content(&mut expr, 5000, cont, 1);
                     list[0] = 0;
                     #[cfg(not(feature = "libxml_regexp"))]
-                    {
-                        if !repl.is_null() {
-                            xml_snprintf_elements(
-                                list.as_mut_ptr().add(0) as _,
-                                5000,
-                                XmlGenericNodePtr::from_raw(repl),
-                                1,
-                            );
-                        } else {
-                            xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
-                        }
+                    if !repl.is_null() {
+                        xml_snprintf_elements(
+                            list.as_mut_ptr().add(0) as _,
+                            5000,
+                            XmlGenericNodePtr::from_raw(repl),
+                            1,
+                        );
+                    } else {
+                        xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
                     }
                     #[cfg(feature = "libxml_regexp")]
                     {
@@ -4694,7 +4691,6 @@ unsafe fn xml_validate_element_content(
 
                     if let Some(name) = name.as_deref() {
                         let name = name.to_string_lossy();
-                        let expr = CStr::from_ptr(expr.as_ptr()).to_string_lossy();
                         let list = CStr::from_ptr(list.as_ptr()).to_string_lossy();
                         xml_err_valid_node(
                         ctxt,
@@ -4709,7 +4705,6 @@ unsafe fn xml_validate_element_content(
                         Some(&list),
                     );
                     } else {
-                        let expr = CStr::from_ptr(expr.as_ptr()).to_string_lossy();
                         let list = CStr::from_ptr(list.as_ptr()).to_string_lossy();
                         xml_err_valid_node(
                         ctxt,
@@ -6865,11 +6860,9 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, mut elem: Xml
         xml_automata_set_final_state((*ctxt).am, (*ctxt).state);
         elem.cont_model = xml_automata_compile((*ctxt).am);
         if xml_regexp_is_determinist(elem.cont_model) != 1 {
-            let mut expr: [c_char; 5000] = [0; 5000];
-            expr[0] = 0;
-            xml_snprintf_element_content(expr.as_mut_ptr() as _, 5000, elem.content, 1);
+            let mut expr = String::with_capacity(5000);
+            xml_snprintf_element_content(&mut expr, 5000, elem.content, 1);
             let name = elem.name.as_deref().unwrap();
-            let expr = CStr::from_ptr(expr.as_ptr()).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
                 Some(elem.into()),
@@ -7421,49 +7414,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlCopyElementContent()"
                     );
                     eprintln!(" {}", n_cur);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_snprintf_element_content() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_CHAR_PTR {
-                for n_size in 0..GEN_NB_INT {
-                    for n_content in 0..GEN_NB_XML_ELEMENT_CONTENT_PTR {
-                        for n_englob in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let buf = gen_char_ptr(n_buf, 0);
-                            let size = gen_int(n_size, 1);
-                            let content = gen_xml_element_content_ptr(n_content, 2);
-                            let englob = gen_int(n_englob, 3);
-
-                            xml_snprintf_element_content(buf, size, content, englob);
-                            des_char_ptr(n_buf, buf, 0);
-                            des_int(n_size, size, 1);
-                            des_xml_element_content_ptr(n_content, content, 2);
-                            des_int(n_englob, englob, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlSnprintfElementContent",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlSnprintfElementContent()"
-                                );
-                                eprint!(" {}", n_buf);
-                                eprint!(" {}", n_size);
-                                eprint!(" {}", n_content);
-                                eprintln!(" {}", n_englob);
-                            }
-                        }
-                    }
                 }
             }
         }

@@ -963,14 +963,14 @@ pub fn generic_error_default(_context: Option<GenericErrorContext>, msg: &str) {
 
 #[macro_export]
 macro_rules! generic_error {
-    ( $fmt:literal, $( $args:expr ),* ) => {
+    ( $fmt:literal, $( $args:expr ),* ) => {{
         let msg = format!($fmt, $( $args ),*);
         let func = $crate::globals::GLOBAL_STATE.with_borrow_mut(|state| state.generic_error);
         func(None, msg.as_str());
-    };
-    ( $fmt:literal ) => {
+    }};
+    ( $fmt:literal ) => {{
         $crate::generic_error!($fmt, );
-    }
+    }}
 }
 
 #[doc(hidden)]

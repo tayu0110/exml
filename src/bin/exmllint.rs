@@ -3113,7 +3113,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     if let Some(filename) = CMD_ARGS.output.as_deref() {
                         match File::options().write(true).truncate(true).open(filename) {
                             Ok(f) => {
-                                xml_debug_dump_document(Some(f), Some(&*doc));
+                                xml_debug_dump_document(Some(f), Some(doc));
                             }
                             _ => {
                                 eprintln!("failed to open {filename}");
@@ -3121,7 +3121,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                             }
                         }
                     } else {
-                        xml_debug_dump_document(Some(stdout()), Some(&*doc));
+                        xml_debug_dump_document(Some(stdout()), Some(doc));
                     }
                 }
             }
@@ -3341,7 +3341,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             any(feature = "html", feature = "libxml_valid")
         ))]
         if CMD_ARGS.debugent && !CMD_ARGS.html {
-            xml_debug_dump_entities(stderr(), Some(&*doc));
+            xml_debug_dump_entities(stderr(), Some(doc));
         }
 
         // free it.
