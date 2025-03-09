@@ -1217,28 +1217,15 @@ fn xml_html_validity_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
 ///     free the returned string.
 #[doc(alias = "xmlShellReadline")]
 #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
-unsafe fn xml_shell_readline(prompt: *mut c_char) -> *mut c_char {
-    unsafe {
-        use std::io::{Write, stdin, stdout};
+fn xml_shell_readline(prompt: &str) -> Option<String> {
+    use std::io::{Write, stdin, stdout};
 
-        use libc::{malloc, memcpy};
-
-        if !prompt.is_null() {
-            print!("{}", CStr::from_ptr(prompt).to_string_lossy());
-        }
-        stdout().flush().ok();
-        let mut line_read = String::new();
-        match stdin().read_line(&mut line_read) {
-            Ok(len) if len > 0 => {
-                let ret = malloc(len + 1) as *mut c_char;
-                if !ret.is_null() {
-                    memcpy(ret as _, line_read.as_ptr() as _, len);
-                }
-                *ret.add(len) = 0;
-                ret
-            }
-            _ => null_mut(),
-        }
+    print!("{prompt}");
+    stdout().flush().ok();
+    let mut line_read = String::new();
+    match stdin().read_line(&mut line_read) {
+        Ok(len) if len > 0 => Some(line_read),
+        _ => None,
     }
 }
 

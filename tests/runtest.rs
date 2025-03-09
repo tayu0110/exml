@@ -4440,7 +4440,9 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
         let node = XmlNodePtr::try_from(node).unwrap();
         let mut ns = node.ns_def;
         while let Some(now) = ns {
-            if xml_xpath_register_ns(ctx, now.prefix, now.href) != 0 {
+            if xml_xpath_register_ns(ctx, now.prefix().as_deref().unwrap(), now.href().as_deref())
+                != 0
+            {
                 eprintln!(
                     "Error: unable to register NS with prefix=\"{}\" and href=\"{}\"",
                     CStr::from_ptr(now.prefix as _).to_string_lossy(),

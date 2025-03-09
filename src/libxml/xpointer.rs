@@ -2411,7 +2411,15 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
             NEXT!(ctxt);
             SKIP_BLANKS!(ctxt);
 
-            xml_xpath_register_ns((*ctxt).context, prefix, (*ctxt).cur);
+            xml_xpath_register_ns(
+                (*ctxt).context,
+                CStr::from_ptr(prefix as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!(*ctxt).cur.is_null())
+                    .then(|| CStr::from_ptr((*ctxt).cur as *const i8).to_string_lossy())
+                    .as_deref(),
+            );
             (*ctxt).base = old_base;
             (*ctxt).cur = old_cur;
             xml_free(prefix as _);

@@ -1028,17 +1028,14 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
 #[doc(alias = "xmlXPathRegisterNs")]
 pub unsafe fn xml_xpath_register_ns(
     ctxt: XmlXPathContextPtr,
-    prefix: *const XmlChar,
-    ns_uri: *const XmlChar,
+    prefix: &str,
+    ns_uri: Option<&str>,
 ) -> i32 {
     unsafe {
         if ctxt.is_null() {
             return -1;
         }
-        if prefix.is_null() {
-            return -1;
-        }
-        if *prefix.add(0) == 0 {
+        if prefix.is_empty() {
             return -1;
         }
 
@@ -1051,33 +1048,22 @@ pub unsafe fn xml_xpath_register_ns(
             (*ctxt).ns_hash = Some(table);
             table
         };
-        if ns_uri.is_null() {
-            return match ns_hash.remove_entry(
-                CStr::from_ptr(prefix as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-                |data, _| {
-                    xml_free(data as _);
-                },
-            ) {
+        let Some(ns_uri) = ns_uri else {
+            return match ns_hash.remove_entry(prefix, |data, _| {
+                xml_free(data as _);
+            }) {
                 Ok(_) => 0,
                 Err(_) => -1,
             };
-        }
+        };
 
-        let copy: *mut XmlChar = xml_strdup(ns_uri);
+        let copy: *mut XmlChar = xml_strndup(ns_uri.as_ptr(), ns_uri.len() as i32);
         if copy.is_null() {
             return -1;
         }
-        match ns_hash.update_entry(
-            CStr::from_ptr(prefix as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-            copy,
-            |data, _| {
-                xml_free(data as _);
-            },
-        ) {
+        match ns_hash.update_entry(prefix, copy, |data, _| {
+            xml_free(data as _);
+        }) {
             Ok(_) => 0,
             Err(_) => {
                 xml_free(copy as _);

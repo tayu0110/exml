@@ -1186,13 +1186,9 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                         );
                     }
                     if let (Some(prefix), Some(uri)) = (prefix, uri) {
+                        xml_xpath_register_ns((*ctxt).xctxt, &prefix, Some(&uri));
                         let prefix = CString::new(prefix).unwrap();
                         let uri = CString::new(uri).unwrap();
-                        xml_xpath_register_ns(
-                            (*ctxt).xctxt,
-                            prefix.as_ptr() as *const u8,
-                            uri.as_ptr() as *const u8,
-                        );
                         xml_schematron_add_namespace(
                             ctxt,
                             prefix.as_ptr() as *const u8,
@@ -1438,7 +1434,11 @@ pub unsafe fn xml_schematron_new_valid_ctxt(
                 if href.is_null() || pref.is_null() {
                     break;
                 }
-                xml_xpath_register_ns((*ret).xctxt, pref, href);
+                xml_xpath_register_ns(
+                    (*ret).xctxt,
+                    CStr::from_ptr(pref as *const i8).to_string_lossy().as_ref(),
+                    Some(CStr::from_ptr(href as *const i8).to_string_lossy().as_ref()),
+                );
             }
         }
         ret

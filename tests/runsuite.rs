@@ -242,15 +242,11 @@ unsafe fn initialize_libxml2() {
             xml_xpath_context_set_cache(CTXT_XPATH.load(Ordering::Relaxed), 0, -1, 0);
         }
         // used as default namespace in xstc tests
+        xml_xpath_register_ns(CTXT_XPATH.load(Ordering::Relaxed), "ts", Some("TestSuite"));
         xml_xpath_register_ns(
             CTXT_XPATH.load(Ordering::Relaxed),
-            c"ts".as_ptr() as _,
-            c"TestSuite".as_ptr() as _,
-        );
-        xml_xpath_register_ns(
-            CTXT_XPATH.load(Ordering::Relaxed),
-            c"xlink".as_ptr() as _,
-            c"http://www.w3.org/1999/xlink".as_ptr() as _,
+            "xlink",
+            Some("http://www.w3.org/1999/xlink"),
         );
         set_generic_error(Some(test_error_handler), None);
         #[cfg(feature = "schema")]

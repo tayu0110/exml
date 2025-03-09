@@ -4223,64 +4223,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_register_func() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_xpath_register_func_lookup() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_xpath_register_func_ns() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_xpath_register_ns() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_ns_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
-                        let prefix = gen_const_xml_char_ptr(n_prefix, 1);
-                        let ns_uri = gen_const_xml_char_ptr(n_ns_uri, 2);
-
-                        let ret_val = xml_xpath_register_ns(ctxt, prefix, ns_uri);
-                        desret_int(ret_val);
-                        des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                        des_const_xml_char_ptr(n_prefix, prefix, 1);
-                        des_const_xml_char_ptr(n_ns_uri, ns_uri, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlXPathRegisterNs",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlXPathRegisterNs()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_prefix);
-                            eprintln!(" {}", n_ns_uri);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_register_variable() {
         #[cfg(feature = "xpath")]
         unsafe {
