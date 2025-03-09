@@ -34,6 +34,8 @@
 //
 // Author: daniel@veillard.com
 
+#[cfg(feature = "xpath")]
+pub mod context;
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 pub mod dump;
 #[cfg(feature = "xpath")]
@@ -47,7 +49,7 @@ use std::{
     borrow::Cow,
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
 };
 
 use libc::memset;
@@ -66,6 +68,8 @@ use crate::{
     tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr},
 };
 
+#[cfg(feature = "xpath")]
+pub use context::*;
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 pub use dump::*;
 #[cfg(feature = "xpath")]
@@ -417,49 +421,6 @@ impl Default for XmlXPathCompExpr {
             last: 0,
             expr: null_mut(),
             stream: null_mut(),
-        }
-    }
-}
-
-#[cfg(feature = "xpath")]
-pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
-/// An XPath parser context. It contains pure parsing information,
-/// an xmlXPathContext, and the stack of objects.
-#[doc(alias = "xmlXPathParserContext")]
-#[cfg(feature = "xpath")]
-#[repr(C)]
-pub struct XmlXPathParserContext {
-    pub(crate) cur: *const XmlChar,  /* the current char being parsed */
-    pub(crate) base: *const XmlChar, /* the full expression */
-
-    pub(crate) error: i32, /* error code */
-
-    pub(crate) context: XmlXPathContextPtr, /* the evaluation context */
-    pub(crate) value: XmlXPathObjectPtr,    /* the current value */
-    // pub(crate) value_nr: i32,               /* number of values stacked */
-    // pub(crate) value_max: i32,              /* max number of values stacked */
-    pub(crate) value_tab: Vec<XmlXPathObjectPtr>, /* stack of values */
-
-    pub(crate) comp: XmlXPathCompExprPtr, /* the precompiled expression */
-    pub(crate) xptr: i32,                 /* it this an XPointer expression */
-    pub(crate) ancestor: Option<XmlGenericNodePtr>, /* used for walking preceding axis */
-
-    pub(crate) value_frame: i32, /* unused */
-}
-
-impl Default for XmlXPathParserContext {
-    fn default() -> Self {
-        Self {
-            cur: null(),
-            base: null(),
-            error: 0,
-            context: null_mut(),
-            value: null_mut(),
-            value_tab: vec![],
-            comp: null_mut(),
-            xptr: 0,
-            ancestor: None,
-            value_frame: 0,
         }
     }
 }
@@ -1404,33 +1365,6 @@ macro_rules! CHECK_CTXT_NEG {
             return -1;
         }
     };
-}
-
-/// Create a new xmlXPathParserContext when processing a compiled expression
-///
-/// Returns the xmlXPathParserContext just allocated.
-#[doc(alias = "xmlXPathCompParserContext")]
-unsafe fn xml_xpath_comp_parser_context(
-    comp: XmlXPathCompExprPtr,
-    ctxt: XmlXPathContextPtr,
-) -> XmlXPathParserContextPtr {
-    unsafe {
-        let ret: XmlXPathParserContextPtr =
-            xml_malloc(size_of::<XmlXPathParserContext>()) as XmlXPathParserContextPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(ctxt, Some("creating evaluation context\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXPathParserContext::default());
-
-        // Allocate the value stack
-        (*ret).value_tab.reserve(10);
-        (*ret).value = null_mut();
-        (*ret).context = ctxt;
-        (*ret).comp = comp;
-
-        ret
-    }
 }
 
 /// Evaluate the Precompiled XPath expression in the given context.

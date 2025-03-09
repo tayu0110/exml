@@ -40,6 +40,7 @@ use libc::c_void;
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::xpath::XmlNodeSet;
+use crate::xpath::{xml_xpath_free_parser_context, xml_xpath_new_parser_context};
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::{
     CHECK_ARITY,
@@ -63,9 +64,8 @@ use crate::{
         XmlXPathContextPtr, XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType,
         XmlXPathParserContextPtr,
         internals::{
-            value_pop, value_push, xml_xpath_eval_expr, xml_xpath_free_parser_context,
-            xml_xpath_id_function, xml_xpath_new_parser_context, xml_xpath_parse_name,
-            xml_xpath_parse_ncname, xml_xpath_register_ns, xml_xpath_root,
+            value_pop, value_push, xml_xpath_eval_expr, xml_xpath_id_function,
+            xml_xpath_parse_name, xml_xpath_parse_ncname, xml_xpath_register_ns, xml_xpath_root,
         },
         xml_xpath_free_object, xml_xpath_new_context, xml_xpath_new_node_set, xml_xpath_new_string,
     },

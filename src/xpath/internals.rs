@@ -32,7 +32,7 @@ use std::{
     iter::repeat,
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null, null_mut},
+    ptr::{addr_of_mut, null, null_mut},
 };
 
 use libc::{INT_MAX, INT_MIN, memcpy, memset};
@@ -55,10 +55,10 @@ use crate::{
         parser_internals::{XML_MAX_NAME_LENGTH, XML_MAX_NAMELEN, xml_copy_char, xml_is_letter},
         pattern::{
             XmlPatternFlags, XmlPatternPtr, XmlStreamCtxtPtr, xml_free_pattern,
-            xml_free_pattern_list, xml_free_stream_ctxt, xml_pattern_from_root,
-            xml_pattern_get_stream_ctxt, xml_pattern_max_depth, xml_pattern_min_depth,
-            xml_pattern_streamable, xml_patterncompile, xml_stream_pop, xml_stream_push,
-            xml_stream_push_node, xml_stream_wants_any_node,
+            xml_free_stream_ctxt, xml_pattern_from_root, xml_pattern_get_stream_ctxt,
+            xml_pattern_max_depth, xml_pattern_min_depth, xml_pattern_streamable,
+            xml_patterncompile, xml_stream_pop, xml_stream_push, xml_stream_push_node,
+            xml_stream_wants_any_node,
         },
         valid::xml_get_id,
         xmlstring::{
@@ -74,16 +74,16 @@ use crate::{
         XML_XPATH_CHECKNS, XML_XPATH_NAN, XML_XPATH_NOVAR, XPATH_MAX_STACK_DEPTH, XPATH_MAX_STEPS,
         XmlXPathCompExpr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathError,
         XmlXPathFuncLookupFunc, XmlXPathFunction, XmlXPathObject, XmlXPathObjectPtr,
-        XmlXPathObjectType, XmlXPathOp, XmlXPathParserContext, XmlXPathParserContextPtr,
-        XmlXPathStepOp, XmlXPathStepOpPtr, XmlXPathVariableLookupFunc,
-        xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
-        xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
-        xml_xpath_cast_number_to_boolean, xml_xpath_cast_number_to_string,
-        xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
-        xml_xpath_cmp_nodes_ext, xml_xpath_free_comp_expr, xml_xpath_free_node_set,
-        xml_xpath_free_object, xml_xpath_free_value_tree, xml_xpath_is_inf, xml_xpath_is_nan,
-        xml_xpath_node_set_create, xml_xpath_node_set_merge_and_clear,
-        xml_xpath_node_set_merge_and_clear_no_dupls, xml_xpath_object_copy,
+        XmlXPathObjectType, XmlXPathOp, XmlXPathParserContextPtr, XmlXPathStepOp,
+        XmlXPathStepOpPtr, XmlXPathVariableLookupFunc, xml_xpath_cast_boolean_to_string,
+        xml_xpath_cast_node_set_to_string, xml_xpath_cast_node_to_number,
+        xml_xpath_cast_node_to_string, xml_xpath_cast_number_to_boolean,
+        xml_xpath_cast_number_to_string, xml_xpath_cast_to_boolean, xml_xpath_cast_to_number,
+        xml_xpath_cast_to_string, xml_xpath_cmp_nodes_ext, xml_xpath_free_comp_expr,
+        xml_xpath_free_node_set, xml_xpath_free_object, xml_xpath_free_value_tree,
+        xml_xpath_is_inf, xml_xpath_is_nan, xml_xpath_node_set_create,
+        xml_xpath_node_set_merge_and_clear, xml_xpath_node_set_merge_and_clear_no_dupls,
+        xml_xpath_object_copy,
     },
 };
 
@@ -1663,7 +1663,7 @@ pub unsafe fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathContextPtr) {
 ///
 /// Returns the newly allocated xmlXPathCompExprPtr or NULL in case of error
 #[doc(alias = "xmlXPathNewCompExpr")]
-unsafe fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
+pub(super) unsafe fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
     unsafe {
         let cur: XmlXPathCompExprPtr =
             xml_malloc(size_of::<XmlXPathCompExpr>()) as XmlXPathCompExprPtr;
@@ -1675,61 +1675,6 @@ unsafe fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
         (*cur).steps.reserve(10);
         (*cur).last = -1;
         cur
-    }
-}
-
-/// Create a new xmlXPathParserContext
-///
-/// Returns the xmlXPathParserContext just allocated.
-#[doc(alias = "xmlXPathNewParserContext")]
-pub unsafe fn xml_xpath_new_parser_context(
-    str: *const XmlChar,
-    ctxt: XmlXPathContextPtr,
-) -> XmlXPathParserContextPtr {
-    unsafe {
-        let ret: XmlXPathParserContextPtr =
-            xml_malloc(size_of::<XmlXPathParserContext>()) as XmlXPathParserContextPtr;
-        if ret.is_null() {
-            xml_xpath_err_memory(ctxt, Some("creating parser context\n"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlXPathParserContext::default());
-        (*ret).cur = str;
-        (*ret).base = (*ret).cur;
-        (*ret).context = ctxt;
-
-        (*ret).comp = xml_xpath_new_comp_expr();
-        if (*ret).comp.is_null() {
-            drop_in_place(ret);
-            xml_free(ret as _);
-            return null_mut();
-        }
-
-        ret
-    }
-}
-
-/// Free up an xmlXPathParserContext
-#[doc(alias = "xmlXPathFreeParserContext")]
-pub unsafe fn xml_xpath_free_parser_context(ctxt: XmlXPathParserContextPtr) {
-    unsafe {
-        for value in (*ctxt).value_tab.drain(..) {
-            if !(*ctxt).context.is_null() {
-                xml_xpath_release_object((*ctxt).context, value);
-            } else {
-                xml_xpath_free_object(value);
-            }
-        }
-        if !(*ctxt).comp.is_null() {
-            #[cfg(feature = "libxml_pattern")]
-            if !(*(*ctxt).comp).stream.is_null() {
-                xml_free_pattern_list((*(*ctxt).comp).stream);
-                (*(*ctxt).comp).stream = null_mut();
-            }
-            xml_xpath_free_comp_expr((*ctxt).comp);
-        }
-        drop_in_place(ctxt);
-        xml_free(ctxt as _);
     }
 }
 
