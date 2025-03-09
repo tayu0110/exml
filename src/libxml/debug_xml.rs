@@ -1864,7 +1864,7 @@ pub fn xml_bool_to_text(boolval: bool) -> &'static str {
 /// Returns a string which will be freed by the Shell.
 #[doc(alias = "xmlShellReadlineFunc")]
 #[cfg(feature = "xpath")]
-pub type XmlShellReadlineFunc = unsafe fn(prompt: &str) -> Option<String>;
+pub type XmlShellReadlineFunc = fn(prompt: &str) -> Option<String>;
 
 /// A debugging shell context.  
 /// TODO: add the defined function tables.
@@ -1890,7 +1890,7 @@ pub struct XmlShellCtxt<'a> {
 #[cfg(feature = "xpath")]
 pub type XmlShellCmd = unsafe fn(
     ctxt: XmlShellCtxtPtr,
-    arg: *mut c_char,
+    arg: Option<&str>,
     node: Option<XmlGenericNodePtr>,
     node2: Option<XmlGenericNodePtr>,
 ) -> i32;
@@ -2412,7 +2412,7 @@ pub unsafe fn xml_shell_validate(
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_shell_du(
     ctxt: XmlShellCtxtPtr,
-    _arg: *mut c_char,
+    _arg: Option<&str>,
     tree: XmlGenericNodePtr,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
@@ -2423,9 +2423,6 @@ pub unsafe fn xml_shell_du(
             return -1;
         }
 
-        // if tree.is_null() {
-        //     return -1;
-        // }
         let mut node = Some(tree);
         while let Some(now) = node {
             if now.element_type() == XmlElementType::XmlDocumentNode
@@ -2501,35 +2498,21 @@ pub unsafe fn xml_shell_du(
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_shell_pwd(
     _ctxt: XmlShellCtxtPtr,
-    buffer: *mut c_char,
+    buffer: &mut String,
     node: Option<XmlGenericNodePtr>,
     _node2: Option<XmlGenericNodePtr>,
 ) -> i32 {
+    let Some(node) = node else {
+        return -1;
+    };
     unsafe {
-        use libc::snprintf;
-
-        if buffer.is_null() {
-            return -1;
-        }
-        let Some(node) = node else {
-            return -1;
-        };
-
         let Some(path) = node.get_node_path() else {
             return -1;
         };
 
-        // This test prevents buffer overflow, because this routine
-        // is only called by xmlShell, in which the second argument is
-        // 500 chars long.
-        // It is a dirty hack before a cleaner solution is found.
-        // Documentation should mention that the second argument must
-        // be at least 500 chars long, and could be stripped if too long.
-        std::ptr::copy_nonoverlapping(path.as_ptr() as *const i8, buffer, path.len().min(499));
-        snprintf(buffer as _, 499, c"%s".as_ptr(), path);
-        *buffer.add(499) = b'0' as _;
-        0
+        *buffer = path;
     }
+    0
 }
 
 /// Implements the XML shell function "relaxng"
@@ -2991,16 +2974,15 @@ pub unsafe fn xml_shell<'a>(
                     }
                 }
                 "pwd" => {
-                    let mut dir: [c_char; 500] = [0; 500];
+                    let mut dir = String::with_capacity(500);
 
-                    if xml_shell_pwd(&raw mut ctxt, dir.as_mut_ptr(), ctxt.node, None) == 0 {
-                        let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
+                    if xml_shell_pwd(&raw mut ctxt, &mut dir, ctxt.node, None) == 0 {
                         writeln!(ctxt.output, "{dir}").ok();
                     }
                 }
                 "du" => {
                     if arg.is_empty() {
-                        xml_shell_du(&raw mut ctxt, null_mut(), ctxt.node.unwrap(), None);
+                        xml_shell_du(&raw mut ctxt, None, ctxt.node.unwrap(), None);
                         continue;
                     }
                     (*ctxt.pctxt).node = ctxt.node;
@@ -3022,7 +3004,7 @@ pub unsafe fn xml_shell<'a>(
                             XmlXPathObjectType::XPathNodeset => {
                                 if let Some(nodeset) = (*list).nodesetval.as_deref() {
                                     for &node in &nodeset.node_tab {
-                                        xml_shell_du(&raw mut ctxt, null_mut(), node, None);
+                                        xml_shell_du(&raw mut ctxt, None, node, None);
                                     }
                                 }
                             }
@@ -3176,11 +3158,10 @@ pub unsafe fn xml_shell<'a>(
                     (*ctxt.pctxt).node = None;
                 }
                 "whereis" => {
-                    let mut dir: [c_char; 500] = [0; 500];
+                    let mut dir = String::with_capacity(500);
 
                     if arg.is_empty() {
-                        if xml_shell_pwd(&raw mut ctxt, dir.as_mut_ptr(), ctxt.node, None) == 0 {
-                            let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
+                        if xml_shell_pwd(&raw mut ctxt, &mut dir, ctxt.node, None) == 0 {
                             writeln!(ctxt.output, "{dir}").ok();
                         }
                     } else {
@@ -3202,15 +3183,14 @@ pub unsafe fn xml_shell<'a>(
                                 XmlXPathObjectType::XPathNodeset => {
                                     if let Some(nodeset) = (*list).nodesetval.as_deref() {
                                         for &node in &nodeset.node_tab {
+                                            dir.clear();
                                             if xml_shell_pwd(
                                                 &raw mut ctxt,
-                                                dir.as_mut_ptr(),
+                                                &mut dir,
                                                 Some(node),
                                                 None,
                                             ) == 0
                                             {
-                                                let dir =
-                                                    CStr::from_ptr(dir.as_ptr()).to_string_lossy();
                                                 writeln!(ctxt.output, "{dir}").ok();
                                             }
                                         }
