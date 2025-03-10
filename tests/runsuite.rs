@@ -257,9 +257,9 @@ unsafe fn initialize_libxml2() {
     }
 }
 
-unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
+unsafe fn get_next(cur: *mut XmlNode, xpath: &str) -> *mut XmlNode {
     unsafe {
-        if cur.is_null() || xpath.is_null() {
+        if cur.is_null() {
             return null_mut();
         }
         let Some(cur_doc) = (*cur).doc else {
@@ -267,12 +267,9 @@ unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
         };
         (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
         (*CTXT_XPATH.load(Ordering::Relaxed)).node = XmlGenericNodePtr::from_raw(cur);
-        let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath as _);
+        let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath);
         if comp.is_null() {
-            eprintln!(
-                "Failed to compile {}",
-                CStr::from_ptr(xpath).to_string_lossy()
-            );
+            eprintln!("Failed to compile {}", xpath);
             return null_mut();
         }
         let res: XmlXPathObjectPtr =
@@ -294,11 +291,11 @@ unsafe fn get_next(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlNode {
     }
 }
 
-unsafe fn get_string(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlChar {
+unsafe fn get_string(cur: *mut XmlNode, xpath: &str) -> *mut XmlChar {
     unsafe {
         let mut ret: *mut XmlChar = null_mut();
 
-        if cur.is_null() || xpath.is_null() {
+        if cur.is_null() {
             return null_mut();
         }
         let Some(cur_doc) = (*cur).doc else {
@@ -306,12 +303,9 @@ unsafe fn get_string(cur: *mut XmlNode, xpath: *const c_char) -> *mut XmlChar {
         };
         (*CTXT_XPATH.load(Ordering::Relaxed)).doc = Some(cur_doc);
         (*CTXT_XPATH.load(Ordering::Relaxed)).node = XmlGenericNodePtr::from_raw(cur);
-        let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath as _);
+        let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath);
         if comp.is_null() {
-            eprintln!(
-                "Failed to compile {}",
-                CStr::from_ptr(xpath).to_string_lossy()
-            );
+            eprintln!("Failed to compile {}", xpath);
             return null_mut();
         }
         let res: XmlXPathObjectPtr =
@@ -335,12 +329,12 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: *mut XmlN
     unsafe {
         let mut ret: c_int = 0;
 
-        cur = get_next(cur, c"./incorrect[1]".as_ptr() as _);
+        cur = get_next(cur, "./incorrect[1]");
         if cur.is_null() {
             return 0;
         }
 
-        let test: *mut XmlNode = get_next(cur, c"./*".as_ptr() as _);
+        let test: *mut XmlNode = get_next(cur, "./*");
         if test.is_null() {
             test_log!(
                 logfile,
@@ -402,11 +396,11 @@ unsafe fn install_resources(mut tst: *mut XmlNode, base: *const XmlChar) {
         (*tst).dump_memory(&mut buf, (*tst).doc, 0, 0);
 
         while !tst.is_null() {
-            test = get_next(tst, c"./*".as_ptr() as _);
+            test = get_next(tst, "./*");
             if !test.is_null() {
                 buf.clear();
                 (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
-                name = get_string(tst, c"string(@name)".as_ptr() as _);
+                name = get_string(tst, "string(@name)");
                 content = xml_strndup(buf.as_ptr(), buf.len() as i32);
                 if !name.is_null() && !content.is_null() {
                     res = compose_dir(base, name);
@@ -421,7 +415,7 @@ unsafe fn install_resources(mut tst: *mut XmlNode, base: *const XmlChar) {
                     }
                 }
             }
-            tst = get_next(tst, c"following-sibling::resource[1]".as_ptr() as _);
+            tst = get_next(tst, "following-sibling::resource[1]");
         }
     }
 }
@@ -430,7 +424,7 @@ unsafe fn install_dirs(tst: *mut XmlNode, base: *const XmlChar) {
     unsafe {
         let mut test: *mut XmlNode;
 
-        let name: *mut XmlChar = get_string(tst, c"string(@name)".as_ptr() as _);
+        let name: *mut XmlChar = get_string(tst, "string(@name)");
         if name.is_null() {
             return;
         }
@@ -440,14 +434,14 @@ unsafe fn install_dirs(tst: *mut XmlNode, base: *const XmlChar) {
             return;
         }
         // Now process resources and subdir recursively
-        test = get_next(tst, c"./resource[1]".as_ptr() as _);
+        test = get_next(tst, "./resource[1]");
         if !test.is_null() {
             install_resources(test, res);
         }
-        test = get_next(tst, c"./dir[1]".as_ptr() as _);
+        test = get_next(tst, "./dir[1]");
         while !test.is_null() {
             install_dirs(test, res);
-            test = get_next(test, c"following-sibling::dir[1]".as_ptr() as _);
+            test = get_next(test, "following-sibling::dir[1]");
         }
         xml_free(res as _);
     }
@@ -466,21 +460,21 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
         TEST_ERRORS_SIZE.store(0, Ordering::Relaxed);
         TEST_ERRORS.lock().unwrap()[0] = 0;
 
-        tmp = get_next(tst, c"./dir[1]".as_ptr() as _);
+        tmp = get_next(tst, "./dir[1]");
         if !tmp.is_null() {
             install_dirs(tmp, null_mut());
         }
-        tmp = get_next(tst, c"./resource[1]".as_ptr() as _);
+        tmp = get_next(tst, "./resource[1]");
         if !tmp.is_null() {
             install_resources(tmp, null_mut());
         }
 
-        let cur: *mut XmlNode = get_next(tst, c"./correct[1]".as_ptr() as _);
+        let cur: *mut XmlNode = get_next(tst, "./correct[1]");
         if cur.is_null() {
             return xsd_incorrect_test_case(logfile, tst);
         }
 
-        test = get_next(cur, c"./*".as_ptr() as _);
+        test = get_next(cur, "./*");
         if test.is_null() {
             eprintln!(
                 "Failed to find test in correct line {}",
@@ -530,10 +524,10 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
             return ret;
         }
         // now scan all the siblings of correct to process the <valid> tests
-        tmp = get_next(cur, c"following-sibling::valid[1]".as_ptr() as _);
+        tmp = get_next(cur, "following-sibling::valid[1]");
         while !tmp.is_null() {
             let dtd = (*tmp).get_prop("dtd");
-            test = get_next(tmp, c"./*".as_ptr() as _);
+            test = get_next(tmp, "./*");
             if test.is_null() {
                 eprintln!(
                     "Failed to find test in <valid> line {}\n",
@@ -602,12 +596,12 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                     NB_LEAKS.fetch_add(1, Ordering::Relaxed);
                 }
             }
-            tmp = get_next(tmp, c"following-sibling::valid[1]".as_ptr() as _);
+            tmp = get_next(tmp, "following-sibling::valid[1]");
         }
         // now scan all the siblings of correct to process the <invalid> tests
-        tmp = get_next(cur, c"following-sibling::invalid[1]".as_ptr() as _);
+        tmp = get_next(cur, "following-sibling::invalid[1]");
         while !tmp.is_null() {
-            test = get_next(tmp, c"./*".as_ptr() as _);
+            test = get_next(tmp, "./*");
             if test.is_null() {
                 eprintln!(
                     "Failed to find test in <invalid> line {}",
@@ -673,7 +667,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
                     NB_LEAKS.fetch_add(1, Ordering::Relaxed);
                 }
             }
-            tmp = get_next(tmp, c"following-sibling::invalid[1]".as_ptr() as _);
+            tmp = get_next(tmp, "following-sibling::invalid[1]");
         }
 
         if !rng.is_null() {
@@ -696,17 +690,17 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: *mut XmlNode) -> c_int 
 unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
     unsafe {
         if VERBOSE != 0 {
-            let doc: *mut XmlChar = get_string(cur, c"string(documentation)".as_ptr() as _);
+            let doc: *mut XmlChar = get_string(cur, "string(documentation)");
 
             if !doc.is_null() {
                 println!("Suite {}", CStr::from_ptr(doc as _).to_string_lossy());
                 xml_free(doc as _);
             }
         }
-        cur = get_next(cur, c"./testCase[1]".as_ptr() as _);
+        cur = get_next(cur, "./testCase[1]");
         while !cur.is_null() {
             xsd_test_case(logfile, cur);
-            cur = get_next(cur, c"following-sibling::testCase[1]".as_ptr() as _);
+            cur = get_next(cur, "following-sibling::testCase[1]");
         }
 
         0
@@ -735,8 +729,8 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
             return ret;
         };
 
-        let mut cur = get_next(cur.into(), c"./testSuite[1]".as_ptr() as _);
-        if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
+        let mut cur = get_next(cur.into(), "./testSuite[1]");
+        if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as *const u8) {
             eprintln!("Unexpected format {}", filename);
             ret = -1;
             xml_free_doc(doc);
@@ -744,7 +738,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
         }
         while !cur.is_null() {
             xsd_test_suite(logfile, cur);
-            cur = get_next(cur, c"following-sibling::testSuite[1]".as_ptr() as _);
+            cur = get_next(cur, "following-sibling::testSuite[1]");
         }
 
         xml_free_doc(doc);
@@ -755,23 +749,23 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
 unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: *mut XmlNode) -> c_int {
     unsafe {
         if VERBOSE != 0 {
-            let mut doc: *mut XmlChar = get_string(cur, c"string(documentation)".as_ptr() as _);
+            let mut doc: *mut XmlChar = get_string(cur, "string(documentation)");
 
             if !doc.is_null() {
                 println!("Suite {}", CStr::from_ptr(doc as _).to_string_lossy());
                 xml_free(doc as _);
             } else {
-                doc = get_string(cur, c"string(section)".as_ptr() as _);
+                doc = get_string(cur, "string(section)");
                 if !doc.is_null() {
                     println!("Section {}", CStr::from_ptr(doc as _).to_string_lossy());
                     xml_free(doc as _);
                 }
             }
         }
-        cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
+        cur = get_next(cur, "./testSuite[1]");
         while !cur.is_null() {
             xsd_test_suite(logfile, cur);
-            cur = get_next(cur, c"following-sibling::testSuite[1]".as_ptr() as _);
+            cur = get_next(cur, "following-sibling::testSuite[1]");
         }
 
         0
@@ -800,7 +794,7 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
             return ret;
         };
 
-        let mut cur = get_next(cur.into(), c"./testSuite[1]".as_ptr() as _);
+        let mut cur = get_next(cur.into(), "./testSuite[1]");
         if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
             eprintln!("Unexpected format {}", filename);
             ret = -1;
@@ -809,7 +803,7 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
         }
         while !cur.is_null() {
             rng_test_suite(logfile, cur);
-            cur = get_next(cur, c"following-sibling::testSuite[1]".as_ptr() as _);
+            cur = get_next(cur, "following-sibling::testSuite[1]");
         }
 
         xml_free_doc(doc);
@@ -839,7 +833,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
             return ret;
         };
 
-        let mut cur = get_next(cur.into(), c"./testSuite[1]".as_ptr() as _);
+        let mut cur = get_next(cur.into(), "./testSuite[1]");
         if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
             eprintln!("Unexpected format {}", filename);
             ret = -1;
@@ -848,7 +842,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
         }
         while !cur.is_null() {
             xsd_test_suite(logfile, cur);
-            cur = get_next(cur, c"following-sibling::testSuite[1]".as_ptr() as _);
+            cur = get_next(cur, "following-sibling::testSuite[1]");
         }
 
         xml_free_doc(doc);
@@ -872,10 +866,7 @@ unsafe fn xstc_test_instance(
         TEST_ERRORS_SIZE.store(0, Ordering::Relaxed);
         TEST_ERRORS.lock().unwrap()[0] = 0;
         let mem: c_int = xml_mem_used();
-        let href: *mut XmlChar = get_string(
-            cur,
-            c"string(ts:instanceDocument/@xlink:href)".as_ptr() as _,
-        );
+        let href: *mut XmlChar = get_string(cur, "string(ts:instanceDocument/@xlink:href)");
         if href.is_null() || *href.add(0) == 0 {
             test_log!(
                 logfile,
@@ -898,7 +889,7 @@ unsafe fn xstc_test_instance(
                 ret = -1;
                 // goto done;
             } else {
-                validity = get_string(cur, c"string(ts:expected/@validity)".as_ptr() as _);
+                validity = get_string(cur, "string(ts:expected/@validity)");
                 if validity.is_null() {
                     eprintln!(
                         "instanceDocument line {} misses expected validity",
@@ -1021,10 +1012,8 @@ unsafe fn xstc_test_group(
         TEST_ERRORS_SIZE.store(0, Ordering::Relaxed);
         TEST_ERRORS.lock().unwrap()[0] = 0;
         let mem: c_int = xml_mem_used();
-        let href: *mut XmlChar = get_string(
-            cur,
-            c"string(ts:schemaTest/ts:schemaDocument/@xlink:href)".as_ptr() as _,
-        );
+        let href: *mut XmlChar =
+            get_string(cur, "string(ts:schemaTest/ts:schemaDocument/@xlink:href)");
         if href.is_null() || *href.add(0) == 0 {
             test_log!(
                 logfile,
@@ -1047,10 +1036,7 @@ unsafe fn xstc_test_group(
                 ret = -1;
                 // goto done;
             } else {
-                validity = get_string(
-                    cur,
-                    c"string(ts:schemaTest/ts:expected/@validity)".as_ptr() as _,
-                );
+                validity = get_string(cur, "string(ts:schemaTest/ts:expected/@validity)");
                 if validity.is_null() {
                     test_log!(
                         logfile,
@@ -1093,7 +1079,7 @@ unsafe fn xstc_test_group(
                             NB_UNIMPLEMENTED.fetch_add(1, Ordering::Relaxed);
                             NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                         }
-                        instance = get_next(cur, c"./ts:instanceTest[1]".as_ptr() as _);
+                        instance = get_next(cur, "./ts:instanceTest[1]");
                         while !instance.is_null() {
                             if !schemas.is_null() {
                                 xstc_test_instance(
@@ -1108,10 +1094,7 @@ unsafe fn xstc_test_group(
                                 // if the schema was broken.
                                 NB_ERRORS.fetch_add(1, Ordering::Relaxed);
                             }
-                            instance = get_next(
-                                instance,
-                                c"following-sibling::ts:instanceTest[1]".as_ptr() as _,
-                            );
+                            instance = get_next(instance, "following-sibling::ts:instanceTest[1]");
                         }
                     } else if xml_str_equal(validity, c"invalid".as_ptr() as _) {
                         NB_SCHEMATAS.fetch_add(1, Ordering::Relaxed);
@@ -1212,7 +1195,7 @@ unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const
         let name = (*cur).get_prop("name").unwrap_or("Unknown".to_owned());
         println!("## {contributor} test suite for Schemas version {name}");
 
-        let mut cur = get_next(cur.into(), c"./ts:testGroup[1]".as_ptr() as _);
+        let mut cur = get_next(cur.into(), "./ts:testGroup[1]");
         if cur.is_null() || !xml_str_equal((*cur).name, c"testGroup".as_ptr() as _) {
             eprintln!("Unexpected format {metadata}");
             ret = -1;
@@ -1221,7 +1204,7 @@ unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const
         }
         while !cur.is_null() {
             xstc_test_group(logfile, cur, base);
-            cur = get_next(cur, c"following-sibling::ts:testGroup[1]".as_ptr() as _);
+            cur = get_next(cur, "following-sibling::ts:testGroup[1]");
         }
 
         xml_free_doc(doc);

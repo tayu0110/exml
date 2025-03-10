@@ -29,7 +29,7 @@
 //
 // Author: daniel@veillard.com
 
-use std::{ffi::CStr, ptr::null_mut};
+use std::ptr::null_mut;
 
 use crate::{
     libxml::{chvalid::xml_is_blank_char, pattern::xml_free_pattern_list},
@@ -113,16 +113,13 @@ impl Default for XmlXPathParserContext {
 /// Returns the xmlXPathParserContext just allocated.
 #[doc(alias = "xmlXPathNewParserContext")]
 pub unsafe fn xml_xpath_new_parser_context(
-    str: *const u8,
+    xpath: &str,
     ctxt: XmlXPathContextPtr,
 ) -> XmlXPathParserContextPtr {
     unsafe {
         let ret = XmlXPathParserContext {
             cur: 0,
-            base: CStr::from_ptr(str as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into_boxed_str(),
+            base: xpath.to_owned().into_boxed_str(),
             context: ctxt,
             comp: xml_xpath_new_comp_expr(),
             ..Default::default()

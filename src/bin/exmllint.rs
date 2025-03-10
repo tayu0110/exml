@@ -2481,7 +2481,7 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
 }
 
 #[cfg(feature = "xpath")]
-unsafe fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
+unsafe fn do_xpath_query(doc: XmlDocPtr, query: &str) {
     unsafe {
         use exml::xpath::{
             XmlXPathContextPtr, xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object,
@@ -2495,7 +2495,7 @@ unsafe fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
             return;
         }
         (*ctxt).node = Some(doc.into());
-        let res: XmlXPathObjectPtr = xml_xpath_eval(query as _, ctxt);
+        let res: XmlXPathObjectPtr = xml_xpath_eval(query, ctxt);
         xml_xpath_free_context(ctxt);
 
         if res.is_null() {
@@ -2843,8 +2843,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
         #[cfg(feature = "xpath")]
         if let Some(query) = CMD_ARGS.xpath.as_deref() {
-            let query = CString::new(query).unwrap();
-            do_xpath_query(doc, query.as_ptr());
+            do_xpath_query(doc, query);
         }
 
         // shell interaction

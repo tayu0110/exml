@@ -63,7 +63,7 @@ use crate::{
         globals::{xml_free, xml_malloc},
         parser::xml_init_parser,
         pattern::{XmlPatternPtr, xml_free_pattern_list},
-        xmlstring::{XmlChar, xml_strdup},
+        xmlstring::XmlChar,
     },
     tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr},
 };
@@ -1116,17 +1116,14 @@ pub unsafe fn xml_xpath_set_context_node(node: XmlGenericNodePtr, ctx: XmlXPathC
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_node_eval(
     node: XmlGenericNodePtr,
-    str: *const XmlChar,
+    xpath: &str,
     ctx: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
     unsafe {
-        if str.is_null() {
-            return null_mut();
-        }
         if xml_xpath_set_context_node(node, ctx) < 0 {
             return null_mut();
         }
-        xml_xpath_eval(str, ctx)
+        xml_xpath_eval(xpath, ctx)
     }
 }
 
@@ -1162,7 +1159,7 @@ macro_rules! CHECK_CTXT {
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathEval")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_eval(str: *const XmlChar, ctx: XmlXPathContextPtr) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathObjectPtr {
     unsafe {
         use crate::generic_error;
 
@@ -1172,7 +1169,7 @@ pub unsafe fn xml_xpath_eval(str: *const XmlChar, ctx: XmlXPathContextPtr) -> Xm
 
         xml_init_parser();
 
-        let ctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(str, ctx);
+        let ctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(xpath, ctx);
         if ctxt.is_null() {
             return null_mut();
         }
@@ -1204,10 +1201,10 @@ pub unsafe fn xml_xpath_eval(str: *const XmlChar, ctx: XmlXPathContextPtr) -> Xm
 #[doc(alias = "xmlXPathEvalExpression")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_eval_expression(
-    str: *const XmlChar,
+    xpath: &str,
     ctxt: XmlXPathContextPtr,
 ) -> XmlXPathObjectPtr {
-    unsafe { xml_xpath_eval(str, ctxt) }
+    unsafe { xml_xpath_eval(xpath, ctxt) }
 }
 
 /// Evaluate a predicate result for the current node.
@@ -1259,8 +1256,8 @@ pub unsafe fn xml_xpath_eval_predicate(ctxt: XmlXPathContextPtr, res: XmlXPathOb
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathCompile")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_compile(str: *const XmlChar) -> XmlXPathCompExprPtr {
-    unsafe { xml_xpath_ctxt_compile(null_mut(), str) }
+pub unsafe fn xml_xpath_compile(xpath: &str) -> XmlXPathCompExprPtr {
+    unsafe { xml_xpath_ctxt_compile(null_mut(), xpath) }
 }
 
 /// Compile an XPath expression
@@ -1269,10 +1266,9 @@ pub unsafe fn xml_xpath_compile(str: *const XmlChar) -> XmlXPathCompExprPtr {
 /// The caller has to free the object.
 #[doc(alias = "xmlXPathCtxtCompile")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_ctxt_compile(
-    ctxt: XmlXPathContextPtr,
-    str: *const XmlChar,
-) -> XmlXPathCompExprPtr {
+pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> XmlXPathCompExprPtr {
+    use crate::libxml::xmlstring::xml_strndup;
+
     unsafe {
         use std::ffi::CString;
 
@@ -1281,7 +1277,7 @@ pub unsafe fn xml_xpath_ctxt_compile(
 
         #[cfg(feature = "libxml_pattern")]
         {
-            comp = xml_xpath_try_stream_compile(ctxt, str);
+            comp = xml_xpath_try_stream_compile(ctxt, xpath);
             if !comp.is_null() {
                 return comp;
             }
@@ -1289,7 +1285,7 @@ pub unsafe fn xml_xpath_ctxt_compile(
 
         xml_init_parser();
 
-        let pctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(str, ctxt);
+        let pctxt: XmlXPathParserContextPtr = xml_xpath_new_parser_context(xpath, ctxt);
         if pctxt.is_null() {
             return null_mut();
         }
@@ -1335,7 +1331,7 @@ pub unsafe fn xml_xpath_ctxt_compile(
         xml_xpath_free_parser_context(pctxt);
 
         if !comp.is_null() {
-            (*comp).expr = xml_strdup(str);
+            (*comp).expr = xml_strndup(xpath.as_ptr(), xpath.len() as i32);
         }
         comp
     }
@@ -2376,79 +2372,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlXPathConvertString()"
                     );
                     eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_ctxt_compile() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_xpath_eval() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_ctx in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let str = gen_const_xml_char_ptr(n_str, 0);
-                    let ctx = gen_xml_xpath_context_ptr(n_ctx, 1);
-
-                    let ret_val = xml_xpath_eval(str as *const XmlChar, ctx);
-                    desret_xml_xpath_object_ptr(ret_val);
-                    des_const_xml_char_ptr(n_str, str, 0);
-                    des_xml_xpath_context_ptr(n_ctx, ctx, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathEval",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathEval()");
-                        eprint!(" {}", n_str);
-                        eprintln!(" {}", n_ctx);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_eval_expression() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let str = gen_const_xml_char_ptr(n_str, 0);
-                    let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 1);
-
-                    let ret_val = xml_xpath_eval_expression(str as *const XmlChar, ctxt);
-                    desret_xml_xpath_object_ptr(ret_val);
-                    des_const_xml_char_ptr(n_str, str, 0);
-                    des_xml_xpath_context_ptr(n_ctxt, ctxt, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathEvalExpression",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathEvalExpression()"
-                        );
-                        eprint!(" {}", n_str);
-                        eprintln!(" {}", n_ctxt);
-                    }
                 }
             }
         }

@@ -2613,7 +2613,7 @@ thread_local! {
 fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
-unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
+unsafe fn test_xpath(xpath: &str, xptr: i32, expr: i32) {
     unsafe {
         use exml::{
             libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
@@ -2636,7 +2636,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
             #[cfg(feature = "xpointer")]
             {
                 ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), None, None);
-                res = xml_xptr_eval(str as _, ctxt);
+                res = xml_xptr_eval(xpath, ctxt);
             }
         } else {
             let xpath_document = XPATH_DOCUMENT.get();
@@ -2645,11 +2645,11 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
                 .and_then(|doc| doc.get_root_element())
                 .map(|root| root.into());
             if expr != 0 {
-                res = xml_xpath_eval_expression(str as _, ctxt);
+                res = xml_xpath_eval_expression(xpath, ctxt);
             } else {
                 /* res = xmlXPathEval(str, ctxt); */
 
-                let comp: XmlXPathCompExprPtr = xml_xpath_compile(str as _);
+                let comp: XmlXPathCompExprPtr = xml_xpath_compile(xpath);
                 if !comp.is_null() {
                     res = xml_xpath_compiled_eval(comp, ctxt);
                     xml_xpath_free_comp_expr(comp);
@@ -2734,7 +2734,13 @@ unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, e
                     )
                     .ok()
                 });
-                test_xpath(expression.as_ptr() as _, xptr, expr);
+                test_xpath(
+                    CStr::from_ptr(expression.as_ptr() as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                    xptr,
+                    expr,
+                );
             }
             expression.clear();
         }
@@ -3028,7 +3034,7 @@ unsafe fn xmlid_doc_test(
         };
         XPATH_OUTPUT.with_borrow_mut(|f| *f = Some(out));
 
-        test_xpath(c"id('bar')".as_ptr() as _, 0, 0);
+        test_xpath("id('bar')", 0, 0);
 
         if let Some(result) = result {
             ret = compare_files(temp.as_str(), result.as_str());
@@ -4456,8 +4462,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
         }
 
         // Evaluate xpath
-        let expr = CString::new(expr).unwrap();
-        let xpath: XmlXPathObjectPtr = xml_xpath_eval_expression(expr.as_ptr() as *const u8, ctx);
+        let xpath: XmlXPathObjectPtr = xml_xpath_eval_expression(&expr, ctx);
         if xpath.is_null() {
             eprintln!("Error: unable to evaluate xpath expression");
             xml_xpath_free_context(ctx);

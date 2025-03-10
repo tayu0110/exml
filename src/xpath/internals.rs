@@ -62,7 +62,7 @@ use crate::{
         },
         valid::xml_get_id,
         xmlstring::{
-            XmlChar, xml_str_equal, xml_strchr, xml_strdup, xml_strlen, xml_strndup, xml_strstr,
+            XmlChar, xml_str_equal, xml_strdup, xml_strlen, xml_strndup, xml_strstr,
             xml_utf8_strlen,
         },
     },
@@ -1857,7 +1857,7 @@ pub unsafe fn xml_xpath_root(ctxt: XmlXPathParserContextPtr) {
 #[cfg(feature = "libxml_pattern")]
 pub unsafe fn xml_xpath_try_stream_compile(
     ctxt: XmlXPathContextPtr,
-    str: *const XmlChar,
+    xpath: &str,
 ) -> XmlXPathCompExprPtr {
     unsafe {
         // Optimization: use streaming patterns when the XPath expression can
@@ -1865,10 +1865,7 @@ pub unsafe fn xml_xpath_try_stream_compile(
         let stream: XmlPatternPtr;
         let comp: XmlXPathCompExprPtr;
 
-        if xml_strchr(str, b'[').is_null()
-            && xml_strchr(str, b'(').is_null()
-            && xml_strchr(str, b'@').is_null()
-        {
+        if !xpath.contains(['[', '(', '@']) {
             // We don't try to handle expressions using the verbose axis
             // specifiers ("::"), just the simplified form at this point.
             // Additionally, if there is no list of namespaces available and
@@ -1876,13 +1873,13 @@ pub unsafe fn xml_xpath_try_stream_compile(
             //  then we won't try to compile either. xmlPatterncompile() needs
             //  to have a list of namespaces at compilation time in order to
             //  compile prefixed name tests.
-            let tmp: *const XmlChar = xml_strchr(str, b':');
-            if !tmp.is_null()
-                && (ctxt.is_null()
+            if let Some((_, tmp)) = xpath.split_once(':') {
+                if ctxt.is_null()
                     || (*ctxt).namespaces.as_ref().map_or(0, |t| t.len()) == 0
-                    || *tmp.add(1) == b':')
-            {
-                return null_mut();
+                    || tmp.starts_with(':')
+                {
+                    return null_mut();
+                }
             }
 
             let mut namespaces = None;
@@ -1896,7 +1893,12 @@ pub unsafe fn xml_xpath_try_stream_compile(
                 }
             }
 
-            stream = xml_patterncompile(str, XmlPatternFlags::XmlPatternXpath as i32, namespaces);
+            let xpath = CString::new(xpath).unwrap();
+            stream = xml_patterncompile(
+                xpath.as_ptr() as *const u8,
+                XmlPatternFlags::XmlPatternXpath as i32,
+                namespaces,
+            );
             if !stream.is_null() && xml_pattern_streamable(stream) == 1 {
                 comp = xml_xpath_new_comp_expr();
                 if comp.is_null() {
@@ -6397,10 +6399,8 @@ pub unsafe fn xml_xpath_eval_expr(ctxt: XmlXPathParserContextPtr) {
         }
 
         #[cfg(feature = "libxml_pattern")]
-        let comp: XmlXPathCompExprPtr = {
-            let base = CString::new((*ctxt).base.as_ref()).unwrap();
-            xml_xpath_try_stream_compile((*ctxt).context, base.as_ptr() as *const u8)
-        };
+        let comp: XmlXPathCompExprPtr =
+            { xml_xpath_try_stream_compile((*ctxt).context, &(*ctxt).base) };
         #[cfg(feature = "libxml_pattern")]
         let f = !comp.is_null();
         #[cfg(not(feature = "libxml_pattern"))]

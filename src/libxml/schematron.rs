@@ -686,9 +686,8 @@ unsafe fn xml_schematron_parse_test_report_msg(ctxt: XmlSchematronParserCtxtPtr,
                 // Do Nothing
             } else if is_schematron(cur_node, "value-of") {
                 if let Some(select) = cur_node.get_no_ns_prop("select") {
-                    let cselect = CString::new(select.as_str()).unwrap();
                     // try first to compile the test expression
-                    comp = xml_xpath_ctxt_compile((*ctxt).xctxt, cselect.as_ptr() as *const u8);
+                    comp = xml_xpath_ctxt_compile((*ctxt).xctxt, &select);
                     if comp.is_null() {
                         xml_schematron_perr!(
                             ctxt,
@@ -734,7 +733,10 @@ unsafe fn xml_schematron_add_test(
         }
 
         // try first to compile the test expression
-        let comp: XmlXPathCompExprPtr = xml_xpath_ctxt_compile((*ctxt).xctxt, test);
+        let comp: XmlXPathCompExprPtr = xml_xpath_ctxt_compile(
+            (*ctxt).xctxt,
+            CStr::from_ptr(test as *const i8).to_string_lossy().as_ref(),
+        );
         if comp.is_null() {
             let test = CStr::from_ptr(test as *const i8).to_string_lossy();
             xml_schematron_perr!(
@@ -866,7 +868,7 @@ unsafe fn xml_schematron_parse_rule(
                         );
                         return;
                     }
-                    Some(value) => CString::new(value).unwrap(),
+                    Some(value) => value,
                     None => {
                         xml_schematron_perr!(
                             ctxt,
@@ -878,15 +880,14 @@ unsafe fn xml_schematron_parse_rule(
                     }
                 };
 
-                let var_comp: XmlXPathCompExprPtr =
-                    xml_xpath_ctxt_compile((*ctxt).xctxt, value.as_ptr() as *const u8);
+                let var_comp: XmlXPathCompExprPtr = xml_xpath_ctxt_compile((*ctxt).xctxt, &value);
                 if var_comp.is_null() {
                     xml_schematron_perr!(
                         ctxt,
                         Some(cur_node.into()),
                         XmlParserErrors::XmlSchemapNoroot,
                         "Failed to compile let expression {}",
-                        value.to_string_lossy().into_owned()
+                        value
                     );
                     return;
                 }
@@ -1496,10 +1497,10 @@ unsafe fn xml_schematron_register_variables(
 unsafe fn xml_schematron_get_node(
     ctxt: XmlSchematronValidCtxtPtr,
     cur: Option<XmlGenericNodePtr>,
-    xpath: *const XmlChar,
+    xpath: &str,
 ) -> Option<XmlGenericNodePtr> {
     unsafe {
-        if ctxt.is_null() || xpath.is_null() {
+        if ctxt.is_null() {
             return None;
         }
 
@@ -1549,10 +1550,8 @@ unsafe fn xml_schematron_format_report(
 
                 let mut node = XmlGenericNodePtr::from(cur);
                 if let Some(path) = path {
-                    let path = CString::new(path).unwrap();
-                    node =
-                        xml_schematron_get_node(ctxt, Some(cur.into()), path.as_ptr() as *const u8)
-                            .unwrap_or(cur.into());
+                    node = xml_schematron_get_node(ctxt, Some(cur.into()), &path)
+                        .unwrap_or(cur.into());
                 }
 
                 let ns = if let Ok(node) = XmlNodePtr::try_from(node) {
@@ -1570,13 +1569,10 @@ unsafe fn xml_schematron_format_report(
                     ret = xml_strcat(ret, node.name().unwrap().as_ptr());
                 }
             } else if is_schematron(cur_node, "value-of") {
-                let select = cur_node
+                comp = cur_node
                     .get_no_ns_prop("select")
-                    .map(|s| CString::new(s).unwrap());
-                let select = select
-                    .as_ref()
-                    .map_or(null_mut(), |s| xml_strdup(s.as_ptr() as *const u8));
-                comp = xml_xpath_ctxt_compile((*ctxt).xctxt, select);
+                    .map(|select| xml_xpath_ctxt_compile((*ctxt).xctxt, &select))
+                    .unwrap_or(null_mut());
                 let eval: XmlXPathObjectPtr = xml_xpath_compiled_eval(comp, (*ctxt).xctxt);
 
                 match (*eval).typ {
@@ -1631,7 +1627,6 @@ unsafe fn xml_schematron_format_report(
                 }
                 xml_xpath_free_object(eval);
                 xml_xpath_free_comp_expr(comp);
-                xml_free(select as _);
             } else {
                 child = cur_node
                     .next

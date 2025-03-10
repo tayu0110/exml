@@ -1506,7 +1506,12 @@ unsafe fn xml_xinclude_load_doc(
                         );
                         break 'error;
                     }
-                    let xptr: XmlXPathObjectPtr = xml_xptr_eval(fragment, xptrctxt);
+                    let xptr: XmlXPathObjectPtr = xml_xptr_eval(
+                        CStr::from_ptr(fragment as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        xptrctxt,
+                    );
                     if xptr.is_null() {
                         let fragment = CStr::from_ptr(fragment as *const i8).to_string_lossy();
                         xml_xinclude_err!(

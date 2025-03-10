@@ -2953,8 +2953,7 @@ pub unsafe fn xml_shell<'a>(
                     #[cfg(feature = "xpath")]
                     {
                         (*ctxt.pctxt).node = ctxt.node;
-                        let arg = CString::new(arg).unwrap();
-                        list = xml_xpath_eval(arg.as_ptr() as *const u8, ctxt.pctxt);
+                        list = xml_xpath_eval(arg, ctxt.pctxt);
                     }
                     #[cfg(not(feature = "xpath"))]
                     {
@@ -3034,8 +3033,7 @@ pub unsafe fn xml_shell<'a>(
                         generic_error!("xpath: expression required\n");
                     } else {
                         (*ctxt.pctxt).node = ctxt.node;
-                        let arg = CString::new(arg).unwrap();
-                        list = xml_xpath_eval(arg.as_ptr() as *const u8, ctxt.pctxt);
+                        list = xml_xpath_eval(arg, ctxt.pctxt);
                         xml_xpath_debug_dump_object(&mut ctxt.output, list, 0);
                         xml_xpath_free_object(list);
                     }
@@ -3059,8 +3057,7 @@ pub unsafe fn xml_shell<'a>(
                     #[cfg(feature = "xpath")]
                     {
                         (*ctxt.pctxt).node = ctxt.node;
-                        let arg = CString::new(arg).unwrap();
-                        list = xml_xpath_eval(arg.as_ptr() as *const u8, ctxt.pctxt);
+                        list = xml_xpath_eval(arg, ctxt.pctxt);
                     }
                     #[cfg(not(feature = "xpath"))]
                     {
@@ -3132,8 +3129,7 @@ pub unsafe fn xml_shell<'a>(
                         (*ctxt.pctxt).node = ctxt.node;
                         #[cfg(feature = "xpath")]
                         {
-                            let arg = CString::new(arg).unwrap();
-                            list = xml_xpath_eval(arg.as_ptr() as *const u8, ctxt.pctxt);
+                            list = xml_xpath_eval(arg, ctxt.pctxt);
                         }
                         #[cfg(not(feature = "xpath"))]
                         {
@@ -3206,8 +3202,7 @@ pub unsafe fn xml_shell<'a>(
                                 arg = new;
                             }
                         }
-                        let arg = CString::new(arg).unwrap();
-                        list = xml_xpath_eval(arg.as_ptr() as *const u8, ctxt.pctxt);
+                        list = xml_xpath_eval(arg, ctxt.pctxt);
                     }
                     #[cfg(not(feature = "xpath"))]
                     {
@@ -3290,8 +3285,7 @@ pub unsafe fn xml_shell<'a>(
                     #[cfg(feature = "xpath")]
                     {
                         (*ctxt.pctxt).node = ctxt.node;
-                        let arg = CString::new(arg).unwrap();
-                        list = xml_xpath_eval(arg.as_ptr() as *const u8, ctxt.pctxt);
+                        list = xml_xpath_eval(arg, ctxt.pctxt);
                     }
                     #[cfg(not(feature = "xpath"))]
                     {
