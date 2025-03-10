@@ -27,8 +27,7 @@
 // Author: daniel@veillard.com
 
 use std::{
-    borrow::Cow,
-    ffi::{CStr, CString, c_char},
+    ffi::{CStr, CString},
     iter::repeat,
     mem::size_of,
     os::raw::c_void,
@@ -78,11 +77,11 @@ use crate::{
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
         xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
         xml_xpath_cast_number_to_boolean, xml_xpath_cast_number_to_string,
-        xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
-        xml_xpath_cmp_nodes_ext, xml_xpath_free_comp_expr, xml_xpath_free_node_set,
-        xml_xpath_free_object, xml_xpath_free_value_tree, xml_xpath_is_inf, xml_xpath_is_nan,
-        xml_xpath_node_set_create, xml_xpath_node_set_merge_and_clear,
-        xml_xpath_node_set_merge_and_clear_no_dupls, xml_xpath_object_copy,
+        xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cmp_nodes_ext,
+        xml_xpath_free_comp_expr, xml_xpath_free_node_set, xml_xpath_free_object,
+        xml_xpath_free_value_tree, xml_xpath_is_inf, xml_xpath_is_nan, xml_xpath_node_set_create,
+        xml_xpath_node_set_merge_and_clear, xml_xpath_node_set_merge_and_clear_no_dupls,
+        xml_xpath_object_copy,
     },
 };
 
@@ -98,25 +97,12 @@ use super::{
 #[doc(alias = "xmlXPathSetError")]
 macro_rules! xml_xpath_set_error {
     ($ctxt:expr, $err:expr) => {{
-        let file = std::ffi::CString::new(file!()).unwrap();
-        xml_xpatherror($ctxt, file.as_ptr() as _, line!() as _, $err);
+        xml_xpatherror($ctxt, $err);
         if !$ctxt.is_null() {
             (*$ctxt).error = $err;
         }
     }};
 }
-
-// /**
-//  * xmlXPathSetArityError:
-//  * @ctxt:  an XPath parser context
-//  *
-//  * Raises an XPATH_INVALID_ARITY error.
-//  */
-// macro_rules! xmlXPathSetArityError {
-//     (ctxt) => {
-//         xmlXPathSetError((ctxt), XPATH_INVALID_ARITY)
-//     };
-// }
 
 /// Raises an XPATH_INVALID_TYPE error.
 #[doc(alias = "xmlXPathSetTypeError")]
@@ -125,215 +111,6 @@ macro_rules! xml_xpath_set_type_error {
         xml_xpath_set_error!($ctxt, XmlXPathError::XPathInvalidType as i32)
     };
 }
-
-// /**
-//  * xmlXPathGetError:
-//  * @ctxt:  an XPath parser context
-//  *
-//  * Get the error code of an XPath context.
-//  *
-//  * Returns the context error.
-//  */
-// macro_rules! xmlXPathGetError {
-// 	(ctxt) => {
-// 		((ctxt)->error)
-// 	}
-// }
-
-// /**
-//  * xmlXPathCheckError:
-//  * @ctxt:  an XPath parser context
-//  *
-//  * Check if an XPath error was raised.
-//  *
-//  * Returns true if an error has been raised, false otherwise.
-//  */
-// macro_rules! xmlXPathCheckError {
-// 	(ctxt) => {
-// 		((ctxt)->error != XPATH_EXPRESSION_OK)
-// 	}
-// }
-
-// /**
-//  * xmlXPathGetDocument:
-//  * @ctxt:  an XPath parser context
-//  *
-//  * Get the document of an XPath context.
-//  *
-//  * Returns the context document.
-//  */
-// macro_rules! xmlXPathGetDocument {
-// 	(ctxt) => {
-// 		((ctxt)->context->doc)
-// 	}
-// }
-
-// /**
-//  * xmlXPathGetContextNode:
-//  * @ctxt: an XPath parser context
-//  *
-//  * Get the context node of an XPath context.
-//  *
-//  * Returns the context node.
-//  */
-// macro_rules! xmlXPathGetContextNode {
-// 	(ctxt) => {
-// 		((ctxt)->context->node)
-// 	}
-// }
-
-// /**
-//  * xmlXPathReturnBoolean:
-//  * @ctxt:  an XPath parser context
-//  * @val:  a boolean
-//  *
-//  * Pushes the boolean @val on the context stack.
-//  */
-// macro_rules! xmlXPathReturnBoolean {
-//     (ctxt, val) => {
-//         valuePush((ctxt), xmlXPathNewBoolean(val))
-//     };
-// }
-
-// /**
-//  * xmlXPathReturnTrue:
-//  * @ctxt:  an XPath parser context
-//  *
-//  * Pushes true on the context stack.
-//  */
-// macro_rules! xmlXPathReturnTrue {
-//     (ctxt) => {
-//         xmlXPathReturnBoolean((ctxt), 1)
-//     };
-// }
-
-// /**
-//  * xmlXPathReturnFalse:
-//  * @ctxt:  an XPath parser context
-//  *
-//  * Pushes false on the context stack.
-//  */
-// macro_rules! xmlXPathReturnFalse {
-//     (ctxt) => {
-//         xmlXPathReturnBoolean((ctxt), 0)
-//     };
-// }
-
-// /**
-//  * xmlXPathReturnNumber:
-//  * @ctxt:  an XPath parser context
-//  * @val:  a double
-//  *
-//  * Pushes the double @val on the context stack.
-//  */
-// macro_rules! xmlXPathReturnNumber {
-//     (ctxt, val) => {
-//         valuePush((ctxt), xmlXPathNewFloat(val))
-//     };
-// }
-
-// /**
-//  * xmlXPathReturnString:
-//  * @ctxt:  an XPath parser context
-//  * @str:  a string
-//  *
-//  * Pushes the string @str on the context stack.
-//  */
-// macro_rules! xmlXPathReturnString {
-//     (ctxt, str) => {
-//         valuePush((ctxt), xmlXPathWrapString(str))
-//     };
-// }
-
-// /**
-//  * xmlXPathReturnEmptyString:
-//  * @ctxt:  an XPath parser context
-//  *
-//  * Pushes an empty string on the stack.
-//  */
-// macro_rules! xmlXPathReturnEmptyString {
-//     (ctxt) => {
-//         valuePush((ctxt), xmlXPathNewCString(""))
-//     };
-// }
-
-// /**
-//  * xmlXPathReturnNodeSet:
-//  * @ctxt:  an XPath parser context
-//  * @ns:  a node-set
-//  *
-//  * Pushes the node-set @ns on the context stack.
-//  */
-// macro_rules! xmlXPathReturnNodeSet {
-//     (ctxt, ns) => {
-//         valuePush((ctxt), xmlXPathWrapNodeSet(ns))
-//     };
-// }
-
-// /**
-//  * xmlXPathReturnEmptyNodeSet:
-//  * @ctxt:  an XPath parser context
-//  *
-//  * Pushes an empty node-set on the context stack.
-//  */
-// macro_rules! xmlXPathReturnEmptyNodeSet {
-//     (ctxt) => {
-//         valuePush((ctxt), xmlXPathNewNodeSet(NULL))
-//     };
-// }
-
-// /**
-//  * xmlXPathReturnExternal:
-//  * @ctxt:  an XPath parser context
-//  * @val:  user data
-//  *
-//  * Pushes user data on the context stack.
-//  */
-// macro_rules! xmlXPathReturnExternal {
-//     (ctxt, val) => {
-//         valuePush((ctxt), xmlXPathWrapExternal(val))
-//     };
-// }
-
-/// Check if the current value on the XPath stack is a node set or an XSLT value tree.
-///
-/// Returns true if the current object on the stack is a node-set.
-#[doc(alias = "xmlXPathStackIsNodeSet")]
-macro_rules! xml_xpath_stack_is_node_set {
-    ($ctxt:expr) => {
-        !(*$ctxt).value.is_null()
-            && ((*(*$ctxt).value).typ == XmlXPathObjectType::XPathNodeset
-                || (*(*$ctxt).value).typ == XmlXPathObjectType::XPathXSLTTree)
-    };
-}
-
-// /**
-//  * xmlXPathStackIsExternal:
-//  * @ctxt: an XPath parser context
-//  *
-//  * Checks if the current value on the XPath stack is an external
-//  * object.
-//  *
-//  * Returns true if the current object on the stack is an external
-//  * object.
-//  */
-// macro_rules! xmlXPathStackIsExternal {
-// 	(ctxt) => {
-// 		(((*$ctxt).value != NULL) && ((*(*$ctxt).value).type == XPATH_USERS))
-// 	}
-// }
-
-// /**
-//  * xmlXPathEmptyNodeSet:
-//  * @ns:  a node-set
-//  *
-//  * Empties a node-set.
-//  */
-// macro_rules! xmlXPathEmptyNodeSet {
-// 	(ns) => {
-// 		{ while ((ns)->nodeNr > 0) (ns)->nodeTab[--(ns)->nodeNr] = NULL; }
-// 	}
-// }
 
 /// Macro to return from the function if an XPath error was detected.
 #[doc(hidden)]
@@ -448,26 +225,6 @@ macro_rules! XP_ERRORNULL {
         return null_mut();
     }};
 }
-
-// macro_rules! XP_CACHE_ADD {
-// 	($sl:expr, $obj:expr) => {
-// 		if $sl.is_null() {
-// 			$sl = xmlPointerListCreate(10);
-// 			if $sl.is_null() {
-// 				goto free_obj;
-// 			}
-// 		}
-// 		if xmlPointerListAddSize($sl, $obj, 0) == -1 {
-// 			goto free_obj;
-// 		}
-// 	}
-// }
-
-// macro_rules! XP_CACHE_WANTS {
-//     ($sl:expr, n) => {
-//         $sl.is_null() || (*$sl).number < n
-//     };
-// }
 
 pub type XmlPointerListPtr = *mut XmlPointerList;
 /// Pointer-list for various purposes.
@@ -707,125 +464,6 @@ pub(crate) unsafe fn xml_xpath_release_object(ctxt: XmlXPathContextPtr, obj: Xml
     }
 }
 
-/// Pops a boolean from the stack, handling conversion if needed.
-/// Check error with #xmlXPathCheckError.
-///
-/// Returns the boolean
-#[doc(alias = "xmlXPathPopBoolean")]
-pub unsafe fn xml_xpath_pop_boolean(ctxt: XmlXPathParserContextPtr) -> i32 {
-    unsafe {
-        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
-        if obj.is_null() {
-            xml_xpath_set_error!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
-            return 0;
-        }
-        let ret = if (*obj).typ != XmlXPathObjectType::XPathBoolean {
-            xml_xpath_cast_to_boolean(obj)
-        } else {
-            (*obj).boolval
-        };
-        xml_xpath_release_object((*ctxt).context, obj);
-        ret as i32
-    }
-}
-
-/// Pops a number from the stack, handling conversion if needed.
-/// Check error with #xmlXPathCheckError.
-///
-/// Returns the number
-#[doc(alias = "xmlXPathPopNumber")]
-pub unsafe fn xml_xpath_pop_number(ctxt: XmlXPathParserContextPtr) -> f64 {
-    unsafe {
-        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
-        if obj.is_null() {
-            xml_xpath_set_error!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
-            return 0.0;
-        }
-        let ret = if (*obj).typ != XmlXPathObjectType::XPathNumber {
-            xml_xpath_cast_to_number(obj)
-        } else {
-            (*obj).floatval
-        };
-        xml_xpath_release_object((*ctxt).context, obj);
-        ret
-    }
-}
-
-/// Pops a string from the stack, handling conversion if needed.
-/// Check error with #xmlXPathCheckError.
-///
-/// Returns the string
-#[doc(alias = "xmlXPathPopString")]
-pub unsafe fn xml_xpath_pop_string(ctxt: XmlXPathParserContextPtr) -> Option<Cow<'static, str>> {
-    unsafe {
-        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
-        if obj.is_null() {
-            xml_xpath_set_error!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
-            return None;
-        }
-        let ret = xml_xpath_cast_to_string(obj); /* this does required strdup */
-        /* TODO: needs refactoring somewhere else */
-        // if (*obj).stringval == ret {
-        //     (*obj).stringval = null_mut();
-        // }
-        xml_xpath_release_object((*ctxt).context, obj);
-        Some(ret)
-    }
-}
-
-/// Pops a node-set from the stack, handling conversion if needed.
-/// Check error with #xmlXPathCheckError.
-///
-/// Returns the node-set
-#[doc(alias = "xmlXPathPopNodeSet")]
-pub unsafe fn xml_xpath_pop_node_set(ctxt: XmlXPathParserContextPtr) -> Option<Box<XmlNodeSet>> {
-    unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
-        if (*ctxt).value.is_null() {
-            xml_xpath_set_error!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
-            return None;
-        }
-        if !xml_xpath_stack_is_node_set!(ctxt) {
-            xml_xpath_set_type_error!(ctxt);
-            return None;
-        }
-        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
-        let ret = (*obj).nodesetval.take();
-        // #if 0
-        // /* to fix memory leak of not clearing (*obj).user */
-        // if ((*obj).boolval && !(*obj).user.is_null())
-        //     xmlFreeNodeList((xmlNodePtr) (*obj).user);
-        // #endif
-        xml_xpath_release_object((*ctxt).context, obj);
-        ret
-    }
-}
-
-/// Pops an external object from the stack, handling conversion if needed.
-/// Check error with #xmlXPathCheckError.
-///
-/// Returns the object
-#[doc(alias = "xmlXPathPopExternal")]
-pub unsafe fn xml_xpath_pop_external(ctxt: XmlXPathParserContextPtr) -> *mut c_void {
-    unsafe {
-        if ctxt.is_null() || (*ctxt).value.is_null() {
-            xml_xpath_set_error!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
-            return null_mut();
-        }
-        if (*(*ctxt).value).typ != XmlXPathObjectType::XPathUsers {
-            xml_xpath_set_type_error!(ctxt);
-            return null_mut();
-        }
-        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
-        let ret: *mut c_void = (*obj).user;
-        (*obj).user = null_mut();
-        xml_xpath_release_object((*ctxt).context, obj);
-        ret
-    }
-}
-
 /// Register an external mechanism to do variable lookup
 #[doc(alias = "xmlXPathRegisterVariableLookup")]
 pub unsafe fn xml_xpath_register_variable_lookup(
@@ -860,12 +498,7 @@ pub unsafe fn xml_xpath_register_func_lookup(
 
 /// Formats an error message.
 #[doc(alias = "xmlXPatherror")]
-pub unsafe fn xml_xpatherror(
-    ctxt: XmlXPathParserContextPtr,
-    _file: *const c_char,
-    _line: i32,
-    no: i32,
-) {
+pub unsafe fn xml_xpatherror(ctxt: XmlXPathParserContextPtr, no: i32) {
     unsafe {
         xml_xpath_err(ctxt, no);
     }
@@ -6947,7 +6580,7 @@ unsafe fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i
 
         CHECK_ARITY!(ctxt, nargs, 2);
 
-        let escape_reserved: i32 = xml_xpath_pop_boolean(ctxt);
+        let escape_reserved: i32 = (*ctxt).pop_boolean();
 
         CAST_TO_STRING!(ctxt);
         let str: XmlXPathObjectPtr = (*ctxt).value_pop();

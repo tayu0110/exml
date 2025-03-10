@@ -1270,8 +1270,6 @@ pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> X
     use crate::libxml::xmlstring::xml_strndup;
 
     unsafe {
-        use std::ffi::CString;
-
         let mut comp: XmlXPathCompExprPtr;
         let mut old_depth: i32 = 0;
 
@@ -1307,13 +1305,7 @@ pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> X
             // (see bug #78858) and probably this should be fixed.
             // However, we are not sure that all error messages are printed
             // out in other places. It's not critical so we leave it as-is for now
-            let file = CString::new(file!()).unwrap();
-            xml_xpatherror(
-                pctxt,
-                file.as_ptr(),
-                line!() as i32,
-                XmlXPathError::XPathExprError as i32,
-            );
+            xml_xpatherror(pctxt, XmlXPathError::XPathExprError as i32);
             comp = null_mut();
         } else {
             comp = (*pctxt).comp;
@@ -3696,66 +3688,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_pop_external() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                let ret_val = xml_xpath_pop_external(ctxt);
-                desret_void_ptr(ret_val);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathPopExternal",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathPopExternal()"
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_pop_node_set() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                let ret_val = xml_xpath_pop_node_set(ctxt);
-                desret_xml_node_set_ptr(ret_val);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathPopNodeSet",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathPopNodeSet()"
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_position_function() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -4577,47 +4509,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlXPathWrapNodeSet()"
                     );
                     eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpatherror() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                for n_file in 0..GEN_NB_FILEPATH {
-                    for n_line in 0..GEN_NB_INT {
-                        for n_no in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-                            let file = gen_filepath(n_file, 1);
-                            let line = gen_int(n_line, 2);
-                            let no = gen_int(n_no, 3);
-
-                            xml_xpatherror(ctxt, file, line, no);
-                            des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                            des_filepath(n_file, file, 1);
-                            des_int(n_line, line, 2);
-                            des_int(n_no, no, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlXPatherror",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlXPatherror()");
-                                eprint!(" {}", n_ctxt);
-                                eprint!(" {}", n_file);
-                                eprint!(" {}", n_line);
-                                eprintln!(" {}", n_no);
-                            }
-                        }
-                    }
                 }
             }
         }
