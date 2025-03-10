@@ -51,10 +51,7 @@ use crate::{
             XmlSchemaAbstractCtxtPtr, xml_schema_facet_type_to_string, xml_schema_format_qname,
             xml_schema_vcheck_cvc_simple_type,
         },
-        xmlstring::{
-            XmlChar, xml_str_equal, xml_strcat, xml_strcmp, xml_strdup, xml_strndup,
-            xml_utf8_strlen,
-        },
+        xmlstring::{XmlChar, xml_str_equal, xml_strcat, xml_strcmp, xml_strdup, xml_strndup},
     },
     tree::{
         XmlAttrPtr, XmlAttributeType, XmlEntityType, XmlGenericNodePtr, validate_name,
@@ -5570,7 +5567,10 @@ unsafe fn xml_schema_validate_facet_internal(
                                 // is not the correct handling.
                                 // TODO: Get rid of this case somehow.
                                 if val_type == XmlSchemaValType::XmlSchemasString {
-                                    len = xml_utf8_strlen(value) as _;
+                                    len = CStr::from_ptr(value as *const i8)
+                                        .to_string_lossy()
+                                        .chars()
+                                        .count() as u32;
                                 } else {
                                     len = xml_schema_norm_len(value) as _;
                                 }
@@ -5579,7 +5579,10 @@ unsafe fn xml_schema_validate_facet_internal(
                                     len = xml_schema_norm_len(value) as _;
                                 } else {
                                     // Should be OK for "preserve" as well.
-                                    len = xml_utf8_strlen(value) as _;
+                                    len = CStr::from_ptr(value as *const i8)
+                                        .to_string_lossy()
+                                        .chars()
+                                        .count() as u32;
                                 }
                             }
                         }
@@ -6405,7 +6408,7 @@ unsafe fn xml_schema_validate_length_facet_internal(
                     // is not the correct handling.
                     // TODO: Get rid of this case somehow.
                     if val_type == XmlSchemaValType::XmlSchemasString {
-                        len = xml_utf8_strlen(value) as _;
+                        len = CStr::from_ptr(value as *const i8).to_string_lossy().chars().count() as u32;
                     } else {
                         len = xml_schema_norm_len(value) as _;
                     }
@@ -6414,7 +6417,7 @@ unsafe fn xml_schema_validate_length_facet_internal(
                         len = xml_schema_norm_len(value) as _;
                     } else {
                         // Should be OK for "preserve" as well.
-                        len = xml_utf8_strlen(value) as _;
+                        len = CStr::from_ptr(value as *const i8).to_string_lossy().chars().count() as u32;
                     }
                 }
             }

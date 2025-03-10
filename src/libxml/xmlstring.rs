@@ -665,53 +665,6 @@ pub unsafe extern "C" fn xml_utf8_charcmp(utf1: *const XmlChar, utf2: *const Xml
     }
 }
 
-/// compute the length of an UTF8 string, it doesn't do a full UTF8
-/// checking of the content of the string.
-///
-/// Returns the number of characters in the string or -1 in case of error
-#[doc(alias = "xmlUTF8Strlen")]
-pub unsafe extern "C" fn xml_utf8_strlen(mut utf: *const XmlChar) -> i32 {
-    unsafe {
-        let mut ret: usize = 0;
-
-        if utf.is_null() {
-            return -1;
-        }
-
-        while *utf != 0 {
-            if *utf.add(0) & 0x80 != 0 {
-                if *utf.add(1) & 0xc0 != 0x80 {
-                    return -1;
-                }
-                if *utf.add(0) & 0xe0 == 0xe0 {
-                    if *utf.add(2) & 0xc0 != 0x80 {
-                        return -1;
-                    }
-                    if *utf.add(0) & 0xf0 == 0xf0 {
-                        if *utf.add(0) & 0xf8 != 0xf0 || *utf.add(3) & 0xc0 != 0x80 {
-                            return -1;
-                        }
-                        utf = utf.add(4);
-                    } else {
-                        utf = utf.add(3);
-                    }
-                } else {
-                    utf = utf.add(2);
-                }
-            } else {
-                utf = utf.add(1);
-            }
-            ret += 1;
-        }
-
-        if ret > INT_MAX as usize {
-            0
-        } else {
-            ret as i32
-        }
-    }
-}
-
 /// Read the first UTF8 character from @utf
 ///
 /// Returns the char value or -1 in case of error, and sets *len to
@@ -1782,32 +1735,6 @@ mod tests {
                         xml_mem_blocks() - mem_base
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlUTF8Size()");
-                    eprintln!(" {}", n_utf);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_utf8_strlen() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_utf in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let utf = gen_const_xml_char_ptr(n_utf, 0);
-
-                let ret_val = xml_utf8_strlen(utf as *const XmlChar);
-                desret_int(ret_val);
-                des_const_xml_char_ptr(n_utf, utf, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUTF8Strlen",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUTF8Strlen()");
                     eprintln!(" {}", n_utf);
                 }
             }

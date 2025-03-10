@@ -60,10 +60,7 @@ use crate::{
             xml_stream_wants_any_node,
         },
         valid::xml_get_id,
-        xmlstring::{
-            XmlChar, xml_str_equal, xml_strdup, xml_strlen, xml_strndup, xml_strstr,
-            xml_utf8_strlen,
-        },
+        xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strlen, xml_strndup, xml_strstr},
     },
     tree::{
         NodeCommon, XML_XML_NAMESPACE, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
@@ -9140,10 +9137,9 @@ pub unsafe fn xml_xpath_string_length_function(ctxt: XmlXPathParserContextPtr, n
             }
             if let Some(context_node) = (*(*ctxt).context).node {
                 let content = xml_xpath_cast_node_to_string(Some(context_node));
-                let content = CString::new(content).unwrap();
                 (*ctxt).value_push(xml_xpath_cache_new_float(
                     (*ctxt).context,
-                    xml_utf8_strlen(content.as_ptr() as *const u8) as _,
+                    content.chars().count() as f64,
                 ));
             } else {
                 (*ctxt).value_push(xml_xpath_cache_new_float((*ctxt).context, 0.0));

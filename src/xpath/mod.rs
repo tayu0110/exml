@@ -1003,16 +1003,15 @@ pub unsafe fn xml_xpath_context_set_cache(
 pub unsafe fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
     use crate::tree::{NodeCommon, XmlNodePtr};
 
-    let mut count: isize = 0;
+    let mut count = 0;
 
     let mut cur = doc.children;
     while let Some(mut now) = cur {
-        if let Some(mut node) = XmlNodePtr::try_from(now)
+        if let Some(node) = XmlNodePtr::try_from(now)
             .ok()
             .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
         {
             count += 1;
-            node.content = (-count) as _;
             if let Some(children) = node.children {
                 cur = Some(children);
                 continue;
@@ -1035,7 +1034,7 @@ pub unsafe fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
             now = cur;
         }
     }
-    count as _
+    count
 }
 
 /// Sets 'node' as the context node. The node must be in the same
