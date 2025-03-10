@@ -29,9 +29,12 @@
 //
 // Author: daniel@veillard.com
 
-use std::ptr::{null, null_mut};
+use std::{ffi::CStr, ptr::null_mut};
 
-use crate::{libxml::pattern::xml_free_pattern_list, tree::XmlGenericNodePtr};
+use crate::{
+    libxml::{chvalid::xml_is_blank_char, pattern::xml_free_pattern_list},
+    tree::XmlGenericNodePtr,
+};
 
 use super::{
     XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr, xml_xpath_free_comp_expr,
@@ -44,8 +47,8 @@ pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
 #[doc(alias = "xmlXPathParserContext")]
 #[repr(C)]
 pub struct XmlXPathParserContext {
-    pub(crate) cur: *const u8,  /* the current char being parsed */
-    pub(crate) base: *const u8, /* the full expression */
+    pub(crate) cur: usize,     /* the current char being parsed */
+    pub(crate) base: Box<str>, /* the full expression */
 
     pub(crate) error: i32, /* error code */
 
@@ -60,11 +63,39 @@ pub struct XmlXPathParserContext {
     pub(crate) value_frame: i32, /* unused */
 }
 
+impl XmlXPathParserContext {
+    pub(crate) fn next_char(&mut self) -> Option<char> {
+        let res = self.current_char()?;
+        self.cur += res.len_utf8();
+        Some(res)
+    }
+
+    pub(crate) fn current_char(&self) -> Option<char> {
+        self.current_str().chars().next()
+    }
+
+    pub(crate) fn current_str(&self) -> &str {
+        &self.base[self.cur..]
+    }
+
+    pub(crate) fn nth_byte(&self, index: usize) -> Option<u8> {
+        self.current_str().as_bytes().get(index).copied()
+    }
+
+    pub(crate) fn skip_blanks(&mut self) {
+        let rem = self
+            .current_str()
+            .trim_start_matches(|c: char| xml_is_blank_char(c as u32));
+        let diff = self.current_str().len() - rem.len();
+        self.cur += diff;
+    }
+}
+
 impl Default for XmlXPathParserContext {
     fn default() -> Self {
         Self {
-            cur: null(),
-            base: null(),
+            cur: 0,
+            base: "".to_owned().into_boxed_str(),
             error: 0,
             context: null_mut(),
             value: null_mut(),
@@ -87,8 +118,11 @@ pub unsafe fn xml_xpath_new_parser_context(
 ) -> XmlXPathParserContextPtr {
     unsafe {
         let ret = XmlXPathParserContext {
-            cur: str,
-            base: str,
+            cur: 0,
+            base: CStr::from_ptr(str as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into_boxed_str(),
             context: ctxt,
             comp: xml_xpath_new_comp_expr(),
             ..Default::default()

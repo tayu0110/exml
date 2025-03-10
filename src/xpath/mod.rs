@@ -1306,7 +1306,7 @@ pub unsafe fn xml_xpath_ctxt_compile(
             return null_mut();
         }
 
-        if *(*pctxt).cur != 0 {
+        if (*pctxt).cur < (*pctxt).base.len() {
             // aleksey: in some cases this line prints *second* error message
             // (see bug #78858) and probably this should be fixed.
             // However, we are not sure that all error messages are printed

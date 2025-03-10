@@ -956,13 +956,10 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
                 XmlErrorLevel::XmlErrError,
                 None,
                 0,
-                (!(*ctxt).base.is_null()).then(|| CStr::from_ptr((*ctxt).base as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-                    .into()),
+                Some((*ctxt).base.to_string().into()),
                 None,
                 None,
-                (*ctxt).cur.offset_from((*ctxt).base) as _,
+                (*ctxt).cur as _,
                 0,
                 XML_XPATH_ERROR_MESSAGES[error as usize],
             );
@@ -979,14 +976,9 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
         )
         .unwrap();
         (*(*ctxt).context).last_error.level = XmlErrorLevel::XmlErrError;
-        (*(*ctxt).context).last_error.str1 = (!(*ctxt).base.is_null()).then(|| {
-            CStr::from_ptr((*ctxt).base as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()
-        });
+        (*(*ctxt).context).last_error.str1 = Some((*ctxt).base.to_string().into());
         // (*(*ctxt).context).last_error.str1 = xml_strdup((*ctxt).base) as *mut c_char;
-        (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
+        (*(*ctxt).context).last_error.int1 = (*ctxt).cur as _;
         (*(*ctxt).context).last_error.node = (*(*ctxt).context).debug_node;
         if let Some(error) = (*(*ctxt).context).error {
             error(
@@ -1008,13 +1000,10 @@ pub unsafe fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
                 XmlErrorLevel::XmlErrError,
                 None,
                 0,
-                (!(*ctxt).base.is_null()).then(|| CStr::from_ptr((*ctxt).base as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-                    .into()),
+                Some((*ctxt).base.to_string().into()),
                 None,
                 None,
-                (*ctxt).cur.offset_from((*ctxt).base) as _,
+                (*ctxt).cur as _,
                 0,
                 XML_XPATH_ERROR_MESSAGES[error as usize],
             );
@@ -1926,44 +1915,6 @@ pub unsafe fn xml_xpath_try_stream_compile(
 
 const XPATH_MAX_RECURSION_DEPTH: usize = 5000;
 
-macro_rules! CUR {
-    ($ctxt:expr) => {
-        *(*$ctxt).cur
-    };
-}
-
-macro_rules! NXT {
-    ($ctxt:expr, $val:expr) => {
-        *(*$ctxt).cur.add($val)
-    };
-}
-
-macro_rules! NEXT {
-    ($ctxt:expr) => {
-        if *(*$ctxt).cur != 0 {
-            let res = (*$ctxt).cur;
-            (*$ctxt).cur = (*$ctxt).cur.add(1);
-            res
-        } else {
-            (*$ctxt).cur
-        }
-    };
-}
-
-macro_rules! SKIP_BLANKS {
-    ($ctxt:expr) => {
-        while $crate::libxml::chvalid::xml_is_blank_char(*(*$ctxt).cur as u32) {
-            NEXT!($ctxt);
-        }
-    };
-}
-
-macro_rules! SKIP {
-    ($ctxt:expr, $val:expr) => {
-        (*$ctxt).cur = (*$ctxt).cur.add($val);
-    };
-}
-
 macro_rules! PUSH_BINARY_EXPR {
     ($ctxt:expr, $op:expr, $ch1:expr, $ch2:expr, $val:expr, $val2:expr) => {
         xml_xpath_comp_expr_add(
@@ -2164,128 +2115,6 @@ impl TryFrom<i32> for XmlXPathTypeVal {
     }
 }
 
-/*
- * Macros for accessing the content. Those should be used only by the parser,
- * and not exported.
- *
- * Dirty macros, i.e. one need to make assumption on the context to use them
- *
- *   CUR_PTR return the current pointer to the xmlChar to be parsed.
- *   CUR     returns the current xmlChar value, i.e. a 8 bit value
- *           in ISO-Latin or UTF-8.
- *           This should be used internally by the parser
- *           only to compare to ASCII values otherwise it would break when
- *           running with UTF-8 encoding.
- *   NXT(n)  returns the n'th next xmlChar. Same as CUR is should be used only
- *           to compare on ASCII based substring.
- *   SKIP(n) Skip n xmlChar, and must also be used only to skip ASCII defined
- *           strings within the parser.
- *   CURRENT Returns the current c_char value, with the full decoding of
- *           UTF-8 if we are using this mode. It returns an int.
- *   NEXT    Skip to the next character, this does the proper decoding
- *           in UTF-8 mode. It also pop-up unfinished entities on the fly.
- *           It returns the pointer to the current xmlChar.
- */
-
-macro_rules! CUR_PTR {
-    ($ctxt:expr) => {
-        (*$ctxt).cur
-    };
-}
-
-macro_rules! CUR_CHAR {
-    ($ctxt:expr, $l:expr) => {
-        xml_xpath_current_char($ctxt, addr_of_mut!($l))
-    };
-}
-
-macro_rules! NEXTL {
-    ($ctxt:expr, $l:expr) => {
-        (*$ctxt).cur = (*$ctxt).cur.add($l as usize);
-    };
-}
-
-/// The current c_char value, if using UTF-8 this may actually span multiple
-/// bytes in the input buffer.
-///
-/// Returns the current c_char value and its length
-#[doc(alias = "xmlXPathCurrentChar")]
-unsafe fn xml_xpath_current_char(ctxt: XmlXPathParserContextPtr, len: *mut i32) -> i32 {
-    unsafe {
-        let mut val: u32;
-
-        if ctxt.is_null() {
-            return 0;
-        }
-        let cur: *const XmlChar = (*ctxt).cur;
-
-        // We are supposed to handle UTF8, check it's valid
-        // From rfc2044: encoding of the Unicode values on UTF-8:
-        //
-        // UCS-4 range (hex.)           UTF-8 octet sequence (binary)
-        // 0000 0000-0000 007F   0xxxxxxx
-        // 0000 0080-0000 07FF   110xxxxx 10xxxxxx
-        // 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
-        //
-        // Check for the 0x110000 limit too
-        'encoding: {
-            let c: u8 = *cur;
-            if c & 0x80 != 0 {
-                if *cur.add(1) & 0xc0 != 0x80 {
-                    break 'encoding;
-                }
-
-                if c & 0xe0 == 0xe0 {
-                    if *cur.add(2) & 0xc0 != 0x80 {
-                        break 'encoding;
-                    }
-
-                    if c & 0xf0 == 0xf0 {
-                        if c & 0xf8 != 0xf0 || *cur.add(3) & 0xc0 != 0x80 {
-                            break 'encoding;
-                        } else {
-                            /* 4-byte code */
-                            *len = 4;
-                            val = (*cur.add(0) as u32 & 0x7) << 18;
-                            val |= (*cur.add(1) as u32 & 0x3f) << 12;
-                            val |= (*cur.add(2) as u32 & 0x3f) << 6;
-                            val |= *cur.add(3) as u32 & 0x3f;
-                        }
-                    } else {
-                        /* 3-byte code */
-                        *len = 3;
-                        val = (*cur.add(0) as u32 & 0xf) << 12;
-                        val |= (*cur.add(1) as u32 & 0x3f) << 6;
-                        val |= *cur.add(2) as u32 & 0x3f;
-                    }
-                } else {
-                    /* 2-byte code */
-                    *len = 2;
-                    val = (*cur.add(0) as u32 & 0x1f) << 6;
-                    val |= *cur.add(1) as u32 & 0x3f;
-                }
-
-                if !xml_is_char(val) {
-                    XP_ERROR0!(ctxt, XmlXPathError::XPathInvalidCharError as i32);
-                }
-                return val as _;
-            } else {
-                /* 1-byte code */
-                *len = 1;
-                return *cur as _;
-            }
-        }
-        //  encoding_error:
-        // If we detect an UTF8 error that probably means that the
-        // input encoding didn't get properly advertised in the
-        // declaration header. Report the error and switch the encoding
-        // to ISO-Latin-1 (if you don't like this policy, just declare the
-        // encoding !)
-        *len = 0;
-        XP_ERROR0!(ctxt, XmlXPathError::XPathEncodingError as i32);
-    }
-}
-
 /// Trickery: parse an XML name but without consuming the input flow
 /// Needed to avoid insanity in the parser state.
 ///
@@ -2301,36 +2130,38 @@ unsafe fn xml_xpath_current_char(ctxt: XmlXPathParserContextPtr, len: *mut i32) 
 #[doc(alias = "xmlXPathScanName")]
 unsafe fn xml_xpath_scan_name(ctxt: XmlXPathParserContextPtr) -> *mut XmlChar {
     unsafe {
-        let mut l: i32 = 0;
-        let mut c: i32;
+        let cur = (*ctxt).cur;
 
-        let cur: *const XmlChar = (*ctxt).cur;
-
-        c = CUR_CHAR!(ctxt, l);
-        if c == ' ' as i32
-        || c == '>' as i32
-        || c == '/' as i32 /* accelerators */
-        || (!xml_is_letter(c as u32) && c != '_' as i32 && c != ':' as i32)
-        {
+        let Some(c) = (*ctxt).current_char() else {
+            return null_mut();
+        };
+        if c == ' ' || c == '>' || c == '/' || (!xml_is_letter(c as u32) && c != '_' && c != ':') {
             return null_mut();
         }
 
-        while c != ' ' as i32
-        && c != '>' as i32
-        && c != '/' as i32   /* test bigname.xml */
-        && (xml_is_letter(c as u32)
-            || xml_is_digit(c as u32)
-            || c == '.' as i32
-            || c == '-' as i32
-            || c == '_' as i32
-            || c == ':' as i32
-            || xml_is_combining(c as u32)
-            || xml_is_extender(c as u32))
+        while (*ctxt)
+            .current_char()
+            .filter(|&c| {
+                c != ' '
+                    && c != '>'
+                    && c != '/'
+                    && (xml_is_letter(c as u32)
+                        || xml_is_digit(c as u32)
+                        || c == '.'
+                        || c == '-'
+                        || c == '_'
+                        || c == ':'
+                        || xml_is_combining(c as u32)
+                        || xml_is_extender(c as u32))
+            })
+            .is_some()
         {
-            NEXTL!(ctxt, l);
-            c = CUR_CHAR!(ctxt, l);
+            (*ctxt).next_char();
         }
-        let ret: *mut XmlChar = xml_strndup(cur, (*ctxt).cur.offset_from(cur) as _);
+        let ret: *mut XmlChar = xml_strndup(
+            (*ctxt).base[cur..].as_ptr(),
+            (*ctxt).cur as i32 - cur as i32,
+        );
         (*ctxt).cur = cur;
         ret
     }
@@ -2443,32 +2274,43 @@ unsafe fn xml_xpath_is_axis_name(name: *const XmlChar) -> Option<XmlXPathAxisVal
 #[doc(alias = "xmlXPathParseLiteral")]
 unsafe fn xml_xpath_parse_literal(ctxt: XmlXPathParserContextPtr) -> *mut XmlChar {
     unsafe {
-        let q: *const XmlChar;
         let ret: *mut XmlChar;
 
-        if CUR!(ctxt) == b'"' {
-            NEXT!(ctxt);
-            q = CUR_PTR!(ctxt);
-            while xml_is_char(CUR!(ctxt) as u32) && CUR!(ctxt) != b'"' {
-                NEXT!(ctxt);
+        if (*ctxt).current_char() == Some('"') {
+            (*ctxt).next_char();
+            let q = (*ctxt).cur;
+            while (*ctxt)
+                .current_char()
+                .is_some_and(|c| xml_is_char(c as u32) && c != '"')
+            {
+                (*ctxt).next_char();
             }
-            if !xml_is_char(CUR!(ctxt) as u32) {
+            if (*ctxt)
+                .current_char()
+                .is_none_or(|c| !xml_is_char(c as u32))
+            {
                 XP_ERRORNULL!(ctxt, XmlXPathError::XPathUnfinishedLiteralError as i32);
             } else {
-                ret = xml_strndup(q, CUR_PTR!(ctxt).offset_from(q) as _);
-                NEXT!(ctxt);
+                ret = xml_strndup((*ctxt).base[q..].as_ptr(), (*ctxt).cur as i32 - q as i32);
+                (*ctxt).next_char();
             }
-        } else if CUR!(ctxt) == b'\'' {
-            NEXT!(ctxt);
-            q = CUR_PTR!(ctxt);
-            while xml_is_char(CUR!(ctxt) as u32) && CUR!(ctxt) != b'\'' {
-                NEXT!(ctxt);
+        } else if (*ctxt).current_char() == Some('\'') {
+            (*ctxt).next_char();
+            let q = (*ctxt).cur;
+            while (*ctxt)
+                .current_char()
+                .is_some_and(|c| xml_is_char(c as u32) && c != '\'')
+            {
+                (*ctxt).next_char();
             }
-            if !xml_is_char(CUR!(ctxt) as u32) {
+            if (*ctxt)
+                .current_char()
+                .is_none_or(|c| !xml_is_char(c as u32))
+            {
                 XP_ERRORNULL!(ctxt, XmlXPathError::XPathUnfinishedLiteralError as i32);
             } else {
-                ret = xml_strndup(q, CUR_PTR!(ctxt).offset_from(q) as _);
-                NEXT!(ctxt);
+                ret = xml_strndup((*ctxt).base[q..].as_ptr(), (*ctxt).cur as i32 - q as i32);
+                (*ctxt).next_char();
             }
         } else {
             XP_ERRORNULL!(ctxt, XmlXPathError::XPathStartLiteralError as i32);
@@ -2508,11 +2350,11 @@ unsafe fn xml_xpath_comp_node_test(
         *typ = XmlXPathTypeVal::NodeTypeNode;
         *test = XmlXPathTestVal::NodeTestNone;
         *prefix = null_mut();
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
 
-        if name.is_null() && CUR!(ctxt) == b'*' {
+        if name.is_null() && (*ctxt).current_char() == Some('*') {
             // All elements
-            NEXT!(ctxt);
+            (*ctxt).next_char();
             *test = XmlXPathTestVal::NodeTestAll;
             return null_mut();
         }
@@ -2524,10 +2366,12 @@ unsafe fn xml_xpath_comp_node_test(
             XP_ERRORNULL!(ctxt, XmlXPathError::XPathExprError as i32);
         }
 
-        let blanks: i32 = xml_is_blank_char(CUR!(ctxt) as u32) as i32;
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) == b'(' {
-            NEXT!(ctxt);
+        let blanks: i32 = (*ctxt)
+            .current_char()
+            .is_some_and(|c| xml_is_blank_char(c as u32)) as i32;
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char() == Some('(') {
+            (*ctxt).next_char();
             // NodeType or PI search
             if xml_str_equal(name, c"comment".as_ptr() as _) {
                 *typ = XmlXPathTypeVal::NodeTypeComment;
@@ -2546,34 +2390,34 @@ unsafe fn xml_xpath_comp_node_test(
 
             *test = XmlXPathTestVal::NodeTestType;
 
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
             if matches!(*typ, XmlXPathTypeVal::NodeTypePI) {
                 // Specific case: search a PI by name.
                 if !name.is_null() {
                     xml_free(name as _);
                 }
                 name = null_mut();
-                if CUR!(ctxt) != b')' {
+                if (*ctxt).current_char() != Some(')') {
                     name = xml_xpath_parse_literal(ctxt);
                     if name.is_null() {
                         XP_ERRORNULL!(ctxt, XmlXPathError::XPathExprError as i32);
                     }
                     *test = XmlXPathTestVal::NodeTestPI;
-                    SKIP_BLANKS!(ctxt);
+                    (*ctxt).skip_blanks();
                 }
             }
-            if CUR!(ctxt) != b')' {
+            if (*ctxt).current_char() != Some(')') {
                 if !name.is_null() {
                     xml_free(name as _);
                 }
                 XP_ERRORNULL!(ctxt, XmlXPathError::XPathUnclosedError as i32);
             }
-            NEXT!(ctxt);
+            (*ctxt).next_char();
             return name;
         }
         *test = XmlXPathTestVal::NodeTestName;
-        if blanks == 0 && CUR!(ctxt) == b':' {
-            NEXT!(ctxt);
+        if blanks == 0 && (*ctxt).current_char() == Some(':') {
+            (*ctxt).next_char();
 
             // Since currently the parser context don't have a
             // namespace list associated:
@@ -2592,9 +2436,9 @@ unsafe fn xml_xpath_comp_node_test(
             *prefix = name;
             // #endif
 
-            if CUR!(ctxt) == b'*' {
+            if (*ctxt).current_char() == Some('*') {
                 // All elements
-                NEXT!(ctxt);
+                (*ctxt).next_char();
                 *test = XmlXPathTestVal::NodeTestAll;
                 return null_mut();
             }
@@ -2619,12 +2463,12 @@ unsafe fn xml_xpath_comp_predicate(ctxt: XmlXPathParserContextPtr, filter: i32) 
     unsafe {
         let op1: i32 = (*(*ctxt).comp).last;
 
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) != b'[' {
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char() != Some('[') {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidPredicateError as i32);
         }
-        NEXT!(ctxt);
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).next_char();
+        (*ctxt).skip_blanks();
 
         (*(*ctxt).comp).last = -1;
         // This call to xmlXPathCompileExpr() will deactivate sorting
@@ -2641,7 +2485,7 @@ unsafe fn xml_xpath_comp_predicate(ctxt: XmlXPathParserContextPtr, filter: i32) 
         }
         CHECK_ERROR!(ctxt);
 
-        if CUR!(ctxt) != b']' {
+        if (*ctxt).current_char() != Some(']') {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidPredicateError as i32);
         }
 
@@ -2665,8 +2509,8 @@ unsafe fn xml_xpath_comp_predicate(ctxt: XmlXPathParserContextPtr, filter: i32) 
             );
         }
 
-        NEXT!(ctxt);
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).next_char();
+        (*ctxt).skip_blanks();
     }
 }
 
@@ -2702,10 +2546,10 @@ unsafe fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
         #[cfg(feature = "libxml_xptr_locs")]
         let mut op2: i32 = -1;
 
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) == b'.' && NXT!(ctxt, 1) == b'.' {
-            SKIP!(ctxt, 2);
-            SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char() == Some('.') && (*ctxt).nth_byte(1) == Some(b'.') {
+            (*ctxt).cur += 2;
+            (*ctxt).skip_blanks();
             PUSH_LONG_EXPR!(
                 ctxt,
                 XmlXPathOp::XpathOpCollect,
@@ -2715,9 +2559,9 @@ unsafe fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
                 null_mut(),
                 null_mut()
             );
-        } else if CUR!(ctxt) == b'.' {
-            NEXT!(ctxt);
-            SKIP_BLANKS!(ctxt);
+        } else if (*ctxt).current_char() == Some('.') {
+            (*ctxt).next_char();
+            (*ctxt).skip_blanks();
         } else {
             let mut name: *mut XmlChar = null_mut();
             let mut prefix: *mut XmlChar = null_mut();
@@ -2737,28 +2581,28 @@ unsafe fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
                     if !name.is_null() && xml_str_equal(name, c"range-to".as_ptr() as _) {
                         op2 = (*(*ctxt).comp).last;
                         xml_free(name as _);
-                        SKIP_BLANKS!(ctxt);
-                        if CUR!(ctxt) != b'(' {
+                        (*ctxt).skip_blanks();
+                        if (*ctxt).current_char() != Some('(') {
                             XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
                         }
-                        NEXT!(ctxt);
-                        SKIP_BLANKS!(ctxt);
+                        (*ctxt).next_char();
+                        (*ctxt).skip_blanks();
 
                         xml_xpath_compile_expr(ctxt, 1);
                         /* PUSH_BINARY_EXPR(XPATH_OP_RANGETO, op2, (*(*ctxt).comp).last, 0, 0); */
                         CHECK_ERROR!(ctxt);
 
-                        SKIP_BLANKS!(ctxt);
-                        if CUR!(ctxt) != b')' {
+                        (*ctxt).skip_blanks();
+                        if (*ctxt).current_char() != Some(')') {
                             XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
                         }
-                        NEXT!(ctxt);
+                        (*ctxt).next_char();
                         rangeto = 1;
                         break 'eval_predicates;
                     }
                 }
 
-                if CUR!(ctxt) == b'*' {
+                if (*ctxt).current_char() == Some('*') {
                     axis = Some(XmlXPathAxisVal::AxisChild);
                 } else {
                     if name.is_null() {
@@ -2767,9 +2611,11 @@ unsafe fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
                     if !name.is_null() {
                         axis = xml_xpath_is_axis_name(name);
                         if axis.is_some() {
-                            SKIP_BLANKS!(ctxt);
-                            if CUR!(ctxt) == b':' && NXT!(ctxt, 1) == b':' {
-                                SKIP!(ctxt, 2);
+                            (*ctxt).skip_blanks();
+                            if (*ctxt).current_char() == Some(':')
+                                && (*ctxt).nth_byte(1) == Some(b':')
+                            {
+                                (*ctxt).cur += 2;
                                 xml_free(name as _);
                                 name = null_mut();
                             } else {
@@ -2779,8 +2625,8 @@ unsafe fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
                         } else {
                             axis = Some(XmlXPathAxisVal::AxisChild);
                         }
-                    } else if CUR!(ctxt) == b'@' {
-                        NEXT!(ctxt);
+                    } else if (*ctxt).current_char() == Some('@') {
+                        (*ctxt).next_char();
                         axis = Some(XmlXPathAxisVal::AxisAttribute);
                     } else {
                         axis = Some(XmlXPathAxisVal::AxisChild);
@@ -2815,9 +2661,9 @@ unsafe fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
             let op1: i32 = (*(*ctxt).comp).last;
             (*(*ctxt).comp).last = -1;
 
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
             #[allow(clippy::while_immutable_condition)]
-            while CUR!(ctxt) == b'[' {
+            while (*ctxt).current_char() == Some('[') {
                 xml_xpath_comp_predicate(ctxt, 0);
             }
 
@@ -2861,10 +2707,10 @@ unsafe fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathCompRelativeLocationPath")]
 unsafe fn xml_xpath_comp_relative_location_path(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) == b'/' && NXT!(ctxt, 1) == b'/' {
-            SKIP!(ctxt, 2);
-            SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char() == Some('/') && (*ctxt).nth_byte(1) == Some(b'/') {
+            (*ctxt).cur += 2;
+            (*ctxt).skip_blanks();
             PUSH_LONG_EXPR!(
                 ctxt,
                 XmlXPathOp::XpathOpCollect,
@@ -2874,17 +2720,17 @@ unsafe fn xml_xpath_comp_relative_location_path(ctxt: XmlXPathParserContextPtr) 
                 null_mut(),
                 null_mut()
             );
-        } else if CUR!(ctxt) == b'/' {
-            NEXT!(ctxt);
-            SKIP_BLANKS!(ctxt);
+        } else if (*ctxt).current_char() == Some('/') {
+            (*ctxt).next_char();
+            (*ctxt).skip_blanks();
         }
         xml_xpath_comp_step(ctxt);
         CHECK_ERROR!(ctxt);
-        SKIP_BLANKS!(ctxt);
-        while CUR!(ctxt) == b'/' {
-            if CUR!(ctxt) == b'/' && NXT!(ctxt, 1) == b'/' {
-                SKIP!(ctxt, 2);
-                SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
+        while (*ctxt).current_char() == Some('/') {
+            if (*ctxt).current_char() == Some('/') && (*ctxt).nth_byte(1) == Some(b'/') {
+                (*ctxt).cur += 2;
+                (*ctxt).skip_blanks();
                 PUSH_LONG_EXPR!(
                     ctxt,
                     XmlXPathOp::XpathOpCollect,
@@ -2895,12 +2741,12 @@ unsafe fn xml_xpath_comp_relative_location_path(ctxt: XmlXPathParserContextPtr) 
                     null_mut()
                 );
                 xml_xpath_comp_step(ctxt);
-            } else if CUR!(ctxt) == b'/' {
-                NEXT!(ctxt);
-                SKIP_BLANKS!(ctxt);
+            } else if (*ctxt).current_char() == Some('/') {
+                (*ctxt).next_char();
+                (*ctxt).skip_blanks();
                 xml_xpath_comp_step(ctxt);
             }
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         }
     }
 }
@@ -2926,14 +2772,14 @@ unsafe fn xml_xpath_comp_relative_location_path(ctxt: XmlXPathParserContextPtr) 
 #[doc(alias = "xmlXPathCompLocationPath")]
 unsafe fn xml_xpath_comp_location_path(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) != b'/' {
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char() != Some('/') {
             xml_xpath_comp_relative_location_path(ctxt);
         } else {
-            while CUR!(ctxt) == b'/' {
-                if CUR!(ctxt) == b'/' && NXT!(ctxt, 1) == b'/' {
-                    SKIP!(ctxt, 2);
-                    SKIP_BLANKS!(ctxt);
+            while (*ctxt).current_char() == Some('/') {
+                if (*ctxt).current_char() == Some('/') && (*ctxt).nth_byte(1) == Some(b'/') {
+                    (*ctxt).cur += 2;
+                    (*ctxt).skip_blanks();
                     PUSH_LONG_EXPR!(
                         ctxt,
                         XmlXPathOp::XpathOpCollect,
@@ -2944,16 +2790,12 @@ unsafe fn xml_xpath_comp_location_path(ctxt: XmlXPathParserContextPtr) {
                         null_mut()
                     );
                     xml_xpath_comp_relative_location_path(ctxt);
-                } else if CUR!(ctxt) == b'/' {
-                    NEXT!(ctxt);
-                    SKIP_BLANKS!(ctxt);
-                    if CUR!(ctxt) != 0
-                        && (CUR!(ctxt).is_ascii_alphabetic()
-                            || CUR!(ctxt) == b'_'
-                            || CUR!(ctxt) == b'.'
-                            || CUR!(ctxt) == b'@'
-                            || (CUR!(ctxt) == b'*'))
-                    {
+                } else if (*ctxt).current_char() == Some('/') {
+                    (*ctxt).next_char();
+                    (*ctxt).skip_blanks();
+                    if (*ctxt).current_char().is_some_and(|c| {
+                        c.is_ascii_alphabetic() || c == '_' || c == '.' || c == '@' || c == '*'
+                    }) {
                         xml_xpath_comp_relative_location_path(ctxt);
                     }
                 }
@@ -2985,9 +2827,9 @@ unsafe fn xml_xpath_parse_qname(
 
         *prefix = null_mut();
         ret = xml_xpath_parse_ncname(ctxt);
-        if !ret.is_null() && CUR!(ctxt) == b':' {
+        if !ret.is_null() && (*ctxt).current_char() == Some(':') {
             *prefix = ret;
-            NEXT!(ctxt);
+            (*ctxt).next_char();
             ret = xml_xpath_parse_ncname(ctxt);
         }
         ret
@@ -3011,11 +2853,11 @@ unsafe fn xml_xpath_comp_variable_reference(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         let mut prefix: *mut XmlChar = null_mut();
 
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) != b'$' {
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char() != Some('$') {
             XP_ERROR!(ctxt, XmlXPathError::XPathVariableRefError as i32);
         }
-        NEXT!(ctxt);
+        (*ctxt).next_char();
         let name: *mut XmlChar = xml_xpath_parse_qname(ctxt, addr_of_mut!(prefix));
         if name.is_null() {
             xml_free(prefix as _);
@@ -3035,7 +2877,7 @@ unsafe fn xml_xpath_comp_variable_reference(ctxt: XmlXPathParserContextPtr) {
             xml_free(prefix as _);
             xml_free(name as _);
         }
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
         if !(*ctxt).context.is_null() && (*(*ctxt).context).flags & XML_XPATH_NOVAR as i32 != 0 {
             XP_ERROR!(ctxt, XmlXPathError::XPathForbidVariableError as i32);
         }
@@ -3058,54 +2900,59 @@ unsafe fn xml_xpath_comp_number(ctxt: XmlXPathParserContextPtr) {
         let mut is_exponent_negative: i32 = 0;
 
         CHECK_ERROR!(ctxt);
-        if CUR!(ctxt) != b'.' && (CUR!(ctxt) < b'0' || CUR!(ctxt) > b'9') {
+        if (*ctxt).current_char() != Some('.')
+            && (*ctxt).current_char().is_none_or(|c| !c.is_ascii_digit())
+        {
             XP_ERROR!(ctxt, XmlXPathError::XPathNumberError as i32);
         }
         ret = 0.0;
-        while CUR!(ctxt) >= b'0' && CUR!(ctxt) <= b'9' {
-            ret = ret * 10.0 + (CUR!(ctxt) - b'0') as f64;
+        while let Some(c) = (*ctxt).current_char().filter(|c| c.is_ascii_digit()) {
+            ret = ret * 10.0 + (c as u8 - b'0') as f64;
             ok = 1;
-            NEXT!(ctxt);
+            (*ctxt).next_char();
         }
-        if CUR!(ctxt) == b'.' {
+        if (*ctxt).current_char() == Some('.') {
             let mut v: i32;
             let mut frac: i32 = 0;
             let mut fraction: f64 = 0.0;
 
-            NEXT!(ctxt);
-            if (CUR!(ctxt) < b'0' || CUR!(ctxt) > b'9') && ok == 0 {
+            (*ctxt).next_char();
+            if (*ctxt).current_char().is_none_or(|c| !c.is_ascii_digit()) && ok == 0 {
                 XP_ERROR!(ctxt, XmlXPathError::XPathNumberError as i32);
             }
-            while CUR!(ctxt) == b'0' {
+            while (*ctxt).current_char() == Some('0') {
                 frac += 1;
-                NEXT!(ctxt);
+                (*ctxt).next_char();
             }
             let max: i32 = frac + MAX_FRAC as i32;
-            while CUR!(ctxt) >= b'0' && CUR!(ctxt) <= b'9' && frac < max {
-                v = (CUR!(ctxt) - b'0') as i32;
+            while let Some(c) = (*ctxt)
+                .current_char()
+                .filter(|c| c.is_ascii_digit() && frac < max)
+            {
+                v = (c as u8 - b'0') as i32;
                 fraction = fraction * 10.0 + v as f64;
                 frac += 1;
-                NEXT!(ctxt);
+                (*ctxt).next_char();
             }
             fraction /= 10.0f64.powi(frac);
             ret += fraction;
-            while CUR!(ctxt) >= b'0' && CUR!(ctxt) <= b'9' {
-                NEXT!(ctxt);
+            while (*ctxt).current_char().is_some_and(|c| c.is_ascii_digit()) {
+                (*ctxt).next_char();
             }
         }
-        if CUR!(ctxt) == b'e' || CUR!(ctxt) == b'E' {
-            NEXT!(ctxt);
-            if CUR!(ctxt) == b'-' {
+        if (*ctxt).current_char() == Some('e') || (*ctxt).current_char() == Some('E') {
+            (*ctxt).next_char();
+            if (*ctxt).current_char() == Some('-') {
                 is_exponent_negative = 1;
-                NEXT!(ctxt);
-            } else if CUR!(ctxt) == b'+' {
-                NEXT!(ctxt);
+                (*ctxt).next_char();
+            } else if (*ctxt).current_char() == Some('+') {
+                (*ctxt).next_char();
             }
-            while CUR!(ctxt) >= b'0' && CUR!(ctxt) <= b'9' {
+            while let Some(c) = (*ctxt).current_char().filter(|c| c.is_ascii_digit()) {
                 if exponent < 1000000 {
-                    exponent = exponent * 10 + (CUR!(ctxt) - b'0') as i32;
+                    exponent = exponent * 10 + (c as u8 - b'0') as i32;
                 }
-                NEXT!(ctxt);
+                (*ctxt).next_char();
             }
             if is_exponent_negative != 0 {
                 exponent = -exponent;
@@ -3138,32 +2985,43 @@ unsafe fn xml_xpath_comp_number(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathCompLiteral")]
 unsafe fn xml_xpath_comp_literal(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let q: *const XmlChar;
         let ret: *mut XmlChar;
 
-        if CUR!(ctxt) == b'"' {
-            NEXT!(ctxt);
-            q = CUR_PTR!(ctxt);
-            while xml_is_char(CUR!(ctxt) as u32) && CUR!(ctxt) != b'"' {
-                NEXT!(ctxt);
+        if (*ctxt).current_char() == Some('"') {
+            (*ctxt).next_char();
+            let q = (*ctxt).cur;
+            while (*ctxt)
+                .current_char()
+                .is_some_and(|c| xml_is_char(c as u32) && c != '"')
+            {
+                (*ctxt).next_char();
             }
-            if !xml_is_char(CUR!(ctxt) as u32) {
+            if (*ctxt)
+                .current_char()
+                .is_none_or(|c| !xml_is_char(c as u32))
+            {
                 XP_ERROR!(ctxt, XmlXPathError::XPathUnfinishedLiteralError as i32);
             } else {
-                ret = xml_strndup(q, CUR_PTR!(ctxt).offset_from(q) as _);
-                NEXT!(ctxt);
+                ret = xml_strndup((*ctxt).base[q..].as_ptr(), (*ctxt).cur as i32 - q as i32);
+                (*ctxt).next_char();
             }
-        } else if CUR!(ctxt) == b'\'' {
-            NEXT!(ctxt);
-            q = CUR_PTR!(ctxt);
-            while xml_is_char(CUR!(ctxt) as u32) && CUR!(ctxt) != b'\'' {
-                NEXT!(ctxt);
+        } else if (*ctxt).current_char() == Some('\'') {
+            (*ctxt).next_char();
+            let q = (*ctxt).cur;
+            while (*ctxt)
+                .current_char()
+                .is_some_and(|c| xml_is_char(c as u32) && c != '\'')
+            {
+                (*ctxt).next_char();
             }
-            if !xml_is_char(CUR!(ctxt) as u32) {
+            if (*ctxt)
+                .current_char()
+                .is_none_or(|c| !xml_is_char(c as u32))
+            {
                 XP_ERROR!(ctxt, XmlXPathError::XPathUnfinishedLiteralError as i32);
             } else {
-                ret = xml_strndup(q, CUR_PTR!(ctxt).offset_from(q) as _);
-                NEXT!(ctxt);
+                ret = xml_strndup((*ctxt).base[q..].as_ptr(), (*ctxt).cur as i32 - q as i32);
+                (*ctxt).next_char();
             }
         } else {
             XP_ERROR!(ctxt, XmlXPathError::XPathStartLiteralError as i32);
@@ -3213,23 +3071,23 @@ unsafe fn xml_xpath_comp_function_call(ctxt: XmlXPathParserContextPtr) {
             xml_free(prefix as _);
             XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
         }
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
 
-        if CUR!(ctxt) != b'(' {
+        if (*ctxt).current_char() != Some('(') {
             xml_free(name as _);
             xml_free(prefix as _);
             XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
         }
-        NEXT!(ctxt);
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).next_char();
+        (*ctxt).skip_blanks();
 
         // Optimization for count(): we don't need the node-set to be sorted.
         if prefix.is_null() && *name.add(0) == b'c' && xml_str_equal(name, c"count".as_ptr() as _) {
             sort = 0;
         }
         (*(*ctxt).comp).last = -1;
-        if CUR!(ctxt) != b')' {
-            while CUR!(ctxt) != 0 {
+        if (*ctxt).current_char() != Some(')') {
+            while (*ctxt).current_char().is_some() {
                 let op1: i32 = (*(*ctxt).comp).last;
                 (*(*ctxt).comp).last = -1;
                 xml_xpath_compile_expr(ctxt, sort);
@@ -3247,16 +3105,16 @@ unsafe fn xml_xpath_comp_function_call(ctxt: XmlXPathParserContextPtr) {
                     0
                 );
                 nbargs += 1;
-                if CUR!(ctxt) == b')' {
+                if (*ctxt).current_char() == Some(')') {
                     break;
                 }
-                if CUR!(ctxt) != b',' {
+                if (*ctxt).current_char() != Some(',') {
                     xml_free(name as _);
                     xml_free(prefix as _);
                     XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
                 }
-                NEXT!(ctxt);
-                SKIP_BLANKS!(ctxt);
+                (*ctxt).next_char();
+                (*ctxt).skip_blanks();
             }
         }
         if PUSH_LONG_EXPR!(
@@ -3272,8 +3130,8 @@ unsafe fn xml_xpath_comp_function_call(ctxt: XmlXPathParserContextPtr) {
             xml_free(prefix as _);
             xml_free(name as _);
         }
-        NEXT!(ctxt);
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).next_char();
+        (*ctxt).skip_blanks();
     }
 }
 
@@ -3289,29 +3147,30 @@ unsafe fn xml_xpath_comp_function_call(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathCompPrimaryExpr")]
 unsafe fn xml_xpath_comp_primary_expr(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) == b'$' {
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char() == Some('$') {
             xml_xpath_comp_variable_reference(ctxt);
-        } else if CUR!(ctxt) == b'(' {
-            NEXT!(ctxt);
-            SKIP_BLANKS!(ctxt);
+        } else if (*ctxt).current_char() == Some('(') {
+            (*ctxt).next_char();
+            (*ctxt).skip_blanks();
             xml_xpath_compile_expr(ctxt, 1);
             CHECK_ERROR!(ctxt);
-            if CUR!(ctxt) != b')' {
+            if (*ctxt).current_char() != Some(')') {
                 XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
             }
-            NEXT!(ctxt);
-            SKIP_BLANKS!(ctxt);
-        } else if CUR!(ctxt).is_ascii_digit()
-            || (CUR!(ctxt) == b'.' && NXT!(ctxt, 1).is_ascii_digit())
+            (*ctxt).next_char();
+            (*ctxt).skip_blanks();
+        } else if (*ctxt).current_char().is_some_and(|c| c.is_ascii_digit())
+            || ((*ctxt).current_char() == Some('.')
+                && (*ctxt).nth_byte(1).is_some_and(|c| c.is_ascii_digit()))
         {
             xml_xpath_comp_number(ctxt);
-        } else if CUR!(ctxt) == b'\'' || CUR!(ctxt) == b'"' {
+        } else if (*ctxt).current_char() == Some('\'') || (*ctxt).current_char() == Some('"') {
             xml_xpath_comp_literal(ctxt);
         } else {
             xml_xpath_comp_function_call(ctxt);
         }
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
     }
 }
 
@@ -3328,11 +3187,11 @@ unsafe fn xml_xpath_comp_filter_expr(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         xml_xpath_comp_primary_expr(ctxt);
         CHECK_ERROR!(ctxt);
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
 
-        while CUR!(ctxt) == b'[' {
+        while (*ctxt).current_char() == Some('[') {
             xml_xpath_comp_predicate(ctxt, 1);
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         }
     }
 }
@@ -3357,19 +3216,20 @@ unsafe fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
         let mut lc: i32 = 1; /* Should we branch to LocationPath ?         */
         let name: *mut XmlChar; /* we may have to preparse a name to find out */
 
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) == b'$'
-            || CUR!(ctxt) == b'('
-            || CUR!(ctxt).is_ascii_digit()
-            || CUR!(ctxt) == b'\''
-            || CUR!(ctxt) == b'"'
-            || (CUR!(ctxt) == b'.' && NXT!(ctxt, 1).is_ascii_digit())
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char() == Some('$')
+            || (*ctxt).current_char() == Some('(')
+            || (*ctxt).current_char().is_some_and(|c| c.is_ascii_digit())
+            || (*ctxt).current_char() == Some('\'')
+            || (*ctxt).current_char() == Some('"')
+            || ((*ctxt).current_char() == Some('.')
+                && (*ctxt).nth_byte(1).is_some_and(|c| c.is_ascii_digit()))
         {
             lc = 0;
-        } else if CUR!(ctxt) == b'*' || CUR!(ctxt) == b'/' {
+        } else if (*ctxt).current_char() == Some('*') || (*ctxt).current_char() == Some('/') {
             // relative or absolute location path
             lc = 1;
-        } else if CUR!(ctxt) == b'@' || CUR!(ctxt) == b'.' {
+        } else if (*ctxt).current_char() == Some('@') || (*ctxt).current_char() == Some('.') {
             // relative abbreviated attribute location path
             lc = 1;
         } else {
@@ -3382,7 +3242,7 @@ unsafe fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
             // maintain parsed token content through the recursive function
             // calls. This looks uglier but makes the code easier to
             // read/write/debug.
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
             name = xml_xpath_scan_name(ctxt);
             if !name.is_null() && !xml_strstr(name, c"::".as_ptr() as _).is_null() {
                 lc = 1;
@@ -3390,17 +3250,20 @@ unsafe fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
             } else if !name.is_null() {
                 let mut len: i32 = xml_strlen(name);
 
-                while NXT!(ctxt, len as usize) != 0 {
-                    if NXT!(ctxt, len as usize) == b'/' {
+                while (*ctxt).nth_byte(len as usize).is_some() {
+                    if (*ctxt).nth_byte(len as usize) == Some(b'/') {
                         // element name
                         lc = 1;
                         break;
-                    } else if xml_is_blank_char(NXT!(ctxt, len as usize) as u32) {
+                    } else if (*ctxt)
+                        .nth_byte(len as usize)
+                        .is_some_and(|c| xml_is_blank_char(c as u32))
+                    {
                         // ignore blanks
-                    } else if NXT!(ctxt, len as usize) == b':' {
+                    } else if (*ctxt).nth_byte(len as usize) == Some(b':') {
                         lc = 1;
                         break;
-                    } else if NXT!(ctxt, len as usize) == b'(' {
+                    } else if (*ctxt).nth_byte(len as usize) == Some(b'(') {
                         // Node Type or Function
                         if xml_xpath_is_node_type(name) != 0 {
                             lc = 1;
@@ -3417,13 +3280,13 @@ unsafe fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
                             }
                         }
                         break;
-                    } else if NXT!(ctxt, len as usize) == b'[' {
+                    } else if (*ctxt).nth_byte(len as usize) == Some(b'[') {
                         // element name
                         lc = 1;
                         break;
-                    // } else if NXT!(ctxt, len as usize) == b'<'
-                    //     || NXT!(ctxt, len as usize) == b'>'
-                    //     || NXT!(ctxt, len as usize) == b'='
+                    // } else if (*ctxt).nth_byte(len as usize) == Some(b'<')
+                    //     || (*ctxt).nth_byte(len as usize) == Some(b'>')
+                    //     || (*ctxt).nth_byte(len as usize) == Some(b'=')
                     // {
                     //     lc = 1;
                     //     break;
@@ -3433,7 +3296,7 @@ unsafe fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
                     }
                     len += 1;
                 }
-                if NXT!(ctxt, len as usize) == 0 {
+                if (*ctxt).nth_byte(len as usize).is_none() {
                     // element name
                     lc = 1;
                 }
@@ -3445,7 +3308,7 @@ unsafe fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
         }
 
         if lc != 0 {
-            if CUR!(ctxt) == b'/' {
+            if (*ctxt).current_char() == Some('/') {
                 PUSH_LEAVE_EXPR!(ctxt, XmlXPathOp::XpathOpRoot, 0, 0);
             } else {
                 PUSH_LEAVE_EXPR!(ctxt, XmlXPathOp::XpathOpNode, 0, 0);
@@ -3454,9 +3317,9 @@ unsafe fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
         } else {
             xml_xpath_comp_filter_expr(ctxt);
             CHECK_ERROR!(ctxt);
-            if CUR!(ctxt) == b'/' && NXT!(ctxt, 1) == b'/' {
-                SKIP!(ctxt, 2);
-                SKIP_BLANKS!(ctxt);
+            if (*ctxt).current_char() == Some('/') && (*ctxt).nth_byte(1) == Some(b'/') {
+                (*ctxt).cur += 2;
+                (*ctxt).skip_blanks();
 
                 PUSH_LONG_EXPR!(
                     ctxt,
@@ -3469,11 +3332,11 @@ unsafe fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
                 );
 
                 xml_xpath_comp_relative_location_path(ctxt);
-            } else if CUR!(ctxt) == b'/' {
+            } else if (*ctxt).current_char() == Some('/') {
                 xml_xpath_comp_relative_location_path(ctxt);
             }
         }
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).skip_blanks();
     }
 }
 
@@ -3485,13 +3348,13 @@ unsafe fn xml_xpath_comp_union_expr(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         xml_xpath_comp_path_expr(ctxt);
         CHECK_ERROR!(ctxt);
-        SKIP_BLANKS!(ctxt);
-        while CUR!(ctxt) == b'|' {
+        (*ctxt).skip_blanks();
+        while (*ctxt).current_char() == Some('|') {
             let op1: i32 = (*(*ctxt).comp).last;
             PUSH_LEAVE_EXPR!(ctxt, XmlXPathOp::XpathOpNode, 0, 0);
 
-            NEXT!(ctxt);
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).next_char();
+            (*ctxt).skip_blanks();
             xml_xpath_comp_path_expr(ctxt);
 
             PUSH_BINARY_EXPR!(
@@ -3503,7 +3366,7 @@ unsafe fn xml_xpath_comp_union_expr(ctxt: XmlXPathParserContextPtr) {
                 0
             );
 
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         }
     }
 }
@@ -3517,12 +3380,12 @@ unsafe fn xml_xpath_comp_unary_expr(ctxt: XmlXPathParserContextPtr) {
         let mut minus: i32 = 0;
         let mut found: i32 = 0;
 
-        SKIP_BLANKS!(ctxt);
-        while CUR!(ctxt) == b'-' {
+        (*ctxt).skip_blanks();
+        while (*ctxt).current_char() == Some('-') {
             minus = 1 - minus;
             found = 1;
-            NEXT!(ctxt);
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).next_char();
+            (*ctxt).skip_blanks();
         }
 
         xml_xpath_comp_union_expr(ctxt);
@@ -3551,25 +3414,29 @@ unsafe fn xml_xpath_comp_multiplicative_expr(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         xml_xpath_comp_unary_expr(ctxt);
         CHECK_ERROR!(ctxt);
-        SKIP_BLANKS!(ctxt);
-        while CUR!(ctxt) == b'*'
-            || (CUR!(ctxt) == b'd' && NXT!(ctxt, 1) == b'i' && NXT!(ctxt, 2) == b'v')
-            || (CUR!(ctxt) == b'm' && NXT!(ctxt, 1) == b'o' && NXT!(ctxt, 2) == b'd')
+        (*ctxt).skip_blanks();
+        while (*ctxt).current_char() == Some('*')
+            || ((*ctxt).current_char() == Some('d')
+                && (*ctxt).nth_byte(1) == Some(b'i')
+                && (*ctxt).nth_byte(2) == Some(b'v'))
+            || ((*ctxt).current_char() == Some('m')
+                && (*ctxt).nth_byte(1) == Some(b'o')
+                && (*ctxt).nth_byte(2) == Some(b'd'))
         {
             let mut op: i32 = -1;
             let op1: i32 = (*(*ctxt).comp).last;
 
-            if CUR!(ctxt) == b'*' {
+            if (*ctxt).current_char() == Some('*') {
                 op = 0;
-                NEXT!(ctxt);
-            } else if CUR!(ctxt) == b'd' {
+                (*ctxt).next_char();
+            } else if (*ctxt).current_char() == Some('d') {
                 op = 1;
-                SKIP!(ctxt, 3);
-            } else if CUR!(ctxt) == b'm' {
+                (*ctxt).cur += 3;
+            } else if (*ctxt).current_char() == Some('m') {
                 op = 2;
-                SKIP!(ctxt, 3);
+                (*ctxt).cur += 3;
             }
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
             xml_xpath_comp_unary_expr(ctxt);
             CHECK_ERROR!(ctxt);
             PUSH_BINARY_EXPR!(
@@ -3580,7 +3447,7 @@ unsafe fn xml_xpath_comp_multiplicative_expr(ctxt: XmlXPathParserContextPtr) {
                 op,
                 0
             );
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         }
     }
 }
@@ -3597,13 +3464,13 @@ unsafe fn xml_xpath_comp_additive_expr(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         xml_xpath_comp_multiplicative_expr(ctxt);
         CHECK_ERROR!(ctxt);
-        SKIP_BLANKS!(ctxt);
-        while CUR!(ctxt) == b'+' || CUR!(ctxt) == b'-' {
+        (*ctxt).skip_blanks();
+        while (*ctxt).current_char() == Some('+') || (*ctxt).current_char() == Some('-') {
             let op1: i32 = (*(*ctxt).comp).last;
-            let plus = (CUR!(ctxt) == b'+') as i32;
+            let plus = ((*ctxt).current_char() == Some('+')) as i32;
 
-            NEXT!(ctxt);
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).next_char();
+            (*ctxt).skip_blanks();
             xml_xpath_comp_multiplicative_expr(ctxt);
             CHECK_ERROR!(ctxt);
             PUSH_BINARY_EXPR!(
@@ -3614,7 +3481,7 @@ unsafe fn xml_xpath_comp_additive_expr(ctxt: XmlXPathParserContextPtr) {
                 plus,
                 0
             );
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         }
     }
 }
@@ -3637,17 +3504,17 @@ unsafe fn xml_xpath_comp_relational_expr(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         xml_xpath_comp_additive_expr(ctxt);
         CHECK_ERROR!(ctxt);
-        SKIP_BLANKS!(ctxt);
-        while CUR!(ctxt) == b'<' || CUR!(ctxt) == b'>' {
+        (*ctxt).skip_blanks();
+        while (*ctxt).current_char() == Some('<') || (*ctxt).current_char() == Some('>') {
             let op1: i32 = (*(*ctxt).comp).last;
-            let inf = (CUR!(ctxt) == b'<') as i32;
-            let strict = (NXT!(ctxt, 1) != b'=') as i32;
+            let inf = ((*ctxt).current_char() == Some('<')) as i32;
+            let strict = ((*ctxt).nth_byte(1) != Some(b'=')) as i32;
 
-            NEXT!(ctxt);
+            (*ctxt).next_char();
             if strict == 0 {
-                NEXT!(ctxt);
+                (*ctxt).next_char();
             }
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
             xml_xpath_comp_additive_expr(ctxt);
             CHECK_ERROR!(ctxt);
             PUSH_BINARY_EXPR!(
@@ -3658,7 +3525,7 @@ unsafe fn xml_xpath_comp_relational_expr(ctxt: XmlXPathParserContextPtr) {
                 inf,
                 strict
             );
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         }
     }
 }
@@ -3681,16 +3548,18 @@ unsafe fn xml_xpath_comp_equality_expr(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         xml_xpath_comp_relational_expr(ctxt);
         CHECK_ERROR!(ctxt);
-        SKIP_BLANKS!(ctxt);
-        while CUR!(ctxt) == b'=' || (CUR!(ctxt) == b'!' && NXT!(ctxt, 1) == b'=') {
+        (*ctxt).skip_blanks();
+        while (*ctxt).current_char() == Some('=')
+            || ((*ctxt).current_char() == Some('!') && (*ctxt).nth_byte(1) == Some(b'='))
+        {
             let op1: i32 = (*(*ctxt).comp).last;
-            let eq = (CUR!(ctxt) == b'=') as i32;
+            let eq = ((*ctxt).current_char() == Some('=')) as i32;
 
-            NEXT!(ctxt);
+            (*ctxt).next_char();
             if eq == 0 {
-                NEXT!(ctxt);
+                (*ctxt).next_char();
             }
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
             xml_xpath_comp_relational_expr(ctxt);
             CHECK_ERROR!(ctxt);
             PUSH_BINARY_EXPR!(
@@ -3701,7 +3570,7 @@ unsafe fn xml_xpath_comp_equality_expr(ctxt: XmlXPathParserContextPtr) {
                 eq,
                 0
             );
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         }
     }
 }
@@ -3714,11 +3583,14 @@ unsafe fn xml_xpath_comp_and_expr(ctxt: XmlXPathParserContextPtr) {
     unsafe {
         xml_xpath_comp_equality_expr(ctxt);
         CHECK_ERROR!(ctxt);
-        SKIP_BLANKS!(ctxt);
-        while CUR!(ctxt) == b'a' && NXT!(ctxt, 1) == b'n' && NXT!(ctxt, 2) == b'd' {
+        (*ctxt).skip_blanks();
+        while (*ctxt).current_char() == Some('a')
+            && (*ctxt).nth_byte(1) == Some(b'n')
+            && (*ctxt).nth_byte(2) == Some(b'd')
+        {
             let op1: i32 = (*(*ctxt).comp).last;
-            SKIP!(ctxt, 3);
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).cur += 3;
+            (*ctxt).skip_blanks();
             xml_xpath_comp_equality_expr(ctxt);
             CHECK_ERROR!(ctxt);
             PUSH_BINARY_EXPR!(
@@ -3729,7 +3601,7 @@ unsafe fn xml_xpath_comp_and_expr(ctxt: XmlXPathParserContextPtr) {
                 0,
                 0
             );
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         }
     }
 }
@@ -3755,15 +3627,15 @@ pub unsafe fn xml_xpath_compile_expr(ctxt: XmlXPathParserContextPtr, sort: i32) 
 
         xml_xpath_comp_and_expr(ctxt);
         CHECK_ERROR!(ctxt);
-        SKIP_BLANKS!(ctxt);
-        while CUR!(ctxt) == b'o' && NXT!(ctxt, 1) == b'r' {
+        (*ctxt).skip_blanks();
+        while (*ctxt).current_char() == Some('o') && (*ctxt).nth_byte(1) == Some(b'r') {
             let op1: i32 = (*(*ctxt).comp).last;
-            SKIP!(ctxt, 2);
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).cur += 2;
+            (*ctxt).skip_blanks();
             xml_xpath_comp_and_expr(ctxt);
             CHECK_ERROR!(ctxt);
             PUSH_BINARY_EXPR!(ctxt, XmlXPathOp::XpathOpOr, op1, (*(*ctxt).comp).last, 0, 0);
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
         }
         if sort != 0
             && !matches!(
@@ -6525,7 +6397,10 @@ pub unsafe fn xml_xpath_eval_expr(ctxt: XmlXPathParserContextPtr) {
         }
 
         #[cfg(feature = "libxml_pattern")]
-        let comp: XmlXPathCompExprPtr = xml_xpath_try_stream_compile((*ctxt).context, (*ctxt).base);
+        let comp: XmlXPathCompExprPtr = {
+            let base = CString::new((*ctxt).base.as_ref()).unwrap();
+            xml_xpath_try_stream_compile((*ctxt).context, base.as_ptr() as *const u8)
+        };
         #[cfg(feature = "libxml_pattern")]
         let f = !comp.is_null();
         #[cfg(not(feature = "libxml_pattern"))]
@@ -6550,7 +6425,7 @@ pub unsafe fn xml_xpath_eval_expr(ctxt: XmlXPathParserContextPtr) {
             CHECK_ERROR!(ctxt);
 
             // Check for trailing characters.
-            if *(*ctxt).cur != 0 {
+            if (*ctxt).cur < (*ctxt).base.len() {
                 XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
             }
 
@@ -6590,38 +6465,39 @@ unsafe fn xml_xpath_parse_name_complex(
     unsafe {
         let mut buf: [XmlChar; XML_MAX_NAMELEN + 5] = [0; XML_MAX_NAMELEN + 5];
         let mut len: i32 = 0;
-        let mut l: i32 = 0;
-        let mut c: i32;
 
         // Handler for more complex cases
-        c = CUR_CHAR!(ctxt, l);
-        if c == ' ' as i32
-        || c == '>' as i32
-        || c == '/' as i32
-        || c == '[' as i32
-        || c == ']' as i32
-        || c == '@' as i32
-        || c == '*' as i32  // accelerators
-        || (!xml_is_letter(c as u32) && c != '_' as i32 && (qualified == 0 || c != ':' as i32))
+        let Some(mut c) = (*ctxt).current_char() else {
+            return null_mut();
+        };
+        if c == ' '
+            || c == '>'
+            || c == '/'
+            || c == '['
+            || c == ']'
+            || c == '@'
+            || c == '*'
+            || (!xml_is_letter(c as u32) && c != '_' && (qualified == 0 || c != ':'))
         {
             return null_mut();
         }
 
-        while c != ' ' as i32
-        && c != '>' as i32
-        && c != '/' as i32  // test bigname.xml
-        && (xml_is_letter(c as u32)
-            || xml_is_digit(c as u32)
-            || c == '.' as i32
-            || c == '-' as i32
-            || c == '_' as i32
-            || (qualified != 0 && c == ':' as i32)
-            || xml_is_combining(c as u32)
-            || xml_is_extender(c as u32))
+        while c != ' '
+            && c != '>'
+            && c != '/'
+            && (xml_is_letter(c as u32)
+                || xml_is_digit(c as u32)
+                || c == '.'
+                || c == '-'
+                || c == '_'
+                || (qualified != 0 && c == ':')
+                || xml_is_combining(c as u32)
+                || xml_is_extender(c as u32))
         {
+            let l = c.len_utf8() as i32;
             COPY_BUF!(l, buf.as_mut_ptr(), len, c);
-            NEXTL!(ctxt, l);
-            c = CUR_CHAR!(ctxt, l);
+            (*ctxt).next_char();
+            c = (*ctxt).current_char().unwrap_or('\0');
             if len >= XML_MAX_NAMELEN as i32 {
                 // Okay someone managed to make a huge name, so he's ready to pay
                 // for the processing speed.
@@ -6637,13 +6513,13 @@ unsafe fn xml_xpath_parse_name_complex(
                 }
                 memcpy(buffer as _, buf.as_ptr() as _, len as usize);
                 while xml_is_letter(c as u32)
-                || xml_is_digit(c as u32)  /* test bigname.xml */
-                || c == '.' as i32
-                || c == '-' as i32
-                || c == '_' as i32
-                || (qualified != 0 && c == ':' as i32)
-                || xml_is_combining(c as u32)
-                || xml_is_extender(c as u32)
+                    || xml_is_digit(c as u32)
+                    || c == '.'
+                    || c == '-'
+                    || c == '_'
+                    || (qualified != 0 && c == ':')
+                    || xml_is_combining(c as u32)
+                    || xml_is_extender(c as u32)
                 {
                     if len + 10 > max {
                         if max > XML_MAX_NAME_LENGTH as i32 {
@@ -6659,9 +6535,10 @@ unsafe fn xml_xpath_parse_name_complex(
                         }
                         buffer = tmp;
                     }
+                    let l = c.len_utf8() as i32;
                     COPY_BUF!(l, buffer, len, c);
-                    NEXTL!(ctxt, l);
-                    c = CUR_CHAR!(ctxt, l);
+                    (*ctxt).next_char();
+                    c = (*ctxt).current_char().unwrap_or('\0');
                 }
                 *buffer.add(len as usize) = 0;
                 return buffer;
@@ -6686,39 +6563,27 @@ unsafe fn xml_xpath_parse_name_complex(
 #[doc(alias = "xmlXPathParseName")]
 pub unsafe fn xml_xpath_parse_name(ctxt: XmlXPathParserContextPtr) -> *mut XmlChar {
     unsafe {
-        let mut input: *const XmlChar;
         let ret: *mut XmlChar;
-        let count: usize;
 
-        if ctxt.is_null() || (*ctxt).cur.is_null() {
+        if ctxt.is_null() {
             return null_mut();
         }
         // Accelerator for simple ASCII names
-        input = (*ctxt).cur;
-        if (*input >= 0x61 && *input <= 0x7A)
-            || (*input >= 0x41 && *input <= 0x5A)
-            || *input == b'_'
-            || *input == b':'
+        let input = (*ctxt).current_str();
+        if let Some(mut input) =
+            input.strip_prefix(|c: char| c.is_ascii_alphabetic() || c == '_' || c == ':')
         {
-            input = input.add(1);
-            while (*input >= 0x61 && *input <= 0x7A)
-                || (*input >= 0x41 && *input <= 0x5A)
-                || (*input >= 0x30 && *input <= 0x39)
-                || *input == b'_'
-                || *input == b'-'
-                || *input == b':'
-                || *input == b'.'
-            {
-                input = input.add(1);
-            }
-            if *input > 0 && *input < 0x80 {
-                count = input.offset_from((*ctxt).cur) as _;
+            input = input.trim_start_matches(|c: char| {
+                c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ':' || c == '.'
+            });
+            if input.starts_with(|b| b <= '\x7F') {
+                let count = (*ctxt).current_str().len() - input.len();
                 if count > XML_MAX_NAME_LENGTH {
-                    (*ctxt).cur = input;
+                    (*ctxt).cur += count;
                     XP_ERRORNULL!(ctxt, XmlXPathError::XPathExprError as i32);
                 }
-                ret = xml_strndup((*ctxt).cur, count as _);
-                (*ctxt).cur = input;
+                ret = xml_strndup((*ctxt).current_str().as_ptr(), count as i32);
+                (*ctxt).cur += count;
                 return ret;
             }
         }
@@ -6738,44 +6603,33 @@ pub unsafe fn xml_xpath_parse_name(ctxt: XmlXPathParserContextPtr) -> *mut XmlCh
 #[doc(alias = "xmlXPathParseNCName")]
 pub unsafe fn xml_xpath_parse_ncname(ctxt: XmlXPathParserContextPtr) -> *mut XmlChar {
     unsafe {
-        let mut input: *const XmlChar;
         let ret: *mut XmlChar;
-        let count: i32;
 
-        if ctxt.is_null() || (*ctxt).cur.is_null() {
+        if ctxt.is_null() {
             return null_mut();
         }
         // Accelerator for simple ASCII names
-        input = (*ctxt).cur;
-        if (*input >= 0x61 && *input <= 0x7A)
-            || (*input >= 0x41 && *input <= 0x5A)
-            || *input == b'_'
-        {
-            input = input.add(1);
-            while (*input >= 0x61 && *input <= 0x7A)
-                || (*input >= 0x41 && *input <= 0x5A)
-                || (*input >= 0x30 && *input <= 0x39)
-                || *input == b'_'
-                || *input == b'.'
-                || *input == b'-'
-            {
-                input = input.add(1);
-            }
-            if *input == b' '
-                || *input == b'>'
-                || *input == b'/'
-                || *input == b'['
-                || *input == b']'
-                || *input == b':'
-                || *input == b'@'
-                || *input == b'*'
-            {
-                count = input.offset_from((*ctxt).cur) as _;
+        let input = (*ctxt).current_str();
+        if let Some(mut input) = input.strip_prefix(|c: char| c.is_ascii_alphabetic() || c == '_') {
+            input = input.trim_start_matches(|c: char| {
+                c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-'
+            });
+            if input.starts_with(|c: char| {
+                c == ' '
+                    || c == '>'
+                    || c == '/'
+                    || c == '['
+                    || c == ']'
+                    || c == ':'
+                    || c == '@'
+                    || c == '*'
+            }) {
+                let count = (*ctxt).current_str().len() - input.len();
                 if count == 0 {
                     return null_mut();
                 }
-                ret = xml_strndup((*ctxt).cur, count);
-                (*ctxt).cur = input;
+                ret = xml_strndup((*ctxt).current_str().as_ptr(), count as i32);
+                (*ctxt).cur += count;
                 return ret;
             }
         }

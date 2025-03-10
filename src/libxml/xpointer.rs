@@ -33,7 +33,11 @@
 //
 // daniel@veillard.com
 
-use std::{ffi::CStr, mem::size_of, ptr::null_mut};
+use std::{
+    ffi::CStr,
+    mem::{replace, size_of},
+    ptr::null_mut,
+};
 
 #[cfg(feature = "libxml_xptr_locs")]
 use libc::c_void;
@@ -55,7 +59,7 @@ use crate::{
     CHECK_ERROR, CHECK_TYPE, XP_ERROR,
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     libxml::{
-        globals::{xml_free, xml_malloc, xml_malloc_atomic},
+        globals::{xml_free, xml_malloc},
         parser::xml_init_parser,
         xmlstring::{XmlChar, xml_str_equal, xml_strlen},
     },
@@ -2036,58 +2040,6 @@ pub unsafe fn xml_xptr_new_context(
     }
 }
 
-/*
- * Macros for accessing the content. Those should be used only by the parser,
- * and not exported.
- *
- * Dirty macros, i.e. one need to make assumption on the context to use them
- *
- *   CUR     returns the current xmlChar value, i.e. a 8 bit value
- *           in ISO-Latin or UTF-8.
- *           This should be used internally by the parser
- *           only to compare to ASCII values otherwise it would break when
- *           running with UTF-8 encoding.
- *   NXT(n)  returns the n'th next xmlChar. Same as CUR is should be used only
- *           to compare on ASCII based substring.
- *   SKIP(n) Skip n xmlChar, and must also be used only to skip ASCII defined
- *           strings within the parser.
- *   CURRENT Returns the current c_char value, with the full decoding of
- *           UTF-8 if we are using this mode. It returns an int.
- *   NEXT    Skip to the next character, this does the proper decoding
- *           in UTF-8 mode. It also pop-up unfinished entities on the fly.
- *           It returns the pointer to the current xmlChar.
- */
-macro_rules! CUR {
-    ($ctxt:expr) => {
-        *(*$ctxt).cur
-    };
-}
-macro_rules! NXT {
-    ($ctxt:expr, $val:expr) => {
-        *(*$ctxt).cur.add($val as usize)
-    };
-}
-
-macro_rules! SKIP_BLANKS {
-    ($ctxt:expr) => {
-        while $crate::libxml::chvalid::xml_is_blank_char(*(*$ctxt).cur as u32) {
-            NEXT!($ctxt);
-        }
-    };
-}
-
-macro_rules! NEXT {
-    ($ctxt:expr) => {
-        if *(*$ctxt).cur != 0 {
-            let res = (*$ctxt).cur;
-            (*$ctxt).cur = (*$ctxt).cur.add(1);
-            res
-        } else {
-            (*$ctxt).cur
-        }
-    };
-}
-
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPtrErr")]
 macro_rules! xml_xptr_err {
@@ -2130,13 +2082,8 @@ macro_rules! xml_xptr_err {
             (*(*ctxt).context).last_error.domain = XmlErrorDomain::XmlFromXPointer;
             (*(*ctxt).context).last_error.code = error;
             (*(*ctxt).context).last_error.level = XmlErrorLevel::XmlErrError;
-            (*(*ctxt).context).last_error.str1 = (!(*ctxt).base.is_null()).then(|| {
-                CStr::from_ptr((*ctxt).base as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-                    .into()
-            });
-            (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
+            (*(*ctxt).context).last_error.str1 = Some((*ctxt).base.to_string().into());
+            (*(*ctxt).context).last_error.int1 = (*ctxt).cur as _;
             (*(*ctxt).context).last_error.node = (*(*ctxt).context).debug_node;
             if let Some(error) = (*(*ctxt).context).error {
                 error(
@@ -2156,12 +2103,9 @@ macro_rules! xml_xptr_err {
                     None,
                     0,
                     $extra,
-                    (!(*ctxt).base.is_null()).then(|| CStr::from_ptr((*ctxt).base as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                        .into()),
+                    Some((*ctxt).base.to_string().into()),
                     None,
-                    (*ctxt).cur.offset_from((*ctxt).base) as _,
+                    (*ctxt).cur as _,
                     0,
                     $msg,
                 );
@@ -2205,7 +2149,10 @@ unsafe fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: Option<&
     unsafe {
         // XPointer don't allow by syntax to address in multirooted trees
         // this might prove useful in some cases, warn about it.
-        if name.is_none() && CUR!(ctxt) == b'/' && NXT!(ctxt, 1) != b'1' {
+        if name.is_none()
+            && (*ctxt).current_char() == Some('/')
+            && (*ctxt).nth_byte(1) != Some(b'1')
+        {
             xml_xptr_err!(
                 ctxt,
                 XmlParserErrors::XmlXPtrChildseqStart,
@@ -2219,26 +2166,20 @@ unsafe fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: Option<&
             CHECK_ERROR!(ctxt);
         }
 
-        while CUR!(ctxt) == b'/' {
+        while (*ctxt).current_char() == Some('/') {
             let mut child: i32 = 0;
-            let mut overflow: i32 = 0;
-            NEXT!(ctxt);
+            let mut overflow = false;
+            (*ctxt).next_char();
 
-            while CUR!(ctxt) >= b'0' && CUR!(ctxt) <= b'9' {
-                let d: i32 = (CUR!(ctxt) - b'0') as i32;
-                if child > i32::MAX / 10 {
-                    overflow = 1;
-                } else {
-                    child *= 10;
-                }
-                if child > i32::MAX - d {
-                    overflow = 1;
-                } else {
-                    child += d;
-                }
-                NEXT!(ctxt);
+            while let Some(cur) = (*ctxt).current_char().filter(|c| c.is_ascii_digit()) {
+                let (c, f) = child.overflowing_mul(10);
+                overflow |= f;
+                let (c, f) = c.overflowing_add(cur as i32 - b'0' as i32);
+                overflow |= f;
+                child = c;
+                (*ctxt).next_char();
             }
-            if overflow != 0 {
+            if overflow {
                 child = 0;
             }
             xml_xptr_get_child_no(ctxt, child);
@@ -2278,10 +2219,6 @@ unsafe fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: Option<&
 #[doc(alias = "xmlXPtrEvalXPtrPart")]
 unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut XmlChar) {
     unsafe {
-        let mut cur: *mut XmlChar;
-        let mut len: i32;
-        let mut level: i32;
-
         if name.is_null() {
             name = xml_xpath_parse_name(ctxt);
         }
@@ -2289,57 +2226,42 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
             XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
         }
 
-        if CUR!(ctxt) != b'(' {
+        if (*ctxt).current_char() != Some('(') {
             xml_free(name as _);
             XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
         }
-        NEXT!(ctxt);
-        level = 1;
+        (*ctxt).next_char();
+        let mut level = 1;
 
-        len = xml_strlen((*ctxt).cur);
-        len += 1;
-        let buffer: *mut XmlChar = xml_malloc_atomic(len as usize) as _;
-        if buffer.is_null() {
-            xml_xptr_err_memory("allocating buffer");
-            xml_free(name as _);
-            return;
-        }
-
-        cur = buffer;
-        while CUR!(ctxt) != 0 {
-            if CUR!(ctxt) == b')' {
+        let mut buffer = String::with_capacity((*ctxt).current_str().len());
+        while let Some(c) = (*ctxt).current_char() {
+            if c == ')' {
                 level -= 1;
                 if level == 0 {
-                    NEXT!(ctxt);
+                    (*ctxt).next_char();
                     break;
                 }
-            } else if CUR!(ctxt) == b'(' {
+            } else if c == '(' {
                 level += 1;
-            } else if CUR!(ctxt) == b'^'
-                && (NXT!(ctxt, 1) == b')' || NXT!(ctxt, 1) == b'(' || NXT!(ctxt, 1) == b'^')
-            {
-                NEXT!(ctxt);
+            } else if c == '^' && matches!((*ctxt).nth_byte(1), Some(b')' | b'(' | b'^')) {
+                (*ctxt).next_char();
             }
-            *cur = CUR!(ctxt);
-            cur = cur.add(1);
-            NEXT!(ctxt);
+            if let Some(c) = (*ctxt).next_char() {
+                buffer.push(c);
+            }
         }
-        *cur = 0;
 
-        if level != 0 && CUR!(ctxt) == 0 {
+        if level != 0 && (*ctxt).current_char().is_none() {
             xml_free(name as _);
-            xml_free(buffer as _);
             XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
         }
 
         if xml_str_equal(name, c"xpointer".as_ptr() as _)
             || xml_str_equal(name, c"xpath1".as_ptr() as _)
         {
-            let old_base: *const XmlChar = (*ctxt).base;
-            let old_cur: *const XmlChar = (*ctxt).cur;
-
-            (*ctxt).cur = buffer;
-            (*ctxt).base = buffer;
+            let old_base = replace(&mut (*ctxt).base, buffer.into_boxed_str());
+            let old_cur = (*ctxt).cur;
+            (*ctxt).cur = 0;
             // To evaluate an xpointer scheme element (4.3) we need:
             //   context initialized to the root
             //   context position initialized to 1
@@ -2355,13 +2277,13 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
             (*ctxt).base = old_base;
             (*ctxt).cur = old_cur;
         } else if xml_str_equal(name, c"element".as_ptr() as _) {
-            let old_base: *const XmlChar = (*ctxt).base;
-            let old_cur: *const XmlChar = (*ctxt).cur;
+            let old_base = replace(&mut (*ctxt).base, buffer.into_boxed_str());
+            let old_cur = (*ctxt).cur;
+            (*ctxt).cur = 0;
+
             let name2: *mut XmlChar;
 
-            (*ctxt).cur = buffer;
-            (*ctxt).base = buffer;
-            if *buffer.add(0) == b'/' {
+            if (*ctxt).base.starts_with('/') {
                 xml_xpath_root(ctxt);
                 xml_xptr_eval_child_seq(ctxt, None);
             } else {
@@ -2369,7 +2291,6 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
                 if name2.is_null() {
                     (*ctxt).base = old_base;
                     (*ctxt).cur = old_cur;
-                    xml_free(buffer as _);
                     xml_free(name as _);
                     XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
                 }
@@ -2386,39 +2307,34 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
             (*ctxt).base = old_base;
             (*ctxt).cur = old_cur;
         } else if xml_str_equal(name, c"xmlns".as_ptr() as _) {
-            let old_base: *const XmlChar = (*ctxt).base;
-            let old_cur: *const XmlChar = (*ctxt).cur;
+            let old_base = replace(&mut (*ctxt).base, buffer.into_boxed_str());
+            let old_cur = (*ctxt).cur;
+            (*ctxt).cur = 0;
 
-            (*ctxt).cur = buffer;
-            (*ctxt).base = buffer;
             let prefix: *mut XmlChar = xml_xpath_parse_ncname(ctxt);
             if prefix.is_null() {
                 (*ctxt).base = old_base;
                 (*ctxt).cur = old_cur;
-                xml_free(buffer as _);
                 xml_free(name as _);
                 XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
             }
-            SKIP_BLANKS!(ctxt);
-            if CUR!(ctxt) != b'=' {
+            (*ctxt).skip_blanks();
+            if (*ctxt).current_char() != Some('=') {
                 (*ctxt).base = old_base;
                 (*ctxt).cur = old_cur;
                 xml_free(prefix as _);
-                xml_free(buffer as _);
                 xml_free(name as _);
                 XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
             }
-            NEXT!(ctxt);
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).next_char();
+            (*ctxt).skip_blanks();
 
             xml_xpath_register_ns(
                 (*ctxt).context,
                 CStr::from_ptr(prefix as *const i8)
                     .to_string_lossy()
                     .as_ref(),
-                (!(*ctxt).cur.is_null())
-                    .then(|| CStr::from_ptr((*ctxt).cur as *const i8).to_string_lossy())
-                    .as_deref(),
+                Some((*ctxt).current_str()),
             );
             (*ctxt).base = old_base;
             (*ctxt).cur = old_cur;
@@ -2431,7 +2347,6 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
                 CStr::from_ptr(name as *const i8).to_string_lossy()
             );
         }
-        xml_free(buffer as _);
         xml_free(name as _);
     }
 }
@@ -2511,7 +2426,7 @@ unsafe fn xml_xptr_eval_full_xptr(ctxt: XmlXPathParserContextPtr, mut name: *mut
             }
 
             // Is there another XPointer part.
-            SKIP_BLANKS!(ctxt);
+            (*ctxt).skip_blanks();
             name = xml_xpath_parse_name(ctxt);
         }
     }
@@ -2523,8 +2438,8 @@ unsafe fn xml_xptr_eval_full_xptr(ctxt: XmlXPathParserContextPtr, mut name: *mut
 #[doc(alias = "xmlXPtrEvalXPointer")]
 unsafe fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) == b'/' {
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char() == Some('/') {
             xml_xpath_root(ctxt);
             xml_xptr_eval_child_seq(ctxt, None);
         } else {
@@ -2532,7 +2447,7 @@ unsafe fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
             if name.is_null() {
                 XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
             }
-            if CUR!(ctxt) == b'(' {
+            if (*ctxt).current_char() == Some('(') {
                 xml_xptr_eval_full_xptr(ctxt, name);
                 // Short evaluation
                 return;
@@ -2545,8 +2460,8 @@ unsafe fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
                 xml_free(name as _);
             }
         }
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) != 0 {
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char().is_some() {
             XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
         }
     }
@@ -2916,7 +2831,6 @@ pub unsafe fn xml_xptr_range_to_function(ctxt: XmlXPathParserContextPtr, _nargs:
 #[cfg(feature = "libxml_xptr_locs")]
 pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let cur: *const XmlChar;
         let mut res: XmlXPathObjectPtr;
         let mut tmp: XmlXPathObjectPtr;
         let newset: XmlLocationSetPtr;
@@ -2925,12 +2839,12 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
             return;
         }
 
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) != b'[' {
+        (*ctxt).skip_blanks();
+        if (*ctxt).current_char() != Some('[') {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidPredicateError as i32);
         }
-        NEXT!(ctxt);
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).next_char();
+        (*ctxt).skip_blanks();
 
         // Extract the old set, and then evaluate the result of the
         // expression for all the element in the set. use it to grow
@@ -2953,7 +2867,7 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
         } else {
             // Save the expression pointer since we will have to evaluate
             // it multiple times. Initialize the new set.
-            cur = (*ctxt).cur;
+            let cur = (*ctxt).cur;
             newset = xml_xptr_location_set_create(null_mut());
 
             for (i, &loc) in (*oldset).loc_tab.iter().enumerate() {
@@ -2995,12 +2909,12 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
             (*(*ctxt).context).proximity_position = -1;
             value_push(ctxt, xml_xptr_wrap_location_set(newset));
         }
-        if CUR!(ctxt) != b']' {
+        if (*ctxt).current_char() != Some(']') {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidPredicateError as i32);
         }
 
-        NEXT!(ctxt);
-        SKIP_BLANKS!(ctxt);
+        (*ctxt).next_char();
+        (*ctxt).skip_blanks();
     }
 }
 
