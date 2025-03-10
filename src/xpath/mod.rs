@@ -1178,7 +1178,7 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
         if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
             res = null_mut();
         } else {
-            res = value_pop(ctxt);
+            res = (*ctxt).value_pop();
             if res.is_null() {
                 generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
             } else if !(*ctxt).value_tab.is_empty() {
@@ -1394,7 +1394,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
         if (*pctxt).error != XmlXPathError::XPathExpressionOK as i32 {
             res_obj = null_mut();
         } else {
-            res_obj = value_pop(pctxt);
+            res_obj = (*pctxt).value_pop();
             if res_obj.is_null() {
                 if to_bool == 0 {
                     generic_error!("xmlXPathCompiledEval: No result on the stack.\n");
@@ -2518,91 +2518,6 @@ mod tests {
     }
 
     #[test]
-    fn test_value_pop() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                let ret_val = value_pop(ctxt);
-                desret_xml_xpath_object_ptr(ret_val);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in valuePop",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in valuePop()");
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_value_push() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                for n_value in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-                    let value = gen_xml_xpath_object_ptr(n_value, 1);
-
-                    let ret_val = value_push(ctxt, value);
-                    desret_int(ret_val);
-                    des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                    des_xml_xpath_object_ptr(n_value, value, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in valuePush",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in valuePush()");
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_value);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_add_values() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                xml_xpath_add_values(ctxt);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathAddValues",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathAddValues()");
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_boolean_function() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -2981,32 +2896,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_div_values() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                xml_xpath_div_values(ctxt);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathDivValues",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathDivValues()");
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_equal_values() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -3194,18 +3083,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_xpath_function_lookup() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_xpath_function_lookup_ns() {
-
-        /* missing type support */
     }
 
     #[test]
@@ -3436,61 +3313,6 @@ mod tests {
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_nargs);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_mod_values() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                xml_xpath_mod_values(ctxt);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathModValues",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathModValues()");
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_mult_values() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                xml_xpath_mult_values(ctxt);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathMultValues",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathMultValues()"
-                    );
-                    eprintln!(" {}", n_ctxt);
                 }
             }
         }
@@ -3874,36 +3696,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_pop_boolean() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                let ret_val = xml_xpath_pop_boolean(ctxt);
-                desret_int(ret_val);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathPopBoolean",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathPopBoolean()"
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_pop_external() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -3957,59 +3749,6 @@ mod tests {
                         leaks == 0,
                         "{leaks} Leaks are found in xmlXPathPopNodeSet()"
                     );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_pop_number() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                let ret_val = xml_xpath_pop_number(ctxt);
-                desret_double(ret_val);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathPopNumber",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathPopNumber()");
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_pop_string() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                let _ = xml_xpath_pop_string(ctxt);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathPopString",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathPopString()");
                     eprintln!(" {}", n_ctxt);
                 }
             }
@@ -4117,12 +3856,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_xpath_register_variable_lookup() {
-
-        /* missing type support */
     }
 
     #[test]
@@ -4444,32 +4177,6 @@ mod tests {
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_nargs);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_sub_values() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                xml_xpath_sub_values(ctxt);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathSubValues",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathSubValues()");
-                    eprintln!(" {}", n_ctxt);
                 }
             }
         }

@@ -71,19 +71,18 @@ use crate::{
         XmlGenericNodePtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, xml_build_qname,
     },
     xpath::{
-        XML_XPATH_CHECKNS, XML_XPATH_NAN, XML_XPATH_NOVAR, XPATH_MAX_STACK_DEPTH, XPATH_MAX_STEPS,
-        XmlXPathCompExpr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathError,
-        XmlXPathFuncLookupFunc, XmlXPathFunction, XmlXPathObject, XmlXPathObjectPtr,
-        XmlXPathObjectType, XmlXPathOp, XmlXPathParserContextPtr, XmlXPathStepOp,
-        XmlXPathStepOpPtr, XmlXPathVariableLookupFunc, xml_xpath_cast_boolean_to_string,
-        xml_xpath_cast_node_set_to_string, xml_xpath_cast_node_to_number,
-        xml_xpath_cast_node_to_string, xml_xpath_cast_number_to_boolean,
-        xml_xpath_cast_number_to_string, xml_xpath_cast_to_boolean, xml_xpath_cast_to_number,
-        xml_xpath_cast_to_string, xml_xpath_cmp_nodes_ext, xml_xpath_free_comp_expr,
-        xml_xpath_free_node_set, xml_xpath_free_object, xml_xpath_free_value_tree,
-        xml_xpath_is_inf, xml_xpath_is_nan, xml_xpath_node_set_create,
-        xml_xpath_node_set_merge_and_clear, xml_xpath_node_set_merge_and_clear_no_dupls,
-        xml_xpath_object_copy,
+        XML_XPATH_CHECKNS, XML_XPATH_NAN, XML_XPATH_NOVAR, XPATH_MAX_STEPS, XmlXPathCompExpr,
+        XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathError, XmlXPathFuncLookupFunc,
+        XmlXPathFunction, XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathOp,
+        XmlXPathParserContextPtr, XmlXPathStepOp, XmlXPathStepOpPtr, XmlXPathVariableLookupFunc,
+        xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
+        xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
+        xml_xpath_cast_number_to_boolean, xml_xpath_cast_number_to_string,
+        xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
+        xml_xpath_cmp_nodes_ext, xml_xpath_free_comp_expr, xml_xpath_free_node_set,
+        xml_xpath_free_object, xml_xpath_free_value_tree, xml_xpath_is_inf, xml_xpath_is_nan,
+        xml_xpath_node_set_create, xml_xpath_node_set_merge_and_clear,
+        xml_xpath_node_set_merge_and_clear_no_dupls, xml_xpath_object_copy,
     },
 };
 
@@ -715,7 +714,7 @@ pub(crate) unsafe fn xml_xpath_release_object(ctxt: XmlXPathContextPtr, obj: Xml
 #[doc(alias = "xmlXPathPopBoolean")]
 pub unsafe fn xml_xpath_pop_boolean(ctxt: XmlXPathParserContextPtr) -> i32 {
     unsafe {
-        let obj: XmlXPathObjectPtr = value_pop(ctxt);
+        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         if obj.is_null() {
             xml_xpath_set_error!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
             return 0;
@@ -737,7 +736,7 @@ pub unsafe fn xml_xpath_pop_boolean(ctxt: XmlXPathParserContextPtr) -> i32 {
 #[doc(alias = "xmlXPathPopNumber")]
 pub unsafe fn xml_xpath_pop_number(ctxt: XmlXPathParserContextPtr) -> f64 {
     unsafe {
-        let obj: XmlXPathObjectPtr = value_pop(ctxt);
+        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         if obj.is_null() {
             xml_xpath_set_error!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
             return 0.0;
@@ -759,7 +758,7 @@ pub unsafe fn xml_xpath_pop_number(ctxt: XmlXPathParserContextPtr) -> f64 {
 #[doc(alias = "xmlXPathPopString")]
 pub unsafe fn xml_xpath_pop_string(ctxt: XmlXPathParserContextPtr) -> Option<Cow<'static, str>> {
     unsafe {
-        let obj: XmlXPathObjectPtr = value_pop(ctxt);
+        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         if obj.is_null() {
             xml_xpath_set_error!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
             return None;
@@ -792,7 +791,7 @@ pub unsafe fn xml_xpath_pop_node_set(ctxt: XmlXPathParserContextPtr) -> Option<B
             xml_xpath_set_type_error!(ctxt);
             return None;
         }
-        let obj: XmlXPathObjectPtr = value_pop(ctxt);
+        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         let ret = (*obj).nodesetval.take();
         // #if 0
         // /* to fix memory leak of not clearing (*obj).user */
@@ -819,7 +818,7 @@ pub unsafe fn xml_xpath_pop_external(ctxt: XmlXPathParserContextPtr) -> *mut c_v
             xml_xpath_set_type_error!(ctxt);
             return null_mut();
         }
-        let obj: XmlXPathObjectPtr = value_pop(ctxt);
+        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         let ret: *mut c_void = (*obj).user;
         (*obj).user = null_mut();
         xml_xpath_release_object((*ctxt).context, obj);
@@ -1667,26 +1666,9 @@ pub(super) unsafe fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
     }
 }
 
-// TODO: remap to xmlXPathValuePop and Push.
-/// Pops the top XPath object from the value stack
-///
-/// Returns the XPath object just removed
-#[doc(alias = "valuePop")]
-pub unsafe fn value_pop(ctxt: XmlXPathParserContextPtr) -> XmlXPathObjectPtr {
-    unsafe {
-        if ctxt.is_null() || (*ctxt).value_tab.is_empty() {
-            return null_mut();
-        }
-
-        let res = (*ctxt).value_tab.pop().unwrap();
-        (*ctxt).value = (*ctxt).value_tab.last().cloned().unwrap_or(null_mut());
-        res
-    }
-}
-
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPathPErrMemory")]
-unsafe fn xml_xpath_perr_memory(ctxt: XmlXPathParserContextPtr, extra: Option<&str>) {
+pub(super) unsafe fn xml_xpath_perr_memory(ctxt: XmlXPathParserContextPtr, extra: Option<&str>) {
     unsafe {
         if ctxt.is_null() {
             xml_xpath_err_memory(null_mut(), extra);
@@ -1694,35 +1676,6 @@ unsafe fn xml_xpath_perr_memory(ctxt: XmlXPathParserContextPtr, extra: Option<&s
             (*ctxt).error = XmlXPathError::XPathMemoryError as i32;
             xml_xpath_err_memory((*ctxt).context, extra);
         }
-    }
-}
-
-/// Pushes a new XPath object on top of the value stack. If value is NULL,
-/// a memory error is recorded in the parser context.
-///
-/// Returns the number of items on the value stack, or -1 in case of error.
-///
-/// The object is destroyed in case of error.
-#[doc(alias = "valuePush")]
-pub unsafe fn value_push(ctxt: XmlXPathParserContextPtr, value: XmlXPathObjectPtr) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return -1;
-        }
-        if value.is_null() {
-            // A NULL value typically indicates that a memory allocation failed,
-            // so we set (*ctxt).error here to propagate the error.
-            (*ctxt).error = XmlXPathError::XPathMemoryError as i32;
-            return -1;
-        }
-        if (*ctxt).value_tab.len() == XPATH_MAX_STACK_DEPTH {
-            xml_xpath_perr_memory(ctxt, Some("XPath stack depth limit reached\n"));
-            xml_xpath_free_object(value);
-            return -1;
-        }
-        (*ctxt).value_tab.push(value);
-        (*ctxt).value = value;
-        (*ctxt).value_tab.len() as i32 - 1
     }
 }
 
@@ -1840,13 +1793,10 @@ pub unsafe fn xml_xpath_root(ctxt: XmlXPathParserContextPtr) {
         if ctxt.is_null() || (*ctxt).context.is_null() {
             return;
         }
-        value_push(
-            ctxt,
-            xml_xpath_cache_new_node_set(
-                (*ctxt).context,
-                (*(*ctxt).context).doc.map(|doc| doc.into()),
-            ),
-        );
+        (*ctxt).value_push(xml_xpath_cache_new_node_set(
+            (*ctxt).context,
+            (*(*ctxt).context).doc.map(|doc| doc.into()),
+        ));
     }
 }
 
@@ -4554,7 +4504,7 @@ unsafe fn xml_xpath_node_collect_and_test(
 
         CHECK_TYPE0!(ctxt, XmlXPathObjectType::XPathNodeset);
         // The popped object holding the context nodes
-        let obj: XmlXPathObjectPtr = value_pop(ctxt);
+        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         // Setup namespaces.
         if !prefix.is_null() {
             uri = xml_xpath_ns_lookup(xpctxt, prefix);
@@ -4653,7 +4603,7 @@ unsafe fn xml_xpath_node_collect_and_test(
         // The set of context nodes for the node tests
         let Some(context_seq) = (*obj).nodesetval.as_deref().filter(|n| !n.is_empty()) else {
             xml_xpath_release_object(xpctxt, obj);
-            value_push(ctxt, xml_xpath_cache_wrap_node_set(xpctxt, None));
+            (*ctxt).value_push(xml_xpath_cache_wrap_node_set(xpctxt, None));
             return 0;
         };
         // Predicate optimization ---------------------------------------------
@@ -4999,7 +4949,7 @@ unsafe fn xml_xpath_node_collect_and_test(
             xml_xpath_free_node_set(seq);
         }
         // Hand over the result. Better to push the set also in case of errors.
-        value_push(ctxt, xml_xpath_cache_wrap_node_set(xpctxt, out_seq));
+        (*ctxt).value_push(xml_xpath_cache_wrap_node_set(xpctxt, out_seq));
         // Reset the context node.
         (*xpctxt).node = old_context_node;
         // When traversing the namespace axis in "toBool" mode, it's
@@ -5081,8 +5031,8 @@ unsafe fn xml_xpath_comp_op_eval_last(
                     { /* TODO: NOP ? */ }
                 }
 
-                arg2 = value_pop(ctxt);
-                arg1 = value_pop(ctxt);
+                arg2 = (*ctxt).value_pop();
+                arg1 = (*ctxt).value_pop();
                 if arg1.is_null()
                     || (*arg1).typ != XmlXPathObjectType::XPathNodeset
                     || arg2.is_null()
@@ -5111,7 +5061,7 @@ unsafe fn xml_xpath_comp_op_eval_last(
                         (*arg1).nodesetval.take(),
                         (*arg2).nodesetval.as_deref(),
                     );
-                    value_push(ctxt, arg1);
+                    (*ctxt).value_push(arg1);
                     xml_xpath_release_object((*ctxt).context, arg2);
                     // optimizer
                     if total > cur {
@@ -5134,10 +5084,10 @@ unsafe fn xml_xpath_comp_op_eval_last(
                         xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch2 as usize]);
                 }
                 CHECK_ERROR0!(ctxt);
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_node_set((*ctxt).context, (*(*ctxt).context).node),
-                );
+                (*ctxt).value_push(xml_xpath_cache_new_node_set(
+                    (*ctxt).context,
+                    (*(*ctxt).context).node,
+                ));
             }
             XmlXPathOp::XpathOpCollect => {
                 if (*op).ch1 == -1 {
@@ -5150,10 +5100,10 @@ unsafe fn xml_xpath_comp_op_eval_last(
                 }
             }
             XmlXPathOp::XpathOpValue => {
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_object_copy((*ctxt).context, (*op).value4 as XmlXPathObjectPtr),
-                );
+                (*ctxt).value_push(xml_xpath_cache_object_copy(
+                    (*ctxt).context,
+                    (*op).value4 as XmlXPathObjectPtr,
+                ));
             }
             XmlXPathOp::XpathOpSort => {
                 if (*op).ch1 != -1 {
@@ -5400,14 +5350,14 @@ unsafe fn xml_xpath_comp_op_eval_filter_first(
         // We have to temporarily remove the nodeset object from the
         // stack to avoid freeing it prematurely.
         CHECK_TYPE0!(ctxt, XmlXPathObjectType::XPathNodeset);
-        let obj: XmlXPathObjectPtr = value_pop(ctxt);
+        let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
         if let Some(set) = (*obj).nodesetval.as_deref_mut() {
             xml_xpath_node_set_filter(ctxt, Some(set), (*op).ch2, 1, 1, true);
             if !set.node_tab.is_empty() {
                 *first = Some(set.node_tab[0]);
             }
         }
-        value_push(ctxt, obj);
+        (*ctxt).value_push(obj);
 
         total
     }
@@ -5474,8 +5424,8 @@ unsafe fn xml_xpath_comp_op_eval_first(
                 );
                 CHECK_ERROR0!(ctxt);
 
-                arg2 = value_pop(ctxt);
-                arg1 = value_pop(ctxt);
+                arg2 = (*ctxt).value_pop();
+                arg1 = (*ctxt).value_pop();
                 if arg1.is_null()
                     || (*arg1).typ != XmlXPathObjectType::XPathNodeset
                     || arg2.is_null()
@@ -5503,7 +5453,7 @@ unsafe fn xml_xpath_comp_op_eval_first(
                         (*arg1).nodesetval.take(),
                         (*arg2).nodesetval.as_deref(),
                     );
-                    value_push(ctxt, arg1);
+                    (*ctxt).value_push(arg1);
                     xml_xpath_release_object((*ctxt).context, arg2);
                     // optimizer
                     if total > cur {
@@ -5526,10 +5476,10 @@ unsafe fn xml_xpath_comp_op_eval_first(
                         xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch2 as usize]);
                 }
                 CHECK_ERROR0!(ctxt);
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_node_set((*ctxt).context, (*(*ctxt).context).node),
-                );
+                (*ctxt).value_push(xml_xpath_cache_new_node_set(
+                    (*ctxt).context,
+                    (*(*ctxt).context).node,
+                ));
             }
             XmlXPathOp::XpathOpCollect => {
                 if (*op).ch1 == -1 {
@@ -5542,10 +5492,10 @@ unsafe fn xml_xpath_comp_op_eval_first(
                 }
             }
             XmlXPathOp::XpathOpValue => {
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_object_copy((*ctxt).context, (*op).value4 as XmlXPathObjectPtr),
-                );
+                (*ctxt).value_push(xml_xpath_cache_object_copy(
+                    (*ctxt).context,
+                    (*op).value4 as XmlXPathObjectPtr,
+                ));
             }
             XmlXPathOp::XpathOpSort => {
                 if (*op).ch1 != -1 {
@@ -5610,7 +5560,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                 if (*ctxt).value.is_null() || !(*(*ctxt).value).boolval {
                     break 'to_break;
                 }
-                arg2 = value_pop(ctxt);
+                arg2 = (*ctxt).value_pop();
                 total += xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch2 as usize]);
                 if (*ctxt).error != 0 {
                     xml_xpath_free_object(arg2);
@@ -5629,7 +5579,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                 if (*ctxt).value.is_null() || (*(*ctxt).value).boolval {
                     break 'to_break;
                 }
-                arg2 = value_pop(ctxt);
+                arg2 = (*ctxt).value_pop();
                 total += xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch2 as usize]);
                 if (*ctxt).error != 0 {
                     xml_xpath_free_object(arg2);
@@ -5651,10 +5601,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                 } else {
                     equal = xml_xpath_not_equal_values(ctxt);
                 }
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_boolean((*ctxt).context, equal != 0),
-                );
+                (*ctxt).value_push(xml_xpath_cache_new_boolean((*ctxt).context, equal != 0));
             }
             XmlXPathOp::XpathOpCmp => {
                 total += xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch1 as usize]);
@@ -5662,7 +5609,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                 total += xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch2 as usize]);
                 CHECK_ERROR0!(ctxt);
                 ret = xml_xpath_compare_values(ctxt, (*op).value, (*op).value2);
-                value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, ret != 0));
+                (*ctxt).value_push(xml_xpath_cache_new_boolean((*ctxt).context, ret != 0));
             }
             XmlXPathOp::XpathOpPlus => {
                 total += xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch1 as usize]);
@@ -5702,8 +5649,8 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                 total += xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch2 as usize]);
                 CHECK_ERROR0!(ctxt);
 
-                arg2 = value_pop(ctxt);
-                arg1 = value_pop(ctxt);
+                arg2 = (*ctxt).value_pop();
+                arg1 = (*ctxt).value_pop();
                 if arg1.is_null()
                     || (*arg1).typ != XmlXPathObjectType::XPathNodeset
                     || arg2.is_null()
@@ -5740,7 +5687,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                     );
                 }
 
-                value_push(ctxt, arg1);
+                (*ctxt).value_push(arg1);
                 xml_xpath_release_object((*ctxt).context, arg2);
             }
             XmlXPathOp::XpathOpRoot => {
@@ -5757,10 +5704,10 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                         xml_xpath_comp_op_eval(ctxt, &raw mut (*comp).steps[(*op).ch2 as usize]);
                 }
                 CHECK_ERROR0!(ctxt);
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_node_set((*ctxt).context, (*(*ctxt).context).node),
-                );
+                (*ctxt).value_push(xml_xpath_cache_new_node_set(
+                    (*ctxt).context,
+                    (*(*ctxt).context).node,
+                ));
             }
             XmlXPathOp::XpathOpCollect => 'to_break: {
                 if (*op).ch1 == -1 {
@@ -5772,10 +5719,10 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                 total += xml_xpath_node_collect_and_test(ctxt, op, None, None, 0);
             }
             XmlXPathOp::XpathOpValue => {
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_object_copy((*ctxt).context, (*op).value4 as XmlXPathObjectPtr),
-                );
+                (*ctxt).value_push(xml_xpath_cache_object_copy(
+                    (*ctxt).context,
+                    (*op).value4 as XmlXPathObjectPtr,
+                ));
             }
             XmlXPathOp::XpathOpVariable => 'to_break: {
                 let val: XmlXPathObjectPtr;
@@ -5788,7 +5735,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                     if val.is_null() {
                         XP_ERROR0!(ctxt, XmlXPathError::XPathUndefVariableError as i32);
                     }
-                    value_push(ctxt, val);
+                    (*ctxt).value_push(val);
                 } else {
                     let uri: *const XmlChar =
                         xml_xpath_ns_lookup((*ctxt).context, (*op).value5 as _);
@@ -5805,7 +5752,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                     if val.is_null() {
                         XP_ERROR0!(ctxt, XmlXPathError::XPathUndefVariableError as i32);
                     }
-                    value_push(ctxt, val);
+                    (*ctxt).value_push(val);
                 }
             }
             XmlXPathOp::XpathOpFunction => 'to_break: {
@@ -6026,12 +5973,12 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                 // nodes from the stack. We have to temporarily remove the
                 // nodeset object from the stack to avoid freeing it prematurely.
                 CHECK_TYPE0!(ctxt, XmlXPathObjectType::XPathNodeset);
-                let obj: XmlXPathObjectPtr = value_pop(ctxt);
+                let obj: XmlXPathObjectPtr = (*ctxt).value_pop();
                 if let Some(set) = (*obj).nodesetval.as_deref_mut() {
                     let max_pos = set.len() as i32;
                     xml_xpath_node_set_filter(ctxt, Some(set), (*op).ch2, 1, max_pos, true);
                 }
-                value_push(ctxt, obj);
+                (*ctxt).value_push(obj);
             }
             XmlXPathOp::XpathOpSort => {
                 if (*op).ch1 != -1 {
@@ -6088,7 +6035,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                         {
                             break 'to_break;
                         }
-                        obj = value_pop(ctxt);
+                        obj = (*ctxt).value_pop();
                         let oldlocset = (*obj).user as XmlLocationSetPtr;
 
                         newlocset = xml_xptr_location_set_create(null_mut());
@@ -6104,7 +6051,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                                 (*ctxt).context,
                                 (*(*ctxt).context).node,
                             );
-                            value_push(ctxt, tmp);
+                            (*ctxt).value_push(tmp);
 
                             if (*op).ch2 != -1 {
                                 total += xml_xpath_comp_op_eval(
@@ -6117,7 +6064,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                                 break 'rangeto_error;
                             }
 
-                            res = value_pop(ctxt);
+                            res = (*ctxt).value_pop();
                             if (*res).typ == XmlXPathObjectType::XPathLocationset {
                                 let rloc: XmlLocationSetPtr = (*res).user as XmlLocationSetPtr;
                                 for &jloc in &(*rloc).loc_tab {
@@ -6149,14 +6096,14 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                                 xml_xpath_release_object((*ctxt).context, res);
                             }
                             if (*ctxt).value == tmp {
-                                res = value_pop(ctxt);
+                                res = (*ctxt).value_pop();
                                 xml_xpath_release_object((*ctxt).context, res);
                             }
                         }
                     } else {
                         // Not a location set
                         CHECK_TYPE0!(ctxt, XmlXPathObjectType::XPathNodeset);
-                        obj = value_pop(ctxt);
+                        obj = (*ctxt).value_pop();
                         newlocset = xml_xptr_location_set_create(null_mut());
 
                         if let Some(oldset) = (*obj).nodesetval.as_deref() {
@@ -6169,7 +6116,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                                     (*ctxt).context,
                                     (*(*ctxt).context).node,
                                 );
-                                value_push(ctxt, tmp);
+                                (*ctxt).value_push(tmp);
 
                                 if (*op).ch2 != -1 {
                                     total += xml_xpath_comp_op_eval(
@@ -6182,7 +6129,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                                     break 'rangeto_error;
                                 }
 
-                                res = value_pop(ctxt);
+                                res = (*ctxt).value_pop();
                                 range = xml_xptr_new_range_node_object(node, res);
                                 if !range.is_null() {
                                     xml_xptr_location_set_add(newlocset, range);
@@ -6193,7 +6140,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                                     xml_xpath_release_object((*ctxt).context, res);
                                 }
                                 if (*ctxt).value == tmp {
-                                    res = value_pop(ctxt);
+                                    res = (*ctxt).value_pop();
                                     xml_xpath_release_object((*ctxt).context, res);
                                 }
                             }
@@ -6201,7 +6148,7 @@ unsafe fn xml_xpath_comp_op_eval(ctxt: XmlXPathParserContextPtr, op: XmlXPathSte
                     }
 
                     // The result is used as the new evaluation set.
-                    value_push(ctxt, xml_xptr_wrap_location_set(newlocset));
+                    (*ctxt).value_push(xml_xptr_wrap_location_set(newlocset));
                 }
                 // rangeto_error:
                 xml_xpath_release_object((*ctxt).context, obj);
@@ -6278,7 +6225,7 @@ unsafe fn xml_xpath_comp_op_eval_to_boolean(
                         return -1;
                     }
 
-                    res_obj = value_pop(ctxt);
+                    res_obj = (*ctxt).value_pop();
                     if res_obj.is_null() {
                         return -1;
                     }
@@ -6290,7 +6237,7 @@ unsafe fn xml_xpath_comp_op_eval_to_boolean(
                         return -1;
                     }
 
-                    res_obj = value_pop(ctxt);
+                    res_obj = (*ctxt).value_pop();
                     if res_obj.is_null() {
                         return -1;
                     }
@@ -6356,7 +6303,7 @@ pub(crate) unsafe fn xml_xpath_run_eval(ctxt: XmlXPathParserContextPtr, to_bool:
                 );
 
                 if res != -1 && !res_obj.is_null() {
-                    value_push(ctxt, res_obj);
+                    (*ctxt).value_push(res_obj);
                     return 0;
                 }
                 if !res_obj.is_null() {
@@ -6849,10 +6796,10 @@ unsafe fn xml_xpath_cache_wrap_string(
 unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
     unsafe {
         if nargs == 0 {
-            value_push(
-                ctxt,
-                xml_xpath_cache_new_node_set((*ctxt).context, (*(*ctxt).context).node),
-            );
+            (*ctxt).value_push(xml_xpath_cache_new_node_set(
+                (*ctxt).context,
+                (*(*ctxt).context).node,
+            ));
             nargs = 1;
         }
 
@@ -6865,7 +6812,7 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
         {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
-        let cur: XmlXPathObjectPtr = value_pop(ctxt);
+        let cur: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         if let Some(nodeset) = (*cur).nodesetval.as_deref() {
             if !nodeset.node_tab.is_empty() {
@@ -6876,7 +6823,8 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
                     XmlElementType::XmlElementNode => {
                         let node = XmlNodePtr::try_from(table[i]).unwrap();
                         if *node.name.add(0) == b' ' {
-                            value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+                            (*ctxt)
+                                .value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
                         } else if let Some(prefix) =
                             node.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
                         {
@@ -6887,29 +6835,27 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
                             if fullname.is_null() {
                                 xml_xpath_perr_memory(ctxt, None);
                             }
-                            value_push(
-                                ctxt,
-                                xml_xpath_cache_wrap_string(
-                                    (*ctxt).context,
-                                    (!fullname.is_null())
-                                        .then(|| {
-                                            CStr::from_ptr(fullname as *const i8).to_string_lossy()
-                                        })
-                                        .as_deref(),
-                                ),
-                            );
+                            (*ctxt).value_push(xml_xpath_cache_wrap_string(
+                                (*ctxt).context,
+                                (!fullname.is_null())
+                                    .then(|| {
+                                        CStr::from_ptr(fullname as *const i8).to_string_lossy()
+                                    })
+                                    .as_deref(),
+                            ));
                             xml_free(fullname as _);
                         } else {
-                            value_push(
-                                ctxt,
-                                xml_xpath_cache_new_string((*ctxt).context, node.name().as_deref()),
-                            );
+                            (*ctxt).value_push(xml_xpath_cache_new_string(
+                                (*ctxt).context,
+                                node.name().as_deref(),
+                            ));
                         }
                     }
                     XmlElementType::XmlAttributeNode => {
                         let attr = XmlAttrPtr::try_from(table[i]).unwrap();
                         if *attr.name.add(0) == b' ' {
-                            value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+                            (*ctxt)
+                                .value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
                         } else if let Some(prefix) =
                             attr.ns.map(|ns| ns.prefix).filter(|p| !p.is_null())
                         {
@@ -6920,38 +6866,35 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
                             if fullname.is_null() {
                                 xml_xpath_perr_memory(ctxt, None);
                             }
-                            value_push(
-                                ctxt,
-                                xml_xpath_cache_wrap_string(
-                                    (*ctxt).context,
-                                    (!fullname.is_null())
-                                        .then(|| {
-                                            CStr::from_ptr(fullname as *const i8).to_string_lossy()
-                                        })
-                                        .as_deref(),
-                                ),
-                            );
+                            (*ctxt).value_push(xml_xpath_cache_wrap_string(
+                                (*ctxt).context,
+                                (!fullname.is_null())
+                                    .then(|| {
+                                        CStr::from_ptr(fullname as *const i8).to_string_lossy()
+                                    })
+                                    .as_deref(),
+                            ));
                             xml_free(fullname as _);
                         } else {
-                            value_push(
-                                ctxt,
-                                xml_xpath_cache_new_string((*ctxt).context, attr.name().as_deref()),
-                            );
+                            (*ctxt).value_push(xml_xpath_cache_new_string(
+                                (*ctxt).context,
+                                attr.name().as_deref(),
+                            ));
                         }
                     }
                     _ => {
-                        value_push(
-                            ctxt,
-                            xml_xpath_cache_new_node_set((*ctxt).context, Some(table[i])),
-                        );
+                        (*ctxt).value_push(xml_xpath_cache_new_node_set(
+                            (*ctxt).context,
+                            Some(table[i]),
+                        ));
                         xml_xpath_local_name_function(ctxt, 1);
                     }
                 }
             } else {
-                value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+                (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
             }
         } else {
-            value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+            (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
         }
         xml_xpath_release_object((*ctxt).context, cur);
     }
@@ -7007,7 +6950,7 @@ unsafe fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i
         let escape_reserved: i32 = xml_xpath_pop_boolean(ctxt);
 
         CAST_TO_STRING!(ctxt);
-        let str: XmlXPathObjectPtr = value_pop(ctxt);
+        let str: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         escape[0] = b'%';
         escape[3] = 0;
@@ -7069,10 +7012,7 @@ unsafe fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i
                 target.push(lo as char);
             }
         }
-        value_push(
-            ctxt,
-            xml_xpath_cache_new_string((*ctxt).context, Some(&target)),
-        );
+        (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some(&target)));
         xml_xpath_release_object((*ctxt).context, str);
     }
 }
@@ -7405,16 +7345,13 @@ unsafe fn xml_xpath_equal_node_set_float(
 
         if let Some(ns) = (*arg).nodesetval.as_deref() {
             for &node in &ns.node_tab {
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_string(
-                        (*ctxt).context,
-                        Some(&xml_xpath_cast_node_to_string(Some(node))),
-                    ),
-                );
+                (*ctxt).value_push(xml_xpath_cache_new_string(
+                    (*ctxt).context,
+                    Some(&xml_xpath_cast_node_to_string(Some(node))),
+                ));
                 xml_xpath_number_function(ctxt, 1);
                 CHECK_ERROR0!(ctxt);
-                val = value_pop(ctxt);
+                val = (*ctxt).value_pop();
                 v = (*val).floatval;
                 xml_xpath_release_object((*ctxt).context, val);
                 if !xml_xpath_is_nan(v) {
@@ -7546,9 +7483,9 @@ unsafe fn xml_xpath_equal_values_common(
                     ty @ XmlXPathObjectType::XPathString
                     | ty @ XmlXPathObjectType::XPathNumber => 'to_break: {
                         if matches!(ty, XmlXPathObjectType::XPathString) {
-                            value_push(ctxt, arg2);
+                            (*ctxt).value_push(arg2);
                             xml_xpath_number_function(ctxt, 1);
-                            arg2 = value_pop(ctxt);
+                            arg2 = (*ctxt).value_pop();
                             if (*ctxt).error != 0 {
                                 break 'to_break;
                             }
@@ -7610,9 +7547,9 @@ unsafe fn xml_xpath_equal_values_common(
                         ret = ((*arg1).stringval == (*arg2).stringval) as i32;
                     }
                     XmlXPathObjectType::XPathNumber => {
-                        value_push(ctxt, arg1);
+                        (*ctxt).value_push(arg1);
                         xml_xpath_number_function(ctxt, 1);
-                        arg1 = value_pop(ctxt);
+                        arg1 = (*ctxt).value_pop();
                         if (*ctxt).error != 0 {
                             // break;
                         } else {
@@ -7693,8 +7630,8 @@ pub unsafe fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 {
         if ctxt.is_null() || (*ctxt).context.is_null() {
             return 0;
         }
-        arg2 = value_pop(ctxt);
-        arg1 = value_pop(ctxt);
+        arg2 = (*ctxt).value_pop();
+        arg1 = (*ctxt).value_pop();
         if arg1.is_null() || arg2.is_null() {
             if !arg1.is_null() {
                 xml_xpath_release_object((*ctxt).context, arg1);
@@ -7777,8 +7714,8 @@ pub unsafe fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 
         if ctxt.is_null() || (*ctxt).context.is_null() {
             return 0;
         }
-        arg2 = value_pop(ctxt);
-        arg1 = value_pop(ctxt);
+        arg2 = (*ctxt).value_pop();
+        arg1 = (*ctxt).value_pop();
         if arg1.is_null() || arg2.is_null() {
             if !arg1.is_null() {
                 xml_xpath_release_object((*ctxt).context, arg1);
@@ -8003,15 +7940,12 @@ unsafe fn xml_xpath_compare_node_set_float(
         }
         if let Some(ns) = (*arg).nodesetval.as_deref() {
             for &node in &ns.node_tab {
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_string(
-                        (*ctxt).context,
-                        Some(&xml_xpath_cast_node_to_string(Some(node))),
-                    ),
-                );
+                (*ctxt).value_push(xml_xpath_cache_new_string(
+                    (*ctxt).context,
+                    Some(&xml_xpath_cast_node_to_string(Some(node))),
+                ));
                 xml_xpath_number_function(ctxt, 1);
-                value_push(ctxt, xml_xpath_cache_object_copy((*ctxt).context, f));
+                (*ctxt).value_push(xml_xpath_cache_object_copy((*ctxt).context, f));
                 ret = xml_xpath_compare_values(ctxt, inf, strict);
                 if ret != 0 {
                     break;
@@ -8060,14 +7994,11 @@ unsafe fn xml_xpath_compare_node_set_string(
         }
         if let Some(ns) = (*arg).nodesetval.as_deref() {
             for &node in &ns.node_tab {
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_string(
-                        (*ctxt).context,
-                        Some(&xml_xpath_cast_node_to_string(Some(node))),
-                    ),
-                );
-                value_push(ctxt, xml_xpath_cache_object_copy((*ctxt).context, s));
+                (*ctxt).value_push(xml_xpath_cache_new_string(
+                    (*ctxt).context,
+                    Some(&xml_xpath_cast_node_to_string(Some(node))),
+                ));
+                (*ctxt).value_push(xml_xpath_cache_object_copy((*ctxt).context, s));
                 ret = xml_xpath_compare_values(ctxt, inf, strict);
                 if ret != 0 {
                     break;
@@ -8122,9 +8053,9 @@ unsafe fn xml_xpath_compare_node_set_value(
                 xml_xpath_compare_node_set_string(ctxt, inf, strict, arg, val)
             }
             XmlXPathObjectType::XPathBoolean => {
-                value_push(ctxt, arg);
+                (*ctxt).value_push(arg);
                 xml_xpath_boolean_function(ctxt, 1);
-                value_push(ctxt, val);
+                (*ctxt).value_push(val);
                 xml_xpath_compare_values(ctxt, inf, strict)
             }
             _ => {
@@ -8173,8 +8104,8 @@ pub unsafe fn xml_xpath_compare_values(
         if ctxt.is_null() || (*ctxt).context.is_null() {
             return 0;
         }
-        arg2 = value_pop(ctxt);
-        arg1 = value_pop(ctxt);
+        arg2 = (*ctxt).value_pop();
+        arg1 = (*ctxt).value_pop();
         if arg1.is_null() || arg2.is_null() {
             if !arg1.is_null() {
                 xml_xpath_release_object((*ctxt).context, arg1);
@@ -8214,14 +8145,14 @@ pub unsafe fn xml_xpath_compare_values(
         }
 
         if !matches!((*arg1).typ, XmlXPathObjectType::XPathNumber) {
-            value_push(ctxt, arg1);
+            (*ctxt).value_push(arg1);
             xml_xpath_number_function(ctxt, 1);
-            arg1 = value_pop(ctxt);
+            arg1 = (*ctxt).value_pop();
         }
         if !matches!((*arg2).typ, XmlXPathObjectType::XPathNumber) {
-            value_push(ctxt, arg2);
+            (*ctxt).value_push(arg2);
             xml_xpath_number_function(ctxt, 1);
-            arg2 = value_pop(ctxt);
+            arg2 = (*ctxt).value_pop();
         }
         if (*ctxt).error != 0 {
             // goto error;
@@ -8299,7 +8230,7 @@ pub unsafe fn xml_xpath_value_flip_sign(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathAddValues")]
 pub unsafe fn xml_xpath_add_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let arg: XmlXPathObjectPtr = value_pop(ctxt);
+        let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
         if arg.is_null() {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
         }
@@ -8317,7 +8248,7 @@ pub unsafe fn xml_xpath_add_values(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathSubValues")]
 pub unsafe fn xml_xpath_sub_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let arg: XmlXPathObjectPtr = value_pop(ctxt);
+        let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
         if arg.is_null() {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
         }
@@ -8335,7 +8266,7 @@ pub unsafe fn xml_xpath_sub_values(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathMultValues")]
 pub unsafe fn xml_xpath_mult_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let arg: XmlXPathObjectPtr = value_pop(ctxt);
+        let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
         if arg.is_null() {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
         }
@@ -8353,7 +8284,7 @@ pub unsafe fn xml_xpath_mult_values(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathDivValues")]
 pub unsafe fn xml_xpath_div_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let arg: XmlXPathObjectPtr = value_pop(ctxt);
+        let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
         if arg.is_null() {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
         }
@@ -8371,7 +8302,7 @@ pub unsafe fn xml_xpath_div_values(ctxt: XmlXPathParserContextPtr) {
 #[doc(alias = "xmlXPathModValues")]
 pub unsafe fn xml_xpath_mod_values(ctxt: XmlXPathParserContextPtr) {
     unsafe {
-        let arg: XmlXPathObjectPtr = value_pop(ctxt);
+        let arg: XmlXPathObjectPtr = (*ctxt).value_pop();
         if arg.is_null() {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
         }
@@ -9136,10 +9067,10 @@ pub unsafe fn xml_xpath_last_function(ctxt: XmlXPathParserContextPtr, nargs: i32
     unsafe {
         CHECK_ARITY!(ctxt, nargs, 0);
         if (*(*ctxt).context).context_size >= 0 {
-            value_push(
-                ctxt,
-                xml_xpath_cache_new_float((*ctxt).context, (*(*ctxt).context).context_size as f64),
-            );
+            (*ctxt).value_push(xml_xpath_cache_new_float(
+                (*ctxt).context,
+                (*(*ctxt).context).context_size as f64,
+            ));
         } else {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidCtxtSize as i32);
         }
@@ -9156,13 +9087,10 @@ pub unsafe fn xml_xpath_position_function(ctxt: XmlXPathParserContextPtr, nargs:
     unsafe {
         CHECK_ARITY!(ctxt, nargs, 0);
         if (*(*ctxt).context).proximity_position >= 0 {
-            value_push(
-                ctxt,
-                xml_xpath_cache_new_float(
-                    (*ctxt).context,
-                    (*(*ctxt).context).proximity_position as f64,
-                ),
-            );
+            (*ctxt).value_push(xml_xpath_cache_new_float(
+                (*ctxt).context,
+                (*(*ctxt).context).proximity_position as f64,
+            ));
         } else {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidCtxtPosition as i32);
         }
@@ -9183,17 +9111,17 @@ pub unsafe fn xml_xpath_count_function(ctxt: XmlXPathParserContextPtr, nargs: i3
         {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
-        let cur: XmlXPathObjectPtr = value_pop(ctxt);
+        let cur: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         if cur.is_null() {
-            value_push(ctxt, xml_xpath_cache_new_float((*ctxt).context, 0.0));
+            (*ctxt).value_push(xml_xpath_cache_new_float((*ctxt).context, 0.0));
         } else if let Some(nodeset) = (*cur).nodesetval.as_deref() {
-            value_push(
-                ctxt,
-                xml_xpath_cache_new_float((*ctxt).context, nodeset.len() as f64),
-            );
+            (*ctxt).value_push(xml_xpath_cache_new_float(
+                (*ctxt).context,
+                nodeset.len() as f64,
+            ));
         } else {
-            value_push(ctxt, xml_xpath_cache_new_float((*ctxt).context, 0.0));
+            (*ctxt).value_push(xml_xpath_cache_new_float((*ctxt).context, 0.0));
         }
         xml_xpath_release_object((*ctxt).context, cur);
     }
@@ -9326,7 +9254,7 @@ unsafe fn xml_xpath_cache_convert_string(
 pub unsafe fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     unsafe {
         CHECK_ARITY!(ctxt, nargs, 1);
-        let mut obj = value_pop(ctxt);
+        let mut obj = (*ctxt).value_pop();
         if obj.is_null() {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
         }
@@ -9351,7 +9279,7 @@ pub unsafe fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, nargs: i32) 
                 }
             }
             xml_xpath_release_object((*ctxt).context, obj);
-            value_push(ctxt, xml_xpath_cache_wrap_node_set((*ctxt).context, ret));
+            (*ctxt).value_push(xml_xpath_cache_wrap_node_set((*ctxt).context, ret));
             return;
         }
         obj = xml_xpath_cache_convert_string((*ctxt).context, obj);
@@ -9368,7 +9296,7 @@ pub unsafe fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, nargs: i32) 
                 .as_deref()
                 .map_or(null_mut(), |s| s.as_ptr() as *const u8),
         );
-        value_push(ctxt, xml_xpath_cache_wrap_node_set((*ctxt).context, ret));
+        (*ctxt).value_push(xml_xpath_cache_wrap_node_set((*ctxt).context, ret));
         xml_xpath_release_object((*ctxt).context, obj);
     }
 }
@@ -9388,10 +9316,10 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: XmlXPathParserContextPtr, mut 
         }
 
         if nargs == 0 {
-            value_push(
-                ctxt,
-                xml_xpath_cache_new_node_set((*ctxt).context, (*(*ctxt).context).node),
-            );
+            (*ctxt).value_push(xml_xpath_cache_new_node_set(
+                (*ctxt).context,
+                (*(*ctxt).context).node,
+            ));
             nargs = 1;
         }
 
@@ -9404,7 +9332,7 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: XmlXPathParserContextPtr, mut 
         {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
-        let cur: XmlXPathObjectPtr = value_pop(ctxt);
+        let cur: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         if let Some(nodeset) = (*cur).nodesetval.as_deref() {
             if !nodeset.node_tab.is_empty() {
@@ -9415,32 +9343,30 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: XmlXPathParserContextPtr, mut 
                     | XmlElementType::XmlAttributeNode
                     | XmlElementType::XmlPINode => {
                         if table[i].name().is_some_and(|name| name.starts_with(' ')) {
-                            value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+                            (*ctxt)
+                                .value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
                         } else {
-                            value_push(
-                                ctxt,
-                                xml_xpath_cache_new_string(
-                                    (*ctxt).context,
-                                    (*table[i]).name().as_deref(),
-                                ),
-                            );
+                            (*ctxt).value_push(xml_xpath_cache_new_string(
+                                (*ctxt).context,
+                                (*table[i]).name().as_deref(),
+                            ));
                         }
                     }
                     XmlElementType::XmlNamespaceDecl => {
                         let ns = XmlNsPtr::try_from(table[i]).unwrap();
                         let prefix = ns.prefix();
                         let value = xml_xpath_cache_new_string((*ctxt).context, prefix.as_deref());
-                        value_push(ctxt, value);
+                        (*ctxt).value_push(value);
                     }
                     _ => {
-                        value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+                        (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
                     }
                 }
             } else {
-                value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+                (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
             }
         } else {
-            value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+            (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
         }
         xml_xpath_release_object((*ctxt).context, cur);
     }
@@ -9462,10 +9388,10 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: XmlXPathParserContextPtr, m
         }
 
         if nargs == 0 {
-            value_push(
-                ctxt,
-                xml_xpath_cache_new_node_set((*ctxt).context, (*(*ctxt).context).node),
-            );
+            (*ctxt).value_push(xml_xpath_cache_new_node_set(
+                (*ctxt).context,
+                (*(*ctxt).context).node,
+            ));
             nargs = 1;
         }
         CHECK_ARITY!(ctxt, nargs, 1);
@@ -9477,7 +9403,7 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: XmlXPathParserContextPtr, m
         {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
-        let cur: XmlXPathObjectPtr = value_pop(ctxt);
+        let cur: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         if let Some(nodeset) = (*cur).nodesetval.as_deref() {
             if !nodeset.node_tab.is_empty() {
@@ -9490,30 +9416,26 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: XmlXPathParserContextPtr, m
                             .or_else(|_| XmlAttrPtr::try_from(table[i]).map(|attr| attr.ns))
                         {
                             let href = ns.href;
-                            value_push(
-                                ctxt,
-                                xml_xpath_cache_new_string(
-                                    (*ctxt).context,
-                                    (!href.is_null())
-                                        .then(|| {
-                                            CStr::from_ptr(href as *const i8).to_string_lossy()
-                                        })
-                                        .as_deref(),
-                                ),
-                            );
+                            (*ctxt).value_push(xml_xpath_cache_new_string(
+                                (*ctxt).context,
+                                (!href.is_null())
+                                    .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+                                    .as_deref(),
+                            ));
                         } else {
-                            value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+                            (*ctxt)
+                                .value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
                         }
                     }
                     _ => {
-                        value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+                        (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
                     }
                 }
             } else {
-                value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+                (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
             }
         } else {
-            value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+            (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
         }
         xml_xpath_release_object((*ctxt).context, cur);
     }
@@ -9557,19 +9479,16 @@ pub unsafe fn xml_xpath_string_function(ctxt: XmlXPathParserContextPtr, nargs: i
         }
         if nargs == 0 {
             let val = xml_xpath_cast_node_to_string((*(*ctxt).context).node);
-            value_push(
-                ctxt,
-                xml_xpath_cache_wrap_string((*ctxt).context, Some(&val)),
-            );
+            (*ctxt).value_push(xml_xpath_cache_wrap_string((*ctxt).context, Some(&val)));
             return;
         }
 
         CHECK_ARITY!(ctxt, nargs, 1);
-        let cur: XmlXPathObjectPtr = value_pop(ctxt);
+        let cur: XmlXPathObjectPtr = (*ctxt).value_pop();
         if cur.is_null() {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
         }
-        value_push(ctxt, xml_xpath_cache_convert_string((*ctxt).context, cur));
+        (*ctxt).value_push(xml_xpath_cache_convert_string((*ctxt).context, cur));
     }
 }
 
@@ -9589,29 +9508,23 @@ pub unsafe fn xml_xpath_string_length_function(ctxt: XmlXPathParserContextPtr, n
             if let Some(context_node) = (*(*ctxt).context).node {
                 let content = xml_xpath_cast_node_to_string(Some(context_node));
                 let content = CString::new(content).unwrap();
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_float(
-                        (*ctxt).context,
-                        xml_utf8_strlen(content.as_ptr() as *const u8) as _,
-                    ),
-                );
+                (*ctxt).value_push(xml_xpath_cache_new_float(
+                    (*ctxt).context,
+                    xml_utf8_strlen(content.as_ptr() as *const u8) as _,
+                ));
             } else {
-                value_push(ctxt, xml_xpath_cache_new_float((*ctxt).context, 0.0));
+                (*ctxt).value_push(xml_xpath_cache_new_float((*ctxt).context, 0.0));
             }
             return;
         }
         CHECK_ARITY!(ctxt, nargs, 1);
         CAST_TO_STRING!(ctxt);
         CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathString);
-        let cur: XmlXPathObjectPtr = value_pop(ctxt);
-        value_push(
-            ctxt,
-            xml_xpath_cache_new_float(
-                (*ctxt).context,
-                (*cur).stringval.as_deref().map_or(0, |s| s.chars().count()) as _,
-            ),
-        );
+        let cur: XmlXPathObjectPtr = (*ctxt).value_pop();
+        (*ctxt).value_push(xml_xpath_cache_new_float(
+            (*ctxt).context,
+            (*cur).stringval.as_deref().map_or(0, |s| s.chars().count()) as _,
+        ));
         xml_xpath_release_object((*ctxt).context, cur);
     }
 }
@@ -9632,7 +9545,7 @@ pub unsafe fn xml_xpath_concat_function(ctxt: XmlXPathParserContextPtr, mut narg
         }
 
         CAST_TO_STRING!(ctxt);
-        let cur: XmlXPathObjectPtr = value_pop(ctxt);
+        let cur: XmlXPathObjectPtr = (*ctxt).value_pop();
         if cur.is_null() || !matches!((*cur).typ, XmlXPathObjectType::XPathString) {
             xml_xpath_release_object((*ctxt).context, cur);
             return;
@@ -9641,7 +9554,7 @@ pub unsafe fn xml_xpath_concat_function(ctxt: XmlXPathParserContextPtr, mut narg
 
         while nargs > 0 {
             CAST_TO_STRING!(ctxt);
-            newobj = value_pop(ctxt);
+            newobj = (*ctxt).value_pop();
             if newobj.is_null() || (*newobj).typ != XmlXPathObjectType::XPathString {
                 xml_xpath_release_object((*ctxt).context, newobj);
                 xml_xpath_release_object((*ctxt).context, cur);
@@ -9656,7 +9569,7 @@ pub unsafe fn xml_xpath_concat_function(ctxt: XmlXPathParserContextPtr, mut narg
             xml_xpath_release_object((*ctxt).context, newobj);
             nargs -= 1;
         }
-        value_push(ctxt, cur);
+        (*ctxt).value_push(cur);
     }
 }
 
@@ -9670,9 +9583,9 @@ pub unsafe fn xml_xpath_contains_function(ctxt: XmlXPathParserContextPtr, nargs:
         CHECK_ARITY!(ctxt, nargs, 2);
         CAST_TO_STRING!(ctxt);
         CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathString);
-        let needle: XmlXPathObjectPtr = value_pop(ctxt);
+        let needle: XmlXPathObjectPtr = (*ctxt).value_pop();
         CAST_TO_STRING!(ctxt);
-        let hay: XmlXPathObjectPtr = value_pop(ctxt);
+        let hay: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         if hay.is_null() || (*hay).typ != XmlXPathObjectType::XPathString {
             xml_xpath_release_object((*ctxt).context, hay);
@@ -9691,9 +9604,9 @@ pub unsafe fn xml_xpath_contains_function(ctxt: XmlXPathParserContextPtr, nargs:
             })
             .is_some()
         {
-            value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, true));
+            (*ctxt).value_push(xml_xpath_cache_new_boolean((*ctxt).context, true));
         } else {
-            value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, false));
+            (*ctxt).value_push(xml_xpath_cache_new_boolean((*ctxt).context, false));
         }
         xml_xpath_release_object((*ctxt).context, hay);
         xml_xpath_release_object((*ctxt).context, needle);
@@ -9710,9 +9623,9 @@ pub unsafe fn xml_xpath_starts_with_function(ctxt: XmlXPathParserContextPtr, nar
         CHECK_ARITY!(ctxt, nargs, 2);
         CAST_TO_STRING!(ctxt);
         CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathString);
-        let needle: XmlXPathObjectPtr = value_pop(ctxt);
+        let needle: XmlXPathObjectPtr = (*ctxt).value_pop();
         CAST_TO_STRING!(ctxt);
-        let hay: XmlXPathObjectPtr = value_pop(ctxt);
+        let hay: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         if hay.is_null() || (*hay).typ != XmlXPathObjectType::XPathString {
             xml_xpath_release_object((*ctxt).context, hay);
@@ -9724,9 +9637,9 @@ pub unsafe fn xml_xpath_starts_with_function(ctxt: XmlXPathParserContextPtr, nar
         if &(*hay).stringval.as_deref().unwrap()[..n.min(m)]
             != (*needle).stringval.as_deref().expect("Internal Error")
         {
-            value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, false));
+            (*ctxt).value_push(xml_xpath_cache_new_boolean((*ctxt).context, false));
         } else {
-            value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, true));
+            (*ctxt).value_push(xml_xpath_cache_new_boolean((*ctxt).context, true));
         }
         xml_xpath_release_object((*ctxt).context, hay);
         xml_xpath_release_object((*ctxt).context, needle);
@@ -9773,19 +9686,19 @@ pub unsafe fn xml_xpath_substring_function(ctxt: XmlXPathParserContextPtr, nargs
         if nargs == 3 {
             CAST_TO_NUMBER!(ctxt);
             CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNumber);
-            len = value_pop(ctxt);
+            len = (*ctxt).value_pop();
             le = (*len).floatval;
             xml_xpath_release_object((*ctxt).context, len);
         }
 
         CAST_TO_NUMBER!(ctxt);
         CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNumber);
-        let start: XmlXPathObjectPtr = value_pop(ctxt);
+        let start: XmlXPathObjectPtr = (*ctxt).value_pop();
         let input: f64 = (*start).floatval;
         xml_xpath_release_object((*ctxt).context, start);
         CAST_TO_STRING!(ctxt);
         CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathString);
-        let str: XmlXPathObjectPtr = value_pop(ctxt);
+        let str: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         if !matches!(
             input.partial_cmp(&(INT_MAX as f64)),
@@ -9835,12 +9748,9 @@ pub unsafe fn xml_xpath_substring_function(ctxt: XmlXPathParserContextPtr, nargs
                 .skip(i as usize - 1)
                 .take((j - i) as usize)
                 .collect::<String>();
-            value_push(
-                ctxt,
-                xml_xpath_cache_new_string((*ctxt).context, Some(&ret)),
-            );
+            (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some(&ret)));
         } else {
-            value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, Some("")));
+            (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some("")));
         }
 
         xml_xpath_release_object((*ctxt).context, str);
@@ -9859,17 +9769,17 @@ pub unsafe fn xml_xpath_substring_before_function(ctxt: XmlXPathParserContextPtr
     unsafe {
         CHECK_ARITY!(ctxt, nargs, 2);
         CAST_TO_STRING!(ctxt);
-        let find: XmlXPathObjectPtr = value_pop(ctxt);
+        let find: XmlXPathObjectPtr = (*ctxt).value_pop();
         CAST_TO_STRING!(ctxt);
-        let str: XmlXPathObjectPtr = value_pop(ctxt);
+        let str: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         let ss = (*str).stringval.as_deref().unwrap();
         let fs = (*find).stringval.as_deref().unwrap();
         let target = ss.find(fs).map(|pos| ss[..pos].to_owned());
-        value_push(
-            ctxt,
-            xml_xpath_cache_new_string((*ctxt).context, target.as_deref()),
-        );
+        (*ctxt).value_push(xml_xpath_cache_new_string(
+            (*ctxt).context,
+            target.as_deref(),
+        ));
         xml_xpath_release_object((*ctxt).context, str);
         xml_xpath_release_object((*ctxt).context, find);
     }
@@ -9888,17 +9798,17 @@ pub unsafe fn xml_xpath_substring_after_function(ctxt: XmlXPathParserContextPtr,
     unsafe {
         CHECK_ARITY!(ctxt, nargs, 2);
         CAST_TO_STRING!(ctxt);
-        let find: XmlXPathObjectPtr = value_pop(ctxt);
+        let find: XmlXPathObjectPtr = (*ctxt).value_pop();
         CAST_TO_STRING!(ctxt);
-        let str: XmlXPathObjectPtr = value_pop(ctxt);
+        let str: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         let ss = (*str).stringval.as_deref().unwrap();
         let fs = (*find).stringval.as_deref().unwrap();
         let target = ss.find(fs).map(|pos| ss[pos..].to_owned());
-        value_push(
-            ctxt,
-            xml_xpath_cache_new_string((*ctxt).context, target.as_deref()),
-        );
+        (*ctxt).value_push(xml_xpath_cache_new_string(
+            (*ctxt).context,
+            target.as_deref(),
+        ));
         xml_xpath_release_object((*ctxt).context, str);
         xml_xpath_release_object((*ctxt).context, find);
     }
@@ -9921,10 +9831,7 @@ pub unsafe fn xml_xpath_normalize_function(ctxt: XmlXPathParserContextPtr, mut n
         if nargs == 0 {
             // Use current context node
             let val = xml_xpath_cast_node_to_string((*(*ctxt).context).node);
-            value_push(
-                ctxt,
-                xml_xpath_cache_wrap_string((*ctxt).context, Some(&val)),
-            );
+            (*ctxt).value_push(xml_xpath_cache_wrap_string((*ctxt).context, Some(&val)));
             nargs = 1;
         }
 
@@ -9988,11 +9895,11 @@ pub unsafe fn xml_xpath_translate_function(ctxt: XmlXPathParserContextPtr, nargs
         CHECK_ARITY!(ctxt, nargs, 3);
 
         CAST_TO_STRING!(ctxt);
-        let to: XmlXPathObjectPtr = value_pop(ctxt);
+        let to: XmlXPathObjectPtr = (*ctxt).value_pop();
         CAST_TO_STRING!(ctxt);
-        let from: XmlXPathObjectPtr = value_pop(ctxt);
+        let from: XmlXPathObjectPtr = (*ctxt).value_pop();
         CAST_TO_STRING!(ctxt);
-        let str: XmlXPathObjectPtr = value_pop(ctxt);
+        let str: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         let to_str = (*to).stringval.as_deref().unwrap();
         let from_str = (*from).stringval.as_deref().unwrap();
@@ -10011,10 +9918,7 @@ pub unsafe fn xml_xpath_translate_function(ctxt: XmlXPathParserContextPtr, nargs
                 target.push(c);
             }
         }
-        value_push(
-            ctxt,
-            xml_xpath_cache_new_string((*ctxt).context, Some(&target)),
-        );
+        (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some(&target)));
         xml_xpath_release_object((*ctxt).context, str);
         xml_xpath_release_object((*ctxt).context, from);
         xml_xpath_release_object((*ctxt).context, to);
@@ -10041,7 +9945,7 @@ pub unsafe fn xml_xpath_not_function(ctxt: XmlXPathParserContextPtr, nargs: i32)
 pub unsafe fn xml_xpath_true_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     unsafe {
         CHECK_ARITY!(ctxt, nargs, 0);
-        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, true));
+        (*ctxt).value_push(xml_xpath_cache_new_boolean((*ctxt).context, true));
     }
 }
 
@@ -10051,7 +9955,7 @@ pub unsafe fn xml_xpath_true_function(ctxt: XmlXPathParserContextPtr, nargs: i32
 pub unsafe fn xml_xpath_false_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     unsafe {
         CHECK_ARITY!(ctxt, nargs, 0);
-        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, false));
+        (*ctxt).value_push(xml_xpath_cache_new_boolean((*ctxt).context, false));
     }
 }
 
@@ -10078,7 +9982,7 @@ pub unsafe fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr, nargs: i32
         CHECK_ARITY!(ctxt, nargs, 1);
         CAST_TO_STRING!(ctxt);
         CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathString);
-        let val = value_pop(ctxt);
+        let val = (*ctxt).value_pop();
         let lang = (*val).stringval.as_deref();
         let the_lang = (*(*ctxt).context).node.unwrap().get_lang();
         'not_equal: {
@@ -10100,7 +10004,7 @@ pub unsafe fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr, nargs: i32
         // not_equal:
 
         xml_xpath_release_object((*ctxt).context, val);
-        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, ret != 0));
+        (*ctxt).value_push(xml_xpath_cache_new_boolean((*ctxt).context, ret != 0));
     }
 }
 
@@ -10144,16 +10048,16 @@ pub unsafe fn xml_xpath_number_function(ctxt: XmlXPathParserContextPtr, nargs: i
                     .as_ref()
                     .map_or(null_mut(), |c| c.as_ptr() as *mut u8);
                 res = xml_xpath_string_eval_number(content);
-                value_push(ctxt, xml_xpath_cache_new_float((*ctxt).context, res));
+                (*ctxt).value_push(xml_xpath_cache_new_float((*ctxt).context, res));
             } else {
-                value_push(ctxt, xml_xpath_cache_new_float((*ctxt).context, 0.0));
+                (*ctxt).value_push(xml_xpath_cache_new_float((*ctxt).context, 0.0));
             }
             return;
         }
 
         CHECK_ARITY!(ctxt, nargs, 1);
-        let cur: XmlXPathObjectPtr = value_pop(ctxt);
-        value_push(ctxt, xml_xpath_cache_convert_number((*ctxt).context, cur));
+        let cur: XmlXPathObjectPtr = (*ctxt).value_pop();
+        (*ctxt).value_push(xml_xpath_cache_convert_number((*ctxt).context, cur));
     }
 }
 
@@ -10175,7 +10079,7 @@ pub unsafe fn xml_xpath_sum_function(ctxt: XmlXPathParserContextPtr, nargs: i32)
         {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
-        let cur: XmlXPathObjectPtr = value_pop(ctxt);
+        let cur: XmlXPathObjectPtr = (*ctxt).value_pop();
 
         if let Some(nodeset) = (*cur).nodesetval.as_deref().filter(|n| !n.is_empty()) {
             if !nodeset.node_tab.is_empty() {
@@ -10184,7 +10088,7 @@ pub unsafe fn xml_xpath_sum_function(ctxt: XmlXPathParserContextPtr, nargs: i32)
                 }
             }
         }
-        value_push(ctxt, xml_xpath_cache_new_float((*ctxt).context, res));
+        (*ctxt).value_push(xml_xpath_cache_new_float((*ctxt).context, res));
         xml_xpath_release_object((*ctxt).context, cur);
     }
 }
@@ -10283,12 +10187,12 @@ pub unsafe fn xml_xpath_boolean_function(ctxt: XmlXPathParserContextPtr, nargs: 
         let mut cur: XmlXPathObjectPtr;
 
         CHECK_ARITY!(ctxt, nargs, 1);
-        cur = value_pop(ctxt);
+        cur = (*ctxt).value_pop();
         if cur.is_null() {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
         }
         cur = xml_xpath_cache_convert_boolean((*ctxt).context, cur);
-        value_push(ctxt, cur);
+        (*ctxt).value_push(cur);
     }
 }
 

@@ -37,8 +37,9 @@ use crate::{
 };
 
 use super::{
-    XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr, xml_xpath_free_comp_expr,
-    xml_xpath_free_object, xml_xpath_new_comp_expr, xml_xpath_release_object,
+    XPATH_MAX_STACK_DEPTH, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathError,
+    XmlXPathObjectPtr, xml_xpath_free_comp_expr, xml_xpath_free_object, xml_xpath_new_comp_expr,
+    xml_xpath_perr_memory, xml_xpath_release_object,
 };
 
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
@@ -88,6 +89,47 @@ impl XmlXPathParserContext {
             .trim_start_matches(|c: char| xml_is_blank_char(c as u32));
         let diff = self.current_str().len() - rem.len();
         self.cur += diff;
+    }
+
+    /// Pushes a new XPath object on top of the value stack. If value is NULL,
+    /// a memory error is recorded in the parser context.
+    ///
+    /// Returns the number of items on the value stack, or -1 in case of error.
+    ///
+    /// The object is destroyed in case of error.
+    #[doc(alias = "valuePush")]
+    pub unsafe fn value_push(&mut self, value: XmlXPathObjectPtr) -> i32 {
+        unsafe {
+            if value.is_null() {
+                // A NULL value typically indicates that a memory allocation failed,
+                // so we set self.error here to propagate the error.
+                self.error = XmlXPathError::XPathMemoryError as i32;
+                return -1;
+            }
+            if self.value_tab.len() == XPATH_MAX_STACK_DEPTH {
+                xml_xpath_perr_memory(self, Some("XPath stack depth limit reached\n"));
+                xml_xpath_free_object(value);
+                return -1;
+            }
+            self.value_tab.push(value);
+            self.value = value;
+            self.value_tab.len() as i32 - 1
+        }
+    }
+
+    // TODO: remap to xmlXPathValuePop and Push.
+    /// Pops the top XPath object from the value stack
+    ///
+    /// Returns the XPath object just removed
+    #[doc(alias = "valuePop")]
+    pub fn value_pop(&mut self) -> XmlXPathObjectPtr {
+        if self.value_tab.is_empty() {
+            return null_mut();
+        }
+
+        let res = self.value_tab.pop().unwrap();
+        self.value = self.value_tab.last().cloned().unwrap_or(null_mut());
+        res
     }
 }
 
