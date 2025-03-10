@@ -65,7 +65,7 @@ use crate::{
         pattern::{XmlPatternPtr, xml_free_pattern_list},
         xmlstring::XmlChar,
     },
-    tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNodePtr, XmlNsPtr},
+    tree::{XmlDocPtr, XmlElementType, XmlGenericNodePtr, XmlNsPtr},
 };
 
 #[cfg(feature = "xpath")]
@@ -442,7 +442,7 @@ pub unsafe fn xml_xpath_cmp_nodes(
     mut node1: XmlGenericNodePtr,
     mut node2: XmlGenericNodePtr,
 ) -> i32 {
-    use crate::tree::{NodeCommon, XmlAttrPtr, XmlNodePtr};
+    use crate::tree::{NodeCommon, XmlAttrPtr};
 
     let mut depth1: i32;
     let mut depth2: i32;
@@ -451,9 +451,6 @@ pub unsafe fn xml_xpath_cmp_nodes(
     let mut attr_node1 = None;
     let mut attr_node2 = None;
 
-    // if node1.is_null() || node2.is_null() {
-    //     return -2;
-    // }
     // a couple of optimizations which will avoid computations in most cases
     // trivial case
     if node1 == node2 {
@@ -499,28 +496,6 @@ pub unsafe fn xml_xpath_cmp_nodes(
     }
     if Some(node1) == node2.next() {
         return -1;
-    }
-
-    // Speedup using document order if available.
-    if let Some((node1, node2)) = XmlNodePtr::try_from(node1)
-        .ok()
-        .zip(XmlNodePtr::try_from(node2).ok())
-    {
-        if node1.element_type() == XmlElementType::XmlElementNode
-            && node2.element_type() == XmlElementType::XmlElementNode
-            && 0 > node1.content as isize
-            && 0 > node2.content as isize
-            && node1.doc == node2.doc
-        {
-            let l1: isize = -(node1.content as isize);
-            let l2: isize = -(node2.content as isize);
-            if l1 < l2 {
-                return 1;
-            }
-            if l1 > l2 {
-                return -1;
-            }
-        }
     }
 
     // compute depth to root
@@ -571,27 +546,6 @@ pub unsafe fn xml_xpath_cmp_nodes(
     }
     if Some(node1) == node2.next() {
         return -1;
-    }
-    // Speedup using document order if available.
-    if let Some((node1, node2)) = XmlNodePtr::try_from(node1)
-        .ok()
-        .zip(XmlNodePtr::try_from(node2).ok())
-    {
-        if node1.element_type() == XmlElementType::XmlElementNode
-            && node2.element_type() == XmlElementType::XmlElementNode
-            && 0 > node1.content as isize
-            && 0 > node2.content as isize
-            && node1.doc == node2.doc
-        {
-            let l1: isize = -(node1.content as isize);
-            let l2: isize = -(node2.content as isize);
-            if l1 < l2 {
-                return 1;
-            }
-            if l1 > l2 {
-                return -1;
-            }
-        }
     }
 
     let mut cur = node1.next();
@@ -1495,10 +1449,6 @@ unsafe fn xml_xpath_cmp_nodes_ext(
     let mut misc_node1 = None;
     let mut misc_node2 = None;
 
-    // if node1.is_null() || node2.is_null() {
-    //     return None;
-    // }
-
     if node1 == node2 {
         return Some(std::cmp::Ordering::Equal);
     }
@@ -1507,27 +1457,7 @@ unsafe fn xml_xpath_cmp_nodes_ext(
     'turtle_comparison: {
         match node1.element_type() {
             XmlElementType::XmlElementNode => {
-                let node1 = XmlNodePtr::try_from(node1).unwrap();
-                if let Some(node2) = XmlNodePtr::try_from(node2)
-                    .ok()
-                    .filter(|node2| node2.element_type() == XmlElementType::XmlElementNode)
-                {
-                    if 0 > node1.content as isize
-                        && 0 > node2.content as isize
-                        && node1.doc == node2.doc
-                    {
-                        let l1 = -(node1.content as isize);
-                        let l2 = -(node2.content as isize);
-                        if l1 < l2 {
-                            return Some(std::cmp::Ordering::Less);
-                        }
-                        if l1 > l2 {
-                            return Some(std::cmp::Ordering::Greater);
-                        }
-                    } else {
-                        break 'turtle_comparison;
-                    }
-                }
+                break 'turtle_comparison;
             }
             XmlElementType::XmlAttributeNode => {
                 precedence1 = 1; /* element is owner */
@@ -1539,39 +1469,7 @@ unsafe fn xml_xpath_cmp_nodes_ext(
             | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlPINode => {
-                misc_node1 = Some(node1);
-                // Find nearest element node.
-                let n1 = if let Some(mut prev1) = node1.prev() {
-                    loop {
-                        node1 = prev1;
-                        if matches!(node1.element_type(), XmlElementType::XmlElementNode) {
-                            precedence1 = 3; /* element in prev-sibl axis */
-                            break Some(node1);
-                        }
-                        let Some(prev) = node1.prev() else {
-                            precedence1 = 2; /* element is parent */
-                            // URGENT TODO: Are there any cases, where the
-                            // parent of such a node is not an element node?
-                            break node1.parent();
-                        };
-                        prev1 = prev;
-                    }
-                } else {
-                    precedence1 = 2; /* element is parent */
-                    node1.parent()
-                };
-                if let Some(n1) = n1
-                    .and_then(|n1| XmlNodePtr::try_from(n1).ok())
-                    .filter(|n1| n1.element_type() == XmlElementType::XmlElementNode)
-                    .filter(|n1| 0 > n1.content as isize)
-                {
-                    node1 = n1.into();
-                    misc = 1;
-                } else {
-                    // Fallback for whatever case.
-                    node1 = misc_node1.unwrap();
-                    precedence1 = 0;
-                }
+                precedence1 = 0;
             }
             XmlElementType::XmlNamespaceDecl => {
                 // TODO: why do we return 1 for namespace nodes?
@@ -1592,35 +1490,7 @@ unsafe fn xml_xpath_cmp_nodes_ext(
             | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlPINode => {
-                misc_node2 = Some(node2);
-                let n2 = if let Some(mut prev2) = node2.prev() {
-                    loop {
-                        node2 = prev2;
-                        if matches!(node2.element_type(), XmlElementType::XmlElementNode) {
-                            precedence2 = 3; /* element in prev-sibl axis */
-                            break Some(node2);
-                        }
-                        let Some(prev) = node2.prev() else {
-                            precedence2 = 2; /* element is parent */
-                            break node2.parent();
-                        };
-                        prev2 = prev;
-                    }
-                } else {
-                    precedence2 = 2; /* element is parent */
-                    node2.parent()
-                };
-                if let Some(n2) = n2
-                    .and_then(|n2| XmlNodePtr::try_from(n2).ok())
-                    .filter(|node| node.element_type() == XmlElementType::XmlElementNode)
-                    .filter(|node| 0 > node.content as isize)
-                {
-                    node2 = n2.into();
-                    misc = 1;
-                } else {
-                    node2 = misc_node2.unwrap();
-                    precedence2 = 0;
-                }
+                precedence2 = 0;
             }
             XmlElementType::XmlNamespaceDecl => {
                 return Some(std::cmp::Ordering::Less);
@@ -1680,28 +1550,6 @@ unsafe fn xml_xpath_cmp_nodes_ext(
                 }
             }
         }
-
-        // Speedup using document order if available.
-        if let Some((node1, node2)) = XmlNodePtr::try_from(node1)
-            .ok()
-            .zip(XmlNodePtr::try_from(node2).ok())
-        {
-            if node1.element_type() == XmlElementType::XmlElementNode
-                && node2.element_type() == XmlElementType::XmlElementNode
-                && 0 > node1.content as isize
-                && 0 > node2.content as isize
-                && node1.doc == node2.doc
-            {
-                let l1 = -(node1.content as isize);
-                let l2 = -(node2.content as isize);
-                if l1 < l2 {
-                    return Some(std::cmp::Ordering::Less);
-                }
-                if l1 > l2 {
-                    return Some(std::cmp::Ordering::Greater);
-                }
-            }
-        }
     }
 
     // turtle_comparison:
@@ -1757,27 +1605,6 @@ unsafe fn xml_xpath_cmp_nodes_ext(
     }
     if Some(node1) == node2.next() {
         return Some(std::cmp::Ordering::Greater);
-    }
-    // Speedup using document order if available.
-    if let Some((node1, node2)) = XmlNodePtr::try_from(node1)
-        .ok()
-        .zip(XmlNodePtr::try_from(node2).ok())
-    {
-        if node1.element_type() == XmlElementType::XmlElementNode
-            && node2.element_type() == XmlElementType::XmlElementNode
-            && 0 > node1.content as isize
-            && 0 > node2.content as isize
-            && node1.doc == node2.doc
-        {
-            let l1 = -(node1.content as isize);
-            let l2 = -(node2.content as isize);
-            if l1 < l2 {
-                return Some(std::cmp::Ordering::Less);
-            }
-            if l1 > l2 {
-                return Some(std::cmp::Ordering::Greater);
-            }
-        }
     }
 
     let mut cur = node1.next();
