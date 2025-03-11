@@ -39,6 +39,8 @@ pub mod context;
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 pub mod dump;
 #[cfg(feature = "xpath")]
+pub mod evaluate;
+#[cfg(feature = "xpath")]
 pub mod internals;
 #[cfg(feature = "xpath")]
 pub mod node_set;
@@ -1126,7 +1128,7 @@ pub unsafe fn xml_xpath_eval(xpath: &str, ctx: XmlXPathContextPtr) -> XmlXPathOb
         if ctxt.is_null() {
             return null_mut();
         }
-        xml_xpath_eval_expr(ctxt);
+        (*ctxt).evaluate_expression();
 
         if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
             res = null_mut();
@@ -1334,7 +1336,7 @@ unsafe fn xml_xpath_compiled_eval_internal(
         if pctxt.is_null() {
             return -1;
         }
-        let res: i32 = xml_xpath_run_eval(pctxt, to_bool);
+        let res: i32 = (*pctxt).run_evaluate(to_bool);
 
         if (*pctxt).error != XmlXPathError::XPathExpressionOK as i32 {
             res_obj = null_mut();
@@ -2769,32 +2771,6 @@ mod tests {
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_error);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_eval_expr() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                xml_xpath_eval_expr(ctxt);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathEvalExpr",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathEvalExpr()");
-                    eprintln!(" {}", n_ctxt);
                 }
             }
         }

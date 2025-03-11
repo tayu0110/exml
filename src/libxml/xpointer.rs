@@ -68,8 +68,8 @@ use crate::{
         XmlXPathContextPtr, XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType,
         XmlXPathParserContextPtr,
         internals::{
-            xml_xpath_eval_expr, xml_xpath_id_function, xml_xpath_parse_name,
-            xml_xpath_parse_ncname, xml_xpath_register_ns, xml_xpath_root,
+            xml_xpath_id_function, xml_xpath_parse_name, xml_xpath_parse_ncname,
+            xml_xpath_register_ns, xml_xpath_root,
         },
         xml_xpath_free_object, xml_xpath_new_context, xml_xpath_new_node_set, xml_xpath_new_string,
     },
@@ -2273,7 +2273,7 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
             {
                 (*ctxt).xptr = xml_str_equal(name, c"xpointer".as_ptr() as _) as i32;
             }
-            xml_xpath_eval_expr(ctxt);
+            (*ctxt).evaluate_expression();
             (*ctxt).base = old_base;
             (*ctxt).cur = old_cur;
         } else if xml_str_equal(name, c"element".as_ptr() as _) {
@@ -2857,7 +2857,7 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
         if oldset.is_null() || (*oldset).loc_tab.is_empty() {
             (*(*ctxt).context).context_size = 0;
             (*(*ctxt).context).proximity_position = 0;
-            xml_xpath_eval_expr(ctxt);
+            (*ctxt).evaluate_expression();
             res = (*ctxt).value_pop();
             if !res.is_null() {
                 xml_xpath_free_object(res);
@@ -2880,7 +2880,7 @@ pub unsafe fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
                 (*(*ctxt).context).context_size = (*oldset).loc_tab.len() as i32;
                 (*(*ctxt).context).proximity_position = i as i32 + 1;
 
-                xml_xpath_eval_expr(ctxt);
+                (*ctxt).evaluate_expression();
                 CHECK_ERROR!(ctxt);
 
                 // The result of the evaluation need to be tested to
