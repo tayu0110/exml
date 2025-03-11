@@ -1614,13 +1614,13 @@ pub unsafe fn xml_xpath_optimize_expression(
         // Try to rewrite "descendant-or-self::node()/foo" to an optimized
         // internal representation.
 
-        if matches!((*op).op, XmlXPathOp::XpathOpCollect /* 11 */)
+        if matches!((*op).op, XmlXPathOp::XPathOpCollect /* 11 */)
             && (*op).ch1 != -1
             && (*op).ch2 == -1
         {
             let prevop = &(*comp).steps[(*op).ch1 as usize];
 
-            if matches!(prevop.op, XmlXPathOp::XpathOpCollect /* 11 */)
+            if matches!(prevop.op, XmlXPathOp::XPathOpCollect /* 11 */)
                 && prevop.value == XmlXPathAxisVal::AxisDescendantOrSelf as i32
                 && prevop.ch2 == -1
                 && prevop.value2 == XmlXPathTestVal::NodeTestType as i32
@@ -1650,7 +1650,7 @@ pub unsafe fn xml_xpath_optimize_expression(
         }
 
         // OP_VALUE has invalid ch1.
-        if matches!((*op).op, XmlXPathOp::XpathOpValue) {
+        if matches!((*op).op, XmlXPathOp::XPathOpValue) {
             return;
         }
 
@@ -2130,7 +2130,7 @@ unsafe fn xml_xpath_is_positional_predicate(
         //      E.g. "key('a', 'b')" or "(//foo | //bar)".
         if !matches!(
             (*op).op,
-            XmlXPathOp::XpathOpPredicate | XmlXPathOp::XpathOpFilter
+            XmlXPathOp::XPathOpPredicate | XmlXPathOp::XPathOpFilter
         ) {
             return 0;
         }
@@ -2140,7 +2140,7 @@ unsafe fn xml_xpath_is_positional_predicate(
         }
         let expr_op = &(*(*ctxt).comp).steps[(*op).ch2 as usize];
 
-        if matches!(expr_op.op, XmlXPathOp::XpathOpValue)
+        if matches!(expr_op.op, XmlXPathOp::XPathOpValue)
             && !expr_op.value4.is_null()
             && matches!(
                 (*(expr_op.value4 as XmlXPathObjectPtr)).typ,
@@ -2300,7 +2300,7 @@ unsafe fn xml_xpath_comp_op_eval_predicate(
             // Process inner predicates first.
             if !matches!(
                 (*comp).steps[(*op).ch1 as usize].op,
-                XmlXPathOp::XpathOpPredicate
+                XmlXPathOp::XPathOpPredicate
             ) {
                 generic_error!("xmlXPathCompOpEvalPredicate: Expected a predicate\n");
                 XP_ERROR!(ctxt, XmlXPathError::XPathInvalidOperand as i32);
@@ -4786,39 +4786,6 @@ pub unsafe fn xml_xpath_mod_values(ctxt: XmlXPathParserContextPtr) {
         } else {
             (*(*ctxt).value).floatval = arg1 % arg2;
         }
-    }
-}
-
-/// Is the name given a NodeType one.
-///
-/// ```text
-/// [38]   NodeType ::=   'comment'
-///                   | 'text'
-///                   | 'processing-instruction'
-///                   | 'node'
-/// ```
-///
-/// Returns 1 if true 0 otherwise
-#[doc(alias = "xmlXPathIsNodeType")]
-pub unsafe fn xml_xpath_is_node_type(name: *const XmlChar) -> i32 {
-    unsafe {
-        if name.is_null() {
-            return 0;
-        }
-
-        if xml_str_equal(name, c"node".as_ptr() as _) {
-            return 1;
-        }
-        if xml_str_equal(name, c"text".as_ptr() as _) {
-            return 1;
-        }
-        if xml_str_equal(name, c"comment".as_ptr() as _) {
-            return 1;
-        }
-        if xml_str_equal(name, c"processing-instruction".as_ptr() as _) {
-            return 1;
-        }
-        0
     }
 }
 

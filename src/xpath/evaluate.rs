@@ -83,7 +83,7 @@ impl XmlXPathParserContext {
                     if !self.context.is_null() {
                         old_depth = (*self.context).depth;
                     }
-                    self.compile_expr(1);
+                    self.compile_expr(true);
                     if !self.context.is_null() {
                         (*self.context).depth = old_depth;
                     }
@@ -198,8 +198,8 @@ impl XmlXPathParserContext {
             (*self.context).depth += 1;
             let comp: XmlXPathCompExprPtr = self.comp;
             match (*op).op {
-                XmlXPathOp::XpathOpEnd => {}
-                XmlXPathOp::XpathOpAnd => 'to_break: {
+                XmlXPathOp::XPathOpEnd => {}
+                XmlXPathOp::XPathOpAnd => 'to_break: {
                     total += self
                         .evaluate_precompiled_operation(&raw mut (*comp).steps[(*op).ch1 as usize]);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -222,7 +222,7 @@ impl XmlXPathParserContext {
                     }
                     xml_xpath_release_object(self.context, arg2);
                 }
-                XmlXPathOp::XpathOpOr => 'to_break: {
+                XmlXPathOp::XPathOpOr => 'to_break: {
                     total += self
                         .evaluate_precompiled_operation(&raw mut (*comp).steps[(*op).ch1 as usize]);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -245,7 +245,7 @@ impl XmlXPathParserContext {
                     }
                     xml_xpath_release_object(self.context, arg2);
                 }
-                XmlXPathOp::XpathOpEqual => {
+                XmlXPathOp::XPathOpEqual => {
                     total += self
                         .evaluate_precompiled_operation(&raw mut (*comp).steps[(*op).ch1 as usize]);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -263,7 +263,7 @@ impl XmlXPathParserContext {
                     }
                     self.value_push(xml_xpath_cache_new_boolean(self.context, equal != 0));
                 }
-                XmlXPathOp::XpathOpCmp => {
+                XmlXPathOp::XPathOpCmp => {
                     total += self
                         .evaluate_precompiled_operation(&raw mut (*comp).steps[(*op).ch1 as usize]);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -277,7 +277,7 @@ impl XmlXPathParserContext {
                     ret = xml_xpath_compare_values(self, (*op).value, (*op).value2);
                     self.value_push(xml_xpath_cache_new_boolean(self.context, ret != 0));
                 }
-                XmlXPathOp::XpathOpPlus => {
+                XmlXPathOp::XPathOpPlus => {
                     total += self
                         .evaluate_precompiled_operation(&raw mut (*comp).steps[(*op).ch1 as usize]);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -313,7 +313,7 @@ impl XmlXPathParserContext {
                         };
                     }
                 }
-                XmlXPathOp::XpathOpMult => {
+                XmlXPathOp::XPathOpMult => {
                     total += self
                         .evaluate_precompiled_operation(&raw mut (*comp).steps[(*op).ch1 as usize]);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -332,7 +332,7 @@ impl XmlXPathParserContext {
                         xml_xpath_mod_values(self);
                     }
                 }
-                XmlXPathOp::XpathOpUnion => 'to_break: {
+                XmlXPathOp::XPathOpUnion => 'to_break: {
                     total += self
                         .evaluate_precompiled_operation(&raw mut (*comp).steps[(*op).ch1 as usize]);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
@@ -386,10 +386,10 @@ impl XmlXPathParserContext {
                     self.value_push(arg1);
                     xml_xpath_release_object(self.context, arg2);
                 }
-                XmlXPathOp::XpathOpRoot => {
+                XmlXPathOp::XPathOpRoot => {
                     xml_xpath_root(self);
                 }
-                XmlXPathOp::XpathOpNode => {
+                XmlXPathOp::XPathOpNode => {
                     if (*op).ch1 != -1 {
                         total += self.evaluate_precompiled_operation(
                             &raw mut (*comp).steps[(*op).ch1 as usize],
@@ -411,7 +411,7 @@ impl XmlXPathParserContext {
                         (*self.context).node,
                     ));
                 }
-                XmlXPathOp::XpathOpCollect => 'to_break: {
+                XmlXPathOp::XPathOpCollect => 'to_break: {
                     if (*op).ch1 == -1 {
                         break 'to_break;
                     }
@@ -423,13 +423,13 @@ impl XmlXPathParserContext {
 
                     total += xml_xpath_node_collect_and_test(self, op, None, None, 0);
                 }
-                XmlXPathOp::XpathOpValue => {
+                XmlXPathOp::XPathOpValue => {
                     self.value_push(xml_xpath_cache_object_copy(
                         self.context,
                         (*op).value4 as XmlXPathObjectPtr,
                     ));
                 }
-                XmlXPathOp::XpathOpVariable => 'to_break: {
+                XmlXPathOp::XPathOpVariable => 'to_break: {
                     let val: XmlXPathObjectPtr;
                     if (*op).ch1 != -1 {
                         total += self.evaluate_precompiled_operation(
@@ -462,7 +462,7 @@ impl XmlXPathParserContext {
                         self.value_push(val);
                     }
                 }
-                XmlXPathOp::XpathOpFunction => 'to_break: {
+                XmlXPathOp::XPathOpFunction => 'to_break: {
                     let func: XmlXPathFunction;
                     let frame = self.value_tab.len();
                     if (*op).ch1 != -1 {
@@ -534,7 +534,7 @@ impl XmlXPathParserContext {
                         return 0;
                     }
                 }
-                XmlXPathOp::XpathOpArg => {
+                XmlXPathOp::XPathOpArg => {
                     if (*op).ch1 != -1 {
                         total += self.evaluate_precompiled_operation(
                             &raw mut (*comp).steps[(*op).ch1 as usize],
@@ -552,7 +552,7 @@ impl XmlXPathParserContext {
                         };
                     }
                 }
-                XmlXPathOp::XpathOpPredicate | XmlXPathOp::XpathOpFilter => 'to_break: {
+                XmlXPathOp::XPathOpPredicate | XmlXPathOp::XPathOpFilter => 'to_break: {
                     // Optimization for ()[1] selection i.e. the first elem
                     if (*op).ch1 != -1
                 && (*op).ch2 != -1
@@ -565,14 +565,14 @@ impl XmlXPathParserContext {
                 // easier to optimize.
                 && (matches!(
                     (*comp).steps[(*op).ch1 as usize].op,
-                    XmlXPathOp::XpathOpSort // 18
+                    XmlXPathOp::XPathOpSort // 18
                 ) || matches!(
                     (*comp).steps[(*op).ch1 as usize].op,
-                    XmlXPathOp::XpathOpFilter // 17
+                    XmlXPathOp::XPathOpFilter // 17
                 ))
                 && matches!(
                     (*comp).steps[(*op).ch2 as usize].op,
-                    XmlXPathOp::XpathOpValue // 12
+                    XmlXPathOp::XPathOpValue // 12
                 ) {
                         let val: XmlXPathObjectPtr = (*comp).steps[(*op).ch2 as usize].value4 as _;
                         if !val.is_null()
@@ -608,17 +608,17 @@ impl XmlXPathParserContext {
                         && (*op).ch2 != -1
                         && matches!(
                             (*comp).steps[(*op).ch1 as usize].op,
-                            XmlXPathOp::XpathOpSort
+                            XmlXPathOp::XPathOpSort
                         )
                         && matches!(
                             (*comp).steps[(*op).ch2 as usize].op,
-                            XmlXPathOp::XpathOpSort
+                            XmlXPathOp::XPathOpSort
                         )
                     {
                         let f: i32 = (*comp).steps[(*op).ch2 as usize].ch1;
 
                         if f != -1
-                            && matches!((*comp).steps[f as usize].op, XmlXPathOp::XpathOpFunction)
+                            && matches!((*comp).steps[f as usize].op, XmlXPathOp::XPathOpFunction)
                             && (*comp).steps[f as usize].value5.is_null()
                             && (*comp).steps[f as usize].value == 0
                             && !(*comp).steps[f as usize].value4.is_null()
@@ -708,7 +708,7 @@ impl XmlXPathParserContext {
                     }
                     self.value_push(obj);
                 }
-                XmlXPathOp::XpathOpSort => {
+                XmlXPathOp::XPathOpSort => {
                     if (*op).ch1 != -1 {
                         total += self.evaluate_precompiled_operation(
                             &raw mut (*comp).steps[(*op).ch1 as usize],
@@ -730,7 +730,7 @@ impl XmlXPathParserContext {
                     }
                 }
                 #[cfg(feature = "libxml_xptr_locs")]
-                XmlXPathOp::XpathOpRangeto => 'to_break: {
+                XmlXPathOp::XPathOpRangeto => 'to_break: {
                     let mut range: XmlXPathObjectPtr;
                     let mut res: XmlXPathObjectPtr;
                     let obj: XmlXPathObjectPtr;
@@ -941,8 +941,8 @@ impl XmlXPathParserContext {
             (*self.context).depth += 1;
             let comp: XmlXPathCompExprPtr = self.comp;
             match (*op).op {
-                XmlXPathOp::XpathOpEnd => {}
-                XmlXPathOp::XpathOpUnion => {
+                XmlXPathOp::XPathOpEnd => {}
+                XmlXPathOp::XPathOpUnion => {
                     total = self.evaluate_precompiled_operation_first(
                         &raw mut (*comp).steps[(*op).ch1 as usize],
                         first,
@@ -1017,10 +1017,10 @@ impl XmlXPathParserContext {
                         total += cur;
                     }
                 }
-                XmlXPathOp::XpathOpRoot => {
+                XmlXPathOp::XPathOpRoot => {
                     xml_xpath_root(self);
                 }
-                XmlXPathOp::XpathOpNode => {
+                XmlXPathOp::XPathOpNode => {
                     if (*op).ch1 != -1 {
                         total += self.evaluate_precompiled_operation(
                             &raw mut (*comp).steps[(*op).ch1 as usize],
@@ -1042,7 +1042,7 @@ impl XmlXPathParserContext {
                         (*self.context).node,
                     ));
                 }
-                XmlXPathOp::XpathOpCollect => {
+                XmlXPathOp::XPathOpCollect => {
                     if (*op).ch1 == -1 {
                         // break;
                     } else {
@@ -1055,13 +1055,13 @@ impl XmlXPathParserContext {
                         total += xml_xpath_node_collect_and_test(self, op, Some(first), None, 0);
                     }
                 }
-                XmlXPathOp::XpathOpValue => {
+                XmlXPathOp::XPathOpValue => {
                     self.value_push(xml_xpath_cache_object_copy(
                         self.context,
                         (*op).value4 as XmlXPathObjectPtr,
                     ));
                 }
-                XmlXPathOp::XpathOpSort => {
+                XmlXPathOp::XPathOpSort => {
                     if (*op).ch1 != -1 {
                         total += self.evaluate_precompiled_operation_first(
                             &raw mut (*comp).steps[(*op).ch1 as usize],
@@ -1083,7 +1083,7 @@ impl XmlXPathParserContext {
                         }
                     }
                 }
-                XmlXPathOp::XpathOpFilter => {
+                XmlXPathOp::XPathOpFilter => {
                     total += self.evaluate_precompiled_operation_filter_first(op, first);
                 }
                 _ => {
@@ -1125,8 +1125,8 @@ impl XmlXPathParserContext {
             (*self.context).depth += 1;
             let comp: XmlXPathCompExprPtr = self.comp;
             match (*op).op {
-                XmlXPathOp::XpathOpEnd => {}
-                XmlXPathOp::XpathOpUnion => {
+                XmlXPathOp::XPathOpEnd => {}
+                XmlXPathOp::XPathOpUnion => {
                     total = self.evaluate_precompiled_operation_last(
                         &raw mut (*comp).steps[(*op).ch1 as usize],
                         last,
@@ -1204,10 +1204,10 @@ impl XmlXPathParserContext {
                         total += cur;
                     }
                 }
-                XmlXPathOp::XpathOpRoot => {
+                XmlXPathOp::XPathOpRoot => {
                     xml_xpath_root(self);
                 }
-                XmlXPathOp::XpathOpNode => {
+                XmlXPathOp::XPathOpNode => {
                     if (*op).ch1 != -1 {
                         total += self.evaluate_precompiled_operation(
                             &raw mut (*comp).steps[(*op).ch1 as usize],
@@ -1229,7 +1229,7 @@ impl XmlXPathParserContext {
                         (*self.context).node,
                     ));
                 }
-                XmlXPathOp::XpathOpCollect => {
+                XmlXPathOp::XPathOpCollect => {
                     if (*op).ch1 == -1 {
                         // break;
                     } else {
@@ -1242,13 +1242,13 @@ impl XmlXPathParserContext {
                         total += xml_xpath_node_collect_and_test(self, op, None, Some(last), 0);
                     }
                 }
-                XmlXPathOp::XpathOpValue => {
+                XmlXPathOp::XPathOpValue => {
                     self.value_push(xml_xpath_cache_object_copy(
                         self.context,
                         (*op).value4 as XmlXPathObjectPtr,
                     ));
                 }
-                XmlXPathOp::XpathOpSort => {
+                XmlXPathOp::XPathOpSort => {
                     if (*op).ch1 != -1 {
                         total += self.evaluate_precompiled_operation_last(
                             &raw mut (*comp).steps[(*op).ch1 as usize],
@@ -1298,17 +1298,17 @@ impl XmlXPathParserContext {
                 && (*op).ch2 != -1
                 && matches!(
                     (*comp).steps[(*op).ch1 as usize].op,
-                    XmlXPathOp::XpathOpSort
+                    XmlXPathOp::XPathOpSort
                 )
                 && matches!(
                     (*comp).steps[(*op).ch2 as usize].op,
-                    XmlXPathOp::XpathOpSort
+                    XmlXPathOp::XPathOpSort
                 )
             {
                 let f: i32 = (*comp).steps[(*op).ch2 as usize].ch1;
 
                 if f != -1
-                    && matches!((*comp).steps[f as usize].op, XmlXPathOp::XpathOpFunction)
+                    && matches!((*comp).steps[f as usize].op, XmlXPathOp::XPathOpFunction)
                     && (*comp).steps[f as usize].value5.is_null()
                     && (*comp).steps[f as usize].value == 0
                     && !(*comp).steps[f as usize].value4.is_null()
@@ -1413,17 +1413,17 @@ impl XmlXPathParserContext {
                 }
                 // comp = self.comp;
                 match (*op).op {
-                    XmlXPathOp::XpathOpEnd => {
+                    XmlXPathOp::XPathOpEnd => {
                         return 0;
                     }
-                    XmlXPathOp::XpathOpValue => {
+                    XmlXPathOp::XPathOpValue => {
                         res_obj = (*op).value4 as XmlXPathObjectPtr;
                         if is_predicate != 0 {
                             return xml_xpath_evaluate_predicate_result(self, res_obj);
                         }
                         return xml_xpath_cast_to_boolean(res_obj) as i32;
                     }
-                    XmlXPathOp::XpathOpSort => {
+                    XmlXPathOp::XPathOpSort => {
                         // We don't need sorting for boolean results. Skip this one.
                         if (*op).ch1 != -1 {
                             op = &raw mut (*self.comp).steps[(*op).ch1 as usize];
@@ -1432,7 +1432,7 @@ impl XmlXPathParserContext {
                         }
                         return 0;
                     }
-                    XmlXPathOp::XpathOpCollect => {
+                    XmlXPathOp::XPathOpCollect => {
                         if (*op).ch1 == -1 {
                             return 0;
                         }

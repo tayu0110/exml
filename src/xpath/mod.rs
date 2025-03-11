@@ -364,26 +364,26 @@ impl Default for XmlXPathContext {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlXPathOp {
-    XpathOpEnd = 0,
-    XpathOpAnd,
-    XpathOpOr,
-    XpathOpEqual,
-    XpathOpCmp,
-    XpathOpPlus,
-    XpathOpMult,
-    XpathOpUnion,
-    XpathOpRoot,
-    XpathOpNode,
-    XpathOpCollect,
-    XpathOpValue, /* 11 */
-    XpathOpVariable,
-    XpathOpFunction,
-    XpathOpArg,
-    XpathOpPredicate,
-    XpathOpFilter, /* 16 */
-    XpathOpSort,   /* 17 */
+    XPathOpEnd = 0,
+    XPathOpAnd,
+    XPathOpOr,
+    XPathOpEqual,
+    XPathOpCmp,
+    XPathOpPlus,
+    XPathOpMult,
+    XPathOpUnion,
+    XPathOpRoot,
+    XPathOpNode,
+    XPathOpCollect,
+    XPathOpValue, /* 11 */
+    XPathOpVariable,
+    XPathOpFunction,
+    XPathOpArg,
+    XPathOpPredicate,
+    XPathOpFilter, /* 16 */
+    XPathOpSort,   /* 17 */
     #[cfg(feature = "libxml_xptr_locs")]
-    XpathOpRangeto,
+    XPathOpRangeto,
 }
 
 #[cfg(feature = "xpath")]
@@ -1247,7 +1247,7 @@ pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> X
         if !ctxt.is_null() {
             old_depth = (*ctxt).depth;
         }
-        (*pctxt).compile_expr(1);
+        (*pctxt).compile_expr(true);
         if !ctxt.is_null() {
             (*ctxt).depth = old_depth;
         }
@@ -1413,7 +1413,7 @@ pub unsafe fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
         }
         for op in &(*comp).steps {
             if !op.value4.is_null() {
-                if matches!(op.op, XmlXPathOp::XpathOpValue) {
+                if matches!(op.op, XmlXPathOp::XPathOpValue) {
                     xml_xpath_free_object(op.value4 as _);
                 } else {
                     xml_free(op.value4 as _);
@@ -2910,36 +2910,6 @@ mod tests {
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_nargs);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_is_node_type() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let name = gen_const_xml_char_ptr(n_name, 0);
-
-                let ret_val = xml_xpath_is_node_type(name as *const XmlChar);
-                desret_int(ret_val);
-                des_const_xml_char_ptr(n_name, name, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathIsNodeType",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathIsNodeType()"
-                    );
-                    eprintln!(" {}", n_name);
                 }
             }
         }

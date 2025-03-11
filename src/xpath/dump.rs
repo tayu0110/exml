@@ -257,23 +257,23 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
             return;
         }
         match (*op).op {
-            XmlXPathOp::XpathOpEnd => {
+            XmlXPathOp::XPathOpEnd => {
                 write!(output, "END").ok();
             }
-            XmlXPathOp::XpathOpAnd => {
+            XmlXPathOp::XPathOpAnd => {
                 write!(output, "AND").ok();
             }
-            XmlXPathOp::XpathOpOr => {
+            XmlXPathOp::XPathOpOr => {
                 write!(output, "OR").ok();
             }
-            XmlXPathOp::XpathOpEqual => {
+            XmlXPathOp::XPathOpEqual => {
                 if (*op).value != 0 {
                     write!(output, "EQUAL =").ok();
                 } else {
                     write!(output, "EQUAL !=").ok();
                 }
             }
-            XmlXPathOp::XpathOpCmp => {
+            XmlXPathOp::XPathOpCmp => {
                 if (*op).value != 0 {
                     write!(output, "CMP <").ok();
                 } else {
@@ -283,7 +283,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                     write!(output, "=").ok();
                 }
             }
-            XmlXPathOp::XpathOpPlus => {
+            XmlXPathOp::XPathOpPlus => {
                 if (*op).value == 0 {
                     write!(output, "PLUS -").ok();
                 } else if (*op).value == 1 {
@@ -294,7 +294,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                     write!(output, "PLUS unary - -").ok();
                 }
             }
-            XmlXPathOp::XpathOpMult => {
+            XmlXPathOp::XPathOpMult => {
                 if (*op).value == 0 {
                     write!(output, "MULT *").ok();
                 } else if (*op).value == 1 {
@@ -303,19 +303,19 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                     write!(output, "MULT mod").ok();
                 }
             }
-            XmlXPathOp::XpathOpUnion => {
+            XmlXPathOp::XPathOpUnion => {
                 write!(output, "UNION").ok();
             }
-            XmlXPathOp::XpathOpRoot => {
+            XmlXPathOp::XPathOpRoot => {
                 write!(output, "ROOT").ok();
             }
-            XmlXPathOp::XpathOpNode => {
+            XmlXPathOp::XPathOpNode => {
                 write!(output, "NODE").ok();
             }
-            XmlXPathOp::XpathOpSort => {
+            XmlXPathOp::XPathOpSort => {
                 write!(output, "SORT").ok();
             }
-            XmlXPathOp::XpathOpCollect => {
+            XmlXPathOp::XPathOpCollect => {
                 let prefix: *const XmlChar = (*op).value4 as _;
                 let name: *const XmlChar = (*op).value5 as _;
 
@@ -407,7 +407,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                     write!(output, "{}", name).ok();
                 }
             }
-            XmlXPathOp::XpathOpValue => {
+            XmlXPathOp::XPathOpValue => {
                 let object: XmlXPathObjectPtr = (*op).value4 as XmlXPathObjectPtr;
 
                 write!(output, "ELEM ").ok();
@@ -431,7 +431,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                 }
                 return;
             }
-            XmlXPathOp::XpathOpVariable => {
+            XmlXPathOp::XPathOpVariable => {
                 let prefix: *const XmlChar = (*op).value5 as _;
                 let name: *const XmlChar = (*op).value4 as _;
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
@@ -443,7 +443,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                     write!(output, "VARIABLE {name}").ok();
                 }
             }
-            XmlXPathOp::XpathOpFunction => {
+            XmlXPathOp::XPathOpFunction => {
                 let nbargs: i32 = (*op).value;
                 let prefix: *const XmlChar = (*op).value5 as _;
                 let name: *const XmlChar = (*op).value4 as _;
@@ -456,17 +456,17 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
                     write!(output, "FUNCTION {name}({nbargs} args)").ok();
                 }
             }
-            XmlXPathOp::XpathOpArg => {
+            XmlXPathOp::XPathOpArg => {
                 write!(output, "ARG").ok();
             }
-            XmlXPathOp::XpathOpPredicate => {
+            XmlXPathOp::XPathOpPredicate => {
                 write!(output, "PREDICATE").ok();
             }
-            XmlXPathOp::XpathOpFilter => {
+            XmlXPathOp::XPathOpFilter => {
                 write!(output, "FILTER").ok();
             }
             #[cfg(feature = "libxml_xptr_locs")]
-            XmlXPathOp::XpathOpRangeto => {
+            XmlXPathOp::XPathOpRangeto => {
                 write!(output, "RANGETO").ok();
             } // _ => {
               //     write!(output, "UNKNOWN %d\n", (*op).op);
