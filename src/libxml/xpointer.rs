@@ -67,10 +67,7 @@ use crate::{
     xpath::{
         XmlXPathContextPtr, XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType,
         XmlXPathParserContextPtr,
-        internals::{
-            xml_xpath_id_function, xml_xpath_parse_name, xml_xpath_parse_ncname,
-            xml_xpath_register_ns, xml_xpath_root,
-        },
+        internals::{xml_xpath_id_function, xml_xpath_register_ns, xml_xpath_root},
         xml_xpath_free_object, xml_xpath_new_context, xml_xpath_new_node_set, xml_xpath_new_string,
     },
 };
@@ -2220,7 +2217,7 @@ unsafe fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: Option<&
 unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut XmlChar) {
     unsafe {
         if name.is_null() {
-            name = xml_xpath_parse_name(ctxt);
+            name = (*ctxt).parse_name();
         }
         if name.is_null() {
             XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
@@ -2287,7 +2284,7 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
                 xml_xpath_root(ctxt);
                 xml_xptr_eval_child_seq(ctxt, None);
             } else {
-                name2 = xml_xpath_parse_name(ctxt);
+                name2 = (*ctxt).parse_name();
                 if name2.is_null() {
                     (*ctxt).base = old_base;
                     (*ctxt).cur = old_cur;
@@ -2311,7 +2308,7 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
             let old_cur = (*ctxt).cur;
             (*ctxt).cur = 0;
 
-            let prefix: *mut XmlChar = xml_xpath_parse_ncname(ctxt);
+            let prefix: *mut XmlChar = (*ctxt).parse_ncname();
             if prefix.is_null() {
                 (*ctxt).base = old_base;
                 (*ctxt).cur = old_cur;
@@ -2376,7 +2373,7 @@ unsafe fn xml_xptr_eval_xptr_part(ctxt: XmlXPathParserContextPtr, mut name: *mut
 unsafe fn xml_xptr_eval_full_xptr(ctxt: XmlXPathParserContextPtr, mut name: *mut XmlChar) {
     unsafe {
         if name.is_null() {
-            name = xml_xpath_parse_name(ctxt);
+            name = (*ctxt).parse_name();
         }
         if name.is_null() {
             XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
@@ -2427,7 +2424,7 @@ unsafe fn xml_xptr_eval_full_xptr(ctxt: XmlXPathParserContextPtr, mut name: *mut
 
             // Is there another XPointer part.
             (*ctxt).skip_blanks();
-            name = xml_xpath_parse_name(ctxt);
+            name = (*ctxt).parse_name();
         }
     }
 }
@@ -2443,7 +2440,7 @@ unsafe fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
             xml_xpath_root(ctxt);
             xml_xptr_eval_child_seq(ctxt, None);
         } else {
-            let name: *mut XmlChar = xml_xpath_parse_name(ctxt);
+            let name: *mut XmlChar = (*ctxt).parse_name();
             if name.is_null() {
                 XP_ERROR!(ctxt, XmlXPathError::XPathExprError as i32);
             }

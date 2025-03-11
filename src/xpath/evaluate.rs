@@ -15,9 +15,8 @@ use crate::{
     },
     tree::{XmlGenericNodePtr, XmlNode},
     xpath::{
-        XmlXPathError, XmlXPathOp, xml_xpath_compile_expr, xml_xpath_location_set_filter,
-        xml_xpath_node_set_filter, xml_xpath_node_set_keep_last, xml_xpath_number_function,
-        xml_xpath_optimize_expression,
+        XmlXPathError, XmlXPathOp, xml_xpath_location_set_filter, xml_xpath_node_set_filter,
+        xml_xpath_node_set_keep_last, xml_xpath_number_function, xml_xpath_optimize_expression,
     },
 };
 
@@ -84,7 +83,7 @@ impl XmlXPathParserContext {
                     if !self.context.is_null() {
                         old_depth = (*self.context).depth;
                     }
-                    xml_xpath_compile_expr(self, 1);
+                    self.compile_expr(1);
                     if !self.context.is_null() {
                         (*self.context).depth = old_depth;
                     }

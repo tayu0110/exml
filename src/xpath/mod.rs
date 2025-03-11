@@ -35,6 +35,8 @@
 // Author: daniel@veillard.com
 
 #[cfg(feature = "xpath")]
+pub mod compile;
+#[cfg(feature = "xpath")]
 pub mod context;
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 pub mod dump;
@@ -1245,7 +1247,7 @@ pub unsafe fn xml_xpath_ctxt_compile(ctxt: XmlXPathContextPtr, xpath: &str) -> X
         if !ctxt.is_null() {
             old_depth = (*ctxt).depth;
         }
-        xml_xpath_compile_expr(pctxt, 1);
+        (*pctxt).compile_expr(1);
         if !ctxt.is_null() {
             (*ctxt).depth = old_depth;
         }
@@ -3427,63 +3429,6 @@ mod tests {
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_nargs);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_parse_ncname() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                let ret_val = xml_xpath_parse_ncname(ctxt);
-                desret_xml_char_ptr(ret_val);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathParseNCName",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathParseNCName()"
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_parse_name() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_PARSER_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
-
-                let ret_val = xml_xpath_parse_name(ctxt);
-                desret_xml_char_ptr(ret_val);
-                des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathParseName",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathParseName()");
-                    eprintln!(" {}", n_ctxt);
                 }
             }
         }
