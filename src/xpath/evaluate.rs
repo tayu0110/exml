@@ -491,7 +491,9 @@ impl XmlXPathParserContext {
                         let mut uri: *const u8 = null();
 
                         let f = if (*op).value5.is_null() {
-                            (*self.context).lookup_function((*op).value4 as _)
+                            (*self.context).lookup_function(
+                                CStr::from_ptr((*op).value4 as _).to_string_lossy().as_ref(),
+                            )
                         } else {
                             uri = xml_xpath_ns_lookup(self.context, (*op).value5 as _);
                             if uri.is_null() {
@@ -503,7 +505,12 @@ impl XmlXPathParserContext {
                                 self.error = XmlXPathError::XPathUndefPrefixError as i32;
                                 break 'to_break;
                             }
-                            (*self.context).lookup_function_ns((*op).value4 as _, uri)
+                            (*self.context).lookup_function_ns(
+                                CStr::from_ptr((*op).value4 as _).to_string_lossy().as_ref(),
+                                (!uri.is_null())
+                                    .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                                    .as_deref(),
+                            )
                         };
                         if let Some(f) = f {
                             func = f;

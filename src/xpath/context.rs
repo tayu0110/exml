@@ -29,12 +29,7 @@
 //
 // Author: daniel@veillard.com
 
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    ffi::{CStr, c_void},
-    ptr::{null, null_mut},
-};
+use std::{borrow::Cow, collections::HashMap, ffi::c_void, ptr::null_mut};
 
 use crate::{
     error::XmlError,
@@ -46,7 +41,7 @@ use crate::{
 
 use super::{
     XPATH_MAX_STACK_DEPTH, XmlNodeSet, XmlXPathAxisPtr, XmlXPathCompExprPtr,
-    XmlXPathContextCachePtr, XmlXPathError, XmlXPathFuncLookupFunc, XmlXPathFunction,
+    XmlXPathContextCachePtr, XmlXPathError, XmlXPathFuncLookup, XmlXPathFunction,
     XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathTypePtr, XmlXPathVariableLookupFunc,
     xml_xpath_boolean_function, xml_xpath_cast_to_boolean, xml_xpath_cast_to_number,
     xml_xpath_cast_to_string, xml_xpath_ceiling_function, xml_xpath_concat_function,
@@ -453,9 +448,7 @@ pub struct XmlXPathContext {
 
     // function lookup function and data
     // function lookup func
-    pub(crate) func_lookup_func: Option<XmlXPathFuncLookupFunc>,
-    // function lookup data
-    pub(crate) func_lookup_data: *mut c_void,
+    pub(crate) func_lookup: Option<Box<dyn XmlXPathFuncLookup>>,
 
     // temporary namespace lists kept for walking the namespace axis
     // Array of namespaces
@@ -570,48 +563,40 @@ impl XmlXPathContext {
     ///
     /// Returns the xmlXPathFunction or NULL if not found
     #[doc(alias = "xmlXPathFunctionLookup")]
-    pub unsafe fn lookup_function(&self, name: *const u8) -> Option<XmlXPathFunction> {
-        unsafe {
-            if let Some(f) = self.func_lookup_func {
-                if let Some(ret) = f(self.func_lookup_data as _, name, null()) {
-                    return Some(ret);
-                }
-            }
-            self.lookup_function_ns(name, null())
+    pub fn lookup_function(&self, name: &str) -> Option<XmlXPathFunction> {
+        if let Some(ret) = self
+            .func_lookup
+            .as_deref()
+            .and_then(|f| f.lookup(name, None))
+        {
+            return Some(ret);
         }
+
+        self.lookup_function_ns(name, None)
     }
 
     /// Search in the Function array of the context for the given function.
     ///
     /// Returns the xmlXPathFunction or NULL if not found
     #[doc(alias = "xmlXPathFunctionLookupNS")]
-    pub unsafe fn lookup_function_ns(
-        &self,
-        name: *const u8,
-        ns_uri: *const u8,
-    ) -> Option<XmlXPathFunction> {
-        unsafe {
-            if name.is_null() {
-                return None;
-            }
-
-            if let Some(f) = self.func_lookup_func.as_ref() {
-                if let Some(ret) = f(self.func_lookup_data, name, ns_uri) {
-                    return Some(ret);
-                }
-            }
-
-            self.func_hash
-                .get(&(
-                    (!ns_uri.is_null())
-                        .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy()),
-                    CStr::from_ptr(name as *const i8)
-                        .to_string_lossy()
-                        .as_ref()
-                        .into(),
-                ))
-                .copied()
+    pub fn lookup_function_ns(&self, name: &str, ns_uri: Option<&str>) -> Option<XmlXPathFunction> {
+        if let Some(ret) = self
+            .func_lookup
+            .as_deref()
+            .and_then(|f| f.lookup(name, ns_uri))
+        {
+            return Some(ret);
         }
+
+        self.func_hash
+            .get(&(ns_uri.map(Cow::Borrowed), Cow::Borrowed(name)))
+            .copied()
+    }
+
+    /// Registers an external mechanism to do function lookup.
+    #[doc(alias = "xmlXPathRegisterFuncLookup")]
+    pub fn register_func_lookup(&mut self, f: impl XmlXPathFuncLookup + 'static) {
+        self.func_lookup = Some(Box::new(f));
     }
 }
 
@@ -641,8 +626,7 @@ impl Default for XmlXPathContext {
             extra: null_mut(),
             function: null_mut(),
             function_uri: null_mut(),
-            func_lookup_func: None,
-            func_lookup_data: null_mut(),
+            func_lookup: None,
             tmp_ns_list: None,
             tmp_ns_nr: 0,
             user_data: None,

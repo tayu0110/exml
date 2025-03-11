@@ -210,11 +210,9 @@ pub type XmlXPathVariableLookupFunc =
 /// Returns the XPath function or NULL if not found.
 #[doc(alias = "xmlXPathFuncLookupFunc")]
 #[cfg(feature = "xpath")]
-pub type XmlXPathFuncLookupFunc = unsafe fn(
-    ctxt: *mut c_void,
-    name: *const XmlChar,
-    ns_uri: *const XmlChar,
-) -> Option<XmlXPathFunction>;
+pub trait XmlXPathFuncLookup {
+    fn lookup(&self, name: &str, ns_uri: Option<&str>) -> Option<XmlXPathFunction>;
+}
 
 /// check namespaces at compilation
 #[cfg(feature = "xpath")]

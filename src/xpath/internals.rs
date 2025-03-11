@@ -61,7 +61,7 @@ use crate::{
     },
     xpath::{
         XML_XPATH_NAN, XmlXPathCompExpr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathError,
-        XmlXPathFuncLookupFunc, XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathOp,
+        XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathOp,
         XmlXPathParserContextPtr, XmlXPathStepOpPtr, XmlXPathVariableLookupFunc,
         xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
         xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
@@ -458,22 +458,6 @@ pub unsafe fn xml_xpath_register_variable_lookup(
         }
         (*ctxt).var_lookup_func = Some(f);
         (*ctxt).var_lookup_data = data;
-    }
-}
-
-/// Registers an external mechanism to do function lookup.
-#[doc(alias = "xmlXPathRegisterFuncLookup")]
-pub unsafe fn xml_xpath_register_func_lookup(
-    ctxt: XmlXPathContextPtr,
-    f: XmlXPathFuncLookupFunc,
-    func_ctxt: *mut c_void,
-) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        (*ctxt).func_lookup_func = Some(f);
-        (*ctxt).func_lookup_data = func_ctxt;
     }
 }
 
