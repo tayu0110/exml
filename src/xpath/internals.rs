@@ -217,9 +217,9 @@ pub struct XmlPointerList {
     pub(crate) size: i32,
 }
 
-pub type XmlXpathContextCachePtr = *mut XmlXpathContextCache;
+pub type XmlXPathContextCachePtr = *mut XmlXPathContextCache;
 #[repr(C)]
-pub struct XmlXpathContextCache {
+pub struct XmlXPathContextCache {
     pub(crate) nodeset_objs: XmlPointerListPtr, /* contains xmlXPathObjectPtr */
     pub(crate) string_objs: XmlPointerListPtr,  /* contains xmlXPathObjectPtr */
     pub(crate) boolean_objs: XmlPointerListPtr, /* contains xmlXPathObjectPtr */
@@ -338,7 +338,7 @@ pub(crate) unsafe fn xml_xpath_release_object(ctxt: XmlXPathContextPtr, obj: Xml
         if ctxt.is_null() || (*ctxt).cache.is_null() {
             xml_xpath_free_object(obj);
         } else {
-            let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
+            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
 
             'free_obj: {
                 'obj_cached: {
@@ -978,7 +978,7 @@ unsafe fn xml_xpath_cache_wrap_node_set(
 ) -> XmlXPathObjectPtr {
     unsafe {
         if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
+            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
 
             if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
                 (*(*cache).misc_objs).number -= 1;
@@ -1069,7 +1069,7 @@ pub(super) unsafe fn xml_xpath_cache_new_string(
 ) -> XmlXPathObjectPtr {
     unsafe {
         if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
+            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
 
             if !(*cache).string_objs.is_null() && (*(*cache).string_objs).number != 0 {
                 (*(*cache).string_objs).number -= 1;
@@ -1107,7 +1107,7 @@ pub(super) unsafe fn xml_xpath_cache_new_boolean(
 ) -> XmlXPathObjectPtr {
     unsafe {
         if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
+            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
 
             if !(*cache).boolean_objs.is_null() && (*(*cache).boolean_objs).number != 0 {
                 (*(*cache).boolean_objs).number -= 1;
@@ -1145,7 +1145,7 @@ pub(super) unsafe fn xml_xpath_cache_new_float(
 ) -> XmlXPathObjectPtr {
     unsafe {
         if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
+            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
 
             if !(*cache).number_objs.is_null() && (*(*cache).number_objs).number != 0 {
                 (*(*cache).number_objs).number -= 1;
@@ -1354,7 +1354,7 @@ pub(super) unsafe fn xml_xpath_cache_new_node_set(
 ) -> XmlXPathObjectPtr {
     unsafe {
         if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
+            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
 
             if !(*cache).nodeset_objs.is_null() && (*(*cache).nodeset_objs).number != 0 {
                 // Use the nodeset-cache.
@@ -3219,7 +3219,7 @@ unsafe fn xml_xpath_cache_wrap_string(
 ) -> XmlXPathObjectPtr {
     unsafe {
         if !ctxt.is_null() && !(*ctxt).cache.is_null() {
-            let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
+            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
 
             if !(*cache).string_objs.is_null() && (*(*cache).string_objs).number != 0 {
                 (*(*cache).string_objs).number -= 1;

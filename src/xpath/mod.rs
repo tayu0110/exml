@@ -879,7 +879,7 @@ unsafe fn xml_xpath_cache_free_object_list(list: XmlPointerListPtr) {
     }
 }
 
-unsafe fn xml_xpath_free_cache(cache: XmlXpathContextCachePtr) {
+unsafe fn xml_xpath_free_cache(cache: XmlXPathContextCachePtr) {
     unsafe {
         if cache.is_null() {
             return;
@@ -913,7 +913,7 @@ pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
         }
 
         if !(*ctxt).cache.is_null() {
-            xml_xpath_free_cache((*ctxt).cache as XmlXpathContextCachePtr);
+            xml_xpath_free_cache((*ctxt).cache as XmlXPathContextCachePtr);
         }
         xml_xpath_registered_ns_cleanup(ctxt);
         xml_xpath_registered_funcs_cleanup(ctxt);
@@ -927,15 +927,15 @@ pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
 ///
 /// Returns the xmlXPathCache just allocated.
 #[doc(alias = "xmlXPathNewCache")]
-unsafe fn xml_xpath_new_cache() -> XmlXpathContextCachePtr {
+unsafe fn xml_xpath_new_cache() -> XmlXPathContextCachePtr {
     unsafe {
-        let ret: XmlXpathContextCachePtr =
-            xml_malloc(size_of::<XmlXpathContextCache>()) as XmlXpathContextCachePtr;
+        let ret: XmlXPathContextCachePtr =
+            xml_malloc(size_of::<XmlXPathContextCache>()) as XmlXPathContextCachePtr;
         if ret.is_null() {
             xml_xpath_err_memory(null_mut(), Some("creating object cache\n"));
             return null_mut();
         }
-        memset(ret as _, 0, size_of::<XmlXpathContextCache>());
+        memset(ret as _, 0, size_of::<XmlXPathContextCache>());
         (*ret).max_nodeset = 100;
         (*ret).max_string = 100;
         (*ret).max_boolean = 100;
@@ -976,7 +976,7 @@ pub unsafe fn xml_xpath_context_set_cache(
                     return -1;
                 }
             }
-            let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
+            let cache: XmlXPathContextCachePtr = (*ctxt).cache as XmlXPathContextCachePtr;
             if options == 0 {
                 if value < 0 {
                     value = 100;
@@ -988,7 +988,7 @@ pub unsafe fn xml_xpath_context_set_cache(
                 (*cache).max_misc = value;
             }
         } else if !(*ctxt).cache.is_null() {
-            xml_xpath_free_cache((*ctxt).cache as XmlXpathContextCachePtr);
+            xml_xpath_free_cache((*ctxt).cache as XmlXPathContextCachePtr);
             (*ctxt).cache = null_mut();
         }
         0
