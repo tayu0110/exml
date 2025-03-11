@@ -1,9 +1,7 @@
 use std::{
-    ffi::{CStr, c_void},
+    ffi::{CStr, CString, c_void},
     ptr::null_mut,
 };
-
-use libc::memcpy;
 
 use crate::{
     generic_error,
@@ -11,8 +9,8 @@ use crate::{
         chvalid::{
             xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
         },
-        globals::{xml_free, xml_malloc_atomic, xml_realloc},
-        parser_internals::{XML_MAX_NAME_LENGTH, XML_MAX_NAMELEN, xml_is_letter},
+        globals::xml_free,
+        parser_internals::{XML_MAX_NAME_LENGTH, xml_is_letter},
         xmlstring::{xml_str_equal, xml_strlen, xml_strndup, xml_strstr},
     },
     xpath::{
@@ -818,8 +816,8 @@ impl XmlXPathParserContext {
                 self.next_char();
                 self.skip_blanks();
             } else {
-                let mut name: *mut u8 = null_mut();
-                let mut prefix: *mut u8 = null_mut();
+                let mut name = None;
+                let mut prefix = None;
                 let mut test: XmlXPathTestVal = XmlXPathTestVal::NodeTestNone;
                 #[cfg(not(feature = "libxml_xptr_locs"))]
                 let mut axis: Option<XmlXPathAxisVal>;
@@ -833,9 +831,8 @@ impl XmlXPathParserContext {
                     #[cfg(feature = "libxml_xptr_locs")]
                     if self.xptr != 0 {
                         name = self.parse_ncname();
-                        if !name.is_null() && xml_str_equal(name, c"range-to".as_ptr() as _) {
+                        if name.as_deref() == Some("range-to") {
                             op2 = (*self.comp).last;
-                            xml_free(name as _);
                             self.skip_blanks();
                             if self.current_char() != Some('(') {
                                 xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
@@ -864,21 +861,18 @@ impl XmlXPathParserContext {
                     if self.current_char() == Some('*') {
                         axis = Some(XmlXPathAxisVal::AxisChild);
                     } else {
-                        if name.is_null() {
+                        if name.is_none() {
                             name = self.parse_ncname();
                         }
-                        if !name.is_null() {
-                            axis = is_axis_name(
-                                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                            );
+                        if name.is_some() {
+                            axis = is_axis_name(name.as_deref().unwrap());
                             if axis.is_some() {
                                 self.skip_blanks();
                                 if self.current_char() == Some(':')
                                     && self.nth_byte(1) == Some(b':')
                                 {
                                     self.cur += 2;
-                                    xml_free(name as _);
-                                    name = null_mut();
+                                    name = None;
                                 } else {
                                     // an element name can conflict with an axis one :-\
                                     axis = Some(XmlXPathAxisVal::AxisChild);
@@ -895,22 +889,32 @@ impl XmlXPathParserContext {
                     }
 
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
-                        xml_free(name as _);
                         return;
                     }
 
-                    name =
-                        self.compile_node_test(&raw mut test, &raw mut typ, &raw mut prefix, name);
+                    match self.compile_node_test(&raw mut test, &raw mut typ, name.as_deref()) {
+                        Some((pref, local)) => {
+                            prefix = pref;
+                            name = Some(local);
+                        }
+                        None => {
+                            prefix = None;
+                            name = None;
+                        }
+                    }
                     if matches!(test, XmlXPathTestVal::NodeTestNone) {
                         return;
                     }
 
-                    if (!prefix.is_null()
-                        && !self.context.is_null()
-                        && (*self.context).flags & XML_XPATH_CHECKNS as i32 != 0)
-                        && xml_xpath_ns_lookup(self.context, prefix).is_null()
-                    {
-                        xml_xpath_err(self, XmlXPathError::XPathUndefPrefixError as i32);
+                    if let Some(prefix) = prefix.as_deref() {
+                        let prefix = CString::new(prefix).unwrap();
+                        if !self.context.is_null()
+                            && (*self.context).flags & XML_XPATH_CHECKNS as i32 != 0
+                            && xml_xpath_ns_lookup(self.context, prefix.as_ptr() as *const u8)
+                                .is_null()
+                        {
+                            xml_xpath_err(self, XmlXPathError::XPathUndefPrefixError as i32);
+                        }
                     }
                 }
 
@@ -938,7 +942,7 @@ impl XmlXPathParserContext {
                     return;
                 }
 
-                if self.add_compiled_expression(
+                self.add_compiled_expression(
                     op1,
                     (*self.comp).last,
                     XmlXPathOp::XpathOpCollect,
@@ -951,13 +955,13 @@ impl XmlXPathParserContext {
                     })) as i32,
                     test as i32,
                     typ as i32,
-                    prefix as _,
-                    name as _,
-                ) == -1
-                {
-                    xml_free(prefix as _);
-                    xml_free(name as _);
-                }
+                    prefix.map_or(null_mut(), |prefix| {
+                        xml_strndup(prefix.as_ptr(), prefix.len() as i32) as _
+                    }),
+                    name.map_or(null_mut(), |name| {
+                        xml_strndup(name.as_ptr(), name.len() as i32) as _
+                    }),
+                );
             }
         }
     }
@@ -982,33 +986,31 @@ impl XmlXPathParserContext {
         &mut self,
         test: *mut XmlXPathTestVal,
         typ: *mut XmlXPathTypeVal,
-        prefix: *mut *mut u8,
-        mut name: *mut u8,
-    ) -> *mut u8 {
+        name: Option<&str>,
+    ) -> Option<(Option<String>, String)> {
         unsafe {
-            if test.is_null() || typ.is_null() || prefix.is_null() {
+            if test.is_null() || typ.is_null() {
                 generic_error!("Internal error at {}:{}\n", file!(), line!());
-                return null_mut();
+                return None;
             }
             *typ = XmlXPathTypeVal::NodeTypeNode;
             *test = XmlXPathTestVal::NodeTestNone;
-            *prefix = null_mut();
             self.skip_blanks();
 
-            if name.is_null() && self.current_char() == Some('*') {
+            if name.is_none() && self.current_char() == Some('*') {
                 // All elements
                 self.next_char();
                 *test = XmlXPathTestVal::NodeTestAll;
-                return null_mut();
+                return None;
             }
 
-            if name.is_null() {
-                name = self.parse_ncname();
-            }
-            if name.is_null() {
+            let Some(mut name) = name
+                .map(|name| name.to_owned())
+                .or_else(|| self.parse_ncname())
+            else {
                 xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
-                return null_mut();
-            }
+                return None;
+            };
 
             let blanks: i32 = self
                 .current_char()
@@ -1017,52 +1019,45 @@ impl XmlXPathParserContext {
             if self.current_char() == Some('(') {
                 self.next_char();
                 // NodeType or PI search
-                if xml_str_equal(name, c"comment".as_ptr() as _) {
+                if name == "comment" {
                     *typ = XmlXPathTypeVal::NodeTypeComment;
-                } else if xml_str_equal(name, c"node".as_ptr() as _) {
+                } else if name == "node" {
                     *typ = XmlXPathTypeVal::NodeTypeNode;
-                } else if xml_str_equal(name, c"processing-instruction".as_ptr() as _) {
+                } else if name == "processing-instruction" {
                     *typ = XmlXPathTypeVal::NodeTypePI;
-                } else if xml_str_equal(name, c"text".as_ptr() as _) {
+                } else if name == "text" {
                     *typ = XmlXPathTypeVal::NodeTypeText;
                 } else {
-                    if !name.is_null() {
-                        xml_free(name as _);
-                    }
                     xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
-                    return null_mut();
+                    return None;
                 }
 
                 *test = XmlXPathTestVal::NodeTestType;
 
                 self.skip_blanks();
+                let mut name = Some(name);
                 if matches!(*typ, XmlXPathTypeVal::NodeTypePI) {
                     // Specific case: search a PI by name.
-                    if !name.is_null() {
-                        xml_free(name as _);
-                    }
-                    name = null_mut();
+                    name = None;
                     if self.current_char() != Some(')') {
                         let Some(lit) = self.parse_literal() else {
                             xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
-                            return null_mut();
+                            return None;
                         };
-                        name = xml_strndup(lit.as_ptr(), lit.len() as i32);
+                        name = Some(lit);
                         *test = XmlXPathTestVal::NodeTestPI;
                         self.skip_blanks();
                     }
                 }
                 if self.current_char() != Some(')') {
-                    if !name.is_null() {
-                        xml_free(name as _);
-                    }
                     xml_xpath_err(self, XmlXPathError::XPathUnclosedError as i32);
-                    return null_mut();
+                    return None;
                 }
                 self.next_char();
-                return name;
+                return name.map(|name| (None, name));
             }
             *test = XmlXPathTestVal::NodeTestName;
+            let mut prefix = None;
             if blanks == 0 && self.current_char() == Some(':') {
                 self.next_char();
 
@@ -1080,23 +1075,23 @@ impl XmlXPathParserContext {
                 // 	    XP_ERROR0!(ctxt, XmlXPathError::XPATH_UNDEF_PREFIX_ERROR as i32);
                 // 	}
                 // #else
-                *prefix = name;
+                prefix = Some(name);
                 // #endif
 
                 if self.current_char() == Some('*') {
                     // All elements
                     self.next_char();
                     *test = XmlXPathTestVal::NodeTestAll;
-                    return null_mut();
+                    return None;
                 }
 
-                name = self.parse_ncname();
-                if name.is_null() {
+                let Some(ncname) = self.parse_ncname() else {
                     xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
-                    return null_mut();
-                }
+                    return None;
+                };
+                name = ncname;
             }
-            name
+            Some((prefix, name))
         }
     }
 
@@ -1347,21 +1342,16 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathCompFunctionCall")]
     unsafe fn compile_function_call(&mut self) {
         unsafe {
-            let mut prefix: *mut u8 = null_mut();
             let mut nbargs: i32 = 0;
             let mut sort: i32 = 1;
 
-            let name: *mut u8 = self.parse_qname(&raw mut prefix);
-            if name.is_null() {
-                xml_free(prefix as _);
+            let Some((prefix, name)) = self.parse_qname() else {
                 xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
                 return;
-            }
+            };
             self.skip_blanks();
 
             if self.current_char() != Some('(') {
-                xml_free(name as _);
-                xml_free(prefix as _);
                 xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
                 return;
             }
@@ -1369,10 +1359,7 @@ impl XmlXPathParserContext {
             self.skip_blanks();
 
             // Optimization for count(): we don't need the node-set to be sorted.
-            if prefix.is_null()
-                && *name.add(0) == b'c'
-                && xml_str_equal(name, c"count".as_ptr() as _)
-            {
+            if prefix.is_none() && name.starts_with('c') && name == "count" {
                 sort = 0;
             }
             (*self.comp).last = -1;
@@ -1382,8 +1369,6 @@ impl XmlXPathParserContext {
                     (*self.comp).last = -1;
                     self.compile_expr(sort);
                     if self.error != XmlXPathError::XPathExpressionOK as i32 {
-                        xml_free(name as _);
-                        xml_free(prefix as _);
                         return;
                     }
                     self.add_compiled_expression(
@@ -1401,8 +1386,6 @@ impl XmlXPathParserContext {
                         break;
                     }
                     if self.current_char() != Some(',') {
-                        xml_free(name as _);
-                        xml_free(prefix as _);
                         xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
                         return;
                     }
@@ -1410,20 +1393,18 @@ impl XmlXPathParserContext {
                     self.skip_blanks();
                 }
             }
-            if self.add_compiled_expression(
+            self.add_compiled_expression(
                 (*self.comp).last,
                 -1,
                 XmlXPathOp::XpathOpFunction,
                 nbargs,
                 0_i32,
                 0_i32,
-                name as _,
-                prefix as _,
-            ) == -1
-            {
-                xml_free(prefix as _);
-                xml_free(name as _);
-            }
+                xml_strndup(name.as_ptr(), name.len() as i32) as _,
+                prefix.map_or(null_mut(), |prefix| {
+                    xml_strndup(prefix.as_ptr(), prefix.len() as i32) as _
+                }),
+            );
             self.next_char();
             self.skip_blanks();
         }
@@ -1514,35 +1495,29 @@ impl XmlXPathParserContext {
     #[doc(alias = "xmlXPathCompVariableReference")]
     unsafe fn compile_variable_reference(&mut self) {
         unsafe {
-            let mut prefix: *mut u8 = null_mut();
-
             self.skip_blanks();
             if self.current_char() != Some('$') {
                 xml_xpath_err(self, XmlXPathError::XPathVariableRefError as i32);
                 return;
             }
             self.next_char();
-            let name: *mut u8 = self.parse_qname(&raw mut prefix);
-            if name.is_null() {
-                xml_free(prefix as _);
+            let Some((prefix, name)) = self.parse_qname() else {
                 xml_xpath_err(self, XmlXPathError::XPathVariableRefError as i32);
                 return;
-            }
+            };
             (*self.comp).last = -1;
-            if self.add_compiled_expression(
+            self.add_compiled_expression(
                 (*self.comp).last,
                 -1,
                 XmlXPathOp::XpathOpVariable,
                 0_i32,
                 0_i32,
                 0_i32,
-                name as _,
-                prefix as _,
-            ) == -1
-            {
-                xml_free(prefix as _);
-                xml_free(name as _);
-            }
+                xml_strndup(name.as_ptr(), name.len() as i32) as _,
+                prefix.map_or(null_mut(), |prefix| {
+                    xml_strndup(prefix.as_ptr(), prefix.len() as i32) as _
+                }),
+            );
             self.skip_blanks();
             if !self.context.is_null() && (*self.context).flags & XML_XPATH_NOVAR as i32 != 0 {
                 xml_xpath_err(self, XmlXPathError::XPathForbidVariableError as i32);
@@ -1613,126 +1588,66 @@ impl XmlXPathParserContext {
     ///
     /// Returns the namespace name or NULL
     #[doc(alias = "xmlXPathParseName")]
-    pub unsafe fn parse_name(&mut self) -> *mut u8 {
-        unsafe {
-            let ret: *mut u8;
-
-            // Accelerator for simple ASCII names
-            let input = self.current_str();
-            if let Some(mut input) =
-                input.strip_prefix(|c: char| c.is_ascii_alphabetic() || c == '_' || c == ':')
-            {
-                input = input.trim_start_matches(|c: char| {
-                    c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ':' || c == '.'
-                });
-                if input.starts_with(|b| b <= '\x7F') {
-                    let count = self.current_str().len() - input.len();
-                    if count > XML_MAX_NAME_LENGTH {
-                        self.cur += count;
-                        xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
-                        return null_mut();
-                    }
-                    ret = xml_strndup(self.current_str().as_ptr(), count as i32);
+    pub fn parse_name(&mut self) -> Option<String> {
+        // Accelerator for simple ASCII names
+        let input = self.current_str();
+        if let Some(mut input) =
+            input.strip_prefix(|c: char| c.is_ascii_alphabetic() || c == '_' || c == ':')
+        {
+            input = input.trim_start_matches(|c: char| {
+                c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ':' || c == '.'
+            });
+            if input.starts_with(|b| b <= '\x7F') {
+                let count = self.current_str().len() - input.len();
+                if count > XML_MAX_NAME_LENGTH {
                     self.cur += count;
-                    return ret;
+                    unsafe {
+                        xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
+                    }
+                    return None;
                 }
+                let ret = self.current_str()[..count].to_owned();
+                self.cur += count;
+                return Some(ret);
             }
-            self.parse_name_complex(1)
         }
+        self.parse_name_complex(1)
     }
 
     #[doc(alias = "xmlXPathParseNameComplex")]
-    unsafe fn parse_name_complex(&mut self, qualified: i32) -> *mut u8 {
-        unsafe {
-            let mut buf: [u8; XML_MAX_NAMELEN + 5] = [0; XML_MAX_NAMELEN + 5];
-            let mut len: i32 = 0;
-
-            // Handler for more complex cases
-            let Some(mut c) = self.current_char() else {
-                return null_mut();
-            };
-            if c == ' '
-                || c == '>'
-                || c == '/'
-                || c == '['
-                || c == ']'
-                || c == '@'
-                || c == '*'
-                || (!xml_is_letter(c as u32) && c != '_' && (qualified == 0 || c != ':'))
-            {
-                return null_mut();
-            }
-
-            while c != ' '
-                && c != '>'
-                && c != '/'
-                && (xml_is_letter(c as u32)
-                    || xml_is_digit(c as u32)
-                    || c == '.'
-                    || c == '-'
-                    || c == '_'
-                    || (qualified != 0 && c == ':')
-                    || xml_is_combining(c as u32)
-                    || xml_is_extender(c as u32))
-            {
-                let l = c.len_utf8() as i32;
-                COPY_BUF!(l, buf.as_mut_ptr(), len, c);
-                self.next_char();
-                c = self.current_char().unwrap_or('\0');
-                if len >= XML_MAX_NAMELEN as i32 {
-                    // Okay someone managed to make a huge name, so he's ready to pay
-                    // for the processing speed.
-                    let mut buffer: *mut u8;
-                    let mut max: i32 = len * 2;
-
-                    if len > XML_MAX_NAME_LENGTH as i32 {
-                        xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
-                        return null_mut();
-                    }
-                    buffer = xml_malloc_atomic(max as usize) as *mut u8;
-                    if buffer.is_null() {
-                        xml_xpath_err(self, XmlXPathError::XPathMemoryError as i32);
-                        return null_mut();
-                    }
-                    memcpy(buffer as _, buf.as_ptr() as _, len as usize);
-                    while xml_is_letter(c as u32)
-                        || xml_is_digit(c as u32)
-                        || c == '.'
-                        || c == '-'
-                        || c == '_'
-                        || (qualified != 0 && c == ':')
-                        || xml_is_combining(c as u32)
-                        || xml_is_extender(c as u32)
-                    {
-                        if len + 10 > max {
-                            if max > XML_MAX_NAME_LENGTH as i32 {
-                                xml_free(buffer as _);
-                                xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
-                                return null_mut();
-                            }
-                            max *= 2;
-                            let tmp: *mut u8 = xml_realloc(buffer as _, max as usize) as *mut u8;
-                            if tmp.is_null() {
-                                xml_free(buffer as _);
-                                xml_xpath_err(self, XmlXPathError::XPathMemoryError as i32);
-                                return null_mut();
-                            }
-                            buffer = tmp;
-                        }
-                        let l = c.len_utf8() as i32;
-                        COPY_BUF!(l, buffer, len, c);
-                        self.next_char();
-                        c = self.current_char().unwrap_or('\0');
-                    }
-                    *buffer.add(len as usize) = 0;
-                    return buffer;
-                }
-            }
-            if len == 0 {
-                return null_mut();
-            }
-            xml_strndup(buf.as_ptr() as _, len)
+    fn parse_name_complex(&mut self, qualified: i32) -> Option<String> {
+        // Handler for more complex cases
+        let mut c = self.current_char()?;
+        if c == ' '
+            || c == '>'
+            || c == '/'
+            || c == '['
+            || c == ']'
+            || c == '@'
+            || c == '*'
+            || (!xml_is_letter(c as u32) && c != '_' && (qualified == 0 || c != ':'))
+        {
+            return None;
         }
+
+        let mut buf = String::with_capacity(XML_MAX_NAME_LENGTH);
+        while c != ' '
+            && c != '>'
+            && c != '/'
+            && (xml_is_letter(c as u32)
+                || xml_is_digit(c as u32)
+                || c == '.'
+                || c == '-'
+                || c == '_'
+                || (qualified != 0 && c == ':')
+                || xml_is_combining(c as u32)
+                || xml_is_extender(c as u32))
+        {
+            buf.push(c);
+            self.next_char();
+            c = self.current_char().unwrap_or('\0');
+        }
+        (!buf.is_empty()).then_some(buf)
     }
 
     /// Parse an XML namespace non qualified name.
@@ -1745,39 +1660,33 @@ impl XmlXPathParserContext {
     ///
     /// Returns the namespace name or NULL
     #[doc(alias = "xmlXPathParseNCName")]
-    pub unsafe fn parse_ncname(&mut self) -> *mut u8 {
-        unsafe {
-            let ret: *mut u8;
-
-            // Accelerator for simple ASCII names
-            let input = self.current_str();
-            if let Some(mut input) =
-                input.strip_prefix(|c: char| c.is_ascii_alphabetic() || c == '_')
-            {
-                input = input.trim_start_matches(|c: char| {
-                    c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-'
-                });
-                if input.starts_with(|c: char| {
-                    c == ' '
-                        || c == '>'
-                        || c == '/'
-                        || c == '['
-                        || c == ']'
-                        || c == ':'
-                        || c == '@'
-                        || c == '*'
-                }) {
-                    let count = self.current_str().len() - input.len();
-                    if count == 0 {
-                        return null_mut();
-                    }
-                    ret = xml_strndup(self.current_str().as_ptr(), count as i32);
-                    self.cur += count;
-                    return ret;
+    pub fn parse_ncname(&mut self) -> Option<String> {
+        // Accelerator for simple ASCII names
+        let input = self.current_str();
+        if let Some(mut input) = input.strip_prefix(|c: char| c.is_ascii_alphabetic() || c == '_') {
+            input = input.trim_start_matches(|c: char| {
+                c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-'
+            });
+            if input.starts_with(|c: char| {
+                c == ' '
+                    || c == '>'
+                    || c == '/'
+                    || c == '['
+                    || c == ']'
+                    || c == ':'
+                    || c == '@'
+                    || c == '*'
+            }) {
+                let count = self.current_str().len() - input.len();
+                if count == 0 {
+                    return None;
                 }
+                let ret = self.current_str()[..count].to_owned();
+                self.cur += count;
+                return Some(ret);
             }
-            self.parse_name_complex(0)
         }
+        self.parse_name_complex(0)
     }
 
     /// parse an XML qualified name
@@ -1793,18 +1702,13 @@ impl XmlXPathParserContext {
     /// Returns the function returns the local part, and prefix is updated
     /// to get the Prefix if any.
     #[doc(alias = "xmlXPathParseQName")]
-    unsafe fn parse_qname(&mut self, prefix: *mut *mut u8) -> *mut u8 {
-        unsafe {
-            let mut ret: *mut u8;
-
-            *prefix = null_mut();
-            ret = self.parse_ncname();
-            if !ret.is_null() && self.current_char() == Some(':') {
-                *prefix = ret;
-                self.next_char();
-                ret = self.parse_ncname();
-            }
-            ret
+    fn parse_qname(&mut self) -> Option<(Option<String>, String)> {
+        let ret = self.parse_ncname()?;
+        if self.current_char() == Some(':') {
+            self.next_char();
+            Some((Some(ret), self.parse_ncname()?))
+        } else {
+            Some((None, ret))
         }
     }
 
