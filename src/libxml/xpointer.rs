@@ -51,7 +51,7 @@ use crate::{
     libxml::xmlstring::xml_strchr,
     xpath::{
         XmlXPathObject,
-        internals::{xml_xpath_err, xml_xpath_evaluate_predicate_result, xml_xpath_register_func},
+        internals::{xml_xpath_err, xml_xpath_evaluate_predicate_result},
         xml_xpath_cmp_nodes, xml_xpath_object_copy,
     },
 };
@@ -2013,27 +2013,14 @@ pub unsafe fn xml_xptr_new_context(
             (*ret).xptr = 1;
             (*ret).here = here;
             (*ret).origin = origin;
-
-            xml_xpath_register_func(ret, c"range".as_ptr() as _, xml_xptr_range_function);
-            xml_xpath_register_func(
-                ret,
-                c"range-inside".as_ptr() as _,
-                xml_xptr_range_inside_function,
-            );
-            xml_xpath_register_func(
-                ret,
-                c"string-range".as_ptr() as _,
-                xml_xptr_string_range_function,
-            );
-            xml_xpath_register_func(
-                ret,
-                c"start-point".as_ptr() as _,
-                xml_xptr_start_point_function,
-            );
-            xml_xpath_register_func(ret, c"end-point".as_ptr() as _, xml_xptr_end_point_function);
-            xml_xpath_register_func(ret, c"here".as_ptr() as _, xml_xptr_here_function);
-            xml_xpath_register_func(ret, c" origin".as_ptr() as _, xml_xptr_origin_function);
         }
+        (*ret).register_function("range".into(), Some(xml_xptr_range_function));
+        (*ret).register_function("range-inside".into(), Some(xml_xptr_range_inside_function));
+        (*ret).register_function("string-range".into(), Some(xml_xptr_string_range_function));
+        (*ret).register_function("start-point".into(), Some(xml_xptr_start_point_function));
+        (*ret).register_function("end-point".into(), Some(xml_xptr_end_point_function));
+        (*ret).register_function("here".into(), Some(xml_xptr_here_function));
+        (*ret).register_function("origin".into(), Some(xml_xptr_origin_function));
 
         ret
     }

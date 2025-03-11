@@ -27,11 +27,11 @@ use super::{
     xml_xpath_cache_new_node_set, xml_xpath_cache_object_copy, xml_xpath_cast_to_boolean,
     xml_xpath_compare_values, xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
     xml_xpath_evaluate_predicate_result, xml_xpath_free_comp_expr, xml_xpath_free_object,
-    xml_xpath_function_lookup, xml_xpath_function_lookup_ns, xml_xpath_mod_values,
-    xml_xpath_mult_values, xml_xpath_node_collect_and_test, xml_xpath_node_set_merge,
-    xml_xpath_not_equal_values, xml_xpath_ns_lookup, xml_xpath_release_object, xml_xpath_root,
-    xml_xpath_run_stream_eval, xml_xpath_sub_values, xml_xpath_try_stream_compile,
-    xml_xpath_value_flip_sign, xml_xpath_variable_lookup, xml_xpath_variable_lookup_ns,
+    xml_xpath_mod_values, xml_xpath_mult_values, xml_xpath_node_collect_and_test,
+    xml_xpath_node_set_merge, xml_xpath_not_equal_values, xml_xpath_ns_lookup,
+    xml_xpath_release_object, xml_xpath_root, xml_xpath_run_stream_eval, xml_xpath_sub_values,
+    xml_xpath_try_stream_compile, xml_xpath_value_flip_sign, xml_xpath_variable_lookup,
+    xml_xpath_variable_lookup_ns,
 };
 
 /// Swaps 2 operations in the compiled expression
@@ -491,7 +491,7 @@ impl XmlXPathParserContext {
                         let mut uri: *const u8 = null();
 
                         let f = if (*op).value5.is_null() {
-                            xml_xpath_function_lookup(self.context, (*op).value4 as _)
+                            (*self.context).lookup_function((*op).value4 as _)
                         } else {
                             uri = xml_xpath_ns_lookup(self.context, (*op).value5 as _);
                             if uri.is_null() {
@@ -503,7 +503,7 @@ impl XmlXPathParserContext {
                                 self.error = XmlXPathError::XPathUndefPrefixError as i32;
                                 break 'to_break;
                             }
-                            xml_xpath_function_lookup_ns(self.context, (*op).value4 as _, uri)
+                            (*self.context).lookup_function_ns((*op).value4 as _, uri)
                         };
                         if let Some(f) = f {
                             func = f;

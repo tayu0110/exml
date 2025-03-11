@@ -29,7 +29,12 @@
 //
 // Author: daniel@veillard.com
 
-use std::{borrow::Cow, ffi::c_void, ptr::null_mut};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    ffi::{CStr, c_void},
+    ptr::{null, null_mut},
+};
 
 use crate::{
     error::XmlError,
@@ -43,12 +48,21 @@ use super::{
     XPATH_MAX_STACK_DEPTH, XmlNodeSet, XmlXPathAxisPtr, XmlXPathCompExprPtr,
     XmlXPathContextCachePtr, XmlXPathError, XmlXPathFuncLookupFunc, XmlXPathFunction,
     XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathTypePtr, XmlXPathVariableLookupFunc,
-    xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
-    xml_xpath_context_set_cache, xml_xpath_free_cache, xml_xpath_free_comp_expr,
-    xml_xpath_free_object, xml_xpath_new_comp_expr, xml_xpath_perr_memory,
-    xml_xpath_register_all_functions, xml_xpath_registered_funcs_cleanup,
+    xml_xpath_boolean_function, xml_xpath_cast_to_boolean, xml_xpath_cast_to_number,
+    xml_xpath_cast_to_string, xml_xpath_ceiling_function, xml_xpath_concat_function,
+    xml_xpath_contains_function, xml_xpath_context_set_cache, xml_xpath_count_function,
+    xml_xpath_escape_uri_function, xml_xpath_false_function, xml_xpath_floor_function,
+    xml_xpath_free_cache, xml_xpath_free_comp_expr, xml_xpath_free_object, xml_xpath_id_function,
+    xml_xpath_lang_function, xml_xpath_last_function, xml_xpath_local_name_function,
+    xml_xpath_name_function, xml_xpath_namespace_uri_function, xml_xpath_new_comp_expr,
+    xml_xpath_normalize_function, xml_xpath_not_function, xml_xpath_number_function,
+    xml_xpath_perr_memory, xml_xpath_position_function, xml_xpath_registered_funcs_cleanup,
     xml_xpath_registered_ns_cleanup, xml_xpath_registered_variables_cleanup,
-    xml_xpath_release_object, xml_xpatherror,
+    xml_xpath_release_object, xml_xpath_round_function, xml_xpath_starts_with_function,
+    xml_xpath_string_function, xml_xpath_string_length_function,
+    xml_xpath_substring_after_function, xml_xpath_substring_before_function,
+    xml_xpath_substring_function, xml_xpath_sum_function, xml_xpath_translate_function,
+    xml_xpath_true_function, xml_xpatherror,
 };
 
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
@@ -392,7 +406,7 @@ pub struct XmlXPathContext {
     pub(crate) types: XmlXPathTypePtr,
 
     // Hash table of defined funcs
-    pub(crate) func_hash: Option<XmlHashTableRef<'static, XmlXPathFunction>>,
+    pub(crate) func_hash: HashMap<(Option<Cow<'static, str>>, Cow<'static, str>), XmlXPathFunction>,
 
     // number of defined axis
     pub(crate) nb_axis: i32,
@@ -471,6 +485,136 @@ pub struct XmlXPathContext {
     pub(crate) depth: i32,
 }
 
+impl XmlXPathContext {
+    /// Register a new function. If @f is NULL it unregisters the function
+    ///
+    /// Returns 0 in case of success, -1 in case of error
+    #[doc(alias = "xmlXPathRegisterFunc")]
+    pub fn register_function(
+        &mut self,
+        name: Cow<'static, str>,
+        f: Option<XmlXPathFunction>,
+    ) -> i32 {
+        self.register_function_ns(name, None, f)
+    }
+
+    /// Register a new function. If @f is NULL it unregisters the function
+    ///
+    /// Returns 0 in case of success, -1 in case of error
+    #[doc(alias = "xmlXPathRegisterFuncNS")]
+    pub fn register_function_ns(
+        &mut self,
+        name: Cow<'static, str>,
+        ns_uri: Option<Cow<'static, str>>,
+        f: Option<XmlXPathFunction>,
+    ) -> i32 {
+        let res = if let Some(f) = f {
+            self.func_hash.insert((ns_uri, name), f).is_some()
+        } else {
+            self.func_hash.remove(&(ns_uri, name)).is_none()
+        };
+        -(res as i32)
+    }
+
+    /// Registers all default XPath functions in this context
+    #[doc(alias = "xmlXPathRegisterAllFunctions")]
+    pub fn register_all_functions(&mut self) {
+        self.register_function("boolean".into(), Some(xml_xpath_boolean_function));
+        self.register_function("ceiling".into(), Some(xml_xpath_ceiling_function));
+        self.register_function("count".into(), Some(xml_xpath_count_function));
+        self.register_function("concat".into(), Some(xml_xpath_concat_function));
+        self.register_function("contains".into(), Some(xml_xpath_contains_function));
+        self.register_function("id".into(), Some(xml_xpath_id_function));
+        self.register_function("false".into(), Some(xml_xpath_false_function));
+        self.register_function("floor".into(), Some(xml_xpath_floor_function));
+        self.register_function("last".into(), Some(xml_xpath_last_function));
+        self.register_function("lang".into(), Some(xml_xpath_lang_function));
+        self.register_function("local-name".into(), Some(xml_xpath_local_name_function));
+        self.register_function("not".into(), Some(xml_xpath_not_function));
+        self.register_function("name".into(), Some(xml_xpath_name_function));
+        self.register_function(
+            "namespace-uri".into(),
+            Some(xml_xpath_namespace_uri_function),
+        );
+        self.register_function("normalize-space".into(), Some(xml_xpath_normalize_function));
+        self.register_function("number".into(), Some(xml_xpath_number_function));
+        self.register_function("position".into(), Some(xml_xpath_position_function));
+        self.register_function("round".into(), Some(xml_xpath_round_function));
+        self.register_function("string".into(), Some(xml_xpath_string_function));
+        self.register_function(
+            "string-length".into(),
+            Some(xml_xpath_string_length_function),
+        );
+        self.register_function("starts-with".into(), Some(xml_xpath_starts_with_function));
+        self.register_function("substring".into(), Some(xml_xpath_substring_function));
+        self.register_function(
+            "substring-before".into(),
+            Some(xml_xpath_substring_before_function),
+        );
+        self.register_function(
+            "substring-after".into(),
+            Some(xml_xpath_substring_after_function),
+        );
+        self.register_function("sum".into(), Some(xml_xpath_sum_function));
+        self.register_function("true".into(), Some(xml_xpath_true_function));
+        self.register_function("translate".into(), Some(xml_xpath_translate_function));
+
+        self.register_function_ns(
+            "escape-uri".into(),
+            Some("http://www.w3.org/2002/08/xquery-functions".into()),
+            Some(xml_xpath_escape_uri_function),
+        );
+    }
+
+    /// Search in the Function array of the context for the given function.
+    ///
+    /// Returns the xmlXPathFunction or NULL if not found
+    #[doc(alias = "xmlXPathFunctionLookup")]
+    pub unsafe fn lookup_function(&self, name: *const u8) -> Option<XmlXPathFunction> {
+        unsafe {
+            if let Some(f) = self.func_lookup_func {
+                if let Some(ret) = f(self.func_lookup_data as _, name, null()) {
+                    return Some(ret);
+                }
+            }
+            self.lookup_function_ns(name, null())
+        }
+    }
+
+    /// Search in the Function array of the context for the given function.
+    ///
+    /// Returns the xmlXPathFunction or NULL if not found
+    #[doc(alias = "xmlXPathFunctionLookupNS")]
+    pub unsafe fn lookup_function_ns(
+        &self,
+        name: *const u8,
+        ns_uri: *const u8,
+    ) -> Option<XmlXPathFunction> {
+        unsafe {
+            if name.is_null() {
+                return None;
+            }
+
+            if let Some(f) = self.func_lookup_func.as_ref() {
+                if let Some(ret) = f(self.func_lookup_data, name, ns_uri) {
+                    return Some(ret);
+                }
+            }
+
+            self.func_hash
+                .get(&(
+                    (!ns_uri.is_null())
+                        .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy()),
+                    CStr::from_ptr(name as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                        .into(),
+                ))
+                .copied()
+        }
+    }
+}
+
 impl Default for XmlXPathContext {
     fn default() -> Self {
         Self {
@@ -480,7 +624,7 @@ impl Default for XmlXPathContext {
             nb_types: 0,
             max_types: 0,
             types: null_mut(),
-            func_hash: None,
+            func_hash: HashMap::new(),
             nb_axis: 0,
             max_axis: 0,
             axis: null_mut(),
@@ -526,7 +670,7 @@ pub unsafe fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPt
         nb_types: 0,
         max_types: 0,
         types: null_mut(),
-        func_hash: XmlHashTableRef::with_capacity(0),
+        func_hash: HashMap::new(),
         nb_axis: 0,
         max_axis: 0,
         axis: null_mut(),
@@ -540,9 +684,8 @@ pub unsafe fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPt
         if xml_xpath_context_set_cache(&mut *ret, 1, -1, 0) == -1 {
             return null_mut();
         }
-
-        xml_xpath_register_all_functions(&mut *ret);
     }
+    ret.register_all_functions();
     Box::leak(ret)
 }
 

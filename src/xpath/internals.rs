@@ -61,14 +61,14 @@ use crate::{
     },
     xpath::{
         XML_XPATH_NAN, XmlXPathCompExpr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathError,
-        XmlXPathFuncLookupFunc, XmlXPathFunction, XmlXPathObject, XmlXPathObjectPtr,
-        XmlXPathObjectType, XmlXPathOp, XmlXPathParserContextPtr, XmlXPathStepOpPtr,
-        XmlXPathVariableLookupFunc, xml_xpath_cast_boolean_to_string,
-        xml_xpath_cast_node_set_to_string, xml_xpath_cast_node_to_number,
-        xml_xpath_cast_node_to_string, xml_xpath_cast_number_to_boolean,
-        xml_xpath_cast_number_to_string, xml_xpath_cast_to_boolean, xml_xpath_cast_to_number,
-        xml_xpath_cmp_nodes_ext, xml_xpath_free_node_set, xml_xpath_free_object,
-        xml_xpath_free_value_tree, xml_xpath_is_inf, xml_xpath_is_nan, xml_xpath_node_set_create,
+        XmlXPathFuncLookupFunc, XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathOp,
+        XmlXPathParserContextPtr, XmlXPathStepOpPtr, XmlXPathVariableLookupFunc,
+        xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
+        xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
+        xml_xpath_cast_number_to_boolean, xml_xpath_cast_number_to_string,
+        xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cmp_nodes_ext,
+        xml_xpath_free_node_set, xml_xpath_free_object, xml_xpath_free_value_tree,
+        xml_xpath_is_inf, xml_xpath_is_nan, xml_xpath_node_set_create,
         xml_xpath_node_set_merge_and_clear, xml_xpath_node_set_merge_and_clear_no_dupls,
         xml_xpath_object_copy,
     },
@@ -728,70 +728,6 @@ pub unsafe fn xml_xpath_registered_ns_cleanup(ctxt: XmlXPathContextPtr) {
     }
 }
 
-/// Register a new function. If @f is NULL it unregisters the function
-///
-/// Returns 0 in case of success, -1 in case of error
-#[doc(alias = "xmlXPathRegisterFunc")]
-pub unsafe fn xml_xpath_register_func(
-    ctxt: XmlXPathContextPtr,
-    name: *const XmlChar,
-    f: XmlXPathFunction,
-) -> i32 {
-    unsafe { xml_xpath_register_func_ns(ctxt, name, null(), Some(f)) }
-}
-
-/// Register a new function. If @f is NULL it unregisters the function
-///
-/// Returns 0 in case of success, -1 in case of error
-#[doc(alias = "xmlXPathRegisterFuncNS")]
-pub unsafe fn xml_xpath_register_func_ns(
-    ctxt: XmlXPathContextPtr,
-    name: *const XmlChar,
-    ns_uri: *const XmlChar,
-    f: Option<XmlXPathFunction>,
-) -> i32 {
-    unsafe {
-        if ctxt.is_null() {
-            return -1;
-        }
-        if name.is_null() {
-            return -1;
-        }
-
-        let mut func_hash = if let Some(table) = (*ctxt).func_hash {
-            table
-        } else {
-            let Some(table) = XmlHashTableRef::with_capacity(0) else {
-                return -1;
-            };
-            (*ctxt).func_hash = Some(table);
-            table
-        };
-        let res = if let Some(f) = f {
-            func_hash
-                .add_entry2(
-                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                    (!ns_uri.is_null())
-                        .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
-                        .as_deref(),
-                    f,
-                )
-                .is_err()
-        } else {
-            func_hash
-                .remove_entry2(
-                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                    (!ns_uri.is_null())
-                        .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
-                        .as_deref(),
-                    |_, _| {},
-                )
-                .is_err()
-        };
-        -(res as i32)
-    }
-}
-
 /// Register a new variable value. If @value is NULL it unregisters the variable
 ///
 /// Returns 0 in case of success, -1 in case of error
@@ -868,63 +804,6 @@ pub unsafe fn xml_xpath_register_variable_ns(
     }
 }
 
-/// Search in the Function array of the context for the given function.
-///
-/// Returns the xmlXPathFunction or NULL if not found
-#[doc(alias = "xmlXPathFunctionLookup")]
-pub unsafe fn xml_xpath_function_lookup(
-    ctxt: XmlXPathContextPtr,
-    name: *const XmlChar,
-) -> Option<XmlXPathFunction> {
-    unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
-
-        if let Some(f) = (*ctxt).func_lookup_func {
-            if let Some(ret) = f((*ctxt).func_lookup_data as _, name, null()) {
-                return Some(ret);
-            }
-        }
-        xml_xpath_function_lookup_ns(ctxt, name, null())
-    }
-}
-
-/// Search in the Function array of the context for the given function.
-///
-/// Returns the xmlXPathFunction or NULL if not found
-#[doc(alias = "xmlXPathFunctionLookupNS")]
-pub unsafe fn xml_xpath_function_lookup_ns(
-    ctxt: XmlXPathContextPtr,
-    name: *const XmlChar,
-    ns_uri: *const XmlChar,
-) -> Option<XmlXPathFunction> {
-    unsafe {
-        if ctxt.is_null() {
-            return None;
-        }
-        if name.is_null() {
-            return None;
-        }
-
-        if let Some(f) = (*ctxt).func_lookup_func.as_ref() {
-            if let Some(ret) = f((*ctxt).func_lookup_data, name, ns_uri) {
-                return Some(ret);
-            }
-        }
-
-        (*ctxt)
-            .func_hash?
-            .lookup2(
-                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                (!ns_uri.is_null())
-                    .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
-                    .as_deref(),
-            )
-            .copied()
-    }
-}
-
 /// Cleanup the XPath context data associated to registered functions
 #[doc(alias = "xmlXPathRegisteredFuncsCleanup")]
 pub unsafe fn xml_xpath_registered_funcs_cleanup(ctxt: XmlXPathContextPtr) {
@@ -933,9 +812,7 @@ pub unsafe fn xml_xpath_registered_funcs_cleanup(ctxt: XmlXPathContextPtr) {
             return;
         }
 
-        if let Some(mut func_hash) = (*ctxt).func_hash.take().map(|t| t.into_inner()) {
-            func_hash.clear();
-        }
+        (*ctxt).func_hash.clear();
     }
 }
 
@@ -3263,7 +3140,7 @@ unsafe fn xml_xpath_cache_wrap_string(
 /// defaults to the context node.
 /// Libxml keep the original prefix so the "real qualified name" used is returned.
 #[doc(alias = "xmlXPathNameFunction")]
-unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
+pub(super) unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
     unsafe {
         if nargs == 0 {
             (*ctxt).value_push(xml_xpath_cache_new_node_set(
@@ -3411,7 +3288,7 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
 ///  xf:escape-uri ("gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles#ocean"), false())
 ///  returns "gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles%23ocean"
 #[doc(alias = "xmlXPathEscapeUriFunction")]
-unsafe fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub(super) unsafe fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     unsafe {
         let mut escape: [XmlChar; 4] = [0; 4];
 
@@ -3484,83 +3361,6 @@ unsafe fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i
         }
         (*ctxt).value_push(xml_xpath_cache_new_string((*ctxt).context, Some(&target)));
         xml_xpath_release_object((*ctxt).context, str);
-    }
-}
-
-/// Registers all default XPath functions in this context
-#[doc(alias = "xmlXPathRegisterAllFunctions")]
-pub unsafe fn xml_xpath_register_all_functions(ctxt: XmlXPathContextPtr) {
-    unsafe {
-        xml_xpath_register_func(ctxt, c"boolean".as_ptr() as _, xml_xpath_boolean_function);
-        xml_xpath_register_func(ctxt, c"ceiling".as_ptr() as _, xml_xpath_ceiling_function);
-        xml_xpath_register_func(ctxt, c"count".as_ptr() as _, xml_xpath_count_function);
-        xml_xpath_register_func(ctxt, c"concat".as_ptr() as _, xml_xpath_concat_function);
-        xml_xpath_register_func(ctxt, c"contains".as_ptr() as _, xml_xpath_contains_function);
-        xml_xpath_register_func(ctxt, c"id".as_ptr() as _, xml_xpath_id_function);
-        xml_xpath_register_func(ctxt, c"false".as_ptr() as _, xml_xpath_false_function);
-        xml_xpath_register_func(ctxt, c"floor".as_ptr() as _, xml_xpath_floor_function);
-        xml_xpath_register_func(ctxt, c"last".as_ptr() as _, xml_xpath_last_function);
-        xml_xpath_register_func(ctxt, c"lang".as_ptr() as _, xml_xpath_lang_function);
-        xml_xpath_register_func(
-            ctxt,
-            c"local-name".as_ptr() as _,
-            xml_xpath_local_name_function,
-        );
-        xml_xpath_register_func(ctxt, c"not".as_ptr() as _, xml_xpath_not_function);
-        xml_xpath_register_func(ctxt, c"name".as_ptr() as _, xml_xpath_name_function);
-        xml_xpath_register_func(
-            ctxt,
-            c"namespace-uri".as_ptr() as _,
-            xml_xpath_namespace_uri_function,
-        );
-        xml_xpath_register_func(
-            ctxt,
-            c"normalize-space".as_ptr() as _,
-            xml_xpath_normalize_function,
-        );
-        xml_xpath_register_func(ctxt, c"number".as_ptr() as _, xml_xpath_number_function);
-        xml_xpath_register_func(ctxt, c"position".as_ptr() as _, xml_xpath_position_function);
-        xml_xpath_register_func(ctxt, c"round".as_ptr() as _, xml_xpath_round_function);
-        xml_xpath_register_func(ctxt, c"string".as_ptr() as _, xml_xpath_string_function);
-        xml_xpath_register_func(
-            ctxt,
-            c"string-length".as_ptr() as _,
-            xml_xpath_string_length_function,
-        );
-        xml_xpath_register_func(
-            ctxt,
-            c"starts-with".as_ptr() as _,
-            xml_xpath_starts_with_function,
-        );
-        xml_xpath_register_func(
-            ctxt,
-            c"substring".as_ptr() as _,
-            xml_xpath_substring_function,
-        );
-        xml_xpath_register_func(
-            ctxt,
-            c"substring-before".as_ptr() as _,
-            xml_xpath_substring_before_function,
-        );
-        xml_xpath_register_func(
-            ctxt,
-            c"substring-after".as_ptr() as _,
-            xml_xpath_substring_after_function,
-        );
-        xml_xpath_register_func(ctxt, c"sum".as_ptr() as _, xml_xpath_sum_function);
-        xml_xpath_register_func(ctxt, c"true".as_ptr() as _, xml_xpath_true_function);
-        xml_xpath_register_func(
-            ctxt,
-            c"translate".as_ptr() as _,
-            xml_xpath_translate_function,
-        );
-
-        xml_xpath_register_func_ns(
-            ctxt,
-            c"escape-uri".as_ptr() as _,
-            c"http://www.w3.org/2002/08/xquery-functions".as_ptr() as _,
-            Some(xml_xpath_escape_uri_function),
-        );
     }
 }
 

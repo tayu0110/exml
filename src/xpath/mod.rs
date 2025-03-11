@@ -3236,35 +3236,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_register_all_functions() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_XPATH_CONTEXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
-
-                xml_xpath_register_all_functions(ctxt);
-                des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathRegisterAllFunctions",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathRegisterAllFunctions()"
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_register_variable() {
         #[cfg(feature = "xpath")]
         unsafe {
