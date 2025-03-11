@@ -361,7 +361,7 @@ pub unsafe fn xml_xpath_free_parser_context(ctxt: XmlXPathParserContextPtr) {
 }
 
 pub type XmlXPathContextPtr = *mut XmlXPathContext;
-/// Expression evaluation occurs with respect to a context.
+/// Expression evaluation occurs with respect to a context.  
 /// he context consists of:
 ///    - a node (the context node)
 ///    - a node list (the context node list)
@@ -376,65 +376,91 @@ pub type XmlXPathContextPtr = *mut XmlXPathContext;
 #[doc(alias = "xmlXPathContext")]
 #[repr(C)]
 pub struct XmlXPathContext {
-    pub doc: Option<XmlDocPtr>,          /* The current document */
-    pub node: Option<XmlGenericNodePtr>, /* The current node */
+    // The current document
+    pub doc: Option<XmlDocPtr>,
+    // The current node
+    pub node: Option<XmlGenericNodePtr>,
 
-    pub(crate) nb_variables_unused: i32, /* unused (hash table) */
-    pub(crate) max_variables_unused: i32, /* unused (hash table) */
-    pub(crate) var_hash: Option<XmlHashTableRef<'static, XmlXPathObjectPtr>>, /* Hash table of defined variables */
+    // Hash table of defined variables
+    pub(crate) var_hash: Option<XmlHashTableRef<'static, XmlXPathObjectPtr>>,
 
-    pub(crate) nb_types: i32,          /* number of defined types */
-    pub(crate) max_types: i32,         /* max number of types */
-    pub(crate) types: XmlXPathTypePtr, /* Array of defined types */
+    // number of defined types
+    pub(crate) nb_types: i32,
+    // max number of types
+    pub(crate) max_types: i32,
+    // Array of defined types
+    pub(crate) types: XmlXPathTypePtr,
 
-    pub(crate) nb_funcs_unused: i32,  /* unused (hash table) */
-    pub(crate) max_funcs_unused: i32, /* unused (hash table) */
-    pub(crate) func_hash: Option<XmlHashTableRef<'static, XmlXPathFunction>>, /* Hash table of defined funcs */
+    // Hash table of defined funcs
+    pub(crate) func_hash: Option<XmlHashTableRef<'static, XmlXPathFunction>>,
 
-    pub(crate) nb_axis: i32,          /* number of defined axis */
-    pub(crate) max_axis: i32,         /* max number of axis */
-    pub(crate) axis: XmlXPathAxisPtr, /* Array of defined axis */
+    // number of defined axis
+    pub(crate) nb_axis: i32,
+    // max number of axis
+    pub(crate) max_axis: i32,
+    // Array of defined axis
+    pub(crate) axis: XmlXPathAxisPtr,
 
     // the namespace nodes of the context node
-    pub(crate) namespaces: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
-    pub(crate) user: *mut c_void,                 /* function to free */
+    // Array of namespaces
+    pub(crate) namespaces: Option<Vec<XmlNsPtr>>,
+    // function to free
+    pub(crate) user: *mut c_void,
 
     // extra variables
-    pub(crate) context_size: i32,       /* the context size */
-    pub(crate) proximity_position: i32, /* the proximity position */
+    // the context size
+    pub(crate) context_size: i32,
+    // the proximity position
+    pub(crate) proximity_position: i32,
 
     // extra stuff for XPointer
-    pub(crate) xptr: i32, /* is this an XPointer context? */
-    pub(crate) here: Option<XmlGenericNodePtr>, /* for here() */
-    pub(crate) origin: Option<XmlGenericNodePtr>, /* for origin() */
+    // is this an XPointer context?
+    pub(crate) xptr: i32,
+    // for here()
+    pub(crate) here: Option<XmlGenericNodePtr>,
+    // for origin()
+    pub(crate) origin: Option<XmlGenericNodePtr>,
 
     // the set of namespace declarations in scope for the expression
-    pub(crate) ns_hash: Option<XmlHashTableRef<'static, *mut u8>>, /* The namespaces hash table */
-    pub(crate) var_lookup_func: Option<XmlXPathVariableLookupFunc>, /* variable lookup func */
-    pub(crate) var_lookup_data: *mut c_void,                       /* variable lookup data */
+    // The namespaces hash table
+    pub(crate) ns_hash: Option<XmlHashTableRef<'static, *mut u8>>,
+    // variable lookup func
+    pub(crate) var_lookup_func: Option<XmlXPathVariableLookupFunc>,
+    // variable lookup data
+    pub(crate) var_lookup_data: *mut c_void,
 
     // Possibility to link in an extra item
-    pub(crate) extra: *mut c_void, /* needed for XSLT */
+    // needed for XSLT
+    pub(crate) extra: *mut c_void,
 
     // The function name and URI when calling a function
     pub(crate) function: *const u8,
     pub(crate) function_uri: *const u8,
 
     // function lookup function and data
-    pub(crate) func_lookup_func: Option<XmlXPathFuncLookupFunc>, /* function lookup func */
-    pub(crate) func_lookup_data: *mut c_void,                    /* function lookup data */
+    // function lookup func
+    pub(crate) func_lookup_func: Option<XmlXPathFuncLookupFunc>,
+    // function lookup data
+    pub(crate) func_lookup_data: *mut c_void,
 
     // temporary namespace lists kept for walking the namespace axis
-    pub(crate) tmp_ns_list: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
-    pub(crate) tmp_ns_nr: i32,                     /* number of namespaces in scope */
+    // Array of namespaces
+    pub(crate) tmp_ns_list: Option<Vec<XmlNsPtr>>,
+    // number of namespaces in scope
+    pub(crate) tmp_ns_nr: i32,
 
     // error reporting mechanism
-    pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
-    pub(crate) error: Option<StructuredError>,         /* the callback in case of errors */
-    pub(crate) last_error: XmlError,                   /* the last error */
-    pub(crate) debug_node: Option<XmlGenericNodePtr>,  /* the source node XSLT */
+    // user specific data block
+    pub(crate) user_data: Option<GenericErrorContext>,
+    // the callback in case of errors
+    pub(crate) error: Option<StructuredError>,
+    // the last error
+    pub(crate) last_error: XmlError,
+    // the source node XSLT
+    pub(crate) debug_node: Option<XmlGenericNodePtr>,
 
-    pub(crate) flags: i32, /* flags to control compilation */
+    // flags to control compilation
+    pub(crate) flags: i32,
 
     // Cache for reusal of XPath objects
     pub cache: *mut c_void,
@@ -450,14 +476,10 @@ impl Default for XmlXPathContext {
         Self {
             doc: None,
             node: None,
-            nb_variables_unused: 0,
-            max_variables_unused: 0,
             var_hash: None,
             nb_types: 0,
             max_types: 0,
             types: null_mut(),
-            nb_funcs_unused: 0,
-            max_funcs_unused: 0,
             func_hash: None,
             nb_axis: 0,
             max_axis: 0,
