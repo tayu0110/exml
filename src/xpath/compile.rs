@@ -868,7 +868,9 @@ impl XmlXPathParserContext {
                             name = self.parse_ncname();
                         }
                         if !name.is_null() {
-                            axis = is_axis_name(name);
+                            axis = is_axis_name(
+                                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                            );
                             if axis.is_some() {
                                 self.skip_blanks();
                                 if self.current_char() == Some(':')
@@ -1877,65 +1879,21 @@ impl XmlXPathParserContext {
 ///
 /// Returns the axis or 0
 #[doc(alias = "xmlXPathIsAxisName")]
-unsafe fn is_axis_name(name: *const u8) -> Option<XmlXPathAxisVal> {
-    unsafe {
-        let mut ret: Option<XmlXPathAxisVal> = None;
-        match *name.add(0) {
-            b'a' => {
-                if xml_str_equal(name, c"ancestor".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisAncestor);
-                }
-                if xml_str_equal(name, c"ancestor-or-self".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisAncestorOrSelf);
-                }
-                if xml_str_equal(name, c"attribute".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisAttribute);
-                }
-            }
-            b'c' => {
-                if xml_str_equal(name, c"child".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisChild);
-                }
-            }
-            b'd' => {
-                if xml_str_equal(name, c"descendant".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisDescendant);
-                }
-                if xml_str_equal(name, c"descendant-or-self".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisDescendantOrSelf);
-                }
-            }
-            b'f' => {
-                if xml_str_equal(name, c"following".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisFollowing);
-                }
-                if xml_str_equal(name, c"following-sibling".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisFollowingSibling);
-                }
-            }
-            b'n' => {
-                if xml_str_equal(name, c"namespace".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisNamespace);
-                }
-            }
-            b'p' => {
-                if xml_str_equal(name, c"parent".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisParent);
-                }
-                if xml_str_equal(name, c"preceding".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisPreceding);
-                }
-                if xml_str_equal(name, c"preceding-sibling".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisPrecedingSibling);
-                }
-            }
-            b's' => {
-                if xml_str_equal(name, c"self".as_ptr() as _) {
-                    ret = Some(XmlXPathAxisVal::AxisSelf);
-                }
-            }
-            _ => {}
-        }
-        ret
+fn is_axis_name(name: &str) -> Option<XmlXPathAxisVal> {
+    match name {
+        "ancestor" => Some(XmlXPathAxisVal::AxisAncestor),
+        "ancestor-or-self" => Some(XmlXPathAxisVal::AxisAncestorOrSelf),
+        "attribute" => Some(XmlXPathAxisVal::AxisAttribute),
+        "child" => Some(XmlXPathAxisVal::AxisChild),
+        "descendant" => Some(XmlXPathAxisVal::AxisDescendant),
+        "descendant-or-self" => Some(XmlXPathAxisVal::AxisDescendantOrSelf),
+        "following" => Some(XmlXPathAxisVal::AxisFollowing),
+        "following-sibling" => Some(XmlXPathAxisVal::AxisFollowingSibling),
+        "namespace" => Some(XmlXPathAxisVal::AxisNamespace),
+        "parent" => Some(XmlXPathAxisVal::AxisParent),
+        "preceding" => Some(XmlXPathAxisVal::AxisPreceding),
+        "preceding-sibling" => Some(XmlXPathAxisVal::AxisPrecedingSibling),
+        "self" => Some(XmlXPathAxisVal::AxisSelf),
+        _ => None,
     }
 }
