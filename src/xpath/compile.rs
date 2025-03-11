@@ -1043,11 +1043,11 @@ impl XmlXPathParserContext {
                     }
                     name = null_mut();
                     if self.current_char() != Some(')') {
-                        name = self.parse_literal();
-                        if name.is_null() {
+                        let Some(lit) = self.parse_literal() else {
                             xml_xpath_err(self, XmlXPathError::XPathExprError as i32);
                             return null_mut();
-                        }
+                        };
+                        name = xml_strndup(lit.as_ptr(), lit.len() as i32);
                         *test = XmlXPathTestVal::NodeTestPI;
                         self.skip_blanks();
                     }
@@ -1816,47 +1816,30 @@ impl XmlXPathParserContext {
     ///
     /// Returns the value found or NULL in case of error
     #[doc(alias = "xmlXPathParseLiteral")]
-    unsafe fn parse_literal(&mut self) -> *mut u8 {
-        unsafe {
-            let ret: *mut u8;
-
-            if self.current_char() == Some('"') {
-                self.next_char();
-                let q = self.cur;
-                while self
-                    .current_char()
-                    .is_some_and(|c| xml_is_char(c as u32) && c != '"')
-                {
-                    self.next_char();
-                }
-                if self.current_char().is_none_or(|c| !xml_is_char(c as u32)) {
-                    xml_xpath_err(self, XmlXPathError::XPathUnfinishedLiteralError as i32);
-                    return null_mut();
-                } else {
-                    ret = xml_strndup(self.base[q..].as_ptr(), self.cur as i32 - q as i32);
-                    self.next_char();
-                }
-            } else if self.current_char() == Some('\'') {
-                self.next_char();
-                let q = self.cur;
-                while self
-                    .current_char()
-                    .is_some_and(|c| xml_is_char(c as u32) && c != '\'')
-                {
-                    self.next_char();
-                }
-                if self.current_char().is_none_or(|c| !xml_is_char(c as u32)) {
-                    xml_xpath_err(self, XmlXPathError::XPathUnfinishedLiteralError as i32);
-                    return null_mut();
-                } else {
-                    ret = xml_strndup(self.base[q..].as_ptr(), self.cur as i32 - q as i32);
-                    self.next_char();
-                }
-            } else {
+    fn parse_literal(&mut self) -> Option<String> {
+        let expr = self.current_str();
+        let Some(sep) = expr.chars().next().filter(|&sep| sep == '"' || sep == '\'') else {
+            unsafe {
                 xml_xpath_err(self, XmlXPathError::XPathStartLiteralError as i32);
-                return null_mut();
             }
-            ret
+            return None;
+        };
+        let Some((lit, _)) = expr.split_once(|c: char| !xml_is_char(c as u32) || c == sep) else {
+            unsafe {
+                xml_xpath_err(self, XmlXPathError::XPathUnfinishedLiteralError as i32);
+            }
+            return None;
+        };
+        let expr = &expr[1 + lit.len()..];
+        if !expr.starts_with(sep) {
+            unsafe {
+                xml_xpath_err(self, XmlXPathError::XPathUnfinishedLiteralError as i32);
+            }
+            None
+        } else {
+            let lit = lit.to_owned();
+            self.cur += 2 + lit.len();
+            Some(lit)
         }
     }
 }
