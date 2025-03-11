@@ -32,15 +32,23 @@
 use std::{borrow::Cow, ffi::c_void, ptr::null_mut};
 
 use crate::{
+    error::XmlError,
+    globals::{GenericErrorContext, StructuredError},
+    hash::XmlHashTableRef,
     libxml::{chvalid::xml_is_blank_char, pattern::xml_free_pattern_list},
-    tree::XmlGenericNodePtr,
+    tree::{XmlDocPtr, XmlGenericNodePtr, XmlNsPtr},
 };
 
 use super::{
-    XPATH_MAX_STACK_DEPTH, XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathError,
-    XmlXPathObjectPtr, XmlXPathObjectType, xml_xpath_cast_to_boolean, xml_xpath_cast_to_number,
-    xml_xpath_cast_to_string, xml_xpath_free_comp_expr, xml_xpath_free_object,
-    xml_xpath_new_comp_expr, xml_xpath_perr_memory, xml_xpath_release_object, xml_xpatherror,
+    XPATH_MAX_STACK_DEPTH, XmlNodeSet, XmlXPathAxisPtr, XmlXPathCompExprPtr,
+    XmlXPathContextCachePtr, XmlXPathError, XmlXPathFuncLookupFunc, XmlXPathFunction,
+    XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathTypePtr, XmlXPathVariableLookupFunc,
+    xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
+    xml_xpath_context_set_cache, xml_xpath_free_cache, xml_xpath_free_comp_expr,
+    xml_xpath_free_object, xml_xpath_new_comp_expr, xml_xpath_perr_memory,
+    xml_xpath_register_all_functions, xml_xpath_registered_funcs_cleanup,
+    xml_xpath_registered_ns_cleanup, xml_xpath_registered_variables_cleanup,
+    xml_xpath_release_object, xml_xpatherror,
 };
 
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
@@ -348,6 +356,189 @@ pub unsafe fn xml_xpath_free_parser_context(ctxt: XmlXPathParserContextPtr) {
             }
             xml_xpath_free_comp_expr((*ctxt).comp);
         }
+        let _ = Box::from_raw(ctxt);
+    }
+}
+
+pub type XmlXPathContextPtr = *mut XmlXPathContext;
+/// Expression evaluation occurs with respect to a context.
+/// he context consists of:
+///    - a node (the context node)
+///    - a node list (the context node list)
+///    - a set of variable bindings
+///    - a function library
+///    - the set of namespace declarations in scope for the expression
+///      Following the switch to hash tables, this need to be trimmed up at
+///      the next binary incompatible release.
+///      The node may be modified when the context is passed to libxml2
+///      for an XPath evaluation so you may need to initialize it again
+///      before the next call.
+#[doc(alias = "xmlXPathContext")]
+#[repr(C)]
+pub struct XmlXPathContext {
+    pub doc: Option<XmlDocPtr>,          /* The current document */
+    pub node: Option<XmlGenericNodePtr>, /* The current node */
+
+    pub(crate) nb_variables_unused: i32, /* unused (hash table) */
+    pub(crate) max_variables_unused: i32, /* unused (hash table) */
+    pub(crate) var_hash: Option<XmlHashTableRef<'static, XmlXPathObjectPtr>>, /* Hash table of defined variables */
+
+    pub(crate) nb_types: i32,          /* number of defined types */
+    pub(crate) max_types: i32,         /* max number of types */
+    pub(crate) types: XmlXPathTypePtr, /* Array of defined types */
+
+    pub(crate) nb_funcs_unused: i32,  /* unused (hash table) */
+    pub(crate) max_funcs_unused: i32, /* unused (hash table) */
+    pub(crate) func_hash: Option<XmlHashTableRef<'static, XmlXPathFunction>>, /* Hash table of defined funcs */
+
+    pub(crate) nb_axis: i32,          /* number of defined axis */
+    pub(crate) max_axis: i32,         /* max number of axis */
+    pub(crate) axis: XmlXPathAxisPtr, /* Array of defined axis */
+
+    // the namespace nodes of the context node
+    pub(crate) namespaces: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
+    pub(crate) user: *mut c_void,                 /* function to free */
+
+    // extra variables
+    pub(crate) context_size: i32,       /* the context size */
+    pub(crate) proximity_position: i32, /* the proximity position */
+
+    // extra stuff for XPointer
+    pub(crate) xptr: i32, /* is this an XPointer context? */
+    pub(crate) here: Option<XmlGenericNodePtr>, /* for here() */
+    pub(crate) origin: Option<XmlGenericNodePtr>, /* for origin() */
+
+    // the set of namespace declarations in scope for the expression
+    pub(crate) ns_hash: Option<XmlHashTableRef<'static, *mut u8>>, /* The namespaces hash table */
+    pub(crate) var_lookup_func: Option<XmlXPathVariableLookupFunc>, /* variable lookup func */
+    pub(crate) var_lookup_data: *mut c_void,                       /* variable lookup data */
+
+    // Possibility to link in an extra item
+    pub(crate) extra: *mut c_void, /* needed for XSLT */
+
+    // The function name and URI when calling a function
+    pub(crate) function: *const u8,
+    pub(crate) function_uri: *const u8,
+
+    // function lookup function and data
+    pub(crate) func_lookup_func: Option<XmlXPathFuncLookupFunc>, /* function lookup func */
+    pub(crate) func_lookup_data: *mut c_void,                    /* function lookup data */
+
+    // temporary namespace lists kept for walking the namespace axis
+    pub(crate) tmp_ns_list: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
+    pub(crate) tmp_ns_nr: i32,                     /* number of namespaces in scope */
+
+    // error reporting mechanism
+    pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
+    pub(crate) error: Option<StructuredError>,         /* the callback in case of errors */
+    pub(crate) last_error: XmlError,                   /* the last error */
+    pub(crate) debug_node: Option<XmlGenericNodePtr>,  /* the source node XSLT */
+
+    pub(crate) flags: i32, /* flags to control compilation */
+
+    // Cache for reusal of XPath objects
+    pub cache: *mut c_void,
+
+    // Resource limits
+    pub(crate) op_limit: u64,
+    pub(crate) op_count: u64,
+    pub(crate) depth: i32,
+}
+
+impl Default for XmlXPathContext {
+    fn default() -> Self {
+        Self {
+            doc: None,
+            node: None,
+            nb_variables_unused: 0,
+            max_variables_unused: 0,
+            var_hash: None,
+            nb_types: 0,
+            max_types: 0,
+            types: null_mut(),
+            nb_funcs_unused: 0,
+            max_funcs_unused: 0,
+            func_hash: None,
+            nb_axis: 0,
+            max_axis: 0,
+            axis: null_mut(),
+            namespaces: None,
+            user: null_mut(),
+            context_size: 0,
+            proximity_position: 0,
+            xptr: 0,
+            here: None,
+            origin: None,
+            ns_hash: None,
+            var_lookup_func: None,
+            var_lookup_data: null_mut(),
+            extra: null_mut(),
+            function: null_mut(),
+            function_uri: null_mut(),
+            func_lookup_func: None,
+            func_lookup_data: null_mut(),
+            tmp_ns_list: None,
+            tmp_ns_nr: 0,
+            user_data: None,
+            error: None,
+            last_error: XmlError::default(),
+            debug_node: None,
+            flags: 0,
+            cache: null_mut(),
+            op_limit: 0,
+            op_count: 0,
+            depth: 0,
+        }
+    }
+}
+
+/// Create a new xmlXPathContext
+///
+/// Returns the xmlXPathContext just allocated. The caller will need to free it.
+#[doc(alias = "xmlXPathNewContext")]
+pub unsafe fn xml_xpath_new_context(doc: Option<XmlDocPtr>) -> XmlXPathContextPtr {
+    let mut ret = Box::new(XmlXPathContext {
+        doc,
+        node: None,
+        var_hash: None,
+        nb_types: 0,
+        max_types: 0,
+        types: null_mut(),
+        func_hash: XmlHashTableRef::with_capacity(0),
+        nb_axis: 0,
+        max_axis: 0,
+        axis: null_mut(),
+        ns_hash: None,
+        user: null_mut(),
+        context_size: -1,
+        proximity_position: -1,
+        ..Default::default()
+    });
+    unsafe {
+        if xml_xpath_context_set_cache(&mut *ret, 1, -1, 0) == -1 {
+            return null_mut();
+        }
+
+        xml_xpath_register_all_functions(&mut *ret);
+    }
+    Box::leak(ret)
+}
+
+/// Free up an xmlXPathContext
+#[doc(alias = "xmlXPathFreeContext")]
+pub unsafe fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
+    unsafe {
+        if ctxt.is_null() {
+            return;
+        }
+
+        if !(*ctxt).cache.is_null() {
+            xml_xpath_free_cache((*ctxt).cache as XmlXPathContextCachePtr);
+        }
+        xml_xpath_registered_ns_cleanup(ctxt);
+        xml_xpath_registered_funcs_cleanup(ctxt);
+        xml_xpath_registered_variables_cleanup(ctxt);
+        (*ctxt).last_error.reset();
         let _ = Box::from_raw(ctxt);
     }
 }
