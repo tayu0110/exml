@@ -16,16 +16,17 @@ use crate::{
     tree::{XmlGenericNodePtr, XmlNode},
     xpath::{
         XmlXPathError, XmlXPathOp, xml_xpath_location_set_filter, xml_xpath_node_set_filter,
-        xml_xpath_node_set_keep_last, xml_xpath_number_function, xml_xpath_optimize_expression,
+        xml_xpath_node_set_keep_last, xml_xpath_optimize_expression,
     },
 };
 
 use super::{
     XPATH_MAX_RECURSION_DEPTH, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathFunction,
     XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContext, XmlXPathStepOpPtr,
-    xml_xpath_add_values, xml_xpath_boolean_function, xml_xpath_cache_new_boolean,
-    xml_xpath_cache_new_node_set, xml_xpath_cache_object_copy, xml_xpath_cast_to_boolean,
-    xml_xpath_compare_values, xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
+    functions::{xml_xpath_boolean_function, xml_xpath_number_function},
+    xml_xpath_add_values, xml_xpath_cache_new_boolean, xml_xpath_cache_new_node_set,
+    xml_xpath_cache_object_copy, xml_xpath_cast_to_boolean, xml_xpath_compare_values,
+    xml_xpath_div_values, xml_xpath_equal_values, xml_xpath_err,
     xml_xpath_evaluate_predicate_result, xml_xpath_free_comp_expr, xml_xpath_free_object,
     xml_xpath_mod_values, xml_xpath_mult_values, xml_xpath_node_collect_and_test,
     xml_xpath_node_set_merge, xml_xpath_not_equal_values, xml_xpath_ns_lookup,
@@ -302,15 +303,13 @@ impl XmlXPathParserContext {
                             && (*self.value).typ != XmlXPathObjectType::XPathNumber
                         {
                             xml_xpath_number_function(self, 1);
-                        };
+                        }
                         if self.value.is_null()
                             || (*self.value).typ != (XmlXPathObjectType::XPathNumber)
                         {
-                            {
-                                xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
-                                return 0;
-                            }
-                        };
+                            xml_xpath_err(self, XmlXPathError::XPathInvalidType as i32);
+                            return 0;
+                        }
                     }
                 }
                 XmlXPathOp::XPathOpMult => {
@@ -531,7 +530,7 @@ impl XmlXPathParserContext {
                     let old_func_uri: *const u8 = (*self.context).function_uri;
                     (*self.context).function = (*op).value4 as _;
                     (*self.context).function_uri = (*op).cache_uri as _;
-                    func(self, (*op).value);
+                    func(self, (*op).value as usize);
                     (*self.context).function = old_func;
                     (*self.context).function_uri = old_func_uri;
                     if self.error == XmlXPathError::XPathExpressionOK as i32

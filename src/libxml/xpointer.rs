@@ -43,17 +43,9 @@ use std::{
 use libc::c_void;
 
 #[cfg(feature = "libxml_xptr_locs")]
-use crate::xpath::XmlNodeSet;
-use crate::xpath::{xml_xpath_free_parser_context, xml_xpath_new_parser_context};
-#[cfg(feature = "libxml_xptr_locs")]
-use crate::{
-    CHECK_ARITY,
-    libxml::xmlstring::xml_strchr,
-    xpath::{
-        XmlXPathObject,
-        internals::{xml_xpath_err, xml_xpath_evaluate_predicate_result},
-        xml_xpath_cmp_nodes, xml_xpath_object_copy,
-    },
+use crate::xpath::{XmlNodeSet, XmlXPathParserContext, functions::check_arity};
+use crate::xpath::{
+    functions::xml_xpath_id_function, xml_xpath_free_parser_context, xml_xpath_new_parser_context,
 };
 use crate::{
     CHECK_ERROR, CHECK_TYPE, XP_ERROR,
@@ -67,8 +59,17 @@ use crate::{
     xpath::{
         XmlXPathContextPtr, XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType,
         XmlXPathParserContextPtr,
-        internals::{xml_xpath_id_function, xml_xpath_register_ns, xml_xpath_root},
+        internals::{xml_xpath_register_ns, xml_xpath_root},
         xml_xpath_free_object, xml_xpath_new_context, xml_xpath_new_node_set, xml_xpath_new_string,
+    },
+};
+#[cfg(feature = "libxml_xptr_locs")]
+use crate::{
+    libxml::xmlstring::xml_strchr,
+    xpath::{
+        XmlXPathObject,
+        internals::{xml_xpath_err, xml_xpath_evaluate_predicate_result},
+        xml_xpath_cmp_nodes, xml_xpath_object_copy,
     },
 };
 
@@ -796,21 +797,21 @@ unsafe fn xml_xptr_covering_range(
 ///  x is added to the result location-set.
 #[doc(alias = "xmlXPtrRangeFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
         let mut set: XmlXPathObjectPtr;
 
-        CHECK_ARITY!(ctxt, nargs, 1);
-        if (*ctxt).value.is_null()
+        check_arity(ctxt, nargs, 1);
+        if ctxt.value.is_null()
             || !matches!(
-                (*(*ctxt).value).typ,
+                (*ctxt.value).typ,
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
         {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
 
-        set = (*ctxt).value_pop();
+        set = ctxt.value_pop();
         if (*set).typ == XmlXPathObjectType::XPathNodeset {
             // First convert to a location set
             let tmp: XmlXPathObjectPtr =
@@ -836,7 +837,7 @@ unsafe fn xml_xptr_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
         }
 
         // Save the new value and cleanup
-        (*ctxt).value_push(xml_xptr_wrap_location_set(newset));
+        ctxt.value_push(xml_xptr_wrap_location_set(newset));
         xml_xpath_free_object(set);
     }
 }
@@ -954,21 +955,21 @@ unsafe fn xml_xptr_inside_range(
 ///  location children of x.
 #[doc(alias = "xmlXPtrRangeInsideFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_range_inside_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_range_inside_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
         let mut set: XmlXPathObjectPtr;
 
-        CHECK_ARITY!(ctxt, nargs, 1);
-        if (*ctxt).value.is_null()
+        check_arity(ctxt, nargs, 1);
+        if ctxt.value.is_null()
             || !matches!(
-                (*(*ctxt).value).typ,
+                (*ctxt.value).typ,
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
         {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
 
-        set = (*ctxt).value_pop();
+        set = ctxt.value_pop();
         if (*set).typ == XmlXPathObjectType::XPathNodeset {
             // First convert to a location set
             let tmp: XmlXPathObjectPtr =
@@ -1510,7 +1511,7 @@ unsafe fn xml_xptr_search_string(
 /// ------------------------------
 #[doc(alias = "xmlXPtrStringRangeFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_string_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
         let mut startindex = 0usize;
         let mut endindex = 0usize;
@@ -1535,40 +1536,36 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
 
         'goto_error: {
             if nargs >= 4 {
-                if (*ctxt).value.is_null()
-                    || (*(*ctxt).value).typ != XmlXPathObjectType::XPathNumber
-                {
+                if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathNumber {
                     xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
                     // goto error;
                     break 'goto_error;
                 }
-                number = (*ctxt).value_pop();
+                number = ctxt.value_pop();
                 if !number.is_null() {
                     num = (*number).floatval as i32;
                 }
             }
             if nargs >= 3 {
-                if (*ctxt).value.is_null()
-                    || (*(*ctxt).value).typ != XmlXPathObjectType::XPathNumber
-                {
+                if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathNumber {
                     xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
                     // goto error;
                     break 'goto_error;
                 }
-                position = (*ctxt).value_pop();
+                position = ctxt.value_pop();
                 if !position.is_null() {
                     pos = (*position).floatval as i32;
                 }
             }
-            if (*ctxt).value.is_null() || (*(*ctxt).value).typ != XmlXPathObjectType::XPathString {
+            if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathString {
                 xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
                 // goto error;
                 break 'goto_error;
             }
-            string = (*ctxt).value_pop();
-            if (*ctxt).value.is_null()
+            string = ctxt.value_pop();
+            if ctxt.value.is_null()
                 || !matches!(
-                    (*(*ctxt).value).typ,
+                    (*ctxt.value).typ,
                     XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
                 )
             {
@@ -1576,7 +1573,7 @@ unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: 
                 // goto error;
                 break 'goto_error;
             }
-            set = (*ctxt).value_pop();
+            set = ctxt.value_pop();
             newset = xml_xptr_location_set_create(null_mut());
             if newset.is_null() {
                 xml_xpath_err(ctxt, XmlXPathError::XPathMemoryError as i32);
@@ -1742,22 +1739,22 @@ unsafe fn xml_xptr_new_point(node: XmlGenericNodePtr, indx: i32) -> XmlXPathObje
 /// ----------------
 #[doc(alias = "xmlXPtrStartPointFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_start_point_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
         let mut obj: XmlXPathObjectPtr;
         let mut point: XmlXPathObjectPtr;
 
-        CHECK_ARITY!(ctxt, nargs, 1);
-        if (*ctxt).value.is_null()
+        check_arity(ctxt, nargs, 1);
+        if ctxt.value.is_null()
             || !matches!(
-                (*(*ctxt).value).typ,
+                (*ctxt.value).typ,
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
         {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
 
-        obj = (*ctxt).value_pop();
+        obj = ctxt.value_pop();
         if (*obj).typ == XmlXPathObjectType::XPathNodeset {
             // First convert to a location set
             let tmp = xml_xptr_new_location_set_node_set((*obj).nodesetval.as_deref());
@@ -1881,22 +1878,22 @@ unsafe fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPtr, nargs: i
 /// ----------------------------
 #[doc(alias = "xmlXPtrEndPointFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
         let mut obj: XmlXPathObjectPtr;
         let mut point: XmlXPathObjectPtr;
 
-        CHECK_ARITY!(ctxt, nargs, 1);
-        if (*ctxt).value.is_null()
+        check_arity(ctxt, nargs, 1);
+        if ctxt.value.is_null()
             || !matches!(
-                (*(*ctxt).value).typ,
+                (*ctxt.value).typ,
                 XmlXPathObjectType::XPathLocationset | XmlXPathObjectType::XPathNodeset
             )
         {
             XP_ERROR!(ctxt, XmlXPathError::XPathInvalidType as i32);
         }
 
-        obj = (*ctxt).value_pop();
+        obj = ctxt.value_pop();
         if (*obj).typ == XmlXPathObjectType::XPathNodeset {
             // First convert to a location set
             let tmp = xml_xptr_new_location_set_node_set((*obj).nodesetval.as_deref());
@@ -1964,11 +1961,11 @@ unsafe fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32
 /// Function implementing here() operation as described in 5.4.3
 #[doc(alias = "xmlXPtrHereFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_here_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        CHECK_ARITY!(ctxt, nargs, 0);
+        check_arity(ctxt, nargs, 0);
 
-        let Some(here) = (*(*ctxt).context).here else {
+        let Some(here) = (*ctxt.context).here else {
             XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
         };
 
@@ -1980,11 +1977,11 @@ unsafe fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
 /// as described in 5.4.3
 #[doc(alias = "xmlXPtrOriginFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xptr_origin_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_origin_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        CHECK_ARITY!(ctxt, nargs, 0);
+        check_arity(ctxt, nargs, 0);
 
-        let Some(origin) = (*(*ctxt).context).origin else {
+        let Some(origin) = (*ctxt.context).origin else {
             XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
         };
 
@@ -2148,7 +2145,7 @@ unsafe fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: Option<&
 
         if let Some(name) = name {
             (*ctxt).value_push(xml_xpath_new_string(Some(name)));
-            xml_xpath_id_function(ctxt, 1);
+            xml_xpath_id_function(&mut *ctxt, 1);
             CHECK_ERROR!(ctxt);
         }
 
