@@ -801,7 +801,9 @@ unsafe fn xml_xptr_range_function(ctxt: &mut XmlXPathParserContext, nargs: usize
     unsafe {
         let mut set: XmlXPathObjectPtr;
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         if ctxt.value.is_null()
             || !matches!(
                 (*ctxt.value).typ,
@@ -959,7 +961,9 @@ unsafe fn xml_xptr_range_inside_function(ctxt: &mut XmlXPathParserContext, nargs
     unsafe {
         let mut set: XmlXPathObjectPtr;
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         if ctxt.value.is_null()
             || !matches!(
                 (*ctxt.value).typ,
@@ -1744,7 +1748,9 @@ unsafe fn xml_xptr_start_point_function(ctxt: &mut XmlXPathParserContext, nargs:
         let mut obj: XmlXPathObjectPtr;
         let mut point: XmlXPathObjectPtr;
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         if ctxt.value.is_null()
             || !matches!(
                 (*ctxt.value).typ,
@@ -1883,7 +1889,9 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
         let mut obj: XmlXPathObjectPtr;
         let mut point: XmlXPathObjectPtr;
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         if ctxt.value.is_null()
             || !matches!(
                 (*ctxt.value).typ,
@@ -1963,7 +1971,9 @@ unsafe fn xml_xptr_end_point_function(ctxt: &mut XmlXPathParserContext, nargs: u
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_here_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 0);
+        if check_arity(ctxt, nargs, 0).is_err() {
+            return;
+        }
 
         let Some(here) = (*ctxt.context).here else {
             XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);
@@ -1979,7 +1989,9 @@ unsafe fn xml_xptr_here_function(ctxt: &mut XmlXPathParserContext, nargs: usize)
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe fn xml_xptr_origin_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 0);
+        if check_arity(ctxt, nargs, 0).is_err() {
+            return;
+        }
 
         let Some(origin) = (*ctxt.context).origin else {
             XP_ERROR!(ctxt, XmlXPathError::XPtrSyntaxError as i32);

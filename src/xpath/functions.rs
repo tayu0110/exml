@@ -25,18 +25,24 @@ use super::{
 
 /// Macro to check that the number of args passed to an XPath function matches.
 #[doc(alias = "CHECK_ARITY")]
-pub(crate) fn check_arity(ctxt: &mut XmlXPathParserContext, nargs: usize, x: usize) {
+pub(crate) fn check_arity(
+    ctxt: &mut XmlXPathParserContext,
+    nargs: usize,
+    x: usize,
+) -> Result<(), XmlXPathError> {
     if nargs != x {
         unsafe {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidArity as i32);
         }
-        return;
+        return Err(XmlXPathError::XPathInvalidArity);
     }
     if (ctxt.value_tab.len() as i32) < ctxt.value_frame + x as i32 {
         unsafe {
             xml_xpath_err(ctxt, XmlXPathError::XPathStackError as i32);
         }
+        return Err(XmlXPathError::XPathInvalidArity);
     }
+    Ok(())
 }
 
 /// Macro to try to cast the value on the top of the XPath stack to a number.
@@ -79,7 +85,9 @@ pub(super) unsafe fn cast_to_boolean(ctxt: &mut XmlXPathParserContext) {
 #[doc(alias = "xmlXPathBooleanFunction")]
 pub unsafe fn xml_xpath_boolean_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         let cur = ctxt.value_pop();
         if cur.is_null() {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidOperand as i32);
@@ -97,7 +105,9 @@ pub unsafe fn xml_xpath_boolean_function(ctxt: &mut XmlXPathParserContext, nargs
 #[doc(alias = "xmlXPathCeilingFunction")]
 pub unsafe fn xml_xpath_ceiling_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         cast_to_number(ctxt);
         if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathNumber {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
@@ -113,7 +123,9 @@ pub unsafe fn xml_xpath_ceiling_function(ctxt: &mut XmlXPathParserContext, nargs
 #[doc(alias = "xmlXPathCountFunction")]
 pub unsafe fn xml_xpath_count_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         if ctxt.value.is_null()
             || !matches!(
                 (*ctxt.value).typ,
@@ -147,8 +159,8 @@ pub unsafe fn xml_xpath_concat_function(ctxt: &mut XmlXPathParserContext, mut na
     unsafe {
         let mut newobj: XmlXPathObjectPtr;
 
-        if nargs < 2 {
-            check_arity(ctxt, nargs, 2);
+        if nargs < 2 && check_arity(ctxt, nargs, 2).is_err() {
+            return;
         }
 
         cast_to_string(ctxt);
@@ -188,7 +200,9 @@ pub unsafe fn xml_xpath_concat_function(ctxt: &mut XmlXPathParserContext, mut na
 #[doc(alias = "xmlXPathContainsFunction")]
 pub unsafe fn xml_xpath_contains_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 2);
+        if check_arity(ctxt, nargs, 2).is_err() {
+            return;
+        }
         cast_to_string(ctxt);
         if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathString {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
@@ -240,7 +254,9 @@ pub unsafe fn xml_xpath_contains_function(ctxt: &mut XmlXPathParserContext, narg
 #[doc(alias = "xmlXPathIdFunction")]
 pub unsafe fn xml_xpath_id_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         let mut obj = ctxt.value_pop();
         if obj.is_null() {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidOperand as i32);
@@ -294,7 +310,9 @@ pub unsafe fn xml_xpath_id_function(ctxt: &mut XmlXPathParserContext, nargs: usi
 #[doc(alias = "xmlXPathFalseFunction")]
 pub unsafe fn xml_xpath_false_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 0);
+        if check_arity(ctxt, nargs, 0).is_err() {
+            return;
+        }
         ctxt.value_push(xml_xpath_cache_new_boolean(ctxt.context, false));
     }
 }
@@ -306,7 +324,9 @@ pub unsafe fn xml_xpath_false_function(ctxt: &mut XmlXPathParserContext, nargs: 
 #[doc(alias = "xmlXPathFloorFunction")]
 pub unsafe fn xml_xpath_floor_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         cast_to_number(ctxt);
         if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathNumber {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
@@ -323,7 +343,9 @@ pub unsafe fn xml_xpath_floor_function(ctxt: &mut XmlXPathParserContext, nargs: 
 #[doc(alias = "xmlXPathLastFunction")]
 pub unsafe fn xml_xpath_last_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 0);
+        if check_arity(ctxt, nargs, 0).is_err() {
+            return;
+        }
         if (*ctxt.context).context_size >= 0 {
             ctxt.value_push(xml_xpath_cache_new_float(
                 ctxt.context,
@@ -355,7 +377,9 @@ pub unsafe fn xml_xpath_lang_function(ctxt: &mut XmlXPathParserContext, nargs: u
     unsafe {
         let mut ret: i32 = 0;
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         cast_to_string(ctxt);
         if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathString {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
@@ -405,7 +429,9 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: &mut XmlXPathParserContext, mu
             nargs = 1;
         }
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         if ctxt.value.is_null()
             || !matches!(
                 (*ctxt.value).typ,
@@ -461,7 +487,9 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: &mut XmlXPathParserContext, mu
 #[doc(alias = "xmlXPathNotFunction")]
 pub unsafe fn xml_xpath_not_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         cast_to_boolean(ctxt);
         if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathBoolean {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
@@ -497,7 +525,9 @@ pub(super) unsafe fn xml_xpath_name_function(ctxt: &mut XmlXPathParserContext, m
             nargs = 1;
         }
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         if ctxt.value.is_null()
             || !matches!(
                 (*ctxt.value).typ,
@@ -608,7 +638,9 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: &mut XmlXPathParserContext,
             ));
             nargs = 1;
         }
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         if ctxt.value.is_null()
             || !matches!(
                 (*ctxt.value).typ,
@@ -673,7 +705,9 @@ pub unsafe fn xml_xpath_normalize_function(ctxt: &mut XmlXPathParserContext, mut
             nargs = 1;
         }
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         cast_to_string(ctxt);
         if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathString {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
@@ -732,7 +766,9 @@ pub unsafe fn xml_xpath_number_function(ctxt: &mut XmlXPathParserContext, nargs:
             return;
         }
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         let cur: XmlXPathObjectPtr = ctxt.value_pop();
         ctxt.value_push(xml_xpath_cache_convert_number(ctxt.context, cur));
     }
@@ -746,7 +782,9 @@ pub unsafe fn xml_xpath_number_function(ctxt: &mut XmlXPathParserContext, nargs:
 #[doc(alias = "xmlXPathPositionFunction")]
 pub unsafe fn xml_xpath_position_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 0);
+        if check_arity(ctxt, nargs, 0).is_err() {
+            return;
+        }
         if (*ctxt.context).proximity_position >= 0 {
             ctxt.value_push(xml_xpath_cache_new_float(
                 ctxt.context,
@@ -766,7 +804,9 @@ pub unsafe fn xml_xpath_position_function(ctxt: &mut XmlXPathParserContext, narg
 #[doc(alias = "xmlXPathRoundFunction")]
 pub unsafe fn xml_xpath_round_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         cast_to_number(ctxt);
         if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathNumber {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
@@ -827,7 +867,9 @@ pub unsafe fn xml_xpath_string_function(ctxt: &mut XmlXPathParserContext, nargs:
             return;
         }
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         let cur: XmlXPathObjectPtr = ctxt.value_pop();
         if cur.is_null() {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidOperand as i32);
@@ -861,7 +903,9 @@ pub unsafe fn xml_xpath_string_length_function(ctxt: &mut XmlXPathParserContext,
             }
             return;
         }
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         cast_to_string(ctxt);
         if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathString {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
@@ -883,7 +927,9 @@ pub unsafe fn xml_xpath_string_length_function(ctxt: &mut XmlXPathParserContext,
 #[doc(alias = "xmlXPathStartsWithFunction")]
 pub unsafe fn xml_xpath_starts_with_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 2);
+        if check_arity(ctxt, nargs, 2).is_err() {
+            return;
+        }
         cast_to_string(ctxt);
         if ctxt.value.is_null() || (*ctxt.value).typ != XmlXPathObjectType::XPathString {
             xml_xpath_err(ctxt, XmlXPathError::XPathInvalidType as i32);
@@ -943,11 +989,11 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
         let mut i: i32 = 1;
         let mut j: i32 = i32::MAX;
 
-        if nargs < 2 {
-            check_arity(ctxt, nargs, 2);
+        if nargs < 2 && check_arity(ctxt, nargs, 2).is_err() {
+            return;
         }
-        if nargs > 3 {
-            check_arity(ctxt, nargs, 3);
+        if nargs > 3 && check_arity(ctxt, nargs, 3).is_err() {
+            return;
         }
         // take care of possible last (position) argument
         if nargs == 3 {
@@ -1043,7 +1089,9 @@ pub unsafe fn xml_xpath_substring_function(ctxt: &mut XmlXPathParserContext, nar
 #[doc(alias = "xmlXPathSubstringBeforeFunction")]
 pub unsafe fn xml_xpath_substring_before_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 2);
+        if check_arity(ctxt, nargs, 2).is_err() {
+            return;
+        }
         cast_to_string(ctxt);
         let find: XmlXPathObjectPtr = ctxt.value_pop();
         cast_to_string(ctxt);
@@ -1069,7 +1117,9 @@ pub unsafe fn xml_xpath_substring_before_function(ctxt: &mut XmlXPathParserConte
 #[doc(alias = "xmlXPathSubstringAfterFunction")]
 pub unsafe fn xml_xpath_substring_after_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 2);
+        if check_arity(ctxt, nargs, 2).is_err() {
+            return;
+        }
         cast_to_string(ctxt);
         let find: XmlXPathObjectPtr = ctxt.value_pop();
         cast_to_string(ctxt);
@@ -1093,7 +1143,9 @@ pub unsafe fn xml_xpath_sum_function(ctxt: &mut XmlXPathParserContext, nargs: us
     unsafe {
         let mut res: f64 = 0.0;
 
-        check_arity(ctxt, nargs, 1);
+        if check_arity(ctxt, nargs, 1).is_err() {
+            return;
+        }
         if ctxt.value.is_null()
             || !matches!(
                 (*ctxt.value).typ,
@@ -1122,7 +1174,9 @@ pub unsafe fn xml_xpath_sum_function(ctxt: &mut XmlXPathParserContext, nargs: us
 #[doc(alias = "xmlXPathTrueFunction")]
 pub unsafe fn xml_xpath_true_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 0);
+        if check_arity(ctxt, nargs, 0).is_err() {
+            return;
+        }
         ctxt.value_push(xml_xpath_cache_new_boolean(ctxt.context, true));
     }
 }
@@ -1145,7 +1199,9 @@ pub unsafe fn xml_xpath_true_function(ctxt: &mut XmlXPathParserContext, nargs: u
 #[doc(alias = "xmlXPathTranslateFunction")]
 pub unsafe fn xml_xpath_translate_function(ctxt: &mut XmlXPathParserContext, nargs: usize) {
     unsafe {
-        check_arity(ctxt, nargs, 3);
+        if check_arity(ctxt, nargs, 3).is_err() {
+            return;
+        }
 
         cast_to_string(ctxt);
         let to: XmlXPathObjectPtr = ctxt.value_pop();
@@ -1223,7 +1279,9 @@ pub(super) unsafe fn xml_xpath_escape_uri_function(ctxt: &mut XmlXPathParserCont
     unsafe {
         let mut escape: [u8; 4] = [0; 4];
 
-        check_arity(ctxt, nargs, 2);
+        if check_arity(ctxt, nargs, 2).is_err() {
+            return;
+        }
 
         let escape_reserved = ctxt.pop_boolean();
 
