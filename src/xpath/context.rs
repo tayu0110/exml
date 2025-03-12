@@ -192,13 +192,13 @@ impl XmlXPathParserContext {
     ///
     /// Returns the boolean
     #[doc(alias = "xmlXPathPopBoolean")]
-    pub unsafe fn pop_boolean(&mut self) -> i32 {
+    pub unsafe fn pop_boolean(&mut self) -> bool {
         unsafe {
             let obj: XmlXPathObjectPtr = self.value_pop();
             if obj.is_null() {
                 xml_xpatherror(self, XmlXPathError::XPathInvalidOperand as i32);
                 self.error = XmlXPathError::XPathInvalidOperand as i32;
-                return 0;
+                return false;
             }
             let ret = if (*obj).typ != XmlXPathObjectType::XPathBoolean {
                 xml_xpath_cast_to_boolean(obj)
@@ -206,7 +206,7 @@ impl XmlXPathParserContext {
                 (*obj).boolval
             };
             xml_xpath_release_object(self.context, obj);
-            ret as i32
+            ret
         }
     }
 
