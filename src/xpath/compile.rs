@@ -26,21 +26,6 @@ use super::{
     xml_xpath_cache_new_string, xml_xpath_perr_memory,
 };
 
-macro_rules! COPY_BUF {
-    ($l:expr, $b:expr, $i:expr, $v:expr) => {
-        if $l == 1 {
-            *$b.add($i as usize) = $v as _;
-            $i += 1;
-        } else {
-            $i += $crate::libxml::parser_internals::xml_copy_char(
-                $l,
-                $b.add($i as usize) as _,
-                $v as _,
-            );
-        }
-    };
-}
-
 impl XmlXPathParserContext {
     /// Add a step to an XPath Compiled Expression
     ///
