@@ -26,7 +26,7 @@ use std::{
     cell::RefCell,
     ffi::{CStr, CString, c_char},
     io::Read,
-    mem::{size_of, zeroed},
+    mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
@@ -34,7 +34,7 @@ use std::{
     sync::atomic::{AtomicI32, Ordering},
 };
 
-use libc::{INT_MAX, bsearch, memcpy, memset, size_t, strcmp};
+use libc::{INT_MAX, memcpy, memset, size_t};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
@@ -4092,1059 +4092,1030 @@ pub fn html_entity_value_lookup(value: u32) -> Option<&'static HtmlEntityDesc> {
 /// Returns 1 if autoclosed, 0 otherwise
 #[doc(alias = "htmlIsAutoClosed")]
 pub unsafe fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> i32 {
-    unsafe {
-        let mut child = elem.children().map(|c| XmlNodePtr::try_from(c).unwrap());
-        while let Some(now) = child {
-            if html_auto_close_tag(doc, elem.name, now) != 0 {
-                return 1;
-            }
-            child = now.next().map(|n| XmlNodePtr::try_from(n).unwrap());
+    let mut child = elem.children().map(|c| XmlNodePtr::try_from(c).unwrap());
+    while let Some(now) = child {
+        if html_auto_close_tag(doc, elem.name().as_deref().unwrap(), now) != 0 {
+            return 1;
         }
-        0
+        child = now.next().map(|n| XmlNodePtr::try_from(n).unwrap());
     }
+    0
 }
 
 #[repr(C)]
 pub struct HtmlStartCloseEntry {
-    old_tag: *const c_char,
-    new_tag: *const c_char,
+    old_tag: &'static str,
+    new_tag: &'static str,
 }
 
 // start tags that imply the end of current element
 const HTML_START_CLOSE: &[HtmlStartCloseEntry] = &[
     HtmlStartCloseEntry {
-        old_tag: c"a".as_ptr() as _,
-        new_tag: c"a".as_ptr() as _,
+        old_tag: "a",
+        new_tag: "a",
     },
     HtmlStartCloseEntry {
-        old_tag: c"a".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "a",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"a".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "a",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"a".as_ptr() as _,
-        new_tag: c"td".as_ptr() as _,
+        old_tag: "a",
+        new_tag: "td",
     },
     HtmlStartCloseEntry {
-        old_tag: c"a".as_ptr() as _,
-        new_tag: c"th".as_ptr() as _,
+        old_tag: "a",
+        new_tag: "th",
     },
     HtmlStartCloseEntry {
-        old_tag: c"address".as_ptr() as _,
-        new_tag: c"dd".as_ptr() as _,
+        old_tag: "address",
+        new_tag: "dd",
     },
     HtmlStartCloseEntry {
-        old_tag: c"address".as_ptr() as _,
-        new_tag: c"dl".as_ptr() as _,
+        old_tag: "address",
+        new_tag: "dl",
     },
     HtmlStartCloseEntry {
-        old_tag: c"address".as_ptr() as _,
-        new_tag: c"dt".as_ptr() as _,
+        old_tag: "address",
+        new_tag: "dt",
     },
     HtmlStartCloseEntry {
-        old_tag: c"address".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "address",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"address".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "address",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"address".as_ptr() as _,
-        new_tag: c"ul".as_ptr() as _,
+        old_tag: "address",
+        new_tag: "ul",
     },
     HtmlStartCloseEntry {
-        old_tag: c"b".as_ptr() as _,
-        new_tag: c"center".as_ptr() as _,
+        old_tag: "b",
+        new_tag: "center",
     },
     HtmlStartCloseEntry {
-        old_tag: c"b".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "b",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"b".as_ptr() as _,
-        new_tag: c"td".as_ptr() as _,
+        old_tag: "b",
+        new_tag: "td",
     },
     HtmlStartCloseEntry {
-        old_tag: c"b".as_ptr() as _,
-        new_tag: c"th".as_ptr() as _,
+        old_tag: "b",
+        new_tag: "th",
     },
     HtmlStartCloseEntry {
-        old_tag: c"big".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "big",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"caption".as_ptr() as _,
-        new_tag: c"col".as_ptr() as _,
+        old_tag: "caption",
+        new_tag: "col",
     },
     HtmlStartCloseEntry {
-        old_tag: c"caption".as_ptr() as _,
-        new_tag: c"colgroup".as_ptr() as _,
+        old_tag: "caption",
+        new_tag: "colgroup",
     },
     HtmlStartCloseEntry {
-        old_tag: c"caption".as_ptr() as _,
-        new_tag: c"tbody".as_ptr() as _,
+        old_tag: "caption",
+        new_tag: "tbody",
     },
     HtmlStartCloseEntry {
-        old_tag: c"caption".as_ptr() as _,
-        new_tag: c"tfoot".as_ptr() as _,
+        old_tag: "caption",
+        new_tag: "tfoot",
     },
     HtmlStartCloseEntry {
-        old_tag: c"caption".as_ptr() as _,
-        new_tag: c"thead".as_ptr() as _,
+        old_tag: "caption",
+        new_tag: "thead",
     },
     HtmlStartCloseEntry {
-        old_tag: c"caption".as_ptr() as _,
-        new_tag: c"tr".as_ptr() as _,
+        old_tag: "caption",
+        new_tag: "tr",
     },
     HtmlStartCloseEntry {
-        old_tag: c"col".as_ptr() as _,
-        new_tag: c"col".as_ptr() as _,
+        old_tag: "col",
+        new_tag: "col",
     },
     HtmlStartCloseEntry {
-        old_tag: c"col".as_ptr() as _,
-        new_tag: c"colgroup".as_ptr() as _,
+        old_tag: "col",
+        new_tag: "colgroup",
     },
     HtmlStartCloseEntry {
-        old_tag: c"col".as_ptr() as _,
-        new_tag: c"tbody".as_ptr() as _,
+        old_tag: "col",
+        new_tag: "tbody",
     },
     HtmlStartCloseEntry {
-        old_tag: c"col".as_ptr() as _,
-        new_tag: c"tfoot".as_ptr() as _,
+        old_tag: "col",
+        new_tag: "tfoot",
     },
     HtmlStartCloseEntry {
-        old_tag: c"col".as_ptr() as _,
-        new_tag: c"thead".as_ptr() as _,
+        old_tag: "col",
+        new_tag: "thead",
     },
     HtmlStartCloseEntry {
-        old_tag: c"col".as_ptr() as _,
-        new_tag: c"tr".as_ptr() as _,
+        old_tag: "col",
+        new_tag: "tr",
     },
     HtmlStartCloseEntry {
-        old_tag: c"colgroup".as_ptr() as _,
-        new_tag: c"colgroup".as_ptr() as _,
+        old_tag: "colgroup",
+        new_tag: "colgroup",
     },
     HtmlStartCloseEntry {
-        old_tag: c"colgroup".as_ptr() as _,
-        new_tag: c"tbody".as_ptr() as _,
+        old_tag: "colgroup",
+        new_tag: "tbody",
     },
     HtmlStartCloseEntry {
-        old_tag: c"colgroup".as_ptr() as _,
-        new_tag: c"tfoot".as_ptr() as _,
+        old_tag: "colgroup",
+        new_tag: "tfoot",
     },
     HtmlStartCloseEntry {
-        old_tag: c"colgroup".as_ptr() as _,
-        new_tag: c"thead".as_ptr() as _,
+        old_tag: "colgroup",
+        new_tag: "thead",
     },
     HtmlStartCloseEntry {
-        old_tag: c"colgroup".as_ptr() as _,
-        new_tag: c"tr".as_ptr() as _,
+        old_tag: "colgroup",
+        new_tag: "tr",
     },
     HtmlStartCloseEntry {
-        old_tag: c"dd".as_ptr() as _,
-        new_tag: c"dt".as_ptr() as _,
+        old_tag: "dd",
+        new_tag: "dt",
     },
     HtmlStartCloseEntry {
-        old_tag: c"dir".as_ptr() as _,
-        new_tag: c"dd".as_ptr() as _,
+        old_tag: "dir",
+        new_tag: "dd",
     },
     HtmlStartCloseEntry {
-        old_tag: c"dir".as_ptr() as _,
-        new_tag: c"dl".as_ptr() as _,
+        old_tag: "dir",
+        new_tag: "dl",
     },
     HtmlStartCloseEntry {
-        old_tag: c"dir".as_ptr() as _,
-        new_tag: c"dt".as_ptr() as _,
+        old_tag: "dir",
+        new_tag: "dt",
     },
     HtmlStartCloseEntry {
-        old_tag: c"dir".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "dir",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"dir".as_ptr() as _,
-        new_tag: c"ul".as_ptr() as _,
+        old_tag: "dir",
+        new_tag: "ul",
     },
     HtmlStartCloseEntry {
-        old_tag: c"dl".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "dl",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"dl".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "dl",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"dt".as_ptr() as _,
-        new_tag: c"dd".as_ptr() as _,
+        old_tag: "dt",
+        new_tag: "dd",
     },
     HtmlStartCloseEntry {
-        old_tag: c"dt".as_ptr() as _,
-        new_tag: c"dl".as_ptr() as _,
+        old_tag: "dt",
+        new_tag: "dl",
     },
     HtmlStartCloseEntry {
-        old_tag: c"font".as_ptr() as _,
-        new_tag: c"center".as_ptr() as _,
+        old_tag: "font",
+        new_tag: "center",
     },
     HtmlStartCloseEntry {
-        old_tag: c"font".as_ptr() as _,
-        new_tag: c"td".as_ptr() as _,
+        old_tag: "font",
+        new_tag: "td",
     },
     HtmlStartCloseEntry {
-        old_tag: c"font".as_ptr() as _,
-        new_tag: c"th".as_ptr() as _,
+        old_tag: "font",
+        new_tag: "th",
     },
     HtmlStartCloseEntry {
-        old_tag: c"form".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "form",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h1".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "h1",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h1".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "h1",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h1".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "h1",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h1".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "h1",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h1".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "h1",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h2".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "h2",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h2".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "h2",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h2".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "h2",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h2".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "h2",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h2".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "h2",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h3".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "h3",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h3".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "h3",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h3".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "h3",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h3".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "h3",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h3".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "h3",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h4".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "h4",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h4".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "h4",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h4".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "h4",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h4".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "h4",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h4".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "h4",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h5".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "h5",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h5".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "h5",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h5".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "h5",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h5".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "h5",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h5".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "h5",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h6".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "h6",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h6".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "h6",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h6".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "h6",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h6".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "h6",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"h6".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "h6",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"a".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "a",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"abbr".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "abbr",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"acronym".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "acronym",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"address".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "address",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"b".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "b",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"bdo".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "bdo",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"big".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "big",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"blockquote".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "blockquote",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"body".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "body",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"br".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "br",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"center".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "center",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"cite".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "cite",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"code".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "code",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"dd".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "dd",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"dfn".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "dfn",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"dir".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "dir",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"div".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "div",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"dl".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "dl",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"dt".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "dt",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"em".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "em",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"font".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "font",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"frameset".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "frameset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"h1".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "h1",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"h2".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "h2",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"h3".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "h3",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"h4".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "h4",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"h5".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "h5",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"h6".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "h6",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"hr".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "hr",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"i".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "i",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"iframe".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "iframe",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"img".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "img",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"kbd".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "kbd",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"listing".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "listing",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"map".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "map",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"menu".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "menu",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"ol".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "ol",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"pre".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "pre",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"q".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "q",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"s".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "s",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"samp".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "samp",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"small".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "small",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"span".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "span",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"strike".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "strike",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"strong".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "strong",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"sub".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "sub",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"sup".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "sup",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"tt".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "tt",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"u".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "u",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"ul".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "ul",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"var".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "var",
     },
     HtmlStartCloseEntry {
-        old_tag: c"head".as_ptr() as _,
-        new_tag: c"xmp".as_ptr() as _,
+        old_tag: "head",
+        new_tag: "xmp",
     },
     HtmlStartCloseEntry {
-        old_tag: c"hr".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "hr",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"i".as_ptr() as _,
-        new_tag: c"center".as_ptr() as _,
+        old_tag: "i",
+        new_tag: "center",
     },
     HtmlStartCloseEntry {
-        old_tag: c"i".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "i",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"i".as_ptr() as _,
-        new_tag: c"td".as_ptr() as _,
+        old_tag: "i",
+        new_tag: "td",
     },
     HtmlStartCloseEntry {
-        old_tag: c"i".as_ptr() as _,
-        new_tag: c"th".as_ptr() as _,
+        old_tag: "i",
+        new_tag: "th",
     },
     HtmlStartCloseEntry {
-        old_tag: c"legend".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "legend",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"li".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "li",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"link".as_ptr() as _,
-        new_tag: c"body".as_ptr() as _,
+        old_tag: "link",
+        new_tag: "body",
     },
     HtmlStartCloseEntry {
-        old_tag: c"link".as_ptr() as _,
-        new_tag: c"frameset".as_ptr() as _,
+        old_tag: "link",
+        new_tag: "frameset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"listing".as_ptr() as _,
-        new_tag: c"dd".as_ptr() as _,
+        old_tag: "listing",
+        new_tag: "dd",
     },
     HtmlStartCloseEntry {
-        old_tag: c"listing".as_ptr() as _,
-        new_tag: c"dl".as_ptr() as _,
+        old_tag: "listing",
+        new_tag: "dl",
     },
     HtmlStartCloseEntry {
-        old_tag: c"listing".as_ptr() as _,
-        new_tag: c"dt".as_ptr() as _,
+        old_tag: "listing",
+        new_tag: "dt",
     },
     HtmlStartCloseEntry {
-        old_tag: c"listing".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "listing",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"listing".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "listing",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"listing".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "listing",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"listing".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "listing",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"listing".as_ptr() as _,
-        new_tag: c"ul".as_ptr() as _,
+        old_tag: "listing",
+        new_tag: "ul",
     },
     HtmlStartCloseEntry {
-        old_tag: c"menu".as_ptr() as _,
-        new_tag: c"dd".as_ptr() as _,
+        old_tag: "menu",
+        new_tag: "dd",
     },
     HtmlStartCloseEntry {
-        old_tag: c"menu".as_ptr() as _,
-        new_tag: c"dl".as_ptr() as _,
+        old_tag: "menu",
+        new_tag: "dl",
     },
     HtmlStartCloseEntry {
-        old_tag: c"menu".as_ptr() as _,
-        new_tag: c"dt".as_ptr() as _,
+        old_tag: "menu",
+        new_tag: "dt",
     },
     HtmlStartCloseEntry {
-        old_tag: c"menu".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "menu",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"menu".as_ptr() as _,
-        new_tag: c"ul".as_ptr() as _,
+        old_tag: "menu",
+        new_tag: "ul",
     },
     HtmlStartCloseEntry {
-        old_tag: c"ol".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "ol",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"option".as_ptr() as _,
-        new_tag: c"optgroup".as_ptr() as _,
+        old_tag: "option",
+        new_tag: "optgroup",
     },
     HtmlStartCloseEntry {
-        old_tag: c"option".as_ptr() as _,
-        new_tag: c"option".as_ptr() as _,
+        old_tag: "option",
+        new_tag: "option",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"address".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "address",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"blockquote".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "blockquote",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"body".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "body",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"caption".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "caption",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"center".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "center",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"col".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "col",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"colgroup".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "colgroup",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"dd".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "dd",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"dir".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "dir",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"div".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "div",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"dl".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "dl",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"dt".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "dt",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"frameset".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "frameset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"h1".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "h1",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"h2".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "h2",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"h3".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "h3",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"h4".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "h4",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"h5".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "h5",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"h6".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "h6",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"head".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "head",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"hr".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "hr",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"listing".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "listing",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"menu".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "menu",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"ol".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "ol",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"pre".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "pre",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"tbody".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "tbody",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"td".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "td",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"tfoot".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "tfoot",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"th".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "th",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"title".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "title",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"tr".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "tr",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"ul".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "ul",
     },
     HtmlStartCloseEntry {
-        old_tag: c"p".as_ptr() as _,
-        new_tag: c"xmp".as_ptr() as _,
+        old_tag: "p",
+        new_tag: "xmp",
     },
     HtmlStartCloseEntry {
-        old_tag: c"pre".as_ptr() as _,
-        new_tag: c"dd".as_ptr() as _,
+        old_tag: "pre",
+        new_tag: "dd",
     },
     HtmlStartCloseEntry {
-        old_tag: c"pre".as_ptr() as _,
-        new_tag: c"dl".as_ptr() as _,
+        old_tag: "pre",
+        new_tag: "dl",
     },
     HtmlStartCloseEntry {
-        old_tag: c"pre".as_ptr() as _,
-        new_tag: c"dt".as_ptr() as _,
+        old_tag: "pre",
+        new_tag: "dt",
     },
     HtmlStartCloseEntry {
-        old_tag: c"pre".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "pre",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"pre".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "pre",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"pre".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "pre",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"pre".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "pre",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"pre".as_ptr() as _,
-        new_tag: c"ul".as_ptr() as _,
+        old_tag: "pre",
+        new_tag: "ul",
     },
     HtmlStartCloseEntry {
-        old_tag: c"s".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "s",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"script".as_ptr() as _,
-        new_tag: c"noscript".as_ptr() as _,
+        old_tag: "script",
+        new_tag: "noscript",
     },
     HtmlStartCloseEntry {
-        old_tag: c"small".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "small",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"span".as_ptr() as _,
-        new_tag: c"td".as_ptr() as _,
+        old_tag: "span",
+        new_tag: "td",
     },
     HtmlStartCloseEntry {
-        old_tag: c"span".as_ptr() as _,
-        new_tag: c"th".as_ptr() as _,
+        old_tag: "span",
+        new_tag: "th",
     },
     HtmlStartCloseEntry {
-        old_tag: c"strike".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "strike",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"style".as_ptr() as _,
-        new_tag: c"body".as_ptr() as _,
+        old_tag: "style",
+        new_tag: "body",
     },
     HtmlStartCloseEntry {
-        old_tag: c"style".as_ptr() as _,
-        new_tag: c"frameset".as_ptr() as _,
+        old_tag: "style",
+        new_tag: "frameset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"tbody".as_ptr() as _,
-        new_tag: c"tbody".as_ptr() as _,
+        old_tag: "tbody",
+        new_tag: "tbody",
     },
     HtmlStartCloseEntry {
-        old_tag: c"tbody".as_ptr() as _,
-        new_tag: c"tfoot".as_ptr() as _,
+        old_tag: "tbody",
+        new_tag: "tfoot",
     },
     HtmlStartCloseEntry {
-        old_tag: c"td".as_ptr() as _,
-        new_tag: c"tbody".as_ptr() as _,
+        old_tag: "td",
+        new_tag: "tbody",
     },
     HtmlStartCloseEntry {
-        old_tag: c"td".as_ptr() as _,
-        new_tag: c"td".as_ptr() as _,
+        old_tag: "td",
+        new_tag: "td",
     },
     HtmlStartCloseEntry {
-        old_tag: c"td".as_ptr() as _,
-        new_tag: c"tfoot".as_ptr() as _,
+        old_tag: "td",
+        new_tag: "tfoot",
     },
     HtmlStartCloseEntry {
-        old_tag: c"td".as_ptr() as _,
-        new_tag: c"th".as_ptr() as _,
+        old_tag: "td",
+        new_tag: "th",
     },
     HtmlStartCloseEntry {
-        old_tag: c"td".as_ptr() as _,
-        new_tag: c"tr".as_ptr() as _,
+        old_tag: "td",
+        new_tag: "tr",
     },
     HtmlStartCloseEntry {
-        old_tag: c"tfoot".as_ptr() as _,
-        new_tag: c"tbody".as_ptr() as _,
+        old_tag: "tfoot",
+        new_tag: "tbody",
     },
     HtmlStartCloseEntry {
-        old_tag: c"th".as_ptr() as _,
-        new_tag: c"tbody".as_ptr() as _,
+        old_tag: "th",
+        new_tag: "tbody",
     },
     HtmlStartCloseEntry {
-        old_tag: c"th".as_ptr() as _,
-        new_tag: c"td".as_ptr() as _,
+        old_tag: "th",
+        new_tag: "td",
     },
     HtmlStartCloseEntry {
-        old_tag: c"th".as_ptr() as _,
-        new_tag: c"tfoot".as_ptr() as _,
+        old_tag: "th",
+        new_tag: "tfoot",
     },
     HtmlStartCloseEntry {
-        old_tag: c"th".as_ptr() as _,
-        new_tag: c"th".as_ptr() as _,
+        old_tag: "th",
+        new_tag: "th",
     },
     HtmlStartCloseEntry {
-        old_tag: c"th".as_ptr() as _,
-        new_tag: c"tr".as_ptr() as _,
+        old_tag: "th",
+        new_tag: "tr",
     },
     HtmlStartCloseEntry {
-        old_tag: c"thead".as_ptr() as _,
-        new_tag: c"tbody".as_ptr() as _,
+        old_tag: "thead",
+        new_tag: "tbody",
     },
     HtmlStartCloseEntry {
-        old_tag: c"thead".as_ptr() as _,
-        new_tag: c"tfoot".as_ptr() as _,
+        old_tag: "thead",
+        new_tag: "tfoot",
     },
     HtmlStartCloseEntry {
-        old_tag: c"title".as_ptr() as _,
-        new_tag: c"body".as_ptr() as _,
+        old_tag: "title",
+        new_tag: "body",
     },
     HtmlStartCloseEntry {
-        old_tag: c"title".as_ptr() as _,
-        new_tag: c"frameset".as_ptr() as _,
+        old_tag: "title",
+        new_tag: "frameset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"tr".as_ptr() as _,
-        new_tag: c"tbody".as_ptr() as _,
+        old_tag: "tr",
+        new_tag: "tbody",
     },
     HtmlStartCloseEntry {
-        old_tag: c"tr".as_ptr() as _,
-        new_tag: c"tfoot".as_ptr() as _,
+        old_tag: "tr",
+        new_tag: "tfoot",
     },
     HtmlStartCloseEntry {
-        old_tag: c"tr".as_ptr() as _,
-        new_tag: c"tr".as_ptr() as _,
+        old_tag: "tr",
+        new_tag: "tr",
     },
     HtmlStartCloseEntry {
-        old_tag: c"tt".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "tt",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"u".as_ptr() as _,
-        new_tag: c"p".as_ptr() as _,
+        old_tag: "u",
+        new_tag: "p",
     },
     HtmlStartCloseEntry {
-        old_tag: c"u".as_ptr() as _,
-        new_tag: c"td".as_ptr() as _,
+        old_tag: "u",
+        new_tag: "td",
     },
     HtmlStartCloseEntry {
-        old_tag: c"u".as_ptr() as _,
-        new_tag: c"th".as_ptr() as _,
+        old_tag: "u",
+        new_tag: "th",
     },
     HtmlStartCloseEntry {
-        old_tag: c"ul".as_ptr() as _,
-        new_tag: c"address".as_ptr() as _,
+        old_tag: "ul",
+        new_tag: "address",
     },
     HtmlStartCloseEntry {
-        old_tag: c"ul".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "ul",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"ul".as_ptr() as _,
-        new_tag: c"menu".as_ptr() as _,
+        old_tag: "ul",
+        new_tag: "menu",
     },
     HtmlStartCloseEntry {
-        old_tag: c"ul".as_ptr() as _,
-        new_tag: c"pre".as_ptr() as _,
+        old_tag: "ul",
+        new_tag: "pre",
     },
     HtmlStartCloseEntry {
-        old_tag: c"xmp".as_ptr() as _,
-        new_tag: c"dd".as_ptr() as _,
+        old_tag: "xmp",
+        new_tag: "dd",
     },
     HtmlStartCloseEntry {
-        old_tag: c"xmp".as_ptr() as _,
-        new_tag: c"dl".as_ptr() as _,
+        old_tag: "xmp",
+        new_tag: "dl",
     },
     HtmlStartCloseEntry {
-        old_tag: c"xmp".as_ptr() as _,
-        new_tag: c"dt".as_ptr() as _,
+        old_tag: "xmp",
+        new_tag: "dt",
     },
     HtmlStartCloseEntry {
-        old_tag: c"xmp".as_ptr() as _,
-        new_tag: c"fieldset".as_ptr() as _,
+        old_tag: "xmp",
+        new_tag: "fieldset",
     },
     HtmlStartCloseEntry {
-        old_tag: c"xmp".as_ptr() as _,
-        new_tag: c"form".as_ptr() as _,
+        old_tag: "xmp",
+        new_tag: "form",
     },
     HtmlStartCloseEntry {
-        old_tag: c"xmp".as_ptr() as _,
-        new_tag: c"li".as_ptr() as _,
+        old_tag: "xmp",
+        new_tag: "li",
     },
     HtmlStartCloseEntry {
-        old_tag: c"xmp".as_ptr() as _,
-        new_tag: c"table".as_ptr() as _,
+        old_tag: "xmp",
+        new_tag: "table",
     },
     HtmlStartCloseEntry {
-        old_tag: c"xmp".as_ptr() as _,
-        new_tag: c"ul".as_ptr() as _,
+        old_tag: "xmp",
+        new_tag: "ul",
     },
 ];
-
-unsafe extern "C" fn html_compare_start_close(vkey: *const c_void, member: *const c_void) -> i32 {
-    unsafe {
-        let key: *const HtmlStartCloseEntry = vkey as *const HtmlStartCloseEntry;
-        let entry: *const HtmlStartCloseEntry = member as *const HtmlStartCloseEntry;
-        let mut ret: i32;
-
-        ret = strcmp((*key).old_tag, (*entry).old_tag);
-        if ret == 0 {
-            ret = strcmp((*key).new_tag, (*entry).new_tag);
-        }
-
-        ret
-    }
-}
 
 /// Checks whether the new tag is one of the registered valid tags for closing old.
 ///
 /// Returns 0 if no, 1 if yes.
 #[doc(alias = "htmlCheckAutoClose")]
-unsafe fn html_check_auto_close(newtag: *const XmlChar, oldtag: Option<&str>) -> i32 {
-    unsafe {
-        let mut key: HtmlStartCloseEntry = zeroed();
-
-        let oldtag = oldtag.map(|t| CString::new(t).unwrap());
-        key.old_tag = oldtag.as_deref().map_or(null(), |t| t.as_ptr());
-        key.new_tag = newtag as *const c_char;
-        let res: *mut c_void = bsearch(
-            addr_of_mut!(key) as _,
-            HTML_START_CLOSE.as_ptr() as _,
-            HTML_START_CLOSE.len(),
-            size_of::<HtmlStartCloseEntry>(),
-            Some(html_compare_start_close),
-        );
-        !res.is_null() as i32
-    }
+fn html_check_auto_close(newtag: &str, oldtag: &str) -> bool {
+    HTML_START_CLOSE
+        .binary_search_by(|entry| (entry.old_tag, entry.new_tag).cmp(&(oldtag, newtag)))
+        .is_ok()
 }
 
 /// The HTML DTD allows a tag to implicitly close other tags.
@@ -5153,36 +5124,21 @@ unsafe fn html_check_auto_close(newtag: *const XmlChar, oldtag: Option<&str>) ->
 ///
 /// Returns 1 if autoclose, 0 otherwise
 #[doc(alias = "htmlAutoCloseTag")]
-pub unsafe fn html_auto_close_tag(
-    _doc: HtmlDocPtr,
-    name: *const XmlChar,
-    elem: HtmlNodePtr,
-) -> i32 {
-    unsafe {
-        // if elem.is_null() {
-        //     return 1;
-        // }
-        if xml_str_equal(name, elem.name) {
-            return 0;
-        }
-        if html_check_auto_close(
-            elem.name,
-            (!name.is_null())
-                .then(|| CStr::from_ptr(name as *const i8).to_string_lossy())
-                .as_deref(),
-        ) != 0
-        {
+pub fn html_auto_close_tag(_doc: HtmlDocPtr, name: &str, elem: HtmlNodePtr) -> i32 {
+    if name == elem.name().as_deref().unwrap() {
+        return 0;
+    }
+    if html_check_auto_close(elem.name().as_deref().unwrap(), name) {
+        return 1;
+    }
+    let mut child = elem.children().map(|c| XmlNodePtr::try_from(c).unwrap());
+    while let Some(now) = child {
+        if html_auto_close_tag(_doc, name, now) != 0 {
             return 1;
         }
-        let mut child = elem.children().map(|c| XmlNodePtr::try_from(c).unwrap());
-        while let Some(now) = child {
-            if html_auto_close_tag(_doc, name, now) != 0 {
-                return 1;
-            }
-            child = now.next().map(|n| XmlNodePtr::try_from(n).unwrap());
-        }
-        0
+        child = now.next().map(|n| XmlNodePtr::try_from(n).unwrap());
     }
+    0
 }
 
 /*
@@ -6121,25 +6077,30 @@ unsafe fn html_auto_close_on_end(ctxt: HtmlParserCtxtPtr) {
 /// If newtag is NULL this mean we are at the end of the resource
 /// and we should check
 #[doc(alias = "htmlAutoClose")]
-unsafe fn html_auto_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
+unsafe fn html_auto_close(ctxt: HtmlParserCtxtPtr, newtag: Option<&str>) {
     unsafe {
-        while !newtag.is_null()
-            && (*ctxt)
+        if let Some(newtag) = newtag {
+            while (*ctxt)
                 .name
                 .as_deref()
-                .is_some_and(|name| html_check_auto_close(newtag, Some(name)) != 0)
-        {
-            if let Some(end_element) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element) {
-                let name = (*ctxt).name.as_deref().unwrap();
-                end_element((*ctxt).user_data.clone(), name);
+                .is_some_and(|name| html_check_auto_close(newtag, name))
+            {
+                if let Some(end_element) =
+                    (*ctxt).sax.as_deref_mut().and_then(|sax| sax.end_element)
+                {
+                    let name = (*ctxt).name.as_deref().unwrap();
+                    end_element((*ctxt).user_data.clone(), name);
+                }
+                html_name_pop(ctxt);
             }
-            html_name_pop(ctxt);
         }
-        if newtag.is_null() {
+        // Why do we return when newtag is None here,
+        // and why do we also make newtag being None a continuation condition in the next while...?
+        if newtag.is_none() {
             html_auto_close_on_end(ctxt);
             return;
         }
-        while newtag.is_null()
+        while newtag.is_none()
             && (*ctxt)
                 .name
                 .as_deref()
@@ -6182,7 +6143,7 @@ unsafe fn html_name_push(ctxt: HtmlParserCtxtPtr, value: *const XmlChar) -> i32 
 /// called when a new tag has been detected and generates the
 /// appropriates implicit tags if missing
 #[doc(alias = "htmlCheckImplied")]
-unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
+unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: &str) {
     unsafe {
         if (*ctxt).options & HtmlParserOption::HtmlParseNoimplied as i32 != 0 {
             return;
@@ -6190,7 +6151,7 @@ unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
         if HTML_OMITTED_DEFAULT_VALUE.load(Ordering::Relaxed) == 0 {
             return;
         }
-        if xml_str_equal(newtag, c"html".as_ptr() as _) {
+        if newtag == "html" {
             return;
         }
         if (*ctxt).name_tab.is_empty() {
@@ -6201,18 +6162,16 @@ unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
                 start_element((*ctxt).user_data.clone(), "html", &[]);
             }
         }
-        if xml_str_equal(newtag, c"body".as_ptr() as _)
-            || xml_str_equal(newtag, c"head".as_ptr() as _)
-        {
+        if newtag == "body" || newtag == "head" {
             return;
         }
         if (*ctxt).name_tab.len() <= 1
-            && (xml_str_equal(newtag, c"script".as_ptr() as _)
-                || xml_str_equal(newtag, c"style".as_ptr() as _)
-                || xml_str_equal(newtag, c"meta".as_ptr() as _)
-                || xml_str_equal(newtag, c"link".as_ptr() as _)
-                || xml_str_equal(newtag, c"title".as_ptr() as _)
-                || xml_str_equal(newtag, c"base".as_ptr() as _))
+            && (newtag == "script"
+                || newtag == "style"
+                || newtag == "meta"
+                || newtag == "link"
+                || newtag == "title"
+                || newtag == "base")
         {
             if (*ctxt).html >= 3 {
                 // we already saw or generated an <head> before
@@ -6225,10 +6184,7 @@ unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
             {
                 start_element((*ctxt).user_data.clone(), "head", &[]);
             }
-        } else if !xml_str_equal(newtag, c"noframes".as_ptr() as _)
-            && !xml_str_equal(newtag, c"frame".as_ptr() as _)
-            && !xml_str_equal(newtag, c"frameset".as_ptr() as _)
-        {
+        } else if newtag != "noframes" && newtag != "frame" && newtag != "frameset" {
             if (*ctxt).html >= 10 {
                 // we already saw or generated a <body> before
                 return;
@@ -6271,7 +6227,7 @@ macro_rules! grow_buffer {
 ///
 /// Returns the attribute parsed or NULL
 #[doc(alias = "htmlParseHTMLAttribute")]
-unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: XmlChar) -> *mut XmlChar {
+unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: u8) -> *mut XmlChar {
     unsafe {
         let mut buffer: *mut XmlChar;
         let mut buffer_size: i32;
@@ -6797,10 +6753,16 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         }
 
         // Check for auto-closure of HTML elements.
-        html_auto_close(ctxt, name);
+        html_auto_close(
+            ctxt,
+            Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+        );
 
         // Check for implied HTML elements.
-        html_check_implied(ctxt, name);
+        html_check_implied(
+            ctxt,
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+        );
 
         // Avoid html at any level > 0, head at any level != 1
         // or any attempt to recurse body
@@ -6930,87 +6892,83 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
 /// Endtags are only allowed to close elements with lower or equal priority.
 #[repr(C)]
 pub struct ElementPriority {
-    name: *const c_char,
+    name: &'static str,
     priority: i32,
 }
 
 const HTML_END_PRIORITY: &[ElementPriority] = &[
     ElementPriority {
-        name: c"div".as_ptr(),
+        name: "div",
         priority: 150,
     },
     ElementPriority {
-        name: c"td".as_ptr(),
+        name: "td",
         priority: 160,
     },
     ElementPriority {
-        name: c"th".as_ptr(),
+        name: "th",
         priority: 160,
     },
     ElementPriority {
-        name: c"tr".as_ptr(),
+        name: "tr",
         priority: 170,
     },
     ElementPriority {
-        name: c"thead".as_ptr(),
+        name: "thead",
         priority: 180,
     },
     ElementPriority {
-        name: c"tbody".as_ptr(),
+        name: "tbody",
         priority: 180,
     },
     ElementPriority {
-        name: c"tfoot".as_ptr(),
+        name: "tfoot",
         priority: 180,
     },
     ElementPriority {
-        name: c"table".as_ptr(),
+        name: "table",
         priority: 190,
     },
     ElementPriority {
-        name: c"head".as_ptr(),
+        name: "head",
         priority: 200,
     },
     ElementPriority {
-        name: c"body".as_ptr(),
+        name: "body",
         priority: 200,
     },
     ElementPriority {
-        name: c"html".as_ptr(),
+        name: "html",
         priority: 220,
     },
     ElementPriority {
-        name: null(),
+        name: "",
         priority: 100,
     }, /* Default priority */
 ];
 
 /// Return value: The "endtag" priority.
 #[doc(alias = "htmlGetEndPriority")]
-unsafe fn html_get_end_priority(name: *const XmlChar) -> i32 {
-    unsafe {
-        let mut i: usize = 0;
-
-        while !HTML_END_PRIORITY[i].name.is_null()
-            && !xml_str_equal(HTML_END_PRIORITY[i].name as _, name)
-        {
-            i += 1;
-        }
-
-        HTML_END_PRIORITY[i].priority
-    }
+fn html_get_end_priority(name: &str) -> i32 {
+    HTML_END_PRIORITY
+        .iter()
+        .find_map(|entry| (entry.name == name || entry.name.is_empty()).then_some(entry.priority))
+        .unwrap()
 }
 
 /// The HTML DTD allows an ending tag to implicitly close other tags.
 #[doc(alias = "htmlAutoCloseOnClose")]
-unsafe fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
+unsafe fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: &str) {
     unsafe {
-        let priority: i32 = html_get_end_priority(newtag);
+        let priority = html_get_end_priority(newtag);
 
         for i in (0..(*ctxt).name_tab.len()).rev() {
-            if xml_str_equal(newtag, (*ctxt).name_tab[i]) {
-                let newtag = CStr::from_ptr(newtag as *const i8).to_string_lossy();
-                while Some(newtag.as_ref()) != (*ctxt).name.as_deref() {
+            if newtag
+                == CStr::from_ptr((*ctxt).name_tab[i] as *const i8)
+                    .to_string_lossy()
+                    .as_ref()
+            {
+                while Some(newtag) != (*ctxt).name.as_deref() {
                     let info = (*ctxt)
                         .name
                         .as_deref()
@@ -7022,7 +6980,7 @@ unsafe fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlCh
                             XmlParserErrors::XmlErrTagNameMismatch,
                             format!("Opening and ending tag mismatch: {newtag} and {name}\n")
                                 .as_str(),
-                            Some(&newtag),
+                            Some(newtag),
                             Some(name),
                         );
                     }
@@ -7041,7 +6999,12 @@ unsafe fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlCh
             // or equal priority, so if we find an element with higher
             // priority before we find an element with
             // matching name, we just ignore this endtag
-            if html_get_end_priority((*ctxt).name_tab[i]) > priority {
+            if html_get_end_priority(
+                CStr::from_ptr((*ctxt).name_tab[i] as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ) > priority
+            {
                 return;
             }
         }
@@ -7122,7 +7085,10 @@ unsafe fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
             if xml_str_equal(name, (*ctxt).name_tab[i]) {
                 // Check for auto-closure of HTML elements.
 
-                html_auto_close_on_close(ctxt, name);
+                html_auto_close_on_close(
+                    ctxt,
+                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                );
 
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 // Well formedness constraints, opening and closing must match.
@@ -7980,8 +7946,8 @@ unsafe fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
         }
         let tag = (*ctxt).name.as_deref();
         let Some(tag) = tag else {
-            html_auto_close(ctxt, c"p".as_ptr() as _);
-            html_check_implied(ctxt, c"p".as_ptr() as _);
+            html_auto_close(ctxt, Some("p"));
+            html_check_implied(ctxt, "p");
             html_name_push(ctxt, c"p".as_ptr() as _);
             if let Some(start_element) =
                 (*ctxt).sax.as_deref_mut().and_then(|sax| sax.start_element)
@@ -7995,8 +7961,8 @@ unsafe fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
         }
         for &elem in HTML_NO_CONTENT_ELEMENTS {
             if tag == elem {
-                html_auto_close(ctxt, c"p".as_ptr() as _);
-                html_check_implied(ctxt, c"p".as_ptr() as _);
+                html_auto_close(ctxt, Some("p"));
+                html_check_implied(ctxt, "p");
                 html_name_push(ctxt, c"p".as_ptr() as _);
                 if let Some(start_element) =
                     (*ctxt).sax.as_deref_mut().and_then(|sax| sax.start_element)
@@ -8962,9 +8928,15 @@ unsafe fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                 }
 
                 if (*ctxt).name.is_some()
-                    && html_check_auto_close(name, (*ctxt).name.as_deref()) == 1
+                    && html_check_auto_close(
+                        CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                        (*ctxt).name.as_deref().unwrap(),
+                    )
                 {
-                    html_auto_close(ctxt, name);
+                    html_auto_close(
+                        ctxt,
+                        Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+                    );
                     continue;
                 }
             }
