@@ -1120,7 +1120,7 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
             #[cfg(feature = "html")]
             {
                 if (*ctxt).my_doc.is_none() {
-                    (*ctxt).my_doc = html_new_doc_no_dtd(null(), null());
+                    (*ctxt).my_doc = html_new_doc_no_dtd(None, None);
                 }
                 let Some(mut my_doc) = (*ctxt).my_doc else {
                     xml_sax2_err_memory(ctxt, "xmlSAX2StartDocument");
@@ -1366,7 +1366,6 @@ unsafe fn xml_sax2_attribute_internal(
             *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
         };
 
-        let cfullname = CString::new(fullname).unwrap();
         let (ns, name) = if (*ctxt).html != 0 {
             (None, fullname)
         } else {
@@ -1398,11 +1397,9 @@ unsafe fn xml_sax2_attribute_internal(
         #[cfg(not(feature = "html"))]
         let f = false;
         #[cfg(feature = "html")]
-        let f = (*ctxt).html != 0
-            && value.is_null()
-            && html_is_boolean_attr(cfullname.as_ptr() as *const u8) != 0;
+        let f = (*ctxt).html != 0 && value.is_null() && html_is_boolean_attr(fullname);
         if f {
-            nval = xml_strdup(cfullname.as_ptr() as *const u8);
+            nval = xml_strndup(fullname.as_ptr(), fullname.len() as i32);
             value = nval;
         } else {
             #[cfg(feature = "libxml_valid")]

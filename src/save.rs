@@ -1244,7 +1244,7 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Option<Xm
                     .children()
                     .map(|children| XmlNodePtr::try_from(children).unwrap())
                     .is_none_or(|c| c.content.is_null() || *c.content.add(0) == 0)
-                && html_is_boolean_attr(now.name) != 0
+                && html_is_boolean_attr(now.name().as_deref().unwrap())
             {
                 if let Some(children) = now.children() {
                     xml_free_node(children);

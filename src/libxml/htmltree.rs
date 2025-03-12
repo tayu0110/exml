@@ -64,12 +64,12 @@ const HTML_PI_NODE: XmlElementType = XmlElementType::XmlPINode;
 ///
 /// Returns a new document
 #[doc(alias = "htmlNewDoc")]
-pub unsafe fn html_new_doc(uri: *const XmlChar, external_id: *const XmlChar) -> Option<HtmlDocPtr> {
+pub unsafe fn html_new_doc(uri: Option<&str>, external_id: Option<&str>) -> Option<HtmlDocPtr> {
     unsafe {
-        if uri.is_null() && external_id.is_null() {
+        if uri.is_some() && external_id.is_some() {
             return html_new_doc_no_dtd(
-                c"http://www.w3.org/TR/REC-html40/loose.dtd".as_ptr() as _,
-                c"-//W3C//DTD HTML 4.0 Transitional//EN".as_ptr() as _,
+                Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
+                Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
             );
         }
 
@@ -82,8 +82,8 @@ pub unsafe fn html_new_doc(uri: *const XmlChar, external_id: *const XmlChar) -> 
 /// Returns a new document, do not initialize the DTD if not provided
 #[doc(alias = "htmlNewDocNoDtD")]
 pub unsafe fn html_new_doc_no_dtd(
-    uri: *const XmlChar,
-    external_id: *const XmlChar,
+    uri: Option<&str>,
+    external_id: Option<&str>,
 ) -> Option<HtmlDocPtr> {
     unsafe {
         // Allocate a new document and fill the fields.
@@ -110,17 +110,8 @@ pub unsafe fn html_new_doc_no_dtd(
             return None;
         };
         cur.doc = Some(cur);
-        if !external_id.is_null() || !uri.is_null() {
-            xml_create_int_subset(
-                Some(cur),
-                Some("html"),
-                (!external_id.is_null())
-                    .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                    .as_deref(),
-                (!uri.is_null())
-                    .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                    .as_deref(),
-            );
+        if external_id.is_some() || uri.is_some() {
+            xml_create_int_subset(Some(cur), Some("html"), external_id, uri);
         }
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         /* && xmlRegisterNodeDefaultValue() */
@@ -515,11 +506,6 @@ pub unsafe fn html_doc_dump_memory_format(
         if mem.is_null() || size.is_null() {
             return;
         }
-        // if cur.is_null() {
-        //     *mem = null_mut();
-        //     *size = 0;
-        //     return;
-        // }
 
         let handler = if let Some(enc) = html_get_meta_encoding(cur) {
             let e = enc.parse::<XmlCharEncoding>();
@@ -590,10 +576,6 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i3
 
         xml_init_parser();
 
-        // if cur.is_null() {
-        //     return -1;
-        // }
-
         let handler = if let Some(enc) = html_get_meta_encoding(cur) {
             let e = enc.parse::<XmlCharEncoding>();
             if !matches!(e, Ok(XmlCharEncoding::UTF8)) {
@@ -614,7 +596,7 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i3
         let Some(mut buf) = XmlOutputBuffer::from_writer(f, handler) else {
             return -1;
         };
-        html_doc_content_dump_output(&mut buf, Some(cur), null_mut());
+        html_doc_content_dump_output(&mut buf, Some(cur), None);
 
         if buf.error.is_ok() {
             buf.flush();
@@ -630,7 +612,7 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i3
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlSaveFile")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
+pub unsafe fn html_save_file(filename: &str, cur: XmlDocPtr) -> i32 {
     unsafe {
         use std::{cell::RefCell, rc::Rc};
 
@@ -638,13 +620,6 @@ pub unsafe fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
             encoding::{XmlCharEncoding, find_encoding_handler},
             libxml::parser::xml_init_parser,
         };
-
-        // if cur.is_null() {
-        //     return -1;
-        // }
-        if filename.is_null() {
-            return -1;
-        }
 
         xml_init_parser();
 
@@ -666,16 +641,15 @@ pub unsafe fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
         };
 
         // save the content to a temp buffer.
-        let filename = CStr::from_ptr(filename).to_string_lossy();
         let Some(mut buf) = XmlOutputBuffer::from_uri(
-            filename.as_ref(),
+            filename,
             handler.map(|e| Rc::new(RefCell::new(e))),
             cur.compression,
         ) else {
             return 0;
         };
 
-        html_doc_content_dump_output(&mut buf, Some(cur), null_mut());
+        html_doc_content_dump_output(&mut buf, Some(cur), None);
 
         if buf.error.is_ok() {
             buf.flush();
@@ -829,10 +803,6 @@ pub unsafe fn html_save_file_format(
             libxml::parser::xml_init_parser,
         };
 
-        // if cur.is_null() {
-        //     return -1;
-        // }
-
         xml_init_parser();
 
         let handler = if let Some(enc) = encoding.as_ref() {
@@ -880,11 +850,7 @@ pub unsafe fn html_save_file_format(
 /// Dump the HTML document DTD, if any.
 #[doc(alias = "htmlDtdDumpOutput")]
 #[cfg(feature = "libxml_output")]
-unsafe fn html_dtd_dump_output(
-    buf: &mut XmlOutputBuffer,
-    doc: XmlDocPtr,
-    _encoding: *const c_char,
-) {
+unsafe fn html_dtd_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, _encoding: Option<&str>) {
     unsafe {
         let Some(cur) = doc.int_subset else {
             html_save_err(XmlParserErrors::XmlSaveNoDoctype, Some(doc.into()), None);
@@ -945,7 +911,7 @@ unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: Option<XmlDocPtr
             .ok();
         if let Some(children) = cur
             .children()
-            .filter(|_| html_is_boolean_attr(cur.name as _) == 0)
+            .filter(|_| !html_is_boolean_attr(cur.name().as_deref().unwrap()))
         {
             if let Some(value) = children.get_string(doc, 0) {
                 buf.write_str("=").ok();
@@ -1024,7 +990,7 @@ pub unsafe fn html_node_dump_format_output(
                 XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode => {
                     let doc = XmlDocPtr::try_from(cur).unwrap();
                     if doc.int_subset.is_some() {
-                        html_dtd_dump_output(buf, doc, null_mut());
+                        html_dtd_dump_output(buf, doc, None);
                     }
                     if let Some(children) = cur.children() {
                         // Always validate cur.parent when descending.
@@ -1275,7 +1241,7 @@ pub unsafe fn html_node_dump_format_output(
 pub unsafe fn html_doc_content_dump_output(
     buf: &mut XmlOutputBuffer,
     cur: Option<XmlDocPtr>,
-    _encoding: *const c_char,
+    _encoding: Option<&str>,
 ) {
     unsafe {
         html_node_dump_format_output(buf, cur, cur.map(|cur| cur.into()), None, 1);
@@ -1311,7 +1277,7 @@ pub unsafe fn html_node_dump_output(
     buf: &mut XmlOutputBuffer,
     doc: Option<XmlDocPtr>,
     cur: XmlGenericNodePtr,
-    _encoding: *const c_char,
+    _encoding: Option<&str>,
 ) {
     unsafe {
         html_node_dump_format_output(buf, doc, Some(cur), None, 1);
@@ -1321,71 +1287,17 @@ pub unsafe fn html_node_dump_output(
 /// These are the HTML attributes which will be output
 /// in minimized form, i.e. <option selected="selected"> will be
 /// output as <option selected>, as per XSLT 1.0 16.2 "HTML Output Method"
-const HTML_BOOLEAN_ATTRS: &[*const c_char] = &[
-    c"checked".as_ptr() as _,
-    c"compact".as_ptr() as _,
-    c"declare".as_ptr() as _,
-    c"defer".as_ptr() as _,
-    c"disabled".as_ptr() as _,
-    c"ismap".as_ptr() as _,
-    c"multiple".as_ptr() as _,
-    c"nohref".as_ptr() as _,
-    c"noresize".as_ptr() as _,
-    c"noshade".as_ptr() as _,
-    c"nowrap".as_ptr() as _,
-    c"readonly".as_ptr() as _,
-    c"selected".as_ptr() as _,
-    null(),
+const HTML_BOOLEAN_ATTRS: &[&str] = &[
+    "checked", "compact", "declare", "defer", "disabled", "ismap", "multiple", "nohref",
+    "noresize", "noshade", "nowrap", "readonly", "selected",
 ];
 
 /// Determine if a given attribute is a boolean attribute.
 ///
 /// returns: false if the attribute is not boolean, true otherwise.
 #[doc(alias = "htmlIsBooleanAttr")]
-pub unsafe fn html_is_boolean_attr(name: *const XmlChar) -> i32 {
-    unsafe {
-        let mut i: usize = 0;
-
-        while !HTML_BOOLEAN_ATTRS[i].is_null() {
-            if xml_strcasecmp(HTML_BOOLEAN_ATTRS[i] as _, name) == 0 {
-                return 1;
-            }
-            i += 1;
-        }
-        0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
-
-    use super::*;
-
-    #[test]
-    fn test_html_is_boolean_attr() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let name = gen_const_xml_char_ptr(n_name, 0);
-
-                let ret_val = html_is_boolean_attr(name as *const XmlChar);
-                desret_int(ret_val);
-                des_const_xml_char_ptr(n_name, name, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in htmlIsBooleanAttr",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in htmlIsBooleanAttr()");
-                    eprintln!(" {}", n_name);
-                }
-            }
-        }
-    }
+pub fn html_is_boolean_attr(name: &str) -> bool {
+    HTML_BOOLEAN_ATTRS
+        .iter()
+        .any(|&attr| attr.eq_ignore_ascii_case(name))
 }

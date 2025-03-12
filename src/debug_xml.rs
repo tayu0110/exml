@@ -20,7 +20,7 @@
 // Daniel Veillard <daniel@veillard.com>
 
 use std::{
-    ffi::{CStr, CString, c_char},
+    ffi::{CStr, CString},
     io::{Write, stdout},
     ptr::{addr_of_mut, null, null_mut},
 };
@@ -2116,7 +2116,7 @@ impl XmlShellCtxt<'_> {
             if filename.is_empty() {
                 return -1;
             }
-            let cfilename = CString::new(filename).unwrap();
+
             match node.element_type() {
                 XmlElementType::XmlDocumentNode => {
                     if self.doc.is_none_or(|mut doc| doc.save_file(filename) < -1) {
@@ -2126,7 +2126,7 @@ impl XmlShellCtxt<'_> {
                 }
                 XmlElementType::XmlHTMLDocumentNode => {
                     #[cfg(feature = "html")]
-                    if html_save_file(cfilename.as_ptr(), self.doc.unwrap()) < 0 {
+                    if html_save_file(filename, self.doc.unwrap()) < 0 {
                         generic_error!("Failed to write to {filename}\n");
                         return -1;
                     }
@@ -2189,13 +2189,12 @@ impl XmlShellCtxt<'_> {
                     }
                 }
                 XmlElementType::XmlHTMLDocumentNode => {
-                    let cfilename = CString::new(filename).unwrap();
                     #[cfg(feature = "html")]
-                    if html_save_file(cfilename.as_ptr() as *mut c_char, doc) < 0 {
+                    if html_save_file(filename, doc) < 0 {
                         generic_error!("Failed to save to {}\n", filename);
                     }
                     #[cfg(not(feature = "html"))]
-                    if (xml_save_file(filename as *mut c_char, self.doc) < 0) {
+                    if (xml_save_file(filename, self.doc) < 0) {
                         generic_error!("Failed to save to {}\n", filename);
                     }
                 }
