@@ -22,6 +22,7 @@
 // daniel@veillard.com
 
 use std::{
+    borrow::Cow,
     cell::RefCell,
     ffi::{CStr, CString, c_char},
     io::Read,
@@ -33,7 +34,7 @@ use std::{
     sync::atomic::{AtomicI32, Ordering},
 };
 
-use libc::{INT_MAX, bsearch, memcpy, memset, size_t, snprintf, strcmp, strlen};
+use libc::{INT_MAX, bsearch, memcpy, memset, size_t, strcmp};
 
 use crate::{
     encoding::{XmlCharEncoding, detect_encoding, find_encoding_handler},
@@ -52,8 +53,7 @@ use crate::{
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         xmlstring::{
-            XmlChar, xml_str_equal, xml_strcasestr, xml_strcmp, xml_strlen, xml_strncasecmp,
-            xml_strndup,
+            XmlChar, xml_str_equal, xml_strcasestr, xml_strlen, xml_strncasecmp, xml_strndup,
         },
     },
     parser::{
@@ -98,7 +98,7 @@ pub struct HtmlElemDesc {
     pub(crate) depr: c_char,         /* Is this a deprecated element ? */
     pub(crate) dtd: c_char,          /* 1: only in Loose DTD, 2: only Frameset one */
     pub(crate) isinline: c_char,     /* is this a block 0 or inline 1 element */
-    pub(crate) desc: *const c_char,  /* the description */
+    pub(crate) desc: &'static str,   /* the description */
 
     // NRK Jan.2003
     // New fields encapsulating HTML structure
@@ -110,20 +110,20 @@ pub struct HtmlElemDesc {
     //     are allowed.  Some element relationships are not fully represented:
     //     these are flagged with the word MODIFIER
     pub(crate) subelts: &'static [&'static str], /* allowed sub-elements of this element */
-    pub(crate) defaultsubelt: *const c_char,     /* subelement for suggested auto-repair
+    pub(crate) defaultsubelt: Option<&'static str>, /* subelement for suggested auto-repair
                                                  if necessary or null_mut() */
-    pub(crate) attrs_opt: *mut *const c_char, /* Optional Attributes */
-    pub(crate) attrs_depr: *mut *const c_char, /* Additional deprecated attributes */
-    pub(crate) attrs_req: *mut *const c_char, /* Required attributes */
+    pub(crate) attrs_opt: &'static [&'static str], /* Optional Attributes */
+    pub(crate) attrs_depr: &'static [&'static str], /* Additional deprecated attributes */
+    pub(crate) attrs_req: &'static [&'static str], /* Required attributes */
 }
 
 pub type HtmlEntityDescPtr = *mut HtmlEntityDesc;
 /// Internal description of an HTML entity.
 pub struct HtmlEntityDesc {
-    value: u32,          /* the UNICODE value for the character */
-    name: *const c_char, /* The entity name */
+    value: u32,         /* the UNICODE value for the character */
+    name: &'static str, /* The entity name */
     #[allow(unused)]
-    desc: *const c_char, /* the description */
+    desc: &'static str, /* the description */
 }
 
 const HTML_FLOW: &[&str] = &[
@@ -202,80 +202,64 @@ const HTML_INLINE: &[&str] = &[
 const HTML_PCDATA: &[&str] = &[];
 const HTML_CDATA: &[&str] = HTML_PCDATA;
 
-const HTML_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    null(),
+const HTML_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
 ];
-const CORE_I18N_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    null(),
-];
-const CORE_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    null(),
-];
-const I18N_ATTRS: &[*const c_char] = &["lang".as_ptr() as _, c"dir".as_ptr() as _, null()];
+const CORE_I18N_ATTRS: &[&str] = &["id", "class", "style", "title", "lang", "dir"];
+const CORE_ATTRS: &[&str] = &["id", "class", "style", "title"];
+const I18N_ATTRS: &[&str] = &["lang", "dir"];
 
 // Other declarations that should go inline ...
-const A_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"charset".as_ptr() as _,
-    c"type".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"href".as_ptr() as _,
-    c"hreflang".as_ptr() as _,
-    c"rel".as_ptr() as _,
-    c"rev".as_ptr() as _,
-    c"accesskey".as_ptr() as _,
-    c"shape".as_ptr() as _,
-    c"coords".as_ptr() as _,
-    c"tabindex".as_ptr() as _,
-    c"onfocus".as_ptr() as _,
-    c"onblur".as_ptr() as _,
-    null(),
+const A_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "charset",
+    "type",
+    "name",
+    "href",
+    "hreflang",
+    "rel",
+    "rev",
+    "accesskey",
+    "shape",
+    "coords",
+    "tabindex",
+    "onfocus",
+    "onblur",
 ];
-const TARGET_ATTR: &[*const c_char] = &[c"target".as_ptr() as _, null()];
-const ROWS_COLS_ATTR: &[*const c_char] = &[c"rows".as_ptr() as _, c"cols".as_ptr() as _, null()];
-const ALT_ATTR: &[*const c_char] = &[c"alt".as_ptr() as _, null()];
-const SRC_ALT_ATTRS: &[*const c_char] = &[c"src".as_ptr() as _, c"alt".as_ptr() as _, null()];
-const HREF_ATTRS: &[*const c_char] = &[c"href".as_ptr() as _, null()];
-const CLEAR_ATTRS: &[*const c_char] = &[c"clear".as_ptr() as _, null()];
+const TARGET_ATTR: &[&str] = &["target"];
+const ROWS_COLS_ATTR: &[&str] = &["rows", "cols"];
+const ALT_ATTR: &[&str] = &["alt"];
+const SRC_ALT_ATTRS: &[&str] = &["src", "alt"];
+const HREF_ATTRS: &[&str] = &["href"];
+const CLEAR_ATTRS: &[&str] = &["clear"];
 const INLINE_P: &[&str] = &[
     "tt", "i", "b", "u", "s", "strike", "big", "small", "em", "strong", "dfn", "code", "samp",
     "kbd", "var", "cite", "abbr", "acronym", "a", "img", "applet", "embed", "object", "font",
@@ -349,58 +333,38 @@ const FLOW_PARAM: &[&str] = &[
     "button",
     "param",
 ];
-const APPLET_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"codebase".as_ptr() as _,
-    c"archive".as_ptr() as _,
-    c"alt".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"height".as_ptr() as _,
-    c"width".as_ptr() as _,
-    c"align".as_ptr() as _,
-    c"hspace".as_ptr() as _,
-    c"vspace".as_ptr() as _,
-    null(),
+const APPLET_ATTRS: &[&str] = &[
+    "id", "class", "style", "title", "codebase", "archive", "alt", "name", "height", "width",
+    "align", "hspace", "vspace",
 ];
-const AREA_ATTRS: &[*const c_char] = &[
-    c"shape".as_ptr() as _,
-    c"coords".as_ptr() as _,
-    c"href".as_ptr() as _,
-    c"nohref".as_ptr() as _,
-    c"tabindex".as_ptr() as _,
-    c"accesskey".as_ptr() as _,
-    c"onfocus".as_ptr() as _,
-    c"onblur".as_ptr() as _,
-    null(),
+const AREA_ATTRS: &[&str] = &[
+    "shape",
+    "coords",
+    "href",
+    "nohref",
+    "tabindex",
+    "accesskey",
+    "onfocus",
+    "onblur",
 ];
-const BASEFONT_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"size".as_ptr() as _,
-    c"color".as_ptr() as _,
-    c"face".as_ptr() as _,
-    null(),
-];
-const QUOTE_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    null(),
+const BASEFONT_ATTRS: &[&str] = &["id", "size", "color", "face"];
+const QUOTE_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "cite",
 ];
 const BODY_CONTENTS: &[&str] = &[
     "h1",
@@ -469,129 +433,116 @@ const BODY_CONTENTS: &[&str] = &[
     "ins",
     "del",
 ];
-const BODY_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"onload".as_ptr() as _,
-    c"onunload".as_ptr() as _,
-    null(),
+const BODY_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "onload",
+    "onunload",
 ];
-const BODY_DEPR: &[*const c_char] = &[
-    c"background".as_ptr() as _,
-    c"bgcolor".as_ptr() as _,
-    c"text".as_ptr() as _,
-    c"link".as_ptr() as _,
-    c"vlink".as_ptr() as _,
-    c"alink".as_ptr() as _,
-    null(),
-];
-const BUTTON_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"value".as_ptr() as _,
-    c"type".as_ptr() as _,
-    c"disabled".as_ptr() as _,
-    c"tabindex".as_ptr() as _,
-    c"accesskey".as_ptr() as _,
-    c"onfocus".as_ptr() as _,
-    c"onblur".as_ptr() as _,
-    null(),
+const BODY_DEPR: &[&str] = &["background", "bgcolor", "text", "link", "vlink", "alink"];
+const BUTTON_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "name",
+    "value",
+    "type",
+    "disabled",
+    "tabindex",
+    "accesskey",
+    "onfocus",
+    "onblur",
 ];
 
-const COL_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"width".as_ptr() as _,
-    c"align".as_ptr() as _,
-    c"char".as_ptr() as _,
-    c"charoff".as_ptr() as _,
-    c"valign".as_ptr() as _,
-    null(),
+const COL_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "span",
+    "width",
+    "align",
+    "char",
+    "charoff",
+    "valign",
 ];
 const COL_ELT: &[&str] = &["col"];
-const EDIT_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"datetime".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    null(),
+const EDIT_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "datetime",
+    "cite",
 ];
-const COMPACT_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"compact".as_ptr() as _,
-    null(),
+const COMPACT_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "compact",
 ];
 const DL_CONTENTS: &[&str] = &["dt", "dd"];
-const COMPACT_ATTR: &[*const c_char] = &[c"compact".as_ptr() as _, null()];
-const LABEL_ATTR: &[*const c_char] = &[c"label".as_ptr() as _, null()];
+const COMPACT_ATTR: &[&str] = &["compact"];
+const LABEL_ATTR: &[&str] = &["label"];
 const FIELDSET_CONTENTS: &[&str] = &[
     "h1",
     "h2",
@@ -658,17 +609,8 @@ const FIELDSET_CONTENTS: &[&str] = &[
     "button",
     "legend",
 ];
-const FONT_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"size".as_ptr() as _,
-    c"color".as_ptr() as _,
-    c"face".as_ptr() as _,
-    null(),
+const FONT_ATTRS: &[&str] = &[
+    "id", "class", "style", "title", "lang", "dir", "size", "color", "face",
 ];
 const FORM_CONTENTS: &[&str] = &[
     "h1",
@@ -733,255 +675,218 @@ const FORM_CONTENTS: &[&str] = &[
     "fieldset",
     "address",
 ];
-const FORM_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"method".as_ptr() as _,
-    c"enctype".as_ptr() as _,
-    c"accept".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"onsubmit".as_ptr() as _,
-    c"onreset".as_ptr() as _,
-    c"accept-charset".as_ptr() as _,
-    null(),
+const FORM_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "method",
+    "enctype",
+    "accept",
+    "name",
+    "onsubmit",
+    "onreset",
+    "accept-charset",
 ];
-const FRAME_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"longdesc".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"src".as_ptr() as _,
-    c"frameborder".as_ptr() as _,
-    c"marginwidth".as_ptr() as _,
-    c"marginheight".as_ptr() as _,
-    c"noresize".as_ptr() as _,
-    c"scrolling".as_ptr() as _,
-    null(),
+const FRAME_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "longdesc",
+    "name",
+    "src",
+    "frameborder",
+    "marginwidth",
+    "marginheight",
+    "noresize",
+    "scrolling",
 ];
-const FRAMESET_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"rows".as_ptr() as _,
-    c"cols".as_ptr() as _,
-    c"onload".as_ptr() as _,
-    c"onunload".as_ptr() as _,
-    null(),
+const FRAMESET_ATTRS: &[&str] = &[
+    "id", "class", "style", "title", "rows", "cols", "onload", "onunload",
 ];
 const FRAMESET_CONTENTS: &[&str] = &["frameset", "frame", "noframes"];
-const HEAD_ATTRS: &[*const c_char] = &[
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"profile".as_ptr() as _,
-    null(),
-];
+const HEAD_ATTRS: &[&str] = &["lang", "dir", "profile"];
 const HEAD_CONTENTS: &[&str] = &[
     "title", "isindex", "base", "script", "style", "meta", "link", "object",
 ];
-const HR_DEPR: &[*const c_char] = &[
-    c"align".as_ptr() as _,
-    c"noshade".as_ptr() as _,
-    c"size".as_ptr() as _,
-    c"width".as_ptr() as _,
-    null(),
-];
-const VERSION_ATTR: &[*const c_char] = &[c"version".as_ptr() as _, null()];
+const HR_DEPR: &[&str] = &["align", "noshade", "size", "width"];
+const VERSION_ATTR: &[&str] = &["version"];
 const HTML_CONTENT: &[&str] = &["head", "body", "frameset"];
-const IFRAME_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"longdesc".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"src".as_ptr() as _,
-    c"frameborder".as_ptr() as _,
-    c"marginwidth".as_ptr() as _,
-    c"marginheight".as_ptr() as _,
-    c"scrolling".as_ptr() as _,
-    c"align".as_ptr() as _,
-    c"height".as_ptr() as _,
-    c"width".as_ptr() as _,
-    null(),
+const IFRAME_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "longdesc",
+    "name",
+    "src",
+    "frameborder",
+    "marginwidth",
+    "marginheight",
+    "scrolling",
+    "align",
+    "height",
+    "width",
 ];
-const IMG_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"longdesc".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"height".as_ptr() as _,
-    c"width".as_ptr() as _,
-    c"usemap".as_ptr() as _,
-    c"ismap".as_ptr() as _,
-    null(),
+const IMG_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "longdesc",
+    "name",
+    "height",
+    "width",
+    "usemap",
+    "ismap",
 ];
-const EMBED_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"align".as_ptr() as _,
-    c"alt".as_ptr() as _,
-    c"border".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"codebase".as_ptr() as _,
-    c"frameborder".as_ptr() as _,
-    c"height".as_ptr() as _,
-    c"hidden".as_ptr() as _,
-    c"hspace".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"palette".as_ptr() as _,
-    c"pluginspace".as_ptr() as _,
-    c"pluginurl".as_ptr() as _,
-    c"src".as_ptr() as _,
-    c"type".as_ptr() as _,
-    c"units".as_ptr() as _,
-    c"vspace".as_ptr() as _,
-    c"width".as_ptr() as _,
-    null(),
+const EMBED_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "align",
+    "alt",
+    "border",
+    "code",
+    "codebase",
+    "frameborder",
+    "height",
+    "hidden",
+    "hspace",
+    "name",
+    "palette",
+    "pluginspace",
+    "pluginurl",
+    "src",
+    "type",
+    "units",
+    "vspace",
+    "width",
 ];
-const INPUT_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"type".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"value".as_ptr() as _,
-    c"checked".as_ptr() as _,
-    c"disabled".as_ptr() as _,
-    c"readonly".as_ptr() as _,
-    c"size".as_ptr() as _,
-    c"maxlength".as_ptr() as _,
-    c"src".as_ptr() as _,
-    c"alt".as_ptr() as _,
-    c"usemap".as_ptr() as _,
-    c"ismap".as_ptr() as _,
-    c"tabindex".as_ptr() as _,
-    c"accesskey".as_ptr() as _,
-    c"onfocus".as_ptr() as _,
-    c"onblur".as_ptr() as _,
-    c"onselect".as_ptr() as _,
-    c"onchange".as_ptr() as _,
-    c"accept".as_ptr() as _,
-    null(),
+const INPUT_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "type",
+    "name",
+    "value",
+    "checked",
+    "disabled",
+    "readonly",
+    "size",
+    "maxlength",
+    "src",
+    "alt",
+    "usemap",
+    "ismap",
+    "tabindex",
+    "accesskey",
+    "onfocus",
+    "onblur",
+    "onselect",
+    "onchange",
+    "accept",
 ];
-const PROMPT_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"prompt".as_ptr() as _,
-    null(),
+const PROMPT_ATTRS: &[&str] = &["id", "class", "style", "title", "lang", "dir", "prompt"];
+const LABEL_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "for",
+    "accesskey",
+    "onfocus",
+    "onblur",
 ];
-const LABEL_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"for".as_ptr() as _,
-    c"accesskey".as_ptr() as _,
-    c"onfocus".as_ptr() as _,
-    c"onblur".as_ptr() as _,
-    null(),
+const LEGEND_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "accesskey",
 ];
-const LEGEND_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"accesskey".as_ptr() as _,
-    null(),
-];
-const ALIGN_ATTR: &[*const c_char] = &[c"align".as_ptr() as _, null()];
-const LINK_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"charset".as_ptr() as _,
-    c"href".as_ptr() as _,
-    c"hreflang".as_ptr() as _,
-    c"type".as_ptr() as _,
-    c"rel".as_ptr() as _,
-    c"rev".as_ptr() as _,
-    c"media".as_ptr() as _,
-    null(),
+const ALIGN_ATTR: &[&str] = &["align"];
+const LINK_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "charset",
+    "href",
+    "hreflang",
+    "type",
+    "rel",
+    "rev",
+    "media",
 ];
 const MAP_CONTENTS: &[&str] = &[
     "h1",
@@ -1010,8 +915,8 @@ const MAP_CONTENTS: &[&str] = &[
     "address",
     "area",
 ];
-const NAME_ATTR: &[*const c_char] = &[c"name".as_ptr() as _, null()];
-const ACTION_ATTR: &[*const c_char] = &[c"action".as_ptr() as _, null()];
+const NAME_ATTR: &[&str] = &["name"];
+const ACTION_ATTR: &[&str] = &["action"];
 const BLOCKLI_ELT: &[&str] = &[
     "h1",
     "h2",
@@ -1039,17 +944,9 @@ const BLOCKLI_ELT: &[&str] = &[
     "address",
     "li",
 ];
-const META_ATTRS: &[*const c_char] = &[
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"http-equiv".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"scheme".as_ptr() as _,
-    c"charset".as_ptr() as _,
-    null(),
-];
-const CONTENT_ATTR: &[*const c_char] = &[c"content".as_ptr() as _, null()];
-const TYPE_ATTR: &[*const c_char] = &[c"type".as_ptr() as _, null()];
+const META_ATTRS: &[&str] = &["lang", "dir", "http-equiv", "name", "scheme", "charset"];
+const CONTENT_ATTR: &[&str] = &["content"];
+const TYPE_ATTR: &[&str] = &["type"];
 const NOFRAMES_CONTENT: &[&str] = &[
     "body",
     "h1",
@@ -1182,267 +1079,223 @@ const OBJECT_CONTENTS: &[&str] = &[
     "button",
     "param",
 ];
-const OBJECT_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"declare".as_ptr() as _,
-    c"classid".as_ptr() as _,
-    c"codebase".as_ptr() as _,
-    c"data".as_ptr() as _,
-    c"type".as_ptr() as _,
-    c"codetype".as_ptr() as _,
-    c"archive".as_ptr() as _,
-    c"standby".as_ptr() as _,
-    c"height".as_ptr() as _,
-    c"width".as_ptr() as _,
-    c"usemap".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"tabindex".as_ptr() as _,
-    null(),
+const OBJECT_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "declare",
+    "classid",
+    "codebase",
+    "data",
+    "type",
+    "codetype",
+    "archive",
+    "standby",
+    "height",
+    "width",
+    "usemap",
+    "name",
+    "tabindex",
 ];
-const OBJECT_DEPR: &[*const c_char] = &[
-    c"align".as_ptr() as _,
-    c"border".as_ptr() as _,
-    c"hspace".as_ptr() as _,
-    c"vspace".as_ptr() as _,
-    null(),
-];
-const OL_ATTRS: &[*const c_char] = &[
-    c"type".as_ptr() as _,
-    c"compact".as_ptr() as _,
-    c"start".as_ptr() as _,
-    null(),
-];
+const OBJECT_DEPR: &[&str] = &["align", "border", "hspace", "vspace"];
+const OL_ATTRS: &[&str] = &["type", "compact", "start"];
 const OPTION_ELT: &[&str] = &["option"];
-const OPTGROUP_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"disabled".as_ptr() as _,
-    null(),
+const OPTGROUP_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "disabled",
 ];
-const OPTION_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"disabled".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"selected".as_ptr() as _,
-    c"value".as_ptr() as _,
-    null(),
+const OPTION_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "disabled",
+    "label",
+    "selected",
+    "value",
 ];
-const PARAM_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"value".as_ptr() as _,
-    c"valuetype".as_ptr() as _,
-    c"type".as_ptr() as _,
-    null(),
-];
-const WIDTH_ATTR: &[*const c_char] = &[c"width".as_ptr() as _, null()];
+const PARAM_ATTRS: &[&str] = &["id", "value", "valuetype", "type"];
+const WIDTH_ATTR: &[&str] = &["width"];
 const PRE_CONTENT: &[&str] = &[
     "em", "strong", "dfn", "code", "samp", "kbd", "var", "cite", "abbr", "acronym", "tt", "i", "b",
     "u", "s", "strike", "a", "br", "script", "map", "q", "span", "bdo", "iframe",
 ];
-const SCRIPT_ATTRS: &[*const c_char] = &[
-    c"charset".as_ptr() as _,
-    c"src".as_ptr() as _,
-    c"defer".as_ptr() as _,
-    c"event".as_ptr() as _,
-    c"for".as_ptr() as _,
-    null(),
-];
-const LANGUAGE_ATTR: &[*const c_char] = &[c"language".as_ptr() as _, null()];
+const SCRIPT_ATTRS: &[&str] = &["charset", "src", "defer", "event", "for"];
+const LANGUAGE_ATTR: &[&str] = &["language"];
 const SELECT_CONTENT: &[&str] = &["optgroup", "option"];
-const SELECT_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"size".as_ptr() as _,
-    c"multiple".as_ptr() as _,
-    c"disabled".as_ptr() as _,
-    c"tabindex".as_ptr() as _,
-    c"onfocus".as_ptr() as _,
-    c"onblur".as_ptr() as _,
-    c"onchange".as_ptr() as _,
-    null(),
+const SELECT_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "name",
+    "size",
+    "multiple",
+    "disabled",
+    "tabindex",
+    "onfocus",
+    "onblur",
+    "onchange",
 ];
-const STYLE_ATTRS: &[*const c_char] = &[
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"media".as_ptr() as _,
-    c"title".as_ptr() as _,
-    null(),
+const STYLE_ATTRS: &[&str] = &["lang", "dir", "media", "title"];
+const TABLE_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "summary",
+    "width",
+    "border",
+    "frame",
+    "rules",
+    "cellspacing",
+    "cellpadding",
+    "datapagesize",
 ];
-const TABLE_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"summary".as_ptr() as _,
-    c"width".as_ptr() as _,
-    c"border".as_ptr() as _,
-    c"frame".as_ptr() as _,
-    c"rules".as_ptr() as _,
-    c"cellspacing".as_ptr() as _,
-    c"cellpadding".as_ptr() as _,
-    c"datapagesize".as_ptr() as _,
-    null(),
-];
-const TABLE_DEPR: &[*const c_char] = &[c"align".as_ptr() as _, c"bgcolor".as_ptr() as _, null()];
+const TABLE_DEPR: &[&str] = &["align", "bgcolor"];
 const TABLE_CONTENTS: &[&str] = &[
     "caption", "col", "colgroup", "thead", "tfoot", "tbody", "tr",
 ];
 const TR_ELT: &[&str] = &["tr"];
-const TALIGN_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"align".as_ptr() as _,
-    c"char".as_ptr() as _,
-    c"charoff".as_ptr() as _,
-    c"valign".as_ptr() as _,
-    null(),
+const TALIGN_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "align",
+    "char",
+    "charoff",
+    "valign",
 ];
-const TH_TD_DEPR: &[*const c_char] = &[
-    c"nowrap".as_ptr() as _,
-    c"bgcolor".as_ptr() as _,
-    c"width".as_ptr() as _,
-    c"height".as_ptr() as _,
-    null(),
+const TH_TD_DEPR: &[&str] = &["nowrap", "bgcolor", "width", "height"];
+const TH_TD_ATTR: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "abbr",
+    "axis",
+    "headers",
+    "scope",
+    "rowspan",
+    "colspan",
+    "align",
+    "char",
+    "charoff",
+    "valign",
 ];
-const TH_TD_ATTR: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"axis".as_ptr() as _,
-    c"headers".as_ptr() as _,
-    c"scope".as_ptr() as _,
-    c"rowspan".as_ptr() as _,
-    c"colspan".as_ptr() as _,
-    c"align".as_ptr() as _,
-    c"char".as_ptr() as _,
-    c"charoff".as_ptr() as _,
-    c"valign".as_ptr() as _,
-    null(),
-];
-const TEXTAREA_ATTRS: &[*const c_char] = &[
-    c"id".as_ptr() as _,
-    c"class".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"title".as_ptr() as _,
-    c"lang".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"name".as_ptr() as _,
-    c"disabled".as_ptr() as _,
-    c"readonly".as_ptr() as _,
-    c"tabindex".as_ptr() as _,
-    c"accesskey".as_ptr() as _,
-    c"onfocus".as_ptr() as _,
-    c"onblur".as_ptr() as _,
-    c"onselect".as_ptr() as _,
-    c"onchange".as_ptr() as _,
-    null(),
+const TEXTAREA_ATTRS: &[&str] = &[
+    "id",
+    "class",
+    "style",
+    "title",
+    "lang",
+    "dir",
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "name",
+    "disabled",
+    "readonly",
+    "tabindex",
+    "accesskey",
+    "onfocus",
+    "onblur",
+    "onselect",
+    "onchange",
 ];
 const TR_CONTENTS: &[&str] = &["th", "td"];
-const BGCOLOR_ATTR: &[*const c_char] = &[c"bgcolor".as_ptr() as _, null()];
+const BGCOLOR_ATTR: &[&str] = &["bgcolor"];
 const LI_ELT: &[&str] = &["li"];
-const UL_DEPR: &[*const c_char] = &[c"type".as_ptr() as _, c"compact".as_ptr() as _, null()];
-const DIR_ATTR: &[*const c_char] = &[c"dir".as_ptr() as _, null()];
+const UL_DEPR: &[&str] = &["type", "compact"];
+const DIR_ATTR: &[&str] = &["dir"];
 
 const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
     HtmlElemDesc {
@@ -1454,12 +1307,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"anchor ".as_ptr() as _,
+        desc: "anchor ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: A_ATTRS.as_ptr() as _,
-        attrs_depr: TARGET_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: A_ATTRS,
+        attrs_depr: TARGET_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "abbr",
@@ -1470,12 +1323,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"abbreviated form".as_ptr() as _,
+        desc: "abbreviated form",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "acronym",
@@ -1486,12 +1339,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"".as_ptr() as _,
+        desc: "",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "address",
@@ -1502,12 +1355,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"information on author ".as_ptr() as _,
+        desc: "information on author ",
         subelts: INLINE_P,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "applet",
@@ -1518,12 +1371,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 2,
-        desc: c"java applet ".as_ptr() as _,
+        desc: "java applet ",
         subelts: FLOW_PARAM,
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: APPLET_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: APPLET_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "area",
@@ -1534,12 +1387,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"client-side image map area ".as_ptr() as _,
+        desc: "client-side image map area ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: AREA_ATTRS.as_ptr() as _,
-        attrs_depr: TARGET_ATTR.as_ptr() as _,
-        attrs_req: ALT_ATTR.as_ptr() as _,
+        defaultsubelt: None,
+        attrs_opt: AREA_ATTRS,
+        attrs_depr: TARGET_ATTR,
+        attrs_req: ALT_ATTR,
     },
     HtmlElemDesc {
         name: "b",
@@ -1550,12 +1403,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"bold text style".as_ptr() as _,
+        desc: "bold text style",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "base",
@@ -1566,12 +1419,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"document base uri ".as_ptr() as _,
+        desc: "document base uri ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: TARGET_ATTR.as_ptr() as _,
-        attrs_req: HREF_ATTRS.as_ptr() as _,
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: TARGET_ATTR,
+        attrs_req: HREF_ATTRS,
     },
     HtmlElemDesc {
         name: "basefont",
@@ -1582,12 +1435,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 1,
-        desc: c"base font size ".as_ptr() as _,
+        desc: "base font size ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: BASEFONT_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: BASEFONT_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "bdo",
@@ -1598,12 +1451,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"i18n bidi over-ride ".as_ptr() as _,
+        desc: "i18n bidi over-ride ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: CORE_I18N_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: DIR_ATTR.as_ptr() as _,
+        defaultsubelt: None,
+        attrs_opt: CORE_I18N_ATTRS,
+        attrs_depr: &[],
+        attrs_req: DIR_ATTR,
     },
     HtmlElemDesc {
         name: "big",
@@ -1614,12 +1467,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"large text style".as_ptr() as _,
+        desc: "large text style",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "blockquote",
@@ -1630,12 +1483,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"long quotation ".as_ptr() as _,
+        desc: "long quotation ",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: QUOTE_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: QUOTE_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "body",
@@ -1646,12 +1499,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"document body ".as_ptr() as _,
+        desc: "document body ",
         subelts: BODY_CONTENTS,
-        defaultsubelt: c"div".as_ptr() as _,
-        attrs_opt: BODY_ATTRS.as_ptr() as _,
-        attrs_depr: BODY_DEPR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: Some("div"),
+        attrs_opt: BODY_ATTRS,
+        attrs_depr: BODY_DEPR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "br",
@@ -1662,12 +1515,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"forced line break ".as_ptr() as _,
+        desc: "forced line break ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: CORE_ATTRS.as_ptr() as _,
-        attrs_depr: CLEAR_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: CORE_ATTRS,
+        attrs_depr: CLEAR_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "button",
@@ -1678,12 +1531,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 2,
-        desc: c"push button ".as_ptr() as _,
+        desc: "push button ",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: BUTTON_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: BUTTON_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "caption",
@@ -1694,12 +1547,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"table caption ".as_ptr() as _,
+        desc: "table caption ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "center",
@@ -1710,12 +1563,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 0,
-        desc: c"shorthand for div align=center ".as_ptr() as _,
+        desc: "shorthand for div align=center ",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: HTML_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: HTML_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "cite",
@@ -1726,12 +1579,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"citation".as_ptr() as _,
+        desc: "citation",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "code",
@@ -1742,12 +1595,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"computer code fragment".as_ptr() as _,
+        desc: "computer code fragment",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "col",
@@ -1758,12 +1611,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"table column ".as_ptr() as _,
+        desc: "table column ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: COL_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: COL_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "colgroup",
@@ -1774,12 +1627,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"table column group ".as_ptr() as _,
+        desc: "table column group ",
         subelts: COL_ELT,
-        defaultsubelt: c"col".as_ptr() as _,
-        attrs_opt: COL_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: Some("col"),
+        attrs_opt: COL_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "dd",
@@ -1790,12 +1643,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"definition description ".as_ptr() as _,
+        desc: "definition description ",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "del",
@@ -1806,12 +1659,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 2,
-        desc: c"deleted text ".as_ptr() as _,
+        desc: "deleted text ",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: EDIT_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: EDIT_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "dfn",
@@ -1822,12 +1675,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"instance definition".as_ptr() as _,
+        desc: "instance definition",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "dir",
@@ -1838,12 +1691,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 0,
-        desc: c"directory list".as_ptr() as _,
+        desc: "directory list",
         subelts: BLOCKLI_ELT,
-        defaultsubelt: c"li".as_ptr() as _,
-        attrs_opt: null_mut(),
-        attrs_depr: COMPACT_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: Some("li"),
+        attrs_opt: &[],
+        attrs_depr: COMPACT_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "div",
@@ -1854,12 +1707,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"generic language/style container".as_ptr() as _,
+        desc: "generic language/style container",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "dl",
@@ -1870,12 +1723,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"definition list ".as_ptr() as _,
+        desc: "definition list ",
         subelts: DL_CONTENTS,
-        defaultsubelt: c"dd".as_ptr() as _,
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: COMPACT_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: Some("dd"),
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: COMPACT_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "dt",
@@ -1886,12 +1739,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"definition term ".as_ptr() as _,
+        desc: "definition term ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "em",
@@ -1902,12 +1755,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"emphasis".as_ptr() as _,
+        desc: "emphasis",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "embed",
@@ -1918,12 +1771,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 1,
-        desc: c"generic embedded object ".as_ptr() as _,
+        desc: "generic embedded object ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: EMBED_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: EMBED_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "fieldset",
@@ -1934,12 +1787,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"form control group ".as_ptr() as _,
+        desc: "form control group ",
         subelts: FIELDSET_CONTENTS,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "font",
@@ -1950,12 +1803,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 1,
-        desc: c"local change to font ".as_ptr() as _,
+        desc: "local change to font ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: FONT_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: FONT_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "form",
@@ -1966,12 +1819,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"interactive form ".as_ptr() as _,
+        desc: "interactive form ",
         subelts: FORM_CONTENTS,
-        defaultsubelt: c"fieldset".as_ptr() as _,
-        attrs_opt: FORM_ATTRS.as_ptr() as _,
-        attrs_depr: TARGET_ATTR.as_ptr() as _,
-        attrs_req: ACTION_ATTR.as_ptr() as _,
+        defaultsubelt: Some("fieldset"),
+        attrs_opt: FORM_ATTRS,
+        attrs_depr: TARGET_ATTR,
+        attrs_req: ACTION_ATTR,
     },
     HtmlElemDesc {
         name: "frame",
@@ -1982,12 +1835,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 2,
         isinline: 0,
-        desc: c"subwindow ".as_ptr() as _,
+        desc: "subwindow ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: FRAME_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: FRAME_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "frameset",
@@ -1998,12 +1851,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 2,
         isinline: 0,
-        desc: c"window subdivision".as_ptr() as _,
+        desc: "window subdivision",
         subelts: FRAMESET_CONTENTS,
-        defaultsubelt: c"noframes".as_ptr() as _,
-        attrs_opt: null_mut(),
-        attrs_depr: FRAMESET_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: Some("noframes"),
+        attrs_opt: &[],
+        attrs_depr: FRAMESET_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "h1",
@@ -2014,12 +1867,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"heading ".as_ptr() as _,
+        desc: "heading ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "h2",
@@ -2030,12 +1883,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"heading ".as_ptr() as _,
+        desc: "heading ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "h3",
@@ -2046,12 +1899,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"heading ".as_ptr() as _,
+        desc: "heading ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "h4",
@@ -2062,12 +1915,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"heading ".as_ptr() as _,
+        desc: "heading ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "h5",
@@ -2078,12 +1931,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"heading ".as_ptr() as _,
+        desc: "heading ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "h6",
@@ -2094,12 +1947,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"heading ".as_ptr() as _,
+        desc: "heading ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "head",
@@ -2110,12 +1963,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"document head ".as_ptr() as _,
+        desc: "document head ",
         subelts: HEAD_CONTENTS,
-        defaultsubelt: null_mut(),
-        attrs_opt: HEAD_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HEAD_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "hr",
@@ -2126,12 +1979,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"horizontal rule ".as_ptr() as _,
+        desc: "horizontal rule ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: HR_DEPR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: HR_DEPR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "html",
@@ -2142,12 +1995,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"document root element ".as_ptr() as _,
+        desc: "document root element ",
         subelts: HTML_CONTENT,
-        defaultsubelt: null_mut(),
-        attrs_opt: I18N_ATTRS.as_ptr() as _,
-        attrs_depr: VERSION_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: I18N_ATTRS,
+        attrs_depr: VERSION_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "i",
@@ -2158,12 +2011,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"italic text style".as_ptr() as _,
+        desc: "italic text style",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "iframe",
@@ -2174,12 +2027,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 1,
         isinline: 2,
-        desc: c"inline subwindow ".as_ptr() as _,
+        desc: "inline subwindow ",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: IFRAME_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: IFRAME_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "img",
@@ -2190,12 +2043,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"embedded image ".as_ptr() as _,
+        desc: "embedded image ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: IMG_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: SRC_ALT_ATTRS.as_ptr() as _,
+        defaultsubelt: None,
+        attrs_opt: IMG_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: SRC_ALT_ATTRS,
     },
     HtmlElemDesc {
         name: "input",
@@ -2206,12 +2059,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"form control ".as_ptr() as _,
+        desc: "form control ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: INPUT_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: INPUT_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "ins",
@@ -2222,12 +2075,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 2,
-        desc: c"inserted text".as_ptr() as _,
+        desc: "inserted text",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: EDIT_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: EDIT_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "isindex",
@@ -2238,12 +2091,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 0,
-        desc: c"single line prompt ".as_ptr() as _,
+        desc: "single line prompt ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: PROMPT_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: PROMPT_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "kbd",
@@ -2254,12 +2107,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"text to be entered by the user".as_ptr() as _,
+        desc: "text to be entered by the user",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "label",
@@ -2270,12 +2123,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"form field label text ".as_ptr() as _,
+        desc: "form field label text ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: LABEL_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: LABEL_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "legend",
@@ -2286,12 +2139,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"fieldset legend ".as_ptr() as _,
+        desc: "fieldset legend ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: LEGEND_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: LEGEND_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "li",
@@ -2302,12 +2155,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"list item ".as_ptr() as _,
+        desc: "list item ",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "link",
@@ -2318,12 +2171,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"a media-independent link ".as_ptr() as _,
+        desc: "a media-independent link ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: LINK_ATTRS.as_ptr() as _,
-        attrs_depr: TARGET_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: LINK_ATTRS,
+        attrs_depr: TARGET_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "map",
@@ -2334,12 +2187,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 2,
-        desc: c"client-side image map ".as_ptr() as _,
+        desc: "client-side image map ",
         subelts: MAP_CONTENTS,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: NAME_ATTR.as_ptr() as _,
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: NAME_ATTR,
     },
     HtmlElemDesc {
         name: "menu",
@@ -2350,12 +2203,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 0,
-        desc: c"menu list ".as_ptr() as _,
+        desc: "menu list ",
         subelts: BLOCKLI_ELT,
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: COMPACT_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: COMPACT_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "meta",
@@ -2366,12 +2219,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"generic metainformation ".as_ptr() as _,
+        desc: "generic metainformation ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: META_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: CONTENT_ATTR.as_ptr() as _,
+        defaultsubelt: None,
+        attrs_opt: META_ATTRS,
+        attrs_depr: &[],
+        attrs_req: CONTENT_ATTR,
     },
     HtmlElemDesc {
         name: "noframes",
@@ -2382,12 +2235,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 2,
         isinline: 0,
-        desc: c"alternate content container for non frame-based rendering ".as_ptr() as _,
+        desc: "alternate content container for non frame-based rendering ",
         subelts: NOFRAMES_CONTENT,
-        defaultsubelt: c"body".as_ptr() as _,
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: Some("body"),
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "noscript",
@@ -2398,12 +2251,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"alternate content container for non script-based rendering ".as_ptr() as _,
+        desc: "alternate content container for non script-based rendering ",
         subelts: HTML_FLOW,
-        defaultsubelt: c"div".as_ptr() as _,
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: Some("div"),
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "object",
@@ -2414,12 +2267,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 2,
-        desc: c"generic embedded object ".as_ptr() as _,
+        desc: "generic embedded object ",
         subelts: OBJECT_CONTENTS,
-        defaultsubelt: c"div".as_ptr() as _,
-        attrs_opt: OBJECT_ATTRS.as_ptr() as _,
-        attrs_depr: OBJECT_DEPR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: Some("div"),
+        attrs_opt: OBJECT_ATTRS,
+        attrs_depr: OBJECT_DEPR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "ol",
@@ -2430,12 +2283,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"ordered list ".as_ptr() as _,
+        desc: "ordered list ",
         subelts: LI_ELT,
-        defaultsubelt: c"li".as_ptr() as _,
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: OL_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: Some("li"),
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: OL_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "optgroup",
@@ -2446,12 +2299,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"option group ".as_ptr() as _,
+        desc: "option group ",
         subelts: OPTION_ELT,
-        defaultsubelt: c"option".as_ptr() as _,
-        attrs_opt: OPTGROUP_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: LABEL_ATTR.as_ptr() as _,
+        defaultsubelt: Some("option"),
+        attrs_opt: OPTGROUP_ATTRS,
+        attrs_depr: &[],
+        attrs_req: LABEL_ATTR,
     },
     HtmlElemDesc {
         name: "option",
@@ -2462,12 +2315,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"selectable choice ".as_ptr() as _,
+        desc: "selectable choice ",
         subelts: HTML_PCDATA,
-        defaultsubelt: null_mut(),
-        attrs_opt: OPTION_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: OPTION_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "p",
@@ -2478,12 +2331,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"paragraph ".as_ptr() as _,
+        desc: "paragraph ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: ALIGN_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: ALIGN_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "param",
@@ -2494,12 +2347,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"named property value ".as_ptr() as _,
+        desc: "named property value ",
         subelts: &[],
-        defaultsubelt: null_mut(),
-        attrs_opt: PARAM_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: NAME_ATTR.as_ptr() as _,
+        defaultsubelt: None,
+        attrs_opt: PARAM_ATTRS,
+        attrs_depr: &[],
+        attrs_req: NAME_ATTR,
     },
     HtmlElemDesc {
         name: "pre",
@@ -2510,12 +2363,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"preformatted text ".as_ptr() as _,
+        desc: "preformatted text ",
         subelts: PRE_CONTENT,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: WIDTH_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: WIDTH_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "q",
@@ -2526,12 +2379,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"short inline quotation ".as_ptr() as _,
+        desc: "short inline quotation ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: QUOTE_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: QUOTE_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "s",
@@ -2542,12 +2395,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 1,
-        desc: c"strike-through text style".as_ptr() as _,
+        desc: "strike-through text style",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: HTML_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: HTML_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "samp",
@@ -2558,12 +2411,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"sample program output, scripts, etc.".as_ptr() as _,
+        desc: "sample program output, scripts, etc.",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "script",
@@ -2574,12 +2427,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 2,
-        desc: c"script statements ".as_ptr() as _,
+        desc: "script statements ",
         subelts: HTML_CDATA,
-        defaultsubelt: null_mut(),
-        attrs_opt: SCRIPT_ATTRS.as_ptr() as _,
-        attrs_depr: LANGUAGE_ATTR.as_ptr() as _,
-        attrs_req: TYPE_ATTR.as_ptr() as _,
+        defaultsubelt: None,
+        attrs_opt: SCRIPT_ATTRS,
+        attrs_depr: LANGUAGE_ATTR,
+        attrs_req: TYPE_ATTR,
     },
     HtmlElemDesc {
         name: "select",
@@ -2590,12 +2443,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"option selector ".as_ptr() as _,
+        desc: "option selector ",
         subelts: SELECT_CONTENT,
-        defaultsubelt: null_mut(),
-        attrs_opt: SELECT_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: SELECT_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "small",
@@ -2606,12 +2459,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"small text style".as_ptr() as _,
+        desc: "small text style",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "span",
@@ -2622,12 +2475,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"generic language/style container ".as_ptr() as _,
+        desc: "generic language/style container ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "strike",
@@ -2638,12 +2491,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 1,
-        desc: c"strike-through text".as_ptr() as _,
+        desc: "strike-through text",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: HTML_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: HTML_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "strong",
@@ -2654,12 +2507,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"strong emphasis".as_ptr() as _,
+        desc: "strong emphasis",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "style",
@@ -2670,12 +2523,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"style info ".as_ptr() as _,
+        desc: "style info ",
         subelts: HTML_CDATA,
-        defaultsubelt: null_mut(),
-        attrs_opt: STYLE_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: TYPE_ATTR.as_ptr() as _,
+        defaultsubelt: None,
+        attrs_opt: STYLE_ATTRS,
+        attrs_depr: &[],
+        attrs_req: TYPE_ATTR,
     },
     HtmlElemDesc {
         name: "sub",
@@ -2686,12 +2539,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"subscript".as_ptr() as _,
+        desc: "subscript",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "sup",
@@ -2702,12 +2555,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"superscript ".as_ptr() as _,
+        desc: "superscript ",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "table",
@@ -2718,12 +2571,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"".as_ptr() as _,
+        desc: "",
         subelts: TABLE_CONTENTS,
-        defaultsubelt: c"tr".as_ptr() as _,
-        attrs_opt: TABLE_ATTRS.as_ptr() as _,
-        attrs_depr: TABLE_DEPR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: Some("tr"),
+        attrs_opt: TABLE_ATTRS,
+        attrs_depr: TABLE_DEPR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "tbody",
@@ -2734,12 +2587,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"table body ".as_ptr() as _,
+        desc: "table body ",
         subelts: TR_ELT,
-        defaultsubelt: c"tr".as_ptr() as _,
-        attrs_opt: TALIGN_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: Some("tr"),
+        attrs_opt: TALIGN_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "td",
@@ -2750,12 +2603,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"table data cell".as_ptr() as _,
+        desc: "table data cell",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: TH_TD_ATTR.as_ptr() as _,
-        attrs_depr: TH_TD_DEPR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: TH_TD_ATTR,
+        attrs_depr: TH_TD_DEPR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "textarea",
@@ -2766,12 +2619,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"multi-line text field ".as_ptr() as _,
+        desc: "multi-line text field ",
         subelts: HTML_PCDATA,
-        defaultsubelt: null_mut(),
-        attrs_opt: TEXTAREA_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: ROWS_COLS_ATTR.as_ptr() as _,
+        defaultsubelt: None,
+        attrs_opt: TEXTAREA_ATTRS,
+        attrs_depr: &[],
+        attrs_req: ROWS_COLS_ATTR,
     },
     HtmlElemDesc {
         name: "tfoot",
@@ -2782,12 +2635,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"table footer ".as_ptr() as _,
+        desc: "table footer ",
         subelts: TR_ELT,
-        defaultsubelt: c"tr".as_ptr() as _,
-        attrs_opt: TALIGN_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: Some("tr"),
+        attrs_opt: TALIGN_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "th",
@@ -2798,12 +2651,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"table header cell".as_ptr() as _,
+        desc: "table header cell",
         subelts: HTML_FLOW,
-        defaultsubelt: null_mut(),
-        attrs_opt: TH_TD_ATTR.as_ptr() as _,
-        attrs_depr: TH_TD_DEPR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: TH_TD_ATTR,
+        attrs_depr: TH_TD_DEPR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "thead",
@@ -2814,12 +2667,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"table header ".as_ptr() as _,
+        desc: "table header ",
         subelts: TR_ELT,
-        defaultsubelt: c"tr".as_ptr() as _,
-        attrs_opt: TALIGN_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: Some("tr"),
+        attrs_opt: TALIGN_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "title",
@@ -2830,12 +2683,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"document title ".as_ptr() as _,
+        desc: "document title ",
         subelts: HTML_PCDATA,
-        defaultsubelt: null_mut(),
-        attrs_opt: I18N_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: I18N_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "tr",
@@ -2846,12 +2699,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"table row ".as_ptr() as _,
+        desc: "table row ",
         subelts: TR_CONTENTS,
-        defaultsubelt: c"td".as_ptr() as _,
-        attrs_opt: TALIGN_ATTRS.as_ptr() as _,
-        attrs_depr: BGCOLOR_ATTR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: Some("td"),
+        attrs_opt: TALIGN_ATTRS,
+        attrs_depr: BGCOLOR_ATTR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "tt",
@@ -2862,12 +2715,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"teletype or monospaced text style".as_ptr() as _,
+        desc: "teletype or monospaced text style",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "u",
@@ -2878,12 +2731,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 1,
         dtd: 1,
         isinline: 1,
-        desc: c"underlined text style".as_ptr() as _,
+        desc: "underlined text style",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: null_mut(),
-        attrs_depr: HTML_ATTRS.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: &[],
+        attrs_depr: HTML_ATTRS,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "ul",
@@ -2894,12 +2747,12 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 0,
-        desc: c"unordered list ".as_ptr() as _,
+        desc: "unordered list ",
         subelts: LI_ELT,
-        defaultsubelt: c"li".as_ptr() as _,
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: UL_DEPR.as_ptr() as _,
-        attrs_req: null_mut(),
+        defaultsubelt: Some("li"),
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: UL_DEPR,
+        attrs_req: &[],
     },
     HtmlElemDesc {
         name: "var",
@@ -2910,1312 +2763,1296 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         depr: 0,
         dtd: 0,
         isinline: 1,
-        desc: c"instance of a variable or program argument".as_ptr() as _,
+        desc: "instance of a variable or program argument",
         subelts: HTML_INLINE,
-        defaultsubelt: null_mut(),
-        attrs_opt: HTML_ATTRS.as_ptr() as _,
-        attrs_depr: null_mut(),
-        attrs_req: null_mut(),
+        defaultsubelt: None,
+        attrs_opt: HTML_ATTRS,
+        attrs_depr: &[],
+        attrs_req: &[],
     },
 ];
 
 const HTML40_ENTITIES_TABLE: &[HtmlEntityDesc] = &[
-    /*
-     * the 4 absolute ones, plus apostrophe.
-     */
+    // the 4 absolute ones, plus apostrophe.
     HtmlEntityDesc {
         value: 34,
-        name: c"quot".as_ptr() as _,
-        desc: c"quotation mark = APL quote, U+0022 ISOnum".as_ptr() as _,
+        name: "quot",
+        desc: "quotation mark = APL quote, U+0022 ISOnum",
     },
     HtmlEntityDesc {
         value: 38,
-        name: c"amp".as_ptr() as _,
-        desc: c"ampersand, U+0026 ISOnum".as_ptr() as _,
+        name: "amp",
+        desc: "ampersand, U+0026 ISOnum",
     },
     HtmlEntityDesc {
         value: 39,
-        name: c"apos".as_ptr() as _,
-        desc: c"single quote".as_ptr() as _,
+        name: "apos",
+        desc: "single quote",
     },
     HtmlEntityDesc {
         value: 60,
-        name: c"lt".as_ptr() as _,
-        desc: c"less-than sign, U+003C ISOnum".as_ptr() as _,
+        name: "lt",
+        desc: "less-than sign, U+003C ISOnum",
     },
     HtmlEntityDesc {
         value: 62,
-        name: c"gt".as_ptr() as _,
-        desc: c"greater-than sign, U+003E ISOnum".as_ptr() as _,
+        name: "gt",
+        desc: "greater-than sign, U+003E ISOnum",
     },
-    /*
-     * A bunch still in the 128-255 range
-     * Replacing them depend really on the charset used.
-     */
+    // A bunch still in the 128-255 range
+    // Replacing them depend really on the charset used.
     HtmlEntityDesc {
         value: 160,
-        name: c"nbsp".as_ptr() as _,
-        desc: c"no-break space = non-breaking space, U+00A0 ISOnum".as_ptr() as _,
+        name: "nbsp",
+        desc: "no-break space = non-breaking space, U+00A0 ISOnum",
     },
     HtmlEntityDesc {
         value: 161,
-        name: c"iexcl".as_ptr() as _,
-        desc: c"inverted exclamation mark, U+00A1 ISOnum".as_ptr() as _,
+        name: "iexcl",
+        desc: "inverted exclamation mark, U+00A1 ISOnum",
     },
     HtmlEntityDesc {
         value: 162,
-        name: c"cent".as_ptr() as _,
-        desc: c"cent sign, U+00A2 ISOnum".as_ptr() as _,
+        name: "cent",
+        desc: "cent sign, U+00A2 ISOnum",
     },
     HtmlEntityDesc {
         value: 163,
-        name: c"pound".as_ptr() as _,
-        desc: c"pound sign, U+00A3 ISOnum".as_ptr() as _,
+        name: "pound",
+        desc: "pound sign, U+00A3 ISOnum",
     },
     HtmlEntityDesc {
         value: 164,
-        name: c"curren".as_ptr() as _,
-        desc: c"currency sign, U+00A4 ISOnum".as_ptr() as _,
+        name: "curren",
+        desc: "currency sign, U+00A4 ISOnum",
     },
     HtmlEntityDesc {
         value: 165,
-        name: c"yen".as_ptr() as _,
-        desc: c"yen sign = yuan sign, U+00A5 ISOnum".as_ptr() as _,
+        name: "yen",
+        desc: "yen sign = yuan sign, U+00A5 ISOnum",
     },
     HtmlEntityDesc {
         value: 166,
-        name: c"brvbar".as_ptr() as _,
-        desc: c"broken bar = broken vertical bar, U+00A6 ISOnum".as_ptr() as _,
+        name: "brvbar",
+        desc: "broken bar = broken vertical bar, U+00A6 ISOnum",
     },
     HtmlEntityDesc {
         value: 167,
-        name: c"sect".as_ptr() as _,
-        desc: c"section sign, U+00A7 ISOnum".as_ptr() as _,
+        name: "sect",
+        desc: "section sign, U+00A7 ISOnum",
     },
     HtmlEntityDesc {
         value: 168,
-        name: c"uml".as_ptr() as _,
-        desc: c"diaeresis = spacing diaeresis, U+00A8 ISOdia".as_ptr() as _,
+        name: "uml",
+        desc: "diaeresis = spacing diaeresis, U+00A8 ISOdia",
     },
     HtmlEntityDesc {
         value: 169,
-        name: c"copy".as_ptr() as _,
-        desc: c"copyright sign, U+00A9 ISOnum".as_ptr() as _,
+        name: "copy",
+        desc: "copyright sign, U+00A9 ISOnum",
     },
     HtmlEntityDesc {
         value: 170,
-        name: c"ordf".as_ptr() as _,
-        desc: c"feminine ordinal indicator, U+00AA ISOnum".as_ptr() as _,
+        name: "ordf",
+        desc: "feminine ordinal indicator, U+00AA ISOnum",
     },
     HtmlEntityDesc {
         value: 171,
-        name: c"laquo".as_ptr() as _,
-        desc: c"left-pointing double angle quotation mark = left pointing guillemet, U+00AB ISOnum"
-            .as_ptr() as _,
+        name: "laquo",
+        desc: "left-pointing double angle quotation mark = left pointing guillemet, U+00AB ISOnum",
     },
     HtmlEntityDesc {
         value: 172,
-        name: c"not".as_ptr() as _,
-        desc: c"not sign, U+00AC ISOnum".as_ptr() as _,
+        name: "not",
+        desc: "not sign, U+00AC ISOnum",
     },
     HtmlEntityDesc {
         value: 173,
-        name: c"shy".as_ptr() as _,
-        desc: c"soft hyphen = discretionary hyphen, U+00AD ISOnum".as_ptr() as _,
+        name: "shy",
+        desc: "soft hyphen = discretionary hyphen, U+00AD ISOnum",
     },
     HtmlEntityDesc {
         value: 174,
-        name: c"reg".as_ptr() as _,
-        desc: c"registered sign = registered trade mark sign, U+00AE ISOnum".as_ptr() as _,
+        name: "reg",
+        desc: "registered sign = registered trade mark sign, U+00AE ISOnum",
     },
     HtmlEntityDesc {
         value: 175,
-        name: c"macr".as_ptr() as _,
-        desc: c"macron = spacing macron = overline = APL overbar, U+00AF ISOdia".as_ptr() as _,
+        name: "macr",
+        desc: "macron = spacing macron = overline = APL overbar, U+00AF ISOdia",
     },
     HtmlEntityDesc {
         value: 176,
-        name: c"deg".as_ptr() as _,
-        desc: c"degree sign, U+00B0 ISOnum".as_ptr() as _,
+        name: "deg",
+        desc: "degree sign, U+00B0 ISOnum",
     },
     HtmlEntityDesc {
         value: 177,
-        name: c"plusmn".as_ptr() as _,
-        desc: c"plus-minus sign = plus-or-minus sign, U+00B1 ISOnum".as_ptr() as _,
+        name: "plusmn",
+        desc: "plus-minus sign = plus-or-minus sign, U+00B1 ISOnum",
     },
     HtmlEntityDesc {
         value: 178,
-        name: c"sup2".as_ptr() as _,
-        desc: c"superscript two = superscript digit two = squared, U+00B2 ISOnum".as_ptr() as _,
+        name: "sup2",
+        desc: "superscript two = superscript digit two = squared, U+00B2 ISOnum",
     },
     HtmlEntityDesc {
         value: 179,
-        name: c"sup3".as_ptr() as _,
-        desc: c"superscript three = superscript digit three = cubed, U+00B3 ISOnum".as_ptr() as _,
+        name: "sup3",
+        desc: "superscript three = superscript digit three = cubed, U+00B3 ISOnum",
     },
     HtmlEntityDesc {
         value: 180,
-        name: c"acute".as_ptr() as _,
-        desc: c"acute accent = spacing acute, U+00B4 ISOdia".as_ptr() as _,
+        name: "acute",
+        desc: "acute accent = spacing acute, U+00B4 ISOdia",
     },
     HtmlEntityDesc {
         value: 181,
-        name: c"micro".as_ptr() as _,
-        desc: c"micro sign, U+00B5 ISOnum".as_ptr() as _,
+        name: "micro",
+        desc: "micro sign, U+00B5 ISOnum",
     },
     HtmlEntityDesc {
         value: 182,
-        name: c"para".as_ptr() as _,
-        desc: c"pilcrow sign = paragraph sign, U+00B6 ISOnum".as_ptr() as _,
+        name: "para",
+        desc: "pilcrow sign = paragraph sign, U+00B6 ISOnum",
     },
     HtmlEntityDesc {
         value: 183,
-        name: c"middot".as_ptr() as _,
-        desc: c"middle dot = Georgian comma Greek middle dot, U+00B7 ISOnum".as_ptr() as _,
+        name: "middot",
+        desc: "middle dot = Georgian comma Greek middle dot, U+00B7 ISOnum",
     },
     HtmlEntityDesc {
         value: 184,
-        name: c"cedil".as_ptr() as _,
-        desc: c"cedilla = spacing cedilla, U+00B8 ISOdia".as_ptr() as _,
+        name: "cedil",
+        desc: "cedilla = spacing cedilla, U+00B8 ISOdia",
     },
     HtmlEntityDesc {
         value: 185,
-        name: c"sup1".as_ptr() as _,
-        desc: c"superscript one = superscript digit one, U+00B9 ISOnum".as_ptr() as _,
+        name: "sup1",
+        desc: "superscript one = superscript digit one, U+00B9 ISOnum",
     },
     HtmlEntityDesc {
         value: 186,
-        name: c"ordm".as_ptr() as _,
-        desc: c"masculine ordinal indicator, U+00BA ISOnum".as_ptr() as _,
+        name: "ordm",
+        desc: "masculine ordinal indicator, U+00BA ISOnum",
     },
     HtmlEntityDesc {
         value: 187,
-        name: c"raquo".as_ptr() as _,
-        desc: c"right-pointing double angle quotation mark right pointing guillemet, U+00BB ISOnum"
-            .as_ptr() as _,
+        name: "raquo",
+        desc: "right-pointing double angle quotation mark right pointing guillemet, U+00BB ISOnum",
     },
     HtmlEntityDesc {
         value: 188,
-        name: c"frac14".as_ptr() as _,
-        desc: c"vulgar fraction one quarter = fraction one quarter, U+00BC ISOnum".as_ptr() as _,
+        name: "frac14",
+        desc: "vulgar fraction one quarter = fraction one quarter, U+00BC ISOnum",
     },
     HtmlEntityDesc {
         value: 189,
-        name: c"frac12".as_ptr() as _,
-        desc: c"vulgar fraction one half = fraction one half, U+00BD ISOnum".as_ptr() as _,
+        name: "frac12",
+        desc: "vulgar fraction one half = fraction one half, U+00BD ISOnum",
     },
     HtmlEntityDesc {
         value: 190,
-        name: c"frac34".as_ptr() as _,
-        desc: c"vulgar fraction three quarters = fraction three quarters, U+00BE ISOnum".as_ptr()
-            as _,
+        name: "frac34",
+        desc: "vulgar fraction three quarters = fraction three quarters, U+00BE ISOnum",
     },
     HtmlEntityDesc {
         value: 191,
-        name: c"iquest".as_ptr() as _,
-        desc: c"inverted question mark = turned question mark, U+00BF ISOnum".as_ptr() as _,
+        name: "iquest",
+        desc: "inverted question mark = turned question mark, U+00BF ISOnum",
     },
     HtmlEntityDesc {
         value: 192,
-        name: c"Agrave".as_ptr() as _,
-        desc: c"latin capital letter A with grave = latin capital letter A grave, U+00C0 ISOlat1"
-            .as_ptr() as _,
+        name: "Agrave",
+        desc: "latin capital letter A with grave = latin capital letter A grave, U+00C0 ISOlat1",
     },
     HtmlEntityDesc {
         value: 193,
-        name: c"Aacute".as_ptr() as _,
-        desc: c"latin capital letter A with acute, U+00C1 ISOlat1".as_ptr() as _,
+        name: "Aacute",
+        desc: "latin capital letter A with acute, U+00C1 ISOlat1",
     },
     HtmlEntityDesc {
         value: 194,
-        name: c"Acirc".as_ptr() as _,
-        desc: c"latin capital letter A with circumflex, U+00C2 ISOlat1".as_ptr() as _,
+        name: "Acirc",
+        desc: "latin capital letter A with circumflex, U+00C2 ISOlat1",
     },
     HtmlEntityDesc {
         value: 195,
-        name: c"Atilde".as_ptr() as _,
-        desc: c"latin capital letter A with tilde, U+00C3 ISOlat1".as_ptr() as _,
+        name: "Atilde",
+        desc: "latin capital letter A with tilde, U+00C3 ISOlat1",
     },
     HtmlEntityDesc {
         value: 196,
-        name: c"Auml".as_ptr() as _,
-        desc: c"latin capital letter A with diaeresis, U+00C4 ISOlat1".as_ptr() as _,
+        name: "Auml",
+        desc: "latin capital letter A with diaeresis, U+00C4 ISOlat1",
     },
     HtmlEntityDesc {
         value: 197,
-        name: c"Aring".as_ptr() as _,
-        desc:
-            c"latin capital letter A with ring above = latin capital letter A ring, U+00C5 ISOlat1"
-                .as_ptr() as _,
+        name: "Aring",
+        desc: "latin capital letter A with ring above = latin capital letter A ring, U+00C5 ISOlat1",
     },
     HtmlEntityDesc {
         value: 198,
-        name: c"AElig".as_ptr() as _,
-        desc: c"latin capital letter AE = latin capital ligature AE, U+00C6 ISOlat1".as_ptr() as _,
+        name: "AElig",
+        desc: "latin capital letter AE = latin capital ligature AE, U+00C6 ISOlat1",
     },
     HtmlEntityDesc {
         value: 199,
-        name: c"Ccedil".as_ptr() as _,
-        desc: c"latin capital letter C with cedilla, U+00C7 ISOlat1".as_ptr() as _,
+        name: "Ccedil",
+        desc: "latin capital letter C with cedilla, U+00C7 ISOlat1",
     },
     HtmlEntityDesc {
         value: 200,
-        name: c"Egrave".as_ptr() as _,
-        desc: c"latin capital letter E with grave, U+00C8 ISOlat1".as_ptr() as _,
+        name: "Egrave",
+        desc: "latin capital letter E with grave, U+00C8 ISOlat1",
     },
     HtmlEntityDesc {
         value: 201,
-        name: c"Eacute".as_ptr() as _,
-        desc: c"latin capital letter E with acute, U+00C9 ISOlat1".as_ptr() as _,
+        name: "Eacute",
+        desc: "latin capital letter E with acute, U+00C9 ISOlat1",
     },
     HtmlEntityDesc {
         value: 202,
-        name: c"Ecirc".as_ptr() as _,
-        desc: c"latin capital letter E with circumflex, U+00CA ISOlat1".as_ptr() as _,
+        name: "Ecirc",
+        desc: "latin capital letter E with circumflex, U+00CA ISOlat1",
     },
     HtmlEntityDesc {
         value: 203,
-        name: c"Euml".as_ptr() as _,
-        desc: c"latin capital letter E with diaeresis, U+00CB ISOlat1".as_ptr() as _,
+        name: "Euml",
+        desc: "latin capital letter E with diaeresis, U+00CB ISOlat1",
     },
     HtmlEntityDesc {
         value: 204,
-        name: c"Igrave".as_ptr() as _,
-        desc: c"latin capital letter I with grave, U+00CC ISOlat1".as_ptr() as _,
+        name: "Igrave",
+        desc: "latin capital letter I with grave, U+00CC ISOlat1",
     },
     HtmlEntityDesc {
         value: 205,
-        name: c"Iacute".as_ptr() as _,
-        desc: c"latin capital letter I with acute, U+00CD ISOlat1".as_ptr() as _,
+        name: "Iacute",
+        desc: "latin capital letter I with acute, U+00CD ISOlat1",
     },
     HtmlEntityDesc {
         value: 206,
-        name: c"Icirc".as_ptr() as _,
-        desc: c"latin capital letter I with circumflex, U+00CE ISOlat1".as_ptr() as _,
+        name: "Icirc",
+        desc: "latin capital letter I with circumflex, U+00CE ISOlat1",
     },
     HtmlEntityDesc {
         value: 207,
-        name: c"Iuml".as_ptr() as _,
-        desc: c"latin capital letter I with diaeresis, U+00CF ISOlat1".as_ptr() as _,
+        name: "Iuml",
+        desc: "latin capital letter I with diaeresis, U+00CF ISOlat1",
     },
     HtmlEntityDesc {
         value: 208,
-        name: c"ETH".as_ptr() as _,
-        desc: c"latin capital letter ETH, U+00D0 ISOlat1".as_ptr() as _,
+        name: "ETH",
+        desc: "latin capital letter ETH, U+00D0 ISOlat1",
     },
     HtmlEntityDesc {
         value: 209,
-        name: c"Ntilde".as_ptr() as _,
-        desc: c"latin capital letter N with tilde, U+00D1 ISOlat1".as_ptr() as _,
+        name: "Ntilde",
+        desc: "latin capital letter N with tilde, U+00D1 ISOlat1",
     },
     HtmlEntityDesc {
         value: 210,
-        name: c"Ograve".as_ptr() as _,
-        desc: c"latin capital letter O with grave, U+00D2 ISOlat1".as_ptr() as _,
+        name: "Ograve",
+        desc: "latin capital letter O with grave, U+00D2 ISOlat1",
     },
     HtmlEntityDesc {
         value: 211,
-        name: c"Oacute".as_ptr() as _,
-        desc: c"latin capital letter O with acute, U+00D3 ISOlat1".as_ptr() as _,
+        name: "Oacute",
+        desc: "latin capital letter O with acute, U+00D3 ISOlat1",
     },
     HtmlEntityDesc {
         value: 212,
-        name: c"Ocirc".as_ptr() as _,
-        desc: c"latin capital letter O with circumflex, U+00D4 ISOlat1".as_ptr() as _,
+        name: "Ocirc",
+        desc: "latin capital letter O with circumflex, U+00D4 ISOlat1",
     },
     HtmlEntityDesc {
         value: 213,
-        name: c"Otilde".as_ptr() as _,
-        desc: c"latin capital letter O with tilde, U+00D5 ISOlat1".as_ptr() as _,
+        name: "Otilde",
+        desc: "latin capital letter O with tilde, U+00D5 ISOlat1",
     },
     HtmlEntityDesc {
         value: 214,
-        name: c"Ouml".as_ptr() as _,
-        desc: c"latin capital letter O with diaeresis, U+00D6 ISOlat1".as_ptr() as _,
+        name: "Ouml",
+        desc: "latin capital letter O with diaeresis, U+00D6 ISOlat1",
     },
     HtmlEntityDesc {
         value: 215,
-        name: c"times".as_ptr() as _,
-        desc: c"multiplication sign, U+00D7 ISOnum".as_ptr() as _,
+        name: "times",
+        desc: "multiplication sign, U+00D7 ISOnum",
     },
     HtmlEntityDesc {
         value: 216,
-        name: c"Oslash".as_ptr() as _,
-        desc: c"latin capital letter O with stroke latin capital letter O slash, U+00D8 ISOlat1"
-            .as_ptr() as _,
+        name: "Oslash",
+        desc: "latin capital letter O with stroke latin capital letter O slash, U+00D8 ISOlat1",
     },
     HtmlEntityDesc {
         value: 217,
-        name: c"Ugrave".as_ptr() as _,
-        desc: c"latin capital letter U with grave, U+00D9 ISOlat1".as_ptr() as _,
+        name: "Ugrave",
+        desc: "latin capital letter U with grave, U+00D9 ISOlat1",
     },
     HtmlEntityDesc {
         value: 218,
-        name: c"Uacute".as_ptr() as _,
-        desc: c"latin capital letter U with acute, U+00DA ISOlat1".as_ptr() as _,
+        name: "Uacute",
+        desc: "latin capital letter U with acute, U+00DA ISOlat1",
     },
     HtmlEntityDesc {
         value: 219,
-        name: c"Ucirc".as_ptr() as _,
-        desc: c"latin capital letter U with circumflex, U+00DB ISOlat1".as_ptr() as _,
+        name: "Ucirc",
+        desc: "latin capital letter U with circumflex, U+00DB ISOlat1",
     },
     HtmlEntityDesc {
         value: 220,
-        name: c"Uuml".as_ptr() as _,
-        desc: c"latin capital letter U with diaeresis, U+00DC ISOlat1".as_ptr() as _,
+        name: "Uuml",
+        desc: "latin capital letter U with diaeresis, U+00DC ISOlat1",
     },
     HtmlEntityDesc {
         value: 221,
-        name: c"Yacute".as_ptr() as _,
-        desc: c"latin capital letter Y with acute, U+00DD ISOlat1".as_ptr() as _,
+        name: "Yacute",
+        desc: "latin capital letter Y with acute, U+00DD ISOlat1",
     },
     HtmlEntityDesc {
         value: 222,
-        name: c"THORN".as_ptr() as _,
-        desc: c"latin capital letter THORN, U+00DE ISOlat1".as_ptr() as _,
+        name: "THORN",
+        desc: "latin capital letter THORN, U+00DE ISOlat1",
     },
     HtmlEntityDesc {
         value: 223,
-        name: c"szlig".as_ptr() as _,
-        desc: c"latin small letter sharp s = ess-zed, U+00DF ISOlat1".as_ptr() as _,
+        name: "szlig",
+        desc: "latin small letter sharp s = ess-zed, U+00DF ISOlat1",
     },
     HtmlEntityDesc {
         value: 224,
-        name: c"agrave".as_ptr() as _,
-        desc: c"latin small letter a with grave = latin small letter a grave, U+00E0 ISOlat1"
-            .as_ptr() as _,
+        name: "agrave",
+        desc: "latin small letter a with grave = latin small letter a grave, U+00E0 ISOlat1",
     },
     HtmlEntityDesc {
         value: 225,
-        name: c"aacute".as_ptr() as _,
-        desc: c"latin small letter a with acute, U+00E1 ISOlat1".as_ptr() as _,
+        name: "aacute",
+        desc: "latin small letter a with acute, U+00E1 ISOlat1",
     },
     HtmlEntityDesc {
         value: 226,
-        name: c"acirc".as_ptr() as _,
-        desc: c"latin small letter a with circumflex, U+00E2 ISOlat1".as_ptr() as _,
+        name: "acirc",
+        desc: "latin small letter a with circumflex, U+00E2 ISOlat1",
     },
     HtmlEntityDesc {
         value: 227,
-        name: c"atilde".as_ptr() as _,
-        desc: c"latin small letter a with tilde, U+00E3 ISOlat1".as_ptr() as _,
+        name: "atilde",
+        desc: "latin small letter a with tilde, U+00E3 ISOlat1",
     },
     HtmlEntityDesc {
         value: 228,
-        name: c"auml".as_ptr() as _,
-        desc: c"latin small letter a with diaeresis, U+00E4 ISOlat1".as_ptr() as _,
+        name: "auml",
+        desc: "latin small letter a with diaeresis, U+00E4 ISOlat1",
     },
     HtmlEntityDesc {
         value: 229,
-        name: c"aring".as_ptr() as _,
-        desc: c"latin small letter a with ring above = latin small letter a ring, U+00E5 ISOlat1"
-            .as_ptr() as _,
+        name: "aring",
+        desc: "latin small letter a with ring above = latin small letter a ring, U+00E5 ISOlat1",
     },
     HtmlEntityDesc {
         value: 230,
-        name: c"aelig".as_ptr() as _,
-        desc: c"latin small letter ae = latin small ligature ae, U+00E6 ISOlat1".as_ptr() as _,
+        name: "aelig",
+        desc: "latin small letter ae = latin small ligature ae, U+00E6 ISOlat1",
     },
     HtmlEntityDesc {
         value: 231,
-        name: c"ccedil".as_ptr() as _,
-        desc: c"latin small letter c with cedilla, U+00E7 ISOlat1".as_ptr() as _,
+        name: "ccedil",
+        desc: "latin small letter c with cedilla, U+00E7 ISOlat1",
     },
     HtmlEntityDesc {
         value: 232,
-        name: c"egrave".as_ptr() as _,
-        desc: c"latin small letter e with grave, U+00E8 ISOlat1".as_ptr() as _,
+        name: "egrave",
+        desc: "latin small letter e with grave, U+00E8 ISOlat1",
     },
     HtmlEntityDesc {
         value: 233,
-        name: c"eacute".as_ptr() as _,
-        desc: c"latin small letter e with acute, U+00E9 ISOlat1".as_ptr() as _,
+        name: "eacute",
+        desc: "latin small letter e with acute, U+00E9 ISOlat1",
     },
     HtmlEntityDesc {
         value: 234,
-        name: c"ecirc".as_ptr() as _,
-        desc: c"latin small letter e with circumflex, U+00EA ISOlat1".as_ptr() as _,
+        name: "ecirc",
+        desc: "latin small letter e with circumflex, U+00EA ISOlat1",
     },
     HtmlEntityDesc {
         value: 235,
-        name: c"euml".as_ptr() as _,
-        desc: c"latin small letter e with diaeresis, U+00EB ISOlat1".as_ptr() as _,
+        name: "euml",
+        desc: "latin small letter e with diaeresis, U+00EB ISOlat1",
     },
     HtmlEntityDesc {
         value: 236,
-        name: c"igrave".as_ptr() as _,
-        desc: c"latin small letter i with grave, U+00EC ISOlat1".as_ptr() as _,
+        name: "igrave",
+        desc: "latin small letter i with grave, U+00EC ISOlat1",
     },
     HtmlEntityDesc {
         value: 237,
-        name: c"iacute".as_ptr() as _,
-        desc: c"latin small letter i with acute, U+00ED ISOlat1".as_ptr() as _,
+        name: "iacute",
+        desc: "latin small letter i with acute, U+00ED ISOlat1",
     },
     HtmlEntityDesc {
         value: 238,
-        name: c"icirc".as_ptr() as _,
-        desc: c"latin small letter i with circumflex, U+00EE ISOlat1".as_ptr() as _,
+        name: "icirc",
+        desc: "latin small letter i with circumflex, U+00EE ISOlat1",
     },
     HtmlEntityDesc {
         value: 239,
-        name: c"iuml".as_ptr() as _,
-        desc: c"latin small letter i with diaeresis, U+00EF ISOlat1".as_ptr() as _,
+        name: "iuml",
+        desc: "latin small letter i with diaeresis, U+00EF ISOlat1",
     },
     HtmlEntityDesc {
         value: 240,
-        name: c"eth".as_ptr() as _,
-        desc: c"latin small letter eth, U+00F0 ISOlat1".as_ptr() as _,
+        name: "eth",
+        desc: "latin small letter eth, U+00F0 ISOlat1",
     },
     HtmlEntityDesc {
         value: 241,
-        name: c"ntilde".as_ptr() as _,
-        desc: c"latin small letter n with tilde, U+00F1 ISOlat1".as_ptr() as _,
+        name: "ntilde",
+        desc: "latin small letter n with tilde, U+00F1 ISOlat1",
     },
     HtmlEntityDesc {
         value: 242,
-        name: c"ograve".as_ptr() as _,
-        desc: c"latin small letter o with grave, U+00F2 ISOlat1".as_ptr() as _,
+        name: "ograve",
+        desc: "latin small letter o with grave, U+00F2 ISOlat1",
     },
     HtmlEntityDesc {
         value: 243,
-        name: c"oacute".as_ptr() as _,
-        desc: c"latin small letter o with acute, U+00F3 ISOlat1".as_ptr() as _,
+        name: "oacute",
+        desc: "latin small letter o with acute, U+00F3 ISOlat1",
     },
     HtmlEntityDesc {
         value: 244,
-        name: c"ocirc".as_ptr() as _,
-        desc: c"latin small letter o with circumflex, U+00F4 ISOlat1".as_ptr() as _,
+        name: "ocirc",
+        desc: "latin small letter o with circumflex, U+00F4 ISOlat1",
     },
     HtmlEntityDesc {
         value: 245,
-        name: c"otilde".as_ptr() as _,
-        desc: c"latin small letter o with tilde, U+00F5 ISOlat1".as_ptr() as _,
+        name: "otilde",
+        desc: "latin small letter o with tilde, U+00F5 ISOlat1",
     },
     HtmlEntityDesc {
         value: 246,
-        name: c"ouml".as_ptr() as _,
-        desc: c"latin small letter o with diaeresis, U+00F6 ISOlat1".as_ptr() as _,
+        name: "ouml",
+        desc: "latin small letter o with diaeresis, U+00F6 ISOlat1",
     },
     HtmlEntityDesc {
         value: 247,
-        name: c"divide".as_ptr() as _,
-        desc: c"division sign, U+00F7 ISOnum".as_ptr() as _,
+        name: "divide",
+        desc: "division sign, U+00F7 ISOnum",
     },
     HtmlEntityDesc {
         value: 248,
-        name: c"oslash".as_ptr() as _,
-        desc: c"latin small letter o with stroke, = latin small letter o slash, U+00F8 ISOlat1"
-            .as_ptr() as _,
+        name: "oslash",
+        desc: "latin small letter o with stroke, = latin small letter o slash, U+00F8 ISOlat1",
     },
     HtmlEntityDesc {
         value: 249,
-        name: c"ugrave".as_ptr() as _,
-        desc: c"latin small letter u with grave, U+00F9 ISOlat1".as_ptr() as _,
+        name: "ugrave",
+        desc: "latin small letter u with grave, U+00F9 ISOlat1",
     },
     HtmlEntityDesc {
         value: 250,
-        name: c"uacute".as_ptr() as _,
-        desc: c"latin small letter u with acute, U+00FA ISOlat1".as_ptr() as _,
+        name: "uacute",
+        desc: "latin small letter u with acute, U+00FA ISOlat1",
     },
     HtmlEntityDesc {
         value: 251,
-        name: c"ucirc".as_ptr() as _,
-        desc: c"latin small letter u with circumflex, U+00FB ISOlat1".as_ptr() as _,
+        name: "ucirc",
+        desc: "latin small letter u with circumflex, U+00FB ISOlat1",
     },
     HtmlEntityDesc {
         value: 252,
-        name: c"uuml".as_ptr() as _,
-        desc: c"latin small letter u with diaeresis, U+00FC ISOlat1".as_ptr() as _,
+        name: "uuml",
+        desc: "latin small letter u with diaeresis, U+00FC ISOlat1",
     },
     HtmlEntityDesc {
         value: 253,
-        name: c"yacute".as_ptr() as _,
-        desc: c"latin small letter y with acute, U+00FD ISOlat1".as_ptr() as _,
+        name: "yacute",
+        desc: "latin small letter y with acute, U+00FD ISOlat1",
     },
     HtmlEntityDesc {
         value: 254,
-        name: c"thorn".as_ptr() as _,
-        desc: c"latin small letter thorn with, U+00FE ISOlat1".as_ptr() as _,
+        name: "thorn",
+        desc: "latin small letter thorn with, U+00FE ISOlat1",
     },
     HtmlEntityDesc {
         value: 255,
-        name: c"yuml".as_ptr() as _,
-        desc: c"latin small letter y with diaeresis, U+00FF ISOlat1".as_ptr() as _,
+        name: "yuml",
+        desc: "latin small letter y with diaeresis, U+00FF ISOlat1",
     },
     HtmlEntityDesc {
         value: 338,
-        name: c"OElig".as_ptr() as _,
-        desc: c"latin capital ligature OE, U+0152 ISOlat2".as_ptr() as _,
+        name: "OElig",
+        desc: "latin capital ligature OE, U+0152 ISOlat2",
     },
     HtmlEntityDesc {
         value: 339,
-        name: c"oelig".as_ptr() as _,
-        desc: c"latin small ligature oe, U+0153 ISOlat2".as_ptr() as _,
+        name: "oelig",
+        desc: "latin small ligature oe, U+0153 ISOlat2",
     },
     HtmlEntityDesc {
         value: 352,
-        name: c"Scaron".as_ptr() as _,
-        desc: c"latin capital letter S with caron, U+0160 ISOlat2".as_ptr() as _,
+        name: "Scaron",
+        desc: "latin capital letter S with caron, U+0160 ISOlat2",
     },
     HtmlEntityDesc {
         value: 353,
-        name: c"scaron".as_ptr() as _,
-        desc: c"latin small letter s with caron, U+0161 ISOlat2".as_ptr() as _,
+        name: "scaron",
+        desc: "latin small letter s with caron, U+0161 ISOlat2",
     },
     HtmlEntityDesc {
         value: 376,
-        name: c"Yuml".as_ptr() as _,
-        desc: c"latin capital letter Y with diaeresis, U+0178 ISOlat2".as_ptr() as _,
+        name: "Yuml",
+        desc: "latin capital letter Y with diaeresis, U+0178 ISOlat2",
     },
-    /*
-     * Anything below should really be kept as entities references
-     */
+    // Anything below should really be kept as entities references
     HtmlEntityDesc {
         value: 402,
-        name: c"fnof".as_ptr() as _,
-        desc: c"latin small f with hook = function = florin, U+0192 ISOtech".as_ptr() as _,
+        name: "fnof",
+        desc: "latin small f with hook = function = florin, U+0192 ISOtech",
     },
     HtmlEntityDesc {
         value: 710,
-        name: c"circ".as_ptr() as _,
-        desc: c"modifier letter circumflex accent, U+02C6 ISOpub".as_ptr() as _,
+        name: "circ",
+        desc: "modifier letter circumflex accent, U+02C6 ISOpub",
     },
     HtmlEntityDesc {
         value: 732,
-        name: c"tilde".as_ptr() as _,
-        desc: c"small tilde, U+02DC ISOdia".as_ptr() as _,
+        name: "tilde",
+        desc: "small tilde, U+02DC ISOdia",
     },
     HtmlEntityDesc {
         value: 913,
-        name: c"Alpha".as_ptr() as _,
-        desc: c"greek capital letter alpha, U+0391".as_ptr() as _,
+        name: "Alpha",
+        desc: "greek capital letter alpha, U+0391",
     },
     HtmlEntityDesc {
         value: 914,
-        name: c"Beta".as_ptr() as _,
-        desc: c"greek capital letter beta, U+0392".as_ptr() as _,
+        name: "Beta",
+        desc: "greek capital letter beta, U+0392",
     },
     HtmlEntityDesc {
         value: 915,
-        name: c"Gamma".as_ptr() as _,
-        desc: c"greek capital letter gamma, U+0393 ISOgrk3".as_ptr() as _,
+        name: "Gamma",
+        desc: "greek capital letter gamma, U+0393 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 916,
-        name: c"Delta".as_ptr() as _,
-        desc: c"greek capital letter delta, U+0394 ISOgrk3".as_ptr() as _,
+        name: "Delta",
+        desc: "greek capital letter delta, U+0394 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 917,
-        name: c"Epsilon".as_ptr() as _,
-        desc: c"greek capital letter epsilon, U+0395".as_ptr() as _,
+        name: "Epsilon",
+        desc: "greek capital letter epsilon, U+0395",
     },
     HtmlEntityDesc {
         value: 918,
-        name: c"Zeta".as_ptr() as _,
-        desc: c"greek capital letter zeta, U+0396".as_ptr() as _,
+        name: "Zeta",
+        desc: "greek capital letter zeta, U+0396",
     },
     HtmlEntityDesc {
         value: 919,
-        name: c"Eta".as_ptr() as _,
-        desc: c"greek capital letter eta, U+0397".as_ptr() as _,
+        name: "Eta",
+        desc: "greek capital letter eta, U+0397",
     },
     HtmlEntityDesc {
         value: 920,
-        name: c"Theta".as_ptr() as _,
-        desc: c"greek capital letter theta, U+0398 ISOgrk3".as_ptr() as _,
+        name: "Theta",
+        desc: "greek capital letter theta, U+0398 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 921,
-        name: c"Iota".as_ptr() as _,
-        desc: c"greek capital letter iota, U+0399".as_ptr() as _,
+        name: "Iota",
+        desc: "greek capital letter iota, U+0399",
     },
     HtmlEntityDesc {
         value: 922,
-        name: c"Kappa".as_ptr() as _,
-        desc: c"greek capital letter kappa, U+039A".as_ptr() as _,
+        name: "Kappa",
+        desc: "greek capital letter kappa, U+039A",
     },
     HtmlEntityDesc {
         value: 923,
-        name: c"Lambda".as_ptr() as _,
-        desc: c"greek capital letter lambda, U+039B ISOgrk3".as_ptr() as _,
+        name: "Lambda",
+        desc: "greek capital letter lambda, U+039B ISOgrk3",
     },
     HtmlEntityDesc {
         value: 924,
-        name: c"Mu".as_ptr() as _,
-        desc: c"greek capital letter mu, U+039C".as_ptr() as _,
+        name: "Mu",
+        desc: "greek capital letter mu, U+039C",
     },
     HtmlEntityDesc {
         value: 925,
-        name: c"Nu".as_ptr() as _,
-        desc: c"greek capital letter nu, U+039D".as_ptr() as _,
+        name: "Nu",
+        desc: "greek capital letter nu, U+039D",
     },
     HtmlEntityDesc {
         value: 926,
-        name: c"Xi".as_ptr() as _,
-        desc: c"greek capital letter xi, U+039E ISOgrk3".as_ptr() as _,
+        name: "Xi",
+        desc: "greek capital letter xi, U+039E ISOgrk3",
     },
     HtmlEntityDesc {
         value: 927,
-        name: c"Omicron".as_ptr() as _,
-        desc: c"greek capital letter omicron, U+039F".as_ptr() as _,
+        name: "Omicron",
+        desc: "greek capital letter omicron, U+039F",
     },
     HtmlEntityDesc {
         value: 928,
-        name: c"Pi".as_ptr() as _,
-        desc: c"greek capital letter pi, U+03A0 ISOgrk3".as_ptr() as _,
+        name: "Pi",
+        desc: "greek capital letter pi, U+03A0 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 929,
-        name: c"Rho".as_ptr() as _,
-        desc: c"greek capital letter rho, U+03A1".as_ptr() as _,
+        name: "Rho",
+        desc: "greek capital letter rho, U+03A1",
     },
     HtmlEntityDesc {
         value: 931,
-        name: c"Sigma".as_ptr() as _,
-        desc: c"greek capital letter sigma, U+03A3 ISOgrk3".as_ptr() as _,
+        name: "Sigma",
+        desc: "greek capital letter sigma, U+03A3 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 932,
-        name: c"Tau".as_ptr() as _,
-        desc: c"greek capital letter tau, U+03A4".as_ptr() as _,
+        name: "Tau",
+        desc: "greek capital letter tau, U+03A4",
     },
     HtmlEntityDesc {
         value: 933,
-        name: c"Upsilon".as_ptr() as _,
-        desc: c"greek capital letter upsilon, U+03A5 ISOgrk3".as_ptr() as _,
+        name: "Upsilon",
+        desc: "greek capital letter upsilon, U+03A5 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 934,
-        name: c"Phi".as_ptr() as _,
-        desc: c"greek capital letter phi, U+03A6 ISOgrk3".as_ptr() as _,
+        name: "Phi",
+        desc: "greek capital letter phi, U+03A6 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 935,
-        name: c"Chi".as_ptr() as _,
-        desc: c"greek capital letter chi, U+03A7".as_ptr() as _,
+        name: "Chi",
+        desc: "greek capital letter chi, U+03A7",
     },
     HtmlEntityDesc {
         value: 936,
-        name: c"Psi".as_ptr() as _,
-        desc: c"greek capital letter psi, U+03A8 ISOgrk3".as_ptr() as _,
+        name: "Psi",
+        desc: "greek capital letter psi, U+03A8 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 937,
-        name: c"Omega".as_ptr() as _,
-        desc: c"greek capital letter omega, U+03A9 ISOgrk3".as_ptr() as _,
+        name: "Omega",
+        desc: "greek capital letter omega, U+03A9 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 945,
-        name: c"alpha".as_ptr() as _,
-        desc: c"greek small letter alpha, U+03B1 ISOgrk3".as_ptr() as _,
+        name: "alpha",
+        desc: "greek small letter alpha, U+03B1 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 946,
-        name: c"beta".as_ptr() as _,
-        desc: c"greek small letter beta, U+03B2 ISOgrk3".as_ptr() as _,
+        name: "beta",
+        desc: "greek small letter beta, U+03B2 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 947,
-        name: c"gamma".as_ptr() as _,
-        desc: c"greek small letter gamma, U+03B3 ISOgrk3".as_ptr() as _,
+        name: "gamma",
+        desc: "greek small letter gamma, U+03B3 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 948,
-        name: c"delta".as_ptr() as _,
-        desc: c"greek small letter delta, U+03B4 ISOgrk3".as_ptr() as _,
+        name: "delta",
+        desc: "greek small letter delta, U+03B4 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 949,
-        name: c"epsilon".as_ptr() as _,
-        desc: c"greek small letter epsilon, U+03B5 ISOgrk3".as_ptr() as _,
+        name: "epsilon",
+        desc: "greek small letter epsilon, U+03B5 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 950,
-        name: c"zeta".as_ptr() as _,
-        desc: c"greek small letter zeta, U+03B6 ISOgrk3".as_ptr() as _,
+        name: "zeta",
+        desc: "greek small letter zeta, U+03B6 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 951,
-        name: c"eta".as_ptr() as _,
-        desc: c"greek small letter eta, U+03B7 ISOgrk3".as_ptr() as _,
+        name: "eta",
+        desc: "greek small letter eta, U+03B7 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 952,
-        name: c"theta".as_ptr() as _,
-        desc: c"greek small letter theta, U+03B8 ISOgrk3".as_ptr() as _,
+        name: "theta",
+        desc: "greek small letter theta, U+03B8 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 953,
-        name: c"iota".as_ptr() as _,
-        desc: c"greek small letter iota, U+03B9 ISOgrk3".as_ptr() as _,
+        name: "iota",
+        desc: "greek small letter iota, U+03B9 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 954,
-        name: c"kappa".as_ptr() as _,
-        desc: c"greek small letter kappa, U+03BA ISOgrk3".as_ptr() as _,
+        name: "kappa",
+        desc: "greek small letter kappa, U+03BA ISOgrk3",
     },
     HtmlEntityDesc {
         value: 955,
-        name: c"lambda".as_ptr() as _,
-        desc: c"greek small letter lambda, U+03BB ISOgrk3".as_ptr() as _,
+        name: "lambda",
+        desc: "greek small letter lambda, U+03BB ISOgrk3",
     },
     HtmlEntityDesc {
         value: 956,
-        name: c"mu".as_ptr() as _,
-        desc: c"greek small letter mu, U+03BC ISOgrk3".as_ptr() as _,
+        name: "mu",
+        desc: "greek small letter mu, U+03BC ISOgrk3",
     },
     HtmlEntityDesc {
         value: 957,
-        name: c"nu".as_ptr() as _,
-        desc: c"greek small letter nu, U+03BD ISOgrk3".as_ptr() as _,
+        name: "nu",
+        desc: "greek small letter nu, U+03BD ISOgrk3",
     },
     HtmlEntityDesc {
         value: 958,
-        name: c"xi".as_ptr() as _,
-        desc: c"greek small letter xi, U+03BE ISOgrk3".as_ptr() as _,
+        name: "xi",
+        desc: "greek small letter xi, U+03BE ISOgrk3",
     },
     HtmlEntityDesc {
         value: 959,
-        name: c"omicron".as_ptr() as _,
-        desc: c"greek small letter omicron, U+03BF NEW".as_ptr() as _,
+        name: "omicron",
+        desc: "greek small letter omicron, U+03BF NEW",
     },
     HtmlEntityDesc {
         value: 960,
-        name: c"pi".as_ptr() as _,
-        desc: c"greek small letter pi, U+03C0 ISOgrk3".as_ptr() as _,
+        name: "pi",
+        desc: "greek small letter pi, U+03C0 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 961,
-        name: c"rho".as_ptr() as _,
-        desc: c"greek small letter rho, U+03C1 ISOgrk3".as_ptr() as _,
+        name: "rho",
+        desc: "greek small letter rho, U+03C1 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 962,
-        name: c"sigmaf".as_ptr() as _,
-        desc: c"greek small letter final sigma, U+03C2 ISOgrk3".as_ptr() as _,
+        name: "sigmaf",
+        desc: "greek small letter final sigma, U+03C2 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 963,
-        name: c"sigma".as_ptr() as _,
-        desc: c"greek small letter sigma, U+03C3 ISOgrk3".as_ptr() as _,
+        name: "sigma",
+        desc: "greek small letter sigma, U+03C3 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 964,
-        name: c"tau".as_ptr() as _,
-        desc: c"greek small letter tau, U+03C4 ISOgrk3".as_ptr() as _,
+        name: "tau",
+        desc: "greek small letter tau, U+03C4 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 965,
-        name: c"upsilon".as_ptr() as _,
-        desc: c"greek small letter upsilon, U+03C5 ISOgrk3".as_ptr() as _,
+        name: "upsilon",
+        desc: "greek small letter upsilon, U+03C5 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 966,
-        name: c"phi".as_ptr() as _,
-        desc: c"greek small letter phi, U+03C6 ISOgrk3".as_ptr() as _,
+        name: "phi",
+        desc: "greek small letter phi, U+03C6 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 967,
-        name: c"chi".as_ptr() as _,
-        desc: c"greek small letter chi, U+03C7 ISOgrk3".as_ptr() as _,
+        name: "chi",
+        desc: "greek small letter chi, U+03C7 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 968,
-        name: c"psi".as_ptr() as _,
-        desc: c"greek small letter psi, U+03C8 ISOgrk3".as_ptr() as _,
+        name: "psi",
+        desc: "greek small letter psi, U+03C8 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 969,
-        name: c"omega".as_ptr() as _,
-        desc: c"greek small letter omega, U+03C9 ISOgrk3".as_ptr() as _,
+        name: "omega",
+        desc: "greek small letter omega, U+03C9 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 977,
-        name: c"thetasym".as_ptr() as _,
-        desc: c"greek small letter theta symbol, U+03D1 NEW".as_ptr() as _,
+        name: "thetasym",
+        desc: "greek small letter theta symbol, U+03D1 NEW",
     },
     HtmlEntityDesc {
         value: 978,
-        name: c"upsih".as_ptr() as _,
-        desc: c"greek upsilon with hook symbol, U+03D2 NEW".as_ptr() as _,
+        name: "upsih",
+        desc: "greek upsilon with hook symbol, U+03D2 NEW",
     },
     HtmlEntityDesc {
         value: 982,
-        name: c"piv".as_ptr() as _,
-        desc: c"greek pi symbol, U+03D6 ISOgrk3".as_ptr() as _,
+        name: "piv",
+        desc: "greek pi symbol, U+03D6 ISOgrk3",
     },
     HtmlEntityDesc {
         value: 8194,
-        name: c"ensp".as_ptr() as _,
-        desc: c"en space, U+2002 ISOpub".as_ptr() as _,
+        name: "ensp",
+        desc: "en space, U+2002 ISOpub",
     },
     HtmlEntityDesc {
         value: 8195,
-        name: c"emsp".as_ptr() as _,
-        desc: c"em space, U+2003 ISOpub".as_ptr() as _,
+        name: "emsp",
+        desc: "em space, U+2003 ISOpub",
     },
     HtmlEntityDesc {
         value: 8201,
-        name: c"thinsp".as_ptr() as _,
-        desc: c"thin space, U+2009 ISOpub".as_ptr() as _,
+        name: "thinsp",
+        desc: "thin space, U+2009 ISOpub",
     },
     HtmlEntityDesc {
         value: 8204,
-        name: c"zwnj".as_ptr() as _,
-        desc: c"zero width non-joiner, U+200C NEW RFC 2070".as_ptr() as _,
+        name: "zwnj",
+        desc: "zero width non-joiner, U+200C NEW RFC 2070",
     },
     HtmlEntityDesc {
         value: 8205,
-        name: c"zwj".as_ptr() as _,
-        desc: c"zero width joiner, U+200D NEW RFC 2070".as_ptr() as _,
+        name: "zwj",
+        desc: "zero width joiner, U+200D NEW RFC 2070",
     },
     HtmlEntityDesc {
         value: 8206,
-        name: c"lrm".as_ptr() as _,
-        desc: c"left-to-right mark, U+200E NEW RFC 2070".as_ptr() as _,
+        name: "lrm",
+        desc: "left-to-right mark, U+200E NEW RFC 2070",
     },
     HtmlEntityDesc {
         value: 8207,
-        name: c"rlm".as_ptr() as _,
-        desc: c"right-to-left mark, U+200F NEW RFC 2070".as_ptr() as _,
+        name: "rlm",
+        desc: "right-to-left mark, U+200F NEW RFC 2070",
     },
     HtmlEntityDesc {
         value: 8211,
-        name: c"ndash".as_ptr() as _,
-        desc: c"en dash, U+2013 ISOpub".as_ptr() as _,
+        name: "ndash",
+        desc: "en dash, U+2013 ISOpub",
     },
     HtmlEntityDesc {
         value: 8212,
-        name: c"mdash".as_ptr() as _,
-        desc: c"em dash, U+2014 ISOpub".as_ptr() as _,
+        name: "mdash",
+        desc: "em dash, U+2014 ISOpub",
     },
     HtmlEntityDesc {
         value: 8216,
-        name: c"lsquo".as_ptr() as _,
-        desc: c"left single quotation mark, U+2018 ISOnum".as_ptr() as _,
+        name: "lsquo",
+        desc: "left single quotation mark, U+2018 ISOnum",
     },
     HtmlEntityDesc {
         value: 8217,
-        name: c"rsquo".as_ptr() as _,
-        desc: c"right single quotation mark, U+2019 ISOnum".as_ptr() as _,
+        name: "rsquo",
+        desc: "right single quotation mark, U+2019 ISOnum",
     },
     HtmlEntityDesc {
         value: 8218,
-        name: c"sbquo".as_ptr() as _,
-        desc: c"single low-9 quotation mark, U+201A NEW".as_ptr() as _,
+        name: "sbquo",
+        desc: "single low-9 quotation mark, U+201A NEW",
     },
     HtmlEntityDesc {
         value: 8220,
-        name: c"ldquo".as_ptr() as _,
-        desc: c"left double quotation mark, U+201C ISOnum".as_ptr() as _,
+        name: "ldquo",
+        desc: "left double quotation mark, U+201C ISOnum",
     },
     HtmlEntityDesc {
         value: 8221,
-        name: c"rdquo".as_ptr() as _,
-        desc: c"right double quotation mark, U+201D ISOnum".as_ptr() as _,
+        name: "rdquo",
+        desc: "right double quotation mark, U+201D ISOnum",
     },
     HtmlEntityDesc {
         value: 8222,
-        name: c"bdquo".as_ptr() as _,
-        desc: c"double low-9 quotation mark, U+201E NEW".as_ptr() as _,
+        name: "bdquo",
+        desc: "double low-9 quotation mark, U+201E NEW",
     },
     HtmlEntityDesc {
         value: 8224,
-        name: c"dagger".as_ptr() as _,
-        desc: c"dagger, U+2020 ISOpub".as_ptr() as _,
+        name: "dagger",
+        desc: "dagger, U+2020 ISOpub",
     },
     HtmlEntityDesc {
         value: 8225,
-        name: c"Dagger".as_ptr() as _,
-        desc: c"double dagger, U+2021 ISOpub".as_ptr() as _,
+        name: "Dagger",
+        desc: "double dagger, U+2021 ISOpub",
     },
     HtmlEntityDesc {
         value: 8226,
-        name: c"bull".as_ptr() as _,
-        desc: c"bullet = black small circle, U+2022 ISOpub".as_ptr() as _,
+        name: "bull",
+        desc: "bullet = black small circle, U+2022 ISOpub",
     },
     HtmlEntityDesc {
         value: 8230,
-        name: c"hellip".as_ptr() as _,
-        desc: c"horizontal ellipsis = three dot leader, U+2026 ISOpub".as_ptr() as _,
+        name: "hellip",
+        desc: "horizontal ellipsis = three dot leader, U+2026 ISOpub",
     },
     HtmlEntityDesc {
         value: 8240,
-        name: c"permil".as_ptr() as _,
-        desc: c"per mille sign, U+2030 ISOtech".as_ptr() as _,
+        name: "permil",
+        desc: "per mille sign, U+2030 ISOtech",
     },
     HtmlEntityDesc {
         value: 8242,
-        name: c"prime".as_ptr() as _,
-        desc: c"prime = minutes = feet, U+2032 ISOtech".as_ptr() as _,
+        name: "prime",
+        desc: "prime = minutes = feet, U+2032 ISOtech",
     },
     HtmlEntityDesc {
         value: 8243,
-        name: c"Prime".as_ptr() as _,
-        desc: c"double prime = seconds = inches, U+2033 ISOtech".as_ptr() as _,
+        name: "Prime",
+        desc: "double prime = seconds = inches, U+2033 ISOtech",
     },
     HtmlEntityDesc {
         value: 8249,
-        name: c"lsaquo".as_ptr() as _,
-        desc: c"single left-pointing angle quotation mark, U+2039 ISO proposed".as_ptr() as _,
+        name: "lsaquo",
+        desc: "single left-pointing angle quotation mark, U+2039 ISO proposed",
     },
     HtmlEntityDesc {
         value: 8250,
-        name: c"rsaquo".as_ptr() as _,
-        desc: c"single right-pointing angle quotation mark, U+203A ISO proposed".as_ptr() as _,
+        name: "rsaquo",
+        desc: "single right-pointing angle quotation mark, U+203A ISO proposed",
     },
     HtmlEntityDesc {
         value: 8254,
-        name: c"oline".as_ptr() as _,
-        desc: c"overline = spacing overscore, U+203E NEW".as_ptr() as _,
+        name: "oline",
+        desc: "overline = spacing overscore, U+203E NEW",
     },
     HtmlEntityDesc {
         value: 8260,
-        name: c"frasl".as_ptr() as _,
-        desc: c"fraction slash, U+2044 NEW".as_ptr() as _,
+        name: "frasl",
+        desc: "fraction slash, U+2044 NEW",
     },
     HtmlEntityDesc {
         value: 8364,
-        name: c"euro".as_ptr() as _,
-        desc: c"euro sign, U+20AC NEW".as_ptr() as _,
+        name: "euro",
+        desc: "euro sign, U+20AC NEW",
     },
     HtmlEntityDesc {
         value: 8465,
-        name: c"image".as_ptr() as _,
-        desc: c"blackletter capital I = imaginary part, U+2111 ISOamso".as_ptr() as _,
+        name: "image",
+        desc: "blackletter capital I = imaginary part, U+2111 ISOamso",
     },
     HtmlEntityDesc {
         value: 8472,
-        name: c"weierp".as_ptr() as _,
-        desc: c"script capital P = power set = Weierstrass p, U+2118 ISOamso".as_ptr() as _,
+        name: "weierp",
+        desc: "script capital P = power set = Weierstrass p, U+2118 ISOamso",
     },
     HtmlEntityDesc {
         value: 8476,
-        name: c"real".as_ptr() as _,
-        desc: c"blackletter capital R = real part symbol, U+211C ISOamso".as_ptr() as _,
+        name: "real",
+        desc: "blackletter capital R = real part symbol, U+211C ISOamso",
     },
     HtmlEntityDesc {
         value: 8482,
-        name: c"trade".as_ptr() as _,
-        desc: c"trade mark sign, U+2122 ISOnum".as_ptr() as _,
+        name: "trade",
+        desc: "trade mark sign, U+2122 ISOnum",
     },
     HtmlEntityDesc {
         value: 8501,
-        name: c"alefsym".as_ptr() as _,
-        desc: c"alef symbol = first transfinite cardinal, U+2135 NEW".as_ptr() as _,
+        name: "alefsym",
+        desc: "alef symbol = first transfinite cardinal, U+2135 NEW",
     },
     HtmlEntityDesc {
         value: 8592,
-        name: c"larr".as_ptr() as _,
-        desc: c"leftwards arrow, U+2190 ISOnum".as_ptr() as _,
+        name: "larr",
+        desc: "leftwards arrow, U+2190 ISOnum",
     },
     HtmlEntityDesc {
         value: 8593,
-        name: c"uarr".as_ptr() as _,
-        desc: c"upwards arrow, U+2191 ISOnum".as_ptr() as _,
+        name: "uarr",
+        desc: "upwards arrow, U+2191 ISOnum",
     },
     HtmlEntityDesc {
         value: 8594,
-        name: c"rarr".as_ptr() as _,
-        desc: c"rightwards arrow, U+2192 ISOnum".as_ptr() as _,
+        name: "rarr",
+        desc: "rightwards arrow, U+2192 ISOnum",
     },
     HtmlEntityDesc {
         value: 8595,
-        name: c"darr".as_ptr() as _,
-        desc: c"downwards arrow, U+2193 ISOnum".as_ptr() as _,
+        name: "darr",
+        desc: "downwards arrow, U+2193 ISOnum",
     },
     HtmlEntityDesc {
         value: 8596,
-        name: c"harr".as_ptr() as _,
-        desc: c"left right arrow, U+2194 ISOamsa".as_ptr() as _,
+        name: "harr",
+        desc: "left right arrow, U+2194 ISOamsa",
     },
     HtmlEntityDesc {
         value: 8629,
-        name: c"crarr".as_ptr() as _,
-        desc: c"downwards arrow with corner leftwards = carriage return, U+21B5 NEW".as_ptr() as _,
+        name: "crarr",
+        desc: "downwards arrow with corner leftwards = carriage return, U+21B5 NEW",
     },
     HtmlEntityDesc {
         value: 8656,
-        name: c"lArr".as_ptr() as _,
-        desc: c"leftwards double arrow, U+21D0 ISOtech".as_ptr() as _,
+        name: "lArr",
+        desc: "leftwards double arrow, U+21D0 ISOtech",
     },
     HtmlEntityDesc {
         value: 8657,
-        name: c"uArr".as_ptr() as _,
-        desc: c"upwards double arrow, U+21D1 ISOamsa".as_ptr() as _,
+        name: "uArr",
+        desc: "upwards double arrow, U+21D1 ISOamsa",
     },
     HtmlEntityDesc {
         value: 8658,
-        name: c"rArr".as_ptr() as _,
-        desc: c"rightwards double arrow, U+21D2 ISOtech".as_ptr() as _,
+        name: "rArr",
+        desc: "rightwards double arrow, U+21D2 ISOtech",
     },
     HtmlEntityDesc {
         value: 8659,
-        name: c"dArr".as_ptr() as _,
-        desc: c"downwards double arrow, U+21D3 ISOamsa".as_ptr() as _,
+        name: "dArr",
+        desc: "downwards double arrow, U+21D3 ISOamsa",
     },
     HtmlEntityDesc {
         value: 8660,
-        name: c"hArr".as_ptr() as _,
-        desc: c"left right double arrow, U+21D4 ISOamsa".as_ptr() as _,
+        name: "hArr",
+        desc: "left right double arrow, U+21D4 ISOamsa",
     },
     HtmlEntityDesc {
         value: 8704,
-        name: c"forall".as_ptr() as _,
-        desc: c"for all, U+2200 ISOtech".as_ptr() as _,
+        name: "forall",
+        desc: "for all, U+2200 ISOtech",
     },
     HtmlEntityDesc {
         value: 8706,
-        name: c"part".as_ptr() as _,
-        desc: c"partial differential, U+2202 ISOtech".as_ptr() as _,
+        name: "part",
+        desc: "partial differential, U+2202 ISOtech",
     },
     HtmlEntityDesc {
         value: 8707,
-        name: c"exist".as_ptr() as _,
-        desc: c"there exists, U+2203 ISOtech".as_ptr() as _,
+        name: "exist",
+        desc: "there exists, U+2203 ISOtech",
     },
     HtmlEntityDesc {
         value: 8709,
-        name: c"empty".as_ptr() as _,
-        desc: c"empty set = null set = diameter, U+2205 ISOamso".as_ptr() as _,
+        name: "empty",
+        desc: "empty set = null set = diameter, U+2205 ISOamso",
     },
     HtmlEntityDesc {
         value: 8711,
-        name: c"nabla".as_ptr() as _,
-        desc: c"nabla = backward difference, U+2207 ISOtech".as_ptr() as _,
+        name: "nabla",
+        desc: "nabla = backward difference, U+2207 ISOtech",
     },
     HtmlEntityDesc {
         value: 8712,
-        name: c"isin".as_ptr() as _,
-        desc: c"element of, U+2208 ISOtech".as_ptr() as _,
+        name: "isin",
+        desc: "element of, U+2208 ISOtech",
     },
     HtmlEntityDesc {
         value: 8713,
-        name: c"notin".as_ptr() as _,
-        desc: c"not an element of, U+2209 ISOtech".as_ptr() as _,
+        name: "notin",
+        desc: "not an element of, U+2209 ISOtech",
     },
     HtmlEntityDesc {
         value: 8715,
-        name: c"ni".as_ptr() as _,
-        desc: c"contains as member, U+220B ISOtech".as_ptr() as _,
+        name: "ni",
+        desc: "contains as member, U+220B ISOtech",
     },
     HtmlEntityDesc {
         value: 8719,
-        name: c"prod".as_ptr() as _,
-        desc: c"n-ary product = product sign, U+220F ISOamsb".as_ptr() as _,
+        name: "prod",
+        desc: "n-ary product = product sign, U+220F ISOamsb",
     },
     HtmlEntityDesc {
         value: 8721,
-        name: c"sum".as_ptr() as _,
-        desc: c"n-ary summation, U+2211 ISOamsb".as_ptr() as _,
+        name: "sum",
+        desc: "n-ary summation, U+2211 ISOamsb",
     },
     HtmlEntityDesc {
         value: 8722,
-        name: c"minus".as_ptr() as _,
-        desc: c"minus sign, U+2212 ISOtech".as_ptr() as _,
+        name: "minus",
+        desc: "minus sign, U+2212 ISOtech",
     },
     HtmlEntityDesc {
         value: 8727,
-        name: c"lowast".as_ptr() as _,
-        desc: c"asterisk operator, U+2217 ISOtech".as_ptr() as _,
+        name: "lowast",
+        desc: "asterisk operator, U+2217 ISOtech",
     },
     HtmlEntityDesc {
         value: 8730,
-        name: c"radic".as_ptr() as _,
-        desc: c"square root = radical sign, U+221A ISOtech".as_ptr() as _,
+        name: "radic",
+        desc: "square root = radical sign, U+221A ISOtech",
     },
     HtmlEntityDesc {
         value: 8733,
-        name: c"prop".as_ptr() as _,
-        desc: c"proportional to, U+221D ISOtech".as_ptr() as _,
+        name: "prop",
+        desc: "proportional to, U+221D ISOtech",
     },
     HtmlEntityDesc {
         value: 8734,
-        name: c"infin".as_ptr() as _,
-        desc: c"infinity, U+221E ISOtech".as_ptr() as _,
+        name: "infin",
+        desc: "infinity, U+221E ISOtech",
     },
     HtmlEntityDesc {
         value: 8736,
-        name: c"ang".as_ptr() as _,
-        desc: c"angle, U+2220 ISOamso".as_ptr() as _,
+        name: "ang",
+        desc: "angle, U+2220 ISOamso",
     },
     HtmlEntityDesc {
         value: 8743,
-        name: c"and".as_ptr() as _,
-        desc: c"logical and = wedge, U+2227 ISOtech".as_ptr() as _,
+        name: "and",
+        desc: "logical and = wedge, U+2227 ISOtech",
     },
     HtmlEntityDesc {
         value: 8744,
-        name: c"or".as_ptr() as _,
-        desc: c"logical or = vee, U+2228 ISOtech".as_ptr() as _,
+        name: "or",
+        desc: "logical or = vee, U+2228 ISOtech",
     },
     HtmlEntityDesc {
         value: 8745,
-        name: c"cap".as_ptr() as _,
-        desc: c"intersection = cap, U+2229 ISOtech".as_ptr() as _,
+        name: "cap",
+        desc: "intersection = cap, U+2229 ISOtech",
     },
     HtmlEntityDesc {
         value: 8746,
-        name: c"cup".as_ptr() as _,
-        desc: c"union = cup, U+222A ISOtech".as_ptr() as _,
+        name: "cup",
+        desc: "union = cup, U+222A ISOtech",
     },
     HtmlEntityDesc {
         value: 8747,
-        name: c"int".as_ptr() as _,
-        desc: c"integral, U+222B ISOtech".as_ptr() as _,
+        name: "int",
+        desc: "integral, U+222B ISOtech",
     },
     HtmlEntityDesc {
         value: 8756,
-        name: c"there4".as_ptr() as _,
-        desc: c"therefore, U+2234 ISOtech".as_ptr() as _,
+        name: "there4",
+        desc: "therefore, U+2234 ISOtech",
     },
     HtmlEntityDesc {
         value: 8764,
-        name: c"sim".as_ptr() as _,
-        desc: c"tilde operator = varies with = similar to, U+223C ISOtech".as_ptr() as _,
+        name: "sim",
+        desc: "tilde operator = varies with = similar to, U+223C ISOtech",
     },
     HtmlEntityDesc {
         value: 8773,
-        name: c"cong".as_ptr() as _,
-        desc: c"approximately equal to, U+2245 ISOtech".as_ptr() as _,
+        name: "cong",
+        desc: "approximately equal to, U+2245 ISOtech",
     },
     HtmlEntityDesc {
         value: 8776,
-        name: c"asymp".as_ptr() as _,
-        desc: c"almost equal to = asymptotic to, U+2248 ISOamsr".as_ptr() as _,
+        name: "asymp",
+        desc: "almost equal to = asymptotic to, U+2248 ISOamsr",
     },
     HtmlEntityDesc {
         value: 8800,
-        name: c"ne".as_ptr() as _,
-        desc: c"not equal to, U+2260 ISOtech".as_ptr() as _,
+        name: "ne",
+        desc: "not equal to, U+2260 ISOtech",
     },
     HtmlEntityDesc {
         value: 8801,
-        name: c"equiv".as_ptr() as _,
-        desc: c"identical to, U+2261 ISOtech".as_ptr() as _,
+        name: "equiv",
+        desc: "identical to, U+2261 ISOtech",
     },
     HtmlEntityDesc {
         value: 8804,
-        name: c"le".as_ptr() as _,
-        desc: c"less-than or equal to, U+2264 ISOtech".as_ptr() as _,
+        name: "le",
+        desc: "less-than or equal to, U+2264 ISOtech",
     },
     HtmlEntityDesc {
         value: 8805,
-        name: c"ge".as_ptr() as _,
-        desc: c"greater-than or equal to, U+2265 ISOtech".as_ptr() as _,
+        name: "ge",
+        desc: "greater-than or equal to, U+2265 ISOtech",
     },
     HtmlEntityDesc {
         value: 8834,
-        name: c"sub".as_ptr() as _,
-        desc: c"subset of, U+2282 ISOtech".as_ptr() as _,
+        name: "sub",
+        desc: "subset of, U+2282 ISOtech",
     },
     HtmlEntityDesc {
         value: 8835,
-        name: c"sup".as_ptr() as _,
-        desc: c"superset of, U+2283 ISOtech".as_ptr() as _,
+        name: "sup",
+        desc: "superset of, U+2283 ISOtech",
     },
     HtmlEntityDesc {
         value: 8836,
-        name: c"nsub".as_ptr() as _,
-        desc: c"not a subset of, U+2284 ISOamsn".as_ptr() as _,
+        name: "nsub",
+        desc: "not a subset of, U+2284 ISOamsn",
     },
     HtmlEntityDesc {
         value: 8838,
-        name: c"sube".as_ptr() as _,
-        desc: c"subset of or equal to, U+2286 ISOtech".as_ptr() as _,
+        name: "sube",
+        desc: "subset of or equal to, U+2286 ISOtech",
     },
     HtmlEntityDesc {
         value: 8839,
-        name: c"supe".as_ptr() as _,
-        desc: c"superset of or equal to, U+2287 ISOtech".as_ptr() as _,
+        name: "supe",
+        desc: "superset of or equal to, U+2287 ISOtech",
     },
     HtmlEntityDesc {
         value: 8853,
-        name: c"oplus".as_ptr() as _,
-        desc: c"circled plus = direct sum, U+2295 ISOamsb".as_ptr() as _,
+        name: "oplus",
+        desc: "circled plus = direct sum, U+2295 ISOamsb",
     },
     HtmlEntityDesc {
         value: 8855,
-        name: c"otimes".as_ptr() as _,
-        desc: c"circled times = vector product, U+2297 ISOamsb".as_ptr() as _,
+        name: "otimes",
+        desc: "circled times = vector product, U+2297 ISOamsb",
     },
     HtmlEntityDesc {
         value: 8869,
-        name: c"perp".as_ptr() as _,
-        desc: c"up tack = orthogonal to = perpendicular, U+22A5 ISOtech".as_ptr() as _,
+        name: "perp",
+        desc: "up tack = orthogonal to = perpendicular, U+22A5 ISOtech",
     },
     HtmlEntityDesc {
         value: 8901,
-        name: c"sdot".as_ptr() as _,
-        desc: c"dot operator, U+22C5 ISOamsb".as_ptr() as _,
+        name: "sdot",
+        desc: "dot operator, U+22C5 ISOamsb",
     },
     HtmlEntityDesc {
         value: 8968,
-        name: c"lceil".as_ptr() as _,
-        desc: c"left ceiling = apl upstile, U+2308 ISOamsc".as_ptr() as _,
+        name: "lceil",
+        desc: "left ceiling = apl upstile, U+2308 ISOamsc",
     },
     HtmlEntityDesc {
         value: 8969,
-        name: c"rceil".as_ptr() as _,
-        desc: c"right ceiling, U+2309 ISOamsc".as_ptr() as _,
+        name: "rceil",
+        desc: "right ceiling, U+2309 ISOamsc",
     },
     HtmlEntityDesc {
         value: 8970,
-        name: c"lfloor".as_ptr() as _,
-        desc: c"left floor = apl downstile, U+230A ISOamsc".as_ptr() as _,
+        name: "lfloor",
+        desc: "left floor = apl downstile, U+230A ISOamsc",
     },
     HtmlEntityDesc {
         value: 8971,
-        name: c"rfloor".as_ptr() as _,
-        desc: c"right floor, U+230B ISOamsc".as_ptr() as _,
+        name: "rfloor",
+        desc: "right floor, U+230B ISOamsc",
     },
     HtmlEntityDesc {
         value: 9001,
-        name: c"lang".as_ptr() as _,
-        desc: c"left-pointing angle bracket = bra, U+2329 ISOtech".as_ptr() as _,
+        name: "lang",
+        desc: "left-pointing angle bracket = bra, U+2329 ISOtech",
     },
     HtmlEntityDesc {
         value: 9002,
-        name: c"rang".as_ptr() as _,
-        desc: c"right-pointing angle bracket = ket, U+232A ISOtech".as_ptr() as _,
+        name: "rang",
+        desc: "right-pointing angle bracket = ket, U+232A ISOtech",
     },
     HtmlEntityDesc {
         value: 9674,
-        name: c"loz".as_ptr() as _,
-        desc: c"lozenge, U+25CA ISOpub".as_ptr() as _,
+        name: "loz",
+        desc: "lozenge, U+25CA ISOpub",
     },
     HtmlEntityDesc {
         value: 9824,
-        name: c"spades".as_ptr() as _,
-        desc: c"black spade suit, U+2660 ISOpub".as_ptr() as _,
+        name: "spades",
+        desc: "black spade suit, U+2660 ISOpub",
     },
     HtmlEntityDesc {
         value: 9827,
-        name: c"clubs".as_ptr() as _,
-        desc: c"black club suit = shamrock, U+2663 ISOpub".as_ptr() as _,
+        name: "clubs",
+        desc: "black club suit = shamrock, U+2663 ISOpub",
     },
     HtmlEntityDesc {
         value: 9829,
-        name: c"hearts".as_ptr() as _,
-        desc: c"black heart suit = valentine, U+2665 ISOpub".as_ptr() as _,
+        name: "hearts",
+        desc: "black heart suit = valentine, U+2665 ISOpub",
     },
     HtmlEntityDesc {
         value: 9830,
-        name: c"diams".as_ptr() as _,
-        desc: c"black diamond suit, U+2666 ISOpub".as_ptr() as _,
+        name: "diams",
+        desc: "black diamond suit, U+2666 ISOpub",
     },
 ];
 
 #[doc(alias = "htmlInitAutoClose")]
 #[deprecated = "This is a no-op"]
-pub unsafe fn html_init_auto_close() {}
+pub fn html_init_auto_close() {}
 
 /// Lookup the HTML tag in the ElementTable
 ///
 /// Returns the related htmlElemDescPtr or null_mut() if not found.
 #[doc(alias = "htmlTagLookup")]
-pub unsafe fn html_tag_lookup(tag: &str) -> Option<&'static HtmlElemDesc> {
+pub fn html_tag_lookup(tag: &str) -> Option<&'static HtmlElemDesc> {
     let tag = tag.to_ascii_lowercase();
     HTML40_ELEMENT_TABLE
         .binary_search_by(|desc| desc.name.to_ascii_lowercase().cmp(&tag))
@@ -4229,15 +4066,10 @@ pub unsafe fn html_tag_lookup(tag: &str) -> Option<&'static HtmlElemDesc> {
 ///
 /// Returns the associated htmlEntityDescPtr if found, NULL otherwise.
 #[doc(alias = "htmlEntityLookup")]
-pub unsafe fn html_entity_lookup(name: *const XmlChar) -> *const HtmlEntityDesc {
-    unsafe {
-        for entry in HTML40_ENTITIES_TABLE {
-            if xml_str_equal(name, entry.name as _) {
-                return entry as *const HtmlEntityDesc;
-            }
-        }
-        null_mut()
-    }
+pub fn html_entity_lookup(name: &str) -> Option<&'static HtmlEntityDesc> {
+    HTML40_ENTITIES_TABLE
+        .iter()
+        .find(|entry| entry.name == name)
 }
 
 /// Lookup the given entity in EntitiesTable
@@ -4246,16 +4078,11 @@ pub unsafe fn html_entity_lookup(name: *const XmlChar) -> *const HtmlEntityDesc 
 ///
 /// Returns the associated htmlEntityDescPtr if found, NULL otherwise.
 #[doc(alias = "htmlEntityValueLookup")]
-pub unsafe fn html_entity_value_lookup(value: u32) -> *const HtmlEntityDesc {
-    for entry in HTML40_ENTITIES_TABLE {
-        if entry.value >= value {
-            if entry.value > value {
-                break;
-            }
-            return entry as *const HtmlEntityDesc;
-        }
-    }
-    null_mut()
+pub fn html_entity_value_lookup(value: u32) -> Option<&'static HtmlEntityDesc> {
+    HTML40_ENTITIES_TABLE
+        .binary_search_by_key(&value, |entry| entry.value)
+        .ok()
+        .and_then(|index| HTML40_ENTITIES_TABLE.get(index))
 }
 
 /// The HTML DTD allows a tag to implicitly close other tags.
@@ -5981,18 +5808,18 @@ unsafe fn html_parse_name(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
 pub(crate) unsafe fn html_parse_entity_ref(
     ctxt: HtmlParserCtxtPtr,
     str: *mut *const XmlChar,
-) -> *const HtmlEntityDesc {
+) -> Option<&'static HtmlEntityDesc> {
     unsafe {
         let name: *const XmlChar;
-        let mut ent: *const HtmlEntityDesc = null();
 
         if !str.is_null() {
             *str = null_mut();
         }
         if ctxt.is_null() || (*ctxt).input.is_null() {
-            return null_mut();
+            return None;
         }
 
+        let mut ent = None;
         if (*ctxt).current_byte() == b'&' {
             (*ctxt).skip_char();
             name = html_parse_name(ctxt);
@@ -6012,8 +5839,10 @@ pub(crate) unsafe fn html_parse_entity_ref(
                     }
 
                     // Lookup the entity in the table.
-                    ent = html_entity_lookup(name);
-                    if !ent.is_null() {
+                    ent = html_entity_lookup(
+                        CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                    );
+                    if ent.is_some() {
                         /* OK that's ugly !!! */
                         (*ctxt).skip_char();
                     }
@@ -6454,7 +6283,6 @@ unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: XmlChar) -> *
         let mut out: *mut XmlChar;
         let mut name: *const XmlChar = null_mut();
         let mut cur: *const XmlChar;
-        let mut ent: *const HtmlEntityDesc;
 
         // allocate a translation buffer.
         buffer_size = HTML_PARSER_BUFFER_SIZE as _;
@@ -6509,7 +6337,7 @@ unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: XmlChar) -> *
                         out = buffer.add(indx as usize) as _;
                     }
                 } else {
-                    ent = html_parse_entity_ref(ctxt, addr_of_mut!(name));
+                    let ent = html_parse_entity_ref(ctxt, addr_of_mut!(name));
                     if name.is_null() {
                         *out = b'&';
                         out = out.add(1);
@@ -6519,22 +6347,7 @@ unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: XmlChar) -> *
                             grow_buffer!(ctxt, buffer, buffer_size);
                             out = buffer.add(indx as usize) as _;
                         }
-                    } else if ent.is_null() {
-                        *out = b'&';
-                        out = out.add(1);
-                        cur = name;
-                        while *cur != 0 {
-                            if out.offset_from(buffer) > buffer_size as isize - 100 {
-                                let indx: i32 = out.offset_from(buffer) as i32;
-
-                                grow_buffer!(ctxt, buffer, buffer_size);
-                                out = buffer.add(indx as usize) as _;
-                            }
-                            *out = *cur;
-                            out = out.add(1);
-                            cur = cur.add(1);
-                        }
-                    } else {
+                    } else if let Some(ent) = ent {
                         let mut bits: i32;
 
                         if out.offset_from(buffer) > buffer_size as isize - 100 {
@@ -6543,7 +6356,7 @@ unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: XmlChar) -> *
                             grow_buffer!(ctxt, buffer, buffer_size);
                             out = buffer.add(indx as usize) as _;
                         }
-                        let c: u32 = (*ent).value;
+                        let c: u32 = ent.value;
                         if c < 0x80 {
                             *out = c as _;
                             out = out.add(1);
@@ -6566,6 +6379,21 @@ unsafe fn html_parse_html_attribute(ctxt: HtmlParserCtxtPtr, stop: XmlChar) -> *
                             *out = ((c >> bits) & 0x3F) as u8 | 0x80;
                             out = out.add(1);
                             bits -= 6;
+                        }
+                    } else {
+                        *out = b'&';
+                        out = out.add(1);
+                        cur = name;
+                        while *cur != 0 {
+                            if out.offset_from(buffer) > buffer_size as isize - 100 {
+                                let indx: i32 = out.offset_from(buffer) as i32;
+
+                                grow_buffer!(ctxt, buffer, buffer_size);
+                                out = buffer.add(indx as usize) as _;
+                            }
+                            *out = *cur;
+                            out = out.add(1);
+                            cur = cur.add(1);
                         }
                     }
                 }
@@ -8187,7 +8015,6 @@ unsafe fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
 #[doc(alias = "htmlParseReference")]
 unsafe fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
     unsafe {
-        let ent: *const HtmlEntityDesc;
         let mut out: [XmlChar; 6] = [0; 6];
         let mut name: *const XmlChar = null();
         if (*ctxt).current_byte() != b'&' {
@@ -8234,7 +8061,7 @@ unsafe fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
                 characters((*ctxt).user_data.clone(), s);
             }
         } else {
-            ent = html_parse_entity_ref(ctxt, addr_of_mut!(name));
+            let ent = html_parse_entity_ref(ctxt, addr_of_mut!(name));
             if name.is_null() {
                 html_check_paragraph(ctxt);
                 if let Some(characters) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.characters)
@@ -8243,22 +8070,11 @@ unsafe fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
                 }
                 return;
             }
-            if ent.is_null() || (*ent).value == 0 {
-                html_check_paragraph(ctxt);
-                if let Some(characters) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.characters)
-                {
-                    characters((*ctxt).user_data.clone(), "&");
-                    characters(
-                        (*ctxt).user_data.clone(),
-                        &CStr::from_ptr(name as *const i8).to_string_lossy(),
-                    );
-                    // (*(*ctxt).sax).characters((*ctxt).userData,  c";".as_ptr() as _, 1);
-                }
-            } else {
+            if let Some(ent) = ent.filter(|ent| ent.value != 0) {
                 let mut bits: i32;
                 let mut i: i32 = 0;
 
-                let c: u32 = (*ent).value;
+                let c: u32 = ent.value;
                 if c < 0x80 {
                     out[i as usize] = c as _;
                     i += 1;
@@ -8289,6 +8105,17 @@ unsafe fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
                 {
                     let s = from_utf8(&out[..i as usize]).expect("Internal Error");
                     characters((*ctxt).user_data.clone(), s);
+                }
+            } else {
+                html_check_paragraph(ctxt);
+                if let Some(characters) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.characters)
+                {
+                    characters((*ctxt).user_data.clone(), "&");
+                    characters(
+                        (*ctxt).user_data.clone(),
+                        &CStr::from_ptr(name as *const i8).to_string_lossy(),
+                    );
+                    // (*(*ctxt).sax).characters((*ctxt).userData,  c";".as_ptr() as _, 1);
                 }
             }
         }
@@ -9633,24 +9460,20 @@ pub unsafe fn utf8_to_html(
                 *out = c as _;
                 out = out.add(1);
             } else {
-                let mut nbuf: [c_char; 16] = [0; 16];
-
                 // Try to lookup a predefined HTML entity for it
 
-                let ent: *const HtmlEntityDesc = html_entity_value_lookup(c);
-                let cp = if ent.is_null() {
-                    snprintf(nbuf.as_mut_ptr() as _, nbuf.len(), c"#%u".as_ptr(), c);
-                    nbuf.as_mut_ptr()
+                let cp = if let Some(ent) = html_entity_value_lookup(c) {
+                    Cow::Borrowed(ent.name)
                 } else {
-                    (*ent).name
+                    Cow::Owned(format!("#{c}"))
                 };
-                let len: i32 = strlen(cp) as _;
+                let len = cp.len();
                 if out.add(2 + len as usize) >= outend as _ {
                     break;
                 }
                 *out = b'&';
                 out = out.add(1);
-                memcpy(out as _, cp as _, len as usize);
+                memcpy(out as _, cp.as_ptr() as _, len as usize);
                 out = out.add(len as usize);
                 *out = b';';
                 out = out.add(1);
@@ -9748,23 +9571,19 @@ pub unsafe fn html_encode_entities(
                 *out = c as _;
                 out = out.add(1);
             } else {
-                let mut nbuf: [c_char; 16] = [0; 16];
-
                 // Try to lookup a predefined HTML entity for it
-                let ent: *const HtmlEntityDesc = html_entity_value_lookup(c);
-                let cp = if ent.is_null() {
-                    snprintf(nbuf.as_mut_ptr() as _, nbuf.len(), c"#%u".as_ptr() as _, c);
-                    nbuf.as_mut_ptr()
+                let cp = if let Some(ent) = html_entity_value_lookup(c) {
+                    Cow::Borrowed(ent.name)
                 } else {
-                    (*ent).name
+                    Cow::Owned(format!("#{c}"))
                 };
-                let len: i32 = strlen(cp as _) as _;
+                let len = cp.len();
                 if outend.offset_from(out) < len as isize + 2 {
                     break;
                 }
                 *out = b'&';
                 out = out.add(1);
-                memcpy(out as _, cp as _, len as usize);
+                memcpy(out as _, cp.as_ptr() as _, len as usize);
                 out = out.add(len as usize);
                 *out = b';';
                 out = out.add(1);
@@ -9781,48 +9600,38 @@ pub unsafe fn html_encode_entities(
 // # Note
 // when adding ones, check htmlIsScriptAttribute() since
 // it assumes the name starts with 'on'
-const HTML_SCRIPT_ATTRIBUTES: &[*const c_char] = &[
-    c"onclick".as_ptr() as _,
-    c"ondblclick".as_ptr() as _,
-    c"onmousedown".as_ptr() as _,
-    c"onmouseup".as_ptr() as _,
-    c"onmouseover".as_ptr() as _,
-    c"onmousemove".as_ptr() as _,
-    c"onmouseout".as_ptr() as _,
-    c"onkeypress".as_ptr() as _,
-    c"onkeydown".as_ptr() as _,
-    c"onkeyup".as_ptr() as _,
-    c"onload".as_ptr() as _,
-    c"onunload".as_ptr() as _,
-    c"onfocus".as_ptr() as _,
-    c"onblur".as_ptr() as _,
-    c"onsubmit".as_ptr() as _,
-    c"onreset".as_ptr() as _,
-    c"onchange".as_ptr() as _,
-    c"onselect".as_ptr() as _,
+const HTML_SCRIPT_ATTRIBUTES: &[&str] = &[
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmouseup",
+    "onmouseover",
+    "onmousemove",
+    "onmouseout",
+    "onkeypress",
+    "onkeydown",
+    "onkeyup",
+    "onload",
+    "onunload",
+    "onfocus",
+    "onblur",
+    "onsubmit",
+    "onreset",
+    "onchange",
+    "onselect",
 ];
 
 /// Check if an attribute is of content type Script
 ///
 /// Returns 1 is the attribute is a script 0 otherwise
 #[doc(alias = "htmlIsScriptAttribute")]
-pub unsafe fn html_is_script_attribute(name: *const XmlChar) -> i32 {
-    unsafe {
-        if name.is_null() {
-            return 0;
-        }
-        // all script attributes start with 'on'
-        if *name.add(0) != b'o' || *name.add(1) != b'n' {
-            return 0;
-        }
-
-        for &attr in HTML_SCRIPT_ATTRIBUTES {
-            if xml_str_equal(name, attr as _) {
-                return 1;
-            }
-        }
-        0
+pub fn html_is_script_attribute(name: &str) -> bool {
+    // all script attributes start with 'on'
+    if !name.starts_with("on") {
+        return false;
     }
+
+    HTML_SCRIPT_ATTRIBUTES.iter().any(|&attr| attr == name)
 }
 
 /// Set and return the previous value for handling HTML omitted tags.
@@ -11273,50 +11082,18 @@ pub enum HtmlStatus {
 ///
 /// Returns one of HTML_REQUIRED, HTML_VALID, HTML_DEPRECATED, HTML_INVALID
 #[doc(alias = "htmlAttrAllowed")]
-pub unsafe fn html_attr_allowed(
-    elt: *const HtmlElemDesc,
-    attr: *const XmlChar,
-    legacy: i32,
-) -> HtmlStatus {
-    unsafe {
-        let mut p: *mut *const c_char;
-
-        if elt.is_null() || attr.is_null() {
-            return HtmlStatus::HtmlInvalid;
-        }
-
-        if !(*elt).attrs_req.is_null() {
-            p = (*elt).attrs_req;
-            while !(*p).is_null() {
-                if xml_strcmp(*p as _, attr) == 0 {
-                    return HtmlStatus::HtmlRequired;
-                }
-                p = p.add(1);
-            }
-        }
-
-        if !(*elt).attrs_opt.is_null() {
-            p = (*elt).attrs_opt;
-            while !(*p).is_null() {
-                if xml_strcmp(*p as _, attr) == 0 {
-                    return HtmlStatus::HtmlValid;
-                }
-                p = p.add(1);
-            }
-        }
-
-        if legacy != 0 && !(*elt).attrs_depr.is_null() {
-            p = (*elt).attrs_depr;
-            while !(*p).is_null() {
-                if xml_strcmp(*p as _, attr) == 0 {
-                    return HtmlStatus::HtmlDeprecated;
-                }
-                p = p.add(1);
-            }
-        }
-
-        HtmlStatus::HtmlInvalid
+pub fn html_attr_allowed(elt: &HtmlElemDesc, attr: &str, legacy: bool) -> HtmlStatus {
+    if elt.attrs_req.iter().any(|&p| p == attr) {
+        return HtmlStatus::HtmlRequired;
     }
+    if elt.attrs_opt.iter().any(|&p| p == attr) {
+        return HtmlStatus::HtmlValid;
+    }
+    if legacy && elt.attrs_depr.iter().any(|&p| p == attr) {
+        return HtmlStatus::HtmlDeprecated;
+    }
+
+    HtmlStatus::HtmlInvalid
 }
 
 /// Checks whether an HTML element may be a direct child of a parent element.
@@ -11355,36 +11132,30 @@ pub fn html_element_status_here(parent: &HtmlElemDesc, elt: &HtmlElemDesc) -> Ht
 /// - For Attribute nodes, a return from htmlAttrAllowed
 /// - For other nodes, htmlStatus::HTML_NA (no checks performed)
 #[doc(alias = "htmlNodeStatus")]
-pub unsafe fn html_node_status(node: HtmlNodePtr, legacy: i32) -> HtmlStatus {
-    unsafe {
-        // if node.is_null() {
-        //     return HtmlStatus::HtmlInvalid;
-        // }
-
-        match (*node).element_type() {
-            XmlElementType::XmlElementNode => {
-                if legacy != 0 {
-                    if html_tag_lookup(&(*node).parent().unwrap().name().unwrap()).is_some_and(
-                        |desc| html_element_allowed_here(desc, &(*node).name().unwrap()),
-                    ) {
-                        HtmlStatus::HtmlValid
-                    } else {
-                        HtmlStatus::HtmlInvalid
-                    }
+pub fn html_node_status(node: HtmlNodePtr, legacy: bool) -> HtmlStatus {
+    match node.element_type() {
+        XmlElementType::XmlElementNode => {
+            if legacy {
+                if html_tag_lookup(&node.parent().unwrap().name().unwrap())
+                    .is_some_and(|desc| html_element_allowed_here(desc, &node.name().unwrap()))
+                {
+                    HtmlStatus::HtmlValid
                 } else {
-                    html_tag_lookup(&(*node).parent().unwrap().name().unwrap())
-                        .zip(html_tag_lookup(&(*node).name().unwrap()))
-                        .map(|(par, chi)| html_element_status_here(par, chi))
-                        .unwrap_or(HtmlStatus::HtmlInvalid)
+                    HtmlStatus::HtmlInvalid
                 }
-            }
-            XmlElementType::XmlAttributeNode => {
-                html_tag_lookup(&(*node).parent().unwrap().name().unwrap())
-                    .map(|desc| html_attr_allowed(desc, node.name, legacy))
+            } else {
+                html_tag_lookup(&node.parent().unwrap().name().unwrap())
+                    .zip(html_tag_lookup(&node.name().unwrap()))
+                    .map(|(par, chi)| html_element_status_here(par, chi))
                     .unwrap_or(HtmlStatus::HtmlInvalid)
             }
-            _ => HtmlStatus::HtmlNa,
         }
+        XmlElementType::XmlAttributeNode => {
+            html_tag_lookup(&node.parent().unwrap().name().unwrap())
+                .map(|desc| html_attr_allowed(desc, node.name().as_deref().unwrap(), legacy))
+                .unwrap_or(HtmlStatus::HtmlInvalid)
+        }
+        _ => HtmlStatus::HtmlNa,
     }
 }
 
@@ -11393,40 +11164,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_html_attr_allowed() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_elt in 0..GEN_NB_CONST_HTML_ELEM_DESC_PTR {
-                for n_attr in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_legacy in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let elt = gen_const_html_elem_desc_ptr(n_elt, 0);
-                        let attr = gen_const_xml_char_ptr(n_attr, 1);
-                        let legacy = gen_int(n_legacy, 2);
-
-                        let ret_val = html_attr_allowed(elt, attr, legacy);
-                        desret_html_status(ret_val);
-                        des_const_html_elem_desc_ptr(n_elt, elt, 0);
-                        des_const_xml_char_ptr(n_attr, attr, 1);
-                        des_int(n_legacy, legacy, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            eprintln!(
-                                "Leak of {} blocks found in htmlAttrAllowed {n_elt} {n_attr} {n_legacy}",
-                                xml_mem_blocks() - mem_base
-                            );
-                            leaks += 1;
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlAttrAllowed()");
-        }
-    }
 
     #[test]
     fn test_html_ctxt_reset() {
@@ -11546,63 +11283,6 @@ mod tests {
     }
 
     #[test]
-    fn test_html_entity_lookup() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let name = gen_const_xml_char_ptr(n_name, 0);
-
-                let ret_val = html_entity_lookup(name as *const XmlChar);
-                desret_const_html_entity_desc_ptr(ret_val);
-                des_const_xml_char_ptr(n_name, name, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in htmlEntityLookup",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_name);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlEntityLookup()");
-        }
-    }
-
-    #[test]
-    fn test_html_entity_value_lookup() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_value in 0..GEN_NB_UNSIGNED_INT {
-                let mem_base = xml_mem_blocks();
-                let value = gen_unsigned_int(n_value, 0);
-
-                let ret_val = html_entity_value_lookup(value);
-                desret_const_html_entity_desc_ptr(ret_val);
-                des_unsigned_int(n_value, value, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in htmlEntityValueLookup",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_value);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlEntityValueLookup()"
-            );
-        }
-    }
-
-    #[test]
     fn test_html_handle_omitted_elem() {
         #[cfg(feature = "html")]
         unsafe {
@@ -11654,36 +11334,6 @@ mod tests {
     }
 
     #[test]
-    fn test_html_is_script_attribute() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let name = gen_const_xml_char_ptr(n_name, 0);
-
-                let ret_val = html_is_script_attribute(name as *const XmlChar);
-                desret_int(ret_val);
-                des_const_xml_char_ptr(n_name, name, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in htmlIsScriptAttribute",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_name);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlIsScriptAttribute()"
-            );
-        }
-    }
-
-    #[test]
     fn test_html_new_parser_ctxt() {
         #[cfg(feature = "html")]
         unsafe {
@@ -11729,41 +11379,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in htmlParseCharRef()");
-        }
-    }
-
-    #[test]
-    fn test_html_parse_entity_ref() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_HTML_PARSER_CTXT_PTR {
-                for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_html_parser_ctxt_ptr(n_ctxt, 0);
-                    let str = gen_const_xml_char_ptr_ptr(n_str, 1);
-
-                    let ret_val = html_parse_entity_ref(ctxt, str as *mut *const XmlChar);
-                    desret_const_html_entity_desc_ptr(ret_val);
-                    des_html_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_const_xml_char_ptr_ptr(n_str, str as *mut *const XmlChar, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlParseEntityRef",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_str);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlParseEntityRef()"
-            );
         }
     }
 }
