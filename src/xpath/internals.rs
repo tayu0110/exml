@@ -1270,11 +1270,17 @@ pub unsafe fn xml_xpath_try_stream_compile(
             let mut namespaces = None;
             if !ctxt.is_null() {
                 if let Some(table) = (*ctxt).namespaces.as_deref().filter(|t| !t.is_empty()) {
-                    let namespaces =
-                        namespaces.get_or_insert_with(|| vec![(null(), null()); table.len()]);
-                    for (i, &ns) in table.iter().enumerate() {
-                        namespaces[i] = (ns.href, ns.prefix);
-                    }
+                    namespaces = Some(
+                        table
+                            .iter()
+                            .map(|ns| {
+                                (
+                                    ns.href().unwrap().into_owned(),
+                                    ns.prefix().map(|pref| pref.into_owned()),
+                                )
+                            })
+                            .collect(),
+                    );
                 }
             }
 

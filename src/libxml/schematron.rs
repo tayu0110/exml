@@ -618,7 +618,22 @@ unsafe fn xml_schematron_add_rule(
         let pattern: XmlPatternPtr = xml_patterncompile(
             context,
             XmlPatternFlags::XmlPatternXPath as i32,
-            (*ctxt).namespaces.clone(),
+            (*ctxt).namespaces.as_deref().map(|ns| {
+                ns.iter()
+                    .map(|&(href, pref)| {
+                        (
+                            CStr::from_ptr(href as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                            (!pref.is_null()).then(|| {
+                                CStr::from_ptr(pref as *const i8)
+                                    .to_string_lossy()
+                                    .into_owned()
+                            }),
+                        )
+                    })
+                    .collect()
+            }),
         );
         if pattern.is_null() {
             let context = CStr::from_ptr(context as *const i8).to_string_lossy();

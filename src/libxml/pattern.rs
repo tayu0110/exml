@@ -209,12 +209,12 @@ macro_rules! XML_STREAM_XS_IDC_SEL {
 #[doc(alias = "xmlPatParserContext")]
 #[repr(C)]
 pub struct XmlPatParserContext {
-    cur: usize,                                      /* the current char being parsed */
-    base: Box<str>,                                  /* the full expression */
-    error: i32,                                      /* error code */
-    comp: XmlPatternPtr,                             /* the result */
-    elem: Option<XmlNodePtr>,                        /* the current node if any */
-    namespaces: Option<Vec<(*const u8, *const u8)>>, /* the namespaces definitions */
+    cur: usize,                                        /* the current char being parsed */
+    base: Box<str>,                                    /* the full expression */
+    error: i32,                                        /* error code */
+    comp: XmlPatternPtr,                               /* the result */
+    elem: Option<XmlNodePtr>,                          /* the current node if any */
+    namespaces: Option<Vec<(String, Option<String>)>>, /* the namespaces definitions */
 }
 
 impl XmlPatParserContext {
@@ -222,7 +222,7 @@ impl XmlPatParserContext {
     ///
     /// Returns the newly allocated xmlPatParserContextPtr or NULL in case of error
     #[doc(alias = "xmlNewPatParserContext")]
-    fn new(pattern: &str, namespaces: Option<Vec<(*const u8, *const u8)>>) -> Self {
+    fn new(pattern: &str, namespaces: Option<Vec<(String, Option<String>)>>) -> Self {
         XmlPatParserContext {
             cur: 0,
             base: pattern.to_owned().into_boxed_str(),
@@ -524,15 +524,9 @@ impl XmlPatParserContext {
                         url = Some(XML_XML_NAMESPACE.to_str().unwrap().to_owned());
                     } else if let Some(namespaces) = self.namespaces.as_deref() {
                         let mut found = false;
-                        for &(href, pref) in namespaces {
-                            if CStr::from_ptr(pref as *const i8).to_string_lossy().as_ref()
-                                == prefix
-                            {
-                                url = Some(
-                                    CStr::from_ptr(href as *const i8)
-                                        .to_string_lossy()
-                                        .into_owned(),
-                                );
+                        for (href, pref) in namespaces {
+                            if pref.as_deref() == Some(prefix.as_str()) {
+                                url = Some(href.to_owned());
                                 found = true;
                                 break;
                             }
@@ -593,15 +587,9 @@ impl XmlPatParserContext {
                                 url = Some(XML_XML_NAMESPACE.to_str().unwrap().to_owned());
                             } else if let Some(namespaces) = self.namespaces.as_deref() {
                                 let mut found = false;
-                                for &(href, pref) in namespaces {
-                                    if CStr::from_ptr(pref as *const i8).to_string_lossy().as_ref()
-                                        == prefix
-                                    {
-                                        url = Some(
-                                            CStr::from_ptr(href as *const i8)
-                                                .to_string_lossy()
-                                                .into_owned(),
-                                        );
+                                for (href, pref) in namespaces {
+                                    if pref.as_deref() == Some(prefix.as_str()) {
+                                        url = Some(href.to_owned());
                                         found = true;
                                         break;
                                     }
@@ -688,13 +676,9 @@ impl XmlPatParserContext {
                     url = Some(XML_XML_NAMESPACE.to_str().unwrap().to_owned());
                 } else if let Some(namespaces) = self.namespaces.as_deref() {
                     let mut found = false;
-                    for &(href, pref) in namespaces {
-                        if CStr::from_ptr(pref as *const i8).to_string_lossy().as_ref() == prefix {
-                            url = Some(
-                                CStr::from_ptr(href as *const i8)
-                                    .to_string_lossy()
-                                    .into_owned(),
-                            );
+                    for (href, pref) in namespaces {
+                        if pref.as_deref() == Some(prefix.as_str()) {
+                            url = Some(href.to_owned());
                             found = true;
                             break;
                         }
@@ -1117,7 +1101,7 @@ unsafe fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
 pub unsafe fn xml_patterncompile(
     pattern: *const XmlChar,
     flags: i32,
-    namespaces: Option<Vec<(*const u8, *const u8)>>,
+    namespaces: Option<Vec<(String, Option<String>)>>,
 ) -> XmlPatternPtr {
     unsafe {
         let mut ret: XmlPatternPtr = null_mut();

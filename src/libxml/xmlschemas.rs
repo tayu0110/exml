@@ -5130,11 +5130,17 @@ pub(crate) unsafe fn xml_schema_check_cselector_xpath(
             // Build an array of prefixes and namespaces.
             let mut ns_array = None;
             if let Some(ns_list) = ns_list {
-                let count: usize = ns_list.len();
-                let ns_array = ns_array.get_or_insert_with(|| vec![(null(), null()); count]);
-                for (i, cur) in ns_list.into_iter().enumerate() {
-                    ns_array[i] = (cur.href, cur.prefix);
-                }
+                ns_array = Some(
+                    ns_list
+                        .into_iter()
+                        .map(|ns| {
+                            (
+                                ns.href().unwrap().into_owned(),
+                                ns.prefix().map(|pref| pref.into_owned()),
+                            )
+                        })
+                        .collect(),
+                );
             }
             // TODO: Differentiate between "selector" and "field".
             if is_field != 0 {

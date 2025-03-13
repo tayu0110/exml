@@ -2342,7 +2342,23 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
                     xml_patterncompile(
                         cpattern.as_ptr() as *const u8,
                         0,
-                        Some(namespaces[..=i].to_vec()),
+                        Some(
+                            namespaces[..i]
+                                .iter()
+                                .map(|&(href, pref)| {
+                                    (
+                                        CStr::from_ptr(href as *const i8)
+                                            .to_string_lossy()
+                                            .into_owned(),
+                                        (!pref.is_null()).then(|| {
+                                            CStr::from_ptr(pref as *const i8)
+                                                .to_string_lossy()
+                                                .into_owned()
+                                        }),
+                                    )
+                                })
+                                .collect(),
+                        ),
                     ),
                     Ordering::Relaxed,
                 );

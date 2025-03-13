@@ -4325,8 +4325,27 @@ unsafe fn pattern_test(
                             ns = now.next;
                         }
 
-                        patternc =
-                            xml_patterncompile(str.as_ptr(), 0, Some(namespaces[..=j].to_vec()));
+                        patternc = xml_patterncompile(
+                            str.as_ptr(),
+                            0,
+                            Some(
+                                namespaces[..j]
+                                    .iter()
+                                    .map(|&(href, pref)| {
+                                        (
+                                            CStr::from_ptr(href as *const i8)
+                                                .to_string_lossy()
+                                                .into_owned(),
+                                            (!pref.is_null()).then(|| {
+                                                CStr::from_ptr(pref as *const i8)
+                                                    .to_string_lossy()
+                                                    .into_owned()
+                                            }),
+                                        )
+                                    })
+                                    .collect(),
+                            ),
+                        );
                         if patternc.is_null() {
                             let str = CStr::from_ptr(str.as_ptr() as *const i8).to_string_lossy();
                             test_error_handler(
