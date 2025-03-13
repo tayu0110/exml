@@ -276,106 +276,89 @@ impl XmlPatParserContext {
     unsafe fn compile_idc_xpath_path(&mut self) {
         unsafe {
             self.skip_blanks();
-            'error_unfinished: {
-                'error: {
-                    if self.current_byte() == Some(b'/') {
-                        break 'error;
-                    }
-                    (*self.comp).flags |= PAT_FROM_CUR as i32;
-
-                    if self.current_byte() == Some(b'.') {
-                        // "." - "self::node()"
-                        self.next();
-                        self.skip_blanks();
-                        if self.current_byte().is_none() {
-                            // Selection of the context node.
-                            if self.pattern_add(
-                                self.comp,
-                                XmlPatOp::XmlOpElem,
-                                null_mut(),
-                                null_mut(),
-                            ) != 0
-                            {
-                                break 'error;
-                            };
-                            return;
-                        }
-                        if self.current_byte() != Some(b'/') {
-                            // TODO: A more meaningful error message.
-                            break 'error;
-                        }
-                        // "./" - "self::node()/"
-                        self.next();
-                        self.skip_blanks();
-                        if self.current_byte() == Some(b'/') {
-                            if self
-                                .peek_prev(1)
-                                .is_some_and(|c| xml_is_blank_char(c as u32))
-                            {
-                                // Disallow "./ /"
-                                break 'error;
-                            }
-                            // ".//" - "self:node()/descendant-or-self::node()/"
-                            if self.pattern_add(
-                                self.comp,
-                                XmlPatOp::XmlOpAncestor,
-                                null_mut(),
-                                null_mut(),
-                            ) != 0
-                            {
-                                break 'error;
-                            };
-                            self.next();
-                            self.skip_blanks();
-                        }
-                        if self.current_byte().is_none() {
-                            break 'error_unfinished;
-                        }
-                    }
-                    // Process steps.
-                    'b: while {
-                        self.compile_step_pattern();
-                        if self.error != 0 {
-                            break 'error;
-                        }
-                        self.skip_blanks();
-                        if self.current_byte() != Some(b'/') {
-                            break 'b;
-                        }
-                        if self.pattern_add(
-                            self.comp,
-                            XmlPatOp::XmlOpParent,
-                            null_mut(),
-                            null_mut(),
-                        ) != 0
-                        {
-                            break 'error;
-                        };
-                        self.next();
-                        self.skip_blanks();
-                        if self.current_byte() == Some(b'/') {
-                            // Disallow subsequent '//'.
-                            break 'error;
-                        }
-                        if self.current_byte().is_none() {
-                            break 'error_unfinished;
-                        }
-
-                        self.current_byte().is_some()
-                    } {}
-
-                    if self.current_byte().is_some() {
-                        self.error = 1;
-                    }
-                    return;
-                }
-                // error:
+            if self.current_byte() == Some(b'/') {
                 self.error = 1;
                 return;
             }
+            (*self.comp).flags |= PAT_FROM_CUR as i32;
 
-            // error_unfinished:
-            self.error = 1;
+            if self.current_byte() == Some(b'.') {
+                // "." - "self::node()"
+                self.next();
+                self.skip_blanks();
+                if self.current_byte().is_none() {
+                    // Selection of the context node.
+                    if self.pattern_add(self.comp, XmlPatOp::XmlOpElem, null_mut(), null_mut()) != 0
+                    {
+                        self.error = 1;
+                    };
+                    return;
+                }
+                if self.current_byte() != Some(b'/') {
+                    // TODO: A more meaningful error message.
+                    self.error = 1;
+                    return;
+                }
+                // "./" - "self::node()/"
+                self.next();
+                self.skip_blanks();
+                if self.current_byte() == Some(b'/') {
+                    if self
+                        .peek_prev(1)
+                        .is_some_and(|c| xml_is_blank_char(c as u32))
+                    {
+                        // Disallow "./ /"
+                        self.error = 1;
+                        return;
+                    }
+                    // ".//" - "self:node()/descendant-or-self::node()/"
+                    if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, null_mut(), null_mut())
+                        != 0
+                    {
+                        self.error = 1;
+                        return;
+                    };
+                    self.next();
+                    self.skip_blanks();
+                }
+                if self.current_byte().is_none() {
+                    self.error = 1;
+                    return;
+                }
+            }
+            // Process steps.
+            'b: while {
+                self.compile_step_pattern();
+                if self.error != 0 {
+                    self.error = 1;
+                    return;
+                }
+                self.skip_blanks();
+                if self.current_byte() != Some(b'/') {
+                    break 'b;
+                }
+                if self.pattern_add(self.comp, XmlPatOp::XmlOpParent, null_mut(), null_mut()) != 0 {
+                    self.error = 1;
+                    return;
+                };
+                self.next();
+                self.skip_blanks();
+                if self.current_byte() == Some(b'/') {
+                    // Disallow subsequent '//'.
+                    self.error = 1;
+                    return;
+                }
+                if self.current_byte().is_none() {
+                    self.error = 1;
+                    return;
+                }
+
+                self.current_byte().is_some()
+            } {}
+
+            if self.current_byte().is_some() {
+                self.error = 1;
+            }
         }
     }
 
@@ -397,112 +380,105 @@ impl XmlPatParserContext {
                 (*self.comp).flags |= PAT_FROM_CUR as i32;
             }
 
-            'error: {
-                if self.current_byte() == Some(b'/') && self.nth_byte(1) == Some(b'/') {
-                    if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, null_mut(), null_mut())
-                        != 0
-                    {
-                        break 'error;
-                    };
-                    self.next();
-                    self.next();
-                } else if self.current_byte() == Some(b'.')
-                    && self.nth_byte(1) == Some(b'/')
-                    && self.nth_byte(2) == Some(b'/')
+            if self.current_byte() == Some(b'/') && self.nth_byte(1) == Some(b'/') {
+                if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, null_mut(), null_mut()) != 0
                 {
-                    if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, null_mut(), null_mut())
-                        != 0
+                    return;
+                };
+                self.next();
+                self.next();
+            } else if self.current_byte() == Some(b'.')
+                && self.nth_byte(1) == Some(b'/')
+                && self.nth_byte(2) == Some(b'/')
+            {
+                if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, null_mut(), null_mut()) != 0
+                {
+                    return;
+                };
+                self.next();
+                self.next();
+                self.next();
+                // Check for incompleteness.
+                self.skip_blanks();
+                if self.current_byte().is_none() {
+                    self.error = 1;
+                    return;
+                }
+            }
+            if self.current_byte() == Some(b'@') {
+                self.next();
+                self.compile_attribute_test();
+                self.skip_blanks();
+                // TODO: check for incompleteness
+                if self.current_byte().is_some() {
+                    self.compile_step_pattern();
+                    if self.error != 0 {
+                        return;
+                    }
+                }
+            } else {
+                if self.current_byte() == Some(b'/') {
+                    if self.pattern_add(self.comp, XmlPatOp::XmlOpRoot, null_mut(), null_mut()) != 0
                     {
-                        break 'error;
+                        return;
                     };
-                    self.next();
-                    self.next();
                     self.next();
                     // Check for incompleteness.
                     self.skip_blanks();
                     if self.current_byte().is_none() {
                         self.error = 1;
-                        break 'error;
+                        return;
                     }
                 }
-                if self.current_byte() == Some(b'@') {
-                    self.next();
-                    self.compile_attribute_test();
-                    self.skip_blanks();
-                    // TODO: check for incompleteness
-                    if self.current_byte().is_some() {
-                        self.compile_step_pattern();
-                        if self.error != 0 {
-                            break 'error;
-                        }
-                    }
-                } else {
-                    if self.current_byte() == Some(b'/') {
-                        if self.pattern_add(self.comp, XmlPatOp::XmlOpRoot, null_mut(), null_mut())
-                            != 0
+                self.compile_step_pattern();
+                if self.error != 0 {
+                    return;
+                }
+                self.skip_blanks();
+                while self.current_byte() == Some(b'/') {
+                    if self.nth_byte(1) == Some(b'/') {
+                        if self.pattern_add(
+                            self.comp,
+                            XmlPatOp::XmlOpAncestor,
+                            null_mut(),
+                            null_mut(),
+                        ) != 0
                         {
-                            break 'error;
+                            return;
                         };
                         self.next();
-                        // Check for incompleteness.
+                        self.next();
+                        self.skip_blanks();
+                        self.compile_step_pattern();
+                        if self.error != 0 {
+                            return;
+                        }
+                    } else {
+                        if self.pattern_add(
+                            self.comp,
+                            XmlPatOp::XmlOpParent,
+                            null_mut(),
+                            null_mut(),
+                        ) != 0
+                        {
+                            return;
+                        };
+                        self.next();
                         self.skip_blanks();
                         if self.current_byte().is_none() {
                             self.error = 1;
-                            break 'error;
+                            return;
+                        }
+                        self.compile_step_pattern();
+                        if self.error != 0 {
+                            return;
                         }
                     }
-                    self.compile_step_pattern();
-                    if self.error != 0 {
-                        break 'error;
-                    }
-                    self.skip_blanks();
-                    while self.current_byte() == Some(b'/') {
-                        if self.nth_byte(1) == Some(b'/') {
-                            if self.pattern_add(
-                                self.comp,
-                                XmlPatOp::XmlOpAncestor,
-                                null_mut(),
-                                null_mut(),
-                            ) != 0
-                            {
-                                break 'error;
-                            };
-                            self.next();
-                            self.next();
-                            self.skip_blanks();
-                            self.compile_step_pattern();
-                            if self.error != 0 {
-                                break 'error;
-                            }
-                        } else {
-                            if self.pattern_add(
-                                self.comp,
-                                XmlPatOp::XmlOpParent,
-                                null_mut(),
-                                null_mut(),
-                            ) != 0
-                            {
-                                break 'error;
-                            };
-                            self.next();
-                            self.skip_blanks();
-                            if self.current_byte().is_none() {
-                                self.error = 1;
-                                break 'error;
-                            }
-                            self.compile_step_pattern();
-                            if self.error != 0 {
-                                break 'error;
-                            }
-                        }
-                    }
-                }
-                if self.current_byte().is_some() {
-                    self.error = 1;
                 }
             }
-            // error:
-            // return;
+            if self.current_byte().is_some() {
+                self.error = 1;
+            }
         }
     }
 
@@ -516,7 +492,6 @@ impl XmlPatParserContext {
     #[doc(alias = "xmlCompileStepPattern")]
     unsafe fn compile_step_pattern(&mut self) {
         unsafe {
-            let mut token: *mut XmlChar = null_mut();
             let mut name: *mut XmlChar = null_mut();
             let mut url: *mut XmlChar = null_mut();
             let mut has_blanks: i32 = 0;
@@ -581,7 +556,7 @@ impl XmlPatParserContext {
                             break 'error;
                         }
                         // This is a namespace is_match
-                        token = self.scan_name();
+                        let token = self.scan_name();
                         if *prefix.add(0) == b'x'
                             && *prefix.add(1) == b'm'
                             && *prefix.add(2) == b'l'
@@ -604,28 +579,26 @@ impl XmlPatParserContext {
                         }
                         xml_free(prefix as _);
                         name = null_mut();
-                        if token.is_null() {
-                            if self.current_byte() == Some(b'*') {
-                                self.next();
-                                if self.pattern_add(self.comp, XmlPatOp::XmlOpNs, url, null_mut())
-                                    != 0
-                                {
-                                    break 'error;
-                                };
-                            } else {
-                                self.error = 1;
+                        if let Some(token) = token {
+                            let token = xml_strndup(token.as_ptr(), token.len() as i32);
+                            if self.pattern_add(self.comp, XmlPatOp::XmlOpElem, token, url) != 0 {
                                 break 'error;
                             }
-                        } else if self.pattern_add(self.comp, XmlPatOp::XmlOpElem, token, url) != 0
-                        {
+                        } else if self.current_byte() == Some(b'*') {
+                            self.next();
+                            if self.pattern_add(self.comp, XmlPatOp::XmlOpNs, url, null_mut()) != 0
+                            {
+                                break 'error;
+                            };
+                        } else {
+                            self.error = 1;
                             break 'error;
                         }
                     } else {
                         self.next();
                         if xml_str_equal(name, c"child".as_ptr() as _) {
                             xml_free(name as _);
-                            name = self.scan_name();
-                            if name.is_null() {
+                            let Some(name) = self.scan_name() else {
                                 if self.current_byte() == Some(b'*') {
                                     self.next();
                                     if self.pattern_add(
@@ -642,9 +615,9 @@ impl XmlPatParserContext {
                                     self.error = 1;
                                     break 'error;
                                 }
-                            }
+                            };
                             if self.current_byte() == Some(b':') {
-                                let prefix: *mut XmlChar = name;
+                                let prefix = name;
 
                                 self.next();
                                 if self
@@ -655,17 +628,17 @@ impl XmlPatParserContext {
                                     break 'error;
                                 }
                                 // This is a namespace is_match
-                                token = self.scan_name();
-                                if *prefix.add(0) == b'x'
-                                    && *prefix.add(1) == b'm'
-                                    && *prefix.add(2) == b'l'
-                                    && *prefix.add(3) == 0
-                                {
+                                let token = self.scan_name();
+                                if prefix == "xml" {
                                     url = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
                                 } else if let Some(namespaces) = self.namespaces.as_deref() {
                                     let mut found = false;
                                     for &(href, pref) in namespaces {
-                                        if xml_str_equal(pref, prefix) {
+                                        if CStr::from_ptr(pref as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref()
+                                            == prefix
+                                        {
                                             url = xml_strdup(href);
                                             found = true;
                                             break;
@@ -676,37 +649,32 @@ impl XmlPatParserContext {
                                         break 'error;
                                     }
                                 }
-                                xml_free(prefix as _);
-                                name = null_mut();
-                                if token.is_null() {
-                                    if self.current_byte() == Some(b'*') {
-                                        self.next();
-                                        if self.pattern_add(
-                                            self.comp,
-                                            XmlPatOp::XmlOpNs,
-                                            url,
-                                            null_mut(),
-                                        ) != 0
-                                        {
-                                            break 'error;
-                                        };
-                                    } else {
-                                        self.error = 1;
+                                if let Some(token) = token {
+                                    let token = xml_strndup(token.as_ptr(), token.len() as i32);
+                                    if self.pattern_add(self.comp, XmlPatOp::XmlOpChild, token, url)
+                                        != 0
+                                    {
                                         break 'error;
                                     }
-                                } else if self.pattern_add(
-                                    self.comp,
-                                    XmlPatOp::XmlOpChild,
-                                    token,
-                                    url,
-                                ) != 0
-                                {
+                                } else if self.current_byte() == Some(b'*') {
+                                    self.next();
+                                    if self.pattern_add(
+                                        self.comp,
+                                        XmlPatOp::XmlOpNs,
+                                        url,
+                                        null_mut(),
+                                    ) != 0
+                                    {
+                                        break 'error;
+                                    };
+                                } else {
+                                    self.error = 1;
                                     break 'error;
                                 }
                             } else if self.pattern_add(
                                 self.comp,
                                 XmlPatOp::XmlOpChild,
-                                name,
+                                xml_strndup(name.as_ptr(), name.len() as i32),
                                 null_mut(),
                             ) != 0
                             {
@@ -735,7 +703,8 @@ impl XmlPatParserContext {
                         break 'error;
                     }
                     self.next();
-                    if self.pattern_add(self.comp, XmlPatOp::XmlOpAll, token, null_mut()) != 0 {
+                    if self.pattern_add(self.comp, XmlPatOp::XmlOpAll, null_mut(), null_mut()) != 0
+                    {
                         break 'error;
                     };
                 } else if self.pattern_add(self.comp, XmlPatOp::XmlOpElem, name, null_mut()) != 0 {
@@ -747,9 +716,6 @@ impl XmlPatParserContext {
             if !url.is_null() {
                 xml_free(url as _)
             }
-            if !token.is_null() {
-                xml_free(token as _)
-            }
             if !name.is_null() {
                 xml_free(name as _)
             }
@@ -760,7 +726,6 @@ impl XmlPatParserContext {
     #[doc(alias = "xmlCompileAttributeTest")]
     unsafe fn compile_attribute_test(&mut self) {
         unsafe {
-            let mut token: *mut XmlChar = null_mut();
             let mut url: *mut XmlChar = null_mut();
 
             self.skip_blanks();
@@ -793,7 +758,7 @@ impl XmlPatParserContext {
                         break 'error;
                     }
                     // This is a namespace is_match
-                    token = self.scan_name();
+                    let token = self.scan_name();
                     if *prefix.add(0) == b'x'
                         && *prefix.add(1) == b'm'
                         && *prefix.add(2) == b'l'
@@ -816,19 +781,18 @@ impl XmlPatParserContext {
                         }
                     }
                     xml_free(prefix as _);
-                    if token.is_null() {
-                        if self.current_byte() == Some(b'*') {
-                            self.next();
-                            if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, null_mut(), url)
-                                != 0
-                            {
-                                break 'error;
-                            };
-                        } else {
-                            self.error = 1;
+                    if let Some(token) = token {
+                        let token = xml_strndup(token.as_ptr(), token.len() as i32);
+                        if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, token, url) != 0 {
                             break 'error;
                         }
-                    } else if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, token, url) != 0 {
+                    } else if self.current_byte() == Some(b'*') {
+                        self.next();
+                        if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, null_mut(), url) != 0 {
+                            break 'error;
+                        };
+                    } else {
+                        self.error = 1;
                         break 'error;
                     }
                 } else if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, name, null_mut()) != 0 {
@@ -839,9 +803,6 @@ impl XmlPatParserContext {
             // error:
             if !url.is_null() {
                 xml_free(url as _)
-            }
-            if !token.is_null() {
-                xml_free(token as _);
             }
         }
     }
@@ -856,28 +817,26 @@ impl XmlPatParserContext {
     ///
     /// Returns the Name parsed or NULL
     #[doc(alias = "xmlPatScanName")]
-    unsafe fn scan_name(&mut self) -> *mut XmlChar {
-        unsafe {
-            self.skip_blanks();
+    fn scan_name(&mut self) -> Option<String> {
+        self.skip_blanks();
 
-            let cur = self.current_str();
-            if !cur.starts_with(|c: char| xml_is_letter(c as u32) || c == '_' || c == ':') {
-                return null_mut();
-            }
-            let trimmed = cur.trim_start_matches(|c: char| {
-                xml_is_letter(c as u32)
-                    || xml_is_digit(c as u32)
-                    || c == '.'
-                    || c == '-'
-                    || c == '_'
-                    || xml_is_combining(c as u32)
-                    || xml_is_extender(c as u32)
-            });
-            let diff = cur.len() - trimmed.len();
-            let ret = xml_strndup(cur.as_ptr(), diff as i32);
-            self.cur += diff;
-            ret
+        let cur = self.current_str();
+        if !cur.starts_with(|c: char| xml_is_letter(c as u32) || c == '_' || c == ':') {
+            return None;
         }
+        let trimmed = cur.trim_start_matches(|c: char| {
+            xml_is_letter(c as u32)
+                || xml_is_digit(c as u32)
+                || c == '.'
+                || c == '-'
+                || c == '_'
+                || xml_is_combining(c as u32)
+                || xml_is_extender(c as u32)
+        });
+        let diff = cur.len() - trimmed.len();
+        let ret = cur[..diff].to_owned();
+        self.cur += diff;
+        Some(ret)
     }
 
     /// Parses a non qualified name
