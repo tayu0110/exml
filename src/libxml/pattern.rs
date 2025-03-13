@@ -28,7 +28,7 @@ use std::{
     ffi::CStr,
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null, null_mut},
 };
 
 use libc::memset;
@@ -106,14 +106,25 @@ pub struct XmlStreamComp {
 pub type XmlPatternPtr = *mut XmlPattern;
 #[repr(C)]
 pub struct XmlPattern {
-    data: *mut c_void,       /* the associated template */
-    next: *mut XmlPattern,   /* next pattern if | is used */
-    pattern: *const XmlChar, /* the pattern */
-    flags: i32,              /* flags */
-    nb_step: i32,
-    max_step: i32,
-    steps: XmlStepOpPtr,      /* ops for computation */
+    data: *mut c_void,        /* the associated template */
+    next: *mut XmlPattern,    /* next pattern if | is used */
+    pattern: *const XmlChar,  /* the pattern */
+    flags: i32,               /* flags */
+    steps: Vec<XmlStepOp>,    /* ops for computation */
     stream: XmlStreamCompPtr, /* the streaming data if any */
+}
+
+impl Default for XmlPattern {
+    fn default() -> Self {
+        Self {
+            data: null_mut(),
+            next: null_mut(),
+            pattern: null(),
+            flags: 0,
+            steps: vec![],
+            stream: null_mut(),
+        }
+    }
 }
 
 // XML_STREAM_ANY_NODE is used for comparison against
@@ -153,8 +164,6 @@ unsafe fn xml_free_stream_comp(comp: XmlStreamCompPtr) {
 
 unsafe fn xml_free_pattern_internal(comp: XmlPatternPtr) {
     unsafe {
-        let mut op: XmlStepOpPtr;
-
         if comp.is_null() {
             return;
         }
@@ -164,20 +173,16 @@ unsafe fn xml_free_pattern_internal(comp: XmlPatternPtr) {
         if !(*comp).pattern.is_null() {
             xml_free((*comp).pattern as _);
         }
-        if !(*comp).steps.is_null() {
-            for i in 0..(*comp).nb_step {
-                op = (*comp).steps.add(i as usize);
-                if !(*op).value.is_null() {
-                    xml_free((*op).value as _);
-                }
-                if !(*op).value2.is_null() {
-                    xml_free((*op).value2 as _);
-                }
+        for op in (*comp).steps.drain(..) {
+            if !op.value.is_null() {
+                xml_free(op.value as _);
             }
-            xml_free((*comp).steps as _);
+            if !op.value2.is_null() {
+                xml_free(op.value2 as _);
+            }
         }
 
-        memset(comp as _, -1, size_of::<XmlPattern>());
+        drop_in_place(comp);
         xml_free(comp as _);
     }
 }
@@ -879,21 +884,7 @@ impl XmlPatParserContext {
         value2: *mut XmlChar,
     ) -> i32 {
         unsafe {
-            if (*comp).nb_step >= (*comp).max_step {
-                let temp: XmlStepOpPtr = xml_realloc(
-                    (*comp).steps as _,
-                    (*comp).max_step as usize * 2 * size_of::<XmlStepOp>(),
-                ) as XmlStepOpPtr;
-                if temp.is_null() {
-                    return -1;
-                }
-                (*comp).steps = temp;
-                (*comp).max_step *= 2;
-            }
-            (*(*comp).steps.add((*comp).nb_step as usize)).op = op;
-            (*(*comp).steps.add((*comp).nb_step as usize)).value = value;
-            (*(*comp).steps.add((*comp).nb_step as usize)).value2 = value2;
-            (*comp).nb_step += 1;
+            (*comp).steps.push(XmlStepOp { op, value, value2 });
             0
         }
     }
@@ -922,14 +913,8 @@ unsafe fn xml_new_pattern() -> XmlPatternPtr {
         if cur.is_null() {
             return null_mut();
         }
-        memset(cur as _, 0, size_of::<XmlPattern>());
-        (*cur).max_step = 10;
-        (*cur).steps =
-            xml_malloc((*cur).max_step as usize * size_of::<XmlStepOp>()) as XmlStepOpPtr;
-        if (*cur).steps.is_null() {
-            xml_free(cur as _);
-            return null_mut();
-        }
+        std::ptr::write(&mut *cur, XmlPattern::default());
+        (*cur).steps.reserve(10);
         cur
     }
 }
@@ -1013,16 +998,15 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
         let mut root: i32 = 0;
         let mut flags: i32 = 0;
         let mut prevs: i32 = -1;
-        let mut step: XmlStepOp;
 
-        if comp.is_null() || (*comp).steps.is_null() {
+        if comp.is_null() || (*comp).steps.is_empty() {
             return -1;
         }
         // special case for .
-        if (*comp).nb_step == 1
-            && matches!((*(*comp).steps.add(0)).op, XmlPatOp::XmlOpElem)
-            && (*(*comp).steps.add(0)).value.is_null()
-            && (*(*comp).steps.add(0)).value2.is_null()
+        if (*comp).steps.len() == 1
+            && matches!((*comp).steps[0].op, XmlPatOp::XmlOpElem)
+            && (*comp).steps[0].value.is_null()
+            && (*comp).steps[0].value2.is_null()
         {
             stream = xml_new_stream_comp(0);
             if stream.is_null() {
@@ -1034,7 +1018,7 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
             return 0;
         }
 
-        stream = xml_new_stream_comp(((*comp).nb_step / 2) + 1);
+        stream = xml_new_stream_comp(((*comp).steps.len() as i32 / 2) + 1);
         if stream.is_null() {
             return -1;
         }
@@ -1044,8 +1028,8 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
         }
 
         'error: {
-            'main: for i in 0..(*comp).nb_step {
-                step = *(*comp).steps.add(i as usize);
+            'main: for i in 0..(*comp).steps.len() {
+                let step = &(*comp).steps[i];
                 match step.op {
                     XmlPatOp::XmlOpEnd => {}
                     XmlPatOp::XmlOpRoot => {
@@ -1091,11 +1075,12 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                             // The only case we won't eliminate is "//.", i.e. if
                             // self::node() is the last node test and we had
                             // continuation somewhere beforehand.
-                            if (*comp).nb_step == i + 1 && flags & XML_STREAM_STEP_DESC as i32 != 0
+                            if (*comp).steps.len() == i + 1
+                                && flags & XML_STREAM_STEP_DESC as i32 != 0
                             {
                                 // Mark the special case where the expression resolves
                                 // to any type of node.
-                                if (*comp).nb_step == i + 1 {
+                                if (*comp).steps.len() == i + 1 {
                                     (*stream).flags |= XML_STREAM_FINAL_IS_ANY_NODE as i32;
                                 }
                                 flags |= XML_STREAM_STEP_NODE as i32;
@@ -1219,50 +1204,16 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
 #[doc(alias = "xmlReversePattern")]
 unsafe fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
     unsafe {
-        let mut i: i32;
-        let mut j: i32;
-
         // remove the leading // for //a or .//a
-        if (*comp).nb_step > 0 && matches!((*(*comp).steps.add(0)).op, XmlPatOp::XmlOpAncestor) {
-            for (i, j) in (0..).zip(1..(*comp).nb_step) {
-                (*(*comp).steps.add(i as usize)).value = (*(*comp).steps.add(j as usize)).value;
-                (*(*comp).steps.add(i as usize)).value2 = (*(*comp).steps.add(j as usize)).value2;
-                (*(*comp).steps.add(i as usize)).op = (*(*comp).steps.add(j as usize)).op;
-            }
-            (*comp).nb_step -= 1;
+        if !(*comp).steps.is_empty() && matches!((*comp).steps[0].op, XmlPatOp::XmlOpAncestor) {
+            (*comp).steps.remove(0);
         }
-        if (*comp).nb_step >= (*comp).max_step {
-            let temp: XmlStepOpPtr = xml_realloc(
-                (*comp).steps as _,
-                (*comp).max_step as usize * 2 * size_of::<XmlStepOp>(),
-            ) as XmlStepOpPtr;
-            if temp.is_null() {
-                return -1;
-            }
-            (*comp).steps = temp;
-            (*comp).max_step *= 2;
-        }
-        i = 0;
-        j = (*comp).nb_step - 1;
-        while j > i {
-            let mut tmp: *const XmlChar;
-
-            tmp = (*(*comp).steps.add(i as usize)).value;
-            (*(*comp).steps.add(i as usize)).value = (*(*comp).steps.add(j as usize)).value;
-            (*(*comp).steps.add(j as usize)).value = tmp;
-            tmp = (*(*comp).steps.add(i as usize)).value2;
-            (*(*comp).steps.add(i as usize)).value2 = (*(*comp).steps.add(j as usize)).value2;
-            (*(*comp).steps.add(j as usize)).value2 = tmp;
-            let op: XmlPatOp = (*(*comp).steps.add(i as usize)).op;
-            (*(*comp).steps.add(i as usize)).op = (*(*comp).steps.add(j as usize)).op;
-            (*(*comp).steps.add(j as usize)).op = op;
-            j -= 1;
-            i += 1;
-        }
-        (*(*comp).steps.add((*comp).nb_step as usize)).value = null_mut();
-        (*(*comp).steps.add((*comp).nb_step as usize)).value2 = null_mut();
-        (*(*comp).steps.add((*comp).nb_step as usize)).op = XmlPatOp::XmlOpEnd;
-        (*comp).nb_step += 1;
+        (*comp).steps.reverse();
+        (*comp).steps.push(XmlStepOp {
+            op: XmlPatOp::XmlOpEnd,
+            value: null_mut(),
+            value2: null_mut(),
+        });
         0
     }
 }
@@ -1437,8 +1388,6 @@ unsafe fn xml_pat_push_state(
 #[doc(alias = "xmlPatMatch")]
 unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32 {
     unsafe {
-        let mut i: i32;
-        let mut step: XmlStepOpPtr;
         let mut states: XmlStepStates = XmlStepStates {
             nbstates: 0,
             maxstates: 0,
@@ -1449,15 +1398,15 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
         if comp.is_null() {
             return -1;
         }
-        i = 0;
+        let mut i = 0;
         // restart:
         loop {
             'rollback: {
                 'found: {
-                    while i < (*comp).nb_step {
+                    while i < (*comp).steps.len() {
                         'to_continue: {
-                            step = (*comp).steps.add(i as usize);
-                            match (*step).op {
+                            let mut step = &(*comp).steps[i];
+                            match step.op {
                                 XmlPatOp::XmlOpEnd => {
                                     break 'found;
                                 }
@@ -1486,27 +1435,27 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                         break 'rollback;
                                     }
                                     let node = XmlNodePtr::try_from(node).unwrap();
-                                    if (*step).value.is_null() {
+                                    if step.value.is_null() {
                                         break 'to_continue;
                                     }
-                                    if *(*step).value.add(0) != *node.name.add(0) {
+                                    if *step.value.add(0) != *node.name.add(0) {
                                         break 'rollback;
                                     }
-                                    if !xml_str_equal((*step).value, node.name) {
+                                    if !xml_str_equal(step.value, node.name) {
                                         break 'rollback;
                                     }
 
                                     // Namespace test
                                     if let Some(ns) = node.ns {
                                         if !ns.href.is_null() {
-                                            if (*step).value2.is_null() {
+                                            if step.value2.is_null() {
                                                 break 'rollback;
                                             }
-                                            if !xml_str_equal((*step).value2, ns.href) {
+                                            if !xml_str_equal(step.value2, ns.href) {
                                                 break 'rollback;
                                             }
                                         }
-                                    } else if !(*step).value2.is_null() {
+                                    } else if !step.value2.is_null() {
                                         break 'rollback;
                                     }
                                     break 'to_continue;
@@ -1523,15 +1472,15 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
 
                                     let mut lst = node.children();
 
-                                    if !(*step).value.is_null() {
+                                    if !step.value.is_null() {
                                         while let Some(now) = lst {
                                             if matches!(
                                                 now.element_type(),
                                                 XmlElementType::XmlElementNode
                                             ) {
                                                 let now = XmlNodePtr::try_from(now).unwrap();
-                                                if *(*step).value.add(0) == *now.name.add(0)
-                                                    && xml_str_equal((*step).value, now.name)
+                                                if *step.value.add(0) == *now.name.add(0)
+                                                    && xml_str_equal(step.value, now.name)
                                                 {
                                                     break;
                                                 }
@@ -1552,22 +1501,22 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                         break 'rollback;
                                     }
                                     let node = XmlAttrPtr::try_from(node).unwrap();
-                                    if !(*step).value.is_null() {
-                                        if *(*step).value.add(0) != *node.name.add(0) {
+                                    if !step.value.is_null() {
+                                        if *step.value.add(0) != *node.name.add(0) {
                                             break 'rollback;
                                         }
-                                        if !xml_str_equal((*step).value, node.name) {
+                                        if !xml_str_equal(step.value, node.name) {
                                             break 'rollback;
                                         }
                                     }
                                     // Namespace test
                                     if let Some(ns) = node.ns {
-                                        if !(*step).value2.is_null()
-                                            && !xml_str_equal((*step).value2, ns.href)
+                                        if !step.value2.is_null()
+                                            && !xml_str_equal(step.value2, ns.href)
                                         {
                                             break 'rollback;
                                         }
-                                    } else if !(*step).value2.is_null() {
+                                    } else if !step.value2.is_null() {
                                         break 'rollback;
                                     }
                                     break 'to_continue;
@@ -1585,44 +1534,44 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                         break 'rollback;
                                     };
                                     node = parent;
-                                    if (*step).value.is_null() {
+                                    if step.value.is_null() {
                                         break 'to_continue;
                                     }
                                     // Is is correct ??????
                                     let node = XmlNodePtr::try_from(node).unwrap();
-                                    if *(*step).value.add(0) != *node.name.add(0) {
+                                    if *step.value.add(0) != *node.name.add(0) {
                                         break 'rollback;
                                     }
-                                    if !xml_str_equal((*step).value, node.name) {
+                                    if !xml_str_equal(step.value, node.name) {
                                         break 'rollback;
                                     }
                                     // Namespace test
                                     if let Some(ns) = node.ns {
                                         if !ns.href.is_null() {
-                                            if (*step).value2.is_null() {
+                                            if step.value2.is_null() {
                                                 break 'rollback;
                                             }
-                                            if !xml_str_equal((*step).value2, ns.href) {
+                                            if !xml_str_equal(step.value2, ns.href) {
                                                 break 'rollback;
                                             }
                                         }
-                                    } else if !(*step).value2.is_null() {
+                                    } else if !step.value2.is_null() {
                                         break 'rollback;
                                     }
                                     break 'to_continue;
                                 }
                                 XmlPatOp::XmlOpAncestor => {
                                     // TODO: implement coalescing of ANCESTOR/NODE ops
-                                    if (*step).value.is_null() {
+                                    if step.value.is_null() {
                                         i += 1;
-                                        step = (*comp).steps.add(i as usize);
-                                        if matches!((*step).op, XmlPatOp::XmlOpRoot) {
+                                        step = &(*comp).steps[i];
+                                        if matches!(step.op, XmlPatOp::XmlOpRoot) {
                                             break 'found;
                                         }
-                                        if !matches!((*step).op, XmlPatOp::XmlOpElem) {
+                                        if !matches!(step.op, XmlPatOp::XmlOpElem) {
                                             break 'rollback;
                                         }
-                                        if (*step).value.is_null() {
+                                        if step.value.is_null() {
                                             return -1;
                                         }
                                     }
@@ -1645,21 +1594,18 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                         ) {
                                             let node = XmlNodePtr::try_from(cur_node).unwrap();
 
-                                            if *(*step).value.add(0) == *node.name.add(0)
-                                                && xml_str_equal((*step).value, node.name)
+                                            if *step.value.add(0) == *node.name.add(0)
+                                                && xml_str_equal(step.value, node.name)
                                             {
                                                 // Namespace test
                                                 if let Some(ns) = node.ns {
                                                     if !ns.href.is_null()
-                                                        && (!(*step).value2.is_null()
-                                                            && xml_str_equal(
-                                                                (*step).value2,
-                                                                ns.href,
-                                                            ))
+                                                        && (!step.value2.is_null()
+                                                            && xml_str_equal(step.value2, ns.href))
                                                     {
                                                         break;
                                                     }
-                                                } else if (*step).value2.is_null() {
+                                                } else if step.value2.is_null() {
                                                     break;
                                                 }
                                             }
@@ -1672,10 +1618,14 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                     node = cur;
                                     // prepare a potential rollback from here
                                     // for ancestors of that node.
-                                    if matches!((*step).op, XmlPatOp::XmlOpAncestor) {
-                                        xml_pat_push_state(addr_of_mut!(states), i, node);
+                                    if matches!(step.op, XmlPatOp::XmlOpAncestor) {
+                                        xml_pat_push_state(addr_of_mut!(states), i as i32, node);
                                     } else {
-                                        xml_pat_push_state(addr_of_mut!(states), i - 1, node);
+                                        xml_pat_push_state(
+                                            addr_of_mut!(states),
+                                            i as i32 - 1,
+                                            node,
+                                        );
                                     }
                                     break 'to_continue;
                                 }
@@ -1689,14 +1639,14 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                     let node = XmlNodePtr::try_from(node).unwrap();
                                     if let Some(ns) = node.ns {
                                         if !ns.href.is_null() {
-                                            if (*step).value.is_null() {
+                                            if step.value.is_null() {
                                                 break 'rollback;
                                             }
-                                            if !xml_str_equal((*step).value, ns.href) {
+                                            if !xml_str_equal(step.value, ns.href) {
                                                 break 'rollback;
                                             }
                                         }
-                                    } else if !(*step).value.is_null() {
+                                    } else if !step.value.is_null() {
                                         break 'rollback;
                                     }
                                 }
@@ -1730,7 +1680,7 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                 return 0;
             }
             states.nbstates -= 1;
-            i = (*states.states.add(states.nbstates as usize)).step;
+            i = (*states.states.add(states.nbstates as usize)).step as usize;
             node = (*states.states.add(states.nbstates as usize)).node;
             // goto restart;
         }
