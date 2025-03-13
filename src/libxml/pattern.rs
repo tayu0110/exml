@@ -1,6 +1,6 @@
 //! Provide methods and data structures for handling pattern expression.  
-//! This module is based on `libxml/pattern.h`, `pattern.c`, and so on in `libxml2-v2.11.8`.
 //!
+//! This module is based on `libxml/pattern.h`, `pattern.c`, and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
@@ -196,91 +196,6 @@ pub unsafe fn xml_free_pattern_list(mut comp: XmlPatternPtr) {
     }
 }
 
-pub type XmlPatParserContextPtr = *mut XmlPatParserContext;
-#[repr(C)]
-pub struct XmlPatParserContext {
-    cur: *const XmlChar,      /* the current char being parsed */
-    base: *const XmlChar,     /* the full expression */
-    error: i32,               /* error code */
-    comp: XmlPatternPtr,      /* the result */
-    elem: Option<XmlNodePtr>, /* the current node if any */
-    namespaces: Option<Vec<(*const u8, *const u8)>>, /* the namespaces definitions */
-}
-
-impl Default for XmlPatParserContext {
-    fn default() -> Self {
-        Self {
-            cur: null(),
-            base: null(),
-            error: 0,
-            comp: null_mut(),
-            elem: None,
-            namespaces: None,
-        }
-    }
-}
-
-/// Create a new XML pattern parser context
-///
-/// Returns the newly allocated xmlPatParserContextPtr or NULL in case of error
-#[doc(alias = "xmlNewPatParserContext")]
-unsafe fn xml_new_pat_parser_context(
-    pattern: *const XmlChar,
-    namespaces: Option<Vec<(*const u8, *const u8)>>,
-) -> XmlPatParserContextPtr {
-    unsafe {
-        if pattern.is_null() {
-            return null_mut();
-        }
-
-        let cur: XmlPatParserContextPtr =
-            xml_malloc(size_of::<XmlPatParserContext>()) as XmlPatParserContextPtr;
-        if cur.is_null() {
-            return null_mut();
-        }
-        std::ptr::write(&mut *cur, XmlPatParserContext::default());
-        (*cur).cur = pattern;
-        (*cur).base = pattern;
-        (*cur).namespaces = namespaces;
-        cur
-    }
-}
-
-/// Free up the memory allocated by @ctxt
-#[doc(alias = "xmlFreePatParserContext")]
-unsafe fn xml_free_pat_parser_context(ctxt: XmlPatParserContextPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        (*ctxt).namespaces = None;
-        std::ptr::write(&mut *ctxt, XmlPatParserContext::default());
-        xml_free(ctxt as _);
-    }
-}
-
-/// Create a new XSLT Pattern
-///
-/// Returns the newly allocated xmlPatternPtr or NULL in case of error
-#[doc(alias = "xmlNewPattern")]
-unsafe fn xml_new_pattern() -> XmlPatternPtr {
-    unsafe {
-        let cur: XmlPatternPtr = xml_malloc(size_of::<XmlPattern>()) as XmlPatternPtr;
-        if cur.is_null() {
-            return null_mut();
-        }
-        memset(cur as _, 0, size_of::<XmlPattern>());
-        (*cur).max_step = 10;
-        (*cur).steps =
-            xml_malloc((*cur).max_step as usize * size_of::<XmlStepOp>()) as XmlStepOpPtr;
-        if (*cur).steps.is_null() {
-            xml_free(cur as _);
-            return null_mut();
-        }
-        cur
-    }
-}
-
 macro_rules! XML_STREAM_XS_IDC {
     ($c:expr) => {
         (*$c).flags
@@ -315,6 +230,279 @@ macro_rules! SKIP_BLANKS {
     };
 }
 
+macro_rules! PUSH {
+    ($ctxt:expr, $op:expr, $val:expr, $val2:expr, $error:tt) => {
+        if xml_pattern_add($ctxt, (*$ctxt).comp, $op, $val, $val2) != 0 {
+            break $error;
+        }
+    };
+}
+
+macro_rules! PEEKPREV {
+    ($ctxt:expr, $val:expr) => {{
+        assert!($val >= 0);
+        *(*$ctxt).cur.sub($val as usize)
+    }};
+}
+
+macro_rules! XML_STREAM_XS_IDC_SEL {
+    ($c:expr) => {
+        (*$c).flags & XmlPatternFlags::XmlPatternXssel as i32 != 0
+    };
+}
+
+macro_rules! CUR_PTR {
+    ($ctxt:expr) => {
+        (*$ctxt).cur
+    };
+}
+
+macro_rules! NXT {
+    ($ctxt:expr, $val:expr) => {
+        *(*$ctxt).cur.add($val as usize)
+    };
+}
+
+pub type XmlPatParserContextPtr = *mut XmlPatParserContext;
+#[doc(alias = "xmlPatParserContext")]
+#[repr(C)]
+pub struct XmlPatParserContext {
+    cur: *const XmlChar,      /* the current char being parsed */
+    base: *const XmlChar,     /* the full expression */
+    error: i32,               /* error code */
+    comp: XmlPatternPtr,      /* the result */
+    elem: Option<XmlNodePtr>, /* the current node if any */
+    namespaces: Option<Vec<(*const u8, *const u8)>>, /* the namespaces definitions */
+}
+
+impl XmlPatParserContext {
+    /// Create a new XML pattern parser context
+    ///
+    /// Returns the newly allocated xmlPatParserContextPtr or NULL in case of error
+    #[doc(alias = "xmlNewPatParserContext")]
+    fn new(pattern: *const u8, namespaces: Option<Vec<(*const u8, *const u8)>>) -> Option<Self> {
+        (!pattern.is_null()).then(|| XmlPatParserContext {
+            cur: pattern,
+            base: pattern,
+            namespaces,
+            ..Default::default()
+        })
+    }
+
+    /// Compile the Path Pattern and generates a precompiled
+    /// form suitable for fast matching.
+    ///
+    /// ```text
+    /// [5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )
+    /// ```
+    #[doc(alias = "xmlCompileIDCXPathPath")]
+    unsafe fn compile_idc_xpath_path(&mut self) {
+        unsafe {
+            SKIP_BLANKS!(self);
+            'error_unfinished: {
+                'error: {
+                    if CUR!(self) == b'/' {
+                        break 'error;
+                    }
+                    (*self.comp).flags |= PAT_FROM_CUR as i32;
+
+                    if CUR!(self) == b'.' {
+                        // "." - "self::node()"
+                        NEXT!(self);
+                        SKIP_BLANKS!(self);
+                        if CUR!(self) == 0 {
+                            // Selection of the context node.
+                            PUSH!(self, XmlPatOp::XmlOpElem, null_mut(), null_mut(), 'error);
+                            return;
+                        }
+                        if CUR!(self) != b'/' {
+                            // TODO: A more meaningful error message.
+                            break 'error;
+                        }
+                        // "./" - "self::node()/"
+                        NEXT!(self);
+                        SKIP_BLANKS!(self);
+                        if CUR!(self) == b'/' {
+                            if xml_is_blank_char(PEEKPREV!(self, 1) as u32) {
+                                // Disallow "./ /"
+                                break 'error;
+                            }
+                            // ".//" - "self:node()/descendant-or-self::node()/"
+                            PUSH!(self, XmlPatOp::XmlOpAncestor, null_mut(), null_mut(), 'error);
+                            NEXT!(self);
+                            SKIP_BLANKS!(self);
+                        }
+                        if CUR!(self) == 0 {
+                            break 'error_unfinished;
+                        }
+                    }
+                    // Process steps.
+                    'b: while {
+                        xml_compile_step_pattern(self);
+                        if self.error != 0 {
+                            break 'error;
+                        }
+                        SKIP_BLANKS!(self);
+                        if CUR!(self) != b'/' {
+                            break 'b;
+                        }
+                        PUSH!(self, XmlPatOp::XmlOpParent, null_mut(), null_mut(), 'error);
+                        NEXT!(self);
+                        SKIP_BLANKS!(self);
+                        if CUR!(self) == b'/' {
+                            // Disallow subsequent '//'.
+                            break 'error;
+                        }
+                        if CUR!(self) == 0 {
+                            break 'error_unfinished;
+                        }
+
+                        CUR!(self) != 0
+                    } {}
+
+                    if CUR!(self) != 0 {
+                        self.error = 1;
+                    }
+                    return;
+                }
+                // error:
+                self.error = 1;
+                return;
+            }
+
+            // error_unfinished:
+            self.error = 1;
+        }
+    }
+
+    /// Compile the Path Pattern and generates a precompiled
+    /// form suitable for fast matching.
+    ///
+    /// `[5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )`
+    #[doc(alias = "xmlCompilePathPattern")]
+    unsafe fn compile_path_pattern(&mut self) {
+        unsafe {
+            SKIP_BLANKS!(self);
+            if CUR!(self) == b'/' {
+                (*self.comp).flags |= PAT_FROM_ROOT as i32;
+            } else if CUR!(self) == b'.' || (*self.comp).flags & XML_PATTERN_NOTPATTERN != 0 {
+                (*self.comp).flags |= PAT_FROM_CUR as i32;
+            }
+
+            'error: {
+                if CUR!(self) == b'/' && NXT!(self, 1) == b'/' {
+                    PUSH!(self, XmlPatOp::XmlOpAncestor, null_mut(), null_mut(), 'error);
+                    NEXT!(self);
+                    NEXT!(self);
+                } else if CUR!(self) == b'.' && NXT!(self, 1) == b'/' && NXT!(self, 2) == b'/' {
+                    PUSH!(self, XmlPatOp::XmlOpAncestor, null_mut(), null_mut(), 'error);
+                    NEXT!(self);
+                    NEXT!(self);
+                    NEXT!(self);
+                    // Check for incompleteness.
+                    SKIP_BLANKS!(self);
+                    if CUR!(self) == 0 {
+                        self.error = 1;
+                        break 'error;
+                    }
+                }
+                if CUR!(self) == b'@' {
+                    NEXT!(self);
+                    xml_compile_attribute_test(self);
+                    SKIP_BLANKS!(self);
+                    // TODO: check for incompleteness
+                    if CUR!(self) != 0 {
+                        xml_compile_step_pattern(self);
+                        if self.error != 0 {
+                            break 'error;
+                        }
+                    }
+                } else {
+                    if CUR!(self) == b'/' {
+                        PUSH!(self, XmlPatOp::XmlOpRoot, null_mut(), null_mut(), 'error);
+                        NEXT!(self);
+                        // Check for incompleteness.
+                        SKIP_BLANKS!(self);
+                        if CUR!(self) == 0 {
+                            self.error = 1;
+                            break 'error;
+                        }
+                    }
+                    xml_compile_step_pattern(self);
+                    if self.error != 0 {
+                        break 'error;
+                    }
+                    SKIP_BLANKS!(self);
+                    while CUR!(self) == b'/' {
+                        if NXT!(self, 1) == b'/' {
+                            PUSH!(self, XmlPatOp::XmlOpAncestor, null_mut(), null_mut(), 'error);
+                            NEXT!(self);
+                            NEXT!(self);
+                            SKIP_BLANKS!(self);
+                            xml_compile_step_pattern(self);
+                            if self.error != 0 {
+                                break 'error;
+                            }
+                        } else {
+                            PUSH!(self, XmlPatOp::XmlOpParent, null_mut(), null_mut(), 'error);
+                            NEXT!(self);
+                            SKIP_BLANKS!(self);
+                            if CUR!(self) == 0 {
+                                self.error = 1;
+                                break 'error;
+                            }
+                            xml_compile_step_pattern(self);
+                            if self.error != 0 {
+                                break 'error;
+                            }
+                        }
+                    }
+                }
+                if CUR!(self) != 0 {
+                    self.error = 1;
+                }
+            }
+            // error:
+            // return;
+        }
+    }
+}
+
+impl Default for XmlPatParserContext {
+    fn default() -> Self {
+        Self {
+            cur: null(),
+            base: null(),
+            error: 0,
+            comp: null_mut(),
+            elem: None,
+            namespaces: None,
+        }
+    }
+}
+
+/// Create a new XSLT Pattern
+///
+/// Returns the newly allocated xmlPatternPtr or NULL in case of error
+#[doc(alias = "xmlNewPattern")]
+unsafe fn xml_new_pattern() -> XmlPatternPtr {
+    unsafe {
+        let cur: XmlPatternPtr = xml_malloc(size_of::<XmlPattern>()) as XmlPatternPtr;
+        if cur.is_null() {
+            return null_mut();
+        }
+        memset(cur as _, 0, size_of::<XmlPattern>());
+        (*cur).max_step = 10;
+        (*cur).steps =
+            xml_malloc((*cur).max_step as usize * size_of::<XmlStepOp>()) as XmlStepOpPtr;
+        if (*cur).steps.is_null() {
+            xml_free(cur as _);
+            return null_mut();
+        }
+        cur
+    }
+}
+
 const PAT_FROM_ROOT: usize = 1 << 8;
 const PAT_FROM_CUR: usize = 1 << 9;
 
@@ -347,33 +535,6 @@ unsafe fn xml_pattern_add(
         (*comp).nb_step += 1;
         0
     }
-}
-
-macro_rules! PUSH {
-    ($ctxt:expr, $op:expr, $val:expr, $val2:expr, $error:tt) => {
-        if xml_pattern_add($ctxt, (*$ctxt).comp, $op, $val, $val2) != 0 {
-            break $error;
-        }
-    };
-}
-
-macro_rules! PEEKPREV {
-    ($ctxt:expr, $val:expr) => {{
-        assert!($val >= 0);
-        *(*$ctxt).cur.sub($val as usize)
-    }};
-}
-
-macro_rules! XML_STREAM_XS_IDC_SEL {
-    ($c:expr) => {
-        (*$c).flags & XmlPatternFlags::XmlPatternXssel as i32 != 0
-    };
-}
-
-macro_rules! CUR_PTR {
-    ($ctxt:expr) => {
-        (*$ctxt).cur
-    };
 }
 
 /// Parses a non qualified name
@@ -731,191 +892,9 @@ unsafe fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
     }
 }
 
-/// Compile the Path Pattern and generates a precompiled
-/// form suitable for fast matching.
-///
-/// `[5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )`
-#[doc(alias = "xmlCompileIDCXPathPath")]
-unsafe fn xml_compile_idc_xpath_path(ctxt: XmlPatParserContextPtr) {
-    unsafe {
-        SKIP_BLANKS!(ctxt);
-        'error_unfinished: {
-            'error: {
-                if CUR!(ctxt) == b'/' {
-                    break 'error;
-                }
-                (*(*ctxt).comp).flags |= PAT_FROM_CUR as i32;
-
-                if CUR!(ctxt) == b'.' {
-                    // "." - "self::node()"
-                    NEXT!(ctxt);
-                    SKIP_BLANKS!(ctxt);
-                    if CUR!(ctxt) == 0 {
-                        // Selection of the context node.
-                        PUSH!(ctxt, XmlPatOp::XmlOpElem, null_mut(), null_mut(), 'error);
-                        return;
-                    }
-                    if CUR!(ctxt) != b'/' {
-                        // TODO: A more meaningful error message.
-                        break 'error;
-                    }
-                    // "./" - "self::node()/"
-                    NEXT!(ctxt);
-                    SKIP_BLANKS!(ctxt);
-                    if CUR!(ctxt) == b'/' {
-                        if xml_is_blank_char(PEEKPREV!(ctxt, 1) as u32) {
-                            // Disallow "./ /"
-                            break 'error;
-                        }
-                        // ".//" - "self:node()/descendant-or-self::node()/"
-                        PUSH!(ctxt, XmlPatOp::XmlOpAncestor, null_mut(), null_mut(), 'error);
-                        NEXT!(ctxt);
-                        SKIP_BLANKS!(ctxt);
-                    }
-                    if CUR!(ctxt) == 0 {
-                        break 'error_unfinished;
-                    }
-                }
-                // Process steps.
-                'b: while {
-                    xml_compile_step_pattern(ctxt);
-                    if (*ctxt).error != 0 {
-                        break 'error;
-                    }
-                    SKIP_BLANKS!(ctxt);
-                    if CUR!(ctxt) != b'/' {
-                        break 'b;
-                    }
-                    PUSH!(ctxt, XmlPatOp::XmlOpParent, null_mut(), null_mut(), 'error);
-                    NEXT!(ctxt);
-                    SKIP_BLANKS!(ctxt);
-                    if CUR!(ctxt) == b'/' {
-                        // Disallow subsequent '//'.
-                        break 'error;
-                    }
-                    if CUR!(ctxt) == 0 {
-                        break 'error_unfinished;
-                    }
-
-                    CUR!(ctxt) != 0
-                } {}
-
-                if CUR!(ctxt) != 0 {
-                    (*ctxt).error = 1;
-                }
-                return;
-            }
-            // error:
-            (*ctxt).error = 1;
-            return;
-        }
-
-        // error_unfinished:
-        (*ctxt).error = 1;
-    }
-}
-
 const XML_PATTERN_NOTPATTERN: i32 = XmlPatternFlags::XmlPatternXpath as i32
     | XmlPatternFlags::XmlPatternXssel as i32
     | XmlPatternFlags::XmlPatternXsfield as i32;
-
-macro_rules! NXT {
-    ($ctxt:expr, $val:expr) => {
-        *(*$ctxt).cur.add($val as usize)
-    };
-}
-
-/// Compile the Path Pattern and generates a precompiled
-/// form suitable for fast matching.
-///
-/// `[5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )`
-#[doc(alias = "xmlCompilePathPattern")]
-unsafe fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
-    unsafe {
-        SKIP_BLANKS!(ctxt);
-        if CUR!(ctxt) == b'/' {
-            (*(*ctxt).comp).flags |= PAT_FROM_ROOT as i32;
-        } else if CUR!(ctxt) == b'.' || (*(*ctxt).comp).flags & XML_PATTERN_NOTPATTERN != 0 {
-            (*(*ctxt).comp).flags |= PAT_FROM_CUR as i32;
-        }
-
-        'error: {
-            if CUR!(ctxt) == b'/' && NXT!(ctxt, 1) == b'/' {
-                PUSH!(ctxt, XmlPatOp::XmlOpAncestor, null_mut(), null_mut(), 'error);
-                NEXT!(ctxt);
-                NEXT!(ctxt);
-            } else if CUR!(ctxt) == b'.' && NXT!(ctxt, 1) == b'/' && NXT!(ctxt, 2) == b'/' {
-                PUSH!(ctxt, XmlPatOp::XmlOpAncestor, null_mut(), null_mut(), 'error);
-                NEXT!(ctxt);
-                NEXT!(ctxt);
-                NEXT!(ctxt);
-                // Check for incompleteness.
-                SKIP_BLANKS!(ctxt);
-                if CUR!(ctxt) == 0 {
-                    (*ctxt).error = 1;
-                    break 'error;
-                }
-            }
-            if CUR!(ctxt) == b'@' {
-                NEXT!(ctxt);
-                xml_compile_attribute_test(ctxt);
-                SKIP_BLANKS!(ctxt);
-                // TODO: check for incompleteness
-                if CUR!(ctxt) != 0 {
-                    xml_compile_step_pattern(ctxt);
-                    if (*ctxt).error != 0 {
-                        break 'error;
-                    }
-                }
-            } else {
-                if CUR!(ctxt) == b'/' {
-                    PUSH!(ctxt, XmlPatOp::XmlOpRoot, null_mut(), null_mut(), 'error);
-                    NEXT!(ctxt);
-                    // Check for incompleteness.
-                    SKIP_BLANKS!(ctxt);
-                    if CUR!(ctxt) == 0 {
-                        (*ctxt).error = 1;
-                        break 'error;
-                    }
-                }
-                xml_compile_step_pattern(ctxt);
-                if (*ctxt).error != 0 {
-                    break 'error;
-                }
-                SKIP_BLANKS!(ctxt);
-                while CUR!(ctxt) == b'/' {
-                    if NXT!(ctxt, 1) == b'/' {
-                        PUSH!(ctxt, XmlPatOp::XmlOpAncestor, null_mut(), null_mut(), 'error);
-                        NEXT!(ctxt);
-                        NEXT!(ctxt);
-                        SKIP_BLANKS!(ctxt);
-                        xml_compile_step_pattern(ctxt);
-                        if (*ctxt).error != 0 {
-                            break 'error;
-                        }
-                    } else {
-                        PUSH!(ctxt, XmlPatOp::XmlOpParent, null_mut(), null_mut(), 'error);
-                        NEXT!(ctxt);
-                        SKIP_BLANKS!(ctxt);
-                        if CUR!(ctxt) == 0 {
-                            (*ctxt).error = 1;
-                            break 'error;
-                        }
-                        xml_compile_step_pattern(ctxt);
-                        if (*ctxt).error != 0 {
-                            break 'error;
-                        }
-                    }
-                }
-            }
-            if CUR!(ctxt) != 0 {
-                (*ctxt).error = 1;
-            }
-        }
-        // error:
-        // return;
-    }
-}
 
 /// Build a new compiled pattern for streaming
 ///
@@ -1255,7 +1234,6 @@ pub unsafe fn xml_patterncompile(
     unsafe {
         let mut ret: XmlPatternPtr = null_mut();
         let mut cur: XmlPatternPtr;
-        let mut ctxt: XmlPatParserContextPtr = null_mut();
         let mut or: *const XmlChar;
         let mut start: *const XmlChar;
         let mut tmp: *mut XmlChar;
@@ -1274,18 +1252,18 @@ pub unsafe fn xml_patterncompile(
                 while *or != 0 && *or != b'|' {
                     or = or.add(1);
                 }
-                if *or == 0 {
-                    ctxt = xml_new_pat_parser_context(start, namespaces.clone());
+                let ctxt = if *or == 0 {
+                    XmlPatParserContext::new(start, namespaces.clone())
                 } else {
                     tmp = xml_strndup(start, or.offset_from(start) as _);
-                    if !tmp.is_null() {
-                        ctxt = xml_new_pat_parser_context(tmp, namespaces.clone());
-                    }
                     or = or.add(1);
-                }
-                if ctxt.is_null() {
+                    (!tmp.is_null())
+                        .then(|| XmlPatParserContext::new(tmp, namespaces.clone()))
+                        .flatten()
+                };
+                let Some(mut ctxt) = ctxt else {
                     break 'error;
-                }
+                };
                 cur = xml_new_pattern();
                 if cur.is_null() {
                     break 'error;
@@ -1298,18 +1276,16 @@ pub unsafe fn xml_patterncompile(
                     (*ret).next = cur;
                 }
                 (*cur).flags = flags;
-                (*ctxt).comp = cur;
+                ctxt.comp = cur;
 
                 if XML_STREAM_XS_IDC!(cur) {
-                    xml_compile_idc_xpath_path(ctxt);
+                    ctxt.compile_idc_xpath_path();
                 } else {
-                    xml_compile_path_pattern(ctxt);
+                    ctxt.compile_path_pattern();
                 }
-                if (*ctxt).error != 0 {
+                if ctxt.error != 0 {
                     break 'error;
                 }
-                xml_free_pat_parser_context(ctxt);
-                ctxt = null_mut();
 
                 if streamable != 0 {
                     if typ == 0 {
@@ -1349,9 +1325,6 @@ pub unsafe fn xml_patterncompile(
             return ret;
         }
         // error:
-        if !ctxt.is_null() {
-            xml_free_pat_parser_context(ctxt);
-        }
         if !ret.is_null() {
             xml_free_pattern(ret);
         }
