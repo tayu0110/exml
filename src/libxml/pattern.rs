@@ -125,9 +125,9 @@ const XML_STREAM_ANY_NODE: usize = 100;
 #[repr(C)]
 pub enum XmlPatternFlags {
     XmlPatternDefault = 0,      /* simple pattern match */
-    XmlPatternXpath = 1 << 0,   /* standard XPath pattern */
-    XmlPatternXssel = 1 << 1,   /* XPath subset for schema selector */
-    XmlPatternXsfield = 1 << 2, /* XPath subset for schema field */
+    XmlPatternXPath = 1 << 0,   /* standard XPath pattern */
+    XmlPatternXSSel = 1 << 1,   /* XPath subset for schema selector */
+    XmlPatternXSField = 1 << 2, /* XPath subset for schema field */
 }
 
 /// Free up the memory allocated by @comp
@@ -200,14 +200,14 @@ pub unsafe fn xml_free_pattern_list(mut comp: XmlPatternPtr) {
 macro_rules! XML_STREAM_XS_IDC {
     ($c:expr) => {
         (*$c).flags
-            & (XmlPatternFlags::XmlPatternXssel as i32 | XmlPatternFlags::XmlPatternXsfield as i32)
+            & (XmlPatternFlags::XmlPatternXSSel as i32 | XmlPatternFlags::XmlPatternXSField as i32)
             != 0
     };
 }
 
 macro_rules! XML_STREAM_XS_IDC_SEL {
     ($c:expr) => {
-        (*$c).flags & XmlPatternFlags::XmlPatternXssel as i32 != 0
+        (*$c).flags & XmlPatternFlags::XmlPatternXSSel as i32 != 0
     };
 }
 
@@ -978,9 +978,9 @@ unsafe fn xml_new_pattern() -> XmlPatternPtr {
 const PAT_FROM_ROOT: usize = 1 << 8;
 const PAT_FROM_CUR: usize = 1 << 9;
 
-const XML_PATTERN_NOTPATTERN: i32 = XmlPatternFlags::XmlPatternXpath as i32
-    | XmlPatternFlags::XmlPatternXssel as i32
-    | XmlPatternFlags::XmlPatternXsfield as i32;
+const XML_PATTERN_NOTPATTERN: i32 = XmlPatternFlags::XmlPatternXPath as i32
+    | XmlPatternFlags::XmlPatternXSSel as i32
+    | XmlPatternFlags::XmlPatternXSField as i32;
 
 /// Build a new compiled pattern for streaming
 ///
@@ -2098,7 +2098,7 @@ unsafe fn xml_stream_push_internal(
                 if (*comp).nb_step == 0 {
                     // / and . are handled at the XPath node set creation
                     // level by checking min depth
-                    if (*stream).flags & XmlPatternFlags::XmlPatternXpath as i32 != 0 {
+                    if (*stream).flags & XmlPatternFlags::XmlPatternXPath as i32 != 0 {
                         stream = (*stream).next;
                         continue 'stream; /* while */
                     }

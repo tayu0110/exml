@@ -617,7 +617,7 @@ unsafe fn xml_schematron_add_rule(
         // Try first to compile the pattern
         let pattern: XmlPatternPtr = xml_patterncompile(
             context,
-            XmlPatternFlags::XmlPatternXpath as i32,
+            XmlPatternFlags::XmlPatternXPath as i32,
             (*ctxt).namespaces.clone(),
         );
         if pattern.is_null() {

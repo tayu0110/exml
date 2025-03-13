@@ -1281,7 +1281,7 @@ pub unsafe fn xml_xpath_try_stream_compile(
             let xpath = CString::new(xpath).unwrap();
             stream = xml_patterncompile(
                 xpath.as_ptr() as *const u8,
-                XmlPatternFlags::XmlPatternXpath as i32,
+                XmlPatternFlags::XmlPatternXPath as i32,
                 namespaces,
             );
             if !stream.is_null() && xml_pattern_streamable(stream) == 1 {
