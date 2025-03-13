@@ -29,17 +29,18 @@ use std::{
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, drop_in_place, null, null_mut},
+    rc::Rc,
 };
 
 use libc::memset;
 
-use crate::tree::XmlAttrPtr;
+use crate::tree::{NodeCommon, XmlAttrPtr};
 use crate::{
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         globals::{xml_free, xml_malloc, xml_realloc},
         parser_internals::xml_is_letter,
-        xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
+        xmlstring::{XmlChar, xml_strndup},
     },
     tree::{XML_XML_NAMESPACE, XmlElementType, XmlGenericNodePtr, XmlNodePtr},
 };
@@ -75,29 +76,28 @@ pub enum XmlPatOp {
 
 pub type XmlStepOpPtr = *mut XmlStepOp;
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct XmlStepOp {
     op: XmlPatOp,
-    value: *const XmlChar,
-    value2: *const XmlChar, /* The namespace name */
+    value: Option<Rc<str>>,
+    value2: Option<Rc<str>>, /* The namespace name */
 }
 
 pub type XmlStreamStepPtr = *mut XmlStreamStep;
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct XmlStreamStep {
-    flags: i32,           /* properties of that step */
-    name: *const XmlChar, /* first string value if NULL accept all */
-    ns: *const XmlChar,   /* second string value */
-    node_type: i32,       /* type of node */
+    flags: i32,            /* properties of that step */
+    name: Option<Rc<str>>, /* first string value if NULL accept all */
+    ns: Option<Rc<str>>,   /* second string value */
+    node_type: i32,        /* type of node */
 }
 
 pub type XmlStreamCompPtr = *mut XmlStreamComp;
 #[repr(C)]
+#[derive(Default)]
 pub struct XmlStreamComp {
-    nb_step: i32,            /* number of steps in the automata */
-    max_step: i32,           /* allocated number of steps */
-    steps: XmlStreamStepPtr, /* the array of steps */
+    steps: Vec<XmlStreamStep>, /* the array of steps */
     flags: i32,
 }
 
@@ -154,9 +154,7 @@ pub unsafe fn xml_free_pattern(comp: XmlPatternPtr) {
 unsafe fn xml_free_stream_comp(comp: XmlStreamCompPtr) {
     unsafe {
         if !comp.is_null() {
-            if !(*comp).steps.is_null() {
-                xml_free((*comp).steps as _);
-            }
+            drop_in_place(comp);
             xml_free(comp as _);
         }
     }
@@ -172,14 +170,6 @@ unsafe fn xml_free_pattern_internal(comp: XmlPatternPtr) {
         }
         if !(*comp).pattern.is_null() {
             xml_free((*comp).pattern as _);
-        }
-        for op in (*comp).steps.drain(..) {
-            if !op.value.is_null() {
-                xml_free(op.value as _);
-            }
-            if !op.value2.is_null() {
-                xml_free(op.value2 as _);
-            }
         }
 
         drop_in_place(comp);
@@ -293,8 +283,7 @@ impl XmlPatParserContext {
                 self.skip_blanks();
                 if self.current_byte().is_none() {
                     // Selection of the context node.
-                    if self.pattern_add(self.comp, XmlPatOp::XmlOpElem, null_mut(), null_mut()) != 0
-                    {
+                    if self.pattern_add(self.comp, XmlPatOp::XmlOpElem, None, None) != 0 {
                         self.error = 1;
                     };
                     return;
@@ -317,9 +306,7 @@ impl XmlPatParserContext {
                         return;
                     }
                     // ".//" - "self:node()/descendant-or-self::node()/"
-                    if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, null_mut(), null_mut())
-                        != 0
-                    {
+                    if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, None, None) != 0 {
                         self.error = 1;
                         return;
                     };
@@ -342,7 +329,7 @@ impl XmlPatParserContext {
                 if self.current_byte() != Some(b'/') {
                     break 'b;
                 }
-                if self.pattern_add(self.comp, XmlPatOp::XmlOpParent, null_mut(), null_mut()) != 0 {
+                if self.pattern_add(self.comp, XmlPatOp::XmlOpParent, None, None) != 0 {
                     self.error = 1;
                     return;
                 };
@@ -386,8 +373,7 @@ impl XmlPatParserContext {
             }
 
             if self.current_byte() == Some(b'/') && self.nth_byte(1) == Some(b'/') {
-                if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, null_mut(), null_mut()) != 0
-                {
+                if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, None, None) != 0 {
                     return;
                 };
                 self.next();
@@ -396,8 +382,7 @@ impl XmlPatParserContext {
                 && self.nth_byte(1) == Some(b'/')
                 && self.nth_byte(2) == Some(b'/')
             {
-                if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, null_mut(), null_mut()) != 0
-                {
+                if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, None, None) != 0 {
                     return;
                 };
                 self.next();
@@ -423,8 +408,7 @@ impl XmlPatParserContext {
                 }
             } else {
                 if self.current_byte() == Some(b'/') {
-                    if self.pattern_add(self.comp, XmlPatOp::XmlOpRoot, null_mut(), null_mut()) != 0
-                    {
+                    if self.pattern_add(self.comp, XmlPatOp::XmlOpRoot, None, None) != 0 {
                         return;
                     };
                     self.next();
@@ -442,13 +426,7 @@ impl XmlPatParserContext {
                 self.skip_blanks();
                 while self.current_byte() == Some(b'/') {
                     if self.nth_byte(1) == Some(b'/') {
-                        if self.pattern_add(
-                            self.comp,
-                            XmlPatOp::XmlOpAncestor,
-                            null_mut(),
-                            null_mut(),
-                        ) != 0
-                        {
+                        if self.pattern_add(self.comp, XmlPatOp::XmlOpAncestor, None, None) != 0 {
                             return;
                         };
                         self.next();
@@ -459,13 +437,7 @@ impl XmlPatParserContext {
                             return;
                         }
                     } else {
-                        if self.pattern_add(
-                            self.comp,
-                            XmlPatOp::XmlOpParent,
-                            null_mut(),
-                            null_mut(),
-                        ) != 0
-                        {
+                        if self.pattern_add(self.comp, XmlPatOp::XmlOpParent, None, None) != 0 {
                             return;
                         };
                         self.next();
@@ -497,232 +469,185 @@ impl XmlPatParserContext {
     #[doc(alias = "xmlCompileStepPattern")]
     unsafe fn compile_step_pattern(&mut self) {
         unsafe {
-            let mut name: *mut XmlChar = null_mut();
-            let mut url: *mut XmlChar = null_mut();
             let mut has_blanks: i32 = 0;
 
             self.skip_blanks();
-            'error: {
-                if self.current_byte() == Some(b'.') {
-                    // Context node.
-                    self.next();
-                    if self.pattern_add(self.comp, XmlPatOp::XmlOpElem, null_mut(), null_mut()) != 0
-                    {
-                        break 'error;
-                    };
-                    return;
-                }
-                if self.current_byte() == Some(b'@') {
-                    // Attribute test.
-                    if XML_STREAM_XS_IDC_SEL!(self.comp) {
-                        self.error = 1;
-                        return;
-                    }
-                    self.next();
-                    self.compile_attribute_test();
-                    if self.error != 0 {
-                        break 'error;
-                    }
-                    return;
-                }
-                name = self.scan_ncname();
-                if name.is_null() {
-                    if self.current_byte() == Some(b'*') {
-                        self.next();
-                        if self.pattern_add(self.comp, XmlPatOp::XmlOpAll, null_mut(), null_mut())
-                            != 0
-                        {
-                            break 'error;
-                        };
-                        return;
-                    } else {
-                        self.error = 1;
-                        return;
-                    }
-                }
-                if self
-                    .current_byte()
-                    .is_some_and(|b| xml_is_blank_char(b as u32))
-                {
-                    has_blanks = 1;
-                    self.skip_blanks();
-                }
-                if self.current_byte() == Some(b':') {
-                    self.next();
-                    if self.current_byte() != Some(b':') {
-                        let prefix: *mut XmlChar = name;
-
-                        if has_blanks != 0
-                            || self
-                                .current_byte()
-                                .is_some_and(|b| xml_is_blank_char(b as u32))
-                        {
-                            self.error = 1;
-                            break 'error;
-                        }
-                        // This is a namespace is_match
-                        let token = self.scan_name();
-                        if *prefix.add(0) == b'x'
-                            && *prefix.add(1) == b'm'
-                            && *prefix.add(2) == b'l'
-                            && *prefix.add(3) == 0
-                        {
-                            url = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
-                        } else if let Some(namespaces) = self.namespaces.as_deref() {
-                            let mut found = false;
-                            for &(href, pref) in namespaces {
-                                if xml_str_equal(pref, prefix) {
-                                    url = xml_strdup(href);
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if !found {
-                                self.error = 1;
-                                break 'error;
-                            }
-                        }
-                        xml_free(prefix as _);
-                        name = null_mut();
-                        if let Some(token) = token {
-                            let token = xml_strndup(token.as_ptr(), token.len() as i32);
-                            if self.pattern_add(self.comp, XmlPatOp::XmlOpElem, token, url) != 0 {
-                                break 'error;
-                            }
-                        } else if self.current_byte() == Some(b'*') {
-                            self.next();
-                            if self.pattern_add(self.comp, XmlPatOp::XmlOpNs, url, null_mut()) != 0
-                            {
-                                break 'error;
-                            };
-                        } else {
-                            self.error = 1;
-                            break 'error;
-                        }
-                    } else {
-                        self.next();
-                        if xml_str_equal(name, c"child".as_ptr() as _) {
-                            xml_free(name as _);
-                            let Some(name) = self.scan_name() else {
-                                if self.current_byte() == Some(b'*') {
-                                    self.next();
-                                    if self.pattern_add(
-                                        self.comp,
-                                        XmlPatOp::XmlOpAll,
-                                        null_mut(),
-                                        null_mut(),
-                                    ) != 0
-                                    {
-                                        break 'error;
-                                    };
-                                    return;
-                                } else {
-                                    self.error = 1;
-                                    break 'error;
-                                }
-                            };
-                            if self.current_byte() == Some(b':') {
-                                let prefix = name;
-
-                                self.next();
-                                if self
-                                    .current_byte()
-                                    .is_some_and(|b| xml_is_blank_char(b as u32))
-                                {
-                                    self.error = 1;
-                                    break 'error;
-                                }
-                                // This is a namespace is_match
-                                let token = self.scan_name();
-                                if prefix == "xml" {
-                                    url = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
-                                } else if let Some(namespaces) = self.namespaces.as_deref() {
-                                    let mut found = false;
-                                    for &(href, pref) in namespaces {
-                                        if CStr::from_ptr(pref as *const i8)
-                                            .to_string_lossy()
-                                            .as_ref()
-                                            == prefix
-                                        {
-                                            url = xml_strdup(href);
-                                            found = true;
-                                            break;
-                                        }
-                                    }
-                                    if !found {
-                                        self.error = 1;
-                                        break 'error;
-                                    }
-                                }
-                                if let Some(token) = token {
-                                    let token = xml_strndup(token.as_ptr(), token.len() as i32);
-                                    if self.pattern_add(self.comp, XmlPatOp::XmlOpChild, token, url)
-                                        != 0
-                                    {
-                                        break 'error;
-                                    }
-                                } else if self.current_byte() == Some(b'*') {
-                                    self.next();
-                                    if self.pattern_add(
-                                        self.comp,
-                                        XmlPatOp::XmlOpNs,
-                                        url,
-                                        null_mut(),
-                                    ) != 0
-                                    {
-                                        break 'error;
-                                    };
-                                } else {
-                                    self.error = 1;
-                                    break 'error;
-                                }
-                            } else if self.pattern_add(
-                                self.comp,
-                                XmlPatOp::XmlOpChild,
-                                xml_strndup(name.as_ptr(), name.len() as i32),
-                                null_mut(),
-                            ) != 0
-                            {
-                                break 'error;
-                            }
-                        } else if xml_str_equal(name, c"attribute".as_ptr() as _) {
-                            xml_free(name as _);
-                            name = null_mut();
-                            if XML_STREAM_XS_IDC_SEL!(self.comp) {
-                                self.error = 1;
-                                break 'error;
-                            }
-                            self.compile_attribute_test();
-                            if self.error != 0 {
-                                break 'error;
-                            }
-                            return;
-                        } else {
-                            self.error = 1;
-                            break 'error;
-                        }
-                    }
-                } else if self.current_byte() == Some(b'*') {
-                    if !name.is_null() {
-                        self.error = 1;
-                        break 'error;
-                    }
-                    self.next();
-                    if self.pattern_add(self.comp, XmlPatOp::XmlOpAll, null_mut(), null_mut()) != 0
-                    {
-                        break 'error;
-                    };
-                } else if self.pattern_add(self.comp, XmlPatOp::XmlOpElem, name, null_mut()) != 0 {
-                    break 'error;
-                }
+            if self.current_byte() == Some(b'.') {
+                // Context node.
+                self.next();
+                self.pattern_add(self.comp, XmlPatOp::XmlOpElem, None, None);
                 return;
             }
-            //  error:
-            if !url.is_null() {
-                xml_free(url as _)
+            if self.current_byte() == Some(b'@') {
+                // Attribute test.
+                if XML_STREAM_XS_IDC_SEL!(self.comp) {
+                    self.error = 1;
+                    return;
+                }
+                self.next();
+                self.compile_attribute_test();
+                return;
             }
-            if !name.is_null() {
-                xml_free(name as _)
+            let Some(name) = self.scan_ncname() else {
+                if self.current_byte() == Some(b'*') {
+                    self.next();
+                    self.pattern_add(self.comp, XmlPatOp::XmlOpAll, None, None);
+                } else {
+                    self.error = 1;
+                }
+                return;
+            };
+            if self
+                .current_byte()
+                .is_some_and(|b| xml_is_blank_char(b as u32))
+            {
+                has_blanks = 1;
+                self.skip_blanks();
+            }
+            if self.current_byte() == Some(b':') {
+                self.next();
+                if self.current_byte() != Some(b':') {
+                    let prefix = name;
+
+                    if has_blanks != 0
+                        || self
+                            .current_byte()
+                            .is_some_and(|b| xml_is_blank_char(b as u32))
+                    {
+                        self.error = 1;
+                        return;
+                    }
+                    // This is a namespace is_match
+                    let token = self.scan_name();
+                    let mut url = None;
+                    if prefix == "xml" {
+                        url = Some(XML_XML_NAMESPACE.to_str().unwrap().to_owned());
+                    } else if let Some(namespaces) = self.namespaces.as_deref() {
+                        let mut found = false;
+                        for &(href, pref) in namespaces {
+                            if CStr::from_ptr(pref as *const i8).to_string_lossy().as_ref()
+                                == prefix
+                            {
+                                url = Some(
+                                    CStr::from_ptr(href as *const i8)
+                                        .to_string_lossy()
+                                        .into_owned(),
+                                );
+                                found = true;
+                                break;
+                            }
+                        }
+                        if !found {
+                            self.error = 1;
+                            return;
+                        }
+                    }
+                    if let Some(token) = token {
+                        self.pattern_add(
+                            self.comp,
+                            XmlPatOp::XmlOpElem,
+                            Some(&token),
+                            url.as_deref(),
+                        );
+                    } else if self.current_byte() == Some(b'*') {
+                        self.next();
+                        if self.pattern_add(self.comp, XmlPatOp::XmlOpNs, url.as_deref(), None) != 0
+                        {
+                            return;
+                        };
+                    } else {
+                        self.error = 1;
+                        return;
+                    }
+                } else {
+                    self.next();
+                    if name == "child" {
+                        let Some(name) = self.scan_name() else {
+                            if self.current_byte() == Some(b'*') {
+                                self.next();
+                                if self.pattern_add(self.comp, XmlPatOp::XmlOpAll, None, None) != 0
+                                {
+                                    return;
+                                };
+                                return;
+                            } else {
+                                self.error = 1;
+                                return;
+                            }
+                        };
+                        if self.current_byte() == Some(b':') {
+                            let prefix = name;
+
+                            self.next();
+                            if self
+                                .current_byte()
+                                .is_some_and(|b| xml_is_blank_char(b as u32))
+                            {
+                                self.error = 1;
+                                return;
+                            }
+                            // This is a namespace is_match
+                            let token = self.scan_name();
+                            let mut url = None;
+                            if prefix == "xml" {
+                                url = Some(XML_XML_NAMESPACE.to_str().unwrap().to_owned());
+                            } else if let Some(namespaces) = self.namespaces.as_deref() {
+                                let mut found = false;
+                                for &(href, pref) in namespaces {
+                                    if CStr::from_ptr(pref as *const i8).to_string_lossy().as_ref()
+                                        == prefix
+                                    {
+                                        url = Some(
+                                            CStr::from_ptr(href as *const i8)
+                                                .to_string_lossy()
+                                                .into_owned(),
+                                        );
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                                if !found {
+                                    self.error = 1;
+                                    return;
+                                }
+                            }
+                            if let Some(token) = token {
+                                self.pattern_add(
+                                    self.comp,
+                                    XmlPatOp::XmlOpChild,
+                                    Some(&token),
+                                    url.as_deref(),
+                                );
+                            } else if self.current_byte() == Some(b'*') {
+                                self.next();
+                                self.pattern_add(
+                                    self.comp,
+                                    XmlPatOp::XmlOpNs,
+                                    url.as_deref(),
+                                    None,
+                                );
+                            } else {
+                                self.error = 1;
+                            }
+                        } else {
+                            self.pattern_add(self.comp, XmlPatOp::XmlOpChild, Some(&name), None);
+                        }
+                    } else if name == "attribute" {
+                        if XML_STREAM_XS_IDC_SEL!(self.comp) {
+                            self.error = 1;
+                            return;
+                        }
+                        self.compile_attribute_test();
+                        return;
+                    } else {
+                        self.error = 1;
+                        return;
+                    }
+                }
+            } else if self.current_byte() == Some(b'*') {
+                self.error = 1;
+            } else {
+                self.pattern_add(self.comp, XmlPatOp::XmlOpElem, Some(&name), None);
             }
         }
     }
@@ -731,83 +656,67 @@ impl XmlPatParserContext {
     #[doc(alias = "xmlCompileAttributeTest")]
     unsafe fn compile_attribute_test(&mut self) {
         unsafe {
-            let mut url: *mut XmlChar = null_mut();
-
             self.skip_blanks();
-            let name: *mut XmlChar = self.scan_ncname();
-            'error: {
-                if name.is_null() {
-                    if self.current_byte() == Some(b'*') {
-                        if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, null_mut(), null_mut())
-                            != 0
-                        {
-                            break 'error;
-                        };
-                        self.next();
-                    } else {
-                        self.error = 1;
-                    }
-                    return;
-                }
-                if self.current_byte() == Some(b':') {
-                    let prefix: *mut XmlChar = name;
-
+            let name = self.scan_ncname();
+            let Some(name) = name else {
+                if self.current_byte() == Some(b'*') {
+                    if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, None, None) != 0 {
+                        return;
+                    };
                     self.next();
-
-                    if self
-                        .current_byte()
-                        .is_some_and(|b| xml_is_blank_char(b as u32))
-                    {
-                        xml_free(prefix as _);
-                        self.error = 1;
-                        break 'error;
-                    }
-                    // This is a namespace is_match
-                    let token = self.scan_name();
-                    if *prefix.add(0) == b'x'
-                        && *prefix.add(1) == b'm'
-                        && *prefix.add(2) == b'l'
-                        && *prefix.add(3) == 0
-                    {
-                        url = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
-                    } else if let Some(namespaces) = self.namespaces.as_deref() {
-                        let mut found = false;
-                        for &(href, pref) in namespaces {
-                            if xml_str_equal(pref, prefix) {
-                                url = xml_strdup(href);
-                                found = true;
-                                break;
-                            }
-                        }
-                        if !found {
-                            xml_free(prefix as _);
-                            self.error = 1;
-                            break 'error;
-                        }
-                    }
-                    xml_free(prefix as _);
-                    if let Some(token) = token {
-                        let token = xml_strndup(token.as_ptr(), token.len() as i32);
-                        if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, token, url) != 0 {
-                            break 'error;
-                        }
-                    } else if self.current_byte() == Some(b'*') {
-                        self.next();
-                        if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, null_mut(), url) != 0 {
-                            break 'error;
-                        };
-                    } else {
-                        self.error = 1;
-                        break 'error;
-                    }
-                } else if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, name, null_mut()) != 0 {
-                    break 'error;
+                } else {
+                    self.error = 1;
                 }
                 return;
-            }
-            // error:
-            if !url.is_null() {
-                xml_free(url as _)
+            };
+            if self.current_byte() == Some(b':') {
+                let prefix = name;
+
+                self.next();
+
+                if self
+                    .current_byte()
+                    .is_some_and(|b| xml_is_blank_char(b as u32))
+                {
+                    self.error = 1;
+                    return;
+                }
+                // This is a namespace is_match
+                let token = self.scan_name();
+                let mut url = None;
+                if prefix == "xml" {
+                    url = Some(XML_XML_NAMESPACE.to_str().unwrap().to_owned());
+                } else if let Some(namespaces) = self.namespaces.as_deref() {
+                    let mut found = false;
+                    for &(href, pref) in namespaces {
+                        if CStr::from_ptr(pref as *const i8).to_string_lossy().as_ref() == prefix {
+                            url = Some(
+                                CStr::from_ptr(href as *const i8)
+                                    .to_string_lossy()
+                                    .into_owned(),
+                            );
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        self.error = 1;
+                        return;
+                    }
+                }
+                if let Some(token) = token {
+                    self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, Some(&token), url.as_deref());
+                } else if self.current_byte() == Some(b'*') {
+                    self.next();
+                    if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, None, url.as_deref()) != 0 {
+                        return;
+                    };
+                } else {
+                    self.error = 1;
+                    return;
+                }
+            } else if self.pattern_add(self.comp, XmlPatOp::XmlOpAttr, Some(&name), None) != 0 {
+                return;
             }
         }
     }
@@ -848,28 +757,26 @@ impl XmlPatParserContext {
     ///
     /// Returns the Name parsed or NULL
     #[doc(alias = "xmlPatScanNCName")]
-    unsafe fn scan_ncname(&mut self) -> *mut XmlChar {
-        unsafe {
-            self.skip_blanks();
+    fn scan_ncname(&mut self) -> Option<String> {
+        self.skip_blanks();
 
-            let cur = self.current_str();
-            if !cur.starts_with(|c: char| xml_is_letter(c as u32) || c == '_') {
-                return null_mut();
-            }
-            let trimmed = cur.trim_start_matches(|c: char| {
-                xml_is_letter(c as u32)
-                    || xml_is_digit(c as u32)
-                    || c == '.'
-                    || c == '-'
-                    || c == '_'
-                    || xml_is_combining(c as u32)
-                    || xml_is_extender(c as u32)
-            });
-            let diff = cur.len() - trimmed.len();
-            let ret = xml_strndup(cur.as_ptr(), diff as i32);
-            self.cur += diff;
-            ret
+        let cur = self.current_str();
+        if !cur.starts_with(|c: char| xml_is_letter(c as u32) || c == '_') {
+            return None;
         }
+        let trimmed = cur.trim_start_matches(|c: char| {
+            xml_is_letter(c as u32)
+                || xml_is_digit(c as u32)
+                || c == '.'
+                || c == '-'
+                || c == '_'
+                || xml_is_combining(c as u32)
+                || xml_is_extender(c as u32)
+        });
+        let diff = cur.len() - trimmed.len();
+        let ret = cur[..diff].to_owned();
+        self.cur += diff;
+        Some(ret)
     }
 
     /// Add a step to an XSLT Compiled Match
@@ -880,11 +787,15 @@ impl XmlPatParserContext {
         &mut self,
         comp: XmlPatternPtr,
         op: XmlPatOp,
-        value: *mut XmlChar,
-        value2: *mut XmlChar,
+        value: Option<&str>,
+        value2: Option<&str>,
     ) -> i32 {
         unsafe {
-            (*comp).steps.push(XmlStepOp { op, value, value2 });
+            (*comp).steps.push(XmlStepOp {
+                op,
+                value: value.map(Rc::from),
+                value2: value2.map(Rc::from),
+            });
             0
         }
     }
@@ -940,14 +851,8 @@ unsafe fn xml_new_stream_comp(mut size: i32) -> XmlStreamCompPtr {
         if cur.is_null() {
             return null_mut();
         }
-        memset(cur as _, 0, size_of::<XmlStreamComp>());
-        (*cur).steps = xml_malloc(size as usize * size_of::<XmlStreamStep>()) as XmlStreamStepPtr;
-        if (*cur).steps.is_null() {
-            xml_free(cur as _);
-            return null_mut();
-        }
-        (*cur).nb_step = 0;
-        (*cur).max_step = size;
+        std::ptr::write(&mut *cur, XmlStreamComp::default());
+        (*cur).steps.reserve(size as usize);
         cur
     }
 }
@@ -958,32 +863,19 @@ unsafe fn xml_new_stream_comp(mut size: i32) -> XmlStreamCompPtr {
 #[doc(alias = "xmlStreamCompAddStep")]
 unsafe fn xml_stream_comp_add_step(
     comp: XmlStreamCompPtr,
-    name: *const XmlChar,
-    ns: *const XmlChar,
+    name: Option<Rc<str>>,
+    ns: Option<Rc<str>>,
     node_type: i32,
     flags: i32,
 ) -> i32 {
     unsafe {
-        let mut cur: XmlStreamStepPtr;
-
-        if (*comp).nb_step >= (*comp).max_step {
-            cur = xml_realloc(
-                (*comp).steps as _,
-                (*comp).max_step as usize * 2 * size_of::<XmlStreamStep>(),
-            ) as XmlStreamStepPtr;
-            if cur.is_null() {
-                return -1;
-            }
-            (*comp).steps = cur;
-            (*comp).max_step *= 2;
-        }
-        cur = (*comp).steps.add((*comp).nb_step as usize);
-        (*comp).nb_step += 1;
-        (*cur).flags = flags;
-        (*cur).name = name;
-        (*cur).ns = ns;
-        (*cur).node_type = node_type;
-        (*comp).nb_step - 1
+        (*comp).steps.push(XmlStreamStep {
+            flags,
+            name,
+            ns,
+            node_type,
+        });
+        (*comp).steps.len() as i32 - 1
     }
 }
 
@@ -1005,8 +897,8 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
         // special case for .
         if (*comp).steps.len() == 1
             && matches!((*comp).steps[0].op, XmlPatOp::XmlOpElem)
-            && (*comp).steps[0].value.is_null()
-            && (*comp).steps[0].value2.is_null()
+            && (*comp).steps[0].value.is_none()
+            && (*comp).steps[0].value2.is_none()
         {
             stream = xml_new_stream_comp(0);
             if stream.is_null() {
@@ -1041,8 +933,8 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                     XmlPatOp::XmlOpNs => {
                         s = xml_stream_comp_add_step(
                             stream,
-                            null(),
-                            step.value,
+                            None,
+                            step.value.clone(),
                             XmlElementType::XmlElementNode as i32,
                             flags,
                         );
@@ -1057,8 +949,8 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                         prevs = -1;
                         s = xml_stream_comp_add_step(
                             stream,
-                            step.value,
-                            step.value2,
+                            step.value.clone(),
+                            step.value2.clone(),
                             XmlElementType::XmlAttributeNode as i32,
                             flags,
                         );
@@ -1068,7 +960,7 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                         }
                     }
                     XmlPatOp::XmlOpElem => 'to_break: {
-                        if step.value.is_null() && step.value2.is_null() {
+                        if step.value.is_none() && step.value2.is_none() {
                             // We have a "." or "self::node()" here.
                             // Eliminate redundant self::node() tests like in "/./."
                             // or "//./"
@@ -1086,8 +978,8 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                                 flags |= XML_STREAM_STEP_NODE as i32;
                                 s = xml_stream_comp_add_step(
                                     stream,
-                                    null(),
-                                    null(),
+                                    None,
+                                    None,
                                     XML_STREAM_ANY_NODE as i32,
                                     flags,
                                 );
@@ -1100,7 +992,7 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                                 // the last step will be marked as "is_final" and only
                                 // "is_final" nodes are added to the resulting set.
                                 if prevs != -1 {
-                                    (*(*stream).steps.add(prevs as usize)).flags |=
+                                    (*stream).steps[prevs as usize].flags |=
                                         XML_STREAM_STEP_IN_SET as i32;
                                     prevs = -1;
                                 }
@@ -1113,8 +1005,8 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                         // An element node.
                         s = xml_stream_comp_add_step(
                             stream,
-                            step.value,
-                            step.value2,
+                            step.value.clone(),
+                            step.value2.clone(),
                             XmlElementType::XmlElementNode as i32,
                             flags,
                         );
@@ -1128,8 +1020,8 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                         // An element node child.
                         s = xml_stream_comp_add_step(
                             stream,
-                            step.value,
-                            step.value2,
+                            step.value.clone(),
+                            step.value2.clone(),
                             XmlElementType::XmlElementNode as i32,
                             flags,
                         );
@@ -1142,8 +1034,8 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                     XmlPatOp::XmlOpAll => {
                         s = xml_stream_comp_add_step(
                             stream,
-                            null(),
-                            null(),
+                            None,
+                            None,
                             XmlElementType::XmlElementNode as i32,
                             flags,
                         );
@@ -1176,18 +1068,18 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                     (*stream).flags |= XML_STREAM_DESC as i32;
                 }
 
-                if (*stream).nb_step > 0
-                    && (*(*stream).steps.add(0)).flags & XML_STREAM_STEP_DESC as i32 == 0
+                if !(*stream).steps.is_empty()
+                    && (*stream).steps[0].flags & XML_STREAM_STEP_DESC as i32 == 0
                 {
-                    (*(*stream).steps.add(0)).flags |= XML_STREAM_STEP_DESC as i32;
+                    (*stream).steps[0].flags |= XML_STREAM_STEP_DESC as i32;
                 }
             }
-            if (*stream).nb_step <= s {
+            if (*stream).steps.len() as i32 <= s {
                 break 'error;
             }
-            (*(*stream).steps.add(s as usize)).flags |= XML_STREAM_STEP_FINAL as i32;
+            (*stream).steps[s as usize].flags |= XML_STREAM_STEP_FINAL as i32;
             if root != 0 {
-                (*(*stream).steps.add(0)).flags |= XML_STREAM_STEP_ROOT as i32;
+                (*stream).steps[0].flags |= XML_STREAM_STEP_ROOT as i32;
             }
             (*comp).stream = stream;
             return 0;
@@ -1211,8 +1103,8 @@ unsafe fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
         (*comp).steps.reverse();
         (*comp).steps.push(XmlStepOp {
             op: XmlPatOp::XmlOpEnd,
-            value: null_mut(),
-            value2: null_mut(),
+            value: None,
+            value2: None,
         });
         0
     }
@@ -1435,27 +1327,21 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                         break 'rollback;
                                     }
                                     let node = XmlNodePtr::try_from(node).unwrap();
-                                    if step.value.is_null() {
+                                    let Some(value) = step.value.as_deref() else {
                                         break 'to_continue;
-                                    }
-                                    if *step.value.add(0) != *node.name.add(0) {
-                                        break 'rollback;
-                                    }
-                                    if !xml_str_equal(step.value, node.name) {
+                                    };
+                                    if Some(value) != node.name().as_deref() {
                                         break 'rollback;
                                     }
 
                                     // Namespace test
                                     if let Some(ns) = node.ns {
-                                        if !ns.href.is_null() {
-                                            if step.value2.is_null() {
-                                                break 'rollback;
-                                            }
-                                            if !xml_str_equal(step.value2, ns.href) {
-                                                break 'rollback;
-                                            }
+                                        if !ns.href.is_null()
+                                            && step.value2.as_deref() != ns.href().as_deref()
+                                        {
+                                            break 'rollback;
                                         }
-                                    } else if !step.value2.is_null() {
+                                    } else if step.value2.is_some() {
                                         break 'rollback;
                                     }
                                     break 'to_continue;
@@ -1472,16 +1358,14 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
 
                                     let mut lst = node.children();
 
-                                    if !step.value.is_null() {
+                                    if let Some(value) = step.value.as_deref() {
                                         while let Some(now) = lst {
                                             if matches!(
                                                 now.element_type(),
                                                 XmlElementType::XmlElementNode
                                             ) {
                                                 let now = XmlNodePtr::try_from(now).unwrap();
-                                                if *step.value.add(0) == *now.name.add(0)
-                                                    && xml_str_equal(step.value, now.name)
-                                                {
+                                                if Some(value) == now.name().as_deref() {
                                                     break;
                                                 }
                                             }
@@ -1501,22 +1385,19 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                         break 'rollback;
                                     }
                                     let node = XmlAttrPtr::try_from(node).unwrap();
-                                    if !step.value.is_null() {
-                                        if *step.value.add(0) != *node.name.add(0) {
-                                            break 'rollback;
-                                        }
-                                        if !xml_str_equal(step.value, node.name) {
+                                    if let Some(value) = step.value.as_deref() {
+                                        if Some(value) != node.name().as_deref() {
                                             break 'rollback;
                                         }
                                     }
                                     // Namespace test
                                     if let Some(ns) = node.ns {
-                                        if !step.value2.is_null()
-                                            && !xml_str_equal(step.value2, ns.href)
+                                        if step.value2.is_some()
+                                            && step.value2.as_deref() != ns.href().as_deref()
                                         {
                                             break 'rollback;
                                         }
-                                    } else if !step.value2.is_null() {
+                                    } else if step.value2.is_some() {
                                         break 'rollback;
                                     }
                                     break 'to_continue;
@@ -1534,35 +1415,29 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                         break 'rollback;
                                     };
                                     node = parent;
-                                    if step.value.is_null() {
+                                    let Some(value) = step.value.as_deref() else {
                                         break 'to_continue;
-                                    }
+                                    };
                                     // Is is correct ??????
                                     let node = XmlNodePtr::try_from(node).unwrap();
-                                    if *step.value.add(0) != *node.name.add(0) {
-                                        break 'rollback;
-                                    }
-                                    if !xml_str_equal(step.value, node.name) {
+                                    if Some(value) != node.name().as_deref() {
                                         break 'rollback;
                                     }
                                     // Namespace test
                                     if let Some(ns) = node.ns {
-                                        if !ns.href.is_null() {
-                                            if step.value2.is_null() {
-                                                break 'rollback;
-                                            }
-                                            if !xml_str_equal(step.value2, ns.href) {
-                                                break 'rollback;
-                                            }
+                                        if !ns.href.is_null()
+                                            && step.value2.as_deref() != ns.href().as_deref()
+                                        {
+                                            break 'rollback;
                                         }
-                                    } else if !step.value2.is_null() {
+                                    } else if step.value2.is_some() {
                                         break 'rollback;
                                     }
                                     break 'to_continue;
                                 }
                                 XmlPatOp::XmlOpAncestor => {
                                     // TODO: implement coalescing of ANCESTOR/NODE ops
-                                    if step.value.is_null() {
+                                    if step.value.is_none() {
                                         i += 1;
                                         step = &(*comp).steps[i];
                                         if matches!(step.op, XmlPatOp::XmlOpRoot) {
@@ -1571,13 +1446,10 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                         if !matches!(step.op, XmlPatOp::XmlOpElem) {
                                             break 'rollback;
                                         }
-                                        if step.value.is_null() {
+                                        if step.value.is_none() {
                                             return -1;
                                         }
                                     }
-                                    // if node.is_null() {
-                                    //     break 'rollback;
-                                    // }
                                     if matches!(
                                         node.element_type(),
                                         XmlElementType::XmlDocumentNode
@@ -1594,18 +1466,16 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                         ) {
                                             let node = XmlNodePtr::try_from(cur_node).unwrap();
 
-                                            if *step.value.add(0) == *node.name.add(0)
-                                                && xml_str_equal(step.value, node.name)
-                                            {
+                                            if step.value.as_deref() == node.name().as_deref() {
                                                 // Namespace test
                                                 if let Some(ns) = node.ns {
                                                     if !ns.href.is_null()
-                                                        && (!step.value2.is_null()
-                                                            && xml_str_equal(step.value2, ns.href))
+                                                        && step.value2.as_deref()
+                                                            == ns.href().as_deref()
                                                     {
                                                         break;
                                                     }
-                                                } else if step.value2.is_null() {
+                                                } else if step.value2.is_none() {
                                                     break;
                                                 }
                                             }
@@ -1638,15 +1508,12 @@ unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlGenericNodePtr) -> i32
                                     }
                                     let node = XmlNodePtr::try_from(node).unwrap();
                                     if let Some(ns) = node.ns {
-                                        if !ns.href.is_null() {
-                                            if step.value.is_null() {
-                                                break 'rollback;
-                                            }
-                                            if !xml_str_equal(step.value, ns.href) {
-                                                break 'rollback;
-                                            }
+                                        if !ns.href.is_null()
+                                            && step.value.as_deref() != ns.href().as_deref()
+                                        {
+                                            break 'rollback;
                                         }
-                                    } else if !step.value.is_null() {
+                                    } else if step.value.is_some() {
                                         break 'rollback;
                                     }
                                 }
@@ -1759,15 +1626,13 @@ pub unsafe fn xml_pattern_max_depth(mut comp: XmlPatternPtr) -> i32 {
                 return -1;
             }
 
-            for i in 0..(*(*comp).stream).nb_step {
-                if (*(*(*comp).stream).steps.add(i as usize)).flags & XML_STREAM_STEP_DESC as i32
-                    != 0
-                {
+            for i in 0..(*(*comp).stream).steps.len() {
+                if (*(*comp).stream).steps[i].flags & XML_STREAM_STEP_DESC as i32 != 0 {
                     return -2;
                 }
             }
-            if (*(*comp).stream).nb_step > ret {
-                ret = (*(*comp).stream).nb_step;
+            if (*(*comp).stream).steps.len() as i32 > ret {
+                ret = (*(*comp).stream).steps.len() as i32;
             }
             comp = (*comp).next;
         }
@@ -1789,8 +1654,8 @@ pub unsafe fn xml_pattern_min_depth(mut comp: XmlPatternPtr) -> i32 {
             if (*comp).stream.is_null() {
                 return -1;
             }
-            if (*(*comp).stream).nb_step < ret {
-                ret = (*(*comp).stream).nb_step;
+            if (*(*comp).stream).steps.len() < ret as usize {
+                ret = (*(*comp).stream).steps.len() as i32;
             }
             if ret == 0 {
                 return 0;
@@ -1963,7 +1828,6 @@ unsafe fn xml_stream_push_internal(
         let mut step_nr: i32;
         let mut desc: i32;
         let mut comp: XmlStreamCompPtr;
-        let mut step: XmlStreamStep;
 
         if stream.is_null() || (*stream).nb_state < 0 {
             return -1;
@@ -1982,16 +1846,16 @@ unsafe fn xml_stream_push_internal(
                     (*stream).level = 0;
                     (*stream).block_level = -1;
                     if (*comp).flags & XML_STREAM_FROM_ROOT as i32 != 0 {
-                        if (*comp).nb_step == 0 {
+                        if (*comp).steps.is_empty() {
                             // TODO: We have a "/." here?
                             ret = 1;
-                        } else if (*comp).nb_step == 1
-                            && (*(*comp).steps.add(0)).node_type == XML_STREAM_ANY_NODE as i32
-                            && (*(*comp).steps.add(0)).flags & XML_STREAM_STEP_DESC as i32 != 0
+                        } else if (*comp).steps.len() == 1
+                            && (*comp).steps[0].node_type == XML_STREAM_ANY_NODE as i32
+                            && (*comp).steps[0].flags & XML_STREAM_STEP_DESC as i32 != 0
                         {
                             // In the case of "//." the document node will is_match as well.
                             ret = 1;
-                        } else if (*(*comp).steps.add(0)).flags & XML_STREAM_STEP_ROOT as i32 != 0 {
+                        } else if (*comp).steps[0].flags & XML_STREAM_STEP_ROOT as i32 != 0 {
                             // TODO: Do we need this ?
                             tmp = xml_stream_ctxt_add_state(stream, 0, 0);
                             if tmp < 0 {
@@ -2004,7 +1868,7 @@ unsafe fn xml_stream_push_internal(
                 }
 
                 // Fast check for ".".
-                if (*comp).nb_step == 0 {
+                if (*comp).steps.is_empty() {
                     // / and . are handled at the XPath node set creation
                     // level by checking min depth
                     if (*stream).flags & XmlPatternFlags::XmlPatternXPath as i32 != 0 {
@@ -2077,14 +1941,14 @@ unsafe fn xml_stream_push_internal(
                             }
 
                             // skip states at ancestor levels, except if "//"
-                            desc = (*(*comp).steps.add(step_nr as usize)).flags
-                                & XML_STREAM_STEP_DESC as i32;
+                            desc =
+                                (*comp).steps[step_nr as usize].flags & XML_STREAM_STEP_DESC as i32;
                             if tmp < (*stream).level && desc == 0 {
                                 break 'next_state;
                             }
                         }
                         // Check for correct node-type.
-                        step = *(*comp).steps.add(step_nr as usize);
+                        let step = &(*comp).steps[step_nr as usize];
                         if step.node_type != node_type {
                             if step.node_type == XmlElementType::XmlAttributeNode as i32 {
                                 // Block this expression for deeper evaluation.
@@ -2100,18 +1964,26 @@ unsafe fn xml_stream_push_internal(
                         is_match = 0;
                         if step.node_type == XML_STREAM_ANY_NODE as i32 {
                             is_match = 1;
-                        } else if step.name.is_null() {
-                            if step.ns.is_null() {
+                        } else if step.name.is_none() {
+                            if step.ns.is_none() {
                                 // This lets through all elements/attributes.
                                 is_match = 1;
                             } else if !ns.is_null() {
-                                is_match = xml_str_equal(step.ns, ns) as i32;
+                                is_match = (step.ns.as_deref()
+                                    == Some(
+                                        CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref(),
+                                    )) as i32;
                             }
-                        } else if step.ns.is_null() == ns.is_null()
+                        } else if step.ns.is_none() == ns.is_null()
                             && !name.is_null()
-                            && *step.name.add(0) == *name.add(0)
-                            && xml_str_equal(step.name, name)
-                            && (step.ns == ns || xml_str_equal(step.ns, ns))
+                            && step.name.as_deref()
+                                == Some(
+                                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                                )
+                            && step.ns.as_deref()
+                                == (!ns.is_null())
+                                    .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
+                                    .as_deref()
                         {
                             is_match = 1;
                         }
@@ -2162,7 +2034,7 @@ unsafe fn xml_stream_push_internal(
                 // Re/enter the expression.
                 // Don't reenter if it's an absolute expression like "/foo",
                 //   except "//foo".
-                step = *(*comp).steps.add(0);
+                let step = &(*comp).steps[0];
                 if step.flags & XML_STREAM_STEP_ROOT as i32 != 0 {
                     break 'stream_next;
                 }
@@ -2207,18 +2079,23 @@ unsafe fn xml_stream_push_internal(
                 is_match = 0;
                 if step.node_type == XML_STREAM_ANY_NODE as i32 {
                     is_match = 1;
-                } else if step.name.is_null() {
-                    if step.ns.is_null() {
+                } else if step.name.is_none() {
+                    if step.ns.is_none() {
                         // This lets through all elements/attributes.
                         is_match = 1;
                     } else if !ns.is_null() {
-                        is_match = xml_str_equal(step.ns, ns) as i32;
+                        is_match = (step.ns.as_deref()
+                            == Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()))
+                            as i32;
                     }
-                } else if step.ns.is_null() == ns.is_null()
+                } else if step.ns.is_none() == ns.is_null()
                     && !name.is_null()
-                    && *step.name.add(0) == *name.add(0)
-                    && xml_str_equal(step.name, name)
-                    && (step.ns == ns || xml_str_equal(step.ns, ns))
+                    && step.name.as_deref()
+                        == Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref())
+                    && step.ns.as_deref()
+                        == (!ns.is_null())
+                            .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
+                            .as_deref()
                 {
                     is_match = 1;
                 }
