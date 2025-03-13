@@ -4236,8 +4236,8 @@ unsafe fn pattern_test(
     unsafe {
         use exml::libxml::{
             pattern::{
-                xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
-                xml_patterncompile, xml_stream_push,
+                xml_free_pattern, xml_free_stream_ctxt, xml_pattern_compile,
+                xml_pattern_get_stream_ctxt, xml_stream_push,
             },
             xmlreader::{xml_free_text_reader, xml_reader_walker},
         };
@@ -4325,8 +4325,10 @@ unsafe fn pattern_test(
                             ns = now.next;
                         }
 
-                        patternc = xml_patterncompile(
-                            str.as_ptr(),
+                        patternc = xml_pattern_compile(
+                            CStr::from_ptr(str.as_ptr() as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
                             0,
                             Some(
                                 namespaces[..j]

@@ -52,7 +52,7 @@ use crate::{
         },
         pattern::{
             XmlPatternFlags, XmlPatternPtr, XmlStreamCtxtPtr, xml_free_pattern,
-            xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile, xml_stream_pop,
+            xml_free_stream_ctxt, xml_pattern_compile, xml_pattern_get_stream_ctxt, xml_stream_pop,
             xml_stream_push, xml_stream_push_attr,
         },
         sax2::xml_sax2_get_line_number,
@@ -5144,14 +5144,18 @@ pub(crate) unsafe fn xml_schema_check_cselector_xpath(
             }
             // TODO: Differentiate between "selector" and "field".
             if is_field != 0 {
-                (*selector).xpath_comp = xml_patterncompile(
-                    (*selector).xpath,
+                (*selector).xpath_comp = xml_pattern_compile(
+                    CStr::from_ptr((*selector).xpath as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
                     XmlPatternFlags::XmlPatternXSField as i32,
                     ns_array,
                 ) as _;
             } else {
-                (*selector).xpath_comp = xml_patterncompile(
-                    (*selector).xpath,
+                (*selector).xpath_comp = xml_pattern_compile(
+                    CStr::from_ptr((*selector).xpath as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
                     XmlPatternFlags::XmlPatternXSSel as i32,
                     ns_array,
                 ) as _;

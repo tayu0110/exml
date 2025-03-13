@@ -53,7 +53,7 @@ use crate::{
             XML_SAX2_MAGIC, XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler,
             xml_create_push_parser_ctxt, xml_ctxt_use_options, xml_parse_chunk,
         },
-        pattern::{XmlPatternPtr, xml_free_pattern, xml_pattern_match, xml_patterncompile},
+        pattern::{XmlPatternPtr, xml_free_pattern, xml_pattern_compile, xml_pattern_match},
         relaxng::{
             XmlRelaxNGPtr, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_set_valid_structured_errors, xml_relaxng_validate_full_element,
@@ -2735,11 +2735,7 @@ impl XmlTextReader {
         namespaces: Option<Vec<(String, Option<String>)>>,
     ) -> i32 {
         unsafe {
-            use std::ffi::CString;
-
-            let pattern = CString::new(pattern).unwrap();
-            let comp: XmlPatternPtr =
-                xml_patterncompile(pattern.as_ptr() as *const u8, 0, namespaces);
+            let comp: XmlPatternPtr = xml_pattern_compile(pattern, 0, namespaces);
             if comp.is_null() {
                 return -1;
             }

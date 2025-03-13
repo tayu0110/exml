@@ -57,7 +57,7 @@ use exml::{
             xml_create_push_parser_ctxt, xml_ctxt_use_options, xml_get_external_entity_loader,
             xml_parse_chunk, xml_parse_dtd, xml_set_external_entity_loader,
         },
-        pattern::{XmlPattern, XmlStreamCtxt, xml_free_pattern, xml_patterncompile},
+        pattern::{XmlPattern, XmlStreamCtxt, xml_free_pattern, xml_pattern_compile},
         relaxng::{
             XmlRelaxNG, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_validate_doc,
@@ -743,11 +743,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
     if cmd_args.pattern.is_some() && !cmd_args.walker {
         if let Some(p) = cmd_args.pattern.as_deref() {
             unsafe {
-                let pattern = CString::new(p).unwrap();
-                PATTERNC.store(
-                    xml_patterncompile(p.as_ptr() as _, 0, None),
-                    Ordering::Relaxed,
-                );
+                PATTERNC.store(xml_pattern_compile(p, 0, None), Ordering::Relaxed);
                 if PATTERNC.load(Ordering::Relaxed).is_null() {
                     generic_error!("Pattern {p} failed to compile\n");
                     PROGRESULT.store(ERR_SCHEMAPAT, Ordering::Relaxed);
@@ -2311,7 +2307,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
 
         use exml::libxml::{
             pattern::{
-                xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile,
+                xml_free_stream_ctxt, xml_pattern_compile, xml_pattern_get_stream_ctxt,
                 xml_stream_push,
             },
             xmlreader::{xml_free_text_reader, xml_reader_walker},
@@ -2337,10 +2333,9 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             }
 
             if let Some(pattern) = CMD_ARGS.path.as_deref() {
-                let cpattern = CString::new(pattern).unwrap();
                 PATTERNC.store(
-                    xml_patterncompile(
-                        cpattern.as_ptr() as *const u8,
+                    xml_pattern_compile(
+                        pattern,
                         0,
                         Some(
                             namespaces[..i]

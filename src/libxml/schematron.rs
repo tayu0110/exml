@@ -52,7 +52,7 @@ use super::{
     globals::{xml_free, xml_malloc},
     parser::XmlParserOption,
     pattern::{
-        XmlPatternFlags, XmlPatternPtr, xml_free_pattern, xml_pattern_match, xml_patterncompile,
+        XmlPatternFlags, XmlPatternPtr, xml_free_pattern, xml_pattern_compile, xml_pattern_match,
     },
     xmlstring::{XmlChar, xml_strcat, xml_strdup, xml_strlen},
 };
@@ -615,8 +615,10 @@ unsafe fn xml_schematron_add_rule(
         }
 
         // Try first to compile the pattern
-        let pattern: XmlPatternPtr = xml_patterncompile(
-            context,
+        let pattern: XmlPatternPtr = xml_pattern_compile(
+            CStr::from_ptr(context as *const i8)
+                .to_string_lossy()
+                .as_ref(),
             XmlPatternFlags::XmlPatternXPath as i32,
             (*ctxt).namespaces.as_deref().map(|ns| {
                 ns.iter()

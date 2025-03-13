@@ -46,9 +46,9 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_realloc},
         pattern::{
             XmlPatternFlags, XmlPatternPtr, XmlStreamCtxtPtr, xml_free_pattern,
-            xml_free_stream_ctxt, xml_pattern_from_root, xml_pattern_get_stream_ctxt,
-            xml_pattern_max_depth, xml_pattern_min_depth, xml_pattern_streamable,
-            xml_patterncompile, xml_stream_pop, xml_stream_push, xml_stream_push_node,
+            xml_free_stream_ctxt, xml_pattern_compile, xml_pattern_from_root,
+            xml_pattern_get_stream_ctxt, xml_pattern_max_depth, xml_pattern_min_depth,
+            xml_pattern_streamable, xml_stream_pop, xml_stream_push, xml_stream_push_node,
             xml_stream_wants_any_node,
         },
         valid::xml_get_id,
@@ -1284,12 +1284,8 @@ pub unsafe fn xml_xpath_try_stream_compile(
                 }
             }
 
-            let xpath = CString::new(xpath).unwrap();
-            stream = xml_patterncompile(
-                xpath.as_ptr() as *const u8,
-                XmlPatternFlags::XmlPatternXPath as i32,
-                namespaces,
-            );
+            stream =
+                xml_pattern_compile(xpath, XmlPatternFlags::XmlPatternXPath as i32, namespaces);
             if !stream.is_null() && xml_pattern_streamable(stream) == 1 {
                 comp = xml_xpath_new_comp_expr();
                 if comp.is_null() {
