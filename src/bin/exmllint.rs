@@ -67,7 +67,7 @@ use exml::{
             XmlSchematron, XmlSchematronParserCtxtPtr, XmlSchematronValidCtxtPtr,
             XmlSchematronValidOptions, xml_schematron_free, xml_schematron_free_parser_ctxt,
             xml_schematron_free_valid_ctxt, xml_schematron_new_parser_ctxt,
-            xml_schematron_new_valid_ctxt, xml_schematron_parse, xml_schematron_validate_doc,
+            xml_schematron_new_valid_ctxt,
         },
         valid::{
             xml_free_valid_ctxt, xml_new_valid_ctxt, xml_valid_get_valid_elements,
@@ -656,7 +656,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                     xml_memory_dump();
                     exit(PROGRESULT.load(Ordering::Relaxed));
                 }
-                WXSCHEMATRON.store(xml_schematron_parse(ctxt), Ordering::Relaxed);
+                WXSCHEMATRON.store((*ctxt).parse(), Ordering::Relaxed);
                 if WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
                     generic_error!("Schematron schema {s} failed to compile\n",);
                     PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
@@ -3200,7 +3200,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 xml_free_doc(doc);
                 return;
             }
-            match xml_schematron_validate_doc(ctxt, doc).cmp(&0) {
+            match (*ctxt).validate_doc(doc).cmp(&0) {
                 std::cmp::Ordering::Equal => {
                     if !CMD_ARGS.quiet {
                         eprintln!("{} validates", filename.unwrap());

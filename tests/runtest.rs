@@ -4022,8 +4022,7 @@ unsafe fn schematron_one_test(
     unsafe {
         use exml::libxml::schematron::{
             XmlSchematronValidOptions, xml_schematron_free_valid_ctxt,
-            xml_schematron_new_valid_ctxt, xml_schematron_set_valid_structured_errors,
-            xml_schematron_validate_doc,
+            xml_schematron_new_valid_ctxt,
         };
 
         let Some(doc) = xml_read_file(filename, None, options) else {
@@ -4035,8 +4034,8 @@ unsafe fn schematron_one_test(
             schematron,
             XmlSchematronValidOptions::XmlSchematronOutError as i32,
         );
-        xml_schematron_set_valid_structured_errors(ctxt, Some(test_structured_error_handler), None);
-        let ret = xml_schematron_validate_doc(ctxt, doc);
+        (*ctxt).set_structured_errors(Some(test_structured_error_handler), None);
+        let ret = (*ctxt).validate_doc(doc);
         match ret.cmp(&0) {
             std::cmp::Ordering::Equal => {
                 test_error_handler(None, &format!("{} validates\n", filename));
@@ -4071,7 +4070,6 @@ unsafe fn schematron_test(
 
         use exml::libxml::schematron::{
             xml_schematron_free, xml_schematron_free_parser_ctxt, xml_schematron_new_parser_ctxt,
-            xml_schematron_parse,
         };
         use libc::{GLOB_DOOFFS, glob_t};
 
@@ -4080,7 +4078,7 @@ unsafe fn schematron_test(
         let mut globbuf: glob_t = zeroed();
 
         let pctxt = xml_schematron_new_parser_ctxt(filename);
-        let schematron = xml_schematron_parse(pctxt);
+        let schematron = (*pctxt).parse();
         xml_schematron_free_parser_ctxt(pctxt);
         if schematron.is_null() {
             test_error_handler(
