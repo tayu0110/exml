@@ -36,7 +36,7 @@ use crate::tree::{NodeCommon, XmlAttrPtr};
 use crate::{
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        globals::{xml_free, xml_malloc, xml_realloc},
+        globals::{xml_free, xml_malloc},
         parser_internals::xml_is_letter,
         xmlstring::XmlChar,
     },
@@ -1511,13 +1511,17 @@ pub type XmlStreamCtxtPtr = *mut XmlStreamCtxt;
 #[doc(alias = "xmlStreamCtxt")]
 #[repr(C)]
 pub struct XmlStreamCtxt {
-    next: *mut XmlStreamCtxt, /* link to next sub pattern if | */
-    comp: XmlStreamCompPtr,   /* the compiled stream */
-    nb_state: i32,            /* number of states in the automata */
-    max_state: i32,           /* allocated number of states */
-    level: i32,               /* how deep are we ? */
-    states: *mut i32,         /* the array of step indexes */
-    flags: i32,               /* validation options */
+    // link to next sub pattern if |
+    next: *mut XmlStreamCtxt,
+    // the compiled stream
+    comp: XmlStreamCompPtr,
+    // how deep are we ?
+    level: i32,
+    // the array of step indexes
+    // (index, level)
+    states: Vec<(i32, i32)>,
+    // validation options
+    flags: i32,
     block_level: i32,
 }
 
@@ -1526,31 +1530,15 @@ impl XmlStreamCtxt {
     ///
     /// Returns -1 in case of error or the state index if successful
     #[doc(alias = "xmlStreamCtxtAddState")]
-    unsafe fn add_state(&mut self, idx: i32, level: i32) -> i32 {
-        unsafe {
-            for i in 0..self.nb_state {
-                if *self.states.add(2 * i as usize) < 0 {
-                    *self.states.add(2 * i as usize) = idx;
-                    *self.states.add(2 * i as usize + 1) = level;
-                    return i;
-                }
+    fn add_state(&mut self, idx: i32, level: i32) -> i32 {
+        for i in 0..self.states.len() {
+            if self.states[i].0 < 0 {
+                self.states[i] = (idx, level);
+                return i as i32;
             }
-            if self.nb_state >= self.max_state {
-                let cur: *mut i32 = xml_realloc(
-                    self.states as _,
-                    self.max_state as usize * 4 * size_of::<i32>(),
-                ) as *mut i32;
-                if cur.is_null() {
-                    return -1;
-                }
-                self.states = cur;
-                self.max_state *= 2;
-            }
-            *self.states.add(2 * self.nb_state as usize) = idx;
-            *self.states.add(2 * self.nb_state as usize + 1) = level;
-            self.nb_state += 1;
-            self.nb_state - 1
         }
+        self.states.push((idx, level));
+        self.states.len() as i32 - 1
     }
 
     /// Push new data onto the stream. NOTE: if the call xmlPatterncompile()
@@ -1579,10 +1567,6 @@ impl XmlStreamCtxt {
             let mut desc: i32;
             let mut comp: XmlStreamCompPtr;
 
-            if self.nb_state < 0 {
-                return -1;
-            }
-
             let mut now = Some(self);
             'stream: while let Some(stream) = now {
                 'stream_next: {
@@ -1593,7 +1577,7 @@ impl XmlStreamCtxt {
                         && ns.is_null()
                     {
                         // We have a document node here (or a reset).
-                        stream.nb_state = 0;
+                        stream.states.clear();
                         stream.level = 0;
                         stream.block_level = -1;
                         if (*comp).flags & XML_STREAM_FROM_ROOT as i32 != 0 {
@@ -1656,17 +1640,15 @@ impl XmlStreamCtxt {
 
                     // Check evolution of existing states
                     i = 0;
-                    m = stream.nb_state;
+                    m = stream.states.len() as i32;
                     while i < m {
                         'next_state: {
                             if (*comp).flags & XML_STREAM_DESC as i32 == 0 {
                                 // If there is no "//", then only the last
                                 // added state is of interest.
-                                step_nr = *stream.states.add(2 * (stream.nb_state - 1) as usize);
+                                step_nr = stream.states.last().unwrap().0;
                                 // TODO: Security check, should not happen, remove it.
-                                if *stream.states.add((2 * (stream.nb_state - 1) as usize) + 1)
-                                    < stream.level
-                                {
+                                if stream.states.last().unwrap().1 < stream.level {
                                     return -1;
                                 }
                                 // desc = 0;
@@ -1675,14 +1657,14 @@ impl XmlStreamCtxt {
                             } else {
                                 // If there are "//", then we need to process every "//"
                                 // occurring in the states, plus any other state for this level.
-                                step_nr = *stream.states.add(2 * i as usize);
+                                step_nr = stream.states[i as usize].0;
 
                                 // TODO: should not happen anymore: dead states
                                 if step_nr < 0 {
                                     break 'next_state;
                                 }
 
-                                tmp = *stream.states.add((2 * i) as usize + 1);
+                                tmp = stream.states[i as usize].1;
 
                                 // skip new states just added
                                 if tmp > stream.level {
@@ -1937,8 +1919,6 @@ impl XmlStreamCtxt {
     #[doc(alias = "xmlStreamPop")]
     pub unsafe fn pop(&mut self) -> i32 {
         unsafe {
-            let mut lev: i32;
-
             let mut now = Some(self);
             while let Some(stream) = now {
                 // Reset block-level.
@@ -1953,15 +1933,12 @@ impl XmlStreamCtxt {
                     stream.level -= 1;
                 }
                 // Check evolution of existing states
-                for i in (0..stream.nb_state).rev() {
-                    // discard obsoleted states
-                    lev = *stream.states.add((2 * i) as usize + 1);
-                    if lev > stream.level {
-                        stream.nb_state -= 1;
-                    }
-                    if lev <= stream.level {
-                        break;
-                    }
+                while stream
+                    .states
+                    .last()
+                    .is_some_and(|state| state.1 > stream.level)
+                {
+                    stream.states.pop();
                 }
                 now = (!stream.next.is_null()).then(|| &mut *stream.next);
             }
@@ -1996,10 +1973,8 @@ impl Default for XmlStreamCtxt {
         Self {
             next: null_mut(),
             comp: null_mut(),
-            nb_state: 0,
-            max_state: 0,
             level: 0,
-            states: null_mut(),
+            states: vec![],
             flags: 0,
             block_level: 0,
         }
@@ -2017,13 +1992,7 @@ unsafe fn xml_new_stream_ctxt(stream: XmlStreamCompPtr) -> XmlStreamCtxtPtr {
             return null_mut();
         }
         std::ptr::write(&mut *cur, XmlStreamCtxt::default());
-        (*cur).states = xml_malloc(4 * 2 * size_of::<i32>()) as *mut i32;
-        if (*cur).states.is_null() {
-            xml_free(cur as _);
-            return null_mut();
-        }
-        (*cur).nb_state = 0;
-        (*cur).max_state = 4;
+        (*cur).states.reserve(4);
         (*cur).level = 0;
         (*cur).comp = stream;
         (*cur).block_level = -1;
@@ -2039,9 +2008,7 @@ pub unsafe fn xml_free_stream_ctxt(mut stream: XmlStreamCtxtPtr) {
 
         while !stream.is_null() {
             next = (*stream).next;
-            if !(*stream).states.is_null() {
-                xml_free((*stream).states as _);
-            }
+            drop_in_place(stream);
             xml_free(stream as _);
             stream = next;
         }
