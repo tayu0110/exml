@@ -1,6 +1,6 @@
 //! Provide methods and data structures for XML Schematron.  
-//! This module is based on `libxml/schematron.h`, `schematron.c`, and so on in `libxml2-v2.11.8`.
 //!
+//! This module is based on `libxml/schematron.h`, `schematron.c`, and so on in `libxml2-v2.11.8`.  
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
@@ -65,7 +65,7 @@ pub enum XmlSchematronValidOptions {
     XmlSchematronOutError = 1 << 3,  /* output via xmlStructuredErrorFunc */
     XmlSchematronOutFile = 1 << 8,   /* output to a file descriptor */
     XmlSchematronOutBuffer = 1 << 9, /* output to a buffer */
-    XmlSchematronOutIo = 1 << 10,    /* output to I/O mechanism */
+    XmlSchematronOutIO = 1 << 10,    /* output to I/O mechanism */
 }
 
 /// Signature of an error callback from a Schematron validation
@@ -232,7 +232,7 @@ pub type XmlSchematronParserCtxtPtr = *mut XmlSchematronParserCtxt;
 #[repr(C)]
 pub struct XmlSchematronParserCtxt {
     typ: i32,
-    url: *const XmlChar,
+    url: Option<String>,
     doc: Option<XmlDocPtr>,
     preserve: i32, /* Whether the doc should be freed  */
     buffer: *const c_char,
@@ -260,7 +260,7 @@ impl Default for XmlSchematronParserCtxt {
     fn default() -> Self {
         Self {
             typ: 0,
-            url: null_mut(),
+            url: None,
             doc: None,
             preserve: 0,
             buffer: null_mut(),
@@ -311,12 +311,8 @@ unsafe fn xml_schematron_perr_memory(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchematronNewParserCtxt")]
-pub unsafe fn xml_schematron_new_parser_ctxt(url: *const c_char) -> XmlSchematronParserCtxtPtr {
+pub unsafe fn xml_schematron_new_parser_ctxt(url: &str) -> XmlSchematronParserCtxtPtr {
     unsafe {
-        if url.is_null() {
-            return null_mut();
-        }
-
         let ret: XmlSchematronParserCtxtPtr =
             xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
         if ret.is_null() {
@@ -326,7 +322,7 @@ pub unsafe fn xml_schematron_new_parser_ctxt(url: *const c_char) -> XmlSchematro
         std::ptr::write(&mut *ret, XmlSchematronParserCtxt::default());
         (*ret).typ = XML_STRON_CTXT_PARSER;
         (*ret).dict = xml_dict_create();
-        (*ret).url = xml_dict_lookup((*ret).dict, url as _, -1);
+        (*ret).url = Some(url.to_owned());
         (*ret).xctxt = xml_xpath_new_context(None);
         if (*ret).xctxt.is_null() {
             xml_schematron_perr_memory(null_mut(), "allocating schema parser XPath context", None);
@@ -1095,9 +1091,8 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
         (*ctxt).nberrors = 0;
 
         // First step is to parse the input document into an DOM/Infoset
-        let doc = if !(*ctxt).url.is_null() {
-            let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
-            let Some(doc) = xml_read_file(&url, None, SCHEMATRON_PARSE_OPTIONS as i32) else {
+        let doc = if let Some(url) = (*ctxt).url.as_deref() {
+            let Some(doc) = xml_read_file(url, None, SCHEMATRON_PARSE_OPTIONS as i32) else {
                 xml_schematron_perr!(
                     ctxt,
                     None::<XmlGenericNodePtr>,
@@ -1122,7 +1117,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 return null_mut();
             };
             doc.url = Some("in_memory_buffer".to_owned());
-            (*ctxt).url = xml_dict_lookup((*ctxt).dict, c"in_memory_buffer".as_ptr() as _, -1);
+            (*ctxt).url = Some("in_memory_buffer".to_owned());
             (*ctxt).preserve = 0;
             doc
         } else if let Some(doc) = (*ctxt).doc {
@@ -1154,13 +1149,12 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
         };
 
         if !is_schematron(root, "schema") {
-            let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
             xml_schematron_perr!(
                 ctxt,
                 Some(root.into()),
                 XmlParserErrors::XmlSchemapNoroot,
                 "The XML document '{}' is not a XML schematron document",
-                url
+                (*ctxt).url.as_deref().unwrap()
             );
             // goto exit;
         } else {
@@ -1241,13 +1235,12 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                     cur = next_schematron(cur);
                 }
                 if (*ret).nb_pattern == 0 {
-                    let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
                     xml_schematron_perr!(
                         ctxt,
                         Some(root.into()),
                         XmlParserErrors::XmlSchemapNoroot,
                         "The schematron document '{}' has no pattern",
-                        url
+                        (*ctxt).url.as_deref().unwrap()
                     );
                 // goto exit;
                 } else {

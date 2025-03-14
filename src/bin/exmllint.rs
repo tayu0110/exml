@@ -648,8 +648,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                 }
             }
             unsafe {
-                let s = CString::new(s).unwrap();
-                let ctxt: XmlSchematronParserCtxtPtr = xml_schematron_new_parser_ctxt(s.as_ptr());
+                let ctxt: XmlSchematronParserCtxtPtr = xml_schematron_new_parser_ctxt(s);
                 if ctxt.is_null() {
                     PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;
@@ -659,10 +658,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                 }
                 WXSCHEMATRON.store(xml_schematron_parse(ctxt), Ordering::Relaxed);
                 if WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
-                    generic_error!(
-                        "Schematron schema {} failed to compile\n",
-                        s.to_string_lossy()
-                    );
+                    generic_error!("Schematron schema {s} failed to compile\n",);
                     PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
                 }
                 xml_schematron_free_parser_ctxt(ctxt);

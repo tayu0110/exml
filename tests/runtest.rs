@@ -4075,12 +4075,11 @@ unsafe fn schematron_test(
         };
         use libc::{GLOB_DOOFFS, glob_t};
 
-        let cfilename = CString::new(filename).unwrap();
         let base = base_filename(filename);
         let mut ret = 0;
         let mut globbuf: glob_t = zeroed();
 
-        let pctxt = xml_schematron_new_parser_ctxt(cfilename.as_ptr());
+        let pctxt = xml_schematron_new_parser_ctxt(filename);
         let schematron = xml_schematron_parse(pctxt);
         xml_schematron_free_parser_ctxt(pctxt);
         if schematron.is_null() {
