@@ -32,6 +32,11 @@ use std::{
 
 use libc::{memset, strchr};
 
+#[cfg(feature = "libxml_pattern")]
+use crate::libxml::pattern::{
+    XmlPattern, XmlPatternFlags, XmlStreamCtxtPtr, xml_free_stream_ctxt, xml_pattern_compile,
+    xml_stream_pop, xml_stream_push, xml_stream_push_attr,
+};
 use crate::{
     encoding::XmlCharEncoding,
     error::{XmlErrorDomain, XmlParserErrors},
@@ -49,11 +54,6 @@ use crate::{
         parser::{
             XML_SAX2_MAGIC, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr,
             xml_new_io_input_stream, xml_parse_document,
-        },
-        pattern::{
-            XmlPatternFlags, XmlPatternPtr, XmlStreamCtxtPtr, xml_free_pattern,
-            xml_free_stream_ctxt, xml_pattern_compile, xml_pattern_get_stream_ctxt, xml_stream_pop,
-            xml_stream_push, xml_stream_push_attr,
         },
         sax2::xml_sax2_get_line_number,
         schemas_internals::{
@@ -660,7 +660,7 @@ pub struct XmlSchemaIdcselect {
     idc: XmlSchemaIDCPtr,
     pub(crate) index: i32, /* an index position if significant for IDC key-sequences */
     pub(crate) xpath: *const XmlChar, /* the XPath expression */
-    xpath_comp: *mut c_void, /* the compiled XPath expression */
+    xpath_comp: Option<Box<XmlPattern>>, /* the compiled XPath expression */
 }
 
 #[doc(alias = "xmlSchemaIDCAugPtr")]
@@ -2806,9 +2806,7 @@ unsafe fn xml_schema_free_idc(idc_def: XmlSchemaIDCPtr) {
         }
         // Selector
         if !(*idc_def).selector.is_null() {
-            if !(*(*idc_def).selector).xpath_comp.is_null() {
-                xml_free_pattern((*(*idc_def).selector).xpath_comp as XmlPatternPtr);
-            }
+            (*(*idc_def).selector).xpath_comp.take();
             xml_free((*idc_def).selector as _);
         }
         // Fields
@@ -2817,9 +2815,7 @@ unsafe fn xml_schema_free_idc(idc_def: XmlSchemaIDCPtr) {
             while {
                 prev = cur;
                 cur = (*cur).next;
-                if !(*prev).xpath_comp.is_null() {
-                    xml_free_pattern((*prev).xpath_comp as XmlPatternPtr);
-                }
+                (*prev).xpath_comp.take();
                 xml_free(prev as _);
 
                 !cur.is_null()
@@ -5161,7 +5157,7 @@ pub(crate) unsafe fn xml_schema_check_cselector_xpath(
                 ) as _;
             }
 
-            if (*selector).xpath_comp.is_null() {
+            if (*selector).xpath_comp.is_none() {
                 let xpath = CStr::from_ptr((*selector).xpath as *const i8).to_string_lossy();
                 // TODO: Adjust error code?
                 xml_schema_pcustom_err(
@@ -14862,8 +14858,7 @@ unsafe fn xml_schema_idc_add_state_object(
         }
 
         // Create a new XPath (pattern) validation context.
-        (*sto).xpath_ctxt =
-            xml_pattern_get_stream_ctxt((*sel).xpath_comp as XmlPatternPtr) as *mut c_void;
+        (*sto).xpath_ctxt = (*sel).xpath_comp.as_ref().unwrap().get_stream_context() as *mut c_void;
         if (*sto).xpath_ctxt.is_null() {
             VERROR_INT!(
                 vctxt,

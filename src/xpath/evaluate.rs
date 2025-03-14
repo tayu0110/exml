@@ -123,13 +123,12 @@ impl XmlXPathParserContext {
             }
 
             #[cfg(feature = "libxml_pattern")]
-            if !(*self.comp).stream.is_null() {
+            if let Some(stream) = (*self.comp).stream.as_deref() {
                 let res: i32;
 
                 if to_bool != 0 {
                     // Evaluation to boolean result.
-                    res =
-                        xml_xpath_run_stream_eval(self.context, (*self.comp).stream, null_mut(), 1);
+                    res = xml_xpath_run_stream_eval(self.context, stream, null_mut(), 1);
                     if res != -1 {
                         return res;
                     }
@@ -137,12 +136,7 @@ impl XmlXPathParserContext {
                     let mut res_obj: XmlXPathObjectPtr = null_mut();
 
                     // Evaluation to a sequence.
-                    res = xml_xpath_run_stream_eval(
-                        self.context,
-                        (*self.comp).stream,
-                        &raw mut res_obj,
-                        0,
-                    );
+                    res = xml_xpath_run_stream_eval(self.context, stream, &raw mut res_obj, 0);
 
                     if res != -1 && !res_obj.is_null() {
                         self.value_push(res_obj);

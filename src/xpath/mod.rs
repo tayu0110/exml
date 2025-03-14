@@ -60,12 +60,13 @@ use std::{
 
 use libc::memset;
 
+#[cfg(feature = "libxml_pattern")]
+use crate::libxml::pattern::XmlPattern;
 use crate::{
     generic_error,
     libxml::{
         globals::{xml_free, xml_malloc},
         parser::xml_init_parser,
-        pattern::{XmlPatternPtr, xml_free_pattern_list},
         xmlstring::XmlChar,
     },
     tree::{XmlDocPtr, XmlElementType, XmlGenericNodePtr},
@@ -278,7 +279,7 @@ pub struct XmlXPathCompExpr {
     pub(crate) last: i32,                  /* index of last step in expression */
     pub(crate) expr: *mut XmlChar,         /* the expression being computed */
     #[cfg(feature = "libxml_pattern")]
-    pub(crate) stream: XmlPatternPtr,
+    pub(crate) stream: Option<Box<XmlPattern>>,
 }
 
 impl Default for XmlXPathCompExpr {
@@ -287,7 +288,7 @@ impl Default for XmlXPathCompExpr {
             steps: vec![],
             last: 0,
             expr: null_mut(),
-            stream: null_mut(),
+            stream: None,
         }
     }
 }
@@ -1221,8 +1222,8 @@ pub unsafe fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
             }
         }
         #[cfg(feature = "libxml_pattern")]
-        if !(*comp).stream.is_null() {
-            xml_free_pattern_list((*comp).stream);
+        {
+            (*comp).stream.take();
         }
         if !(*comp).expr.is_null() {
             xml_free((*comp).expr as _);

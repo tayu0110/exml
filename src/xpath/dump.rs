@@ -510,7 +510,7 @@ pub unsafe fn xml_xpath_debug_dump_comp_expr<'a>(
 
         write!(output, "{}", shift).ok();
 
-        if !(*comp).stream.is_null() {
+        if (*comp).stream.is_some() {
             writeln!(output, "Streaming Expression").ok();
         } else {
             writeln!(

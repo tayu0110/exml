@@ -51,9 +51,7 @@ use super::{
     dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference},
     globals::{xml_free, xml_malloc},
     parser::XmlParserOption,
-    pattern::{
-        XmlPatternFlags, XmlPatternPtr, xml_free_pattern, xml_pattern_compile, xml_pattern_match,
-    },
+    pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile},
     xmlstring::{XmlChar, xml_strcat, xml_strdup, xml_strlen},
 };
 
@@ -112,14 +110,14 @@ pub type XmlSchematronRulePtr = *mut XmlSchematronRule;
 #[doc(alias = "xmlSchematronRule")]
 #[repr(C)]
 pub struct XmlSchematronRule {
-    next: XmlSchematronRulePtr,    /* the next rule in the list */
-    patnext: XmlSchematronRulePtr, /* the next rule in the pattern list */
-    node: Option<XmlNodePtr>,      /* the node in the tree */
-    context: *mut XmlChar,         /* the context evaluation rule */
-    tests: XmlSchematronTestPtr,   /* the list of tests */
-    pattern: XmlPatternPtr,        /* the compiled pattern associated */
-    report: *mut XmlChar,          /* the message to report */
-    lets: XmlSchematronLetPtr,     /* the list of let variables */
+    next: XmlSchematronRulePtr,       /* the next rule in the list */
+    patnext: XmlSchematronRulePtr,    /* the next rule in the pattern list */
+    node: Option<XmlNodePtr>,         /* the node in the tree */
+    context: *mut XmlChar,            /* the context evaluation rule */
+    tests: XmlSchematronTestPtr,      /* the list of tests */
+    pattern: Option<Box<XmlPattern>>, /* the compiled pattern associated */
+    report: *mut XmlChar,             /* the message to report */
+    lets: XmlSchematronLetPtr,        /* the list of let variables */
 }
 
 pub type XmlSchematronPatternPtr = *mut XmlSchematronPattern;
@@ -615,7 +613,7 @@ unsafe fn xml_schematron_add_rule(
         }
 
         // Try first to compile the pattern
-        let pattern: XmlPatternPtr = xml_pattern_compile(
+        let pattern = xml_pattern_compile(
             CStr::from_ptr(context as *const i8)
                 .to_string_lossy()
                 .as_ref(),
@@ -637,7 +635,7 @@ unsafe fn xml_schematron_add_rule(
                     .collect()
             }),
         );
-        if pattern.is_null() {
+        if pattern.is_none() {
             let context = CStr::from_ptr(context as *const i8).to_string_lossy();
             xml_schematron_perr!(
                 ctxt,
@@ -1335,9 +1333,7 @@ unsafe fn xml_schematron_free_rules(mut rules: XmlSchematronRulePtr) {
             if !(*rules).context.is_null() {
                 xml_free((*rules).context as _);
             }
-            if !(*rules).pattern.is_null() {
-                xml_free_pattern((*rules).pattern);
-            }
+            (*rules).pattern.take();
             if !(*rules).report.is_null() {
                 xml_free((*rules).report as _);
             }
@@ -1979,7 +1975,13 @@ pub unsafe fn xml_schematron_validate_doc(
             while let Some(cur_node) = cur {
                 rule = (*(*ctxt).schema).rules;
                 while !rule.is_null() {
-                    if xml_pattern_match((*rule).pattern, cur_node.into()) == 1 {
+                    if (*rule)
+                        .pattern
+                        .as_deref()
+                        .unwrap()
+                        .pattern_match(cur_node.into())
+                        == 1
+                    {
                         test = (*rule).tests;
 
                         if xml_schematron_register_variables(
@@ -1998,7 +2000,10 @@ pub unsafe fn xml_schematron_validate_doc(
                                 test,
                                 instance,
                                 cur_node,
-                                (*rule).pattern as XmlSchematronPatternPtr,
+                                // What is this ????
+                                // XmlPattern and XmlSchematronPattern are not compatible...
+                                // (*rule).pattern as XmlSchematronPatternPtr,
+                                null_mut(),
                             );
                             test = (*test).next;
                         }
@@ -2027,7 +2032,13 @@ pub unsafe fn xml_schematron_validate_doc(
                 while let Some(cur_node) = cur {
                     rule = (*pattern).rules;
                     while !rule.is_null() {
-                        if xml_pattern_match((*rule).pattern, cur_node.into()) == 1 {
+                        if (*rule)
+                            .pattern
+                            .as_deref()
+                            .unwrap()
+                            .pattern_match(cur_node.into())
+                            == 1
+                        {
                             test = (*rule).tests;
                             xml_schematron_register_variables(
                                 (*ctxt).xctxt,

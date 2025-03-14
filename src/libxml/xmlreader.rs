@@ -32,6 +32,8 @@ use std::{
     sync::atomic::Ordering,
 };
 
+#[cfg(feature = "libxml_pattern")]
+use crate::libxml::pattern::{XmlPattern, xml_pattern_compile};
 #[cfg(feature = "schema")]
 use crate::relaxng::{XmlRelaxNGValidCtxtPtr, xml_relaxng_new_parser_ctxt};
 #[cfg(feature = "libxml_reader")]
@@ -53,7 +55,6 @@ use crate::{
             XML_SAX2_MAGIC, XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler,
             xml_create_push_parser_ctxt, xml_ctxt_use_options, xml_parse_chunk,
         },
-        pattern::{XmlPatternPtr, xml_free_pattern, xml_pattern_compile, xml_pattern_match},
         relaxng::{
             XmlRelaxNGPtr, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_set_valid_structured_errors, xml_relaxng_validate_full_element,
@@ -317,7 +318,7 @@ pub struct XmlTextReader {
     // pattern_max: i32,
     // array of preserve patterns
     #[cfg(feature = "libxml_pattern")]
-    pattern_tab: Vec<XmlPatternPtr>,
+    pattern_tab: Vec<XmlPattern>,
     // level of preserves
     preserves: i32,
     // the set of options set
@@ -758,8 +759,8 @@ impl XmlTextReader {
                     XmlTextReaderState::End | XmlTextReaderState::Backtrack
                 )
             {
-                for &pattern in &self.pattern_tab {
-                    if xml_pattern_match(pattern, self.node.unwrap()) == 1 {
+                for pattern in &self.pattern_tab {
+                    if pattern.pattern_match(self.node.unwrap()) == 1 {
                         self.preserve();
                         break;
                     }
@@ -2735,12 +2736,11 @@ impl XmlTextReader {
         namespaces: Option<Vec<(String, Option<String>)>>,
     ) -> i32 {
         unsafe {
-            let comp: XmlPatternPtr = xml_pattern_compile(pattern, 0, namespaces);
-            if comp.is_null() {
+            let Some(comp) = xml_pattern_compile(pattern, 0, namespaces) else {
                 return -1;
-            }
+            };
 
-            self.pattern_tab.push(comp);
+            self.pattern_tab.push(*comp);
             self.pattern_tab.len() as i32 - 1
         }
     }
@@ -3239,11 +3239,7 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         }
         #[cfg(feature = "libxml_pattern")]
         {
-            for pattern in (*reader).pattern_tab.drain(..) {
-                if !pattern.is_null() {
-                    xml_free_pattern(pattern);
-                }
-            }
+            (*reader).pattern_tab.clear();
         }
         if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeClosed {
             xml_text_reader_close(&mut *reader);
@@ -3462,11 +3458,7 @@ pub unsafe fn xml_text_reader_setup(
             (*reader).in_xinclude = 0;
         }
         #[cfg(feature = "libxml_pattern")]
-        while let Some(pattern) = (*reader).pattern_tab.pop() {
-            if !pattern.is_null() {
-                xml_free_pattern(pattern);
-            }
-        }
+        (*reader).pattern_tab.clear();
 
         if options & XmlParserOption::XmlParseDTDValid as i32 != 0 {
             (*reader).validate = XmlTextReaderValidate::ValidateDtd;

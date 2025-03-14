@@ -35,7 +35,7 @@ use crate::{
     error::XmlError,
     globals::{GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
-    libxml::{chvalid::xml_is_blank_char, pattern::xml_free_pattern_list},
+    libxml::chvalid::xml_is_blank_char,
     tree::{XmlDocPtr, XmlGenericNodePtr, XmlNsPtr},
 };
 
@@ -361,9 +361,8 @@ pub unsafe fn xml_xpath_free_parser_context(ctxt: XmlXPathParserContextPtr) {
         }
         if !(*ctxt).comp.is_null() {
             #[cfg(feature = "libxml_pattern")]
-            if !(*(*ctxt).comp).stream.is_null() {
-                xml_free_pattern_list((*(*ctxt).comp).stream);
-                (*(*ctxt).comp).stream = null_mut();
+            {
+                (*(*ctxt).comp).stream.take();
             }
             xml_xpath_free_comp_expr((*ctxt).comp);
         }

@@ -22,6 +22,8 @@ use std::{
 use const_format::concatcp;
 #[cfg(feature = "c14n")]
 use exml::c14n::XmlC14NMode;
+#[cfg(feature = "libxml_pattern")]
+use exml::libxml::pattern::{XmlPattern, XmlStreamCtxtPtr};
 #[cfg(feature = "schematron")]
 use exml::libxml::schematron::XmlSchematronPtr;
 #[cfg(feature = "schema")]
@@ -52,7 +54,6 @@ use exml::{
             xml_ctxt_use_options, xml_init_parser, xml_parse_document, xml_parse_file,
             xml_set_external_entity_loader,
         },
-        pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
         relaxng::XmlRelaxNGPtr,
         xinclude::xml_xinclude_process_flags,
         xmlmemory::{
@@ -4148,12 +4149,12 @@ unsafe fn pattern_node(
     out: &mut File,
     reader: XmlTextReaderPtr,
     pattern: *const c_char,
-    patternc: XmlPatternPtr,
+    patternc: &XmlPattern,
     mut patstream: XmlStreamCtxtPtr,
 ) {
     unsafe {
         use exml::libxml::{
-            pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
+            pattern::{xml_free_stream_ctxt, xml_stream_pop, xml_stream_push},
             xmlreader::{
                 XmlReaderTypes, xml_text_reader_const_local_name,
                 xml_text_reader_const_namespace_uri,
@@ -4168,7 +4169,7 @@ unsafe fn pattern_node(
 
         if typ == XmlReaderTypes::XmlReaderTypeElement {
             /* do the check only on element start */
-            is_match = xml_pattern_match(patternc, (*reader).current_node().unwrap());
+            is_match = patternc.pattern_match((*reader).current_node().unwrap());
 
             if is_match != 0 {
                 path = (*reader).current_node().unwrap().get_node_path();
@@ -4235,14 +4236,10 @@ unsafe fn pattern_test(
 ) -> i32 {
     unsafe {
         use exml::libxml::{
-            pattern::{
-                xml_free_pattern, xml_free_stream_ctxt, xml_pattern_compile,
-                xml_pattern_get_stream_ctxt, xml_stream_push,
-            },
+            pattern::{xml_free_stream_ctxt, xml_pattern_compile, xml_stream_push},
             xmlreader::{xml_free_text_reader, xml_reader_walker},
         };
 
-        let mut patternc: XmlPatternPtr;
         let mut patstream: XmlStreamCtxtPtr;
         let mut xml: [c_char; 500] = [0; 500];
         let mut result: [c_char; 500] = [0; 500];
@@ -4325,7 +4322,7 @@ unsafe fn pattern_test(
                             ns = now.next;
                         }
 
-                        patternc = xml_pattern_compile(
+                        let Some(patternc) = xml_pattern_compile(
                             CStr::from_ptr(str.as_ptr() as *const i8)
                                 .to_string_lossy()
                                 .as_ref(),
@@ -4347,8 +4344,7 @@ unsafe fn pattern_test(
                                     })
                                     .collect(),
                             ),
-                        );
-                        if patternc.is_null() {
+                        ) else {
                             let str = CStr::from_ptr(str.as_ptr() as *const i8).to_string_lossy();
                             test_error_handler(
                                 None,
@@ -4357,8 +4353,8 @@ unsafe fn pattern_test(
                             xml_free_doc(doc);
                             // ret = 1;
                             continue;
-                        }
-                        patstream = xml_pattern_get_stream_ctxt(patternc);
+                        };
+                        patstream = patternc.get_stream_context();
                         if !patstream.is_null() {
                             ret = xml_stream_push(patstream, null_mut(), null_mut());
                             if ret < 0 {
@@ -4372,7 +4368,7 @@ unsafe fn pattern_test(
                         reader = xml_reader_walker(doc);
                         res = (*reader).read();
                         while res == 1 {
-                            pattern_node(&mut o, reader, str.as_ptr() as _, patternc, patstream);
+                            pattern_node(&mut o, reader, str.as_ptr() as _, &patternc, patstream);
                             res = (*reader).read();
                         }
                         if res != 0 {
@@ -4382,7 +4378,6 @@ unsafe fn pattern_test(
                         xml_free_doc(doc);
                         xml_free_stream_ctxt(patstream);
                         // patstream = null_mut();
-                        xml_free_pattern(patternc);
                     } else {
                         eprintln!("Failed to parse {xml}");
                         // ret = 1;

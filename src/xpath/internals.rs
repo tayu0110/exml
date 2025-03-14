@@ -35,6 +35,11 @@ use std::{
 
 use libc::{INT_MAX, INT_MIN, memset};
 
+#[cfg(feature = "libxml_pattern")]
+use crate::libxml::pattern::{
+    XmlPattern, XmlPatternFlags, XmlStreamCtxtPtr, xml_free_stream_ctxt, xml_pattern_compile,
+    xml_stream_pop, xml_stream_push, xml_stream_push_node, xml_stream_wants_any_node,
+};
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::{XmlLocationSetPtr, xml_xptr_free_location_set};
 use crate::{
@@ -44,13 +49,6 @@ use crate::{
     libxml::{
         chvalid::xml_is_blank_char,
         globals::{xml_free, xml_malloc, xml_realloc},
-        pattern::{
-            XmlPatternFlags, XmlPatternPtr, XmlStreamCtxtPtr, xml_free_pattern,
-            xml_free_stream_ctxt, xml_pattern_compile, xml_pattern_from_root,
-            xml_pattern_get_stream_ctxt, xml_pattern_max_depth, xml_pattern_min_depth,
-            xml_pattern_streamable, xml_stream_pop, xml_stream_push, xml_stream_push_node,
-            xml_stream_wants_any_node,
-        },
         valid::xml_get_id,
         xmlstring::{XmlChar, xml_str_equal, xml_strdup, xml_strndup},
     },
@@ -1247,7 +1245,6 @@ pub unsafe fn xml_xpath_try_stream_compile(
     unsafe {
         // Optimization: use streaming patterns when the XPath expression can
         // be compiled to a stream lookup
-        let stream: XmlPatternPtr;
         let comp: XmlXPathCompExprPtr;
 
         if !xpath.contains(['[', '(', '@']) {
@@ -1284,19 +1281,19 @@ pub unsafe fn xml_xpath_try_stream_compile(
                 }
             }
 
-            stream =
-                xml_pattern_compile(xpath, XmlPatternFlags::XmlPatternXPath as i32, namespaces);
-            if !stream.is_null() && xml_pattern_streamable(stream) == 1 {
-                comp = xml_xpath_new_comp_expr();
-                if comp.is_null() {
-                    xml_xpath_err_memory(ctxt, Some("allocating streamable expression\n"));
-                    xml_free_pattern(stream);
-                    return null_mut();
+            if let Some(stream) =
+                xml_pattern_compile(xpath, XmlPatternFlags::XmlPatternXPath as i32, namespaces)
+            {
+                if stream.is_streamable() == 1 {
+                    comp = xml_xpath_new_comp_expr();
+                    if comp.is_null() {
+                        xml_xpath_err_memory(ctxt, Some("allocating streamable expression\n"));
+                        return null_mut();
+                    }
+                    (*comp).stream = Some(stream);
+                    return comp;
                 }
-                (*comp).stream = stream;
-                return comp;
             }
-            xml_free_pattern(stream);
         }
         null_mut()
     }
@@ -1496,7 +1493,7 @@ pub unsafe fn xml_xpath_optimize_expression(
 #[cfg(feature = "libxml_pattern")]
 pub(super) unsafe fn xml_xpath_run_stream_eval(
     ctxt: XmlXPathContextPtr,
-    comp: XmlPatternPtr,
+    comp: &XmlPattern,
     result_seq: *mut XmlXPathObjectPtr,
     to_bool: i32,
 ) -> i32 {
@@ -1505,21 +1502,21 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
         let mut ret: i32;
         let mut depth: i32;
 
-        if ctxt.is_null() || comp.is_null() {
+        if ctxt.is_null() {
             return -1;
         }
-        max_depth = xml_pattern_max_depth(comp);
+        max_depth = comp.max_depth();
         if max_depth == -1 {
             return -1;
         }
         if max_depth == -2 {
             max_depth = 10000;
         }
-        let min_depth: i32 = xml_pattern_min_depth(comp);
+        let min_depth: i32 = comp.min_depth();
         if min_depth == -1 {
             return -1;
         }
-        let from_root: i32 = xml_pattern_from_root(comp);
+        let from_root: i32 = comp.is_from_root();
         if from_root < 0 {
             return -1;
         }
@@ -1597,7 +1594,7 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
             return 0;
         };
 
-        let patstream: XmlStreamCtxtPtr = xml_pattern_get_stream_ctxt(comp);
+        let patstream: XmlStreamCtxtPtr = comp.get_stream_context();
         if patstream.is_null() {
             // QUESTION TODO: Is this an error?
             return 0;
