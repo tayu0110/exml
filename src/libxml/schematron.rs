@@ -184,10 +184,10 @@ pub struct XmlSchematronRule {
     next: XmlSchematronRulePtr,       /* the next rule in the list */
     patnext: XmlSchematronRulePtr,    /* the next rule in the pattern list */
     node: Option<XmlNodePtr>,         /* the node in the tree */
-    context: *mut XmlChar,            /* the context evaluation rule */
+    context: String,                  /* the context evaluation rule */
     tests: XmlSchematronTestPtr,      /* the list of tests */
     pattern: Option<Box<XmlPattern>>, /* the compiled pattern associated */
-    report: *mut XmlChar,             /* the message to report */
+    report: Option<String>,           /* the message to report */
     lets: XmlSchematronLetPtr,        /* the list of let variables */
 }
 
@@ -198,7 +198,7 @@ pub type XmlSchematronPatternPtr = *mut XmlSchematronPattern;
 pub struct XmlSchematronPattern {
     next: XmlSchematronPatternPtr, /* the next pattern in the list */
     rules: XmlSchematronRulePtr,   /* the list of rules */
-    name: *mut XmlChar,            /* the name of the pattern */
+    name: String,                  /* the name of the pattern */
 }
 
 pub type XmlSchematronPtr = *mut XmlSchematron;
@@ -514,12 +514,7 @@ impl XmlSchematronValidCtxt {
                         if pattern.is_null() {
                             None
                         } else {
-                            Some(
-                                CStr::from_ptr((*pattern).name as _)
-                                    .to_string_lossy()
-                                    .into_owned()
-                                    .into(),
-                            )
+                            Some((*pattern).name.clone().into())
                         },
                         Some(path.to_owned().into()),
                         Some(report.into()),
@@ -550,13 +545,7 @@ impl XmlSchematronValidCtxt {
             if self.flags & XmlSchematronValidOptions::XmlSchematronOutXml as i32 != 0 {
                 // TODO
             } else {
-                if (*pattern).name.is_null() {
-                    return;
-                }
-                let msg = format!(
-                    "Pattern: {}\n",
-                    CStr::from_ptr((*pattern).name as *const i8).to_string_lossy()
-                );
+                let msg = format!("Pattern: {}\n", (*pattern).name);
                 self.report_output(None, &msg);
             }
         }
@@ -813,10 +802,10 @@ impl XmlSchematronParserCtxt {
         &mut self,
         schema: XmlSchematronPtr,
         node: XmlNodePtr,
-        name: *mut XmlChar,
+        name: Option<&str>,
     ) -> XmlSchematronPatternPtr {
         unsafe {
-            if schema.is_null() || name.is_null() {
+            if schema.is_null() || name.is_none() {
                 return null_mut();
             }
 
@@ -827,7 +816,7 @@ impl XmlSchematronParserCtxt {
                 return null_mut();
             }
             memset(ret as _, 0, size_of::<XmlSchematronPattern>());
-            (*ret).name = name;
+            std::ptr::write(&mut (*ret).name, name.unwrap().to_owned());
             (*ret).next = null_mut();
             if (*schema).patterns.is_null() {
                 (*schema).patterns = ret;
@@ -852,24 +841,21 @@ impl XmlSchematronParserCtxt {
         schema: XmlSchematronPtr,
         pat: XmlSchematronPatternPtr,
         node: XmlNodePtr,
-        context: *mut XmlChar,
-        report: *mut XmlChar,
+        context: &str,
+        report: Option<&str>,
     ) -> XmlSchematronRulePtr {
         unsafe {
-            if schema.is_null() || context.is_null() {
+            if schema.is_null() {
                 return null_mut();
             }
 
             // Try first to compile the pattern
             let pattern = xml_pattern_compile(
-                CStr::from_ptr(context as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
+                context,
                 XmlPatternFlags::XmlPatternXPath as i32,
                 Some(self.namespaces.clone()),
             );
             if pattern.is_none() {
-                let context = CStr::from_ptr(context as *const i8).to_string_lossy();
                 xml_schematron_perr!(
                     self,
                     Some(node.into()),
@@ -887,9 +873,9 @@ impl XmlSchematronParserCtxt {
             }
             memset(ret as _, 0, size_of::<XmlSchematronRule>());
             (*ret).node = Some(node);
-            (*ret).context = context;
+            std::ptr::write(&mut (*ret).context, context.to_owned());
             (*ret).pattern = pattern;
-            (*ret).report = report;
+            std::ptr::write(&mut (*ret).report, report.map(|report| report.to_owned()));
             (*ret).next = null_mut();
             (*ret).lets = null_mut();
             if (*schema).rules.is_null() {
@@ -998,11 +984,8 @@ impl XmlSchematronParserCtxt {
                     return;
                 }
                 Some(context) => {
-                    let context = CString::new(context).unwrap();
-                    let context = xml_strdup(context.as_ptr() as *const u8);
-                    ruleptr = self.add_rule(self.schema, pattern, rule, context, null_mut());
+                    ruleptr = self.add_rule(self.schema, pattern, rule, &context, None);
                     if ruleptr.is_null() {
-                        xml_free(context as _);
                         return;
                     }
                 }
@@ -1201,16 +1184,10 @@ impl XmlSchematronParserCtxt {
 
             let id = pat
                 .get_no_ns_prop("id")
-                .or_else(|| pat.get_no_ns_prop("name"))
-                .map(|id| CString::new(id).unwrap());
-            let id = id
-                .as_ref()
-                .map_or(null_mut(), |id| xml_strdup(id.as_ptr() as *const u8));
-            let pattern: XmlSchematronPatternPtr = self.add_pattern(self.schema, pat, id);
+                .or_else(|| pat.get_no_ns_prop("name"));
+            let pattern: XmlSchematronPatternPtr =
+                self.add_pattern(self.schema, pat, id.as_deref());
             if pattern.is_null() {
-                if !id.is_null() {
-                    xml_free(id as _);
-                }
                 return;
             }
             let mut cur = pat.children().map(|c| XmlNodePtr::try_from(c).unwrap());
@@ -1734,16 +1711,12 @@ unsafe fn xml_schematron_free_rules(mut rules: XmlSchematronRulePtr) {
             if !(*rules).tests.is_null() {
                 xml_schematron_free_tests((*rules).tests);
             }
-            if !(*rules).context.is_null() {
-                xml_free((*rules).context as _);
-            }
             (*rules).pattern.take();
-            if !(*rules).report.is_null() {
-                xml_free((*rules).report as _);
-            }
+            (*rules).report.take();
             if !(*rules).lets.is_null() {
                 xml_schematron_free_lets((*rules).lets);
             }
+            drop_in_place(rules);
             xml_free(rules as _);
             rules = next;
         }
@@ -1758,9 +1731,7 @@ unsafe fn xml_schematron_free_patterns(mut patterns: XmlSchematronPatternPtr) {
 
         while !patterns.is_null() {
             next = (*patterns).next;
-            if !(*patterns).name.is_null() {
-                xml_free((*patterns).name as _);
-            }
+            drop_in_place(patterns);
             xml_free(patterns as _);
             patterns = next;
         }
