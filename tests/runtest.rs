@@ -4154,7 +4154,7 @@ unsafe fn pattern_node(
 ) {
     unsafe {
         use exml::libxml::{
-            pattern::{xml_free_stream_ctxt, xml_stream_pop, xml_stream_push},
+            pattern::xml_free_stream_ctxt,
             xmlreader::{
                 XmlReaderTypes, xml_text_reader_const_local_name,
                 xml_text_reader_const_namespace_uri,
@@ -4186,8 +4186,7 @@ unsafe fn pattern_node(
             let mut ret: i32;
 
             if typ == XmlReaderTypes::XmlReaderTypeElement {
-                ret = xml_stream_push(
-                    patstream,
+                ret = (*patstream).push(
                     xml_text_reader_const_local_name(&mut *reader),
                     xml_text_reader_const_namespace_uri(&mut *reader),
                 );
@@ -4212,7 +4211,7 @@ unsafe fn pattern_node(
             if typ == XmlReaderTypes::XmlReaderTypeEndElement
                 || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap())
             {
-                ret = xml_stream_pop(patstream);
+                ret = (*patstream).pop();
                 if ret < 0 {
                     writeln!(out, "xmlStreamPop() failure").ok();
                     xml_free_stream_ctxt(patstream);
@@ -4236,7 +4235,7 @@ unsafe fn pattern_test(
 ) -> i32 {
     unsafe {
         use exml::libxml::{
-            pattern::{xml_free_stream_ctxt, xml_pattern_compile, xml_stream_push},
+            pattern::{xml_free_stream_ctxt, xml_pattern_compile},
             xmlreader::{xml_free_text_reader, xml_reader_walker},
         };
 
@@ -4356,7 +4355,7 @@ unsafe fn pattern_test(
                         };
                         patstream = patternc.get_stream_context();
                         if !patstream.is_null() {
-                            ret = xml_stream_push(patstream, null_mut(), null_mut());
+                            ret = (*patstream).push(null_mut(), null_mut());
                             if ret < 0 {
                                 eprintln!("xmlStreamPush() failure");
                                 xml_free_stream_ctxt(patstream);

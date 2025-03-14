@@ -38,7 +38,6 @@ use libc::{INT_MAX, INT_MIN, memset};
 #[cfg(feature = "libxml_pattern")]
 use crate::libxml::pattern::{
     XmlPattern, XmlPatternFlags, XmlStreamCtxtPtr, xml_free_stream_ctxt, xml_pattern_compile,
-    xml_stream_pop, xml_stream_push, xml_stream_push_node, xml_stream_wants_any_node,
 };
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::{XmlLocationSetPtr, xml_xptr_free_location_set};
@@ -1600,10 +1599,10 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
             return 0;
         }
 
-        let eval_all_nodes: i32 = xml_stream_wants_any_node(patstream);
+        let eval_all_nodes: i32 = (*patstream).wants_any_node();
 
         if from_root != 0 {
-            ret = xml_stream_push(patstream, null(), null());
+            ret = (*patstream).push(null(), null());
             if ret < 0 {
             } else if ret == 1 {
                 if to_bool != 0 {
@@ -1646,14 +1645,12 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
                                     if matches!(cur.element_type(), XmlElementType::XmlElementNode)
                                     {
                                         let node = XmlNodePtr::try_from(cur).unwrap();
-                                        xml_stream_push(
-                                            patstream,
+                                        (*patstream).push(
                                             node.name,
                                             node.ns.map_or(null_mut(), |ns| ns.href),
                                         )
                                     } else if eval_all_nodes != 0 {
-                                        xml_stream_push_node(
-                                            patstream,
+                                        (*patstream).push_node(
                                             null(),
                                             null(),
                                             cur.element_type() as i32,
@@ -1684,7 +1681,7 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
                                 }
                                 if cur.children().is_none() || depth >= max_depth {
                                     // ret =
-                                    xml_stream_pop(patstream);
+                                    (*patstream).pop();
                                     while let Some(next) = cur.next() {
                                         cur = next;
                                         if !matches!(
@@ -1760,7 +1757,7 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
                             ))
                     {
                         // ret =
-                        xml_stream_pop(patstream);
+                        (*patstream).pop();
                     };
                     if let Some(next) = cur.next() {
                         cur = next;

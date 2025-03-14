@@ -32,8 +32,6 @@ use std::{
     rc::Rc,
 };
 
-use libc::memset;
-
 use crate::tree::{NodeCommon, XmlAttrPtr};
 use crate::{
     libxml::{
@@ -1510,6 +1508,7 @@ impl XmlStepStates {
 
 // streaming interfaces
 pub type XmlStreamCtxtPtr = *mut XmlStreamCtxt;
+#[doc(alias = "xmlStreamCtxt")]
 #[repr(C)]
 pub struct XmlStreamCtxt {
     next: *mut XmlStreamCtxt, /* link to next sub pattern if | */
@@ -1522,6 +1521,491 @@ pub struct XmlStreamCtxt {
     block_level: i32,
 }
 
+impl XmlStreamCtxt {
+    /// Add a new state to the stream context
+    ///
+    /// Returns -1 in case of error or the state index if successful
+    #[doc(alias = "xmlStreamCtxtAddState")]
+    unsafe fn add_state(&mut self, idx: i32, level: i32) -> i32 {
+        unsafe {
+            for i in 0..self.nb_state {
+                if *self.states.add(2 * i as usize) < 0 {
+                    *self.states.add(2 * i as usize) = idx;
+                    *self.states.add(2 * i as usize + 1) = level;
+                    return i;
+                }
+            }
+            if self.nb_state >= self.max_state {
+                let cur: *mut i32 = xml_realloc(
+                    self.states as _,
+                    self.max_state as usize * 4 * size_of::<i32>(),
+                ) as *mut i32;
+                if cur.is_null() {
+                    return -1;
+                }
+                self.states = cur;
+                self.max_state *= 2;
+            }
+            *self.states.add(2 * self.nb_state as usize) = idx;
+            *self.states.add(2 * self.nb_state as usize + 1) = level;
+            self.nb_state += 1;
+            self.nb_state - 1
+        }
+    }
+
+    /// Push new data onto the stream. NOTE: if the call xmlPatterncompile()
+    /// indicated a dictionary, then strings for name and ns will be expected
+    /// to come from the dictionary.
+    /// Both @name and @ns being NULL means the / i.e. the root of the document.
+    /// This can also act as a reset.
+    ///
+    /// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
+    #[doc(alias = "xmlStreamPushInternal")]
+    unsafe fn push_internal(
+        &mut self,
+        name: *const XmlChar,
+        ns: *const XmlChar,
+        node_type: i32,
+    ) -> i32 {
+        unsafe {
+            let mut ret: i32 = 0;
+            let mut err: i32 = 0;
+            let mut is_final: i32 = 0;
+            let mut tmp: i32;
+            let mut i: i32;
+            let mut m: i32;
+            let mut is_match: i32;
+            let mut step_nr: i32;
+            let mut desc: i32;
+            let mut comp: XmlStreamCompPtr;
+
+            if self.nb_state < 0 {
+                return -1;
+            }
+
+            let mut now = Some(self);
+            'stream: while let Some(stream) = now {
+                'stream_next: {
+                    comp = stream.comp;
+
+                    if node_type == XmlElementType::XmlElementNode as i32
+                        && name.is_null()
+                        && ns.is_null()
+                    {
+                        // We have a document node here (or a reset).
+                        stream.nb_state = 0;
+                        stream.level = 0;
+                        stream.block_level = -1;
+                        if (*comp).flags & XML_STREAM_FROM_ROOT as i32 != 0 {
+                            if (*comp).steps.is_empty() {
+                                // TODO: We have a "/." here?
+                                ret = 1;
+                            } else if (*comp).steps.len() == 1
+                                && (*comp).steps[0].node_type == XML_STREAM_ANY_NODE as i32
+                                && (*comp).steps[0].flags & XML_STREAM_STEP_DESC as i32 != 0
+                            {
+                                // In the case of "//." the document node will is_match as well.
+                                ret = 1;
+                            } else if (*comp).steps[0].flags & XML_STREAM_STEP_ROOT as i32 != 0 {
+                                // TODO: Do we need this ?
+                                tmp = stream.add_state(0, 0);
+                                if tmp < 0 {
+                                    err += 1;
+                                }
+                            }
+                        }
+                        now = (!stream.next.is_null()).then(|| &mut *stream.next);
+                        continue 'stream;
+                    }
+
+                    // Fast check for ".".
+                    if (*comp).steps.is_empty() {
+                        // / and . are handled at the XPath node set creation
+                        // level by checking min depth
+                        if stream.flags & XmlPatternFlags::XmlPatternXPath as i32 != 0 {
+                            now = (!stream.next.is_null()).then(|| &mut *stream.next);
+                            continue 'stream; /* while */
+                        }
+                        // For non-pattern like evaluation like XML Schema IDCs
+                        // or traditional XPath expressions, this will is_match if
+                        // we are at the first level only, otherwise on every level.
+                        if node_type != XmlElementType::XmlAttributeNode as i32
+                            && (stream.flags & XML_PATTERN_NOTPATTERN == 0 || stream.level == 0)
+                        {
+                            ret = 1;
+                        }
+                        stream.level += 1;
+                        break 'stream_next;
+                    }
+                    if stream.block_level != -1 {
+                        // Skip blocked expressions.
+                        stream.level += 1;
+                        break 'stream_next;
+                    }
+
+                    if node_type != XmlElementType::XmlElementNode as i32
+                        && node_type != XmlElementType::XmlAttributeNode as i32
+                        && (*comp).flags & XML_STREAM_FINAL_IS_ANY_NODE as i32 == 0
+                    {
+                        // No need to process nodes of other types if we don't
+                        // resolve to those types.
+                        // TODO: Do we need to block the context here?
+                        stream.level += 1;
+                        break 'stream_next;
+                    }
+
+                    // Check evolution of existing states
+                    i = 0;
+                    m = stream.nb_state;
+                    while i < m {
+                        'next_state: {
+                            if (*comp).flags & XML_STREAM_DESC as i32 == 0 {
+                                // If there is no "//", then only the last
+                                // added state is of interest.
+                                step_nr = *stream.states.add(2 * (stream.nb_state - 1) as usize);
+                                // TODO: Security check, should not happen, remove it.
+                                if *stream.states.add((2 * (stream.nb_state - 1) as usize) + 1)
+                                    < stream.level
+                                {
+                                    return -1;
+                                }
+                                // desc = 0;
+                                // loop-stopper
+                                i = m;
+                            } else {
+                                // If there are "//", then we need to process every "//"
+                                // occurring in the states, plus any other state for this level.
+                                step_nr = *stream.states.add(2 * i as usize);
+
+                                // TODO: should not happen anymore: dead states
+                                if step_nr < 0 {
+                                    break 'next_state;
+                                }
+
+                                tmp = *stream.states.add((2 * i) as usize + 1);
+
+                                // skip new states just added
+                                if tmp > stream.level {
+                                    break 'next_state;
+                                }
+
+                                // skip states at ancestor levels, except if "//"
+                                desc = (*comp).steps[step_nr as usize].flags
+                                    & XML_STREAM_STEP_DESC as i32;
+                                if tmp < stream.level && desc == 0 {
+                                    break 'next_state;
+                                }
+                            }
+                            // Check for correct node-type.
+                            let step = &(*comp).steps[step_nr as usize];
+                            if step.node_type != node_type {
+                                if step.node_type == XmlElementType::XmlAttributeNode as i32 {
+                                    // Block this expression for deeper evaluation.
+                                    if (*comp).flags & XML_STREAM_DESC as i32 == 0 {
+                                        stream.block_level = stream.level + 1;
+                                    }
+                                    break 'next_state;
+                                } else if step.node_type != XML_STREAM_ANY_NODE as i32 {
+                                    break 'next_state;
+                                }
+                            }
+                            // Compare local/namespace-name.
+                            is_match = 0;
+                            if step.node_type == XML_STREAM_ANY_NODE as i32 {
+                                is_match = 1;
+                            } else if step.name.is_none() {
+                                if step.ns.is_none() {
+                                    // This lets through all elements/attributes.
+                                    is_match = 1;
+                                } else if !ns.is_null() {
+                                    is_match = (step.ns.as_deref()
+                                        == Some(
+                                            CStr::from_ptr(ns as *const i8)
+                                                .to_string_lossy()
+                                                .as_ref(),
+                                        )) as i32;
+                                }
+                            } else if step.ns.is_none() == ns.is_null()
+                                && !name.is_null()
+                                && step.name.as_deref()
+                                    == Some(
+                                        CStr::from_ptr(name as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    )
+                                && step.ns.as_deref()
+                                    == (!ns.is_null())
+                                        .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
+                                        .as_deref()
+                            {
+                                is_match = 1;
+                            }
+                            // #if 0
+                            // /*
+                            // * TODO: Pointer comparison won't work, since not guaranteed that the given
+                            // *  values are in the same dict; especially if it's the namespace name,
+                            // *  normally coming from ns->href. We need a namespace dict mechanism !
+                            // */
+                            //  } else if ((*comp).dict) {
+                            //      if (step.name.is_null()) {
+                            //          if (step.ns.is_null())
+                            //      	is_match = 1;
+                            //          else
+                            //      	is_match = (step.ns == ns);
+                            //      } else {
+                            //          is_match = ((step.name == name) && (step.ns == ns));
+                            //      }
+                            // #endif /* if 0 ------------------------------------------------------- */
+                            if is_match != 0 {
+                                is_final = step.flags & XML_STREAM_STEP_FINAL as i32;
+                                if is_final != 0 {
+                                    ret = 1;
+                                } else {
+                                    stream.add_state(step_nr + 1, stream.level + 1);
+                                }
+                                if ret != 1 && step.flags & XML_STREAM_STEP_IN_SET as i32 != 0 {
+                                    // Check if we have a special case like "foo/bar//.", where
+                                    // "foo" is selected as well.
+                                    ret = 1;
+                                }
+                            }
+                            if (*comp).flags & XML_STREAM_DESC as i32 == 0
+                                && (is_match == 0 || is_final != 0)
+                            {
+                                // Mark this expression as blocked for any evaluation at
+                                // deeper levels. Note that this includes "/foo"
+                                // expressions if the *pattern* behaviour is used.
+                                stream.block_level = stream.level + 1;
+                            }
+                        }
+                        // next_state:
+                        i += 1;
+                    }
+
+                    stream.level += 1;
+
+                    // Re/enter the expression.
+                    // Don't reenter if it's an absolute expression like "/foo",
+                    //   except "//foo".
+                    let step = &(*comp).steps[0];
+                    if step.flags & XML_STREAM_STEP_ROOT as i32 != 0 {
+                        break 'stream_next;
+                    }
+
+                    desc = step.flags & XML_STREAM_STEP_DESC as i32;
+                    'compare: {
+                        if stream.flags & XML_PATTERN_NOTPATTERN != 0 {
+                            // Re/enter the expression if it is a "descendant" one,
+                            // or if we are at the 1st level of evaluation.
+                            if stream.level == 1 {
+                                if XML_STREAM_XS_IDC!(stream) {
+                                    // XS-IDC: The missing "self::node()" will always
+                                    // is_match the first given node.
+                                    break 'stream_next;
+                                } else {
+                                    break 'compare;
+                                }
+                            }
+                            // A "//" is always reentrant.
+                            if desc != 0 {
+                                break 'compare;
+                            }
+                            // XS-IDC: Process the 2nd level, since the missing
+                            // "self::node()" is responsible for the 2nd level being
+                            // the real start level.
+                            if stream.level == 2 && XML_STREAM_XS_IDC!(stream) {
+                                break 'compare;
+                            }
+                            break 'stream_next;
+                        }
+                    }
+
+                    // compare:
+                    // Check expected node-type.
+                    if step.node_type != node_type
+                        && (node_type == XmlElementType::XmlAttributeNode as i32
+                            || step.node_type != XML_STREAM_ANY_NODE as i32)
+                    {
+                        break 'stream_next;
+                    }
+                    // Compare local/namespace-name.
+                    is_match = 0;
+                    if step.node_type == XML_STREAM_ANY_NODE as i32 {
+                        is_match = 1;
+                    } else if step.name.is_none() {
+                        if step.ns.is_none() {
+                            // This lets through all elements/attributes.
+                            is_match = 1;
+                        } else if !ns.is_null() {
+                            is_match = (step.ns.as_deref()
+                                == Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()))
+                                as i32;
+                        }
+                    } else if step.ns.is_none() == ns.is_null()
+                        && !name.is_null()
+                        && step.name.as_deref()
+                            == Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref())
+                        && step.ns.as_deref()
+                            == (!ns.is_null())
+                                .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
+                                .as_deref()
+                    {
+                        is_match = 1;
+                    }
+                    is_final = step.flags & XML_STREAM_STEP_FINAL as i32;
+                    if is_match != 0 {
+                        if is_final != 0 {
+                            ret = 1;
+                        } else {
+                            stream.add_state(1, stream.level);
+                        }
+                        if ret != 1 && step.flags & XML_STREAM_STEP_IN_SET as i32 != 0 {
+                            // Check if we have a special case like "foo//.", where
+                            // "foo" is selected as well.
+                            ret = 1;
+                        }
+                    }
+                    if (*comp).flags & XML_STREAM_DESC as i32 == 0
+                        && (is_match == 0 || is_final != 0)
+                    {
+                        // Mark this expression as blocked for any evaluation at
+                        // deeper levels.
+                        stream.block_level = stream.level;
+                    }
+                }
+
+                // stream_next:
+                now = (!stream.next.is_null()).then(|| &mut *stream.next);
+            } /* while !stream.is_null() */
+
+            if err > 0 {
+                ret = -1;
+            }
+            ret
+        }
+    }
+
+    /// Push new data onto the stream. NOTE: if the call xmlPatterncompile()
+    /// indicated a dictionary, then strings for name and ns will be expected
+    /// to come from the dictionary.
+    /// Both @name and @ns being NULL means the / i.e. the root of the document.
+    /// This can also act as a reset.
+    /// Different from xmlStreamPush() this function can be fed with nodes of type:
+    /// element-, attribute-, text-, cdata-section-, comment- and
+    /// processing-instruction-node.
+    ///
+    /// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
+    #[doc(alias = "xmlStreamPushNode")]
+    pub unsafe fn push_node(
+        &mut self,
+        name: *const XmlChar,
+        ns: *const XmlChar,
+        node_type: i32,
+    ) -> i32 {
+        unsafe { self.push_internal(name, ns, node_type) }
+    }
+
+    /// Push new data onto the stream. NOTE: if the call xmlPatterncompile()
+    /// indicated a dictionary, then strings for name and ns will be expected
+    /// to come from the dictionary.
+    /// Both @name and @ns being NULL means the / i.e. the root of the document.
+    /// This can also act as a reset.
+    /// Otherwise the function will act as if it has been given an element-node.
+    ///
+    /// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
+    #[doc(alias = "xmlStreamPush")]
+    pub unsafe fn push(&mut self, name: *const XmlChar, ns: *const XmlChar) -> i32 {
+        unsafe { self.push_internal(name, ns, XmlElementType::XmlElementNode as i32) }
+    }
+
+    /// Push new attribute data onto the stream. NOTE: if the call xmlPatterncompile()
+    /// indicated a dictionary, then strings for name and ns will be expected
+    /// to come from the dictionary.
+    /// Both @name and @ns being NULL means the / i.e. the root of the document.
+    /// This can also act as a reset.
+    /// Otherwise the function will act as if it has been given an attribute-node.
+    ///
+    /// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
+    #[doc(alias = "xmlStreamPushAttr")]
+    pub unsafe fn push_attr(&mut self, name: *const XmlChar, ns: *const XmlChar) -> i32 {
+        unsafe { self.push_internal(name, ns, XmlElementType::XmlAttributeNode as i32) }
+    }
+
+    /// Push one level from the stream.
+    ///
+    /// Returns: -1 in case of error, 0 otherwise.
+    #[doc(alias = "xmlStreamPop")]
+    pub unsafe fn pop(&mut self) -> i32 {
+        unsafe {
+            let mut lev: i32;
+
+            let mut now = Some(self);
+            while let Some(stream) = now {
+                // Reset block-level.
+                if stream.block_level == stream.level {
+                    stream.block_level = -1;
+                }
+
+                //  (*stream).level can be zero when XML_FINAL_IS_ANY_NODE is set
+                //  (see the thread at
+                //  http://mail.gnome.org/archives/xslt/2008-July/msg00027.html)
+                if stream.level != 0 {
+                    stream.level -= 1;
+                }
+                // Check evolution of existing states
+                for i in (0..stream.nb_state).rev() {
+                    // discard obsoleted states
+                    lev = *stream.states.add((2 * i) as usize + 1);
+                    if lev > stream.level {
+                        stream.nb_state -= 1;
+                    }
+                    if lev <= stream.level {
+                        break;
+                    }
+                }
+                now = (!stream.next.is_null()).then(|| &mut *stream.next);
+            }
+            0
+        }
+    }
+
+    /// Query if the streaming pattern additionally needs to be fed with
+    /// text-, cdata-section-, comment- and processing-instruction-nodes.
+    /// If the result is 0 then only element-nodes and attribute-nodes
+    /// need to be pushed.
+    ///
+    /// Returns 1 in case of need of nodes of the above described types,
+    /// 0 otherwise. -1 on API errors.
+    #[doc(alias = "xmlStreamWantsAnyNode")]
+    pub unsafe fn wants_any_node(&self) -> i32 {
+        unsafe {
+            let mut now = Some(self);
+            while let Some(stream) = now {
+                if (*stream.comp).flags & XML_STREAM_FINAL_IS_ANY_NODE as i32 != 0 {
+                    return 1;
+                }
+                now = (!stream.next.is_null()).then(|| &*stream.next);
+            }
+            0
+        }
+    }
+}
+
+impl Default for XmlStreamCtxt {
+    fn default() -> Self {
+        Self {
+            next: null_mut(),
+            comp: null_mut(),
+            nb_state: 0,
+            max_state: 0,
+            level: 0,
+            states: null_mut(),
+            flags: 0,
+            block_level: 0,
+        }
+    }
+}
+
 /// Build a new stream context
 ///
 /// Returns the new structure or NULL in case of error.
@@ -1532,7 +2016,7 @@ unsafe fn xml_new_stream_ctxt(stream: XmlStreamCompPtr) -> XmlStreamCtxtPtr {
         if cur.is_null() {
             return null_mut();
         }
-        memset(cur as _, 0, size_of::<XmlStreamCtxt>());
+        std::ptr::write(&mut *cur, XmlStreamCtxt::default());
         (*cur).states = xml_malloc(4 * 2 * size_of::<i32>()) as *mut i32;
         if (*cur).states.is_null() {
             xml_free(cur as _);
@@ -1560,664 +2044,6 @@ pub unsafe fn xml_free_stream_ctxt(mut stream: XmlStreamCtxtPtr) {
             }
             xml_free(stream as _);
             stream = next;
-        }
-    }
-}
-
-/// Add a new state to the stream context
-///
-/// Returns -1 in case of error or the state index if successful
-#[doc(alias = "xmlStreamCtxtAddState")]
-unsafe fn xml_stream_ctxt_add_state(comp: XmlStreamCtxtPtr, idx: i32, level: i32) -> i32 {
-    unsafe {
-        for i in 0..(*comp).nb_state {
-            if *(*comp).states.add(2 * i as usize) < 0 {
-                *(*comp).states.add(2 * i as usize) = idx;
-                *(*comp).states.add(2 * i as usize + 1) = level;
-                return i;
-            }
-        }
-        if (*comp).nb_state >= (*comp).max_state {
-            let cur: *mut i32 = xml_realloc(
-                (*comp).states as _,
-                (*comp).max_state as usize * 4 * size_of::<i32>(),
-            ) as *mut i32;
-            if cur.is_null() {
-                return -1;
-            }
-            (*comp).states = cur;
-            (*comp).max_state *= 2;
-        }
-        *(*comp).states.add(2 * (*comp).nb_state as usize) = idx;
-        *(*comp).states.add(2 * (*comp).nb_state as usize + 1) = level;
-        (*comp).nb_state += 1;
-        (*comp).nb_state - 1
-    }
-}
-
-/// Push new data onto the stream. NOTE: if the call xmlPatterncompile()
-/// indicated a dictionary, then strings for name and ns will be expected
-/// to come from the dictionary.
-/// Both @name and @ns being NULL means the / i.e. the root of the document.
-/// This can also act as a reset.
-///
-/// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
-#[doc(alias = "xmlStreamPushInternal")]
-unsafe fn xml_stream_push_internal(
-    mut stream: XmlStreamCtxtPtr,
-    name: *const XmlChar,
-    ns: *const XmlChar,
-    node_type: i32,
-) -> i32 {
-    unsafe {
-        let mut ret: i32 = 0;
-        let mut err: i32 = 0;
-        let mut is_final: i32 = 0;
-        let mut tmp: i32;
-        let mut i: i32;
-        let mut m: i32;
-        let mut is_match: i32;
-        let mut step_nr: i32;
-        let mut desc: i32;
-        let mut comp: XmlStreamCompPtr;
-
-        if stream.is_null() || (*stream).nb_state < 0 {
-            return -1;
-        }
-
-        'stream: while !stream.is_null() {
-            'stream_next: {
-                comp = (*stream).comp;
-
-                if node_type == XmlElementType::XmlElementNode as i32
-                    && name.is_null()
-                    && ns.is_null()
-                {
-                    // We have a document node here (or a reset).
-                    (*stream).nb_state = 0;
-                    (*stream).level = 0;
-                    (*stream).block_level = -1;
-                    if (*comp).flags & XML_STREAM_FROM_ROOT as i32 != 0 {
-                        if (*comp).steps.is_empty() {
-                            // TODO: We have a "/." here?
-                            ret = 1;
-                        } else if (*comp).steps.len() == 1
-                            && (*comp).steps[0].node_type == XML_STREAM_ANY_NODE as i32
-                            && (*comp).steps[0].flags & XML_STREAM_STEP_DESC as i32 != 0
-                        {
-                            // In the case of "//." the document node will is_match as well.
-                            ret = 1;
-                        } else if (*comp).steps[0].flags & XML_STREAM_STEP_ROOT as i32 != 0 {
-                            // TODO: Do we need this ?
-                            tmp = xml_stream_ctxt_add_state(stream, 0, 0);
-                            if tmp < 0 {
-                                err += 1;
-                            }
-                        }
-                    }
-                    stream = (*stream).next;
-                    continue 'stream;
-                }
-
-                // Fast check for ".".
-                if (*comp).steps.is_empty() {
-                    // / and . are handled at the XPath node set creation
-                    // level by checking min depth
-                    if (*stream).flags & XmlPatternFlags::XmlPatternXPath as i32 != 0 {
-                        stream = (*stream).next;
-                        continue 'stream; /* while */
-                    }
-                    // For non-pattern like evaluation like XML Schema IDCs
-                    // or traditional XPath expressions, this will is_match if
-                    // we are at the first level only, otherwise on every level.
-                    if node_type != XmlElementType::XmlAttributeNode as i32
-                        && ((*stream).flags & XML_PATTERN_NOTPATTERN == 0 || (*stream).level == 0)
-                    {
-                        ret = 1;
-                    }
-                    (*stream).level += 1;
-                    break 'stream_next;
-                }
-                if (*stream).block_level != -1 {
-                    // Skip blocked expressions.
-                    (*stream).level += 1;
-                    break 'stream_next;
-                }
-
-                if node_type != XmlElementType::XmlElementNode as i32
-                    && node_type != XmlElementType::XmlAttributeNode as i32
-                    && (*comp).flags & XML_STREAM_FINAL_IS_ANY_NODE as i32 == 0
-                {
-                    // No need to process nodes of other types if we don't
-                    // resolve to those types.
-                    // TODO: Do we need to block the context here?
-                    (*stream).level += 1;
-                    break 'stream_next;
-                }
-
-                // Check evolution of existing states
-                i = 0;
-                m = (*stream).nb_state;
-                while i < m {
-                    'next_state: {
-                        if (*comp).flags & XML_STREAM_DESC as i32 == 0 {
-                            // If there is no "//", then only the last
-                            // added state is of interest.
-                            step_nr = *(*stream).states.add(2 * ((*stream).nb_state - 1) as usize);
-                            // TODO: Security check, should not happen, remove it.
-                            if *(*stream)
-                                .states
-                                .add((2 * ((*stream).nb_state - 1) as usize) + 1)
-                                < (*stream).level
-                            {
-                                return -1;
-                            }
-                            // desc = 0;
-                            // loop-stopper
-                            i = m;
-                        } else {
-                            // If there are "//", then we need to process every "//"
-                            // occurring in the states, plus any other state for this level.
-                            step_nr = *(*stream).states.add(2 * i as usize);
-
-                            // TODO: should not happen anymore: dead states
-                            if step_nr < 0 {
-                                break 'next_state;
-                            }
-
-                            tmp = *(*stream).states.add((2 * i) as usize + 1);
-
-                            // skip new states just added
-                            if tmp > (*stream).level {
-                                break 'next_state;
-                            }
-
-                            // skip states at ancestor levels, except if "//"
-                            desc =
-                                (*comp).steps[step_nr as usize].flags & XML_STREAM_STEP_DESC as i32;
-                            if tmp < (*stream).level && desc == 0 {
-                                break 'next_state;
-                            }
-                        }
-                        // Check for correct node-type.
-                        let step = &(*comp).steps[step_nr as usize];
-                        if step.node_type != node_type {
-                            if step.node_type == XmlElementType::XmlAttributeNode as i32 {
-                                // Block this expression for deeper evaluation.
-                                if (*comp).flags & XML_STREAM_DESC as i32 == 0 {
-                                    (*stream).block_level = (*stream).level + 1;
-                                }
-                                break 'next_state;
-                            } else if step.node_type != XML_STREAM_ANY_NODE as i32 {
-                                break 'next_state;
-                            }
-                        }
-                        // Compare local/namespace-name.
-                        is_match = 0;
-                        if step.node_type == XML_STREAM_ANY_NODE as i32 {
-                            is_match = 1;
-                        } else if step.name.is_none() {
-                            if step.ns.is_none() {
-                                // This lets through all elements/attributes.
-                                is_match = 1;
-                            } else if !ns.is_null() {
-                                is_match = (step.ns.as_deref()
-                                    == Some(
-                                        CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref(),
-                                    )) as i32;
-                            }
-                        } else if step.ns.is_none() == ns.is_null()
-                            && !name.is_null()
-                            && step.name.as_deref()
-                                == Some(
-                                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-                                )
-                            && step.ns.as_deref()
-                                == (!ns.is_null())
-                                    .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
-                                    .as_deref()
-                        {
-                            is_match = 1;
-                        }
-                        // #if 0
-                        // /*
-                        // * TODO: Pointer comparison won't work, since not guaranteed that the given
-                        // *  values are in the same dict; especially if it's the namespace name,
-                        // *  normally coming from ns->href. We need a namespace dict mechanism !
-                        // */
-                        //  } else if ((*comp).dict) {
-                        //      if (step.name.is_null()) {
-                        //          if (step.ns.is_null())
-                        //      	is_match = 1;
-                        //          else
-                        //      	is_match = (step.ns == ns);
-                        //      } else {
-                        //          is_match = ((step.name == name) && (step.ns == ns));
-                        //      }
-                        // #endif /* if 0 ------------------------------------------------------- */
-                        if is_match != 0 {
-                            is_final = step.flags & XML_STREAM_STEP_FINAL as i32;
-                            if is_final != 0 {
-                                ret = 1;
-                            } else {
-                                xml_stream_ctxt_add_state(stream, step_nr + 1, (*stream).level + 1);
-                            }
-                            if ret != 1 && step.flags & XML_STREAM_STEP_IN_SET as i32 != 0 {
-                                // Check if we have a special case like "foo/bar//.", where
-                                // "foo" is selected as well.
-                                ret = 1;
-                            }
-                        }
-                        if (*comp).flags & XML_STREAM_DESC as i32 == 0
-                            && (is_match == 0 || is_final != 0)
-                        {
-                            // Mark this expression as blocked for any evaluation at
-                            // deeper levels. Note that this includes "/foo"
-                            // expressions if the *pattern* behaviour is used.
-                            (*stream).block_level = (*stream).level + 1;
-                        }
-                    }
-                    // next_state:
-                    i += 1;
-                }
-
-                (*stream).level += 1;
-
-                // Re/enter the expression.
-                // Don't reenter if it's an absolute expression like "/foo",
-                //   except "//foo".
-                let step = &(*comp).steps[0];
-                if step.flags & XML_STREAM_STEP_ROOT as i32 != 0 {
-                    break 'stream_next;
-                }
-
-                desc = step.flags & XML_STREAM_STEP_DESC as i32;
-                'compare: {
-                    if (*stream).flags & XML_PATTERN_NOTPATTERN != 0 {
-                        // Re/enter the expression if it is a "descendant" one,
-                        // or if we are at the 1st level of evaluation.
-                        if (*stream).level == 1 {
-                            if XML_STREAM_XS_IDC!(stream) {
-                                // XS-IDC: The missing "self::node()" will always
-                                // is_match the first given node.
-                                break 'stream_next;
-                            } else {
-                                break 'compare;
-                            }
-                        }
-                        // A "//" is always reentrant.
-                        if desc != 0 {
-                            break 'compare;
-                        }
-                        // XS-IDC: Process the 2nd level, since the missing
-                        // "self::node()" is responsible for the 2nd level being
-                        // the real start level.
-                        if (*stream).level == 2 && XML_STREAM_XS_IDC!(stream) {
-                            break 'compare;
-                        }
-                        break 'stream_next;
-                    }
-                }
-
-                // compare:
-                // Check expected node-type.
-                if step.node_type != node_type
-                    && (node_type == XmlElementType::XmlAttributeNode as i32
-                        || step.node_type != XML_STREAM_ANY_NODE as i32)
-                {
-                    break 'stream_next;
-                }
-                // Compare local/namespace-name.
-                is_match = 0;
-                if step.node_type == XML_STREAM_ANY_NODE as i32 {
-                    is_match = 1;
-                } else if step.name.is_none() {
-                    if step.ns.is_none() {
-                        // This lets through all elements/attributes.
-                        is_match = 1;
-                    } else if !ns.is_null() {
-                        is_match = (step.ns.as_deref()
-                            == Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()))
-                            as i32;
-                    }
-                } else if step.ns.is_none() == ns.is_null()
-                    && !name.is_null()
-                    && step.name.as_deref()
-                        == Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref())
-                    && step.ns.as_deref()
-                        == (!ns.is_null())
-                            .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
-                            .as_deref()
-                {
-                    is_match = 1;
-                }
-                is_final = step.flags & XML_STREAM_STEP_FINAL as i32;
-                if is_match != 0 {
-                    if is_final != 0 {
-                        ret = 1;
-                    } else {
-                        xml_stream_ctxt_add_state(stream, 1, (*stream).level);
-                    }
-                    if ret != 1 && step.flags & XML_STREAM_STEP_IN_SET as i32 != 0 {
-                        // Check if we have a special case like "foo//.", where
-                        // "foo" is selected as well.
-                        ret = 1;
-                    }
-                }
-                if (*comp).flags & XML_STREAM_DESC as i32 == 0 && (is_match == 0 || is_final != 0) {
-                    // Mark this expression as blocked for any evaluation at
-                    // deeper levels.
-                    (*stream).block_level = (*stream).level;
-                }
-            }
-
-            // stream_next:
-            stream = (*stream).next;
-        } /* while !stream.is_null() */
-
-        if err > 0 {
-            ret = -1;
-        }
-        ret
-    }
-}
-
-/// Push new data onto the stream. NOTE: if the call xmlPatterncompile()
-/// indicated a dictionary, then strings for name and ns will be expected
-/// to come from the dictionary.
-/// Both @name and @ns being NULL means the / i.e. the root of the document.
-/// This can also act as a reset.
-/// Different from xmlStreamPush() this function can be fed with nodes of type:
-/// element-, attribute-, text-, cdata-section-, comment- and
-/// processing-instruction-node.
-///
-/// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
-#[doc(alias = "xmlStreamPushNode")]
-pub unsafe fn xml_stream_push_node(
-    stream: XmlStreamCtxtPtr,
-    name: *const XmlChar,
-    ns: *const XmlChar,
-    node_type: i32,
-) -> i32 {
-    unsafe { xml_stream_push_internal(stream, name, ns, node_type) }
-}
-
-/// Push new data onto the stream. NOTE: if the call xmlPatterncompile()
-/// indicated a dictionary, then strings for name and ns will be expected
-/// to come from the dictionary.
-/// Both @name and @ns being NULL means the / i.e. the root of the document.
-/// This can also act as a reset.
-/// Otherwise the function will act as if it has been given an element-node.
-///
-/// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
-#[doc(alias = "xmlStreamPush")]
-pub unsafe fn xml_stream_push(
-    stream: XmlStreamCtxtPtr,
-    name: *const XmlChar,
-    ns: *const XmlChar,
-) -> i32 {
-    unsafe { xml_stream_push_internal(stream, name, ns, XmlElementType::XmlElementNode as i32) }
-}
-
-/// Push new attribute data onto the stream. NOTE: if the call xmlPatterncompile()
-/// indicated a dictionary, then strings for name and ns will be expected
-/// to come from the dictionary.
-/// Both @name and @ns being NULL means the / i.e. the root of the document.
-/// This can also act as a reset.
-/// Otherwise the function will act as if it has been given an attribute-node.
-///
-/// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
-#[doc(alias = "xmlStreamPushAttr")]
-pub unsafe fn xml_stream_push_attr(
-    stream: XmlStreamCtxtPtr,
-    name: *const XmlChar,
-    ns: *const XmlChar,
-) -> i32 {
-    unsafe { xml_stream_push_internal(stream, name, ns, XmlElementType::XmlAttributeNode as i32) }
-}
-
-/// Push one level from the stream.
-///
-/// Returns: -1 in case of error, 0 otherwise.
-#[doc(alias = "xmlStreamPop")]
-pub unsafe fn xml_stream_pop(mut stream: XmlStreamCtxtPtr) -> i32 {
-    unsafe {
-        let mut lev: i32;
-
-        if stream.is_null() {
-            return -1;
-        }
-        while !stream.is_null() {
-            // Reset block-level.
-            if (*stream).block_level == (*stream).level {
-                (*stream).block_level = -1;
-            }
-
-            //  (*stream).level can be zero when XML_FINAL_IS_ANY_NODE is set
-            //  (see the thread at
-            //  http://mail.gnome.org/archives/xslt/2008-July/msg00027.html)
-            if (*stream).level != 0 {
-                (*stream).level -= 1;
-            }
-            // Check evolution of existing states
-            for i in (0..(*stream).nb_state).rev() {
-                // discard obsoleted states
-                lev = *(*stream).states.add((2 * i) as usize + 1);
-                if lev > (*stream).level {
-                    (*stream).nb_state -= 1;
-                }
-                if lev <= (*stream).level {
-                    break;
-                }
-            }
-            stream = (*stream).next;
-        }
-        0
-    }
-}
-
-/// Query if the streaming pattern additionally needs to be fed with
-/// text-, cdata-section-, comment- and processing-instruction-nodes.
-/// If the result is 0 then only element-nodes and attribute-nodes
-/// need to be pushed.
-///
-/// Returns 1 in case of need of nodes of the above described types,
-/// 0 otherwise. -1 on API errors.
-#[doc(alias = "xmlStreamWantsAnyNode")]
-pub unsafe fn xml_stream_wants_any_node(mut stream: XmlStreamCtxtPtr) -> i32 {
-    unsafe {
-        if stream.is_null() {
-            return -1;
-        }
-        while !stream.is_null() {
-            if (*(*stream).comp).flags & XML_STREAM_FINAL_IS_ANY_NODE as i32 != 0 {
-                return 1;
-            }
-            stream = (*stream).next;
-        }
-        0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
-
-    use super::*;
-
-    #[test]
-    fn test_xml_stream_pop() {
-        #[cfg(feature = "libxml_pattern")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_stream in 0..GEN_NB_XML_STREAM_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let stream = gen_xml_stream_ctxt_ptr(n_stream, 0);
-
-                let ret_val = xml_stream_pop(stream);
-                desret_int(ret_val);
-                des_xml_stream_ctxt_ptr(n_stream, stream, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlStreamPop",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlStreamPop()");
-                    eprintln!(" {}", n_stream);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_stream_push() {
-        #[cfg(feature = "libxml_pattern")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_stream in 0..GEN_NB_XML_STREAM_CTXT_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_ns in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let stream = gen_xml_stream_ctxt_ptr(n_stream, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let ns = gen_const_xml_char_ptr(n_ns, 2);
-
-                        let ret_val = xml_stream_push(stream, name, ns);
-                        desret_int(ret_val);
-                        des_xml_stream_ctxt_ptr(n_stream, stream, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_ns, ns, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlStreamPush",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlStreamPush()");
-                            eprint!(" {}", n_stream);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_ns);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_stream_push_attr() {
-        #[cfg(feature = "libxml_pattern")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_stream in 0..GEN_NB_XML_STREAM_CTXT_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_ns in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let stream = gen_xml_stream_ctxt_ptr(n_stream, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let ns = gen_const_xml_char_ptr(n_ns, 2);
-
-                        let ret_val = xml_stream_push_attr(stream, name, ns);
-                        desret_int(ret_val);
-                        des_xml_stream_ctxt_ptr(n_stream, stream, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_ns, ns, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlStreamPushAttr",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlStreamPushAttr()");
-                            eprint!(" {}", n_stream);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_ns);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_stream_push_node() {
-        #[cfg(feature = "libxml_pattern")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_stream in 0..GEN_NB_XML_STREAM_CTXT_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_ns in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_node_type in 0..GEN_NB_INT {
-                            let mem_base = xml_mem_blocks();
-                            let stream = gen_xml_stream_ctxt_ptr(n_stream, 0);
-                            let name = gen_const_xml_char_ptr(n_name, 1);
-                            let ns = gen_const_xml_char_ptr(n_ns, 2);
-                            let node_type = gen_int(n_node_type, 3);
-
-                            let ret_val = xml_stream_push_node(stream, name, ns, node_type);
-                            desret_int(ret_val);
-                            des_xml_stream_ctxt_ptr(n_stream, stream, 0);
-                            des_const_xml_char_ptr(n_name, name, 1);
-                            des_const_xml_char_ptr(n_ns, ns, 2);
-                            des_int(n_node_type, node_type, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlStreamPushNode",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlStreamPushNode()"
-                                );
-                                eprint!(" {}", n_stream);
-                                eprint!(" {}", n_name);
-                                eprint!(" {}", n_ns);
-                                eprintln!(" {}", n_node_type);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_stream_wants_any_node() {
-        #[cfg(feature = "libxml_pattern")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_stream_ctxt in 0..GEN_NB_XML_STREAM_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let stream_ctxt = gen_xml_stream_ctxt_ptr(n_stream_ctxt, 0);
-
-                let ret_val = xml_stream_wants_any_node(stream_ctxt);
-                desret_int(ret_val);
-                des_xml_stream_ctxt_ptr(n_stream_ctxt, stream_ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlStreamWantsAnyNode",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlStreamWantsAnyNode()"
-                    );
-                    eprintln!(" {}", n_stream_ctxt);
-                }
-            }
         }
     }
 }

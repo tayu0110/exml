@@ -35,7 +35,6 @@ use libc::{memset, strchr};
 #[cfg(feature = "libxml_pattern")]
 use crate::libxml::pattern::{
     XmlPattern, XmlPatternFlags, XmlStreamCtxtPtr, xml_free_stream_ctxt, xml_pattern_compile,
-    xml_stream_pop, xml_stream_push, xml_stream_push_attr,
 };
 use crate::{
     encoding::XmlCharEncoding,
@@ -15159,17 +15158,11 @@ unsafe fn xml_schema_xpath_evaluate(
         sto = first;
         while sto != head {
             if node_type == XmlElementType::XmlElementNode {
-                res = xml_stream_push(
-                    (*sto).xpath_ctxt as XmlStreamCtxtPtr,
-                    (*(*vctxt).inode).local_name,
-                    (*(*vctxt).inode).ns_name,
-                );
+                res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr))
+                    .push((*(*vctxt).inode).local_name, (*(*vctxt).inode).ns_name);
             } else {
-                res = xml_stream_push_attr(
-                    (*sto).xpath_ctxt as XmlStreamCtxtPtr,
-                    (*(*vctxt).inode).local_name,
-                    (*(*vctxt).inode).ns_name,
-                );
+                res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr))
+                    .push_attr((*(*vctxt).inode).local_name, (*(*vctxt).inode).ns_name);
             }
 
             if res == -1 {
@@ -15480,7 +15473,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
 
         // Evaluate the state objects.
         'main: while !sto.is_null() {
-            res = xml_stream_pop((*sto).xpath_ctxt as XmlStreamCtxtPtr);
+            res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr)).pop();
             if res == -1 {
                 VERROR_INT!(
                     vctxt,
@@ -15987,7 +15980,7 @@ unsafe fn xml_schema_xpath_pop(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
         }
         sto = (*vctxt).xpath_states;
         while {
-            res = xml_stream_pop((*sto).xpath_ctxt as XmlStreamCtxtPtr);
+            res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr)).pop();
             if res == -1 {
                 return -1;
             }

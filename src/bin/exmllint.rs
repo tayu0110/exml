@@ -1977,7 +1977,7 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
     unsafe {
         use exml::{
             libxml::{
-                pattern::{xml_free_stream_ctxt, xml_stream_pop, xml_stream_push},
+                pattern::xml_free_stream_ctxt,
                 xmlreader::{
                     XmlReaderTypes, xml_text_reader_const_local_name, xml_text_reader_const_name,
                     xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
@@ -2046,8 +2046,7 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
                 let mut ret: i32;
 
                 if typ == XmlReaderTypes::XmlReaderTypeElement {
-                    ret = xml_stream_push(
-                        PATSTREAM.load(Ordering::Relaxed),
+                    ret = (*PATSTREAM.load(Ordering::Relaxed)).push(
                         xml_text_reader_const_local_name(&mut *reader),
                         xml_text_reader_const_namespace_uri(&mut *reader),
                     );
@@ -2076,7 +2075,7 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
                 if typ == XmlReaderTypes::XmlReaderTypeEndElement
                     || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap())
                 {
-                    ret = xml_stream_pop(PATSTREAM.load(Ordering::Relaxed));
+                    ret = (*PATSTREAM.load(Ordering::Relaxed)).pop();
                     if ret < 0 {
                         eprintln!("xmlStreamPop() failure");
                         xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
@@ -2094,7 +2093,7 @@ unsafe fn stream_file(filename: *mut c_char) {
         use std::{ptr::null, slice::from_raw_parts};
 
         use exml::libxml::{
-            pattern::{xml_free_stream_ctxt, xml_stream_push},
+            pattern::xml_free_stream_ctxt,
             xmlreader::{
                 XmlParserProperties, xml_free_text_reader, xml_reader_for_file,
                 xml_reader_for_memory, xml_text_reader_relaxng_validate,
@@ -2148,7 +2147,7 @@ unsafe fn stream_file(filename: *mut c_char) {
         if let Some(pattern) = PATTERNC.lock().unwrap().as_ref() {
             PATSTREAM.store(pattern.get_stream_context(), Ordering::Relaxed);
             if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-                ret = xml_stream_push(PATSTREAM.load(Ordering::Relaxed), null_mut(), null_mut());
+                ret = (*PATSTREAM.load(Ordering::Relaxed)).push(null_mut(), null_mut());
                 if ret < 0 {
                     eprintln!("xmlStreamPush() failure");
                     xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
@@ -2299,7 +2298,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
         use std::{ptr::null, sync::atomic::Ordering};
 
         use exml::libxml::{
-            pattern::{xml_free_stream_ctxt, xml_pattern_compile, xml_stream_push},
+            pattern::{xml_free_stream_ctxt, xml_pattern_compile},
             xmlreader::{xml_free_text_reader, xml_reader_walker},
         };
 
@@ -2354,8 +2353,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             if let Some(pattern) = PATTERNC.lock().unwrap().as_ref() {
                 PATSTREAM.store(pattern.get_stream_context(), Ordering::Relaxed);
                 if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-                    ret =
-                        xml_stream_push(PATSTREAM.load(Ordering::Relaxed), null_mut(), null_mut());
+                    ret = (*PATSTREAM.load(Ordering::Relaxed)).push(null_mut(), null_mut());
                     if ret < 0 {
                         eprintln!("xmlStreamPush() failure");
                         xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
