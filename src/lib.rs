@@ -28,6 +28,8 @@ pub mod list;
 #[cfg(feature = "http")]
 pub mod nanohttp;
 pub mod parser;
+#[cfg(feature = "libxml_pattern")]
+pub mod pattern;
 #[cfg(feature = "schema")]
 pub mod relaxng;
 #[cfg(feature = "libxml_output")]

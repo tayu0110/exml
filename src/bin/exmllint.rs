@@ -31,6 +31,8 @@ use clap::Parser;
 use exml::c14n::{XmlC14NMode, xml_c14n_doc_dump_memory};
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
+#[cfg(feature = "libxml_pattern")]
+use exml::pattern::{XmlPattern, XmlStreamCtxt, xml_pattern_compile};
 #[cfg(feature = "schema")]
 use exml::xmlschemas::schema::XmlSchema;
 use exml::{
@@ -57,7 +59,6 @@ use exml::{
             xml_create_push_parser_ctxt, xml_ctxt_use_options, xml_get_external_entity_loader,
             xml_parse_chunk, xml_parse_dtd, xml_set_external_entity_loader,
         },
-        pattern::{XmlPattern, XmlStreamCtxt, xml_pattern_compile},
         relaxng::{
             XmlRelaxNG, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_validate_doc,
@@ -2294,10 +2295,9 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
     unsafe {
         use std::{ptr::null, sync::atomic::Ordering};
 
-        use exml::libxml::{
-            pattern::xml_pattern_compile,
-            xmlreader::{xml_free_text_reader, xml_reader_walker},
-        };
+        use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_walker};
+        #[cfg(feature = "libxml_pattern")]
+        use exml::pattern::xml_pattern_compile;
 
         let mut ret: i32;
 

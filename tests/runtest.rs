@@ -22,10 +22,10 @@ use std::{
 use const_format::concatcp;
 #[cfg(feature = "c14n")]
 use exml::c14n::XmlC14NMode;
-#[cfg(feature = "libxml_pattern")]
-use exml::libxml::pattern::{XmlPattern, XmlStreamCtxt};
 #[cfg(feature = "schematron")]
 use exml::libxml::schematron::XmlSchematronPtr;
+#[cfg(feature = "libxml_pattern")]
+use exml::pattern::{XmlPattern, XmlStreamCtxt};
 #[cfg(feature = "schema")]
 use exml::xmlschemas::schema::XmlSchemaPtr;
 use exml::{
@@ -4233,9 +4233,9 @@ unsafe fn pattern_test(
     options: i32,
 ) -> i32 {
     unsafe {
-        use exml::libxml::{
+        use exml::{
+            libxml::xmlreader::{xml_free_text_reader, xml_reader_walker},
             pattern::xml_pattern_compile,
-            xmlreader::{xml_free_text_reader, xml_reader_walker},
         };
 
         let mut xml: [c_char; 500] = [0; 500];

@@ -33,7 +33,7 @@ use std::{
 };
 
 #[cfg(feature = "libxml_pattern")]
-use crate::libxml::pattern::{XmlPattern, xml_pattern_compile};
+use crate::pattern::{XmlPattern, xml_pattern_compile};
 #[cfg(feature = "schema")]
 use crate::relaxng::{XmlRelaxNGValidCtxtPtr, xml_relaxng_new_parser_ctxt};
 #[cfg(feature = "libxml_reader")]

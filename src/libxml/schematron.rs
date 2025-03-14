@@ -28,6 +28,8 @@ use std::{
 
 use libc::{FILE, malloc, memset, snprintf, sprintf};
 
+#[cfg(feature = "libxml_pattern")]
+use crate::pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile};
 use crate::{
     error::{__xml_raise_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
     generic_error,
@@ -51,7 +53,6 @@ use super::{
     dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference},
     globals::{xml_free, xml_malloc},
     parser::XmlParserOption,
-    pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile},
     xmlstring::{XmlChar, xml_strcat, xml_strdup, xml_strlen},
 };
 

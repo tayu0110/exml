@@ -33,7 +33,7 @@ use std::{
 use libc::{memset, strchr};
 
 #[cfg(feature = "libxml_pattern")]
-use crate::libxml::pattern::{XmlPattern, XmlPatternFlags, XmlStreamCtxt, xml_pattern_compile};
+use crate::pattern::{XmlPattern, XmlPatternFlags, XmlStreamCtxt, xml_pattern_compile};
 use crate::{
     encoding::XmlCharEncoding,
     error::{XmlErrorDomain, XmlParserErrors},

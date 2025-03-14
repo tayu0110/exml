@@ -12,8 +12,6 @@ pub mod htmltree;
 pub mod nanoftp;
 pub mod parser;
 pub mod parser_internals;
-#[cfg(feature = "libxml_pattern")]
-pub mod pattern;
 #[cfg(feature = "schema")]
 pub mod relaxng;
 pub mod sax2;

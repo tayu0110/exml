@@ -61,7 +61,7 @@ use std::{
 use libc::memset;
 
 #[cfg(feature = "libxml_pattern")]
-use crate::libxml::pattern::XmlPattern;
+use crate::pattern::XmlPattern;
 use crate::{
     generic_error,
     libxml::{

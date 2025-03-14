@@ -35,10 +35,10 @@ use std::{
 
 use libc::{INT_MAX, INT_MIN, memset};
 
-#[cfg(feature = "libxml_pattern")]
-use crate::libxml::pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile};
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::{XmlLocationSetPtr, xml_xptr_free_location_set};
+#[cfg(feature = "libxml_pattern")]
+use crate::pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile};
 use crate::{
     error::{__xml_raise_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
