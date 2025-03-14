@@ -2047,8 +2047,20 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
 
                 if typ == XmlReaderTypes::XmlReaderTypeElement {
                     ret = (*PATSTREAM.load(Ordering::Relaxed)).push(
-                        xml_text_reader_const_local_name(&mut *reader),
-                        xml_text_reader_const_namespace_uri(&mut *reader),
+                        Some(
+                            CStr::from_ptr(
+                                xml_text_reader_const_local_name(&mut *reader) as *const i8
+                            )
+                            .to_string_lossy()
+                            .as_ref(),
+                        ),
+                        Some(
+                            CStr::from_ptr(
+                                xml_text_reader_const_namespace_uri(&mut *reader) as *const i8
+                            )
+                            .to_string_lossy()
+                            .as_ref(),
+                        ),
                     );
                     if ret < 0 {
                         eprintln!("xmlStreamPush() failure");
@@ -2147,7 +2159,7 @@ unsafe fn stream_file(filename: *mut c_char) {
         if let Some(pattern) = PATTERNC.lock().unwrap().as_ref() {
             PATSTREAM.store(pattern.get_stream_context(), Ordering::Relaxed);
             if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-                ret = (*PATSTREAM.load(Ordering::Relaxed)).push(null_mut(), null_mut());
+                ret = (*PATSTREAM.load(Ordering::Relaxed)).push(None, None);
                 if ret < 0 {
                     eprintln!("xmlStreamPush() failure");
                     xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
@@ -2353,7 +2365,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             if let Some(pattern) = PATTERNC.lock().unwrap().as_ref() {
                 PATSTREAM.store(pattern.get_stream_context(), Ordering::Relaxed);
                 if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-                    ret = (*PATSTREAM.load(Ordering::Relaxed)).push(null_mut(), null_mut());
+                    ret = (*PATSTREAM.load(Ordering::Relaxed)).push(None, None);
                     if ret < 0 {
                         eprintln!("xmlStreamPush() failure");
                         xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));

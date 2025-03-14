@@ -4186,9 +4186,16 @@ unsafe fn pattern_node(
             let mut ret: i32;
 
             if typ == XmlReaderTypes::XmlReaderTypeElement {
+                let ns = xml_text_reader_const_namespace_uri(&mut *reader);
                 ret = (*patstream).push(
-                    xml_text_reader_const_local_name(&mut *reader),
-                    xml_text_reader_const_namespace_uri(&mut *reader),
+                    Some(
+                        CStr::from_ptr(xml_text_reader_const_local_name(&mut *reader) as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                    (!ns.is_null())
+                        .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
+                        .as_deref(),
                 );
                 if ret < 0 {
                     writeln!(out, "xmlStreamPush() failure").ok();
@@ -4355,7 +4362,7 @@ unsafe fn pattern_test(
                         };
                         patstream = patternc.get_stream_context();
                         if !patstream.is_null() {
-                            ret = (*patstream).push(null_mut(), null_mut());
+                            ret = (*patstream).push(None, None);
                             if ret < 0 {
                                 eprintln!("xmlStreamPush() failure");
                                 xml_free_stream_ctxt(patstream);

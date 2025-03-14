@@ -1602,7 +1602,7 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
         let eval_all_nodes: i32 = (*patstream).wants_any_node();
 
         if from_root != 0 {
-            ret = (*patstream).push(null(), null());
+            ret = (*patstream).push(None, None);
             if ret < 0 {
             } else if ret == 1 {
                 if to_bool != 0 {
@@ -1646,13 +1646,13 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
                                     {
                                         let node = XmlNodePtr::try_from(cur).unwrap();
                                         (*patstream).push(
-                                            node.name,
-                                            node.ns.map_or(null_mut(), |ns| ns.href),
+                                            node.name().as_deref(),
+                                            node.ns.as_deref().and_then(|ns| ns.href()).as_deref(),
                                         )
                                     } else if eval_all_nodes != 0 {
                                         (*patstream).push_node(
-                                            null(),
-                                            null(),
+                                            None,
+                                            None,
                                             cur.element_type() as i32,
                                         )
                                     } else {

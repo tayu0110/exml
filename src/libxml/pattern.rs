@@ -25,7 +25,6 @@
 // daniel@veillard.com
 
 use std::{
-    ffi::CStr,
     mem::size_of,
     os::raw::c_void,
     ptr::{drop_in_place, null_mut},
@@ -38,7 +37,6 @@ use crate::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         globals::{xml_free, xml_malloc},
         parser_internals::xml_is_letter,
-        xmlstring::XmlChar,
     },
     tree::{XML_XML_NAMESPACE, XmlElementType, XmlGenericNodePtr, XmlNodePtr},
 };
@@ -1551,8 +1549,8 @@ impl XmlStreamCtxt {
     #[doc(alias = "xmlStreamPushInternal")]
     unsafe fn push_internal(
         &mut self,
-        name: *const XmlChar,
-        ns: *const XmlChar,
+        name: Option<&str>,
+        ns: Option<&str>,
         node_type: i32,
     ) -> i32 {
         unsafe {
@@ -1573,8 +1571,8 @@ impl XmlStreamCtxt {
                     comp = stream.comp;
 
                     if node_type == XmlElementType::XmlElementNode as i32
-                        && name.is_null()
-                        && ns.is_null()
+                        && name.is_none()
+                        && ns.is_none()
                     {
                         // We have a document node here (or a reset).
                         stream.states.clear();
@@ -1699,26 +1697,13 @@ impl XmlStreamCtxt {
                                 if step.ns.is_none() {
                                     // This lets through all elements/attributes.
                                     is_match = 1;
-                                } else if !ns.is_null() {
-                                    is_match = (step.ns.as_deref()
-                                        == Some(
-                                            CStr::from_ptr(ns as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
-                                        )) as i32;
+                                } else if ns.is_some() {
+                                    is_match = (step.ns.as_deref() == ns) as i32;
                                 }
-                            } else if step.ns.is_none() == ns.is_null()
-                                && !name.is_null()
-                                && step.name.as_deref()
-                                    == Some(
-                                        CStr::from_ptr(name as *const i8)
-                                            .to_string_lossy()
-                                            .as_ref(),
-                                    )
-                                && step.ns.as_deref()
-                                    == (!ns.is_null())
-                                        .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
-                                        .as_deref()
+                            } else if step.ns.is_none() == ns.is_none()
+                                && name.is_some()
+                                && step.name.as_deref() == name
+                                && step.ns.as_deref() == ns
                             {
                                 is_match = 1;
                             }
@@ -1818,19 +1803,13 @@ impl XmlStreamCtxt {
                         if step.ns.is_none() {
                             // This lets through all elements/attributes.
                             is_match = 1;
-                        } else if !ns.is_null() {
-                            is_match = (step.ns.as_deref()
-                                == Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()))
-                                as i32;
+                        } else if ns.is_some() {
+                            is_match = (step.ns.as_deref() == ns) as i32;
                         }
-                    } else if step.ns.is_none() == ns.is_null()
-                        && !name.is_null()
-                        && step.name.as_deref()
-                            == Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref())
-                        && step.ns.as_deref()
-                            == (!ns.is_null())
-                                .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
-                                .as_deref()
+                    } else if step.ns.is_none() == ns.is_none()
+                        && name.is_some()
+                        && step.name.as_deref() == name
+                        && step.ns.as_deref() == ns
                     {
                         is_match = 1;
                     }
@@ -1880,8 +1859,8 @@ impl XmlStreamCtxt {
     #[doc(alias = "xmlStreamPushNode")]
     pub unsafe fn push_node(
         &mut self,
-        name: *const XmlChar,
-        ns: *const XmlChar,
+        name: Option<&str>,
+        ns: Option<&str>,
         node_type: i32,
     ) -> i32 {
         unsafe { self.push_internal(name, ns, node_type) }
@@ -1896,7 +1875,7 @@ impl XmlStreamCtxt {
     ///
     /// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
     #[doc(alias = "xmlStreamPush")]
-    pub unsafe fn push(&mut self, name: *const XmlChar, ns: *const XmlChar) -> i32 {
+    pub unsafe fn push(&mut self, name: Option<&str>, ns: Option<&str>) -> i32 {
         unsafe { self.push_internal(name, ns, XmlElementType::XmlElementNode as i32) }
     }
 
@@ -1909,7 +1888,7 @@ impl XmlStreamCtxt {
     ///
     /// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
     #[doc(alias = "xmlStreamPushAttr")]
-    pub unsafe fn push_attr(&mut self, name: *const XmlChar, ns: *const XmlChar) -> i32 {
+    pub unsafe fn push_attr(&mut self, name: Option<&str>, ns: Option<&str>) -> i32 {
         unsafe { self.push_internal(name, ns, XmlElementType::XmlAttributeNode as i32) }
     }
 

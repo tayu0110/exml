@@ -15158,11 +15158,29 @@ unsafe fn xml_schema_xpath_evaluate(
         sto = first;
         while sto != head {
             if node_type == XmlElementType::XmlElementNode {
-                res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr))
-                    .push((*(*vctxt).inode).local_name, (*(*vctxt).inode).ns_name);
+                let ns = (*(*vctxt).inode).ns_name;
+                res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr)).push(
+                    Some(
+                        CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                    (!ns.is_null())
+                        .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
+                        .as_deref(),
+                );
             } else {
-                res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr))
-                    .push_attr((*(*vctxt).inode).local_name, (*(*vctxt).inode).ns_name);
+                let ns = (*(*vctxt).inode).ns_name;
+                res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr)).push_attr(
+                    Some(
+                        CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ),
+                    (!ns.is_null())
+                        .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
+                        .as_deref(),
+                );
             }
 
             if res == -1 {
