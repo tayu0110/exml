@@ -4148,7 +4148,7 @@ unsafe fn schematron_test(
 unsafe fn pattern_node(
     out: &mut File,
     reader: XmlTextReaderPtr,
-    pattern: *const c_char,
+    pattern: &str,
     patternc: &XmlPattern,
     patstream: Option<&mut XmlStreamCtxt>,
 ) {
@@ -4171,9 +4171,8 @@ unsafe fn pattern_node(
                 path = (*reader).current_node().unwrap().get_node_path();
                 writeln!(
                     out,
-                    "Node {} matches pattern {}",
+                    "Node {} matches pattern {pattern}",
                     path.as_deref().unwrap(),
-                    CStr::from_ptr(pattern).to_string_lossy()
                 )
                 .ok();
             }
@@ -4200,13 +4199,7 @@ unsafe fn pattern_node(
                         path = (*reader).current_node().unwrap().get_node_path();
                     }
                     writeln!(out, "xmlPatternMatch and xmlStreamPush disagree").ok();
-                    writeln!(
-                        out,
-                        "  pattern {} node {}",
-                        CStr::from_ptr(pattern).to_string_lossy(),
-                        path.as_deref().unwrap()
-                    )
-                    .ok();
+                    writeln!(out, "  pattern {pattern} node {}", path.as_deref().unwrap()).ok();
                 }
             }
             if typ == XmlReaderTypes::XmlReaderTypeEndElement
@@ -4238,40 +4231,17 @@ unsafe fn pattern_test(
             pattern::xml_pattern_compile,
         };
 
-        let mut xml: [c_char; 500] = [0; 500];
-        let mut result: [c_char; 500] = [0; 500];
-        let mut len: usize;
         let mut ret: i32;
         let mut res: i32;
-        let cfilename = CString::new(filename).unwrap();
         let mut reader: XmlTextReaderPtr;
 
-        len = filename.len();
-        len -= 4;
-        memcpy(xml.as_mut_ptr() as _, cfilename.as_ptr() as _, len);
-        xml[len] = 0;
-        let cbase = CString::new(base_filename(
-            CStr::from_ptr(xml.as_ptr()).to_string_lossy().as_ref(),
-        ))
-        .unwrap();
-        if snprintf(
-            result.as_mut_ptr(),
-            499,
-            c"./result/pattern/%s".as_ptr(),
-            cbase.as_ptr(),
-        ) >= 499
-        {
-            result[499] = 0;
-        }
-        memcpy(xml.as_mut_ptr().add(len) as _, c".xml".as_ptr() as _, 5);
+        let mut xml = filename[..filename.len() - 4].to_owned();
+        let base = base_filename(&xml);
+        let result = format!("./result/pattern/{base}");
+        xml.push_str(".xml");
 
-        if !check_test_file(CStr::from_ptr(xml.as_ptr()).to_string_lossy().as_ref())
-            && !*UPDATE_RESULTS.get_or_init(|| false)
-        {
-            eprintln!(
-                "Missing xml file {}",
-                CStr::from_ptr(xml.as_ptr()).to_string_lossy()
-            );
+        if !check_test_file(&xml) && !*UPDATE_RESULTS.get_or_init(|| false) {
+            eprintln!("Missing xml file {xml}");
             return -1;
         }
         let Ok(mut f) = File::open(filename).map(BufReader::new) else {
@@ -4292,60 +4262,32 @@ unsafe fn pattern_test(
             eprintln!("failed to open output file {temp}",);
             return -1;
         };
-        let mut str = vec![];
+        let mut buffer = String::new();
         loop {
             // read one line in string buffer.
-            match f.read_until(b'\n', &mut str) {
-                Ok(mut size) if size > 0 => {
+            match f.read_line(&mut buffer) {
+                Ok(size) if size > 0 => {
                     // remove the ending spaces
-                    while size > 0
-                        && (str[size - 1] == b'\n'
-                            || str[size - 1] == b'\r'
-                            || str[size - 1] == b' '
-                            || str[size - 1] == b'\t')
-                    {
-                        size -= 1;
-                        str[size] = 0;
-                    }
-                    let xml = CStr::from_ptr(xml.as_ptr()).to_string_lossy();
+                    let pattern = buffer.trim();
                     if let Some(doc) = xml_read_file(&xml, None, options) {
-                        let mut namespaces: [(*const u8, *const u8); 20] = [(null(), null()); 20];
                         let root = doc.get_root_element().unwrap();
                         let mut ns = root.ns_def;
                         let mut j = 0;
+                        let mut namespaces = vec![];
                         while let Some(now) = ns.filter(|_| j < 10) {
-                            namespaces[j] = (now.href, now.prefix);
+                            namespaces.push((
+                                now.href().unwrap().into_owned(),
+                                now.prefix().as_deref().map(|pre| pre.to_owned()),
+                            ));
                             j += 1;
                             ns = now.next;
                         }
 
-                        let Some(patternc) = xml_pattern_compile(
-                            CStr::from_ptr(str.as_ptr() as *const i8)
-                                .to_string_lossy()
-                                .as_ref(),
-                            0,
-                            Some(
-                                namespaces[..j]
-                                    .iter()
-                                    .map(|&(href, pref)| {
-                                        (
-                                            CStr::from_ptr(href as *const i8)
-                                                .to_string_lossy()
-                                                .into_owned(),
-                                            (!pref.is_null()).then(|| {
-                                                CStr::from_ptr(pref as *const i8)
-                                                    .to_string_lossy()
-                                                    .into_owned()
-                                            }),
-                                        )
-                                    })
-                                    .collect(),
-                            ),
-                        ) else {
-                            let str = CStr::from_ptr(str.as_ptr() as *const i8).to_string_lossy();
+                        let Some(patternc) = xml_pattern_compile(pattern, 0, Some(namespaces))
+                        else {
                             test_error_handler(
                                 None,
-                                format!("Pattern {str} failed to compile\n").as_str(),
+                                format!("Pattern {pattern} failed to compile\n").as_str(),
                             );
                             xml_free_doc(doc);
                             // ret = 1;
@@ -4366,7 +4308,7 @@ unsafe fn pattern_test(
                             pattern_node(
                                 &mut o,
                                 reader,
-                                str.as_ptr() as _,
+                                pattern,
                                 &patternc,
                                 patstream.as_deref_mut(),
                             );
@@ -4386,11 +4328,10 @@ unsafe fn pattern_test(
                     break;
                 }
             }
-            str.clear();
+            buffer.clear();
         }
 
-        let result = CStr::from_ptr(result.as_ptr()).to_string_lossy();
-        ret = compare_files(temp.as_str(), result.as_ref());
+        ret = compare_files(temp.as_str(), &result);
         if ret != 0 {
             eprintln!("Result for {filename} failed in {result}");
             ret = 1;
