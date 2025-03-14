@@ -26,7 +26,7 @@ use std::{
     slice::from_raw_parts,
 };
 
-use libc::{FILE, malloc, memset, snprintf, sprintf};
+use libc::{FILE, malloc, memset};
 
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile};
@@ -52,7 +52,7 @@ use crate::{
 use super::{
     globals::{xml_free, xml_malloc},
     parser::XmlParserOption,
-    xmlstring::{XmlChar, xml_strcat, xml_strdup, xml_strlen},
+    xmlstring::{XmlChar, xml_strdup},
 };
 
 /// Handle a parser error
@@ -319,9 +319,9 @@ impl XmlSchematronValidCtxt {
     ///
     /// Returns a report string or NULL in case of error. The string needs to be deallocated by the caller
     #[doc(alias = "xmlSchematronFormatReport")]
-    unsafe fn format_report(&self, test: XmlNodePtr, cur: XmlNodePtr) -> *mut XmlChar {
+    unsafe fn format_report(&self, test: XmlNodePtr, cur: XmlNodePtr) -> Option<String> {
         unsafe {
-            let mut ret: *mut XmlChar = null_mut();
+            let mut ret: Option<String> = None;
             let mut comp: XmlXPathCompExprPtr;
 
             let mut child = test.children().map(|c| XmlNodePtr::try_from(c).unwrap());
@@ -329,7 +329,12 @@ impl XmlSchematronValidCtxt {
                 if cur_node.element_type() == XmlElementType::XmlTextNode
                     || cur_node.element_type() == XmlElementType::XmlCDATASectionNode
                 {
-                    ret = xml_strcat(ret, cur_node.content);
+                    let ret = ret.get_or_insert_default();
+                    ret.push_str(
+                        CStr::from_ptr(cur_node.content as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
                 } else if is_schematron(cur_node, "name") {
                     let path = cur_node.get_no_ns_prop("path");
 
@@ -345,13 +350,16 @@ impl XmlSchematronValidCtxt {
                         attr.ns
                     };
 
-                    if let Some(prefix) = ns.map(|ns| ns.prefix).filter(|p| !p.is_null()) {
-                        ret = xml_strcat(ret, prefix);
-                        ret = xml_strcat(ret, c":".as_ptr() as _);
-                        ret = xml_strcat(ret, node.name().unwrap().as_ptr());
-                    } else {
-                        ret = xml_strcat(ret, node.name().unwrap().as_ptr());
+                    let ret = ret.get_or_insert_default();
+                    if let Some(prefix) = ns
+                        .as_deref()
+                        .and_then(|ns| ns.prefix())
+                        .filter(|p| !p.is_empty())
+                    {
+                        ret.push_str(&prefix);
+                        ret.push(':');
                     }
+                    ret.push_str(&node.name().unwrap());
                 } else if is_schematron(cur_node, "value-of") {
                     comp = cur_node
                         .get_no_ns_prop("select")
@@ -361,49 +369,40 @@ impl XmlSchematronValidCtxt {
 
                     match (*eval).typ {
                         XmlXPathObjectType::XPathNodeset => {
-                            let spacer: *mut XmlChar = c" ".as_ptr() as _;
+                            let spacer = " ";
+                            let ret = ret.get_or_insert_default();
 
                             if let Some(nodeset) = (*eval).nodesetval.as_deref() {
                                 for (indx, &node) in nodeset.node_tab.iter().enumerate() {
                                     if indx > 0 {
-                                        ret = xml_strcat(ret, spacer);
+                                        ret.push_str(spacer);
                                     }
-                                    ret = xml_strcat(
-                                        ret,
-                                        node.name().map_or(null_mut(), |name| name.as_ptr()),
-                                    );
+                                    ret.push_str(&node.name().unwrap());
                                 }
                             } else {
                                 generic_error!("Empty node set\n");
                             }
                         }
                         XmlXPathObjectType::XPathBoolean => {
-                            let str: *const c_char = if (*eval).boolval {
-                                c"True".as_ptr()
+                            let s = if (*eval).boolval { "True" } else { "False" };
+                            if let Some(ret) = ret.as_mut() {
+                                ret.push_str(s);
                             } else {
-                                c"False".as_ptr()
-                            };
-                            ret = xml_strcat(ret, str as _);
+                                ret = Some(s.to_owned());
+                            }
                         }
                         XmlXPathObjectType::XPathNumber => {
-                            let size: i32 =
-                                snprintf(null_mut(), 0, c"%0g".as_ptr() as _, (*eval).floatval);
-                            let buf: *mut XmlChar = malloc(size as usize) as _;
-                            sprintf(buf as _, c"%0g".as_ptr() as _, (*eval).floatval);
-                            ret = xml_strcat(ret, buf);
-                            xml_free(buf as _);
+                            if let Some(ret) = ret.as_mut() {
+                                ret.push_str(format!("{}", (*eval).floatval).as_str());
+                            } else {
+                                ret = Some(format!("{}", (*eval).floatval));
+                            }
                         }
                         XmlXPathObjectType::XPathString => {
-                            let strval = (*eval)
-                                .stringval
-                                .as_deref()
-                                .map(|s| CString::new(s).unwrap());
-                            ret = xml_strcat(
-                                ret,
-                                strval
-                                    .as_deref()
-                                    .map_or(null_mut(), |s| s.as_ptr() as *const u8),
-                            );
+                            let strval = (*eval).stringval.as_deref().unwrap();
+                            let ret =
+                                ret.get_or_insert_with(|| String::with_capacity(strval.len()));
+                            ret.push_str(strval);
                         }
                         _ => {
                             generic_error!("Unsupported XPATH Type: {:?}\n", (*eval).typ);
@@ -419,23 +418,12 @@ impl XmlSchematronValidCtxt {
                 }
 
                 // remove superfluous \n
-                if !ret.is_null() {
-                    let mut len: i32 = xml_strlen(ret) as _;
-                    let mut c: XmlChar;
-
-                    if len > 0 {
-                        c = *ret.add(len as usize - 1);
-                        if c == b' ' || c == b'\n' || c == b'\r' || c == b'\t' {
-                            while c == b' ' || c == b'\n' || c == b'\r' || c == b'\t' {
-                                len -= 1;
-                                if len == 0 {
-                                    break;
-                                }
-                                c = *ret.add(len as usize - 1);
-                            }
-                            *ret.add(len as usize) = b' ';
-                            *ret.add(len as usize + 1) = 0;
-                        }
+                if let Some(ret) = ret.as_mut() {
+                    let trimmed = ret.trim_end_matches([' ', '\n', '\r', '\t']);
+                    if ret.len() != trimmed.len() {
+                        let newlen = trimmed.len();
+                        ret.truncate(newlen);
+                        ret.push(' ');
                     }
                 }
 
@@ -477,8 +465,6 @@ impl XmlSchematronValidCtxt {
             if self.flags & XmlSchematronValidOptions::XmlSchematronOutXml as i32 != 0 {
                 // TODO
             } else {
-                let mut report: *const XmlChar = null_mut();
-
                 if ((*test).typ == XmlSchematronTestType::XmlSchematronReport && success == 0)
                     || ((*test).typ == XmlSchematronTestType::XmlSchematronAssert && success != 0)
                 {
@@ -486,22 +472,18 @@ impl XmlSchematronValidCtxt {
                 }
                 let line: i64 = cur.get_line_no();
                 let path = cur.get_node_path().expect("Internal Error");
+                let mut report = None;
                 if let Some(node) = (*test).node {
                     report = self.format_report(node, cur);
                 }
-                if report.is_null() {
+                let report = report.unwrap_or_else(|| {
                     if (*test).typ == XmlSchematronTestType::XmlSchematronAssert {
-                        report = xml_strdup(c"node failed assert".as_ptr() as _);
+                        "node failed assert".to_owned()
                     } else {
-                        report = xml_strdup(c"node failed report".as_ptr() as _);
+                        "node failed report".to_owned()
                     }
-                }
-                let msg = format!(
-                    "{} line {}: {}\n",
-                    path,
-                    line,
-                    CStr::from_ptr(report as *const i8).to_string_lossy()
-                );
+                });
+                let msg = format!("{path} line {line}: {report}\n");
 
                 if self.flags & XmlSchematronValidOptions::XmlSchematronOutError as i32 != 0 {
                     let mut schannel: Option<StructuredError> = None;
@@ -540,10 +522,7 @@ impl XmlSchematronValidCtxt {
                             )
                         },
                         Some(path.to_owned().into()),
-                        (!report.is_null()).then(|| CStr::from_ptr(report as *const i8)
-                            .to_string_lossy()
-                            .into_owned()
-                            .into()),
+                        Some(report.into()),
                         0,
                         0,
                         msg.as_str(),
@@ -551,8 +530,6 @@ impl XmlSchematronValidCtxt {
                 } else {
                     self.report_output(Some(cur), &msg);
                 }
-
-                xml_free(report as _);
             }
         }
     }
