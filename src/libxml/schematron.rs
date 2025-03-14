@@ -50,7 +50,6 @@ use crate::{
 };
 
 use super::{
-    dict::{XmlDictPtr, xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference},
     globals::{xml_free, xml_malloc},
     parser::XmlParserOption,
     xmlstring::{XmlChar, xml_strcat, xml_strdup, xml_strlen},
@@ -143,9 +142,7 @@ pub struct XmlSchematron {
     flags: i32,             /* specific to this schematron */
 
     _private: *mut c_void, /* unused by the library */
-    dict: XmlDictPtr,      /* the dictionary used internally */
-
-    title: *const XmlChar, /* the title if any */
+    title: Option<String>, /* the title if any */
 
     nb_ns: i32, /* the number of namespaces */
 
@@ -165,8 +162,7 @@ impl Default for XmlSchematron {
             doc: None,
             flags: 0,
             _private: null_mut(),
-            dict: null_mut(),
-            title: null_mut(),
+            title: None,
             nb_ns: 0,
             nb_pattern: 0,
             patterns: null_mut(),
@@ -184,7 +180,6 @@ pub struct XmlSchematronValidCtxt {
     typ: i32,
     flags: i32, /* an or of xmlSchematronValidOptions */
 
-    dict: XmlDictPtr,
     nberrors: i32,
     err: i32,
 
@@ -211,7 +206,6 @@ impl Default for XmlSchematronValidCtxt {
         Self {
             typ: 0,
             flags: 0,
-            dict: null_mut(),
             nberrors: 0,
             err: 0,
             schema: null_mut(),
@@ -231,6 +225,7 @@ impl Default for XmlSchematronValidCtxt {
 
 pub type XmlSchematronParserCtxtPtr = *mut XmlSchematronParserCtxt;
 /// A schemas validation context
+#[doc(alias = "xmlSchematronParserCtxt")]
 #[repr(C)]
 pub struct XmlSchematronParserCtxt {
     typ: i32,
@@ -239,8 +234,6 @@ pub struct XmlSchematronParserCtxt {
     preserve: i32, /* Whether the doc should be freed  */
     buffer: *const c_char,
     size: i32,
-
-    dict: XmlDictPtr, /* dictionary for interned string names */
 
     nberrors: i32,
     err: i32,
@@ -269,7 +262,6 @@ impl Default for XmlSchematronParserCtxt {
             preserve: 0,
             buffer: null_mut(),
             size: 0,
-            dict: null_mut(),
             nberrors: 0,
             err: 0,
             xctxt: null_mut(),
@@ -325,7 +317,6 @@ pub unsafe fn xml_schematron_new_parser_ctxt(url: &str) -> XmlSchematronParserCt
         }
         std::ptr::write(&mut *ret, XmlSchematronParserCtxt::default());
         (*ret).typ = XML_STRON_CTXT_PARSER;
-        (*ret).dict = xml_dict_create();
         (*ret).url = Some(url.to_owned());
         (*ret).xctxt = xml_xpath_new_context(None);
         if (*ret).xctxt.is_null() {
@@ -361,7 +352,6 @@ pub unsafe fn xml_schematron_new_mem_parser_ctxt(
         memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
         (*ret).buffer = buffer;
         (*ret).size = size;
-        (*ret).dict = xml_dict_create();
         (*ret).xctxt = xml_xpath_new_context(None);
         if (*ret).xctxt.is_null() {
             xml_schematron_perr_memory(null_mut(), "allocating schema parser XPath context", None);
@@ -379,19 +369,14 @@ pub unsafe fn xml_schematron_new_mem_parser_ctxt(
 #[doc(alias = "xmlSchematronNewDocParserCtxt")]
 pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchematronParserCtxtPtr {
     unsafe {
-        // if doc.is_null() {
-        //     return null_mut();
-        // }
-
         let ret: XmlSchematronParserCtxtPtr =
             xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
         if ret.is_null() {
             xml_schematron_perr_memory(null_mut(), "allocating schema parser context", None);
             return null_mut();
         }
-        memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
+        std::ptr::write(&mut *ret, XmlSchematronParserCtxt::default());
         (*ret).doc = Some(doc);
-        (*ret).dict = xml_dict_create();
         // The application has responsibility for the document
         (*ret).preserve = 1;
         (*ret).xctxt = xml_xpath_new_context(Some(doc));
@@ -418,7 +403,6 @@ pub unsafe fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronParserCtxtPtr) 
         if !(*ctxt).xctxt.is_null() {
             xml_xpath_free_context((*ctxt).xctxt);
         }
-        xml_dict_free((*ctxt).dict);
         drop_in_place(ctxt);
         xml_free(ctxt as _);
     }
@@ -535,8 +519,6 @@ unsafe fn xml_schematron_new_schematron(ctxt: XmlSchematronParserCtxtPtr) -> Xml
             return null_mut();
         }
         std::ptr::write(&mut *ret, XmlSchematron::default());
-        (*ret).dict = (*ctxt).dict;
-        xml_dict_reference((*ret).dict);
 
         ret
     }
@@ -1156,9 +1138,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 let mut cur = next_schematron(cur).unwrap();
                 if is_schematron(cur, "title") {
                     if let Some(title) = cur.get_content() {
-                        let title = CString::new(title).unwrap();
-                        (*ret).title =
-                            xml_dict_lookup((*ret).dict, title.as_ptr() as *const u8, -1);
+                        (*ret).title = Some(title);
                     }
                     cur = next_schematron(cur.next.map(|node| XmlNodePtr::try_from(node).unwrap()))
                         .unwrap();
@@ -1352,7 +1332,6 @@ pub unsafe fn xml_schematron_free(schema: XmlSchematronPtr) {
 
         xml_schematron_free_rules((*schema).rules);
         xml_schematron_free_patterns((*schema).patterns);
-        xml_dict_free((*schema).dict);
         drop_in_place(schema);
         xml_free(schema as _);
     }
@@ -1436,9 +1415,6 @@ pub unsafe fn xml_schematron_free_valid_ctxt(ctxt: XmlSchematronValidCtxtPtr) {
         }
         if !(*ctxt).xctxt.is_null() {
             xml_xpath_free_context((*ctxt).xctxt);
-        }
-        if !(*ctxt).dict.is_null() {
-            xml_dict_free((*ctxt).dict);
         }
         xml_free(ctxt as _);
     }
