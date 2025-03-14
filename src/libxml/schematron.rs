@@ -20,9 +20,9 @@
 
 use std::{
     ffi::{CStr, CString, c_char},
-    mem::size_of,
+    mem::{size_of, take},
     os::raw::c_void,
-    ptr::null_mut,
+    ptr::{drop_in_place, null_mut},
     slice::from_raw_parts,
 };
 
@@ -149,10 +149,12 @@ pub struct XmlSchematron {
 
     nb_ns: i32, /* the number of namespaces */
 
-    nb_pattern: i32,                                 /* the number of patterns */
-    patterns: XmlSchematronPatternPtr,               /* the patterns found */
-    rules: XmlSchematronRulePtr,                     /* the rules gathered */
-    namespaces: Option<Vec<(*const u8, *const u8)>>, /* the array of namespaces */
+    nb_pattern: i32,                   /* the number of patterns */
+    patterns: XmlSchematronPatternPtr, /* the patterns found */
+    rules: XmlSchematronRulePtr,       /* the rules gathered */
+    // the array of namespaces
+    // (href, prefix)
+    namespaces: Vec<(String, Option<String>)>,
 }
 
 impl Default for XmlSchematron {
@@ -169,7 +171,7 @@ impl Default for XmlSchematron {
             nb_pattern: 0,
             patterns: null_mut(),
             rules: null_mut(),
-            namespaces: None,
+            namespaces: vec![],
         }
     }
 }
@@ -245,7 +247,9 @@ pub struct XmlSchematronParserCtxt {
     xctxt: XmlXPathContextPtr, /* the XPath context used for compilation */
     schema: XmlSchematronPtr,
 
-    namespaces: Option<Vec<(*const u8, *const u8)>>, /* the array of namespaces */
+    // the array of namespaces
+    // (href, prefix)
+    namespaces: Vec<(String, Option<String>)>,
 
     includes: Vec<XmlNodePtr>, /* the array of includes */
 
@@ -270,7 +274,7 @@ impl Default for XmlSchematronParserCtxt {
             err: 0,
             xctxt: null_mut(),
             schema: null_mut(),
-            namespaces: None,
+            namespaces: vec![],
             includes: vec![],
             user_data: None,
             error: None,
@@ -414,8 +418,8 @@ pub unsafe fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronParserCtxtPtr) 
         if !(*ctxt).xctxt.is_null() {
             xml_xpath_free_context((*ctxt).xctxt);
         }
-        (*ctxt).namespaces = None;
         xml_dict_free((*ctxt).dict);
+        drop_in_place(ctxt);
         xml_free(ctxt as _);
     }
 }
@@ -542,15 +546,13 @@ unsafe fn xml_schematron_new_schematron(ctxt: XmlSchematronParserCtxtPtr) -> Xml
 #[doc(alias = "xmlSchematronAddNamespace")]
 unsafe fn xml_schematron_add_namespace(
     ctxt: XmlSchematronParserCtxtPtr,
-    prefix: *const XmlChar,
-    ns: *const XmlChar,
+    prefix: Option<&str>,
+    ns: &str,
 ) {
     unsafe {
-        let namespaces = (*ctxt).namespaces.get_or_insert_with(Vec::new);
-        namespaces.push((
-            xml_dict_lookup((*ctxt).dict, ns, -1),
-            xml_dict_lookup((*ctxt).dict, prefix, -1),
-        ));
+        (*ctxt)
+            .namespaces
+            .push((ns.to_owned(), prefix.map(|pre| pre.to_owned())));
     }
 }
 
@@ -615,22 +617,7 @@ unsafe fn xml_schematron_add_rule(
                 .to_string_lossy()
                 .as_ref(),
             XmlPatternFlags::XmlPatternXPath as i32,
-            (*ctxt).namespaces.as_deref().map(|ns| {
-                ns.iter()
-                    .map(|&(href, pref)| {
-                        (
-                            CStr::from_ptr(href as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                            (!pref.is_null()).then(|| {
-                                CStr::from_ptr(pref as *const i8)
-                                    .to_string_lossy()
-                                    .into_owned()
-                            }),
-                        )
-                    })
-                    .collect()
-            }),
+            Some((*ctxt).namespaces.clone()),
         );
         if pattern.is_none() {
             let context = CStr::from_ptr(context as *const i8).to_string_lossy();
@@ -1198,13 +1185,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                     }
                     if let (Some(prefix), Some(uri)) = (prefix, uri) {
                         xml_xpath_register_ns((*ctxt).xctxt, &prefix, Some(&uri));
-                        let prefix = CString::new(prefix).unwrap();
-                        let uri = CString::new(uri).unwrap();
-                        xml_schematron_add_namespace(
-                            ctxt,
-                            prefix.as_ptr() as *const u8,
-                            uri.as_ptr() as *const u8,
-                        );
+                        xml_schematron_add_namespace(ctxt, Some(&prefix), &uri);
                         (*ret).nb_ns += 1;
                     }
                     next =
@@ -1263,7 +1244,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 xml_schematron_free(ret);
                 ret = null_mut();
             } else {
-                (*ret).namespaces = (*ctxt).namespaces.take();
+                (*ret).namespaces = take(&mut (*ctxt).namespaces);
             }
         }
         ret
@@ -1369,11 +1350,10 @@ pub unsafe fn xml_schematron_free(schema: XmlSchematronPtr) {
             xml_free_doc(doc);
         }
 
-        (*schema).namespaces = None;
-
         xml_schematron_free_rules((*schema).rules);
         xml_schematron_free_patterns((*schema).patterns);
         xml_dict_free((*schema).dict);
+        drop_in_place(schema);
         xml_free(schema as _);
     }
 }
@@ -1437,17 +1417,11 @@ pub unsafe fn xml_schematron_new_valid_ctxt(
             xml_schematron_free_valid_ctxt(ret);
             return null_mut();
         }
-        if let Some(namespaces) = (*schema).namespaces.as_deref() {
-            for &(href, pref) in namespaces {
-                if href.is_null() || pref.is_null() {
-                    break;
-                }
-                xml_xpath_register_ns(
-                    (*ret).xctxt,
-                    CStr::from_ptr(pref as *const i8).to_string_lossy().as_ref(),
-                    Some(CStr::from_ptr(href as *const i8).to_string_lossy().as_ref()),
-                );
-            }
+        for (href, pref) in &(*schema).namespaces {
+            let Some(pref) = pref.as_deref() else {
+                break;
+            };
+            xml_xpath_register_ns((*ret).xctxt, pref, Some(href.as_str()));
         }
         ret
     }
