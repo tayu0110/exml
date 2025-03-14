@@ -2730,19 +2730,17 @@ impl XmlTextReader {
     /// Returns a non-negative number in case of success and -1 in case of error
     #[doc(alias = "xmlTextReaderPreservePattern")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
-    pub unsafe fn preserve_pattern(
+    pub fn preserve_pattern(
         &mut self,
         pattern: &str,
         namespaces: Option<Vec<(String, Option<String>)>>,
     ) -> i32 {
-        unsafe {
-            let Some(comp) = xml_pattern_compile(pattern, 0, namespaces) else {
-                return -1;
-            };
+        let Some(comp) = xml_pattern_compile(pattern, 0, namespaces) else {
+            return -1;
+        };
 
-            self.pattern_tab.push(*comp);
-            self.pattern_tab.len() as i32 - 1
-        }
+        self.pattern_tab.push(*comp);
+        self.pattern_tab.len() as i32 - 1
     }
 
     /// Provides the text value of the node if present
