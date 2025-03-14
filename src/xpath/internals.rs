@@ -36,9 +36,7 @@ use std::{
 use libc::{INT_MAX, INT_MIN, memset};
 
 #[cfg(feature = "libxml_pattern")]
-use crate::libxml::pattern::{
-    XmlPattern, XmlPatternFlags, XmlStreamCtxtPtr, xml_free_stream_ctxt, xml_pattern_compile,
-};
+use crate::libxml::pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile};
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::{XmlLocationSetPtr, xml_xptr_free_location_set};
 use crate::{
@@ -1593,23 +1591,18 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
             return 0;
         };
 
-        let patstream: XmlStreamCtxtPtr = comp.get_stream_context();
-        if patstream.is_null() {
+        let Some(mut patstream) = comp.get_stream_context() else {
             // QUESTION TODO: Is this an error?
             return 0;
-        }
+        };
 
-        let eval_all_nodes: i32 = (*patstream).wants_any_node();
+        let eval_all_nodes: i32 = patstream.wants_any_node();
 
         if from_root != 0 {
-            ret = (*patstream).push(None, None);
+            ret = patstream.push(None, None);
             if ret < 0 {
             } else if ret == 1 {
                 if to_bool != 0 {
-                    // goto return_1;
-                    if !patstream.is_null() {
-                        xml_free_stream_ctxt(patstream);
-                    }
                     return 1;
                 }
                 // TODO: Check memory error.
@@ -1629,7 +1622,6 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
                         if (*ctxt).op_limit != 0 {
                             if (*ctxt).op_count >= (*ctxt).op_limit {
                                 generic_error!("XPath operation limit exceeded\n");
-                                xml_free_stream_ctxt(patstream);
                                 return -1;
                             }
                             (*ctxt).op_count += 1;
@@ -1645,16 +1637,12 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
                                     if matches!(cur.element_type(), XmlElementType::XmlElementNode)
                                     {
                                         let node = XmlNodePtr::try_from(cur).unwrap();
-                                        (*patstream).push(
+                                        patstream.push(
                                             node.name().as_deref(),
                                             node.ns.as_deref().and_then(|ns| ns.href()).as_deref(),
                                         )
                                     } else if eval_all_nodes != 0 {
-                                        (*patstream).push_node(
-                                            None,
-                                            None,
-                                            cur.element_type() as i32,
-                                        )
+                                        patstream.push_node(None, None, cur.element_type() as i32)
                                     } else {
                                         break 'to_break;
                                     };
@@ -1662,10 +1650,6 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
                                     // NOP.
                                 } else if ret == 1 {
                                     if to_bool != 0 {
-                                        // goto return_1;
-                                        if !patstream.is_null() {
-                                            xml_free_stream_ctxt(patstream);
-                                        }
                                         return 1;
                                     }
                                     if let Some(nodeset) =
@@ -1681,7 +1665,7 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
                                 }
                                 if cur.children().is_none() || depth >= max_depth {
                                     // ret =
-                                    (*patstream).pop();
+                                    patstream.pop();
                                     while let Some(next) = cur.next() {
                                         cur = next;
                                         if !matches!(
@@ -1757,7 +1741,7 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
                             ))
                     {
                         // ret =
-                        (*patstream).pop();
+                        patstream.pop();
                     };
                     if let Some(next) = cur.next() {
                         cur = next;
@@ -1771,16 +1755,7 @@ pub(super) unsafe fn xml_xpath_run_stream_eval(
 
         // done:
 
-        if !patstream.is_null() {
-            xml_free_stream_ctxt(patstream);
-        }
         0
-
-        // return_1:
-        // if (patstream) {
-        // 	xmlFreeStreamCtxt(patstream);
-        // }
-        // return 1;
     }
 }
 

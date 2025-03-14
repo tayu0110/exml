@@ -768,7 +768,7 @@ static PROGRESULT: AtomicI32 = AtomicI32::new(RETURN_OK);
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
 static PATTERNC: Mutex<Option<XmlPattern>> = Mutex::new(None);
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
-static PATSTREAM: AtomicPtr<XmlStreamCtxt> = AtomicPtr::new(null_mut());
+static PATSTREAM: Mutex<Option<XmlStreamCtxt>> = Mutex::new(None);
 static NBREGISTER: AtomicUsize = AtomicUsize::new(0);
 static OPTIONS: AtomicI32 = AtomicI32::new(
     XmlParserOption::XmlParseCompact as i32 | XmlParserOption::XmlParseBigLines as i32,
@@ -1976,12 +1976,9 @@ unsafe fn test_sax(filename: &str) {
 unsafe fn process_node(reader: XmlTextReaderPtr) {
     unsafe {
         use exml::{
-            libxml::{
-                pattern::xml_free_stream_ctxt,
-                xmlreader::{
-                    XmlReaderTypes, xml_text_reader_const_local_name, xml_text_reader_const_name,
-                    xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
-                },
+            libxml::xmlreader::{
+                XmlReaderTypes, xml_text_reader_const_local_name, xml_text_reader_const_name,
+                xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
             },
             tree::XmlGenericNodePtr,
         };
@@ -2042,11 +2039,11 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
                     }
                 }
             }
-            if !PATSTREAM.load(Ordering::Relaxed).is_null() {
+            if let Some(stream) = PATSTREAM.lock().unwrap().as_mut() {
                 let mut ret: i32;
 
                 if typ == XmlReaderTypes::XmlReaderTypeElement {
-                    ret = (*PATSTREAM.load(Ordering::Relaxed)).push(
+                    ret = stream.push(
                         Some(
                             CStr::from_ptr(
                                 xml_text_reader_const_local_name(&mut *reader) as *const i8
@@ -2064,8 +2061,6 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
                     );
                     if ret < 0 {
                         eprintln!("xmlStreamPush() failure");
-                        xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-                        PATSTREAM.store(null_mut(), Ordering::Relaxed);
                     } else if ret != is_match {
                         #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
                         if path.is_none() {
@@ -2087,11 +2082,9 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
                 if typ == XmlReaderTypes::XmlReaderTypeEndElement
                     || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap())
                 {
-                    ret = (*PATSTREAM.load(Ordering::Relaxed)).pop();
+                    ret = stream.pop();
                     if ret < 0 {
                         eprintln!("xmlStreamPop() failure");
-                        xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-                        PATSTREAM.store(null_mut(), Ordering::Relaxed);
                     }
                 }
             }
@@ -2104,13 +2097,10 @@ unsafe fn stream_file(filename: *mut c_char) {
     unsafe {
         use std::{ptr::null, slice::from_raw_parts};
 
-        use exml::libxml::{
-            pattern::xml_free_stream_ctxt,
-            xmlreader::{
-                XmlParserProperties, xml_free_text_reader, xml_reader_for_file,
-                xml_reader_for_memory, xml_text_reader_relaxng_validate,
-                xml_text_reader_schema_validate, xml_text_reader_set_parser_prop,
-            },
+        use exml::libxml::xmlreader::{
+            XmlParserProperties, xml_free_text_reader, xml_reader_for_file, xml_reader_for_memory,
+            xml_text_reader_relaxng_validate, xml_text_reader_schema_validate,
+            xml_text_reader_set_parser_prop,
         };
         use libc::{MAP_FAILED, MAP_SHARED, PROT_READ, close, mmap, munmap, stat};
 
@@ -2157,13 +2147,11 @@ unsafe fn stream_file(filename: *mut c_char) {
         }
         #[cfg(feature = "libxml_pattern")]
         if let Some(pattern) = PATTERNC.lock().unwrap().as_ref() {
-            PATSTREAM.store(pattern.get_stream_context(), Ordering::Relaxed);
-            if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-                ret = (*PATSTREAM.load(Ordering::Relaxed)).push(None, None);
+            *PATSTREAM.lock().unwrap() = pattern.get_stream_context().map(|pat| *pat);
+            if let Some(stream) = PATSTREAM.lock().unwrap().as_mut() {
+                ret = stream.push(None, None);
                 if ret < 0 {
                     eprintln!("xmlStreamPush() failure");
-                    xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-                    PATSTREAM.store(null_mut(), Ordering::Relaxed);
                 }
             }
         }
@@ -2292,10 +2280,7 @@ unsafe fn stream_file(filename: *mut c_char) {
             PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         }
         #[cfg(feature = "libxml_pattern")]
-        if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-            xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-            PATSTREAM.store(null_mut(), Ordering::Relaxed);
-        }
+        let _ = PATSTREAM.lock().unwrap().take();
         if CMD_ARGS.memory {
             // xml_free_parser_input_buffer(input);
             munmap(base as _, info.st_size as _);
@@ -2310,7 +2295,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
         use std::{ptr::null, sync::atomic::Ordering};
 
         use exml::libxml::{
-            pattern::{xml_free_stream_ctxt, xml_pattern_compile},
+            pattern::xml_pattern_compile,
             xmlreader::{xml_free_text_reader, xml_reader_walker},
         };
 
@@ -2363,13 +2348,11 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
                 }
             }
             if let Some(pattern) = PATTERNC.lock().unwrap().as_ref() {
-                PATSTREAM.store(pattern.get_stream_context(), Ordering::Relaxed);
-                if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-                    ret = (*PATSTREAM.load(Ordering::Relaxed)).push(None, None);
+                *PATSTREAM.lock().unwrap() = pattern.get_stream_context().map(|pat| *pat);
+                if let Some(stream) = PATSTREAM.lock().unwrap().as_mut() {
+                    ret = stream.push(None, None);
                     if ret < 0 {
                         eprintln!("xmlStreamPush() failure");
-                        xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-                        PATSTREAM.store(null_mut(), Ordering::Relaxed);
                     }
                 }
             }
@@ -2403,10 +2386,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         }
         #[cfg(feature = "libxml_pattern")]
-        if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-            xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
-            PATSTREAM.store(null_mut(), Ordering::Relaxed);
-        }
+        let _ = PATSTREAM.lock().unwrap().take();
     }
 }
 

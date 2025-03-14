@@ -16,7 +16,6 @@ use crate::{
             HtmlElemDesc, HtmlEntityDesc, HtmlParserCtxtPtr, HtmlStatus, html_free_parser_ctxt,
         },
         parser::{XmlFeature, XmlParserOption},
-        pattern::XmlStreamCtxtPtr,
         relaxng::XmlRelaxNGPtr,
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaValType},
         uri::XmlURIPtr,
@@ -592,14 +591,6 @@ pub(crate) fn gen_xml_relaxng_ptr(_no: i32, _nr: i32) -> XmlRelaxNGPtr {
 
 #[cfg(feature = "schema")]
 pub(crate) fn des_xml_relaxng_ptr(_no: i32, _val: XmlRelaxNGPtr, _nr: i32) {}
-
-#[cfg(feature = "libxml_pattern")]
-pub(crate) fn gen_xml_stream_ctxt_ptr(_no: i32, _nr: i32) -> XmlStreamCtxtPtr {
-    null_mut()
-}
-
-#[cfg(feature = "libxml_pattern")]
-pub(crate) fn des_xml_stream_ctxt_ptr(_no: i32, _val: XmlStreamCtxtPtr, _nr: i32) {}
 
 pub(crate) fn gen_xml_char(no: i32, _nr: i32) -> XmlChar {
     if no == 0 {

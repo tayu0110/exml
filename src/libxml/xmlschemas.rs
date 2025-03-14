@@ -33,9 +33,7 @@ use std::{
 use libc::{memset, strchr};
 
 #[cfg(feature = "libxml_pattern")]
-use crate::libxml::pattern::{
-    XmlPattern, XmlPatternFlags, XmlStreamCtxtPtr, xml_free_stream_ctxt, xml_pattern_compile,
-};
+use crate::libxml::pattern::{XmlPattern, XmlPatternFlags, XmlStreamCtxt, xml_pattern_compile};
 use crate::{
     encoding::XmlCharEncoding,
     error::{XmlErrorDomain, XmlParserErrors},
@@ -742,7 +740,7 @@ pub struct XmlSchemaIDCStateObj {
     matcher: XmlSchemaIDCMatcherPtr, /* the correspondent field/selector
                                      matcher */
     sel: XmlSchemaIdcselectPtr,
-    xpath_ctxt: *mut c_void,
+    xpath_ctxt: Option<Box<XmlStreamCtxt>>,
 }
 
 const IDC_MATCHER: i32 = 0;
@@ -13594,9 +13592,7 @@ pub(crate) unsafe fn xml_schema_free_idc_state_obj_list(mut sto: XmlSchemaIDCSta
             if !(*sto).history.is_null() {
                 xml_free((*sto).history as _);
             }
-            if !(*sto).xpath_ctxt.is_null() {
-                xml_free_stream_ctxt((*sto).xpath_ctxt as XmlStreamCtxtPtr);
-            }
+            (*sto).xpath_ctxt.take();
             xml_free(sto as _);
             sto = next;
         }
@@ -14852,13 +14848,11 @@ unsafe fn xml_schema_idc_add_state_object(
         (*vctxt).xpath_states = sto;
 
         // Free the old xpath validation context.
-        if !(*sto).xpath_ctxt.is_null() {
-            xml_free_stream_ctxt((*sto).xpath_ctxt as XmlStreamCtxtPtr);
-        }
+        (*sto).xpath_ctxt.take();
 
         // Create a new XPath (pattern) validation context.
-        (*sto).xpath_ctxt = (*sel).xpath_comp.as_ref().unwrap().get_stream_context() as *mut c_void;
-        if (*sto).xpath_ctxt.is_null() {
+        (*sto).xpath_ctxt = (*sel).xpath_comp.as_ref().unwrap().get_stream_context();
+        if (*sto).xpath_ctxt.is_none() {
             VERROR_INT!(
                 vctxt,
                 "xmlSchemaIDCAddStateObject",
@@ -15159,7 +15153,7 @@ unsafe fn xml_schema_xpath_evaluate(
         while sto != head {
             if node_type == XmlElementType::XmlElementNode {
                 let ns = (*(*vctxt).inode).ns_name;
-                res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr)).push(
+                res = (*sto).xpath_ctxt.as_mut().unwrap().push(
                     Some(
                         CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
                             .to_string_lossy()
@@ -15171,7 +15165,7 @@ unsafe fn xml_schema_xpath_evaluate(
                 );
             } else {
                 let ns = (*(*vctxt).inode).ns_name;
-                res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr)).push_attr(
+                res = (*sto).xpath_ctxt.as_mut().unwrap().push_attr(
                     Some(
                         CStr::from_ptr((*(*vctxt).inode).local_name as *const i8)
                             .to_string_lossy()
@@ -15491,7 +15485,7 @@ unsafe fn xml_schema_xpath_process_history(vctxt: XmlSchemaValidCtxtPtr, depth: 
 
         // Evaluate the state objects.
         'main: while !sto.is_null() {
-            res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr)).pop();
+            res = (*sto).xpath_ctxt.as_mut().unwrap().pop();
             if res == -1 {
                 VERROR_INT!(
                     vctxt,
@@ -15998,7 +15992,7 @@ unsafe fn xml_schema_xpath_pop(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
         }
         sto = (*vctxt).xpath_states;
         while {
-            res = (*((*sto).xpath_ctxt as XmlStreamCtxtPtr)).pop();
+            res = (*sto).xpath_ctxt.as_mut().unwrap().pop();
             if res == -1 {
                 return -1;
             }

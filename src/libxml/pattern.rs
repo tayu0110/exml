@@ -717,42 +717,28 @@ impl XmlPattern {
     ///
     /// Returns a pointer to the context or NULL in case of failure
     #[doc(alias = "xmlPatternGetStreamCtxt")]
-    pub unsafe fn get_stream_context(&self) -> XmlStreamCtxtPtr {
-        unsafe {
-            let mut ret: XmlStreamCtxtPtr = null_mut();
-            let mut cur: XmlStreamCtxtPtr;
-
-            if self.stream.is_null() {
-                return null_mut();
-            }
-
-            let mut now = Some(self);
-            while let Some(comp) = now {
-                if comp.stream.is_null() {
-                    // goto failed;
-                    xml_free_stream_ctxt(ret);
-                    return null_mut();
-                }
-                cur = xml_new_stream_ctxt(comp.stream);
-                if cur.is_null() {
-                    // goto failed;
-                    xml_free_stream_ctxt(ret);
-                    return null_mut();
-                }
-                if ret.is_null() {
-                    ret = cur;
-                } else {
-                    (*cur).next = (*ret).next;
-                    (*ret).next = cur;
-                }
-                (*cur).flags = comp.flags;
-                now = comp.next.as_deref();
-            }
-            ret
-            // failed:
-            // xmlFreeStreamCtxt(ret);
-            // return null_mut();
+    pub fn get_stream_context(&self) -> Option<Box<XmlStreamCtxt>> {
+        if self.stream.is_null() {
+            return None;
         }
+
+        let mut ret: Option<Box<XmlStreamCtxt>> = None;
+        let mut now = Some(self);
+        while let Some(comp) = now {
+            if comp.stream.is_null() {
+                return None;
+            }
+            let mut cur = XmlStreamCtxt::new(comp.stream);
+            cur.flags = comp.flags;
+            if let Some(ret) = ret.as_deref_mut() {
+                cur.next = ret.next.take();
+                ret.next = Some(Box::new(cur));
+            } else {
+                ret = Some(Box::new(cur))
+            }
+            now = comp.next.as_deref();
+        }
+        ret
     }
 }
 
@@ -1505,12 +1491,11 @@ impl XmlStepStates {
 }
 
 // streaming interfaces
-pub type XmlStreamCtxtPtr = *mut XmlStreamCtxt;
 #[doc(alias = "xmlStreamCtxt")]
 #[repr(C)]
 pub struct XmlStreamCtxt {
     // link to next sub pattern if |
-    next: *mut XmlStreamCtxt,
+    next: Option<Box<XmlStreamCtxt>>,
     // the compiled stream
     comp: XmlStreamCompPtr,
     // how deep are we ?
@@ -1524,6 +1509,21 @@ pub struct XmlStreamCtxt {
 }
 
 impl XmlStreamCtxt {
+    /// Build a new stream context
+    ///
+    /// Returns the new structure or NULL in case of error.
+    #[doc(alias = "xmlNewStreamCtxt")]
+    fn new(stream: XmlStreamCompPtr) -> Self {
+        Self {
+            next: None,
+            comp: stream,
+            level: 0,
+            states: Vec::with_capacity(4),
+            flags: 0,
+            block_level: -1,
+        }
+    }
+
     /// Add a new state to the stream context
     ///
     /// Returns -1 in case of error or the state index if successful
@@ -1596,7 +1596,7 @@ impl XmlStreamCtxt {
                                 }
                             }
                         }
-                        now = (!stream.next.is_null()).then(|| &mut *stream.next);
+                        now = stream.next.as_deref_mut();
                         continue 'stream;
                     }
 
@@ -1605,7 +1605,7 @@ impl XmlStreamCtxt {
                         // / and . are handled at the XPath node set creation
                         // level by checking min depth
                         if stream.flags & XmlPatternFlags::XmlPatternXPath as i32 != 0 {
-                            now = (!stream.next.is_null()).then(|| &mut *stream.next);
+                            now = stream.next.as_deref_mut();
                             continue 'stream; /* while */
                         }
                         // For non-pattern like evaluation like XML Schema IDCs
@@ -1836,7 +1836,7 @@ impl XmlStreamCtxt {
                 }
 
                 // stream_next:
-                now = (!stream.next.is_null()).then(|| &mut *stream.next);
+                now = stream.next.as_deref_mut();
             } /* while !stream.is_null() */
 
             if err > 0 {
@@ -1896,33 +1896,31 @@ impl XmlStreamCtxt {
     ///
     /// Returns: -1 in case of error, 0 otherwise.
     #[doc(alias = "xmlStreamPop")]
-    pub unsafe fn pop(&mut self) -> i32 {
-        unsafe {
-            let mut now = Some(self);
-            while let Some(stream) = now {
-                // Reset block-level.
-                if stream.block_level == stream.level {
-                    stream.block_level = -1;
-                }
-
-                //  (*stream).level can be zero when XML_FINAL_IS_ANY_NODE is set
-                //  (see the thread at
-                //  http://mail.gnome.org/archives/xslt/2008-July/msg00027.html)
-                if stream.level != 0 {
-                    stream.level -= 1;
-                }
-                // Check evolution of existing states
-                while stream
-                    .states
-                    .last()
-                    .is_some_and(|state| state.1 > stream.level)
-                {
-                    stream.states.pop();
-                }
-                now = (!stream.next.is_null()).then(|| &mut *stream.next);
+    pub fn pop(&mut self) -> i32 {
+        let mut now = Some(self);
+        while let Some(stream) = now {
+            // Reset block-level.
+            if stream.block_level == stream.level {
+                stream.block_level = -1;
             }
-            0
+
+            //  (*stream).level can be zero when XML_FINAL_IS_ANY_NODE is set
+            //  (see the thread at
+            //  http://mail.gnome.org/archives/xslt/2008-July/msg00027.html)
+            if stream.level != 0 {
+                stream.level -= 1;
+            }
+            // Check evolution of existing states
+            while stream
+                .states
+                .last()
+                .is_some_and(|state| state.1 > stream.level)
+            {
+                stream.states.pop();
+            }
+            now = stream.next.as_deref_mut();
         }
+        0
     }
 
     /// Query if the streaming pattern additionally needs to be fed with
@@ -1940,7 +1938,7 @@ impl XmlStreamCtxt {
                 if (*stream.comp).flags & XML_STREAM_FINAL_IS_ANY_NODE as i32 != 0 {
                     return 1;
                 }
-                now = (!stream.next.is_null()).then(|| &*stream.next);
+                now = stream.next.as_deref();
             }
             0
         }
@@ -1950,7 +1948,7 @@ impl XmlStreamCtxt {
 impl Default for XmlStreamCtxt {
     fn default() -> Self {
         Self {
-            next: null_mut(),
+            next: None,
             comp: null_mut(),
             level: 0,
             states: vec![],
@@ -1960,36 +1958,5 @@ impl Default for XmlStreamCtxt {
     }
 }
 
-/// Build a new stream context
-///
-/// Returns the new structure or NULL in case of error.
-#[doc(alias = "xmlNewStreamCtxt")]
-unsafe fn xml_new_stream_ctxt(stream: XmlStreamCompPtr) -> XmlStreamCtxtPtr {
-    unsafe {
-        let cur: XmlStreamCtxtPtr = xml_malloc(size_of::<XmlStreamCtxt>()) as XmlStreamCtxtPtr;
-        if cur.is_null() {
-            return null_mut();
-        }
-        std::ptr::write(&mut *cur, XmlStreamCtxt::default());
-        (*cur).states.reserve(4);
-        (*cur).level = 0;
-        (*cur).comp = stream;
-        (*cur).block_level = -1;
-        cur
-    }
-}
-
-/// Free the stream context
-#[doc(alias = "xmlFreeStreamCtxt")]
-pub unsafe fn xml_free_stream_ctxt(mut stream: XmlStreamCtxtPtr) {
-    unsafe {
-        let mut next: XmlStreamCtxtPtr;
-
-        while !stream.is_null() {
-            next = (*stream).next;
-            drop_in_place(stream);
-            xml_free(stream as _);
-            stream = next;
-        }
-    }
-}
+unsafe impl Send for XmlStreamCtxt {}
+unsafe impl Sync for XmlStreamCtxt {}
