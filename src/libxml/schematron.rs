@@ -171,9 +171,9 @@ pub struct XmlSchematronTest {
     next: XmlSchematronTestPtr, /* the next test in the list */
     typ: XmlSchematronTestType, /* the test type */
     node: Option<XmlNodePtr>,   /* the node in the tree */
-    test: *mut XmlChar,         /* the expression to test */
+    test: String,               /* the expression to test */
     comp: XmlXPathCompExprPtr,  /* the compiled expression */
-    report: *mut XmlChar,       /* the message to report */
+    report: Option<String>,     /* the message to report */
 }
 
 pub type XmlSchematronRulePtr = *mut XmlSchematronRule;
@@ -912,21 +912,17 @@ impl XmlSchematronParserCtxt {
         typ: XmlSchematronTestType,
         rule: XmlSchematronRulePtr,
         node: XmlNodePtr,
-        test: *mut XmlChar,
-        report: *mut XmlChar,
+        test: &str,
+        report: Option<&str>,
     ) -> XmlSchematronTestPtr {
         unsafe {
-            if rule.is_null() || test.is_null() {
+            if rule.is_null() {
                 return null_mut();
             }
 
             // try first to compile the test expression
-            let comp: XmlXPathCompExprPtr = xml_xpath_ctxt_compile(
-                self.xctxt,
-                CStr::from_ptr(test as *const i8).to_string_lossy().as_ref(),
-            );
+            let comp: XmlXPathCompExprPtr = xml_xpath_ctxt_compile(self.xctxt, test);
             if comp.is_null() {
-                let test = CStr::from_ptr(test as *const i8).to_string_lossy();
                 xml_schematron_perr!(
                     self,
                     Some(node.into()),
@@ -946,9 +942,9 @@ impl XmlSchematronParserCtxt {
             memset(ret as _, 0, size_of::<XmlSchematronTest>());
             (*ret).typ = typ;
             (*ret).node = Some(node);
-            (*ret).test = test;
+            std::ptr::write(&mut (*ret).test, test.to_owned());
             (*ret).comp = comp;
-            (*ret).report = report;
+            std::ptr::write(&mut (*ret).report, report.map(|report| report.to_owned()));
             (*ret).next = null_mut();
             if (*rule).tests.is_null() {
                 (*rule).tests = ret;
@@ -969,9 +965,7 @@ impl XmlSchematronParserCtxt {
     unsafe fn parse_rule(&mut self, pattern: XmlSchematronPatternPtr, rule: XmlNodePtr) {
         unsafe {
             let mut nb_checks: i32 = 0;
-            let mut report: *mut XmlChar;
             let ruleptr: XmlSchematronRulePtr;
-            let mut testptr: XmlSchematronTestPtr;
 
             match rule.get_no_ns_prop("context") {
                 Some(context) if context.is_empty() => {
@@ -1086,22 +1080,15 @@ impl XmlSchematronParserCtxt {
                         }
                         Some(test) => {
                             self.parse_test_report_msg(cur_node);
-                            let tmp = cur_node.get_content().map(|c| CString::new(c).unwrap());
-                            report =
-                                tmp.map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
+                            let report = cur_node.get_content();
 
-                            let test = CString::new(test).unwrap();
-                            let test = xml_strdup(test.as_ptr() as *const u8);
-                            testptr = self.add_test(
+                            self.add_test(
                                 XmlSchematronTestType::XmlSchematronAssert,
                                 ruleptr,
                                 cur_node,
-                                test,
-                                report,
+                                &test,
+                                report.as_deref(),
                             );
-                            if testptr.is_null() {
-                                xml_free(test as _);
-                            }
                         }
                         None => {
                             xml_schematron_perr!(
@@ -1125,22 +1112,15 @@ impl XmlSchematronParserCtxt {
                         }
                         Some(test) => {
                             self.parse_test_report_msg(cur_node);
-                            let tmp = cur_node.get_content().map(|c| CString::new(c).unwrap());
-                            report =
-                                tmp.map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
+                            let report = cur_node.get_content();
 
-                            let test = CString::new(test).unwrap();
-                            let test = xml_strdup(test.as_ptr() as *const u8);
-                            testptr = self.add_test(
+                            self.add_test(
                                 XmlSchematronTestType::XmlSchematronReport,
                                 ruleptr,
                                 cur_node,
-                                test,
-                                report,
+                                &test,
+                                report.as_deref(),
                             );
-                            if testptr.is_null() {
-                                xml_free(test as _);
-                            }
                         }
                         None => {
                             xml_schematron_perr!(
@@ -1665,15 +1645,10 @@ unsafe fn xml_schematron_free_tests(mut tests: XmlSchematronTestPtr) {
 
         while !tests.is_null() {
             next = (*tests).next;
-            if !(*tests).test.is_null() {
-                xml_free((*tests).test as _);
-            }
             if !(*tests).comp.is_null() {
                 xml_xpath_free_comp_expr((*tests).comp);
             }
-            if !(*tests).report.is_null() {
-                xml_free((*tests).report as _);
-            }
+            drop_in_place(tests);
             xml_free(tests as _);
             tests = next;
         }
