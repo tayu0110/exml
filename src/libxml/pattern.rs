@@ -28,7 +28,7 @@ use std::{
     ffi::CStr,
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null_mut},
+    ptr::{drop_in_place, null_mut},
     rc::Rc,
 };
 
@@ -369,270 +369,243 @@ impl XmlPattern {
     #[doc(alias = "xmlPatMatch")]
     unsafe fn pattern_match_internal(&self, mut node: XmlGenericNodePtr) -> i32 {
         unsafe {
-            let mut states: XmlStepStates = XmlStepStates {
-                nbstates: 0,
-                maxstates: 0,
-                states: null_mut(),
-            };
+            let mut states: XmlStepStates = XmlStepStates { states: vec![] };
             // // may require backtrack
 
             let mut i = 0;
             // restart:
             loop {
                 'rollback: {
-                    'found: while i < self.steps.len() {
-                        'to_continue: {
-                            let mut step = &self.steps[i];
-                            match step.op {
-                                XmlPatOp::XmlOpEnd => {
-                                    break 'found;
-                                }
-                                XmlPatOp::XmlOpRoot => {
-                                    if matches!(
-                                        node.element_type(),
-                                        XmlElementType::XmlNamespaceDecl
-                                    ) {
-                                        break 'rollback;
-                                    }
-                                    node = node.parent().unwrap();
-                                    if matches!(
-                                        node.element_type(),
-                                        XmlElementType::XmlDocumentNode
-                                            | XmlElementType::XmlHTMLDocumentNode
-                                    ) {
-                                        break 'to_continue;
-                                    }
+                    while i < self.steps.len() {
+                        let mut step = &self.steps[i];
+                        match step.op {
+                            XmlPatOp::XmlOpEnd => {
+                                return 1;
+                            }
+                            XmlPatOp::XmlOpRoot => {
+                                if matches!(node.element_type(), XmlElementType::XmlNamespaceDecl) {
                                     break 'rollback;
                                 }
-                                XmlPatOp::XmlOpElem => {
-                                    if !matches!(
-                                        node.element_type(),
-                                        XmlElementType::XmlElementNode
-                                    ) {
-                                        break 'rollback;
-                                    }
-                                    let node = XmlNodePtr::try_from(node).unwrap();
-                                    let Some(value) = step.value.as_deref() else {
-                                        break 'to_continue;
-                                    };
-                                    if Some(value) != node.name().as_deref() {
-                                        break 'rollback;
-                                    }
-
-                                    // Namespace test
-                                    if let Some(ns) = node.ns {
-                                        if !ns.href.is_null()
-                                            && step.value2.as_deref() != ns.href().as_deref()
-                                        {
-                                            break 'rollback;
-                                        }
-                                    } else if step.value2.is_some() {
-                                        break 'rollback;
-                                    }
-                                    break 'to_continue;
+                                node = node.parent().unwrap();
+                                if matches!(
+                                    node.element_type(),
+                                    XmlElementType::XmlDocumentNode
+                                        | XmlElementType::XmlHTMLDocumentNode
+                                ) {
+                                    i += 1;
+                                    continue;
                                 }
-                                XmlPatOp::XmlOpChild => {
-                                    if !matches!(
-                                        node.element_type(),
-                                        XmlElementType::XmlElementNode
-                                            | XmlElementType::XmlDocumentNode
-                                            | XmlElementType::XmlHTMLDocumentNode
-                                    ) {
-                                        break 'rollback;
-                                    }
-
-                                    let mut lst = node.children();
-
-                                    if let Some(value) = step.value.as_deref() {
-                                        while let Some(now) = lst {
-                                            if matches!(
-                                                now.element_type(),
-                                                XmlElementType::XmlElementNode
-                                            ) {
-                                                let now = XmlNodePtr::try_from(now).unwrap();
-                                                if Some(value) == now.name().as_deref() {
-                                                    break;
-                                                }
-                                            }
-                                            lst = now.next();
-                                        }
-                                        if lst.is_some() {
-                                            break 'to_continue;
-                                        }
-                                    }
+                                break 'rollback;
+                            }
+                            XmlPatOp::XmlOpElem => {
+                                if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
                                     break 'rollback;
                                 }
-                                XmlPatOp::XmlOpAttr => {
-                                    if !matches!(
-                                        node.element_type(),
-                                        XmlElementType::XmlAttributeNode
-                                    ) {
-                                        break 'rollback;
-                                    }
-                                    let node = XmlAttrPtr::try_from(node).unwrap();
-                                    if let Some(value) = step.value.as_deref() {
-                                        if Some(value) != node.name().as_deref() {
-                                            break 'rollback;
-                                        }
-                                    }
-                                    // Namespace test
-                                    if let Some(ns) = node.ns {
-                                        if step.value2.is_some()
-                                            && step.value2.as_deref() != ns.href().as_deref()
-                                        {
-                                            break 'rollback;
-                                        }
-                                    } else if step.value2.is_some() {
-                                        break 'rollback;
-                                    }
-                                    break 'to_continue;
+                                let node = XmlNodePtr::try_from(node).unwrap();
+                                let Some(value) = step.value.as_deref() else {
+                                    i += 1;
+                                    continue;
+                                };
+                                if Some(value) != node.name().as_deref() {
+                                    break 'rollback;
                                 }
-                                XmlPatOp::XmlOpParent => {
-                                    if matches!(
-                                        node.element_type(),
-                                        XmlElementType::XmlDocumentNode
-                                            | XmlElementType::XmlHTMLDocumentNode
-                                            | XmlElementType::XmlNamespaceDecl
-                                    ) {
+
+                                // Namespace test
+                                if let Some(ns) = node.ns {
+                                    if !ns.href.is_null()
+                                        && step.value2.as_deref() != ns.href().as_deref()
+                                    {
                                         break 'rollback;
                                     }
-                                    let Some(parent) = node.parent() else {
-                                        break 'rollback;
-                                    };
-                                    node = parent;
-                                    let Some(value) = step.value.as_deref() else {
-                                        break 'to_continue;
-                                    };
-                                    // Is is correct ??????
-                                    let node = XmlNodePtr::try_from(node).unwrap();
-                                    if Some(value) != node.name().as_deref() {
-                                        break 'rollback;
-                                    }
-                                    // Namespace test
-                                    if let Some(ns) = node.ns {
-                                        if !ns.href.is_null()
-                                            && step.value2.as_deref() != ns.href().as_deref()
-                                        {
-                                            break 'rollback;
-                                        }
-                                    } else if step.value2.is_some() {
-                                        break 'rollback;
-                                    }
-                                    break 'to_continue;
+                                } else if step.value2.is_some() {
+                                    break 'rollback;
                                 }
-                                XmlPatOp::XmlOpAncestor => {
-                                    // TODO: implement coalescing of ANCESTOR/NODE ops
-                                    if step.value.is_none() {
-                                        i += 1;
-                                        step = &self.steps[i];
-                                        if matches!(step.op, XmlPatOp::XmlOpRoot) {
-                                            break 'found;
-                                        }
-                                        if !matches!(step.op, XmlPatOp::XmlOpElem) {
-                                            break 'rollback;
-                                        }
-                                        if step.value.is_none() {
-                                            return -1;
-                                        }
-                                    }
-                                    if matches!(
-                                        node.element_type(),
-                                        XmlElementType::XmlDocumentNode
-                                            | XmlElementType::XmlHTMLDocumentNode
-                                            | XmlElementType::XmlNamespaceDecl
-                                    ) {
-                                        break 'rollback;
-                                    }
-                                    let mut cur = node.parent();
-                                    while let Some(cur_node) = cur {
+                                i += 1;
+                                continue;
+                            }
+                            XmlPatOp::XmlOpChild => {
+                                if !matches!(
+                                    node.element_type(),
+                                    XmlElementType::XmlElementNode
+                                        | XmlElementType::XmlDocumentNode
+                                        | XmlElementType::XmlHTMLDocumentNode
+                                ) {
+                                    break 'rollback;
+                                }
+
+                                let mut lst = node.children();
+
+                                if let Some(value) = step.value.as_deref() {
+                                    while let Some(now) = lst {
                                         if matches!(
-                                            cur_node.element_type(),
+                                            now.element_type(),
                                             XmlElementType::XmlElementNode
                                         ) {
-                                            let node = XmlNodePtr::try_from(cur_node).unwrap();
-
-                                            if step.value.as_deref() == node.name().as_deref() {
-                                                // Namespace test
-                                                if let Some(ns) = node.ns {
-                                                    if !ns.href.is_null()
-                                                        && step.value2.as_deref()
-                                                            == ns.href().as_deref()
-                                                    {
-                                                        break;
-                                                    }
-                                                } else if step.value2.is_none() {
-                                                    break;
-                                                }
+                                            let now = XmlNodePtr::try_from(now).unwrap();
+                                            if Some(value) == now.name().as_deref() {
+                                                break;
                                             }
                                         }
-                                        cur = cur_node.parent();
+                                        lst = now.next();
                                     }
-                                    let Some(cur) = cur else {
-                                        break 'rollback;
-                                    };
-                                    node = cur;
-                                    // prepare a potential rollback from here
-                                    // for ancestors of that node.
-                                    if matches!(step.op, XmlPatOp::XmlOpAncestor) {
-                                        xml_pat_push_state(addr_of_mut!(states), i as i32, node);
-                                    } else {
-                                        xml_pat_push_state(
-                                            addr_of_mut!(states),
-                                            i as i32 - 1,
-                                            node,
-                                        );
+                                    if lst.is_some() {
+                                        i += 1;
+                                        continue;
                                     }
-                                    break 'to_continue;
                                 }
-                                XmlPatOp::XmlOpNs => {
-                                    if !matches!(
-                                        node.element_type(),
+                                break 'rollback;
+                            }
+                            XmlPatOp::XmlOpAttr => {
+                                if !matches!(node.element_type(), XmlElementType::XmlAttributeNode)
+                                {
+                                    break 'rollback;
+                                }
+                                let node = XmlAttrPtr::try_from(node).unwrap();
+                                if let Some(value) = step.value.as_deref() {
+                                    if Some(value) != node.name().as_deref() {
+                                        break 'rollback;
+                                    }
+                                }
+                                // Namespace test
+                                if let Some(ns) = node.ns {
+                                    if step.value2.is_some()
+                                        && step.value2.as_deref() != ns.href().as_deref()
+                                    {
+                                        break 'rollback;
+                                    }
+                                } else if step.value2.is_some() {
+                                    break 'rollback;
+                                }
+                                i += 1;
+                                continue;
+                            }
+                            XmlPatOp::XmlOpParent => {
+                                if matches!(
+                                    node.element_type(),
+                                    XmlElementType::XmlDocumentNode
+                                        | XmlElementType::XmlHTMLDocumentNode
+                                        | XmlElementType::XmlNamespaceDecl
+                                ) {
+                                    break 'rollback;
+                                }
+                                let Some(parent) = node.parent() else {
+                                    break 'rollback;
+                                };
+                                node = parent;
+                                let Some(value) = step.value.as_deref() else {
+                                    i += 1;
+                                    continue;
+                                };
+                                // Is is correct ??????
+                                let node = XmlNodePtr::try_from(node).unwrap();
+                                if Some(value) != node.name().as_deref() {
+                                    break 'rollback;
+                                }
+                                // Namespace test
+                                if let Some(ns) = node.ns {
+                                    if !ns.href.is_null()
+                                        && step.value2.as_deref() != ns.href().as_deref()
+                                    {
+                                        break 'rollback;
+                                    }
+                                } else if step.value2.is_some() {
+                                    break 'rollback;
+                                }
+                                i += 1;
+                                continue;
+                            }
+                            XmlPatOp::XmlOpAncestor => {
+                                // TODO: implement coalescing of ANCESTOR/NODE ops
+                                if step.value.is_none() {
+                                    i += 1;
+                                    step = &self.steps[i];
+                                    if matches!(step.op, XmlPatOp::XmlOpRoot) {
+                                        return 1;
+                                    }
+                                    if !matches!(step.op, XmlPatOp::XmlOpElem) {
+                                        break 'rollback;
+                                    }
+                                    if step.value.is_none() {
+                                        return -1;
+                                    }
+                                }
+                                if matches!(
+                                    node.element_type(),
+                                    XmlElementType::XmlDocumentNode
+                                        | XmlElementType::XmlHTMLDocumentNode
+                                        | XmlElementType::XmlNamespaceDecl
+                                ) {
+                                    break 'rollback;
+                                }
+                                let mut cur = node.parent();
+                                while let Some(cur_node) = cur {
+                                    if matches!(
+                                        cur_node.element_type(),
                                         XmlElementType::XmlElementNode
                                     ) {
-                                        break 'rollback;
-                                    }
-                                    let node = XmlNodePtr::try_from(node).unwrap();
-                                    if let Some(ns) = node.ns {
-                                        if !ns.href.is_null()
-                                            && step.value.as_deref() != ns.href().as_deref()
-                                        {
-                                            break 'rollback;
+                                        let node = XmlNodePtr::try_from(cur_node).unwrap();
+
+                                        if step.value.as_deref() == node.name().as_deref() {
+                                            // Namespace test
+                                            if let Some(ns) = node.ns {
+                                                if !ns.href.is_null()
+                                                    && step.value2.as_deref()
+                                                        == ns.href().as_deref()
+                                                {
+                                                    break;
+                                                }
+                                            } else if step.value2.is_none() {
+                                                break;
+                                            }
                                         }
-                                    } else if step.value.is_some() {
-                                        break 'rollback;
                                     }
+                                    cur = cur_node.parent();
                                 }
-                                XmlPatOp::XmlOpAll => {
-                                    if !matches!(
-                                        node.element_type(),
-                                        XmlElementType::XmlElementNode
-                                    ) {
+                                let Some(cur) = cur else {
+                                    break 'rollback;
+                                };
+                                node = cur;
+                                // prepare a potential rollback from here
+                                // for ancestors of that node.
+                                if matches!(step.op, XmlPatOp::XmlOpAncestor) {
+                                    states.push_state(i as i32, node);
+                                } else {
+                                    states.push_state(i as i32 - 1, node);
+                                }
+                                i += 1;
+                                continue;
+                            }
+                            XmlPatOp::XmlOpNs => {
+                                if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
+                                    break 'rollback;
+                                }
+                                let node = XmlNodePtr::try_from(node).unwrap();
+                                if let Some(ns) = node.ns {
+                                    if !ns.href.is_null()
+                                        && step.value.as_deref() != ns.href().as_deref()
+                                    {
                                         break 'rollback;
                                     }
+                                } else if step.value.is_some() {
+                                    break 'rollback;
+                                }
+                            }
+                            XmlPatOp::XmlOpAll => {
+                                if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
+                                    break 'rollback;
                                 }
                             }
                         }
                         i += 1;
                     }
-                    // found:
-                    if !states.states.is_null() {
-                        /* Free the rollback states */
-                        xml_free(states.states as _);
-                    }
-                    return 1;
                 }
                 // rollback:
-                /* got an error try to rollback */
-                if states.states.is_null() {
+                // got an error try to rollback
+                let Some(state) = states.states.pop() else {
                     return 0;
-                }
-                if states.nbstates <= 0 {
-                    xml_free(states.states as _);
-                    return 0;
-                }
-                states.nbstates -= 1;
-                i = (*states.states.add(states.nbstates as usize)).step as usize;
-                node = (*states.states.add(states.nbstates as usize)).node;
+                };
+                i = state.step as usize;
+                node = state.node;
                 // goto restart;
             }
         }
@@ -1519,45 +1492,18 @@ pub unsafe fn xml_pattern_compile(
     }
 }
 
-pub type XmlStepStatePtr = *mut XmlStepState;
-#[repr(C)]
-pub struct XmlStepState {
+struct XmlStepState {
     step: i32,
     node: XmlGenericNodePtr,
 }
 
-pub type XmlStepStatesPtr = *mut XmlStepStates;
-#[repr(C)]
-pub struct XmlStepStates {
-    nbstates: i32,
-    maxstates: i32,
-    states: XmlStepStatePtr,
+struct XmlStepStates {
+    states: Vec<XmlStepState>,
 }
 
-unsafe fn xml_pat_push_state(
-    states: *mut XmlStepStates,
-    step: i32,
-    node: XmlGenericNodePtr,
-) -> i32 {
-    unsafe {
-        if (*states).states.is_null() || (*states).maxstates <= 0 {
-            (*states).maxstates = 4;
-            (*states).nbstates = 0;
-            (*states).states = xml_malloc(4 * size_of::<XmlStepState>()) as _;
-        } else if (*states).maxstates <= (*states).nbstates {
-            let tmp: *mut XmlStepState = xml_realloc(
-                (*states).states as _,
-                2 * (*states).maxstates as usize * size_of::<XmlStepState>(),
-            ) as XmlStepStatePtr;
-            if tmp.is_null() {
-                return -1;
-            }
-            (*states).states = tmp;
-            (*states).maxstates *= 2;
-        }
-        (*(*states).states.add((*states).nbstates as usize)).step = step;
-        (*(*states).states.add((*states).nbstates as usize)).node = node;
-        (*states).nbstates += 1;
+impl XmlStepStates {
+    fn push_state(&mut self, step: i32, node: XmlGenericNodePtr) -> i32 {
+        self.states.push(XmlStepState { step, node });
         0
     }
 }
