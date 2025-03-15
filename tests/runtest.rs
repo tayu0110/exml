@@ -4019,23 +4019,23 @@ unsafe fn schematron_one_test(
     options: i32,
     schematron: &mut XmlSchematron,
 ) -> i32 {
+    use exml::libxml::schematron::XmlSchematronValidCtxt;
+
     unsafe {
-        use exml::libxml::schematron::{
-            XmlSchematronValidOptions, xml_schematron_free_valid_ctxt,
-            xml_schematron_new_valid_ctxt,
-        };
+        use exml::libxml::schematron::XmlSchematronValidOptions;
 
         let Some(doc) = xml_read_file(filename, None, options) else {
             eprintln!("failed to parse instance {} for {}", filename, sch,);
             return -1;
         };
 
-        let ctxt = xml_schematron_new_valid_ctxt(
+        let mut ctxt = XmlSchematronValidCtxt::new(
             schematron,
             XmlSchematronValidOptions::XmlSchematronOutError as i32,
-        );
-        (*ctxt).set_structured_errors(Some(test_structured_error_handler), None);
-        let ret = (*ctxt).validate_doc(doc);
+        )
+        .unwrap();
+        ctxt.set_structured_errors(Some(test_structured_error_handler), None);
+        let ret = ctxt.validate_doc(doc);
         match ret.cmp(&0) {
             std::cmp::Ordering::Equal => {
                 test_error_handler(None, &format!("{} validates\n", filename));
@@ -4051,7 +4051,6 @@ unsafe fn schematron_one_test(
             }
         }
 
-        xml_schematron_free_valid_ctxt(ctxt);
         xml_free_doc(doc);
         0
     }

@@ -32,10 +32,7 @@ use exml::c14n::{XmlC14NMode, xml_c14n_doc_dump_memory};
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
 #[cfg(feature = "schematron")]
-use exml::libxml::schematron::{
-    XmlSchematron, XmlSchematronValidCtxtPtr, XmlSchematronValidOptions,
-    xml_schematron_free_valid_ctxt, xml_schematron_new_valid_ctxt,
-};
+use exml::libxml::schematron::{XmlSchematron, XmlSchematronValidCtxt, XmlSchematronValidOptions};
 #[cfg(feature = "libxml_pattern")]
 use exml::pattern::{XmlPattern, XmlStreamCtxt, xml_pattern_compile};
 #[cfg(feature = "schema")]
@@ -3193,13 +3190,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if CMD_ARGS.noout {
                 flag |= XmlSchematronValidOptions::XmlSchematronOutQuiet as i32;
             }
-            let ctxt: XmlSchematronValidCtxtPtr = xml_schematron_new_valid_ctxt(schematron, flag);
-            if ctxt.is_null() {
+            let Some(mut ctxt) = XmlSchematronValidCtxt::new(schematron, flag) else {
                 PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                 xml_free_doc(doc);
                 return;
-            }
-            match (*ctxt).validate_doc(doc).cmp(&0) {
+            };
+            match ctxt.validate_doc(doc).cmp(&0) {
                 std::cmp::Ordering::Equal => {
                     if !CMD_ARGS.quiet {
                         eprintln!("{} validates", filename.unwrap());
@@ -3217,7 +3213,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
                 }
             }
-            xml_schematron_free_valid_ctxt(ctxt);
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 end_timer!("Validating");
             }

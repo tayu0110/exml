@@ -21,7 +21,7 @@
 use std::{
     cell::RefCell,
     ffi::{CStr, c_char},
-    mem::{size_of, take},
+    mem::take,
     os::raw::c_void,
     ptr::null_mut,
     rc::Rc,
@@ -32,7 +32,7 @@ use libc::FILE;
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile};
 use crate::{
-    error::{__xml_raise_error, __xml_simple_oom_error, XmlErrorDomain, XmlParserErrors},
+    error::{__xml_raise_error, __xml_simple_oom_error, XmlErrorDomain},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
@@ -50,10 +50,7 @@ use crate::{
     },
 };
 
-use super::{
-    globals::{xml_free, xml_malloc},
-    parser::XmlParserOption,
-};
+use super::parser::XmlParserOption;
 
 /// Handle a parser error
 #[doc(alias = "xmlSchematronPErr")]
@@ -223,8 +220,6 @@ pub struct XmlSchematronPattern {
     name: String,                                    /* the name of the pattern */
 }
 
-pub type XmlSchematronPtr = *mut XmlSchematron;
-
 /// A Schematrons definition
 #[doc(alias = "xmlSchematron")]
 #[repr(C)]
@@ -282,18 +277,17 @@ impl Drop for XmlSchematron {
 unsafe impl Send for XmlSchematron {}
 unsafe impl Sync for XmlSchematron {}
 
-pub type XmlSchematronValidCtxtPtr = *mut XmlSchematronValidCtxt;
 /// A Schematrons validation context
 #[doc(alias = "xmlSchematronValidCtxt")]
 #[repr(C)]
-pub struct XmlSchematronValidCtxt {
+pub struct XmlSchematronValidCtxt<'a> {
     typ: i32,
     flags: i32, /* an or of xmlSchematronValidOptions */
 
     nberrors: i32,
     err: i32,
 
-    schema: XmlSchematronPtr,
+    schema: &'a XmlSchematron,
     xctxt: XmlXPathContextPtr,
 
     output_file: *mut FILE, /* if using XML_SCHEMATRON_OUT_FILE */
@@ -311,7 +305,44 @@ pub struct XmlSchematronValidCtxt {
     serror: Option<StructuredError>,        /* the structured function */
 }
 
-impl XmlSchematronValidCtxt {
+impl<'a> XmlSchematronValidCtxt<'a> {
+    /// Create an XML Schematrons validation context based on the given schema.
+    ///
+    /// Returns the validation context or NULL in case of error
+    #[doc(alias = "xmlSchematronNewValidCtxt")]
+    pub unsafe fn new(schema: &'a XmlSchematron, options: i32) -> Option<Self> {
+        unsafe {
+            let ret = Self {
+                typ: XML_STRON_CTXT_VALIDATOR,
+                flags: options,
+                nberrors: 0,
+                err: 0,
+                schema,
+                xctxt: xml_xpath_new_context(None),
+                output_file: null_mut(),
+                output_buffer: vec![],
+                iowrite: None,
+                ioclose: None,
+                ioctx: null_mut(),
+                user_data: None,
+                error: None,
+                warning: None,
+                serror: None,
+            };
+            if ret.xctxt.is_null() {
+                xml_schematron_perr_memory("allocating schema parser XPath context", None);
+                return None;
+            }
+            for (href, pref) in &schema.namespaces {
+                let Some(pref) = pref.as_deref() else {
+                    break;
+                };
+                xml_xpath_register_ns(ret.xctxt, pref, Some(href.as_str()));
+            }
+            Some(ret)
+        }
+    }
+
     #[doc(alias = "xmlSchematronGetNode")]
     unsafe fn get_node(
         &self,
@@ -476,7 +507,7 @@ impl XmlSchematronValidCtxt {
 
     /// Output part of the report to whatever channel the user selected
     #[doc(alias = "xmlSchematronReportOutput")]
-    unsafe fn report_output(&self, _cur: Option<XmlNodePtr>, msg: &str) {
+    fn report_output(&self, _cur: Option<XmlNodePtr>, msg: &str) {
         // TODO
         eprintln!("{}", msg);
     }
@@ -559,20 +590,18 @@ impl XmlSchematronValidCtxt {
 
     /// Called from the validation engine when starting to check a pattern
     #[doc(alias = "xmlSchematronReportPattern")]
-    unsafe fn report_pattern(&self, pattern: &XmlSchematronPattern) {
-        unsafe {
-            if self.flags & XmlSchematronValidOptions::XmlSchematronOutQuiet as i32 != 0
-                || self.flags & XmlSchematronValidOptions::XmlSchematronOutError as i32 != 0
-            {
-                // Error gives pattern name as part of error
-                return;
-            }
-            if self.flags & XmlSchematronValidOptions::XmlSchematronOutXml as i32 != 0 {
-                // TODO
-            } else {
-                let msg = format!("Pattern: {}\n", pattern.name);
-                self.report_output(None, &msg);
-            }
+    fn report_pattern(&self, pattern: &XmlSchematronPattern) {
+        if self.flags & XmlSchematronValidOptions::XmlSchematronOutQuiet as i32 != 0
+            || self.flags & XmlSchematronValidOptions::XmlSchematronOutError as i32 != 0
+        {
+            // Error gives pattern name as part of error
+            return;
+        }
+        if self.flags & XmlSchematronValidOptions::XmlSchematronOutXml as i32 != 0 {
+            // TODO
+        } else {
+            let msg = format!("Pattern: {}\n", pattern.name);
+            self.report_output(None, &msg);
         }
     }
 
@@ -646,7 +675,7 @@ impl XmlSchematronValidCtxt {
     #[doc(alias = "xmlSchematronValidateDoc")]
     pub unsafe fn validate_doc(&mut self, instance: XmlDocPtr) -> i32 {
         unsafe {
-            if self.schema.is_null() || (*self.schema).rules.is_none() {
+            if self.schema.rules.is_none() {
                 return -1;
             }
             self.nberrors = 0;
@@ -662,7 +691,7 @@ impl XmlSchematronValidCtxt {
                 // speed primes over the output, run in a single pass
                 let mut cur = Some(root);
                 while let Some(cur_node) = cur {
-                    let mut now = (*self.schema).rules.clone();
+                    let mut now = self.schema.rules.clone();
                     while let Some(rule) = now {
                         if rule
                             .borrow()
@@ -709,7 +738,7 @@ impl XmlSchematronValidCtxt {
                 }
             } else {
                 // Process all contexts one at a time
-                let mut curpat = (*self.schema).patterns.clone();
+                let mut curpat = self.schema.patterns.clone();
 
                 while let Some(pattern) = curpat {
                     self.report_pattern(&pattern.borrow());
@@ -762,24 +791,14 @@ impl XmlSchematronValidCtxt {
     }
 }
 
-impl Default for XmlSchematronValidCtxt {
-    fn default() -> Self {
-        Self {
-            typ: 0,
-            flags: 0,
-            nberrors: 0,
-            err: 0,
-            schema: null_mut(),
-            xctxt: null_mut(),
-            output_file: null_mut(),
-            output_buffer: vec![],
-            iowrite: None,
-            ioclose: None,
-            ioctx: null_mut(),
-            user_data: None,
-            error: None,
-            warning: None,
-            serror: None,
+impl Drop for XmlSchematronValidCtxt<'_> {
+    /// Free the resources associated to the schema validation context
+    #[doc(alias = "xmlSchematronFreeValidCtxt")]
+    fn drop(&mut self) {
+        unsafe {
+            if !self.xctxt.is_null() {
+                xml_xpath_free_context(self.xctxt);
+            }
         }
     }
 }
@@ -1600,71 +1619,6 @@ unsafe fn next_schematron(mut node: Option<XmlNodePtr>) -> Option<XmlNodePtr> {
             node = cur.next.map(|node| XmlNodePtr::try_from(node).unwrap());
         }
         node
-    }
-}
-
-/// Handle an out of memory condition
-#[doc(alias = "xmlSchematronVTypeErrMemory")]
-unsafe fn xml_schematron_verr_memory(
-    ctxt: XmlSchematronValidCtxtPtr,
-    extra: &str,
-    node: Option<XmlGenericNodePtr>,
-) {
-    unsafe {
-        if !ctxt.is_null() {
-            (*ctxt).nberrors += 1;
-            (*ctxt).err = XmlParserErrors::XmlSchemavInternal as i32;
-        }
-        __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasv, node, Some(extra));
-    }
-}
-
-/// Create an XML Schematrons validation context based on the given schema.
-///
-/// Returns the validation context or NULL in case of error
-#[doc(alias = "xmlSchematronNewValidCtxt")]
-pub unsafe fn xml_schematron_new_valid_ctxt(
-    schema: XmlSchematronPtr,
-    options: i32,
-) -> XmlSchematronValidCtxtPtr {
-    unsafe {
-        let ret: XmlSchematronValidCtxtPtr =
-            xml_malloc(size_of::<XmlSchematronValidCtxt>()) as XmlSchematronValidCtxtPtr;
-        if ret.is_null() {
-            xml_schematron_verr_memory(null_mut(), "allocating validation context", None);
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlSchematronValidCtxt::default());
-        (*ret).typ = XML_STRON_CTXT_VALIDATOR;
-        (*ret).schema = schema;
-        (*ret).xctxt = xml_xpath_new_context(None);
-        (*ret).flags = options;
-        if (*ret).xctxt.is_null() {
-            xml_schematron_perr_memory("allocating schema parser XPath context", None);
-            xml_schematron_free_valid_ctxt(ret);
-            return null_mut();
-        }
-        for (href, pref) in &(*schema).namespaces {
-            let Some(pref) = pref.as_deref() else {
-                break;
-            };
-            xml_xpath_register_ns((*ret).xctxt, pref, Some(href.as_str()));
-        }
-        ret
-    }
-}
-
-/// Free the resources associated to the schema validation context
-#[doc(alias = "xmlSchematronFreeValidCtxt")]
-pub unsafe fn xml_schematron_free_valid_ctxt(ctxt: XmlSchematronValidCtxtPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        if !(*ctxt).xctxt.is_null() {
-            xml_xpath_free_context((*ctxt).xctxt);
-        }
-        xml_free(ctxt as _);
     }
 }
 
