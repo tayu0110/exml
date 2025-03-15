@@ -28,7 +28,7 @@ use std::{
     slice::from_raw_parts,
 };
 
-use libc::{FILE, malloc, memset};
+use libc::{FILE, malloc};
 
 #[cfg(feature = "libxml_pattern")]
 use crate::pattern::{XmlPattern, XmlPatternFlags, xml_pattern_compile};
@@ -165,17 +165,29 @@ pub struct XmlSchematronLet {
     comp: XmlXPathCompExprPtr, /* the compiled expression */
 }
 
-pub type XmlSchematronTestPtr = *mut XmlSchematronTest;
 /// A Schematrons test, either an assert or a report
 #[doc(alias = "xmlSchematronTest")]
 #[repr(C)]
 pub struct XmlSchematronTest {
-    next: XmlSchematronTestPtr, /* the next test in the list */
-    typ: XmlSchematronTestType, /* the test type */
-    node: Option<XmlNodePtr>,   /* the node in the tree */
-    test: String,               /* the expression to test */
-    comp: XmlXPathCompExprPtr,  /* the compiled expression */
-    report: Option<String>,     /* the message to report */
+    next: Option<Box<XmlSchematronTest>>, /* the next test in the list */
+    typ: XmlSchematronTestType,           /* the test type */
+    node: Option<XmlNodePtr>,             /* the node in the tree */
+    test: String,                         /* the expression to test */
+    comp: XmlXPathCompExprPtr,            /* the compiled expression */
+    report: Option<String>,               /* the message to report */
+}
+
+impl Drop for XmlSchematronTest {
+    /// Free a list of tests.
+    #[doc(alias = "xmlSchematronFreeTests")]
+    fn drop(&mut self) {
+        self.next.take();
+        unsafe {
+            if !self.comp.is_null() {
+                xml_xpath_free_comp_expr(self.comp);
+            }
+        }
+    }
 }
 
 /// A Schematrons rule
@@ -186,7 +198,7 @@ pub struct XmlSchematronRule {
     patnext: Option<Rc<RefCell<XmlSchematronRule>>>, /* the next rule in the pattern list */
     node: Option<XmlNodePtr>,                     /* the node in the tree */
     context: String,                              /* the context evaluation rule */
-    tests: XmlSchematronTestPtr,                  /* the list of tests */
+    tests: Option<Box<XmlSchematronTest>>,        /* the list of tests */
     pattern: Option<Box<XmlPattern>>,             /* the compiled pattern associated */
     report: Option<String>,                       /* the message to report */
     lets: XmlSchematronLetPtr,                    /* the list of let variables */
@@ -196,12 +208,8 @@ impl Drop for XmlSchematronRule {
     /// Free a list of rules.
     #[doc(alias = "xmlSchematronFreeRules")]
     fn drop(&mut self) {
-        let _ = self.next.take();
-        if !self.tests.is_null() {
-            unsafe {
-                xml_schematron_free_tests(self.tests);
-            }
-        }
+        self.next.take();
+        self.tests.take();
         self.pattern.take();
         self.report.take();
         if !self.lets.is_null() {
@@ -466,38 +474,35 @@ impl XmlSchematronValidCtxt {
     #[doc(alias = "xmlSchematronReportSuccess")]
     unsafe fn report_success(
         &self,
-        test: XmlSchematronTestPtr,
+        test: &XmlSchematronTest,
         cur: XmlNodePtr,
         pattern: Option<&XmlSchematronPattern>,
         success: i32,
     ) {
         unsafe {
-            if test.is_null() {
-                return;
-            }
             // if quiet and not SVRL report only failures
             if self.flags & XmlSchematronValidOptions::XmlSchematronOutQuiet as i32 != 0
                 && self.flags & XmlSchematronValidOptions::XmlSchematronOutXml as i32 == 0
-                && (*test).typ == XmlSchematronTestType::XmlSchematronReport
+                && test.typ == XmlSchematronTestType::XmlSchematronReport
             {
                 return;
             }
             if self.flags & XmlSchematronValidOptions::XmlSchematronOutXml as i32 != 0 {
                 // TODO
             } else {
-                if ((*test).typ == XmlSchematronTestType::XmlSchematronReport && success == 0)
-                    || ((*test).typ == XmlSchematronTestType::XmlSchematronAssert && success != 0)
+                if (test.typ == XmlSchematronTestType::XmlSchematronReport && success == 0)
+                    || (test.typ == XmlSchematronTestType::XmlSchematronAssert && success != 0)
                 {
                     return;
                 }
                 let line: i64 = cur.get_line_no();
                 let path = cur.get_node_path().expect("Internal Error");
                 let mut report = None;
-                if let Some(node) = (*test).node {
+                if let Some(node) = test.node {
                     report = self.format_report(node, cur);
                 }
                 let report = report.unwrap_or_else(|| {
-                    if (*test).typ == XmlSchematronTestType::XmlSchematronAssert {
+                    if test.typ == XmlSchematronTestType::XmlSchematronAssert {
                         "node failed assert".to_owned()
                     } else {
                         "node failed report".to_owned()
@@ -523,7 +528,7 @@ impl XmlSchematronValidCtxt {
                         null_mut(),
                         Some(cur.into()),
                         XmlErrorDomain::XmlFromSchematronv,
-                        if (*test).typ == XmlSchematronTestType::XmlSchematronAssert {
+                        if test.typ == XmlSchematronTestType::XmlSchematronAssert {
                             XmlParserErrors::XmlSchematronvAssert
                         } else {
                             XmlParserErrors::XmlSchematronvReport
@@ -570,7 +575,7 @@ impl XmlSchematronValidCtxt {
     #[doc(alias = "xmlSchematronRunTest")]
     unsafe fn run_test(
         &mut self,
-        test: XmlSchematronTestPtr,
+        test: &XmlSchematronTest,
         instance: XmlDocPtr,
         cur: XmlNodePtr,
         pattern: Option<&XmlSchematronPattern>,
@@ -581,7 +586,7 @@ impl XmlSchematronValidCtxt {
             failed = 0;
             (*self.xctxt).doc = Some(instance);
             (*self.xctxt).node = Some(cur.into());
-            let ret: XmlXPathObjectPtr = xml_xpath_compiled_eval((*test).comp, self.xctxt);
+            let ret: XmlXPathObjectPtr = xml_xpath_compiled_eval(test.comp, self.xctxt);
             if ret.is_null() {
                 failed = 1;
             } else {
@@ -616,8 +621,8 @@ impl XmlSchematronValidCtxt {
                 }
                 xml_xpath_free_object(ret);
             }
-            if (failed != 0 && (*test).typ == XmlSchematronTestType::XmlSchematronAssert)
-                || (failed == 0 && (*test).typ == XmlSchematronTestType::XmlSchematronReport)
+            if (failed != 0 && test.typ == XmlSchematronTestType::XmlSchematronAssert)
+                || (failed == 0 && test.typ == XmlSchematronTestType::XmlSchematronReport)
             {
                 self.nberrors += 1;
             }
@@ -634,8 +639,6 @@ impl XmlSchematronValidCtxt {
     #[doc(alias = "xmlSchematronValidateDoc")]
     pub unsafe fn validate_doc(&mut self, instance: XmlDocPtr) -> i32 {
         unsafe {
-            let mut test: XmlSchematronTestPtr;
-
             if self.schema.is_null() || (*self.schema).rules.is_none() {
                 return -1;
             }
@@ -662,11 +665,12 @@ impl XmlSchematronValidCtxt {
                             .pattern_match(cur_node.into())
                             == 1
                         {
-                            test = rule.borrow().tests;
+                            let rule = rule.borrow();
+                            let mut test = rule.tests.as_deref();
 
                             if xml_schematron_register_variables(
                                 self.xctxt,
-                                rule.borrow().lets,
+                                rule.lets,
                                 instance,
                                 Some(cur_node.into()),
                             ) != 0
@@ -674,20 +678,18 @@ impl XmlSchematronValidCtxt {
                                 return -1;
                             }
 
-                            while !test.is_null() {
+                            while let Some(tst) = test {
                                 self.run_test(
-                                    test, instance, cur_node,
+                                    tst, instance, cur_node,
                                     // What is this ????
                                     // XmlPattern and XmlSchematronPattern are not compatible...
                                     // rule.pattern as XmlSchematronPatternPtr,
                                     None,
                                 );
-                                test = (*test).next;
+                                test = tst.next.as_deref();
                             }
 
-                            if xml_schematron_unregister_variables(self.xctxt, rule.borrow().lets)
-                                != 0
-                            {
+                            if xml_schematron_unregister_variables(self.xctxt, rule.lets) != 0 {
                                 return -1;
                             }
                         }
@@ -719,25 +721,21 @@ impl XmlSchematronValidCtxt {
                                 .pattern_match(cur_node.into())
                                 == 1
                             {
-                                test = rule.borrow().tests;
+                                let rule = rule.borrow();
+                                let mut test = rule.tests.as_deref();
                                 xml_schematron_register_variables(
                                     self.xctxt,
-                                    rule.borrow().lets,
+                                    rule.lets,
                                     instance,
                                     Some(cur_node.into()),
                                 );
 
-                                while !test.is_null() {
-                                    self.run_test(
-                                        test,
-                                        instance,
-                                        cur_node,
-                                        Some(&pattern.borrow()),
-                                    );
-                                    test = (*test).next;
+                                while let Some(tst) = test {
+                                    self.run_test(tst, instance, cur_node, Some(&pattern.borrow()));
+                                    test = tst.next.as_deref();
                                 }
 
-                                xml_schematron_unregister_variables(self.xctxt, rule.borrow().lets);
+                                xml_schematron_unregister_variables(self.xctxt, rule.lets);
                             }
                             now = rule.borrow().patnext.clone();
                         }
@@ -883,7 +881,7 @@ impl XmlSchematronParserCtxt {
                 next: None,
                 patnext: None,
                 context: context.to_owned(),
-                tests: null_mut(),
+                tests: None,
                 pattern,
                 report: report.map(|report| report.to_owned()),
                 lets: null_mut(),
@@ -925,7 +923,7 @@ impl XmlSchematronParserCtxt {
         node: XmlNodePtr,
         test: &str,
         report: Option<&str>,
-    ) -> XmlSchematronTestPtr {
+    ) {
         unsafe {
             // try first to compile the test expression
             let comp: XmlXPathCompExprPtr = xml_xpath_ctxt_compile(self.xctxt, test);
@@ -937,33 +935,25 @@ impl XmlSchematronParserCtxt {
                     "Failed to compile test expression {}",
                     test
                 );
-                return null_mut();
+                return;
             }
 
-            let ret: XmlSchematronTestPtr =
-                xml_malloc(size_of::<XmlSchematronTest>()) as XmlSchematronTestPtr;
-            if ret.is_null() {
-                xml_schematron_perr_memory(self, "allocating schema test", Some(node.into()));
-                return null_mut();
-            }
-            memset(ret as _, 0, size_of::<XmlSchematronTest>());
-            (*ret).typ = typ;
-            (*ret).node = Some(node);
-            std::ptr::write(&mut (*ret).test, test.to_owned());
-            (*ret).comp = comp;
-            std::ptr::write(&mut (*ret).report, report.map(|report| report.to_owned()));
-            (*ret).next = null_mut();
-            if rule.tests.is_null() {
-                rule.tests = ret;
-            } else {
-                let mut prev: XmlSchematronTestPtr = rule.tests;
-
-                while !(*prev).next.is_null() {
-                    prev = (*prev).next;
+            let ret = Box::new(XmlSchematronTest {
+                typ,
+                next: None,
+                node: Some(node),
+                test: test.to_owned(),
+                comp,
+                report: report.map(|report| report.to_owned()),
+            });
+            if let Some(mut prev) = rule.tests.as_deref_mut() {
+                while prev.next.is_some() {
+                    prev = prev.next.as_deref_mut().unwrap();
                 }
-                (*prev).next = ret;
+                prev.next = Some(ret);
+            } else {
+                rule.tests = Some(ret);
             }
-            ret
         }
     }
 
@@ -1640,24 +1630,6 @@ unsafe fn xml_schematron_new_schematron(ctxt: XmlSchematronParserCtxtPtr) -> Xml
         std::ptr::write(&mut *ret, XmlSchematron::default());
 
         ret
-    }
-}
-
-/// Free a list of tests.
-#[doc(alias = "xmlSchematronFreeTests")]
-unsafe fn xml_schematron_free_tests(mut tests: XmlSchematronTestPtr) {
-    unsafe {
-        let mut next: XmlSchematronTestPtr;
-
-        while !tests.is_null() {
-            next = (*tests).next;
-            if !(*tests).comp.is_null() {
-                xml_xpath_free_comp_expr((*tests).comp);
-            }
-            drop_in_place(tests);
-            xml_free(tests as _);
-            tests = next;
-        }
     }
 }
 
