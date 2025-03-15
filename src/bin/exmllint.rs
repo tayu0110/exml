@@ -33,9 +33,8 @@ use exml::c14n::{XmlC14NMode, xml_c14n_doc_dump_memory};
 use exml::libxml::catalog::xml_load_catalogs;
 #[cfg(feature = "schematron")]
 use exml::libxml::schematron::{
-    XmlSchematron, XmlSchematronParserCtxtPtr, XmlSchematronValidCtxtPtr,
-    XmlSchematronValidOptions, xml_schematron_free_parser_ctxt, xml_schematron_free_valid_ctxt,
-    xml_schematron_new_parser_ctxt, xml_schematron_new_valid_ctxt,
+    XmlSchematron, XmlSchematronValidCtxtPtr, XmlSchematronValidOptions,
+    xml_schematron_free_valid_ctxt, xml_schematron_new_valid_ctxt,
 };
 #[cfg(feature = "libxml_pattern")]
 use exml::pattern::{XmlPattern, XmlStreamCtxt, xml_pattern_compile};
@@ -69,6 +68,7 @@ use exml::{
             XmlRelaxNG, xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_validate_doc,
         },
+        schematron::XmlSchematronParserCtxt,
         valid::{
             xml_free_valid_ctxt, xml_new_valid_ctxt, xml_valid_get_valid_elements,
             xml_validate_document, xml_validate_dtd,
@@ -648,21 +648,20 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                 }
             }
             unsafe {
-                let ctxt: XmlSchematronParserCtxtPtr = xml_schematron_new_parser_ctxt(s);
-                if ctxt.is_null() {
+                let Some(mut ctxt) = XmlSchematronParserCtxt::new(s) else {
                     PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;
                     xml_cleanup_parser();
                     xml_memory_dump();
                     exit(PROGRESULT.load(Ordering::Relaxed));
-                }
-                let schematron = (*ctxt).parse();
+                };
+
+                let schematron = ctxt.parse();
                 if schematron.is_none() {
                     generic_error!("Schematron schema {s} failed to compile\n",);
                     PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
                 }
                 *WXSCHEMATRON.lock().unwrap() = schematron;
-                xml_schematron_free_parser_ctxt(ctxt);
                 if cmd_args.timing {
                     end_timer!("Compiling the schemas");
                 }

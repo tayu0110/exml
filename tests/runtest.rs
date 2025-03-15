@@ -4065,21 +4065,19 @@ unsafe fn schematron_test(
     _errr: Option<String>,
     options: i32,
 ) -> i32 {
+    use exml::libxml::schematron::XmlSchematronParserCtxt;
+
     unsafe {
         use std::mem::zeroed;
 
-        use exml::libxml::schematron::{
-            xml_schematron_free_parser_ctxt, xml_schematron_new_parser_ctxt,
-        };
         use libc::{GLOB_DOOFFS, glob_t};
 
         let base = base_filename(filename);
         let mut ret = 0;
         let mut globbuf: glob_t = zeroed();
 
-        let pctxt = xml_schematron_new_parser_ctxt(filename);
-        let mut schematron = (*pctxt).parse();
-        xml_schematron_free_parser_ctxt(pctxt);
+        let mut pctxt = XmlSchematronParserCtxt::new(filename).unwrap();
+        let mut schematron = pctxt.parse();
         if schematron.is_none() {
             test_error_handler(
                 None,

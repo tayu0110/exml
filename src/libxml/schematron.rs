@@ -23,7 +23,7 @@ use std::{
     ffi::{CStr, c_char},
     mem::{size_of, take},
     os::raw::c_void,
-    ptr::{drop_in_place, null_mut},
+    ptr::null_mut,
     rc::Rc,
     slice::from_raw_parts,
 };
@@ -789,7 +789,6 @@ impl Default for XmlSchematronValidCtxt {
     }
 }
 
-pub type XmlSchematronParserCtxtPtr = *mut XmlSchematronParserCtxt;
 /// A schemas validation context
 #[doc(alias = "xmlSchematronParserCtxt")]
 #[repr(C)]
@@ -819,6 +818,109 @@ pub struct XmlSchematronParserCtxt {
 }
 
 impl XmlSchematronParserCtxt {
+    /// Create an XML Schematrons parse context for that file/resource expected
+    /// to contain an XML Schematrons file.
+    ///
+    /// Returns the parser context or NULL in case of error
+    #[doc(alias = "xmlSchematronNewParserCtxt")]
+    pub unsafe fn new(url: &str) -> Option<Self> {
+        unsafe {
+            let ret = Self {
+                typ: XML_STRON_CTXT_PARSER,
+                url: Some(url.to_owned()),
+                doc: None,
+                preserve: 0,
+                buffer: null_mut(),
+                size: 0,
+                nberrors: 0,
+                err: 0,
+                xctxt: xml_xpath_new_context(None),
+                namespaces: vec![],
+                includes: vec![],
+                user_data: None,
+                error: None,
+                warning: None,
+                serror: None,
+            };
+            if ret.xctxt.is_null() {
+                xml_schematron_perr_memory("allocating schema parser XPath context", None);
+                return None;
+            }
+            (*ret.xctxt).flags = XML_XPATH_CHECKNS as i32;
+            Some(ret)
+        }
+    }
+
+    /// Create an XML Schematrons parse context for that memory buffer expected
+    /// to contain an XML Schematrons file.
+    ///
+    /// Returns the parser context or NULL in case of error
+    #[doc(alias = "xmlSchematronNewMemParserCtxt")]
+    pub unsafe fn from_memory(buffer: *const c_char, size: i32) -> Option<Self> {
+        unsafe {
+            if buffer.is_null() || size <= 0 {
+                return None;
+            }
+
+            let ret = Self {
+                typ: XML_STRON_CTXT_PARSER,
+                url: None,
+                doc: None,
+                preserve: 0,
+                buffer,
+                size,
+                nberrors: 0,
+                err: 0,
+                xctxt: xml_xpath_new_context(None),
+                namespaces: vec![],
+                includes: vec![],
+                user_data: None,
+                error: None,
+                warning: None,
+                serror: None,
+            };
+            if ret.xctxt.is_null() {
+                xml_schematron_perr_memory("allocating schema parser XPath context", None);
+                return None;
+            }
+            Some(ret)
+        }
+    }
+
+    /// Create an XML Schematrons parse context for that document.
+    /// NB. The document may be modified during the parsing process.
+    ///
+    /// Returns the parser context or NULL in case of error
+    #[doc(alias = "xmlSchematronNewDocParserCtxt")]
+    pub unsafe fn from_doc(doc: XmlDocPtr) -> Option<Self> {
+        unsafe {
+            let ret = Self {
+                typ: XML_STRON_CTXT_PARSER,
+                url: None,
+                doc: Some(doc),
+                // The application has responsibility for the document
+                preserve: 1,
+                buffer: null_mut(),
+                size: 0,
+                nberrors: 0,
+                err: 0,
+                xctxt: xml_xpath_new_context(Some(doc)),
+                namespaces: vec![],
+                includes: vec![],
+                user_data: None,
+                error: None,
+                warning: None,
+                serror: None,
+            };
+            if ret.xctxt.is_null() {
+                xml_schematron_perr_memory("allocating schema parser XPath context", None);
+                return None;
+            }
+
+            Some(ret)
+        }
+    }
+
     /// Add a namespace definition in the context
     #[doc(alias = "xmlSchematronAddNamespace")]
     fn add_namespace(&mut self, prefix: Option<&str>, ns: &str) {
@@ -1447,6 +1549,21 @@ impl Default for XmlSchematronParserCtxt {
     }
 }
 
+impl Drop for XmlSchematronParserCtxt {
+    /// Free the resources associated to the schema parser context
+    #[doc(alias = "xmlSchematronFreeParserCtxt")]
+    fn drop(&mut self) {
+        unsafe {
+            if let Some(doc) = self.doc.filter(|_| self.preserve == 0) {
+                xml_free_doc(doc);
+            }
+            if !self.xctxt.is_null() {
+                xml_xpath_free_context(self.xctxt);
+            }
+        }
+    }
+}
+
 const XML_STRON_CTXT_PARSER: i32 = 1;
 const XML_STRON_CTXT_VALIDATOR: i32 = 2;
 
@@ -1460,122 +1577,9 @@ const XML_OLD_SCHEMATRON_NS: &str = SCT_OLD_NS;
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchematronPErrMemory")]
-unsafe fn xml_schematron_perr_memory(
-    ctxt: XmlSchematronParserCtxtPtr,
-    extra: &str,
-    node: Option<XmlGenericNodePtr>,
-) {
+unsafe fn xml_schematron_perr_memory(extra: &str, node: Option<XmlGenericNodePtr>) {
     unsafe {
-        if !ctxt.is_null() {
-            (*ctxt).nberrors += 1;
-        }
         __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
-    }
-}
-
-/// Create an XML Schematrons parse context for that file/resource expected
-/// to contain an XML Schematrons file.
-///
-/// Returns the parser context or NULL in case of error
-#[doc(alias = "xmlSchematronNewParserCtxt")]
-pub unsafe fn xml_schematron_new_parser_ctxt(url: &str) -> XmlSchematronParserCtxtPtr {
-    unsafe {
-        let ret: XmlSchematronParserCtxtPtr =
-            xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
-        if ret.is_null() {
-            xml_schematron_perr_memory(null_mut(), "allocating schema parser context", None);
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlSchematronParserCtxt::default());
-        (*ret).typ = XML_STRON_CTXT_PARSER;
-        (*ret).url = Some(url.to_owned());
-        (*ret).xctxt = xml_xpath_new_context(None);
-        if (*ret).xctxt.is_null() {
-            xml_schematron_perr_memory(null_mut(), "allocating schema parser XPath context", None);
-            xml_schematron_free_parser_ctxt(ret);
-            return null_mut();
-        }
-        (*(*ret).xctxt).flags = XML_XPATH_CHECKNS as i32;
-        ret
-    }
-}
-
-/// Create an XML Schematrons parse context for that memory buffer expected
-/// to contain an XML Schematrons file.
-///
-/// Returns the parser context or NULL in case of error
-#[doc(alias = "xmlSchematronNewMemParserCtxt")]
-pub unsafe fn xml_schematron_new_mem_parser_ctxt(
-    buffer: *const c_char,
-    size: i32,
-) -> XmlSchematronParserCtxtPtr {
-    unsafe {
-        if buffer.is_null() || size <= 0 {
-            return null_mut();
-        }
-
-        let ret: XmlSchematronParserCtxtPtr =
-            xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
-        if ret.is_null() {
-            xml_schematron_perr_memory(null_mut(), "allocating schema parser context", None);
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlSchematronParserCtxt::default());
-        (*ret).buffer = buffer;
-        (*ret).size = size;
-        (*ret).xctxt = xml_xpath_new_context(None);
-        if (*ret).xctxt.is_null() {
-            xml_schematron_perr_memory(null_mut(), "allocating schema parser XPath context", None);
-            xml_schematron_free_parser_ctxt(ret);
-            return null_mut();
-        }
-        ret
-    }
-}
-
-/// Create an XML Schematrons parse context for that document.
-/// NB. The document may be modified during the parsing process.
-///
-/// Returns the parser context or NULL in case of error
-#[doc(alias = "xmlSchematronNewDocParserCtxt")]
-pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchematronParserCtxtPtr {
-    unsafe {
-        let ret: XmlSchematronParserCtxtPtr =
-            xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
-        if ret.is_null() {
-            xml_schematron_perr_memory(null_mut(), "allocating schema parser context", None);
-            return null_mut();
-        }
-        std::ptr::write(&mut *ret, XmlSchematronParserCtxt::default());
-        (*ret).doc = Some(doc);
-        // The application has responsibility for the document
-        (*ret).preserve = 1;
-        (*ret).xctxt = xml_xpath_new_context(Some(doc));
-        if (*ret).xctxt.is_null() {
-            xml_schematron_perr_memory(null_mut(), "allocating schema parser XPath context", None);
-            xml_schematron_free_parser_ctxt(ret);
-            return null_mut();
-        }
-
-        ret
-    }
-}
-
-/// Free the resources associated to the schema parser context
-#[doc(alias = "xmlSchematronFreeParserCtxt")]
-pub unsafe fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronParserCtxtPtr) {
-    unsafe {
-        if ctxt.is_null() {
-            return;
-        }
-        if let Some(doc) = (*ctxt).doc.filter(|_| (*ctxt).preserve == 0) {
-            xml_free_doc(doc);
-        }
-        if !(*ctxt).xctxt.is_null() {
-            xml_xpath_free_context((*ctxt).xctxt);
-        }
-        drop_in_place(ctxt);
-        xml_free(ctxt as _);
     }
 }
 
@@ -1644,7 +1648,7 @@ pub unsafe fn xml_schematron_new_valid_ctxt(
         (*ret).xctxt = xml_xpath_new_context(None);
         (*ret).flags = options;
         if (*ret).xctxt.is_null() {
-            xml_schematron_perr_memory(null_mut(), "allocating schema parser XPath context", None);
+            xml_schematron_perr_memory("allocating schema parser XPath context", None);
             xml_schematron_free_valid_ctxt(ret);
             return null_mut();
         }
