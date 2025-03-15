@@ -1595,11 +1595,9 @@ macro_rules! __xml_raise_error {
                             }
                         }
                         #[cfg(not(feature = "xinclude"))] {
-                            to.file = (!(*(*baseptr).doc).url.is_null()).then(|| {
-                                CStr::from_ptr((*(*baseptr).doc).url as *const i8)
-                                    .to_string_lossy()
-                                    .into()
-                            });
+                            if let Some(doc) = baseptr.document() {
+                                to.file = doc.url.as_deref().map(|u| Cow::Owned(u.to_owned()));
+                            }
                         }
                         if to.file.is_none() {
                             if let Some(node) = node {
