@@ -25,7 +25,6 @@ use std::{
     os::raw::c_void,
     ptr::null_mut,
     rc::Rc,
-    slice::from_raw_parts,
 };
 
 use libc::FILE;
@@ -182,7 +181,7 @@ impl Drop for XmlSchematronLet {
 pub struct XmlSchematronTest {
     next: Option<Box<XmlSchematronTest>>, /* the next test in the list */
     typ: XmlSchematronTestType,           /* the test type */
-    node: Option<XmlNodePtr>,             /* the node in the tree */
+    node: XmlNodePtr,                     /* the node in the tree */
     test: String,                         /* the expression to test */
     comp: XmlXPathCompExprPtr,            /* the compiled expression */
     report: Option<String>,               /* the message to report */
@@ -207,7 +206,7 @@ impl Drop for XmlSchematronTest {
 pub struct XmlSchematronRule {
     next: Option<Rc<RefCell<XmlSchematronRule>>>, /* the next rule in the list */
     patnext: Option<Rc<RefCell<XmlSchematronRule>>>, /* the next rule in the pattern list */
-    node: Option<XmlNodePtr>,                     /* the node in the tree */
+    node: XmlNodePtr,                             /* the node in the tree */
     context: String,                              /* the context evaluation rule */
     tests: Option<Box<XmlSchematronTest>>,        /* the list of tests */
     pattern: Option<Box<XmlPattern>>,             /* the compiled pattern associated */
@@ -509,11 +508,7 @@ impl XmlSchematronValidCtxt {
                 }
                 let line: i64 = cur.get_line_no();
                 let path = cur.get_node_path().expect("Internal Error");
-                let mut report = None;
-                if let Some(node) = test.node {
-                    report = self.format_report(node, cur);
-                }
-                let report = report.unwrap_or_else(|| {
+                let report = self.format_report(test.node, cur).unwrap_or_else(|| {
                     if test.typ == XmlSchematronTestType::XmlSchematronAssert {
                         "node failed assert".to_owned()
                     } else {
@@ -792,13 +787,12 @@ impl Default for XmlSchematronValidCtxt {
 /// A schemas validation context
 #[doc(alias = "xmlSchematronParserCtxt")]
 #[repr(C)]
-pub struct XmlSchematronParserCtxt {
+pub struct XmlSchematronParserCtxt<'a> {
     typ: i32,
     url: Option<String>,
     doc: Option<XmlDocPtr>,
     preserve: i32, /* Whether the doc should be freed  */
-    buffer: *const c_char,
-    size: i32,
+    buffer: &'a [u8],
 
     nberrors: i32,
     err: i32,
@@ -817,7 +811,7 @@ pub struct XmlSchematronParserCtxt {
     serror: Option<StructuredError>,        /* the structured function */
 }
 
-impl XmlSchematronParserCtxt {
+impl<'a> XmlSchematronParserCtxt<'a> {
     /// Create an XML Schematrons parse context for that file/resource expected
     /// to contain an XML Schematrons file.
     ///
@@ -830,8 +824,7 @@ impl XmlSchematronParserCtxt {
                 url: Some(url.to_owned()),
                 doc: None,
                 preserve: 0,
-                buffer: null_mut(),
-                size: 0,
+                buffer: &[],
                 nberrors: 0,
                 err: 0,
                 xctxt: xml_xpath_new_context(None),
@@ -856,9 +849,9 @@ impl XmlSchematronParserCtxt {
     ///
     /// Returns the parser context or NULL in case of error
     #[doc(alias = "xmlSchematronNewMemParserCtxt")]
-    pub unsafe fn from_memory(buffer: *const c_char, size: i32) -> Option<Self> {
+    pub unsafe fn from_memory(buffer: &'a [u8]) -> Option<Self> {
         unsafe {
-            if buffer.is_null() || size <= 0 {
+            if buffer.is_empty() {
                 return None;
             }
 
@@ -868,7 +861,6 @@ impl XmlSchematronParserCtxt {
                 doc: None,
                 preserve: 0,
                 buffer,
-                size,
                 nberrors: 0,
                 err: 0,
                 xctxt: xml_xpath_new_context(None),
@@ -900,8 +892,7 @@ impl XmlSchematronParserCtxt {
                 doc: Some(doc),
                 // The application has responsibility for the document
                 preserve: 1,
-                buffer: null_mut(),
-                size: 0,
+                buffer: &[],
                 nberrors: 0,
                 err: 0,
                 xctxt: xml_xpath_new_context(Some(doc)),
@@ -985,7 +976,7 @@ impl XmlSchematronParserCtxt {
             }
 
             let ret = Rc::new(RefCell::new(XmlSchematronRule {
-                node: Some(node),
+                node,
                 next: None,
                 patnext: None,
                 context: context.to_owned(),
@@ -1049,7 +1040,7 @@ impl XmlSchematronParserCtxt {
             let ret = Box::new(XmlSchematronTest {
                 typ,
                 next: None,
-                node: Some(node),
+                node,
                 test: test.to_owned(),
                 comp,
                 report: report.map(|report| report.to_owned()),
@@ -1374,11 +1365,13 @@ impl XmlSchematronParserCtxt {
                 };
                 self.preserve = 0;
                 doc
-            } else if !self.buffer.is_null() {
-                let mem = from_raw_parts(self.buffer as *const u8, self.size as usize).to_vec();
-                let Some(mut doc) =
-                    xml_read_memory(mem, None, None, SCHEMATRON_PARSE_OPTIONS as i32)
-                else {
+            } else if !self.buffer.is_empty() {
+                let Some(mut doc) = xml_read_memory(
+                    self.buffer.to_owned(),
+                    None,
+                    None,
+                    SCHEMATRON_PARSE_OPTIONS as i32,
+                ) else {
                     xml_schematron_perr!(
                         self,
                         None::<XmlGenericNodePtr>,
@@ -1527,15 +1520,14 @@ impl XmlSchematronParserCtxt {
     }
 }
 
-impl Default for XmlSchematronParserCtxt {
+impl Default for XmlSchematronParserCtxt<'_> {
     fn default() -> Self {
         Self {
             typ: 0,
             url: None,
             doc: None,
             preserve: 0,
-            buffer: null_mut(),
-            size: 0,
+            buffer: &[],
             nberrors: 0,
             err: 0,
             xctxt: null_mut(),
@@ -1549,7 +1541,7 @@ impl Default for XmlSchematronParserCtxt {
     }
 }
 
-impl Drop for XmlSchematronParserCtxt {
+impl Drop for XmlSchematronParserCtxt<'_> {
     /// Free the resources associated to the schema parser context
     #[doc(alias = "xmlSchematronFreeParserCtxt")]
     fn drop(&mut self) {
